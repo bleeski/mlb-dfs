@@ -1,0 +1,1416 @@
+{
+ "label": "deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied",
+ "version": "0.5-review",
+ "coverage": "full",
+ "contest_id": "194282826",
+ "slate_date": "2026-08-24",
+ "contest_type": "showdown",
+ "meta": {
+  "entries_total": 48,
+  "entries_complete_lineups": 48,
+  "roster_size": 6,
+  "entries_unparsed": 0,
+  "winning_points": 113.45,
+  "winning_entry_id": "5228877224",
+  "multi_entry_flag": false
+ },
+ "duplication": {
+  "distinct_lineups": 47,
+  "entries_in_duplicated_lineups": 2,
+  "share_duplicated_pct": 4.2,
+  "max_copies": 2,
+  "copies_histogram": {
+   "1": 46,
+   "2": 1
+  },
+  "winner_copies": 1
+ },
+ "construction": {
+  "cheap_salary_threshold": 3000,
+  "at_cap_entries": 8,
+  "at_cap_share_pct": 16.7,
+  "salary_left_histogram": {
+   "301-700": 19,
+   "701-1500": 9,
+   "<= 0": 4,
+   "101-300": 10,
+   "> 1500": 2,
+   "1-100": 4
+  },
+  "max_stack_histogram": {
+   "3": 9,
+   "4": 14,
+   "5": 25
+  },
+  "sp_pair_top": [],
+  "top_owned": [
+   {
+    "player": "Joc Pederson",
+    "pct_drafted": 62.5
+   },
+   {
+    "player": "Corey Seager",
+    "pct_drafted": 47.92
+   },
+   {
+    "player": "Munetaka Murakami",
+    "pct_drafted": 45.83
+   },
+   {
+    "player": "Kumar Rocker",
+    "pct_drafted": 39.58
+   },
+   {
+    "player": "Miguel Vargas",
+    "pct_drafted": 39.58
+   }
+  ],
+  "captain_table": [
+   {
+    "player": "Kumar Rocker",
+    "captain_count": 8,
+    "captain_share_pct": 16.7,
+    "pct_drafted": 39.58
+   },
+   {
+    "player": "Munetaka Murakami",
+    "captain_count": 7,
+    "captain_share_pct": 14.6,
+    "pct_drafted": 45.83
+   },
+   {
+    "player": "Jose Urquidy",
+    "captain_count": 7,
+    "captain_share_pct": 14.6,
+    "pct_drafted": 35.42
+   },
+   {
+    "player": "Joc Pederson",
+    "captain_count": 6,
+    "captain_share_pct": 12.5,
+    "pct_drafted": 62.5
+   },
+   {
+    "player": "Corey Seager",
+    "captain_count": 5,
+    "captain_share_pct": 10.4,
+    "pct_drafted": 47.92
+   },
+   {
+    "player": "Evan Carter",
+    "captain_count": 3,
+    "captain_share_pct": 6.2,
+    "pct_drafted": 35.42
+   },
+   {
+    "player": "Andrew Benintendi",
+    "captain_count": 3,
+    "captain_share_pct": 6.2,
+    "pct_drafted": 31.25
+   },
+   {
+    "player": "Miguel Vargas",
+    "captain_count": 3,
+    "captain_share_pct": 6.2,
+    "pct_drafted": 39.58
+   }
+  ],
+  "winner_captain": {
+   "player": "Wyatt Langford",
+   "pct_drafted": 31.25,
+   "captain_share_pct": 2.1,
+   "was_top_owned_captain": false
+  }
+ },
+ "diagnostics": {
+  "salary_join_rate_pct": 100.0,
+  "unmatched_names_top": [],
+  "salary_name_collisions": [],
+  "ownership_recompute_max_diff_pts": 0.0,
+  "ownership_recompute_denominator": "all_entries",
+  "ownership_recompute_ok": true,
+  "parse_structural_ok": true,
+  "parsed_nothing": false,
+  "mostly_unparsed": false,
+  "contest_type_mismatch": false,
+  "salary_join_collapsed": false,
+  "entries_unparsed_share": 0.0,
+  "intra_entry_duplicate_entry_ids": [],
+  "roster_slots_observed": 288,
+  "roster_slots_expected": 288,
+  "recomputed_total_pct": 600.0,
+  "dk_table_total_pct": 600.0,
+  "dk_table_deficit_pts": 0.0,
+  "dk_table_agrees": true,
+  "verification_note": "parse structurally sound; DK %Drafted agrees with the lineup recompute"
+ },
+ "entries": [
+  {
+   "rank": "1",
+   "entry_id": "5228877224",
+   "username": "aramisj22",
+   "points": 113.45,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 37.15,
+   "n_cheap": 1,
+   "players_norm": [
+    "corey seager",
+    "drew romo",
+    "jake burger",
+    "joc pederson",
+    "kumar rocker",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "wyatt langford"
+  },
+  {
+   "rank": "2",
+   "entry_id": "5229416252",
+   "username": "gbuckner60",
+   "points": 106.93,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 36.81,
+   "n_cheap": 1,
+   "players_norm": [
+    "corey seager",
+    "drew romo",
+    "ezequiel duran",
+    "jake burger",
+    "joc pederson",
+    "kumar rocker"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "kumar rocker"
+  },
+  {
+   "rank": "3",
+   "entry_id": "5228944777",
+   "username": "howardwi",
+   "points": 105.93,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 34.38,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "evan carter",
+    "ezequiel duran",
+    "kumar rocker",
+    "tristan peters"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "kumar rocker"
+  },
+  {
+   "rank": "4",
+   "entry_id": "5228878798",
+   "username": "oneupthedevil",
+   "points": 97.5,
+   "salary_used": 48600,
+   "salary_left": 1400,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 38.2,
+   "n_cheap": 0,
+   "players_norm": [
+    "corey seager",
+    "evan carter",
+    "jake burger",
+    "joc pederson",
+    "sam antonacci",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "corey seager"
+  },
+  {
+   "rank": "5",
+   "entry_id": "5229406077",
+   "username": "ghstrnr",
+   "points": 95.95,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 40.62,
+   "n_cheap": 0,
+   "players_norm": [
+    "corey seager",
+    "ezequiel duran",
+    "joc pederson",
+    "kumar rocker",
+    "miguel vargas",
+    "tristan peters"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "tristan peters"
+  },
+  {
+   "rank": "6",
+   "entry_id": "5228940413",
+   "username": "mythicalrhymer01",
+   "points": 93.93,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 34.72,
+   "n_cheap": 0,
+   "players_norm": [
+    "cody freeman",
+    "corey seager",
+    "evan carter",
+    "ezequiel duran",
+    "kumar rocker",
+    "sam antonacci"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "kumar rocker"
+  },
+  {
+   "rank": "7",
+   "entry_id": "5229274847",
+   "username": "bleeski",
+   "points": 90.5,
+   "salary_used": 48800,
+   "salary_left": 1200,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 37.5,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew benintendi",
+    "brandon nimmo",
+    "corey seager",
+    "jake burger",
+    "joc pederson",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "corey seager"
+  },
+  {
+   "rank": "8",
+   "entry_id": "5229340613",
+   "username": "Rhombus87",
+   "points": 86.95,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 42.36,
+   "n_cheap": 0,
+   "players_norm": [
+    "cody freeman",
+    "corey seager",
+    "joc pederson",
+    "kumar rocker",
+    "munetaka murakami",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "joc pederson"
+  },
+  {
+   "rank": "9",
+   "entry_id": "5228308418",
+   "username": "cocosdaddy1",
+   "points": 84.93,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 33.33,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "chase meidroth",
+    "joc pederson",
+    "kumar rocker",
+    "tristan peters",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "kumar rocker"
+  },
+  {
+   "rank": "10",
+   "entry_id": "5228838450",
+   "username": "jep4576",
+   "points": 84.5,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 31.6,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew benintendi",
+    "braden montgomery",
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "corey seager"
+  },
+  {
+   "rank": "11",
+   "entry_id": "5228740478",
+   "username": "buisercruiser",
+   "points": 84.45,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 32.99,
+   "n_cheap": 0,
+   "players_norm": [
+    "evan carter",
+    "jake burger",
+    "kumar rocker",
+    "munetaka murakami",
+    "sam antonacci",
+    "tristan peters"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "evan carter"
+  },
+  {
+   "rank": "12",
+   "entry_id": "5229445149",
+   "username": "faubion23",
+   "points": 83.0,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 34.03,
+   "n_cheap": 1,
+   "players_norm": [
+    "corey seager",
+    "drew romo",
+    "ezequiel duran",
+    "jake burger",
+    "miguel vargas",
+    "munetaka murakami"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "ezequiel duran"
+  },
+  {
+   "rank": "13",
+   "entry_id": "5229113472",
+   "username": "austin60915",
+   "points": 79.95,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 39.23,
+   "n_cheap": 0,
+   "players_norm": [
+    "cody freeman",
+    "ezequiel duran",
+    "joc pederson",
+    "kumar rocker",
+    "munetaka murakami",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "joc pederson"
+  },
+  {
+   "rank": "14",
+   "entry_id": "5229389832",
+   "username": "josephje",
+   "points": 75.5,
+   "salary_used": 46300,
+   "salary_left": 3700,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 31.95,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "elias diaz",
+    "evan carter",
+    "miguel vargas",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "evan carter"
+  },
+  {
+   "rank": "15",
+   "entry_id": "5229395614",
+   "username": "Ezilodi",
+   "points": 75.48,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 41.32,
+   "n_cheap": 0,
+   "players_norm": [
+    "cody freeman",
+    "corey seager",
+    "evan carter",
+    "joc pederson",
+    "jose urquidy",
+    "kumar rocker"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "kumar rocker"
+  },
+  {
+   "rank": "15",
+   "entry_id": "5229445563",
+   "username": "SpongeCake",
+   "points": 75.48,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 41.32,
+   "n_cheap": 0,
+   "players_norm": [
+    "cody freeman",
+    "corey seager",
+    "evan carter",
+    "joc pederson",
+    "jose urquidy",
+    "kumar rocker"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "kumar rocker"
+  },
+  {
+   "rank": "17",
+   "entry_id": "5229449197",
+   "username": "BAlmeida402",
+   "points": 74.45,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 43.4,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "evan carter",
+    "joc pederson",
+    "kumar rocker",
+    "munetaka murakami"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "evan carter"
+  },
+  {
+   "rank": "18",
+   "entry_id": "5229314371",
+   "username": "clags22",
+   "points": 72.95,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 39.24,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "evan carter",
+    "jake burger",
+    "joc pederson",
+    "kumar rocker",
+    "munetaka murakami"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "joc pederson"
+  },
+  {
+   "rank": "19",
+   "entry_id": "5229433276",
+   "username": "iowahawks40",
+   "points": 72.5,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 30.9,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "chase meidroth",
+    "corey seager",
+    "evan carter",
+    "jake burger",
+    "munetaka murakami"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "munetaka murakami"
+  },
+  {
+   "rank": "20",
+   "entry_id": "5228855631",
+   "username": "bposluszny",
+   "points": 72.0,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 25.0,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "chase meidroth",
+    "colson montgomery",
+    "corey seager",
+    "ezequiel duran",
+    "jake burger"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "brandon nimmo"
+  },
+  {
+   "rank": "21",
+   "entry_id": "5229433159",
+   "username": "Rnipper13",
+   "points": 70.5,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 26.74,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew benintendi",
+    "braden montgomery",
+    "brandon nimmo",
+    "colson montgomery",
+    "corey seager",
+    "jake burger"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "corey seager"
+  },
+  {
+   "rank": "21",
+   "entry_id": "5229435742",
+   "username": "davidlobo4",
+   "points": 70.5,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 38.2,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "joc pederson",
+    "miguel vargas"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "corey seager"
+  },
+  {
+   "rank": "23",
+   "entry_id": "5228833654",
+   "username": "cadle40",
+   "points": 69.33,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 29.86,
+   "n_cheap": 0,
+   "players_norm": [
+    "corey seager",
+    "elias diaz",
+    "evan carter",
+    "ezequiel duran",
+    "jake burger",
+    "jose urquidy"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "jose urquidy"
+  },
+  {
+   "rank": "24",
+   "entry_id": "5228836820",
+   "username": "USAFJorgensen",
+   "points": 68.48,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 34.03,
+   "n_cheap": 0,
+   "players_norm": [
+    "cody freeman",
+    "elias diaz",
+    "joc pederson",
+    "jose urquidy",
+    "kumar rocker",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "kumar rocker"
+  },
+  {
+   "rank": "24",
+   "entry_id": "5229184567",
+   "username": "mrclean913",
+   "points": 68.48,
+   "salary_used": 48800,
+   "salary_left": 1200,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 38.2,
+   "n_cheap": 0,
+   "players_norm": [
+    "cody freeman",
+    "evan carter",
+    "ezequiel duran",
+    "joc pederson",
+    "jose urquidy",
+    "kumar rocker"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "kumar rocker"
+  },
+  {
+   "rank": "26",
+   "entry_id": "5229441466",
+   "username": "Apples00",
+   "points": 60.27,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 41.32,
+   "n_cheap": 0,
+   "players_norm": [
+    "cody freeman",
+    "corey seager",
+    "evan carter",
+    "joc pederson",
+    "jose urquidy",
+    "kumar rocker"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "jose urquidy"
+  },
+  {
+   "rank": "27",
+   "entry_id": "5229423004",
+   "username": "Idonotcare76",
+   "points": 59.0,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 38.89,
+   "n_cheap": 0,
+   "players_norm": [
+    "joc pederson",
+    "miguel vargas",
+    "munetaka murakami",
+    "sam antonacci",
+    "tristan peters",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "tristan peters"
+  },
+  {
+   "rank": "28",
+   "entry_id": "5229370299",
+   "username": "gwarrick0639",
+   "points": 57.0,
+   "salary_used": 48800,
+   "salary_left": 1200,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 38.89,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "joc pederson",
+    "miguel vargas",
+    "munetaka murakami",
+    "tristan peters",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "joc pederson"
+  },
+  {
+   "rank": "29",
+   "entry_id": "5229204619",
+   "username": "KristianFTM",
+   "points": 55.5,
+   "salary_used": 48700,
+   "salary_left": 1300,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 37.5,
+   "n_cheap": 0,
+   "players_norm": [
+    "cody freeman",
+    "ezequiel duran",
+    "joc pederson",
+    "munetaka murakami",
+    "sam antonacci",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "munetaka murakami"
+  },
+  {
+   "rank": "30",
+   "entry_id": "5229140750",
+   "username": "bkukor",
+   "points": 54.28,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 33.68,
+   "n_cheap": 0,
+   "players_norm": [
+    "cody freeman",
+    "evan carter",
+    "jose urquidy",
+    "kumar rocker",
+    "miguel vargas",
+    "tristan peters"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "jose urquidy"
+  },
+  {
+   "rank": "31",
+   "entry_id": "5229055239",
+   "username": "corruption79",
+   "points": 50.45,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 39.23,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew benintendi",
+    "braden montgomery",
+    "evan carter",
+    "joc pederson",
+    "kumar rocker",
+    "munetaka murakami"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "munetaka murakami"
+  },
+  {
+   "rank": "32",
+   "entry_id": "5228839481",
+   "username": "whoisjohngalt420",
+   "points": 48.05,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 31.95,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "evan carter",
+    "ezequiel duran",
+    "jose urquidy",
+    "munetaka murakami",
+    "tristan peters"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "munetaka murakami"
+  },
+  {
+   "rank": "33",
+   "entry_id": "5229434896",
+   "username": "fantasygolfinsidercm",
+   "points": 46.0,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 38.2,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew benintendi",
+    "brandon nimmo",
+    "corey seager",
+    "evan carter",
+    "miguel vargas",
+    "munetaka murakami"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "andrew benintendi"
+  },
+  {
+   "rank": "34",
+   "entry_id": "5228589849",
+   "username": "smoothcriminal",
+   "points": 44.05,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 40.28,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew benintendi",
+    "corey seager",
+    "joc pederson",
+    "jose urquidy",
+    "miguel vargas",
+    "tristan peters"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "miguel vargas"
+  },
+  {
+   "rank": "35",
+   "entry_id": "5229278073",
+   "username": "calcityHvg",
+   "points": 38.0,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 37.85,
+   "n_cheap": 1,
+   "players_norm": [
+    "drew romo",
+    "joc pederson",
+    "miguel vargas",
+    "munetaka murakami",
+    "sam antonacci",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "sam antonacci"
+  },
+  {
+   "rank": "36",
+   "entry_id": "5229420986",
+   "username": "coleproffer",
+   "points": 37.0,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 37.15,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew benintendi",
+    "chase meidroth",
+    "joc pederson",
+    "miguel vargas",
+    "munetaka murakami",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "andrew benintendi"
+  },
+  {
+   "rank": "37",
+   "entry_id": "5228932677",
+   "username": "jeff12464",
+   "points": 35.05,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 28.82,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew benintendi",
+    "chase meidroth",
+    "ezequiel duran",
+    "jose urquidy",
+    "miguel vargas",
+    "tristan peters"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "miguel vargas"
+  },
+  {
+   "rank": "37",
+   "entry_id": "5229132348",
+   "username": "fan21",
+   "points": 35.05,
+   "salary_used": 47900,
+   "salary_left": 2100,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 32.99,
+   "n_cheap": 1,
+   "players_norm": [
+    "cody freeman",
+    "corey seager",
+    "drew romo",
+    "jose urquidy",
+    "miguel vargas",
+    "sam antonacci"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "miguel vargas"
+  },
+  {
+   "rank": "39",
+   "entry_id": "5229392239",
+   "username": "Bombers04",
+   "points": 34.0,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 32.64,
+   "n_cheap": 1,
+   "players_norm": [
+    "andrew benintendi",
+    "drew romo",
+    "miguel vargas",
+    "munetaka murakami",
+    "sam antonacci",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "andrew benintendi"
+  },
+  {
+   "rank": "40",
+   "entry_id": "5229209085",
+   "username": "flintmonster",
+   "points": 29.5,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 35.41,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew benintendi",
+    "colson montgomery",
+    "joc pederson",
+    "miguel vargas",
+    "munetaka murakami",
+    "tristan peters"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "munetaka murakami"
+  },
+  {
+   "rank": "41",
+   "entry_id": "5228648213",
+   "username": "dtapper29",
+   "points": 27.5,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 34.38,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew benintendi",
+    "elias diaz",
+    "joc pederson",
+    "jose urquidy",
+    "kumar rocker",
+    "sam antonacci"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "joc pederson"
+  },
+  {
+   "rank": "42",
+   "entry_id": "5229434985",
+   "username": "monsoonserge",
+   "points": 24.33,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 30.55,
+   "n_cheap": 0,
+   "players_norm": [
+    "braden montgomery",
+    "cody freeman",
+    "jose urquidy",
+    "munetaka murakami",
+    "sam antonacci",
+    "tristan peters"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "jose urquidy"
+  },
+  {
+   "rank": "43",
+   "entry_id": "5229390980",
+   "username": "yaya0130",
+   "points": 19.5,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 36.8,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew benintendi",
+    "brandon nimmo",
+    "chase meidroth",
+    "joc pederson",
+    "miguel vargas",
+    "munetaka murakami"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "munetaka murakami"
+  },
+  {
+   "rank": "44",
+   "entry_id": "5229338172",
+   "username": "3lbfrill",
+   "points": 18.0,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 39.58,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew benintendi",
+    "brandon nimmo",
+    "joc pederson",
+    "miguel vargas",
+    "munetaka murakami",
+    "sam antonacci"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "joc pederson"
+  },
+  {
+   "rank": "45",
+   "entry_id": "5229417899",
+   "username": "Jpage86",
+   "points": 10.05,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 38.89,
+   "n_cheap": 1,
+   "players_norm": [
+    "andrew benintendi",
+    "drew romo",
+    "joc pederson",
+    "jose urquidy",
+    "miguel vargas",
+    "munetaka murakami"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "munetaka murakami"
+  },
+  {
+   "rank": "46",
+   "entry_id": "5229373409",
+   "username": "nutrinoche",
+   "points": 9.33,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 34.38,
+   "n_cheap": 1,
+   "players_norm": [
+    "braden montgomery",
+    "drew romo",
+    "joc pederson",
+    "jose urquidy",
+    "miguel vargas",
+    "sam antonacci"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "jose urquidy"
+  },
+  {
+   "rank": "47",
+   "entry_id": "5228890553",
+   "username": "JcClark18",
+   "points": 7.33,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 35.42,
+   "n_cheap": 1,
+   "players_norm": [
+    "braden montgomery",
+    "drew romo",
+    "joc pederson",
+    "jose urquidy",
+    "munetaka murakami",
+    "sam antonacci"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "jose urquidy"
+  },
+  {
+   "rank": "48",
+   "entry_id": "5228820817",
+   "username": "Stree",
+   "points": 5.33,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 25.35,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew benintendi",
+    "braden montgomery",
+    "cody freeman",
+    "colson montgomery",
+    "jose urquidy",
+    "sam antonacci"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "jose urquidy"
+  }
+ ],
+ "player_table": [
+  {
+   "player": "Joc Pederson",
+   "player_norm": "joc pederson",
+   "roster_position": "UTIL",
+   "pct_drafted": 62.5,
+   "fpts": 4.0
+  },
+  {
+   "player": "Corey Seager",
+   "player_norm": "corey seager",
+   "roster_position": "UTIL",
+   "pct_drafted": 47.92,
+   "fpts": 23.0
+  },
+  {
+   "player": "Munetaka Murakami",
+   "player_norm": "munetaka murakami",
+   "roster_position": "UTIL",
+   "pct_drafted": 45.83,
+   "fpts": 3.0
+  },
+  {
+   "player": "Kumar Rocker",
+   "player_norm": "kumar rocker",
+   "roster_position": "UTIL",
+   "pct_drafted": 39.58,
+   "fpts": 23.95
+  },
+  {
+   "player": "Miguel Vargas",
+   "player_norm": "miguel vargas",
+   "roster_position": "UTIL",
+   "pct_drafted": 39.58,
+   "fpts": 5.0
+  },
+  {
+   "player": "Jose Urquidy",
+   "player_norm": "jose urquidy",
+   "roster_position": "UTIL",
+   "pct_drafted": 35.42,
+   "fpts": -6.45
+  },
+  {
+   "player": "Evan Carter",
+   "player_norm": "evan carter",
+   "roster_position": "UTIL",
+   "pct_drafted": 35.42,
+   "fpts": 11.0
+  },
+  {
+   "player": "Wyatt Langford",
+   "player_norm": "wyatt langford",
+   "roster_position": "UTIL",
+   "pct_drafted": 31.25,
+   "fpts": 23.0
+  },
+  {
+   "player": "Andrew Benintendi",
+   "player_norm": "andrew benintendi",
+   "roster_position": "UTIL",
+   "pct_drafted": 31.25,
+   "fpts": 0.0
+  },
+  {
+   "player": "Sam Antonacci",
+   "player_norm": "sam antonacci",
+   "roster_position": "UTIL",
+   "pct_drafted": 29.17,
+   "fpts": 0.0
+  },
+  {
+   "player": "Ezequiel Duran",
+   "player_norm": "ezequiel duran",
+   "roster_position": "UTIL",
+   "pct_drafted": 29.17,
+   "fpts": 16.0
+  },
+  {
+   "player": "Brandon Nimmo",
+   "player_norm": "brandon nimmo",
+   "roster_position": "UTIL",
+   "pct_drafted": 29.17,
+   "fpts": 4.0
+  },
+  {
+   "player": "Cody Freeman",
+   "player_norm": "cody freeman",
+   "roster_position": "UTIL",
+   "pct_drafted": 27.08,
+   "fpts": 8.0
+  },
+  {
+   "player": "Tristan Peters",
+   "player_norm": "tristan peters",
+   "roster_position": "UTIL",
+   "pct_drafted": 25.0,
+   "fpts": 16.0
+  },
+  {
+   "player": "Jake Burger",
+   "player_norm": "jake burger",
+   "roster_position": "UTIL",
+   "pct_drafted": 22.92,
+   "fpts": 25.0
+  },
+  {
+   "player": "Braden Montgomery",
+   "player_norm": "braden montgomery",
+   "roster_position": "UTIL",
+   "pct_drafted": 20.83,
+   "fpts": 7.0
+  },
+  {
+   "player": "Drew Romo",
+   "player_norm": "drew romo",
+   "roster_position": "UTIL",
+   "pct_drafted": 18.75,
+   "fpts": 3.0
+  },
+  {
+   "player": "Chase Meidroth",
+   "player_norm": "chase meidroth",
+   "roster_position": "UTIL",
+   "pct_drafted": 12.5,
+   "fpts": 2.0
+  },
+  {
+   "player": "Colson Montgomery",
+   "player_norm": "colson montgomery",
+   "roster_position": "UTIL",
+   "pct_drafted": 8.33,
+   "fpts": 0.0
+  },
+  {
+   "player": "Elias Diaz",
+   "player_norm": "elias diaz",
+   "roster_position": "UTIL",
+   "pct_drafted": 8.33,
+   "fpts": 4.0
+  }
+ ],
+ "own_results": {
+  "matched": 1,
+  "requested": 1,
+  "field_size": 48,
+  "best_rank": 7,
+  "worst_rank": 7,
+  "best_finish_percentile": 87.5,
+  "median_finish_percentile": 87.5,
+  "best_points": 90.5,
+  "winning_points": 113.45,
+  "own_lineups_duplicated_by_field": 0,
+  "max_copies_of_an_own_lineup": 1,
+  "entry_fee": 0.1,
+  "fees_total": 0.1,
+  "winnings_total": 0.0,
+  "paid_places": 1,
+  "payout_breadth_observed": 0.0208,
+  "cashed_entries": 0,
+  "net": -0.1,
+  "labels": "observed outcomes from a completed contest; never a graded prediction, ROI model, win rate, or probability claim"
+ }
+}

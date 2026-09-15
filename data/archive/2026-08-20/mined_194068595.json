@@ -1,0 +1,840 @@
+{
+ "label": "deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied",
+ "version": "0.5-review",
+ "coverage": "full",
+ "contest_id": "194068595",
+ "slate_date": "2026-08-20",
+ "contest_type": "showdown",
+ "meta": {
+  "entries_total": 23,
+  "entries_complete_lineups": 23,
+  "roster_size": 6,
+  "entries_unparsed": 0,
+  "winning_points": 125.05,
+  "winning_entry_id": "5224866013",
+  "multi_entry_flag": false
+ },
+ "duplication": {
+  "distinct_lineups": 23,
+  "entries_in_duplicated_lineups": 0,
+  "share_duplicated_pct": 0.0,
+  "max_copies": 1,
+  "copies_histogram": {
+   "1": 23
+  },
+  "winner_copies": 1
+ },
+ "construction": {
+  "cheap_salary_threshold": 3000,
+  "at_cap_entries": 7,
+  "at_cap_share_pct": 30.4,
+  "salary_left_histogram": {
+   "701-1500": 1,
+   "> 1500": 5,
+   "101-300": 5,
+   "<= 0": 6,
+   "1-100": 1,
+   "301-700": 5
+  },
+  "max_stack_histogram": {
+   "3": 5,
+   "4": 5,
+   "5": 13
+  },
+  "sp_pair_top": [],
+  "top_owned": [
+   {
+    "player": "Peter Lambert",
+    "pct_drafted": 69.57
+   },
+   {
+    "player": "LaMonte Wade Jr.",
+    "pct_drafted": 52.17
+   },
+   {
+    "player": "Isaac Paredes",
+    "pct_drafted": 47.83
+   },
+   {
+    "player": "Grayson Rodriguez",
+    "pct_drafted": 39.13
+   },
+   {
+    "player": "Yordan Alvarez",
+    "pct_drafted": 39.13
+   }
+  ],
+  "captain_table": [
+   {
+    "player": "Peter Lambert",
+    "captain_count": 11,
+    "captain_share_pct": 47.8,
+    "pct_drafted": 69.57
+   },
+   {
+    "player": "Grayson Rodriguez",
+    "captain_count": 4,
+    "captain_share_pct": 17.4,
+    "pct_drafted": 39.13
+   },
+   {
+    "player": "Vaughn Grissom",
+    "captain_count": 1,
+    "captain_share_pct": 4.3,
+    "pct_drafted": 17.39
+   },
+   {
+    "player": "Daulton Varsho",
+    "captain_count": 1,
+    "captain_share_pct": 4.3,
+    "pct_drafted": 30.43
+   },
+   {
+    "player": "Zach Neto",
+    "captain_count": 1,
+    "captain_share_pct": 4.3,
+    "pct_drafted": 34.78
+   },
+   {
+    "player": "Yordan Alvarez",
+    "captain_count": 1,
+    "captain_share_pct": 4.3,
+    "pct_drafted": 39.13
+   },
+   {
+    "player": "Jose Altuve",
+    "captain_count": 1,
+    "captain_share_pct": 4.3,
+    "pct_drafted": 26.09
+   },
+   {
+    "player": "Cam Smith",
+    "captain_count": 1,
+    "captain_share_pct": 4.3,
+    "pct_drafted": 34.78
+   }
+  ],
+  "winner_captain": {
+   "player": "Vaughn Grissom",
+   "pct_drafted": 17.39,
+   "captain_share_pct": 4.3,
+   "was_top_owned_captain": false
+  }
+ },
+ "diagnostics": {
+  "salary_join_rate_pct": 100.0,
+  "unmatched_names_top": [],
+  "salary_name_collisions": [],
+  "ownership_recompute_max_diff_pts": 0.0,
+  "ownership_recompute_denominator": "all_entries",
+  "ownership_recompute_ok": true,
+  "parse_structural_ok": true,
+  "parsed_nothing": false,
+  "mostly_unparsed": false,
+  "contest_type_mismatch": false,
+  "salary_join_collapsed": false,
+  "entries_unparsed_share": 0.0,
+  "intra_entry_duplicate_entry_ids": [],
+  "roster_slots_observed": 138,
+  "roster_slots_expected": 138,
+  "recomputed_total_pct": 600.0,
+  "dk_table_total_pct": 600.0,
+  "dk_table_deficit_pts": 0.0,
+  "dk_table_agrees": true,
+  "verification_note": "parse structurally sound; DK %Drafted agrees with the lineup recompute"
+ },
+ "entries": [
+  {
+   "rank": "1",
+   "entry_id": "5224866013",
+   "username": "zonaque",
+   "points": 125.05,
+   "salary_used": 48700,
+   "salary_left": 1300,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 31.88,
+   "n_cheap": 0,
+   "players_norm": [
+    "daulton varsho",
+    "grayson rodriguez",
+    "lamonte wade",
+    "vaughn grissom",
+    "wade meckler",
+    "zach neto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "vaughn grissom"
+  },
+  {
+   "rank": "2",
+   "entry_id": "5224992810",
+   "username": "djprymek",
+   "points": 116.33,
+   "salary_used": 47800,
+   "salary_left": 2200,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 28.98,
+   "n_cheap": 1,
+   "players_norm": [
+    "cam smith",
+    "grayson rodriguez",
+    "mike trout",
+    "tyler heineman",
+    "wade meckler",
+    "zach neto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "grayson rodriguez"
+  },
+  {
+   "rank": "3",
+   "entry_id": "5225053825",
+   "username": "johnbrock636",
+   "points": 104.5,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 33.33,
+   "n_cheap": 0,
+   "players_norm": [
+    "daulton varsho",
+    "isaac paredes",
+    "moises ballesteros",
+    "vaughn grissom",
+    "yordan alvarez",
+    "zach neto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "daulton varsho"
+  },
+  {
+   "rank": "4",
+   "entry_id": "5225014176",
+   "username": "deathmetalbob",
+   "points": 102.58,
+   "salary_used": 48000,
+   "salary_left": 2000,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 37.68,
+   "n_cheap": 0,
+   "players_norm": [
+    "christian vazquez",
+    "grayson rodriguez",
+    "josh lowe",
+    "moises ballesteros",
+    "peter lambert",
+    "zach neto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "grayson rodriguez"
+  },
+  {
+   "rank": "5",
+   "entry_id": "5225022252",
+   "username": "pcolaboyy",
+   "points": 93.0,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 36.23,
+   "n_cheap": 0,
+   "players_norm": [
+    "cam smith",
+    "christian vazquez",
+    "isaac paredes",
+    "mike trout",
+    "yordan alvarez",
+    "zach neto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "zach neto"
+  },
+  {
+   "rank": "6",
+   "entry_id": "5224839811",
+   "username": "corruption79",
+   "points": 81.75,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 40.58,
+   "n_cheap": 0,
+   "players_norm": [
+    "adam frazier",
+    "lamonte wade",
+    "moises ballesteros",
+    "peter lambert",
+    "yordan alvarez",
+    "zach neto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "yordan alvarez"
+  },
+  {
+   "rank": "7",
+   "entry_id": "5224828727",
+   "username": "cartman6523",
+   "points": 79.33,
+   "salary_used": 47000,
+   "salary_left": 3000,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 25.36,
+   "n_cheap": 0,
+   "players_norm": [
+    "adam frazier",
+    "grayson rodriguez",
+    "jose altuve",
+    "josh lowe",
+    "mike trout",
+    "nolan schanuel"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "grayson rodriguez"
+  },
+  {
+   "rank": "8",
+   "entry_id": "5224353177",
+   "username": "JcClark18",
+   "points": 78.58,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 34.06,
+   "n_cheap": 1,
+   "players_norm": [
+    "grayson rodriguez",
+    "mike trout",
+    "moises ballesteros",
+    "peter lambert",
+    "tyler heineman",
+    "wade meckler"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "grayson rodriguez"
+  },
+  {
+   "rank": "9",
+   "entry_id": "5224494034",
+   "username": "pat_the_hat2",
+   "points": 67.0,
+   "salary_used": 48400,
+   "salary_left": 1600,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 26.81,
+   "n_cheap": 0,
+   "players_norm": [
+    "daulton varsho",
+    "jose altuve",
+    "mike trout",
+    "nick allen",
+    "nolan schanuel",
+    "zach neto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "jose altuve"
+  },
+  {
+   "rank": "10",
+   "entry_id": "5225023333",
+   "username": "kelvin987",
+   "points": 63.55,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 31.16,
+   "n_cheap": 0,
+   "players_norm": [
+    "adam frazier",
+    "cam smith",
+    "grayson rodriguez",
+    "jose altuve",
+    "mike trout",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "cam smith"
+  },
+  {
+   "rank": "11",
+   "entry_id": "5224629116",
+   "username": "Celticsnc",
+   "points": 55.25,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 44.93,
+   "n_cheap": 0,
+   "players_norm": [
+    "cam smith",
+    "daulton varsho",
+    "isaac paredes",
+    "lamonte wade",
+    "peter lambert",
+    "zach neto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "lamonte wade"
+  },
+  {
+   "rank": "12",
+   "entry_id": "5224771124",
+   "username": "mrmoz48",
+   "points": 48.93,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 32.61,
+   "n_cheap": 0,
+   "players_norm": [
+    "christian vazquez",
+    "grayson rodriguez",
+    "josh lowe",
+    "nolan schanuel",
+    "peter lambert",
+    "vaughn grissom"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "peter lambert"
+  },
+  {
+   "rank": "13",
+   "entry_id": "5225015580",
+   "username": "Darkmen715",
+   "points": 36.38,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 39.13,
+   "n_cheap": 0,
+   "players_norm": [
+    "isaac paredes",
+    "lamonte wade",
+    "moises ballesteros",
+    "nolan schanuel",
+    "peter lambert",
+    "vaughn grissom"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "peter lambert"
+  },
+  {
+   "rank": "14",
+   "entry_id": "5224993309",
+   "username": "L053R666",
+   "points": 31.93,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 41.3,
+   "n_cheap": 0,
+   "players_norm": [
+    "cam smith",
+    "daulton varsho",
+    "grayson rodriguez",
+    "lamonte wade",
+    "nick allen",
+    "peter lambert"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "peter lambert"
+  },
+  {
+   "rank": "15",
+   "entry_id": "5224490074",
+   "username": "whoisjohngalt420",
+   "points": 28.93,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 42.75,
+   "n_cheap": 0,
+   "players_norm": [
+    "cam smith",
+    "christian vazquez",
+    "daulton varsho",
+    "grayson rodriguez",
+    "lamonte wade",
+    "peter lambert"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "peter lambert"
+  },
+  {
+   "rank": "16",
+   "entry_id": "5224915821",
+   "username": "grantgoupil",
+   "points": 28.38,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 43.48,
+   "n_cheap": 0,
+   "players_norm": [
+    "isaac paredes",
+    "lamonte wade",
+    "moises ballesteros",
+    "nick allen",
+    "peter lambert",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "peter lambert"
+  },
+  {
+   "rank": "17",
+   "entry_id": "5225064695",
+   "username": "DUI-Guy",
+   "points": 27.38,
+   "salary_used": 48200,
+   "salary_left": 1800,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 39.85,
+   "n_cheap": 0,
+   "players_norm": [
+    "christian vazquez",
+    "isaac paredes",
+    "moises ballesteros",
+    "nick allen",
+    "peter lambert",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "peter lambert"
+  },
+  {
+   "rank": "18",
+   "entry_id": "5224395012",
+   "username": "RFinch_Kings",
+   "points": 27.25,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 44.2,
+   "n_cheap": 0,
+   "players_norm": [
+    "cam smith",
+    "isaac paredes",
+    "josh lowe",
+    "lamonte wade",
+    "peter lambert",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "isaac paredes"
+  },
+  {
+   "rank": "19",
+   "entry_id": "5224880499",
+   "username": "KristianFTM",
+   "points": 20.38,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 37.68,
+   "n_cheap": 0,
+   "players_norm": [
+    "adam frazier",
+    "jose altuve",
+    "lamonte wade",
+    "nick allen",
+    "peter lambert",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "peter lambert"
+  },
+  {
+   "rank": "20",
+   "entry_id": "5225060884",
+   "username": "crf_333",
+   "points": 19.38,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 43.48,
+   "n_cheap": 0,
+   "players_norm": [
+    "christian vazquez",
+    "isaac paredes",
+    "josh lowe",
+    "lamonte wade",
+    "peter lambert",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "peter lambert"
+  },
+  {
+   "rank": "21",
+   "entry_id": "5224645302",
+   "username": "mrclean913",
+   "points": 15.38,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 37.68,
+   "n_cheap": 0,
+   "players_norm": [
+    "cam smith",
+    "isaac paredes",
+    "lamonte wade",
+    "peter lambert",
+    "taylor trammell",
+    "wade meckler"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "peter lambert"
+  },
+  {
+   "rank": "22",
+   "entry_id": "5225017436",
+   "username": "bleeski",
+   "points": 11.38,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 40.58,
+   "n_cheap": 1,
+   "players_norm": [
+    "daulton varsho",
+    "isaac paredes",
+    "jose altuve",
+    "lamonte wade",
+    "peter lambert",
+    "tyler heineman"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "peter lambert"
+  },
+  {
+   "rank": "22",
+   "entry_id": "5225055293",
+   "username": "ongbok",
+   "points": 11.38,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 36.96,
+   "n_cheap": 1,
+   "players_norm": [
+    "christian vazquez",
+    "isaac paredes",
+    "jose altuve",
+    "mike trout",
+    "peter lambert",
+    "tyler heineman"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "peter lambert"
+  }
+ ],
+ "player_table": [
+  {
+   "player": "Peter Lambert",
+   "player_norm": "peter lambert",
+   "roster_position": "UTIL",
+   "pct_drafted": 69.57,
+   "fpts": -9.75
+  },
+  {
+   "player": "LaMonte Wade Jr.",
+   "player_norm": "lamonte wade",
+   "roster_position": "UTIL",
+   "pct_drafted": 52.17,
+   "fpts": 4.0
+  },
+  {
+   "player": "Isaac Paredes",
+   "player_norm": "isaac paredes",
+   "roster_position": "UTIL",
+   "pct_drafted": 47.83,
+   "fpts": 8.0
+  },
+  {
+   "player": "Grayson Rodriguez",
+   "player_norm": "grayson rodriguez",
+   "roster_position": "UTIL",
+   "pct_drafted": 39.13,
+   "fpts": 27.55
+  },
+  {
+   "player": "Yordan Alvarez",
+   "player_norm": "yordan alvarez",
+   "roster_position": "UTIL",
+   "pct_drafted": 39.13,
+   "fpts": 9.0
+  },
+  {
+   "player": "Zach Neto",
+   "player_norm": "zach neto",
+   "roster_position": "UTIL",
+   "pct_drafted": 34.78,
+   "fpts": 42.0
+  },
+  {
+   "player": "Cam Smith",
+   "player_norm": "cam smith",
+   "roster_position": "UTIL",
+   "pct_drafted": 34.78,
+   "fpts": 2.0
+  },
+  {
+   "player": "Mike Trout",
+   "player_norm": "mike trout",
+   "roster_position": "UTIL",
+   "pct_drafted": 30.43,
+   "fpts": 8.0
+  },
+  {
+   "player": "Daulton Varsho",
+   "player_norm": "daulton varsho",
+   "roster_position": "UTIL",
+   "pct_drafted": 30.43,
+   "fpts": 7.0
+  },
+  {
+   "player": "Moises Ballesteros",
+   "player_norm": "moises ballesteros",
+   "roster_position": "UTIL",
+   "pct_drafted": 30.43,
+   "fpts": 16.0
+  },
+  {
+   "player": "Christian Vazquez",
+   "player_norm": "christian vazquez",
+   "roster_position": "UTIL",
+   "pct_drafted": 30.43,
+   "fpts": 3.0
+  },
+  {
+   "player": "Jose Altuve",
+   "player_norm": "jose altuve",
+   "roster_position": "UTIL",
+   "pct_drafted": 26.09,
+   "fpts": 0.0
+  },
+  {
+   "player": "Josh Lowe",
+   "player_norm": "josh lowe",
+   "roster_position": "UTIL",
+   "pct_drafted": 21.74,
+   "fpts": 10.0
+  },
+  {
+   "player": "Nick Allen",
+   "player_norm": "nick allen",
+   "roster_position": "UTIL",
+   "pct_drafted": 21.74,
+   "fpts": 6.0
+  },
+  {
+   "player": "Vaughn Grissom",
+   "player_norm": "vaughn grissom",
+   "roster_position": "UTIL",
+   "pct_drafted": 17.39,
+   "fpts": 19.0
+  },
+  {
+   "player": "Nolan Schanuel",
+   "player_norm": "nolan schanuel",
+   "roster_position": "UTIL",
+   "pct_drafted": 17.39,
+   "fpts": 4.0
+  },
+  {
+   "player": "Wade Meckler",
+   "player_norm": "wade meckler",
+   "roster_position": "UTIL",
+   "pct_drafted": 17.39,
+   "fpts": 16.0
+  },
+  {
+   "player": "Adam Frazier",
+   "player_norm": "adam frazier",
+   "roster_position": "UTIL",
+   "pct_drafted": 17.39,
+   "fpts": 16.0
+  },
+  {
+   "player": "Tyler Heineman",
+   "player_norm": "tyler heineman",
+   "roster_position": "UTIL",
+   "pct_drafted": 17.39,
+   "fpts": 7.0
+  },
+  {
+   "player": "Taylor Trammell",
+   "player_norm": "taylor trammell",
+   "roster_position": "UTIL",
+   "pct_drafted": 4.35,
+   "fpts": 0.0
+  }
+ ],
+ "own_results": {
+  "matched": 1,
+  "requested": 1,
+  "field_size": 23,
+  "best_rank": 22,
+  "worst_rank": 22,
+  "best_finish_percentile": 8.7,
+  "median_finish_percentile": 8.7,
+  "best_points": 11.38,
+  "winning_points": 125.05,
+  "own_lineups_duplicated_by_field": 0,
+  "max_copies_of_an_own_lineup": 1,
+  "entry_fee": 0.25,
+  "fees_total": 0.25,
+  "winnings_total": 0.0,
+  "paid_places": 1,
+  "payout_breadth_observed": 0.0435,
+  "cashed_entries": 0,
+  "net": -0.25,
+  "labels": "observed outcomes from a completed contest; never a graded prediction, ROI model, win rate, or probability claim"
+ }
+}

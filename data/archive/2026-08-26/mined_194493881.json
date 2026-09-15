@@ -1,0 +1,1272 @@
+{
+ "label": "deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied",
+ "version": "0.5-review",
+ "coverage": "full",
+ "contest_id": "194493881",
+ "slate_date": "2026-08-26",
+ "contest_type": "classic",
+ "meta": {
+  "entries_total": 29,
+  "entries_complete_lineups": 29,
+  "roster_size": 10,
+  "entries_unparsed": 0,
+  "winning_points": 143.6,
+  "winning_entry_id": "5231518450",
+  "multi_entry_flag": false
+ },
+ "duplication": {
+  "distinct_lineups": 29,
+  "entries_in_duplicated_lineups": 0,
+  "share_duplicated_pct": 0.0,
+  "max_copies": 1,
+  "copies_histogram": {
+   "1": 29
+  },
+  "winner_copies": 1
+ },
+ "construction": {
+  "cheap_salary_threshold": 2300,
+  "at_cap_entries": 15,
+  "at_cap_share_pct": 51.7,
+  "salary_left_histogram": {
+   "101-300": 6,
+   "1-100": 11,
+   "301-700": 3,
+   "701-1500": 2,
+   "<= 0": 4,
+   "> 1500": 3
+  },
+  "max_stack_histogram": {
+   "3": 9,
+   "4": 13,
+   "5": 7
+  },
+  "sp_pair_top": [
+   {
+    "pair": [
+     "Ryan Gusto",
+     "Sonny Gray"
+    ],
+    "count": 11,
+    "field_share_pct": 37.9
+   },
+   {
+    "pair": [
+     "Sonny Gray",
+     "Will Dion"
+    ],
+    "count": 9,
+    "field_share_pct": 31.0
+   },
+   {
+    "pair": [
+     "Sonny Gray",
+     "Tanner Gordon"
+    ],
+    "count": 7,
+    "field_share_pct": 24.1
+   },
+   {
+    "pair": [
+     "Ryan Gusto",
+     "Will Dion"
+    ],
+    "count": 2,
+    "field_share_pct": 6.9
+   }
+  ],
+  "top_owned": [
+   {
+    "player": "Sonny Gray",
+    "pct_drafted": 93.1
+   },
+   {
+    "player": "CJ Abrams",
+    "pct_drafted": 82.76
+   },
+   {
+    "player": "Willi Castro",
+    "pct_drafted": 65.52
+   },
+   {
+    "player": "Hunter Goodman",
+    "pct_drafted": 55.17
+   },
+   {
+    "player": "Daylen Lile",
+    "pct_drafted": 51.72
+   }
+  ],
+  "captain_table": [],
+  "winner_captain": null
+ },
+ "diagnostics": {
+  "salary_join_rate_pct": 100.0,
+  "unmatched_names_top": [],
+  "salary_name_collisions": [],
+  "ownership_recompute_max_diff_pts": 0.0,
+  "ownership_recompute_denominator": "all_entries",
+  "ownership_recompute_ok": true,
+  "parse_structural_ok": true,
+  "parsed_nothing": false,
+  "mostly_unparsed": false,
+  "contest_type_mismatch": false,
+  "salary_join_collapsed": false,
+  "entries_unparsed_share": 0.0,
+  "intra_entry_duplicate_entry_ids": [],
+  "roster_slots_observed": 290,
+  "roster_slots_expected": 290,
+  "recomputed_total_pct": 1000.0,
+  "dk_table_total_pct": 1000.0,
+  "dk_table_deficit_pts": 0.0,
+  "dk_table_agrees": true,
+  "verification_note": "parse structurally sound; DK %Drafted agrees with the lineup recompute"
+ },
+ "entries": [
+  {
+   "rank": "1",
+   "entry_id": "5231518450",
+   "username": "clandtroop0181",
+   "points": 143.6,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Sonny Gray",
+    "Tanner Gordon"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 37.93,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres chaparro",
+    "caleb durbin",
+    "cole carrigg",
+    "hunter goodman",
+    "jake mccarthy",
+    "nick sogard",
+    "otto lopez",
+    "sonny gray",
+    "tanner gordon",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "2",
+   "entry_id": "5231507313",
+   "username": "Rallycap",
+   "points": 118.8,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Ryan Gusto",
+    "Sonny Gray"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 48.28,
+   "n_cheap": 0,
+   "players_norm": [
+    "abimelec ortiz",
+    "cj abrams",
+    "connor norby",
+    "dylan crews",
+    "hunter goodman",
+    "jake mccarthy",
+    "jose tena",
+    "ryan gusto",
+    "sonny gray",
+    "willi castro"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "3",
+   "entry_id": "5231459521",
+   "username": "niemo33",
+   "points": 113.6,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Sonny Gray",
+    "Tanner Gordon"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 37.93,
+   "n_cheap": 0,
+   "players_norm": [
+    "abimelec ortiz",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "cole carrigg",
+    "dylan crews",
+    "hunter goodman",
+    "jake mccarthy",
+    "sonny gray",
+    "tanner gordon",
+    "xavier edwards"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "4",
+   "entry_id": "5231414282",
+   "username": "juiceman1984",
+   "points": 112.8,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Ryan Gusto",
+    "Sonny Gray"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 39.31,
+   "n_cheap": 0,
+   "players_norm": [
+    "hunter goodman",
+    "jake mccarthy",
+    "jose tena",
+    "kyle stowers",
+    "mickey moniak",
+    "otto lopez",
+    "ryan gusto",
+    "sonny gray",
+    "willi castro",
+    "xavier edwards"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "5",
+   "entry_id": "5231512561",
+   "username": "RaymondAnthonyPablo",
+   "points": 111.6,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Sonny Gray",
+    "Tanner Gordon"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 43.1,
+   "n_cheap": 1,
+   "players_norm": [
+    "daylen lile",
+    "ezequiel tovar",
+    "hunter goodman",
+    "jake mccarthy",
+    "kyle stowers",
+    "sonny gray",
+    "tanner gordon",
+    "willi castro",
+    "wilyer abreu",
+    "xavier edwards"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "6",
+   "entry_id": "5231512140",
+   "username": "bfeinber42",
+   "points": 107.8,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Ryan Gusto",
+    "Sonny Gray"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 53.45,
+   "n_cheap": 0,
+   "players_norm": [
+    "cj abrams",
+    "connor norby",
+    "daylen lile",
+    "hunter goodman",
+    "jake mccarthy",
+    "jarren duran",
+    "mickey gasper",
+    "ryan gusto",
+    "sonny gray",
+    "willi castro"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "7",
+   "entry_id": "5231515188",
+   "username": "Seefeldt96",
+   "points": 106.8,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Ryan Gusto",
+    "Sonny Gray"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 50.34,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "cj abrams",
+    "daylen lile",
+    "hunter goodman",
+    "jake mccarthy",
+    "mickey gasper",
+    "ryan gusto",
+    "sonny gray",
+    "tj rumfield",
+    "troy johnston"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "8",
+   "entry_id": "5231495578",
+   "username": "KRISTIAN0007",
+   "points": 105.8,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [
+    "Ryan Gusto",
+    "Sonny Gray"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 50.0,
+   "n_cheap": 0,
+   "players_norm": [
+    "cj abrams",
+    "connor norby",
+    "daylen lile",
+    "heriberto hernandez",
+    "hunter goodman",
+    "jarren duran",
+    "mickey gasper",
+    "ryan gusto",
+    "sonny gray",
+    "willi castro"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "9",
+   "entry_id": "5231518578",
+   "username": "d9144",
+   "points": 100.8,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Ryan Gusto",
+    "Sonny Gray"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 45.86,
+   "n_cheap": 0,
+   "players_norm": [
+    "cj abrams",
+    "connor norby",
+    "daylen lile",
+    "dylan crews",
+    "harry ford",
+    "jake mccarthy",
+    "jose tena",
+    "ryan gusto",
+    "sonny gray",
+    "willi castro"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "10",
+   "entry_id": "5231397820",
+   "username": "astro247",
+   "points": 100.75,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Ryan Gusto",
+    "Will Dion"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 42.76,
+   "n_cheap": 0,
+   "players_norm": [
+    "cj abrams",
+    "hunter goodman",
+    "jake mccarthy",
+    "javier sanoja",
+    "kyle stowers",
+    "mickey moniak",
+    "ryan gusto",
+    "will dion",
+    "willi castro",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "11",
+   "entry_id": "5231402726",
+   "username": "jklodawizard",
+   "points": 98.6,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Sonny Gray",
+    "Tanner Gordon"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 44.14,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "ceddanne rafaela",
+    "cj abrams",
+    "heriberto hernandez",
+    "hunter goodman",
+    "owen caissie",
+    "sonny gray",
+    "tanner gordon",
+    "tj rumfield",
+    "willi castro"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "12",
+   "entry_id": "5231459455",
+   "username": "samirnj",
+   "points": 92.8,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Ryan Gusto",
+    "Sonny Gray"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 46.55,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres chaparro",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "cj abrams",
+    "daylen lile",
+    "dylan crews",
+    "hunter goodman",
+    "jose tena",
+    "ryan gusto",
+    "sonny gray"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "13",
+   "entry_id": "5231447726",
+   "username": "higgins21fan",
+   "points": 89.85,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Sonny Gray",
+    "Will Dion"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 46.21,
+   "n_cheap": 0,
+   "players_norm": [
+    "cj abrams",
+    "daylen lile",
+    "hunter goodman",
+    "jake mccarthy",
+    "javier sanoja",
+    "kyle stowers",
+    "mickey gasper",
+    "mickey moniak",
+    "sonny gray",
+    "will dion"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "14",
+   "entry_id": "5231426710",
+   "username": "SlobberKnockers1",
+   "points": 89.8,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [
+    "Ryan Gusto",
+    "Sonny Gray"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 49.66,
+   "n_cheap": 0,
+   "players_norm": [
+    "cj abrams",
+    "connor norby",
+    "daylen lile",
+    "jake mccarthy",
+    "jarren duran",
+    "mickey gasper",
+    "ryan gusto",
+    "sonny gray",
+    "willi castro",
+    "xavier edwards"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "15",
+   "entry_id": "5231473688",
+   "username": "bleeski",
+   "points": 88.8,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Ryan Gusto",
+    "Sonny Gray"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 45.52,
+   "n_cheap": 0,
+   "players_norm": [
+    "abimelec ortiz",
+    "cj abrams",
+    "daylen lile",
+    "dylan crews",
+    "hunter goodman",
+    "nasim nunez",
+    "ryan gusto",
+    "sonny gray",
+    "troy johnston",
+    "willi castro"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "16",
+   "entry_id": "5231513680",
+   "username": "jadogogmx",
+   "points": 83.6,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Sonny Gray",
+    "Tanner Gordon"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 47.24,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony seigler",
+    "cj abrams",
+    "jake mccarthy",
+    "jarren duran",
+    "mickey gasper",
+    "sonny gray",
+    "tanner gordon",
+    "tj rumfield",
+    "willi castro",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "17",
+   "entry_id": "5231518985",
+   "username": "SkipperRush",
+   "points": 80.75,
+   "salary_used": 47400,
+   "salary_left": 2600,
+   "sp_pair": [
+    "Ryan Gusto",
+    "Will Dion"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 37.24,
+   "n_cheap": 0,
+   "players_norm": [
+    "cj abrams",
+    "dylan crews",
+    "griffin conine",
+    "heriberto hernandez",
+    "hunter goodman",
+    "kyle stowers",
+    "ryan gusto",
+    "will dion",
+    "willi castro",
+    "xavier edwards"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "18",
+   "entry_id": "5231397777",
+   "username": "nickenyon6",
+   "points": 79.85,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Sonny Gray",
+    "Will Dion"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 47.59,
+   "n_cheap": 0,
+   "players_norm": [
+    "andres chaparro",
+    "caleb durbin",
+    "cj abrams",
+    "daylen lile",
+    "dylan crews",
+    "hunter goodman",
+    "jose tena",
+    "sonny gray",
+    "will dion",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "19",
+   "entry_id": "5231468106",
+   "username": "apenn21",
+   "points": 73.8,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Ryan Gusto",
+    "Sonny Gray"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 47.24,
+   "n_cheap": 0,
+   "players_norm": [
+    "abimelec ortiz",
+    "cj abrams",
+    "cole carrigg",
+    "heriberto hernandez",
+    "mickey gasper",
+    "nick sogard",
+    "ryan gusto",
+    "sonny gray",
+    "willi castro",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "20",
+   "entry_id": "5231484202",
+   "username": "jegan4776",
+   "points": 71.6,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Sonny Gray",
+    "Tanner Gordon"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 49.66,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "ceddanne rafaela",
+    "cj abrams",
+    "jarren duran",
+    "mickey gasper",
+    "sonny gray",
+    "tanner gordon",
+    "tj rumfield",
+    "willi castro",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "21",
+   "entry_id": "5231520078",
+   "username": "jgunn26",
+   "points": 65.6,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Sonny Gray",
+    "Tanner Gordon"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 48.62,
+   "n_cheap": 0,
+   "players_norm": [
+    "ceddanne rafaela",
+    "cj abrams",
+    "jarren duran",
+    "mickey gasper",
+    "nick sogard",
+    "sonny gray",
+    "tanner gordon",
+    "tj rumfield",
+    "willi castro",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "22",
+   "entry_id": "5231440038",
+   "username": "wilsonsoup",
+   "points": 60.85,
+   "salary_used": 46600,
+   "salary_left": 3400,
+   "sp_pair": [
+    "Sonny Gray",
+    "Will Dion"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 41.72,
+   "n_cheap": 0,
+   "players_norm": [
+    "ceddanne rafaela",
+    "daylen lile",
+    "mickey gasper",
+    "mickey moniak",
+    "nick sogard",
+    "otto lopez",
+    "sonny gray",
+    "tj rumfield",
+    "will dion",
+    "willi castro"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "23",
+   "entry_id": "5231512538",
+   "username": "browns2k",
+   "points": 57.85,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Sonny Gray",
+    "Will Dion"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 46.55,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "ceddanne rafaela",
+    "cj abrams",
+    "cole carrigg",
+    "mickey gasper",
+    "nick sogard",
+    "sonny gray",
+    "tj rumfield",
+    "will dion",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "24",
+   "entry_id": "5231475225",
+   "username": "jakethesnake83",
+   "points": 55.85,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Sonny Gray",
+    "Will Dion"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 53.1,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "cj abrams",
+    "daylen lile",
+    "dylan crews",
+    "mickey gasper",
+    "sonny gray",
+    "tj rumfield",
+    "will dion",
+    "willi castro",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "25",
+   "entry_id": "5231512580",
+   "username": "wackkattack34",
+   "points": 52.8,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Ryan Gusto",
+    "Sonny Gray"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 52.07,
+   "n_cheap": 0,
+   "players_norm": [
+    "abimelec ortiz",
+    "caleb durbin",
+    "cj abrams",
+    "daylen lile",
+    "jake mccarthy",
+    "mickey gasper",
+    "nick sogard",
+    "ryan gusto",
+    "sonny gray",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "26",
+   "entry_id": "5231488777",
+   "username": "smittyderek",
+   "points": 46.85,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Sonny Gray",
+    "Will Dion"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 47.59,
+   "n_cheap": 0,
+   "players_norm": [
+    "abimelec ortiz",
+    "caleb durbin",
+    "ceddanne rafaela",
+    "cj abrams",
+    "hunter goodman",
+    "jose tena",
+    "nick sogard",
+    "sonny gray",
+    "will dion",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "27",
+   "entry_id": "5231416767",
+   "username": "WHITGAR",
+   "points": 39.85,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Sonny Gray",
+    "Will Dion"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 50.34,
+   "n_cheap": 0,
+   "players_norm": [
+    "ceddanne rafaela",
+    "cj abrams",
+    "griffin conine",
+    "jake mccarthy",
+    "mickey gasper",
+    "nick sogard",
+    "sonny gray",
+    "will dion",
+    "willi castro",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "28",
+   "entry_id": "5231450584",
+   "username": "callahanm328",
+   "points": 33.85,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Sonny Gray",
+    "Will Dion"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 52.07,
+   "n_cheap": 0,
+   "players_norm": [
+    "ceddanne rafaela",
+    "cj abrams",
+    "daylen lile",
+    "kyle stowers",
+    "mickey gasper",
+    "nick sogard",
+    "sonny gray",
+    "will dion",
+    "willi castro",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "29",
+   "entry_id": "5231496150",
+   "username": "kimberlylair",
+   "points": 30.85,
+   "salary_used": 47100,
+   "salary_left": 2900,
+   "sp_pair": [
+    "Sonny Gray",
+    "Will Dion"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 43.45,
+   "n_cheap": 1,
+   "players_norm": [
+    "abimelec ortiz",
+    "caleb durbin",
+    "cj abrams",
+    "connor wong",
+    "daylen lile",
+    "jarren duran",
+    "jose tena",
+    "sonny gray",
+    "will dion",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  }
+ ],
+ "player_table": [
+  {
+   "player": "Sonny Gray",
+   "player_norm": "sonny gray",
+   "roster_position": "P",
+   "pct_drafted": 93.1,
+   "fpts": 12.45
+  },
+  {
+   "player": "CJ Abrams",
+   "player_norm": "cj abrams",
+   "roster_position": "SS",
+   "pct_drafted": 82.76,
+   "fpts": 0.0
+  },
+  {
+   "player": "Willi Castro",
+   "player_norm": "willi castro",
+   "roster_position": "2B",
+   "pct_drafted": 65.52,
+   "fpts": 8.0
+  },
+  {
+   "player": "Hunter Goodman",
+   "player_norm": "hunter goodman",
+   "roster_position": "C",
+   "pct_drafted": 55.17,
+   "fpts": 21.0
+  },
+  {
+   "player": "Wilyer Abreu",
+   "player_norm": "wilyer abreu",
+   "roster_position": "OF",
+   "pct_drafted": 51.72,
+   "fpts": 2.0
+  },
+  {
+   "player": "Daylen Lile",
+   "player_norm": "daylen lile",
+   "roster_position": "OF",
+   "pct_drafted": 51.72,
+   "fpts": 0.0
+  },
+  {
+   "player": "Mickey Gasper",
+   "player_norm": "mickey gasper",
+   "roster_position": "C",
+   "pct_drafted": 51.72,
+   "fpts": 2.0
+  },
+  {
+   "player": "Jake McCarthy",
+   "player_norm": "jake mccarthy",
+   "roster_position": "OF",
+   "pct_drafted": 48.28,
+   "fpts": 15.0
+  },
+  {
+   "player": "Ryan Gusto",
+   "player_norm": "ryan gusto",
+   "roster_position": "P",
+   "pct_drafted": 44.83,
+   "fpts": 15.35
+  },
+  {
+   "player": "Caleb Durbin",
+   "player_norm": "caleb durbin",
+   "roster_position": "3B",
+   "pct_drafted": 41.38,
+   "fpts": 6.0
+  },
+  {
+   "player": "Will Dion",
+   "player_norm": "will dion",
+   "roster_position": "P",
+   "pct_drafted": 37.93,
+   "fpts": 0.4
+  },
+  {
+   "player": "Ceddanne Rafaela",
+   "player_norm": "ceddanne rafaela",
+   "roster_position": "OF",
+   "pct_drafted": 34.48,
+   "fpts": 0.0
+  },
+  {
+   "player": "Nick Sogard",
+   "player_norm": "nick sogard",
+   "roster_position": "2B",
+   "pct_drafted": 31.03,
+   "fpts": 0.0
+  },
+  {
+   "player": "Dylan Crews",
+   "player_norm": "dylan crews",
+   "roster_position": "OF",
+   "pct_drafted": 27.59,
+   "fpts": 11.0
+  },
+  {
+   "player": "TJ Rumfield",
+   "player_norm": "tj rumfield",
+   "roster_position": "1B",
+   "pct_drafted": 27.59,
+   "fpts": 14.0
+  },
+  {
+   "player": "Tanner Gordon",
+   "player_norm": "tanner gordon",
+   "roster_position": "P",
+   "pct_drafted": 24.14,
+   "fpts": 24.15
+  },
+  {
+   "player": "Jarren Duran",
+   "player_norm": "jarren duran",
+   "roster_position": "OF",
+   "pct_drafted": 24.14,
+   "fpts": 3.0
+  },
+  {
+   "player": "Abimelec Ortiz",
+   "player_norm": "abimelec ortiz",
+   "roster_position": "1B",
+   "pct_drafted": 24.14,
+   "fpts": 0.0
+  },
+  {
+   "player": "Jose Tena",
+   "player_norm": "jose tena",
+   "roster_position": "2B",
+   "pct_drafted": 24.14,
+   "fpts": 5.0
+  },
+  {
+   "player": "Kyle Stowers",
+   "player_norm": "kyle stowers",
+   "roster_position": "1B",
+   "pct_drafted": 20.69,
+   "fpts": 9.0
+  },
+  {
+   "player": "Xavier Edwards",
+   "player_norm": "xavier edwards",
+   "roster_position": "2B",
+   "pct_drafted": 17.24,
+   "fpts": 3.0
+  },
+  {
+   "player": "Connor Norby",
+   "player_norm": "connor norby",
+   "roster_position": "1B",
+   "pct_drafted": 17.24,
+   "fpts": 31.0
+  },
+  {
+   "player": "Cole Carrigg",
+   "player_norm": "cole carrigg",
+   "roster_position": "SS",
+   "pct_drafted": 13.79,
+   "fpts": 21.0
+  },
+  {
+   "player": "Mickey Moniak",
+   "player_norm": "mickey moniak",
+   "roster_position": "OF",
+   "pct_drafted": 13.79,
+   "fpts": 4.0
+  },
+  {
+   "player": "Heriberto Hernandez",
+   "player_norm": "heriberto hernandez",
+   "roster_position": "OF",
+   "pct_drafted": 13.79,
+   "fpts": 13.0
+  },
+  {
+   "player": "Otto Lopez",
+   "player_norm": "otto lopez",
+   "roster_position": "SS",
+   "pct_drafted": 10.34,
+   "fpts": 20.0
+  },
+  {
+   "player": "Andres Chaparro",
+   "player_norm": "andres chaparro",
+   "roster_position": "1B",
+   "pct_drafted": 10.34,
+   "fpts": 22.0
+  },
+  {
+   "player": "Griffin Conine",
+   "player_norm": "griffin conine",
+   "roster_position": "1B",
+   "pct_drafted": 6.9,
+   "fpts": 0.0
+  },
+  {
+   "player": "Javier Sanoja",
+   "player_norm": "javier sanoja",
+   "roster_position": "3B",
+   "pct_drafted": 6.9,
+   "fpts": 26.0
+  },
+  {
+   "player": "Troy Johnston",
+   "player_norm": "troy johnston",
+   "roster_position": "OF",
+   "pct_drafted": 6.9,
+   "fpts": 21.0
+  },
+  {
+   "player": "Harry Ford",
+   "player_norm": "harry ford",
+   "roster_position": "C",
+   "pct_drafted": 3.45,
+   "fpts": 3.0
+  },
+  {
+   "player": "Nasim Nunez",
+   "player_norm": "nasim nunez",
+   "roster_position": "2B",
+   "pct_drafted": 3.45,
+   "fpts": 0.0
+  },
+  {
+   "player": "Anthony Seigler",
+   "player_norm": "anthony seigler",
+   "roster_position": "2B",
+   "pct_drafted": 3.45,
+   "fpts": 3.0
+  },
+  {
+   "player": "Owen Caissie",
+   "player_norm": "owen caissie",
+   "roster_position": "OF",
+   "pct_drafted": 3.45,
+   "fpts": 0.0
+  },
+  {
+   "player": "Ezequiel Tovar",
+   "player_norm": "ezequiel tovar",
+   "roster_position": "SS",
+   "pct_drafted": 3.45,
+   "fpts": 17.0
+  },
+  {
+   "player": "Connor Wong",
+   "player_norm": "connor wong",
+   "roster_position": "C",
+   "pct_drafted": 3.45,
+   "fpts": 2.0
+  }
+ ],
+ "own_results": {
+  "matched": 1,
+  "requested": 1,
+  "field_size": 29,
+  "best_rank": 15,
+  "worst_rank": 15,
+  "best_finish_percentile": 51.72,
+  "median_finish_percentile": 51.72,
+  "best_points": 88.8,
+  "winning_points": 143.6,
+  "own_lineups_duplicated_by_field": 0,
+  "max_copies_of_an_own_lineup": 1,
+  "entry_fee": null,
+  "fees_total": null,
+  "winnings_total": null,
+  "paid_places": null,
+  "payout_breadth_observed": null,
+  "cashed_entries": null,
+  "net": null,
+  "labels": "observed outcomes from a completed contest; never a graded prediction, ROI model, win rate, or probability claim"
+ }
+}

@@ -1,0 +1,1180 @@
+{
+ "label": "deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied",
+ "version": "0.5-review",
+ "coverage": "full",
+ "contest_id": "194426112",
+ "slate_date": "2026-08-25",
+ "contest_type": "classic",
+ "meta": {
+  "entries_total": 23,
+  "entries_complete_lineups": 23,
+  "roster_size": 10,
+  "entries_unparsed": 0,
+  "winning_points": 123.95,
+  "winning_entry_id": "5230235134",
+  "multi_entry_flag": false
+ },
+ "duplication": {
+  "distinct_lineups": 23,
+  "entries_in_duplicated_lineups": 0,
+  "share_duplicated_pct": 0.0,
+  "max_copies": 1,
+  "copies_histogram": {
+   "1": 23
+  },
+  "winner_copies": 1
+ },
+ "construction": {
+  "cheap_salary_threshold": 2500,
+  "at_cap_entries": 10,
+  "at_cap_share_pct": 43.5,
+  "salary_left_histogram": {
+   "301-700": 4,
+   "<= 0": 4,
+   "101-300": 5,
+   "701-1500": 3,
+   "1-100": 6,
+   "> 1500": 1
+  },
+  "max_stack_histogram": {
+   "3": 5,
+   "4": 7,
+   "5": 11
+  },
+  "sp_pair_top": [
+   {
+    "pair": [
+     "Ian Seymour",
+     "Payton Tolle"
+    ],
+    "count": 8,
+    "field_share_pct": 34.8
+   },
+   {
+    "pair": [
+     "Andrew Alvarez",
+     "Payton Tolle"
+    ],
+    "count": 5,
+    "field_share_pct": 21.7
+   },
+   {
+    "pair": [
+     "Jackson Jobe",
+     "Payton Tolle"
+    ],
+    "count": 3,
+    "field_share_pct": 13.0
+   },
+   {
+    "pair": [
+     "Payton Tolle",
+     "Tyler Phillips"
+    ],
+    "count": 3,
+    "field_share_pct": 13.0
+   },
+   {
+    "pair": [
+     "Andrew Alvarez",
+     "Ian Seymour"
+    ],
+    "count": 1,
+    "field_share_pct": 4.3
+   },
+   {
+    "pair": [
+     "Andrew Alvarez",
+     "Jackson Jobe"
+    ],
+    "count": 1,
+    "field_share_pct": 4.3
+   },
+   {
+    "pair": [
+     "Andrew Alvarez",
+     "Tyler Phillips"
+    ],
+    "count": 1,
+    "field_share_pct": 4.3
+   },
+   {
+    "pair": [
+     "Jackson Jobe",
+     "Tyler Phillips"
+    ],
+    "count": 1,
+    "field_share_pct": 4.3
+   }
+  ],
+  "top_owned": [
+   {
+    "player": "Payton Tolle",
+    "pct_drafted": 82.61
+   },
+   {
+    "player": "CJ Abrams",
+    "pct_drafted": 73.91
+   },
+   {
+    "player": "Daylen Lile",
+    "pct_drafted": 69.57
+   },
+   {
+    "player": "Abimelec Ortiz",
+    "pct_drafted": 52.17
+   },
+   {
+    "player": "Dylan Crews",
+    "pct_drafted": 47.83
+   }
+  ],
+  "captain_table": [],
+  "winner_captain": null
+ },
+ "diagnostics": {
+  "salary_join_rate_pct": 100.0,
+  "unmatched_names_top": [],
+  "salary_name_collisions": [],
+  "ownership_recompute_max_diff_pts": 0.0,
+  "ownership_recompute_denominator": "all_entries",
+  "ownership_recompute_ok": true,
+  "parse_structural_ok": true,
+  "parsed_nothing": false,
+  "mostly_unparsed": false,
+  "contest_type_mismatch": false,
+  "salary_join_collapsed": false,
+  "entries_unparsed_share": 0.0,
+  "intra_entry_duplicate_entry_ids": [],
+  "roster_slots_observed": 230,
+  "roster_slots_expected": 230,
+  "recomputed_total_pct": 1000.0,
+  "dk_table_total_pct": 1000.0,
+  "dk_table_deficit_pts": 0.0,
+  "dk_table_agrees": true,
+  "verification_note": "parse structurally sound; DK %Drafted agrees with the lineup recompute"
+ },
+ "entries": [
+  {
+   "rank": "1",
+   "entry_id": "5230235134",
+   "username": "Elwaysarmy",
+   "points": 123.95,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Jackson Jobe",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 33.48,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "daylen lile",
+    "gleyber torres",
+    "hao yu lee",
+    "jackson jobe",
+    "jarren duran",
+    "mickey gasper",
+    "payton tolle",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "2",
+   "entry_id": "5230271958",
+   "username": "snellman",
+   "points": 120.7,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Andrew Alvarez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 48.26,
+   "n_cheap": 0,
+   "players_norm": [
+    "abimelec ortiz",
+    "andrew alvarez",
+    "cj abrams",
+    "daylen lile",
+    "dylan crews",
+    "hao yu lee",
+    "jarren duran",
+    "junior caminero",
+    "mickey gasper",
+    "payton tolle"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "3",
+   "entry_id": "5230334514",
+   "username": "ayoung1327",
+   "points": 113.95,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Ian Seymour",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 43.91,
+   "n_cheap": 0,
+   "players_norm": [
+    "brady house",
+    "cj abrams",
+    "daylen lile",
+    "ian seymour",
+    "jacob young",
+    "jarren duran",
+    "mickey gasper",
+    "nasim nunez",
+    "payton tolle",
+    "yandy diaz"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "4",
+   "entry_id": "5230314112",
+   "username": "KILLANADZ24",
+   "points": 112.95,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Ian Seymour",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 47.39,
+   "n_cheap": 0,
+   "players_norm": [
+    "abimelec ortiz",
+    "ceddanne rafaela",
+    "cj abrams",
+    "daylen lile",
+    "ian seymour",
+    "jarren duran",
+    "javier sanoja",
+    "mickey gasper",
+    "nick sogard",
+    "payton tolle"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "5",
+   "entry_id": "5230334023",
+   "username": "Bay101",
+   "points": 108.95,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Ian Seymour",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 47.39,
+   "n_cheap": 1,
+   "players_norm": [
+    "abimelec ortiz",
+    "brady house",
+    "cj abrams",
+    "daylen lile",
+    "ian seymour",
+    "jarren duran",
+    "jorbit vivas",
+    "mickey gasper",
+    "payton tolle",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "6",
+   "entry_id": "5230270647",
+   "username": "DicVec",
+   "points": 99.95,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Ian Seymour",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 44.35,
+   "n_cheap": 0,
+   "players_norm": [
+    "abimelec ortiz",
+    "ceddanne rafaela",
+    "cj abrams",
+    "daylen lile",
+    "ian seymour",
+    "jacob young",
+    "mickey gasper",
+    "nasim nunez",
+    "payton tolle",
+    "yandy diaz"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "7",
+   "entry_id": "5230240834",
+   "username": "skibumb124",
+   "points": 96.7,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Andrew Alvarez",
+    "Payton Tolle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 46.09,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew alvarez",
+    "ceddanne rafaela",
+    "cj abrams",
+    "daylen lile",
+    "dylan crews",
+    "hao yu lee",
+    "mickey gasper",
+    "nick sogard",
+    "payton tolle",
+    "yandy diaz"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "8",
+   "entry_id": "5230277669",
+   "username": "eebob2072",
+   "points": 93.85,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Andrew Alvarez",
+    "Ian Seymour"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 44.35,
+   "n_cheap": 0,
+   "players_norm": [
+    "abimelec ortiz",
+    "andrew alvarez",
+    "chandler simpson",
+    "cj abrams",
+    "daylen lile",
+    "dylan crews",
+    "ian seymour",
+    "junior caminero",
+    "mickey gasper",
+    "nick sogard"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "9",
+   "entry_id": "5230352876",
+   "username": "Noflyzone52",
+   "points": 93.3,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Payton Tolle",
+    "Tyler Phillips"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 40.0,
+   "n_cheap": 1,
+   "players_norm": [
+    "abimelec ortiz",
+    "cj abrams",
+    "daylen lile",
+    "dillon dingler",
+    "dylan crews",
+    "jorbit vivas",
+    "junior caminero",
+    "max clark",
+    "payton tolle",
+    "tyler phillips"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "10",
+   "entry_id": "5230233946",
+   "username": "dmann8888",
+   "points": 92.95,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Ian Seymour",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 51.74,
+   "n_cheap": 0,
+   "players_norm": [
+    "abimelec ortiz",
+    "brady house",
+    "ceddanne rafaela",
+    "cj abrams",
+    "daylen lile",
+    "dylan crews",
+    "ian seymour",
+    "mickey gasper",
+    "nick sogard",
+    "payton tolle"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "11",
+   "entry_id": "5230271094",
+   "username": "Mackdawg44",
+   "points": 86.7,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Andrew Alvarez",
+    "Payton Tolle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 43.04,
+   "n_cheap": 1,
+   "players_norm": [
+    "abimelec ortiz",
+    "andrew alvarez",
+    "chandler simpson",
+    "cj abrams",
+    "connor wong",
+    "daylen lile",
+    "jarren duran",
+    "junior caminero",
+    "nick sogard",
+    "payton tolle"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "11",
+   "entry_id": "5230351924",
+   "username": "ep3550",
+   "points": 86.7,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Andrew Alvarez",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 40.0,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew alvarez",
+    "brady house",
+    "ceddanne rafaela",
+    "daylen lile",
+    "jonathan aranda",
+    "kevin mcgonigle",
+    "mickey gasper",
+    "nick sogard",
+    "payton tolle",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "13",
+   "entry_id": "5230325547",
+   "username": "jrmurphy2",
+   "points": 81.7,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Andrew Alvarez",
+    "Payton Tolle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 27.83,
+   "n_cheap": 2,
+   "players_norm": [
+    "andrew alvarez",
+    "jarren duran",
+    "jordan beck",
+    "junior caminero",
+    "liam hicks",
+    "nasim nunez",
+    "payton tolle",
+    "ryan ritter",
+    "wilyer abreu",
+    "yandy diaz"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "14",
+   "entry_id": "5230271880",
+   "username": "Nbot11",
+   "points": 78.95,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Ian Seymour",
+    "Payton Tolle"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-1-1-1",
+   "chalk_score": 30.87,
+   "n_cheap": 1,
+   "players_norm": [
+    "ian seymour",
+    "jake mccarthy",
+    "javier sanoja",
+    "jonathan aranda",
+    "jordan beck",
+    "kevin mcgonigle",
+    "mickey gasper",
+    "nick sogard",
+    "payton tolle",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "15",
+   "entry_id": "5230343318",
+   "username": "ouroboros0",
+   "points": 77.95,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Ian Seymour",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 48.26,
+   "n_cheap": 0,
+   "players_norm": [
+    "abimelec ortiz",
+    "agustin ramirez",
+    "brady house",
+    "cj abrams",
+    "daylen lile",
+    "dylan crews",
+    "ian seymour",
+    "jarren duran",
+    "nick sogard",
+    "payton tolle"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "16",
+   "entry_id": "5230266345",
+   "username": "Bankster17",
+   "points": 73.95,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Ian Seymour",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 47.39,
+   "n_cheap": 1,
+   "players_norm": [
+    "abimelec ortiz",
+    "brady house",
+    "cj abrams",
+    "daylen lile",
+    "dylan crews",
+    "ian seymour",
+    "jordan beck",
+    "liam hicks",
+    "nick sogard",
+    "payton tolle"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "17",
+   "entry_id": "5230319837",
+   "username": "djprymek",
+   "points": 72.85,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Andrew Alvarez",
+    "Jackson Jobe"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 35.65,
+   "n_cheap": 0,
+   "players_norm": [
+    "abimelec ortiz",
+    "andrew alvarez",
+    "cj abrams",
+    "daylen lile",
+    "dillon dingler",
+    "dylan crews",
+    "gleyber torres",
+    "jackson jobe",
+    "kevin mcgonigle",
+    "max clark"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "18",
+   "entry_id": "5230313968",
+   "username": "andrewp332",
+   "points": 72.3,
+   "salary_used": 47800,
+   "salary_left": 2200,
+   "sp_pair": [
+    "Payton Tolle",
+    "Tyler Phillips"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 20.0,
+   "n_cheap": 1,
+   "players_norm": [
+    "cole carrigg",
+    "hao yu lee",
+    "hunter goodman",
+    "jake mccarthy",
+    "kevin mcgonigle",
+    "mickey moniak",
+    "payton tolle",
+    "ryan ritter",
+    "spencer torkelson",
+    "tyler phillips"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "19",
+   "entry_id": "5230292793",
+   "username": "bleeski",
+   "points": 70.2,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Andrew Alvarez",
+    "Tyler Phillips"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 33.91,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew alvarez",
+    "chandler simpson",
+    "cj abrams",
+    "daylen lile",
+    "dylan crews",
+    "gleyber torres",
+    "jonathan aranda",
+    "liam hicks",
+    "tyler phillips",
+    "yandy diaz"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "20",
+   "entry_id": "5230287726",
+   "username": "RDJordan123",
+   "points": 68.3,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Payton Tolle",
+    "Tyler Phillips"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 30.87,
+   "n_cheap": 0,
+   "players_norm": [
+    "brady house",
+    "chandler simpson",
+    "cj abrams",
+    "cole carrigg",
+    "gleyber torres",
+    "jonathan aranda",
+    "liam hicks",
+    "max clark",
+    "payton tolle",
+    "tyler phillips"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "21",
+   "entry_id": "5230234940",
+   "username": "pat_the_hat2",
+   "points": 61.45,
+   "salary_used": 48700,
+   "salary_left": 1300,
+   "sp_pair": [
+    "Jackson Jobe",
+    "Tyler Phillips"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 23.48,
+   "n_cheap": 0,
+   "players_norm": [
+    "cj abrams",
+    "dylan crews",
+    "hunter goodman",
+    "jackson jobe",
+    "jake mccarthy",
+    "mickey moniak",
+    "nasim nunez",
+    "tj rumfield",
+    "tyler phillips",
+    "willi castro"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "22",
+   "entry_id": "5230291242",
+   "username": "djensen221",
+   "points": 59.95,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Jackson Jobe",
+    "Payton Tolle"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 27.39,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "brady house",
+    "ceddanne rafaela",
+    "connor norby",
+    "dylan crews",
+    "harry ford",
+    "jackson jobe",
+    "payton tolle",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "23",
+   "entry_id": "5230219545",
+   "username": "Mige1",
+   "points": 54.95,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Jackson Jobe",
+    "Payton Tolle"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 33.04,
+   "n_cheap": 0,
+   "players_norm": [
+    "abimelec ortiz",
+    "brady house",
+    "cj abrams",
+    "harry ford",
+    "jackson jobe",
+    "jacob young",
+    "jake mccarthy",
+    "mickey moniak",
+    "payton tolle",
+    "willi castro"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  }
+ ],
+ "player_table": [
+  {
+   "player": "Payton Tolle",
+   "player_norm": "payton tolle",
+   "roster_position": "P",
+   "pct_drafted": 82.61,
+   "fpts": 18.4
+  },
+  {
+   "player": "CJ Abrams",
+   "player_norm": "cj abrams",
+   "roster_position": "SS",
+   "pct_drafted": 73.91,
+   "fpts": 0.0
+  },
+  {
+   "player": "Daylen Lile",
+   "player_norm": "daylen lile",
+   "roster_position": "OF",
+   "pct_drafted": 69.57,
+   "fpts": 19.0
+  },
+  {
+   "player": "Abimelec Ortiz",
+   "player_norm": "abimelec ortiz",
+   "roster_position": "1B",
+   "pct_drafted": 52.17,
+   "fpts": 3.0
+  },
+  {
+   "player": "Dylan Crews",
+   "player_norm": "dylan crews",
+   "roster_position": "OF",
+   "pct_drafted": 47.83,
+   "fpts": 3.0
+  },
+  {
+   "player": "Mickey Gasper",
+   "player_norm": "mickey gasper",
+   "roster_position": "C",
+   "pct_drafted": 47.83,
+   "fpts": 32.0
+  },
+  {
+   "player": "Ian Seymour",
+   "player_norm": "ian seymour",
+   "roster_position": "P",
+   "pct_drafted": 39.13,
+   "fpts": 12.55
+  },
+  {
+   "player": "Nick Sogard",
+   "player_norm": "nick sogard",
+   "roster_position": "2B",
+   "pct_drafted": 39.13,
+   "fpts": 2.0
+  },
+  {
+   "player": "Brady House",
+   "player_norm": "brady house",
+   "roster_position": "3B",
+   "pct_drafted": 39.13,
+   "fpts": 0.0
+  },
+  {
+   "player": "Andrew Alvarez",
+   "player_norm": "andrew alvarez",
+   "roster_position": "P",
+   "pct_drafted": 34.78,
+   "fpts": 12.3
+  },
+  {
+   "player": "Jarren Duran",
+   "player_norm": "jarren duran",
+   "roster_position": "OF",
+   "pct_drafted": 34.78,
+   "fpts": 20.0
+  },
+  {
+   "player": "Wilyer Abreu",
+   "player_norm": "wilyer abreu",
+   "roster_position": "OF",
+   "pct_drafted": 26.09,
+   "fpts": 0.0
+  },
+  {
+   "player": "Ceddanne Rafaela",
+   "player_norm": "ceddanne rafaela",
+   "roster_position": "OF",
+   "pct_drafted": 26.09,
+   "fpts": 3.0
+  },
+  {
+   "player": "Jackson Jobe",
+   "player_norm": "jackson jobe",
+   "roster_position": "P",
+   "pct_drafted": 21.74,
+   "fpts": 11.55
+  },
+  {
+   "player": "Tyler Phillips",
+   "player_norm": "tyler phillips",
+   "roster_position": "P",
+   "pct_drafted": 21.74,
+   "fpts": 18.9
+  },
+  {
+   "player": "Junior Caminero",
+   "player_norm": "junior caminero",
+   "roster_position": "3B",
+   "pct_drafted": 21.74,
+   "fpts": 8.0
+  },
+  {
+   "player": "Yandy Diaz",
+   "player_norm": "yandy diaz",
+   "roster_position": "1B",
+   "pct_drafted": 21.74,
+   "fpts": 2.0
+  },
+  {
+   "player": "Kevin McGonigle",
+   "player_norm": "kevin mcgonigle",
+   "roster_position": "3B",
+   "pct_drafted": 17.39,
+   "fpts": 0.0
+  },
+  {
+   "player": "Liam Hicks",
+   "player_norm": "liam hicks",
+   "roster_position": "C",
+   "pct_drafted": 17.39,
+   "fpts": 8.0
+  },
+  {
+   "player": "Jake McCarthy",
+   "player_norm": "jake mccarthy",
+   "roster_position": "OF",
+   "pct_drafted": 17.39,
+   "fpts": 3.0
+  },
+  {
+   "player": "Jonathan Aranda",
+   "player_norm": "jonathan aranda",
+   "roster_position": "1B",
+   "pct_drafted": 17.39,
+   "fpts": 0.0
+  },
+  {
+   "player": "Gleyber Torres",
+   "player_norm": "gleyber torres",
+   "roster_position": "2B",
+   "pct_drafted": 17.39,
+   "fpts": 5.0
+  },
+  {
+   "player": "Chandler Simpson",
+   "player_norm": "chandler simpson",
+   "roster_position": "OF",
+   "pct_drafted": 17.39,
+   "fpts": 2.0
+  },
+  {
+   "player": "Nasim Nunez",
+   "player_norm": "nasim nunez",
+   "roster_position": "2B",
+   "pct_drafted": 17.39,
+   "fpts": 0.0
+  },
+  {
+   "player": "Hao-Yu Lee",
+   "player_norm": "hao yu lee",
+   "roster_position": "2B",
+   "pct_drafted": 17.39,
+   "fpts": 5.0
+  },
+  {
+   "player": "Mickey Moniak",
+   "player_norm": "mickey moniak",
+   "roster_position": "OF",
+   "pct_drafted": 13.04,
+   "fpts": 0.0
+  },
+  {
+   "player": "Max Clark",
+   "player_norm": "max clark",
+   "roster_position": "OF",
+   "pct_drafted": 13.04,
+   "fpts": 16.0
+  },
+  {
+   "player": "Jacob Young",
+   "player_norm": "jacob young",
+   "roster_position": "OF",
+   "pct_drafted": 13.04,
+   "fpts": 10.0
+  },
+  {
+   "player": "Jordan Beck",
+   "player_norm": "jordan beck",
+   "roster_position": "OF",
+   "pct_drafted": 13.04,
+   "fpts": 8.0
+  },
+  {
+   "player": "Willson Contreras",
+   "player_norm": "willson contreras",
+   "roster_position": "1B",
+   "pct_drafted": 8.7,
+   "fpts": 8.0
+  },
+  {
+   "player": "Dillon Dingler",
+   "player_norm": "dillon dingler",
+   "roster_position": "C",
+   "pct_drafted": 8.7,
+   "fpts": 3.0
+  },
+  {
+   "player": "Cole Carrigg",
+   "player_norm": "cole carrigg",
+   "roster_position": "OF",
+   "pct_drafted": 8.7,
+   "fpts": 0.0
+  },
+  {
+   "player": "Willi Castro",
+   "player_norm": "willi castro",
+   "roster_position": "2B",
+   "pct_drafted": 8.7,
+   "fpts": 7.0
+  },
+  {
+   "player": "Harry Ford",
+   "player_norm": "harry ford",
+   "roster_position": "C",
+   "pct_drafted": 8.7,
+   "fpts": 2.0
+  },
+  {
+   "player": "Andruw Monasterio",
+   "player_norm": "andruw monasterio",
+   "roster_position": "SS",
+   "pct_drafted": 8.7,
+   "fpts": 5.0
+  },
+  {
+   "player": "Javier Sanoja",
+   "player_norm": "javier sanoja",
+   "roster_position": "3B",
+   "pct_drafted": 8.7,
+   "fpts": 3.0
+  },
+  {
+   "player": "Jorbit Vivas",
+   "player_norm": "jorbit vivas",
+   "roster_position": "2B",
+   "pct_drafted": 8.7,
+   "fpts": 4.0
+  },
+  {
+   "player": "Ryan Ritter",
+   "player_norm": "ryan ritter",
+   "roster_position": "2B",
+   "pct_drafted": 8.7,
+   "fpts": 5.0
+  },
+  {
+   "player": "Hunter Goodman",
+   "player_norm": "hunter goodman",
+   "roster_position": "C",
+   "pct_drafted": 8.7,
+   "fpts": 14.0
+  },
+  {
+   "player": "TJ Rumfield",
+   "player_norm": "tj rumfield",
+   "roster_position": "1B",
+   "pct_drafted": 4.35,
+   "fpts": 4.0
+  },
+  {
+   "player": "Spencer Torkelson",
+   "player_norm": "spencer torkelson",
+   "roster_position": "1B",
+   "pct_drafted": 4.35,
+   "fpts": 8.0
+  },
+  {
+   "player": "Agustin Ramirez",
+   "player_norm": "agustin ramirez",
+   "roster_position": "C",
+   "pct_drafted": 4.35,
+   "fpts": 0.0
+  },
+  {
+   "player": "Connor Norby",
+   "player_norm": "connor norby",
+   "roster_position": "2B",
+   "pct_drafted": 4.35,
+   "fpts": 9.0
+  },
+  {
+   "player": "Connor Wong",
+   "player_norm": "connor wong",
+   "roster_position": "C",
+   "pct_drafted": 4.35,
+   "fpts": 2.0
+  }
+ ],
+ "own_results": {
+  "matched": 1,
+  "requested": 1,
+  "field_size": 23,
+  "best_rank": 19,
+  "worst_rank": 19,
+  "best_finish_percentile": 21.74,
+  "median_finish_percentile": 21.74,
+  "best_points": 70.2,
+  "winning_points": 123.95,
+  "own_lineups_duplicated_by_field": 0,
+  "max_copies_of_an_own_lineup": 1,
+  "entry_fee": 0.25,
+  "fees_total": 0.25,
+  "winnings_total": 0.0,
+  "paid_places": 1,
+  "payout_breadth_observed": 0.0435,
+  "cashed_entries": 0,
+  "net": -0.25,
+  "labels": "observed outcomes from a completed contest; never a graded prediction, ROI model, win rate, or probability claim"
+ }
+}

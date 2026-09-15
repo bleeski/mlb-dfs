@@ -1,0 +1,1781 @@
+{
+ "label": "deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied",
+ "version": "0.5-review",
+ "coverage": "full",
+ "contest_id": "194017595",
+ "slate_date": "2026-08-19",
+ "contest_type": "showdown",
+ "meta": {
+  "entries_total": 59,
+  "entries_complete_lineups": 59,
+  "roster_size": 6,
+  "entries_unparsed": 0,
+  "winning_points": 80.5,
+  "winning_entry_id": "5223915876",
+  "multi_entry_flag": false
+ },
+ "duplication": {
+  "distinct_lineups": 58,
+  "entries_in_duplicated_lineups": 2,
+  "share_duplicated_pct": 3.4,
+  "max_copies": 2,
+  "copies_histogram": {
+   "1": 57,
+   "2": 1
+  },
+  "winner_copies": 1
+ },
+ "construction": {
+  "cheap_salary_threshold": 3400,
+  "at_cap_entries": 22,
+  "at_cap_share_pct": 37.3,
+  "salary_left_histogram": {
+   "1-100": 9,
+   "> 1500": 5,
+   "701-1500": 12,
+   "<= 0": 13,
+   "101-300": 8,
+   "301-700": 12
+  },
+  "max_stack_histogram": {
+   "3": 14,
+   "4": 25,
+   "5": 20
+  },
+  "sp_pair_top": [],
+  "top_owned": [
+   {
+    "player": "Andy Pages",
+    "pct_drafted": 71.18
+   },
+   {
+    "player": "Shohei Ohtani",
+    "pct_drafted": 57.62
+   },
+   {
+    "player": "Teoscar Hernandez",
+    "pct_drafted": 47.45
+   },
+   {
+    "player": "Zac Veen",
+    "pct_drafted": 38.98
+   },
+   {
+    "player": "Mookie Betts",
+    "pct_drafted": 35.59
+   }
+  ],
+  "captain_table": [
+   {
+    "player": "Shohei Ohtani",
+    "captain_count": 11,
+    "captain_share_pct": 18.6,
+    "pct_drafted": 57.62
+   },
+   {
+    "player": "Andy Pages",
+    "captain_count": 7,
+    "captain_share_pct": 11.9,
+    "pct_drafted": 71.18
+   },
+   {
+    "player": "Mookie Betts",
+    "captain_count": 5,
+    "captain_share_pct": 8.5,
+    "pct_drafted": 35.59
+   },
+   {
+    "player": "Teoscar Hernandez",
+    "captain_count": 5,
+    "captain_share_pct": 8.5,
+    "pct_drafted": 47.45
+   },
+   {
+    "player": "Roki Sasaki",
+    "captain_count": 4,
+    "captain_share_pct": 6.8,
+    "pct_drafted": 32.2
+   },
+   {
+    "player": "Mickey Moniak",
+    "captain_count": 4,
+    "captain_share_pct": 6.8,
+    "pct_drafted": 30.51
+   },
+   {
+    "player": "Adael Amador",
+    "captain_count": 4,
+    "captain_share_pct": 6.8,
+    "pct_drafted": 33.9
+   },
+   {
+    "player": "Zac Veen",
+    "captain_count": 4,
+    "captain_share_pct": 6.8,
+    "pct_drafted": 38.98
+   }
+  ],
+  "winner_captain": {
+   "player": "Mookie Betts",
+   "pct_drafted": 35.59,
+   "captain_share_pct": 8.5,
+   "was_top_owned_captain": false
+  }
+ },
+ "diagnostics": {
+  "salary_join_rate_pct": 100.0,
+  "unmatched_names_top": [],
+  "salary_name_collisions": [],
+  "ownership_recompute_max_diff_pts": 0.01,
+  "ownership_recompute_denominator": "all_entries",
+  "ownership_recompute_ok": true,
+  "parse_structural_ok": true,
+  "parsed_nothing": false,
+  "mostly_unparsed": false,
+  "contest_type_mismatch": false,
+  "salary_join_collapsed": false,
+  "entries_unparsed_share": 0.0,
+  "intra_entry_duplicate_entry_ids": [],
+  "roster_slots_observed": 354,
+  "roster_slots_expected": 354,
+  "recomputed_total_pct": 600.0,
+  "dk_table_total_pct": 599.9,
+  "dk_table_deficit_pts": 0.1,
+  "dk_table_agrees": true,
+  "verification_note": "parse structurally sound; DK %Drafted agrees with the lineup recompute"
+ },
+ "entries": [
+  {
+   "rank": "1",
+   "entry_id": "5223915876",
+   "username": "Ldsimons3",
+   "points": 80.5,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 24.29,
+   "n_cheap": 0,
+   "players_norm": [
+    "cole carrigg",
+    "ezequiel tovar",
+    "kike hernandez",
+    "kyle freeland",
+    "mookie betts",
+    "roki sasaki"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "mookie betts"
+  },
+  {
+   "rank": "2",
+   "entry_id": "5224077830",
+   "username": "Stree",
+   "points": 78.675,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 37.85,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "ezequiel tovar",
+    "kike hernandez",
+    "mookie betts",
+    "roki sasaki",
+    "teoscar hernandez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "roki sasaki"
+  },
+  {
+   "rank": "3",
+   "entry_id": "5224007956",
+   "username": "bleeski",
+   "points": 73.45,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 32.76,
+   "n_cheap": 0,
+   "players_norm": [
+    "ezequiel tovar",
+    "kike hernandez",
+    "miguel rojas",
+    "mookie betts",
+    "roki sasaki",
+    "shohei ohtani"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "mookie betts"
+  },
+  {
+   "rank": "4",
+   "entry_id": "5224006892",
+   "username": "stroontz",
+   "points": 73.075,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 30.79,
+   "n_cheap": 0,
+   "players_norm": [
+    "adael amador",
+    "freddie freeman",
+    "kyle freeland",
+    "mickey moniak",
+    "mookie betts",
+    "zac veen"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "kyle freeland"
+  },
+  {
+   "rank": "5",
+   "entry_id": "5224032733",
+   "username": "CrazyNate96",
+   "points": 72.725,
+   "salary_used": 48300,
+   "salary_left": 1700,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 27.96,
+   "n_cheap": 0,
+   "players_norm": [
+    "ezequiel tovar",
+    "kike hernandez",
+    "kyle freeland",
+    "mookie betts",
+    "roki sasaki",
+    "zac veen"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "roki sasaki"
+  },
+  {
+   "rank": "6",
+   "entry_id": "5224079662",
+   "username": "josephje",
+   "points": 70.0,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 37.0,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "brett sullivan",
+    "jake mccarthy",
+    "mickey moniak",
+    "mookie betts",
+    "teoscar hernandez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "brett sullivan"
+  },
+  {
+   "rank": "7",
+   "entry_id": "5224076835",
+   "username": "tentguy42",
+   "points": 69.675,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 37.28,
+   "n_cheap": 1,
+   "players_norm": [
+    "ben rortvedt",
+    "connor norby",
+    "mookie betts",
+    "roki sasaki",
+    "shohei ohtani",
+    "teoscar hernandez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "roki sasaki"
+  },
+  {
+   "rank": "8",
+   "entry_id": "5224079373",
+   "username": "baseballtxc",
+   "points": 69.5,
+   "salary_used": 45800,
+   "salary_left": 4200,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 33.89,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "brett sullivan",
+    "connor norby",
+    "mickey moniak",
+    "miguel rojas",
+    "mookie betts"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "andy pages"
+  },
+  {
+   "rank": "9",
+   "entry_id": "5224107315",
+   "username": "Quin8000",
+   "points": 67.45,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 27.68,
+   "n_cheap": 1,
+   "players_norm": [
+    "ben rortvedt",
+    "freddie freeman",
+    "miguel rojas",
+    "mookie betts",
+    "roki sasaki",
+    "tj rumfield"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "mookie betts"
+  },
+  {
+   "rank": "10",
+   "entry_id": "5224105028",
+   "username": "jonjarvis",
+   "points": 65.0,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 31.07,
+   "n_cheap": 0,
+   "players_norm": [
+    "cole carrigg",
+    "freddie freeman",
+    "mickey moniak",
+    "miguel rojas",
+    "mookie betts",
+    "teoscar hernandez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "miguel rojas"
+  },
+  {
+   "rank": "11",
+   "entry_id": "5223151842",
+   "username": "BADM00N",
+   "points": 64.5,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 31.35,
+   "n_cheap": 0,
+   "players_norm": [
+    "adael amador",
+    "freddie freeman",
+    "jake mccarthy",
+    "mickey moniak",
+    "teoscar hernandez",
+    "tj rumfield"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "jake mccarthy"
+  },
+  {
+   "rank": "12",
+   "entry_id": "5223936467",
+   "username": "corruption79",
+   "points": 64.0,
+   "salary_used": 48200,
+   "salary_left": 1800,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 35.87,
+   "n_cheap": 0,
+   "players_norm": [
+    "adael amador",
+    "andy pages",
+    "jake mccarthy",
+    "mickey moniak",
+    "teoscar hernandez",
+    "willi castro"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "mickey moniak"
+  },
+  {
+   "rank": "13",
+   "entry_id": "5224076261",
+   "username": "Alancey",
+   "points": 63.55,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 32.48,
+   "n_cheap": 0,
+   "players_norm": [
+    "adael amador",
+    "andy pages",
+    "jake mccarthy",
+    "kyle freeland",
+    "kyle tucker",
+    "mickey moniak"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "adael amador"
+  },
+  {
+   "rank": "14",
+   "entry_id": "5224105417",
+   "username": "deathmetalbob",
+   "points": 62.55,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 25.98,
+   "n_cheap": 0,
+   "players_norm": [
+    "cole carrigg",
+    "jake mccarthy",
+    "kike hernandez",
+    "kyle freeland",
+    "mickey moniak",
+    "zac veen"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "cole carrigg"
+  },
+  {
+   "rank": "15",
+   "entry_id": "5223839897",
+   "username": "dmann8888",
+   "points": 62.0,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 40.96,
+   "n_cheap": 1,
+   "players_norm": [
+    "adael amador",
+    "andy pages",
+    "ben rortvedt",
+    "jake mccarthy",
+    "mickey moniak",
+    "shohei ohtani"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "mickey moniak"
+  },
+  {
+   "rank": "15",
+   "entry_id": "5224076129",
+   "username": "G-nice",
+   "points": 62.0,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 40.67,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "connor norby",
+    "miguel rojas",
+    "mookie betts",
+    "shohei ohtani",
+    "tj rumfield"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "mookie betts"
+  },
+  {
+   "rank": "17",
+   "entry_id": "5223983560",
+   "username": "Cxmc_28",
+   "points": 61.05,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 37.85,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "ezequiel tovar",
+    "jake mccarthy",
+    "kyle freeland",
+    "mookie betts",
+    "teoscar hernandez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "mookie betts"
+  },
+  {
+   "rank": "18",
+   "entry_id": "5223661187",
+   "username": "Bears133",
+   "points": 60.5,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 43.5,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "connor norby",
+    "mookie betts",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tj rumfield"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "teoscar hernandez"
+  },
+  {
+   "rank": "19",
+   "entry_id": "5224043846",
+   "username": "grantgoupil",
+   "points": 60.0,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 35.59,
+   "n_cheap": 0,
+   "players_norm": [
+    "adael amador",
+    "andy pages",
+    "cole carrigg",
+    "jake mccarthy",
+    "mickey moniak",
+    "miguel rojas"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "mickey moniak"
+  },
+  {
+   "rank": "20",
+   "entry_id": "5223817864",
+   "username": "KristianFTM",
+   "points": 57.5,
+   "salary_used": 48600,
+   "salary_left": 1400,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 39.83,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "connor norby",
+    "freddie freeman",
+    "miguel rojas",
+    "mookie betts",
+    "teoscar hernandez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "andy pages"
+  },
+  {
+   "rank": "21",
+   "entry_id": "5224025199",
+   "username": "118JLK",
+   "points": 55.5,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 34.46,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "brett sullivan",
+    "jake mccarthy",
+    "mickey moniak",
+    "teoscar hernandez",
+    "tj rumfield"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "jake mccarthy"
+  },
+  {
+   "rank": "22",
+   "entry_id": "5224070031",
+   "username": "cej23",
+   "points": 54.5,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 33.33,
+   "n_cheap": 0,
+   "players_norm": [
+    "freddie freeman",
+    "kike hernandez",
+    "miguel rojas",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tj rumfield"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "kike hernandez"
+  },
+  {
+   "rank": "23",
+   "entry_id": "5223400392",
+   "username": "whoisjohngalt420",
+   "points": 53.5,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 40.11,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "connor norby",
+    "kyle tucker",
+    "mookie betts",
+    "shohei ohtani",
+    "zac veen"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "andy pages"
+  },
+  {
+   "rank": "23",
+   "entry_id": "5224105913",
+   "username": "stewie14",
+   "points": 53.5,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 41.52,
+   "n_cheap": 0,
+   "players_norm": [
+    "adael amador",
+    "andy pages",
+    "kike hernandez",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tj rumfield"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "andy pages"
+  },
+  {
+   "rank": "25",
+   "entry_id": "5224100313",
+   "username": "SteelBowl7",
+   "points": 53.45,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 35.31,
+   "n_cheap": 1,
+   "players_norm": [
+    "adael amador",
+    "ben rortvedt",
+    "miguel rojas",
+    "mookie betts",
+    "roki sasaki",
+    "shohei ohtani"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "shohei ohtani"
+  },
+  {
+   "rank": "26",
+   "entry_id": "5224087284",
+   "username": "JohnZaps",
+   "points": 52.5,
+   "salary_used": 48800,
+   "salary_left": 1200,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 39.83,
+   "n_cheap": 0,
+   "players_norm": [
+    "adael amador",
+    "jake mccarthy",
+    "mickey moniak",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "zac veen"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "jake mccarthy"
+  },
+  {
+   "rank": "26",
+   "entry_id": "5224105683",
+   "username": "sellputs",
+   "points": 52.5,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 41.8,
+   "n_cheap": 1,
+   "players_norm": [
+    "adael amador",
+    "andy pages",
+    "ben rortvedt",
+    "jake mccarthy",
+    "mookie betts",
+    "shohei ohtani"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "andy pages"
+  },
+  {
+   "rank": "28",
+   "entry_id": "5223715037",
+   "username": "bposluszny",
+   "points": 52.0,
+   "salary_used": 48700,
+   "salary_left": 1300,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 38.41,
+   "n_cheap": 0,
+   "players_norm": [
+    "adael amador",
+    "andy pages",
+    "freddie freeman",
+    "jake mccarthy",
+    "mickey moniak",
+    "zac veen"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "zac veen"
+  },
+  {
+   "rank": "29",
+   "entry_id": "5223517087",
+   "username": "howardwi",
+   "points": 51.675,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 34.74,
+   "n_cheap": 0,
+   "players_norm": [
+    "ezequiel tovar",
+    "kike hernandez",
+    "miguel rojas",
+    "roki sasaki",
+    "shohei ohtani",
+    "teoscar hernandez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "roki sasaki"
+  },
+  {
+   "rank": "30",
+   "entry_id": "5224095427",
+   "username": "TColone33",
+   "points": 51.5,
+   "salary_used": 47700,
+   "salary_left": 2300,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 42.94,
+   "n_cheap": 0,
+   "players_norm": [
+    "adael amador",
+    "andy pages",
+    "mookie betts",
+    "shohei ohtani",
+    "tj rumfield",
+    "zac veen"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "adael amador"
+  },
+  {
+   "rank": "30",
+   "entry_id": "5224110464",
+   "username": "jarvis29",
+   "points": 51.5,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 43.78,
+   "n_cheap": 0,
+   "players_norm": [
+    "adael amador",
+    "andy pages",
+    "jake mccarthy",
+    "mickey moniak",
+    "shohei ohtani",
+    "zac veen"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "adael amador"
+  },
+  {
+   "rank": "32",
+   "entry_id": "5224107062",
+   "username": "chavita71",
+   "points": 51.0,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 31.92,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "cole carrigg",
+    "kyle tucker",
+    "mookie betts",
+    "tj rumfield",
+    "zac veen"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "kyle tucker"
+  },
+  {
+   "rank": "33",
+   "entry_id": "5224104046",
+   "username": "Jetharris513",
+   "points": 50.55,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 27.68,
+   "n_cheap": 0,
+   "players_norm": [
+    "brett sullivan",
+    "cole carrigg",
+    "connor norby",
+    "kyle freeland",
+    "mookie betts",
+    "shohei ohtani"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "cole carrigg"
+  },
+  {
+   "rank": "34",
+   "entry_id": "5224106999",
+   "username": "Rhombus87",
+   "points": 50.05,
+   "salary_used": 47400,
+   "salary_left": 2600,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 33.33,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "cole carrigg",
+    "ezequiel tovar",
+    "kyle freeland",
+    "mickey moniak",
+    "zac veen"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "mickey moniak"
+  },
+  {
+   "rank": "35",
+   "entry_id": "5224114420",
+   "username": "dreday7",
+   "points": 50.0,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 42.93,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "connor norby",
+    "jake mccarthy",
+    "mickey moniak",
+    "shohei ohtani",
+    "zac veen"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "zac veen"
+  },
+  {
+   "rank": "36",
+   "entry_id": "5224089767",
+   "username": "scrappycrab",
+   "points": 49.5,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 40.39,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "ezequiel tovar",
+    "kyle tucker",
+    "mookie betts",
+    "shohei ohtani",
+    "teoscar hernandez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "teoscar hernandez"
+  },
+  {
+   "rank": "37",
+   "entry_id": "5223332320",
+   "username": "mythicalrhymer01",
+   "points": 48.95,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 39.26,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "connor norby",
+    "freddie freeman",
+    "miguel rojas",
+    "roki sasaki",
+    "teoscar hernandez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "teoscar hernandez"
+  },
+  {
+   "rank": "37",
+   "entry_id": "5223464472",
+   "username": "JcClark18",
+   "points": 48.95,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 39.26,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "connor norby",
+    "freddie freeman",
+    "miguel rojas",
+    "roki sasaki",
+    "teoscar hernandez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "teoscar hernandez"
+  },
+  {
+   "rank": "39",
+   "entry_id": "5223828381",
+   "username": "Absahel",
+   "points": 48.0,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 37.28,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "connor norby",
+    "ezequiel tovar",
+    "freddie freeman",
+    "kike hernandez",
+    "shohei ohtani"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "shohei ohtani"
+  },
+  {
+   "rank": "40",
+   "entry_id": "5224050914",
+   "username": "vavo27",
+   "points": 46.525,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 35.31,
+   "n_cheap": 0,
+   "players_norm": [
+    "adael amador",
+    "connor norby",
+    "kyle freeland",
+    "roki sasaki",
+    "shohei ohtani",
+    "zac veen"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "kyle freeland"
+  },
+  {
+   "rank": "41",
+   "entry_id": "5224073928",
+   "username": "137666",
+   "points": 45.95,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 43.22,
+   "n_cheap": 1,
+   "players_norm": [
+    "andy pages",
+    "ben rortvedt",
+    "connor norby",
+    "roki sasaki",
+    "shohei ohtani",
+    "teoscar hernandez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "andy pages"
+  },
+  {
+   "rank": "42",
+   "entry_id": "5224072696",
+   "username": "aharrold323",
+   "points": 45.075,
+   "salary_used": 48500,
+   "salary_left": 1500,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 35.59,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "ezequiel tovar",
+    "jake mccarthy",
+    "kyle freeland",
+    "mickey moniak",
+    "zac veen"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "kyle freeland"
+  },
+  {
+   "rank": "43",
+   "entry_id": "5224105916",
+   "username": "MoneyBlast",
+   "points": 44.95,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 42.37,
+   "n_cheap": 0,
+   "players_norm": [
+    "adael amador",
+    "andy pages",
+    "jake mccarthy",
+    "roki sasaki",
+    "teoscar hernandez",
+    "zac veen"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "andy pages"
+  },
+  {
+   "rank": "44",
+   "entry_id": "5223336508",
+   "username": "fan21",
+   "points": 43.0,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 44.91,
+   "n_cheap": 0,
+   "players_norm": [
+    "adael amador",
+    "andy pages",
+    "connor norby",
+    "jake mccarthy",
+    "shohei ohtani",
+    "teoscar hernandez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "shohei ohtani"
+  },
+  {
+   "rank": "45",
+   "entry_id": "5223998374",
+   "username": "bigbone33",
+   "points": 42.0,
+   "salary_used": 48700,
+   "salary_left": 1300,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 40.96,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "kike hernandez",
+    "miguel rojas",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tj rumfield"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "miguel rojas"
+  },
+  {
+   "rank": "46",
+   "entry_id": "5224061912",
+   "username": "KnogKnebronson",
+   "points": 41.95,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 46.89,
+   "n_cheap": 0,
+   "players_norm": [
+    "adael amador",
+    "andy pages",
+    "roki sasaki",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "zac veen"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "adael amador"
+  },
+  {
+   "rank": "47",
+   "entry_id": "5224089845",
+   "username": "jc000000",
+   "points": 41.5,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 46.04,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "mickey moniak",
+    "miguel rojas",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "zac veen"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "teoscar hernandez"
+  },
+  {
+   "rank": "48",
+   "entry_id": "5224093645",
+   "username": "Kalaklan",
+   "points": 38.05,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 33.61,
+   "n_cheap": 1,
+   "players_norm": [
+    "ben rortvedt",
+    "connor norby",
+    "freddie freeman",
+    "kyle freeland",
+    "shohei ohtani",
+    "teoscar hernandez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "shohei ohtani"
+  },
+  {
+   "rank": "49",
+   "entry_id": "5223970396",
+   "username": "MIKEMETAL",
+   "points": 38.0,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 36.44,
+   "n_cheap": 1,
+   "players_norm": [
+    "adael amador",
+    "andy pages",
+    "ben rortvedt",
+    "freddie freeman",
+    "kyle tucker",
+    "shohei ohtani"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "kyle tucker"
+  },
+  {
+   "rank": "50",
+   "entry_id": "5223545664",
+   "username": "mrclean913",
+   "points": 36.0,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 44.06,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "kike hernandez",
+    "miguel rojas",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "zac veen"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "shohei ohtani"
+  },
+  {
+   "rank": "51",
+   "entry_id": "5223963352",
+   "username": "skibumb124",
+   "points": 34.45,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 42.65,
+   "n_cheap": 1,
+   "players_norm": [
+    "adael amador",
+    "andy pages",
+    "ben rortvedt",
+    "roki sasaki",
+    "shohei ohtani",
+    "zac veen"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "shohei ohtani"
+  },
+  {
+   "rank": "51",
+   "entry_id": "5223996735",
+   "username": "iamMAXbet",
+   "points": 34.45,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 41.8,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "connor norby",
+    "ezequiel tovar",
+    "roki sasaki",
+    "shohei ohtani",
+    "zac veen"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "shohei ohtani"
+  },
+  {
+   "rank": "51",
+   "entry_id": "5224110398",
+   "username": "Bonfire_Villa8",
+   "points": 34.45,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 36.44,
+   "n_cheap": 1,
+   "players_norm": [
+    "ben rortvedt",
+    "roki sasaki",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tj rumfield",
+    "zac veen"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "shohei ohtani"
+  },
+  {
+   "rank": "54",
+   "entry_id": "5223531237",
+   "username": "Celticsnc",
+   "points": 32.5,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 35.59,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "kyle freeland",
+    "miguel rojas",
+    "roki sasaki",
+    "tj rumfield",
+    "zac veen"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "zac veen"
+  },
+  {
+   "rank": "55",
+   "entry_id": "5224063398",
+   "username": "Oxyfide",
+   "points": 30.0,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 39.26,
+   "n_cheap": 1,
+   "players_norm": [
+    "andy pages",
+    "ben rortvedt",
+    "connor norby",
+    "freddie freeman",
+    "miguel rojas",
+    "shohei ohtani"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "shohei ohtani"
+  },
+  {
+   "rank": "56",
+   "entry_id": "5224076268",
+   "username": "ghstrnr",
+   "points": 29.45,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 33.89,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "cole carrigg",
+    "ezequiel tovar",
+    "jake mccarthy",
+    "miguel rojas",
+    "roki sasaki"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "miguel rojas"
+  },
+  {
+   "rank": "57",
+   "entry_id": "5223283093",
+   "username": "jgorms3322",
+   "points": 27.0,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 44.35,
+   "n_cheap": 0,
+   "players_norm": [
+    "adael amador",
+    "andy pages",
+    "cole carrigg",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "zac veen"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "shohei ohtani"
+  },
+  {
+   "rank": "58",
+   "entry_id": "5223228491",
+   "username": "jazzyj0619",
+   "points": 25.0,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 40.96,
+   "n_cheap": 1,
+   "players_norm": [
+    "andy pages",
+    "ben rortvedt",
+    "ezequiel tovar",
+    "freddie freeman",
+    "shohei ohtani",
+    "teoscar hernandez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "shohei ohtani"
+  },
+  {
+   "rank": "59",
+   "entry_id": "5224102429",
+   "username": "johnbrock636",
+   "points": 20.0,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 38.7,
+   "n_cheap": 1,
+   "players_norm": [
+    "andy pages",
+    "ben rortvedt",
+    "cole carrigg",
+    "freddie freeman",
+    "shohei ohtani",
+    "zac veen"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "zac veen"
+  }
+ ],
+ "player_table": [
+  {
+   "player": "Andy Pages",
+   "player_norm": "andy pages",
+   "roster_position": "UTIL",
+   "pct_drafted": 59.32,
+   "fpts": 5.0
+  },
+  {
+   "player": "Teoscar Hernandez",
+   "player_norm": "teoscar hernandez",
+   "roster_position": "UTIL",
+   "pct_drafted": 38.98,
+   "fpts": 7.0
+  },
+  {
+   "player": "Shohei Ohtani",
+   "player_norm": "shohei ohtani",
+   "roster_position": "UTIL",
+   "pct_drafted": 38.98,
+   "fpts": 2.0
+  },
+  {
+   "player": "Zac Veen",
+   "player_norm": "zac veen",
+   "roster_position": "UTIL",
+   "pct_drafted": 32.2,
+   "fpts": 0.0
+  },
+  {
+   "player": "Connor Norby",
+   "player_norm": "connor norby",
+   "roster_position": "UTIL",
+   "pct_drafted": 28.81,
+   "fpts": 12.0
+  },
+  {
+   "player": "Adael Amador",
+   "player_norm": "adael amador",
+   "roster_position": "UTIL",
+   "pct_drafted": 27.12,
+   "fpts": 9.0
+  },
+  {
+   "player": "Mookie Betts",
+   "player_norm": "mookie betts",
+   "roster_position": "UTIL",
+   "pct_drafted": 27.12,
+   "fpts": 24.0
+  },
+  {
+   "player": "Freddie Freeman",
+   "player_norm": "freddie freeman",
+   "roster_position": "UTIL",
+   "pct_drafted": 25.42,
+   "fpts": 7.0
+  },
+  {
+   "player": "Roki Sasaki",
+   "player_norm": "roki sasaki",
+   "roster_position": "UTIL",
+   "pct_drafted": 25.42,
+   "fpts": 14.45
+  },
+  {
+   "player": "Miguel Rojas",
+   "player_norm": "miguel rojas",
+   "roster_position": "UTIL",
+   "pct_drafted": 25.42,
+   "fpts": 0.0
+  },
+  {
+   "player": "Jake McCarthy",
+   "player_norm": "jake mccarthy",
+   "roster_position": "UTIL",
+   "pct_drafted": 25.42,
+   "fpts": 7.0
+  },
+  {
+   "player": "Mickey Moniak",
+   "player_norm": "mickey moniak",
+   "roster_position": "UTIL",
+   "pct_drafted": 23.73,
+   "fpts": 24.0
+  },
+  {
+   "player": "Ezequiel Tovar",
+   "player_norm": "ezequiel tovar",
+   "roster_position": "UTIL",
+   "pct_drafted": 22.03,
+   "fpts": 0.0
+  },
+  {
+   "player": "Ben Rortvedt",
+   "player_norm": "ben rortvedt",
+   "roster_position": "UTIL",
+   "pct_drafted": 22.03,
+   "fpts": 3.0
+  },
+  {
+   "player": "TJ Rumfield",
+   "player_norm": "tj rumfield",
+   "roster_position": "UTIL",
+   "pct_drafted": 20.34,
+   "fpts": 7.0
+  },
+  {
+   "player": "Shohei Ohtani",
+   "player_norm": "shohei ohtani",
+   "roster_position": "CPT",
+   "pct_drafted": 18.64,
+   "fpts": 3.0
+  },
+  {
+   "player": "Kike Hernandez",
+   "player_norm": "kike hernandez",
+   "roster_position": "UTIL",
+   "pct_drafted": 16.95,
+   "fpts": 21.0
+  },
+  {
+   "player": "Kyle Freeland",
+   "player_norm": "kyle freeland",
+   "roster_position": "UTIL",
+   "pct_drafted": 15.25,
+   "fpts": 6.05
+  },
+  {
+   "player": "Cole Carrigg",
+   "player_norm": "cole carrigg",
+   "roster_position": "UTIL",
+   "pct_drafted": 13.56,
+   "fpts": 3.0
+  },
+  {
+   "player": "Andy Pages",
+   "player_norm": "andy pages",
+   "roster_position": "CPT",
+   "pct_drafted": 11.86,
+   "fpts": 7.5
+  },
+  {
+   "player": "Teoscar Hernandez",
+   "player_norm": "teoscar hernandez",
+   "roster_position": "CPT",
+   "pct_drafted": 8.47,
+   "fpts": 10.5
+  },
+  {
+   "player": "Mookie Betts",
+   "player_norm": "mookie betts",
+   "roster_position": "CPT",
+   "pct_drafted": 8.47,
+   "fpts": 36.0
+  },
+  {
+   "player": "Roki Sasaki",
+   "player_norm": "roki sasaki",
+   "roster_position": "CPT",
+   "pct_drafted": 6.78,
+   "fpts": 21.67
+  },
+  {
+   "player": "Zac Veen",
+   "player_norm": "zac veen",
+   "roster_position": "CPT",
+   "pct_drafted": 6.78,
+   "fpts": 0.0
+  },
+  {
+   "player": "Mickey Moniak",
+   "player_norm": "mickey moniak",
+   "roster_position": "CPT",
+   "pct_drafted": 6.78,
+   "fpts": 36.0
+  },
+  {
+   "player": "Adael Amador",
+   "player_norm": "adael amador",
+   "roster_position": "CPT",
+   "pct_drafted": 6.78,
+   "fpts": 13.5
+  },
+  {
+   "player": "Jake McCarthy",
+   "player_norm": "jake mccarthy",
+   "roster_position": "CPT",
+   "pct_drafted": 5.08,
+   "fpts": 10.5
+  },
+  {
+   "player": "Kyle Tucker",
+   "player_norm": "kyle tucker",
+   "roster_position": "UTIL",
+   "pct_drafted": 5.08,
+   "fpts": 8.0
+  },
+  {
+   "player": "Miguel Rojas",
+   "player_norm": "miguel rojas",
+   "roster_position": "CPT",
+   "pct_drafted": 5.08,
+   "fpts": 0.0
+  },
+  {
+   "player": "Kyle Freeland",
+   "player_norm": "kyle freeland",
+   "roster_position": "CPT",
+   "pct_drafted": 5.08,
+   "fpts": 9.07
+  },
+  {
+   "player": "Brett Sullivan",
+   "player_norm": "brett sullivan",
+   "roster_position": "UTIL",
+   "pct_drafted": 5.08,
+   "fpts": 2.0
+  },
+  {
+   "player": "Kyle Tucker",
+   "player_norm": "kyle tucker",
+   "roster_position": "CPT",
+   "pct_drafted": 3.39,
+   "fpts": 12.0
+  },
+  {
+   "player": "Cole Carrigg",
+   "player_norm": "cole carrigg",
+   "roster_position": "CPT",
+   "pct_drafted": 3.39,
+   "fpts": 4.5
+  },
+  {
+   "player": "Willi Castro",
+   "player_norm": "willi castro",
+   "roster_position": "UTIL",
+   "pct_drafted": 1.69,
+   "fpts": 0.0
+  },
+  {
+   "player": "Kike Hernandez",
+   "player_norm": "kike hernandez",
+   "roster_position": "CPT",
+   "pct_drafted": 1.69,
+   "fpts": 31.5
+  },
+  {
+   "player": "Brett Sullivan",
+   "player_norm": "brett sullivan",
+   "roster_position": "CPT",
+   "pct_drafted": 1.69,
+   "fpts": 3.0
+  }
+ ],
+ "own_results": {
+  "matched": 1,
+  "requested": 1,
+  "field_size": 59,
+  "best_rank": 3,
+  "worst_rank": 3,
+  "best_finish_percentile": 96.61,
+  "median_finish_percentile": 96.61,
+  "best_points": 73.45,
+  "winning_points": 80.5,
+  "own_lineups_duplicated_by_field": 0,
+  "max_copies_of_an_own_lineup": 1,
+  "entry_fee": 0.1,
+  "fees_total": 0.1,
+  "winnings_total": 0.0,
+  "paid_places": 1,
+  "payout_breadth_observed": 0.0169,
+  "cashed_entries": 0,
+  "net": -0.1,
+  "labels": "observed outcomes from a completed contest; never a graded prediction, ROI model, win rate, or probability claim"
+ }
+}

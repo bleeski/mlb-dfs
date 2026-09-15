@@ -1,0 +1,787 @@
+{
+ "label": "deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied",
+ "version": "0.5-review",
+ "coverage": "full",
+ "contest_id": "194017523",
+ "slate_date": "2026-08-19",
+ "contest_type": "showdown",
+ "meta": {
+  "entries_total": 23,
+  "entries_complete_lineups": 21,
+  "roster_size": 6,
+  "entries_unparsed": 2,
+  "winning_points": 87.23,
+  "winning_entry_id": "5223817824",
+  "multi_entry_flag": false
+ },
+ "duplication": {
+  "distinct_lineups": 21,
+  "entries_in_duplicated_lineups": 0,
+  "share_duplicated_pct": 0.0,
+  "max_copies": 1,
+  "copies_histogram": {
+   "1": 21
+  },
+  "winner_copies": 1
+ },
+ "construction": {
+  "cheap_salary_threshold": 3000,
+  "at_cap_entries": 9,
+  "at_cap_share_pct": 42.9,
+  "salary_left_histogram": {
+   "701-1500": 6,
+   "301-700": 4,
+   "101-300": 2,
+   "1-100": 5,
+   "<= 0": 4
+  },
+  "max_stack_histogram": {
+   "3": 1,
+   "4": 9,
+   "5": 11
+  },
+  "sp_pair_top": [],
+  "top_owned": [
+   {
+    "player": "Payton Tolle",
+    "pct_drafted": 69.57
+   },
+   {
+    "player": "Brandon Pfaadt",
+    "pct_drafted": 56.52
+   },
+   {
+    "player": "Mickey Gasper",
+    "pct_drafted": 52.17
+   },
+   {
+    "player": "Nick Sogard",
+    "pct_drafted": 43.48
+   },
+   {
+    "player": "Ceddanne Rafaela",
+    "pct_drafted": 34.78
+   }
+  ],
+  "captain_table": [
+   {
+    "player": "Payton Tolle",
+    "captain_count": 10,
+    "captain_share_pct": 47.6,
+    "pct_drafted": 69.57
+   },
+   {
+    "player": "Brandon Pfaadt",
+    "captain_count": 4,
+    "captain_share_pct": 19.0,
+    "pct_drafted": 56.52
+   },
+   {
+    "player": "Ceddanne Rafaela",
+    "captain_count": 3,
+    "captain_share_pct": 14.3,
+    "pct_drafted": 34.78
+   },
+   {
+    "player": "Mickey Gasper",
+    "captain_count": 1,
+    "captain_share_pct": 4.8,
+    "pct_drafted": 52.17
+   },
+   {
+    "player": "Corbin Carroll",
+    "captain_count": 1,
+    "captain_share_pct": 4.8,
+    "pct_drafted": 21.74
+   },
+   {
+    "player": "Wilyer Abreu",
+    "captain_count": 1,
+    "captain_share_pct": 4.8,
+    "pct_drafted": 21.74
+   },
+   {
+    "player": "Gabriel Moreno",
+    "captain_count": 1,
+    "captain_share_pct": 4.8,
+    "pct_drafted": 26.09
+   }
+  ],
+  "winner_captain": {
+   "player": "Payton Tolle",
+   "pct_drafted": 69.57,
+   "captain_share_pct": 47.6,
+   "was_top_owned_captain": true
+  }
+ },
+ "diagnostics": {
+  "salary_join_rate_pct": 100.0,
+  "unmatched_names_top": [],
+  "salary_name_collisions": [],
+  "ownership_recompute_max_diff_pts": 0.0,
+  "ownership_recompute_denominator": "all_entries",
+  "ownership_recompute_ok": true,
+  "parse_structural_ok": true,
+  "parsed_nothing": false,
+  "mostly_unparsed": false,
+  "contest_type_mismatch": false,
+  "salary_join_collapsed": false,
+  "entries_unparsed_share": 0.087,
+  "intra_entry_duplicate_entry_ids": [],
+  "roster_slots_observed": 126,
+  "roster_slots_expected": 126,
+  "recomputed_total_pct": 547.8,
+  "dk_table_total_pct": 547.8,
+  "dk_table_deficit_pts": 0.0,
+  "dk_table_agrees": true,
+  "verification_note": "parse structurally sound; DK %Drafted agrees with the lineup recompute"
+ },
+ "entries": [
+  {
+   "rank": "1",
+   "entry_id": "5223817824",
+   "username": "NYC5788",
+   "points": 87.23,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 44.2,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon pfaadt",
+    "jarren duran",
+    "jordan lawlar",
+    "mickey gasper",
+    "nick sogard",
+    "payton tolle"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "payton tolle"
+  },
+  {
+   "rank": "2",
+   "entry_id": "5223465798",
+   "username": "KristianFTM",
+   "points": 85.68,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 36.23,
+   "n_cheap": 0,
+   "players_norm": [
+    "ildemaro vargas",
+    "jarren duran",
+    "mickey gasper",
+    "nick sogard",
+    "payton tolle",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "payton tolle"
+  },
+  {
+   "rank": "3",
+   "entry_id": "5223708778",
+   "username": "vavo27",
+   "points": 83.23,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 44.93,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon pfaadt",
+    "connor wong",
+    "mickey gasper",
+    "nick sogard",
+    "payton tolle",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "payton tolle"
+  },
+  {
+   "rank": "4",
+   "entry_id": "5223801772",
+   "username": "misk",
+   "points": 80.23,
+   "salary_used": 48600,
+   "salary_left": 1400,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 42.75,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon pfaadt",
+    "jordan lawlar",
+    "mickey gasper",
+    "nick sogard",
+    "nolan arenado",
+    "payton tolle"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "payton tolle"
+  },
+  {
+   "rank": "5",
+   "entry_id": "5223706483",
+   "username": "dcw331",
+   "points": 74.45,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 40.58,
+   "n_cheap": 0,
+   "players_norm": [
+    "ceddanne rafaela",
+    "corbin carroll",
+    "mickey gasper",
+    "nick sogard",
+    "payton tolle",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "mickey gasper"
+  },
+  {
+   "rank": "6",
+   "entry_id": "5223742758",
+   "username": "beccapatt",
+   "points": 72.23,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 39.85,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "brandon pfaadt",
+    "connor wong",
+    "jarren duran",
+    "nick sogard",
+    "payton tolle"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "payton tolle"
+  },
+  {
+   "rank": "7",
+   "entry_id": "5223561221",
+   "username": "KILLANADZ24",
+   "points": 70.68,
+   "salary_used": 48600,
+   "salary_left": 1400,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 36.96,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "gabriel moreno",
+    "geraldo perdomo",
+    "mickey gasper",
+    "nick sogard",
+    "payton tolle"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "payton tolle"
+  },
+  {
+   "rank": "8",
+   "entry_id": "5223532955",
+   "username": "mrclean913",
+   "points": 70.28,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 35.51,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon pfaadt",
+    "gabriel moreno",
+    "jordan lawlar",
+    "payton tolle",
+    "ryan waldschmidt",
+    "tim tawa"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "brandon pfaadt"
+  },
+  {
+   "rank": "9",
+   "entry_id": "5223463433",
+   "username": "JcClark18",
+   "points": 70.23,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 43.48,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "brandon pfaadt",
+    "caleb durbin",
+    "mickey gasper",
+    "nick sogard",
+    "payton tolle"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "payton tolle"
+  },
+  {
+   "rank": "10",
+   "entry_id": "5223399809",
+   "username": "whoisjohngalt420",
+   "points": 65.68,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 35.51,
+   "n_cheap": 0,
+   "players_norm": [
+    "ceddanne rafaela",
+    "connor wong",
+    "jose fernandez",
+    "nick sogard",
+    "payton tolle",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "payton tolle"
+  },
+  {
+   "rank": "11",
+   "entry_id": "5223765904",
+   "username": "kinnscashskills",
+   "points": 64.83,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 27.54,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon pfaadt",
+    "caleb durbin",
+    "corbin carroll",
+    "gabriel moreno",
+    "ryan waldschmidt",
+    "tim tawa"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "brandon pfaadt"
+  },
+  {
+   "rank": "12",
+   "entry_id": "5223451137",
+   "username": "Celticsnc",
+   "points": 63.55,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 25.36,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon pfaadt",
+    "ceddanne rafaela",
+    "ildemaro vargas",
+    "jarren duran",
+    "jose fernandez",
+    "nolan arenado"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "ceddanne rafaela"
+  },
+  {
+   "rank": "13",
+   "entry_id": "5223811737",
+   "username": "DUI-Guy",
+   "points": 63.23,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 42.75,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon pfaadt",
+    "connor wong",
+    "mickey gasper",
+    "payton tolle",
+    "tim tawa",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "payton tolle"
+  },
+  {
+   "rank": "14",
+   "entry_id": "5223726839",
+   "username": "kelvin987",
+   "points": 62.05,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 31.88,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon pfaadt",
+    "connor wong",
+    "corbin carroll",
+    "gabriel moreno",
+    "geraldo perdomo",
+    "nick sogard"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "corbin carroll"
+  },
+  {
+   "rank": "15",
+   "entry_id": "5223471510",
+   "username": "grantgoupil",
+   "points": 61.28,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 41.3,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon pfaadt",
+    "corbin carroll",
+    "jordan lawlar",
+    "mickey gasper",
+    "payton tolle",
+    "tim tawa"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "brandon pfaadt"
+  },
+  {
+   "rank": "16",
+   "entry_id": "5223724223",
+   "username": "Ldsimons3",
+   "points": 61.0,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 42.75,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon pfaadt",
+    "ceddanne rafaela",
+    "connor wong",
+    "mickey gasper",
+    "nolan arenado",
+    "payton tolle"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "ceddanne rafaela"
+  },
+  {
+   "rank": "17",
+   "entry_id": "5223324249",
+   "username": "mythicalrhymer01",
+   "points": 59.28,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 33.33,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon pfaadt",
+    "geraldo perdomo",
+    "jordan lawlar",
+    "payton tolle",
+    "ryan waldschmidt",
+    "tim tawa"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "brandon pfaadt"
+  },
+  {
+   "rank": "18",
+   "entry_id": "5223786901",
+   "username": "amiezin",
+   "points": 55.68,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 31.16,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "ceddanne rafaela",
+    "jarren duran",
+    "jose fernandez",
+    "payton tolle",
+    "tim tawa"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "payton tolle"
+  },
+  {
+   "rank": "19",
+   "entry_id": "5223760673",
+   "username": "bleeski",
+   "points": 53.5,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 28.98,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "ceddanne rafaela",
+    "gabriel moreno",
+    "mickey gasper",
+    "willson contreras",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "wilyer abreu"
+  },
+  {
+   "rank": "20",
+   "entry_id": "5223667785",
+   "username": "zonaque",
+   "points": 46.45,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 34.06,
+   "n_cheap": 0,
+   "players_norm": [
+    "andruw monasterio",
+    "ceddanne rafaela",
+    "ildemaro vargas",
+    "mickey gasper",
+    "payton tolle",
+    "willson contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "ceddanne rafaela"
+  },
+  {
+   "rank": "21",
+   "entry_id": "5223523228",
+   "username": "bposluszny",
+   "points": 38.5,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 26.09,
+   "n_cheap": 0,
+   "players_norm": [
+    "caleb durbin",
+    "ceddanne rafaela",
+    "connor wong",
+    "corbin carroll",
+    "gabriel moreno",
+    "wilyer abreu"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "gabriel moreno"
+  }
+ ],
+ "player_table": [
+  {
+   "player": "Payton Tolle",
+   "player_norm": "payton tolle",
+   "roster_position": "UTIL",
+   "pct_drafted": 69.57,
+   "fpts": 12.45
+  },
+  {
+   "player": "Brandon Pfaadt",
+   "player_norm": "brandon pfaadt",
+   "roster_position": "UTIL",
+   "pct_drafted": 56.52,
+   "fpts": 14.55
+  },
+  {
+   "player": "Mickey Gasper",
+   "player_norm": "mickey gasper",
+   "roster_position": "UTIL",
+   "pct_drafted": 52.17,
+   "fpts": 18.0
+  },
+  {
+   "player": "Nick Sogard",
+   "player_norm": "nick sogard",
+   "roster_position": "UTIL",
+   "pct_drafted": 43.48,
+   "fpts": 19.0
+  },
+  {
+   "player": "Ceddanne Rafaela",
+   "player_norm": "ceddanne rafaela",
+   "roster_position": "UTIL",
+   "pct_drafted": 34.78,
+   "fpts": 2.0
+  },
+  {
+   "player": "Connor Wong",
+   "player_norm": "connor wong",
+   "roster_position": "UTIL",
+   "pct_drafted": 30.43,
+   "fpts": 3.0
+  },
+  {
+   "player": "Gabriel Moreno",
+   "player_norm": "gabriel moreno",
+   "roster_position": "UTIL",
+   "pct_drafted": 26.09,
+   "fpts": 13.0
+  },
+  {
+   "player": "Tim Tawa",
+   "player_norm": "tim tawa",
+   "roster_position": "UTIL",
+   "pct_drafted": 26.09,
+   "fpts": 2.0
+  },
+  {
+   "player": "Corbin Carroll",
+   "player_norm": "corbin carroll",
+   "roster_position": "UTIL",
+   "pct_drafted": 21.74,
+   "fpts": 7.0
+  },
+  {
+   "player": "Wilyer Abreu",
+   "player_norm": "wilyer abreu",
+   "roster_position": "UTIL",
+   "pct_drafted": 21.74,
+   "fpts": 7.0
+  },
+  {
+   "player": "Jarren Duran",
+   "player_norm": "jarren duran",
+   "roster_position": "UTIL",
+   "pct_drafted": 21.74,
+   "fpts": 17.0
+  },
+  {
+   "player": "Caleb Durbin",
+   "player_norm": "caleb durbin",
+   "roster_position": "UTIL",
+   "pct_drafted": 21.74,
+   "fpts": 0.0
+  },
+  {
+   "player": "Jordan Lawlar",
+   "player_norm": "jordan lawlar",
+   "roster_position": "UTIL",
+   "pct_drafted": 21.74,
+   "fpts": 0.0
+  },
+  {
+   "player": "Willson Contreras",
+   "player_norm": "willson contreras",
+   "roster_position": "UTIL",
+   "pct_drafted": 17.39,
+   "fpts": 10.0
+  },
+  {
+   "player": "Andruw Monasterio",
+   "player_norm": "andruw monasterio",
+   "roster_position": "UTIL",
+   "pct_drafted": 17.39,
+   "fpts": 0.0
+  },
+  {
+   "player": "Geraldo Perdomo",
+   "player_norm": "geraldo perdomo",
+   "roster_position": "UTIL",
+   "pct_drafted": 13.04,
+   "fpts": 2.0
+  },
+  {
+   "player": "Nolan Arenado",
+   "player_norm": "nolan arenado",
+   "roster_position": "UTIL",
+   "pct_drafted": 13.04,
+   "fpts": 10.0
+  },
+  {
+   "player": "Ildemaro Vargas",
+   "player_norm": "ildemaro vargas",
+   "roster_position": "UTIL",
+   "pct_drafted": 13.04,
+   "fpts": 3.0
+  },
+  {
+   "player": "Jose Fernandez",
+   "player_norm": "jose fernandez",
+   "roster_position": "UTIL",
+   "pct_drafted": 13.04,
+   "fpts": 16.0
+  },
+  {
+   "player": "Ryan Waldschmidt",
+   "player_norm": "ryan waldschmidt",
+   "roster_position": "UTIL",
+   "pct_drafted": 13.04,
+   "fpts": 21.0
+  }
+ ],
+ "own_results": {
+  "matched": 1,
+  "requested": 1,
+  "field_size": 23,
+  "best_rank": 19,
+  "worst_rank": 19,
+  "best_finish_percentile": 21.74,
+  "median_finish_percentile": 21.74,
+  "best_points": 53.5,
+  "winning_points": 87.23,
+  "own_lineups_duplicated_by_field": 0,
+  "max_copies_of_an_own_lineup": 1,
+  "entry_fee": 0.25,
+  "fees_total": 0.25,
+  "winnings_total": 0.0,
+  "paid_places": 1,
+  "payout_breadth_observed": 0.0435,
+  "cashed_entries": 0,
+  "net": -0.25,
+  "labels": "observed outcomes from a completed contest; never a graded prediction, ROI model, win rate, or probability claim"
+ }
+}

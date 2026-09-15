@@ -1,0 +1,840 @@
+{
+ "label": "deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied",
+ "version": "0.5-review",
+ "coverage": "full",
+ "contest_id": "194311681",
+ "slate_date": "2026-08-23",
+ "contest_type": "showdown",
+ "meta": {
+  "entries_total": 23,
+  "entries_complete_lineups": 23,
+  "roster_size": 6,
+  "entries_unparsed": 0,
+  "winning_points": 71.85,
+  "winning_entry_id": "5228386439",
+  "multi_entry_flag": false
+ },
+ "duplication": {
+  "distinct_lineups": 23,
+  "entries_in_duplicated_lineups": 0,
+  "share_duplicated_pct": 0.0,
+  "max_copies": 1,
+  "copies_histogram": {
+   "1": 23
+  },
+  "winner_copies": 1
+ },
+ "construction": {
+  "cheap_salary_threshold": 3200,
+  "at_cap_entries": 6,
+  "at_cap_share_pct": 26.1,
+  "salary_left_histogram": {
+   "701-1500": 4,
+   "101-300": 5,
+   "<= 0": 4,
+   "1-100": 2,
+   "> 1500": 2,
+   "301-700": 6
+  },
+  "max_stack_histogram": {
+   "3": 6,
+   "4": 9,
+   "5": 8
+  },
+  "sp_pair_top": [],
+  "top_owned": [
+   {
+    "player": "Tyler Mahle",
+    "pct_drafted": 60.87
+   },
+   {
+    "player": "Ronald Acuna Jr.",
+    "pct_drafted": 43.48
+   },
+   {
+    "player": "Andrew Vaughn",
+    "pct_drafted": 39.13
+   },
+   {
+    "player": "Shane Drohan",
+    "pct_drafted": 39.13
+   },
+   {
+    "player": "Jake Bauers",
+    "pct_drafted": 34.78
+   }
+  ],
+  "captain_table": [
+   {
+    "player": "Tyler Mahle",
+    "captain_count": 6,
+    "captain_share_pct": 26.1,
+    "pct_drafted": 60.87
+   },
+   {
+    "player": "Ronald Acuna Jr.",
+    "captain_count": 4,
+    "captain_share_pct": 17.4,
+    "pct_drafted": 43.48
+   },
+   {
+    "player": "Shane Drohan",
+    "captain_count": 2,
+    "captain_share_pct": 8.7,
+    "pct_drafted": 39.13
+   },
+   {
+    "player": "Ozzie Albies",
+    "captain_count": 2,
+    "captain_share_pct": 8.7,
+    "pct_drafted": 26.09
+   },
+   {
+    "player": "William Contreras",
+    "captain_count": 2,
+    "captain_share_pct": 8.7,
+    "pct_drafted": 26.09
+   },
+   {
+    "player": "Christian Yelich",
+    "captain_count": 1,
+    "captain_share_pct": 4.3,
+    "pct_drafted": 21.74
+   },
+   {
+    "player": "Sean Murphy",
+    "captain_count": 1,
+    "captain_share_pct": 4.3,
+    "pct_drafted": 30.43
+   },
+   {
+    "player": "Andrew Vaughn",
+    "captain_count": 1,
+    "captain_share_pct": 4.3,
+    "pct_drafted": 39.13
+   }
+  ],
+  "winner_captain": {
+   "player": "Ronald Acuna Jr.",
+   "pct_drafted": 43.48,
+   "captain_share_pct": 17.4,
+   "was_top_owned_captain": false
+  }
+ },
+ "diagnostics": {
+  "salary_join_rate_pct": 100.0,
+  "unmatched_names_top": [],
+  "salary_name_collisions": [],
+  "ownership_recompute_max_diff_pts": 0.0,
+  "ownership_recompute_denominator": "all_entries",
+  "ownership_recompute_ok": true,
+  "parse_structural_ok": true,
+  "parsed_nothing": false,
+  "mostly_unparsed": false,
+  "contest_type_mismatch": false,
+  "salary_join_collapsed": false,
+  "entries_unparsed_share": 0.0,
+  "intra_entry_duplicate_entry_ids": [],
+  "roster_slots_observed": 138,
+  "roster_slots_expected": 138,
+  "recomputed_total_pct": 600.0,
+  "dk_table_total_pct": 600.0,
+  "dk_table_deficit_pts": 0.0,
+  "dk_table_agrees": true,
+  "verification_note": "parse structurally sound; DK %Drafted agrees with the lineup recompute"
+ },
+ "entries": [
+  {
+   "rank": "1",
+   "entry_id": "5228386439",
+   "username": "mammola",
+   "points": 71.85,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 34.78,
+   "n_cheap": 1,
+   "players_norm": [
+    "austin riley",
+    "michael harris",
+    "ronald acuna",
+    "sean murphy",
+    "tyler mahle",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "ronald acuna"
+  },
+  {
+   "rank": "2",
+   "entry_id": "5228393259",
+   "username": "RINO19",
+   "points": 70.78,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 34.06,
+   "n_cheap": 1,
+   "players_norm": [
+    "christian yelich",
+    "drake baldwin",
+    "mauricio dubon",
+    "ronald acuna",
+    "sean murphy",
+    "tyler mahle"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "tyler mahle"
+  },
+  {
+   "rank": "3",
+   "entry_id": "5228398958",
+   "username": "BUdropout",
+   "points": 70.43,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 35.51,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "austin riley",
+    "lane thomas",
+    "mauricio dubon",
+    "shane drohan",
+    "tyler mahle"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "tyler mahle"
+  },
+  {
+   "rank": "4",
+   "entry_id": "5228398783",
+   "username": "beccapatt",
+   "points": 69.78,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 32.61,
+   "n_cheap": 1,
+   "players_norm": [
+    "austin riley",
+    "jackson chourio",
+    "michael harris",
+    "ozzie albies",
+    "sean murphy",
+    "tyler mahle"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "tyler mahle"
+  },
+  {
+   "rank": "5",
+   "entry_id": "5228418997",
+   "username": "luckymark62",
+   "points": 62.82,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 38.41,
+   "n_cheap": 1,
+   "players_norm": [
+    "andrew vaughn",
+    "michael harris",
+    "sean murphy",
+    "shane drohan",
+    "tyler mahle",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "shane drohan"
+  },
+  {
+   "rank": "6",
+   "entry_id": "5228413366",
+   "username": "iamMAXbet",
+   "points": 55.0,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 31.16,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "brice turang",
+    "christian yelich",
+    "drake baldwin",
+    "jake bauers",
+    "ronald acuna"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "christian yelich"
+  },
+  {
+   "rank": "6",
+   "entry_id": "5228413409",
+   "username": "josephje",
+   "points": 55.0,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 30.43,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "christian yelich",
+    "drake baldwin",
+    "jackson chourio",
+    "ozzie albies",
+    "ronald acuna"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "ozzie albies"
+  },
+  {
+   "rank": "8",
+   "entry_id": "5228368887",
+   "username": "L053R666",
+   "points": 54.43,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 36.23,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "david hamilton",
+    "lane thomas",
+    "ozzie albies",
+    "shane drohan",
+    "tyler mahle"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "tyler mahle"
+  },
+  {
+   "rank": "9",
+   "entry_id": "5228422837",
+   "username": "corruption79",
+   "points": 54.0,
+   "salary_used": 48100,
+   "salary_left": 1900,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 33.33,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "brice turang",
+    "jackson chourio",
+    "lane thomas",
+    "mauricio dubon",
+    "ronald acuna"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "ronald acuna"
+  },
+  {
+   "rank": "10",
+   "entry_id": "5228361408",
+   "username": "djprymek",
+   "points": 53.78,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 34.06,
+   "n_cheap": 1,
+   "players_norm": [
+    "garrett mitchell",
+    "matt olson",
+    "mauricio dubon",
+    "ronald acuna",
+    "sean murphy",
+    "tyler mahle"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "tyler mahle"
+  },
+  {
+   "rank": "10",
+   "entry_id": "5228397643",
+   "username": "Phlegmgoat",
+   "points": 53.78,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 36.23,
+   "n_cheap": 0,
+   "players_norm": [
+    "joey ortiz",
+    "lane thomas",
+    "matt olson",
+    "michael harris",
+    "ozzie albies",
+    "tyler mahle"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "tyler mahle"
+  },
+  {
+   "rank": "12",
+   "entry_id": "5228368843",
+   "username": "Parker8171",
+   "points": 53.0,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 37.68,
+   "n_cheap": 1,
+   "players_norm": [
+    "andrew vaughn",
+    "brice turang",
+    "jackson chourio",
+    "sean murphy",
+    "shane drohan",
+    "tyler mahle"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "sean murphy"
+  },
+  {
+   "rank": "13",
+   "entry_id": "5228366456",
+   "username": "RuthlessVillain",
+   "points": 52.85,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 37.68,
+   "n_cheap": 0,
+   "players_norm": [
+    "joey ortiz",
+    "lane thomas",
+    "matt olson",
+    "mauricio dubon",
+    "ronald acuna",
+    "tyler mahle"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "ronald acuna"
+  },
+  {
+   "rank": "14",
+   "entry_id": "5228362614",
+   "username": "falstaff64",
+   "points": 51.5,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 37.68,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "jackson chourio",
+    "joey ortiz",
+    "ozzie albies",
+    "shane drohan",
+    "tyler mahle"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "andrew vaughn"
+  },
+  {
+   "rank": "15",
+   "entry_id": "5228395370",
+   "username": "Flipper9",
+   "points": 51.0,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 33.33,
+   "n_cheap": 0,
+   "players_norm": [
+    "jackson chourio",
+    "jake bauers",
+    "joey ortiz",
+    "michael harris",
+    "ronald acuna",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "ronald acuna"
+  },
+  {
+   "rank": "16",
+   "entry_id": "5228365463",
+   "username": "mbrewer81",
+   "points": 49.82,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 35.51,
+   "n_cheap": 1,
+   "players_norm": [
+    "garrett mitchell",
+    "jake bauers",
+    "lane thomas",
+    "sean murphy",
+    "shane drohan",
+    "tyler mahle"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "shane drohan"
+  },
+  {
+   "rank": "17",
+   "entry_id": "5228401294",
+   "username": "bleeski",
+   "points": 49.35,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 33.33,
+   "n_cheap": 0,
+   "players_norm": [
+    "drake baldwin",
+    "lane thomas",
+    "matt olson",
+    "mauricio dubon",
+    "tyler mahle",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "drake baldwin"
+  },
+  {
+   "rank": "18",
+   "entry_id": "5228384074",
+   "username": "Ivaldry",
+   "points": 46.5,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 35.51,
+   "n_cheap": 0,
+   "players_norm": [
+    "david hamilton",
+    "jake bauers",
+    "lane thomas",
+    "shane drohan",
+    "tyler mahle",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "william contreras"
+  },
+  {
+   "rank": "19",
+   "entry_id": "5228363123",
+   "username": "RFinch_Kings",
+   "points": 46.15,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 31.88,
+   "n_cheap": 0,
+   "players_norm": [
+    "christian yelich",
+    "jake bauers",
+    "joey ortiz",
+    "matt olson",
+    "michael harris",
+    "shane drohan"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "jake bauers"
+  },
+  {
+   "rank": "20",
+   "entry_id": "5228382622",
+   "username": "samspadoni2011",
+   "points": 45.0,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 29.71,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "brice turang",
+    "garrett mitchell",
+    "jackson chourio",
+    "ozzie albies",
+    "ronald acuna"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "ozzie albies"
+  },
+  {
+   "rank": "21",
+   "entry_id": "5228384450",
+   "username": "cwsavage",
+   "points": 41.0,
+   "salary_used": 48500,
+   "salary_left": 1500,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 33.33,
+   "n_cheap": 0,
+   "players_norm": [
+    "brice turang",
+    "jake bauers",
+    "joey ortiz",
+    "matt olson",
+    "michael harris",
+    "ronald acuna"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "joey ortiz"
+  },
+  {
+   "rank": "22",
+   "entry_id": "5228414125",
+   "username": "WhoDat15",
+   "points": 40.65,
+   "salary_used": 44100,
+   "salary_left": 5900,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 30.43,
+   "n_cheap": 0,
+   "players_norm": [
+    "david hamilton",
+    "jake bauers",
+    "joey ortiz",
+    "michael harris",
+    "shane drohan",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "william contreras"
+  },
+  {
+   "rank": "23",
+   "entry_id": "5228368669",
+   "username": "Brewtown311",
+   "points": 34.5,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 25.36,
+   "n_cheap": 0,
+   "players_norm": [
+    "brice turang",
+    "christian yelich",
+    "david hamilton",
+    "drake baldwin",
+    "jake bauers",
+    "matt olson"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "brice turang"
+  }
+ ],
+ "player_table": [
+  {
+   "player": "Tyler Mahle",
+   "player_norm": "tyler mahle",
+   "roster_position": "UTIL",
+   "pct_drafted": 60.87,
+   "fpts": 15.85
+  },
+  {
+   "player": "Ronald Acuna Jr.",
+   "player_norm": "ronald acuna",
+   "roster_position": "UTIL",
+   "pct_drafted": 43.48,
+   "fpts": 12.0
+  },
+  {
+   "player": "Shane Drohan",
+   "player_norm": "shane drohan",
+   "roster_position": "UTIL",
+   "pct_drafted": 39.13,
+   "fpts": 10.65
+  },
+  {
+   "player": "Andrew Vaughn",
+   "player_norm": "andrew vaughn",
+   "roster_position": "UTIL",
+   "pct_drafted": 39.13,
+   "fpts": 6.0
+  },
+  {
+   "player": "Jake Bauers",
+   "player_norm": "jake bauers",
+   "roster_position": "UTIL",
+   "pct_drafted": 34.78,
+   "fpts": 5.0
+  },
+  {
+   "player": "Michael Harris II",
+   "player_norm": "michael harris",
+   "roster_position": "UTIL",
+   "pct_drafted": 34.78,
+   "fpts": 14.0
+  },
+  {
+   "player": "Lane Thomas",
+   "player_norm": "lane thomas",
+   "roster_position": "UTIL",
+   "pct_drafted": 34.78,
+   "fpts": 6.0
+  },
+  {
+   "player": "Jackson Chourio",
+   "player_norm": "jackson chourio",
+   "roster_position": "UTIL",
+   "pct_drafted": 30.43,
+   "fpts": 6.0
+  },
+  {
+   "player": "Matt Olson",
+   "player_norm": "matt olson",
+   "roster_position": "UTIL",
+   "pct_drafted": 30.43,
+   "fpts": 0.0
+  },
+  {
+   "player": "Joey Ortiz",
+   "player_norm": "joey ortiz",
+   "roster_position": "UTIL",
+   "pct_drafted": 30.43,
+   "fpts": 2.0
+  },
+  {
+   "player": "Sean Murphy",
+   "player_norm": "sean murphy",
+   "roster_position": "UTIL",
+   "pct_drafted": 30.43,
+   "fpts": 5.0
+  },
+  {
+   "player": "Brice Turang",
+   "player_norm": "brice turang",
+   "roster_position": "UTIL",
+   "pct_drafted": 26.09,
+   "fpts": 7.0
+  },
+  {
+   "player": "Ozzie Albies",
+   "player_norm": "ozzie albies",
+   "roster_position": "UTIL",
+   "pct_drafted": 26.09,
+   "fpts": 8.0
+  },
+  {
+   "player": "William Contreras",
+   "player_norm": "william contreras",
+   "roster_position": "UTIL",
+   "pct_drafted": 26.09,
+   "fpts": 6.0
+  },
+  {
+   "player": "Mauricio Dubon",
+   "player_norm": "mauricio dubon",
+   "roster_position": "UTIL",
+   "pct_drafted": 26.09,
+   "fpts": 11.0
+  },
+  {
+   "player": "Drake Baldwin",
+   "player_norm": "drake baldwin",
+   "roster_position": "UTIL",
+   "pct_drafted": 21.74,
+   "fpts": 7.0
+  },
+  {
+   "player": "Christian Yelich",
+   "player_norm": "christian yelich",
+   "roster_position": "UTIL",
+   "pct_drafted": 21.74,
+   "fpts": 12.0
+  },
+  {
+   "player": "David Hamilton",
+   "player_norm": "david hamilton",
+   "roster_position": "UTIL",
+   "pct_drafted": 17.39,
+   "fpts": 0.0
+  },
+  {
+   "player": "Austin Riley",
+   "player_norm": "austin riley",
+   "roster_position": "UTIL",
+   "pct_drafted": 13.04,
+   "fpts": 13.0
+  },
+  {
+   "player": "Garrett Mitchell",
+   "player_norm": "garrett mitchell",
+   "roster_position": "UTIL",
+   "pct_drafted": 13.04,
+   "fpts": 2.0
+  }
+ ],
+ "own_results": {
+  "matched": 1,
+  "requested": 1,
+  "field_size": 23,
+  "best_rank": 17,
+  "worst_rank": 17,
+  "best_finish_percentile": 30.43,
+  "median_finish_percentile": 30.43,
+  "best_points": 49.35,
+  "winning_points": 71.85,
+  "own_lineups_duplicated_by_field": 0,
+  "max_copies_of_an_own_lineup": 1,
+  "entry_fee": 0.25,
+  "fees_total": 0.25,
+  "winnings_total": 0.0,
+  "paid_places": 1,
+  "payout_breadth_observed": 0.0435,
+  "cashed_entries": 0,
+  "net": -0.25,
+  "labels": "observed outcomes from a completed contest; never a graded prediction, ROI model, win rate, or probability claim"
+ }
+}

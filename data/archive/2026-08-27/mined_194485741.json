@@ -1,0 +1,1751 @@
+{
+ "label": "deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied",
+ "version": "0.5-review",
+ "coverage": "full",
+ "contest_id": "194485741",
+ "slate_date": "2026-08-27",
+ "contest_type": "showdown",
+ "meta": {
+  "entries_total": 59,
+  "entries_complete_lineups": 58,
+  "roster_size": 6,
+  "entries_unparsed": 1,
+  "winning_points": 83.0,
+  "winning_entry_id": "5232606712",
+  "multi_entry_flag": false
+ },
+ "duplication": {
+  "distinct_lineups": 54,
+  "entries_in_duplicated_lineups": 8,
+  "share_duplicated_pct": 13.8,
+  "max_copies": 2,
+  "copies_histogram": {
+   "1": 50,
+   "2": 4
+  },
+  "winner_copies": 1
+ },
+ "construction": {
+  "cheap_salary_threshold": 3400,
+  "at_cap_entries": 16,
+  "at_cap_share_pct": 27.6,
+  "salary_left_histogram": {
+   "> 1500": 5,
+   "1-100": 4,
+   "101-300": 13,
+   "701-1500": 11,
+   "<= 0": 12,
+   "301-700": 13
+  },
+  "max_stack_histogram": {
+   "3": 16,
+   "4": 20,
+   "5": 22
+  },
+  "sp_pair_top": [],
+  "top_owned": [
+   {
+    "player": "Rafael Devers",
+    "pct_drafted": 76.27
+   },
+   {
+    "player": "Drew Gilbert",
+    "pct_drafted": 55.93
+   },
+   {
+    "player": "Landen Roupp",
+    "pct_drafted": 45.76
+   },
+   {
+    "player": "Lars Nootbaar",
+    "pct_drafted": 44.07
+   },
+   {
+    "player": "Corbin Carroll",
+    "pct_drafted": 42.37
+   }
+  ],
+  "captain_table": [
+   {
+    "player": "Rafael Devers",
+    "captain_count": 18,
+    "captain_share_pct": 31.0,
+    "pct_drafted": 76.27
+   },
+   {
+    "player": "Landen Roupp",
+    "captain_count": 14,
+    "captain_share_pct": 24.1,
+    "pct_drafted": 45.76
+   },
+   {
+    "player": "Gabriel Moreno",
+    "captain_count": 4,
+    "captain_share_pct": 6.9,
+    "pct_drafted": 37.29
+   },
+   {
+    "player": "Bryce Eldridge",
+    "captain_count": 4,
+    "captain_share_pct": 6.9,
+    "pct_drafted": 35.59
+   },
+   {
+    "player": "Jose Cabrera",
+    "captain_count": 4,
+    "captain_share_pct": 6.9,
+    "pct_drafted": 22.03
+   },
+   {
+    "player": "Corbin Carroll",
+    "captain_count": 4,
+    "captain_share_pct": 6.9,
+    "pct_drafted": 42.37
+   },
+   {
+    "player": "Lars Nootbaar",
+    "captain_count": 4,
+    "captain_share_pct": 6.9,
+    "pct_drafted": 44.07
+   },
+   {
+    "player": "Drew Gilbert",
+    "captain_count": 2,
+    "captain_share_pct": 3.4,
+    "pct_drafted": 55.93
+   }
+  ],
+  "winner_captain": {
+   "player": "Rafael Devers",
+   "pct_drafted": 76.27,
+   "captain_share_pct": 31.0,
+   "was_top_owned_captain": true
+  }
+ },
+ "diagnostics": {
+  "salary_join_rate_pct": 100.0,
+  "unmatched_names_top": [],
+  "salary_name_collisions": [],
+  "ownership_recompute_max_diff_pts": 0.01,
+  "ownership_recompute_denominator": "all_entries",
+  "ownership_recompute_ok": true,
+  "parse_structural_ok": true,
+  "parsed_nothing": false,
+  "mostly_unparsed": false,
+  "contest_type_mismatch": false,
+  "salary_join_collapsed": false,
+  "entries_unparsed_share": 0.0169,
+  "intra_entry_duplicate_entry_ids": [],
+  "roster_slots_observed": 348,
+  "roster_slots_expected": 348,
+  "recomputed_total_pct": 589.8,
+  "dk_table_total_pct": 589.8,
+  "dk_table_deficit_pts": 0.0,
+  "dk_table_agrees": true,
+  "verification_note": "parse structurally sound; DK %Drafted agrees with the lineup recompute"
+ },
+ "entries": [
+  {
+   "rank": "1",
+   "entry_id": "5232606712",
+   "username": "SkyFlyDFS",
+   "points": 83.0,
+   "salary_used": 48200,
+   "salary_left": 1800,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 45.76,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce eldridge",
+    "drew gilbert",
+    "gabriel moreno",
+    "geraldo perdomo",
+    "jonah cox",
+    "rafael devers"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "rafael devers"
+  },
+  {
+   "rank": "2",
+   "entry_id": "5232635257",
+   "username": "SivaMB",
+   "points": 82.475,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 46.89,
+   "n_cheap": 0,
+   "players_norm": [
+    "drew gilbert",
+    "geraldo perdomo",
+    "jonah cox",
+    "landen roupp",
+    "rafael devers",
+    "turner hill"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "landen roupp"
+  },
+  {
+   "rank": "3",
+   "entry_id": "5232624557",
+   "username": "jbhintz",
+   "points": 81.475,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 41.81,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce eldridge",
+    "drew gilbert",
+    "geraldo perdomo",
+    "jonah cox",
+    "landen roupp",
+    "lars nootbaar"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "landen roupp"
+  },
+  {
+   "rank": "4",
+   "entry_id": "5232678116",
+   "username": "josephje",
+   "points": 81.225,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 38.98,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce eldridge",
+    "drew gilbert",
+    "jonah cox",
+    "jose cabrera",
+    "landen roupp",
+    "turner hill"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "landen roupp"
+  },
+  {
+   "rank": "5",
+   "entry_id": "5232729751",
+   "username": "MG271973",
+   "points": 81.0,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 43.22,
+   "n_cheap": 0,
+   "players_norm": [
+    "drew gilbert",
+    "gabriel moreno",
+    "geraldo perdomo",
+    "jonah cox",
+    "max kepler",
+    "rafael devers"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "gabriel moreno"
+  },
+  {
+   "rank": "6",
+   "entry_id": "5232704332",
+   "username": "Harmiles",
+   "points": 80.475,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 44.63,
+   "n_cheap": 1,
+   "players_norm": [
+    "drew gilbert",
+    "gabriel moreno",
+    "jonah cox",
+    "landen roupp",
+    "nate furman",
+    "rafael devers"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "landen roupp"
+  },
+  {
+   "rank": "7",
+   "entry_id": "5232660136",
+   "username": "JohnZaps",
+   "points": 76.4,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 45.76,
+   "n_cheap": 0,
+   "players_norm": [
+    "drew gilbert",
+    "jonah cox",
+    "jose cabrera",
+    "landen roupp",
+    "rafael devers",
+    "turner hill"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "rafael devers"
+  },
+  {
+   "rank": "8",
+   "entry_id": "5232595507",
+   "username": "bleeski",
+   "points": 73.15,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 45.2,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce eldridge",
+    "christian koss",
+    "drew gilbert",
+    "gabriel moreno",
+    "landen roupp",
+    "rafael devers"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "bryce eldridge"
+  },
+  {
+   "rank": "9",
+   "entry_id": "5231894354",
+   "username": "buisercruiser",
+   "points": 72.65,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 45.76,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce eldridge",
+    "drew gilbert",
+    "jonah cox",
+    "landen roupp",
+    "max kepler",
+    "rafael devers"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "rafael devers"
+  },
+  {
+   "rank": "9",
+   "entry_id": "5232666642",
+   "username": "mdnorton1DK",
+   "points": 72.65,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 45.76,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce eldridge",
+    "drew gilbert",
+    "jonah cox",
+    "landen roupp",
+    "max kepler",
+    "rafael devers"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "rafael devers"
+  },
+  {
+   "rank": "11",
+   "entry_id": "5232688606",
+   "username": "jeter8587",
+   "points": 70.15,
+   "salary_used": 46600,
+   "salary_left": 3400,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 39.55,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce eldridge",
+    "gabriel moreno",
+    "jonah cox",
+    "landen roupp",
+    "lars nootbaar",
+    "turner hill"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "bryce eldridge"
+  },
+  {
+   "rank": "12",
+   "entry_id": "5232681235",
+   "username": "vavo27",
+   "points": 69.65,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 49.15,
+   "n_cheap": 0,
+   "players_norm": [
+    "corbin carroll",
+    "drew gilbert",
+    "jonah cox",
+    "landen roupp",
+    "rafael devers",
+    "turner hill"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "drew gilbert"
+  },
+  {
+   "rank": "13",
+   "entry_id": "5232216593",
+   "username": "PigHeart",
+   "points": 69.475,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 47.46,
+   "n_cheap": 0,
+   "players_norm": [
+    "drew gilbert",
+    "jonah cox",
+    "landen roupp",
+    "lars nootbaar",
+    "rafael devers",
+    "tim tawa"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "landen roupp"
+  },
+  {
+   "rank": "14",
+   "entry_id": "5232667993",
+   "username": "jeff12464",
+   "points": 67.0,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 44.63,
+   "n_cheap": 0,
+   "players_norm": [
+    "corbin carroll",
+    "drew gilbert",
+    "gabriel moreno",
+    "jonah cox",
+    "rafael devers",
+    "shay whitcomb"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "drew gilbert"
+  },
+  {
+   "rank": "15",
+   "entry_id": "5232390243",
+   "username": "cw1tt",
+   "points": 65.225,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 37.85,
+   "n_cheap": 0,
+   "players_norm": [
+    "christian koss",
+    "jonah cox",
+    "jose cabrera",
+    "landen roupp",
+    "rafael devers",
+    "tim tawa"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "landen roupp"
+  },
+  {
+   "rank": "16",
+   "entry_id": "5232148348",
+   "username": "TY54321",
+   "points": 62.225,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 38.7,
+   "n_cheap": 1,
+   "players_norm": [
+    "christian koss",
+    "drew gilbert",
+    "jose cabrera",
+    "landen roupp",
+    "nate furman",
+    "rafael devers"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "landen roupp"
+  },
+  {
+   "rank": "17",
+   "entry_id": "5232577080",
+   "username": "BADM00N",
+   "points": 62.15,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 39.83,
+   "n_cheap": 1,
+   "players_norm": [
+    "drew gilbert",
+    "geraldo perdomo",
+    "landen roupp",
+    "max kepler",
+    "nate furman",
+    "rafael devers"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "geraldo perdomo"
+  },
+  {
+   "rank": "18",
+   "entry_id": "5232083631",
+   "username": "jep4576",
+   "points": 62.0,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 44.07,
+   "n_cheap": 0,
+   "players_norm": [
+    "drew gilbert",
+    "gabriel moreno",
+    "geraldo perdomo",
+    "lars nootbaar",
+    "rafael devers",
+    "tim tawa"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "rafael devers"
+  },
+  {
+   "rank": "19",
+   "entry_id": "5232635154",
+   "username": "TeamDetroit85",
+   "points": 61.0,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 44.63,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce eldridge",
+    "christian koss",
+    "corbin carroll",
+    "drew gilbert",
+    "gabriel moreno",
+    "rafael devers"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "gabriel moreno"
+  },
+  {
+   "rank": "20",
+   "entry_id": "5232611847",
+   "username": "Flipper9",
+   "points": 60.5,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 45.76,
+   "n_cheap": 0,
+   "players_norm": [
+    "corbin carroll",
+    "drew gilbert",
+    "gabriel moreno",
+    "geraldo perdomo",
+    "rafael devers",
+    "turner hill"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "turner hill"
+  },
+  {
+   "rank": "21",
+   "entry_id": "5232656656",
+   "username": "Kathambone",
+   "points": 60.0,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 43.22,
+   "n_cheap": 0,
+   "players_norm": [
+    "corbin carroll",
+    "drew gilbert",
+    "geraldo perdomo",
+    "jonah cox",
+    "rafael devers",
+    "shay whitcomb"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "rafael devers"
+  },
+  {
+   "rank": "22",
+   "entry_id": "5232299953",
+   "username": "Boltmantom",
+   "points": 59.65,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 42.94,
+   "n_cheap": 0,
+   "players_norm": [
+    "drew cavanaugh",
+    "drew gilbert",
+    "geraldo perdomo",
+    "landen roupp",
+    "lars nootbaar",
+    "rafael devers"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "rafael devers"
+  },
+  {
+   "rank": "23",
+   "entry_id": "5232178337",
+   "username": "corruption79",
+   "points": 59.475,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 38.7,
+   "n_cheap": 0,
+   "players_norm": [
+    "corbin carroll",
+    "drew gilbert",
+    "grant mccray",
+    "jonah cox",
+    "landen roupp",
+    "lars nootbaar"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "landen roupp"
+  },
+  {
+   "rank": "24",
+   "entry_id": "5232600513",
+   "username": "rynstien",
+   "points": 58.5,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 46.89,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce eldridge",
+    "corbin carroll",
+    "drew gilbert",
+    "gabriel moreno",
+    "rafael devers",
+    "turner hill"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "bryce eldridge"
+  },
+  {
+   "rank": "25",
+   "entry_id": "5232403329",
+   "username": "KristianFTM",
+   "points": 58.475,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 42.65,
+   "n_cheap": 0,
+   "players_norm": [
+    "jonah cox",
+    "landen roupp",
+    "lars nootbaar",
+    "rafael devers",
+    "shay whitcomb",
+    "turner hill"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "landen roupp"
+  },
+  {
+   "rank": "26",
+   "entry_id": "5232116058",
+   "username": "howardwi",
+   "points": 57.475,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 43.22,
+   "n_cheap": 0,
+   "players_norm": [
+    "christian koss",
+    "corbin carroll",
+    "jonah cox",
+    "landen roupp",
+    "rafael devers",
+    "turner hill"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "landen roupp"
+  },
+  {
+   "rank": "26",
+   "entry_id": "5232474519",
+   "username": "JRaab",
+   "points": 57.475,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 43.22,
+   "n_cheap": 0,
+   "players_norm": [
+    "christian koss",
+    "corbin carroll",
+    "jonah cox",
+    "landen roupp",
+    "rafael devers",
+    "turner hill"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "landen roupp"
+  },
+  {
+   "rank": "28",
+   "entry_id": "5231788387",
+   "username": "aramisj22",
+   "points": 56.65,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 41.8,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce eldridge",
+    "drew gilbert",
+    "landen roupp",
+    "rafael devers",
+    "shay whitcomb",
+    "tim tawa"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "rafael devers"
+  },
+  {
+   "rank": "29",
+   "entry_id": "5232663557",
+   "username": "Rangers72",
+   "points": 56.0,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 42.94,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce eldridge",
+    "drew gilbert",
+    "gabriel moreno",
+    "ildemaro vargas",
+    "lars nootbaar",
+    "rafael devers"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "rafael devers"
+  },
+  {
+   "rank": "30",
+   "entry_id": "5232365864",
+   "username": "fan21",
+   "points": 55.0,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 45.48,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce eldridge",
+    "corbin carroll",
+    "drew gilbert",
+    "geraldo perdomo",
+    "rafael devers",
+    "turner hill"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "rafael devers"
+  },
+  {
+   "rank": "30",
+   "entry_id": "5232521036",
+   "username": "atleast31",
+   "points": 55.0,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 46.04,
+   "n_cheap": 0,
+   "players_norm": [
+    "christian koss",
+    "corbin carroll",
+    "drew gilbert",
+    "gabriel moreno",
+    "lars nootbaar",
+    "rafael devers"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "gabriel moreno"
+  },
+  {
+   "rank": "32",
+   "entry_id": "5232536618",
+   "username": "Sally_Bunn",
+   "points": 54.475,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 37.0,
+   "n_cheap": 0,
+   "players_norm": [
+    "drew cavanaugh",
+    "gabriel moreno",
+    "landen roupp",
+    "rafael devers",
+    "tim tawa",
+    "turner hill"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "landen roupp"
+  },
+  {
+   "rank": "33",
+   "entry_id": "5232604390",
+   "username": "belvison",
+   "points": 53.775,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 30.22,
+   "n_cheap": 0,
+   "players_norm": [
+    "jonah cox",
+    "jose cabrera",
+    "landen roupp",
+    "lars nootbaar",
+    "ryan waldschmidt",
+    "tim tawa"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "jose cabrera"
+  },
+  {
+   "rank": "34",
+   "entry_id": "5232733247",
+   "username": "Robster01",
+   "points": 53.475,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 40.96,
+   "n_cheap": 0,
+   "players_norm": [
+    "corbin carroll",
+    "drew cavanaugh",
+    "jonah cox",
+    "landen roupp",
+    "rafael devers",
+    "turner hill"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "landen roupp"
+  },
+  {
+   "rank": "35",
+   "entry_id": "5231869983",
+   "username": "Stolle76",
+   "points": 53.0,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 41.24,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce eldridge",
+    "drew gilbert",
+    "geraldo perdomo",
+    "lars nootbaar",
+    "nolan arenado",
+    "rafael devers"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "rafael devers"
+  },
+  {
+   "rank": "35",
+   "entry_id": "5232585525",
+   "username": "LUvikes29",
+   "points": 53.0,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 41.8,
+   "n_cheap": 0,
+   "players_norm": [
+    "corbin carroll",
+    "gabriel moreno",
+    "jonah cox",
+    "max kepler",
+    "rafael devers",
+    "turner hill"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "rafael devers"
+  },
+  {
+   "rank": "35",
+   "entry_id": "5232684388",
+   "username": "jr3304",
+   "points": 53.0,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 41.24,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce eldridge",
+    "drew gilbert",
+    "geraldo perdomo",
+    "lars nootbaar",
+    "nolan arenado",
+    "rafael devers"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "rafael devers"
+  },
+  {
+   "rank": "38",
+   "entry_id": "5232684810",
+   "username": "jc000000",
+   "points": 52.65,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 38.98,
+   "n_cheap": 0,
+   "players_norm": [
+    "christian koss",
+    "drew gilbert",
+    "landen roupp",
+    "max kepler",
+    "rafael devers",
+    "shay whitcomb"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "rafael devers"
+  },
+  {
+   "rank": "39",
+   "entry_id": "5232172055",
+   "username": "oneupthedevil",
+   "points": 51.775,
+   "salary_used": 48400,
+   "salary_left": 1600,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 28.81,
+   "n_cheap": 1,
+   "players_norm": [
+    "christian koss",
+    "geraldo perdomo",
+    "jose cabrera",
+    "landen roupp",
+    "lars nootbaar",
+    "nate furman"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "jose cabrera"
+  },
+  {
+   "rank": "40",
+   "entry_id": "5232712201",
+   "username": "Jagman40",
+   "points": 49.0,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 39.27,
+   "n_cheap": 0,
+   "players_norm": [
+    "drew gilbert",
+    "gabriel moreno",
+    "lars nootbaar",
+    "rafael devers",
+    "ryan waldschmidt",
+    "shay whitcomb"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "rafael devers"
+  },
+  {
+   "rank": "41",
+   "entry_id": "5232674823",
+   "username": "FrozenFromundaCheese",
+   "points": 46.75,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 33.05,
+   "n_cheap": 1,
+   "players_norm": [
+    "corbin carroll",
+    "gabriel moreno",
+    "jonah cox",
+    "jose cabrera",
+    "lars nootbaar",
+    "nate furman"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "corbin carroll"
+  },
+  {
+   "rank": "42",
+   "entry_id": "5232680316",
+   "username": "blade39428",
+   "points": 46.5,
+   "salary_used": 48100,
+   "salary_left": 1900,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 46.89,
+   "n_cheap": 0,
+   "players_norm": [
+    "corbin carroll",
+    "drew gilbert",
+    "geraldo perdomo",
+    "lars nootbaar",
+    "rafael devers",
+    "turner hill"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "lars nootbaar"
+  },
+  {
+   "rank": "43",
+   "entry_id": "5232503380",
+   "username": "charlesydr",
+   "points": 45.65,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 42.37,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce eldridge",
+    "christian koss",
+    "corbin carroll",
+    "landen roupp",
+    "rafael devers",
+    "turner hill"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "rafael devers"
+  },
+  {
+   "rank": "44",
+   "entry_id": "5232662060",
+   "username": "jabbo123",
+   "points": 45.25,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 23.44,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce eldridge",
+    "gabriel moreno",
+    "jose cabrera",
+    "jose fernandez",
+    "max kepler",
+    "tim tawa"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "max kepler"
+  },
+  {
+   "rank": "45",
+   "entry_id": "5232326103",
+   "username": "stewie14",
+   "points": 42.0,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 43.5,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce eldridge",
+    "corbin carroll",
+    "geraldo perdomo",
+    "lars nootbaar",
+    "rafael devers",
+    "turner hill"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "rafael devers"
+  },
+  {
+   "rank": "46",
+   "entry_id": "5231670330",
+   "username": "Dctmn",
+   "points": 41.475,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 36.16,
+   "n_cheap": 0,
+   "players_norm": [
+    "jordan lawlar",
+    "landen roupp",
+    "lars nootbaar",
+    "rafael devers",
+    "shay whitcomb",
+    "turner hill"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "landen roupp"
+  },
+  {
+   "rank": "47",
+   "entry_id": "5232273329",
+   "username": "udod59",
+   "points": 41.0,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 34.46,
+   "n_cheap": 0,
+   "players_norm": [
+    "corbin carroll",
+    "gabriel moreno",
+    "jonah cox",
+    "lars nootbaar",
+    "max kepler",
+    "tim tawa"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "corbin carroll"
+  },
+  {
+   "rank": "48",
+   "entry_id": "5232689426",
+   "username": "reaper959",
+   "points": 40.75,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 39.83,
+   "n_cheap": 0,
+   "players_norm": [
+    "christian koss",
+    "corbin carroll",
+    "drew gilbert",
+    "jose cabrera",
+    "rafael devers",
+    "tim tawa"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "corbin carroll"
+  },
+  {
+   "rank": "49",
+   "entry_id": "5232661078",
+   "username": "crf_333",
+   "points": 39.5,
+   "salary_used": 48500,
+   "salary_left": 1500,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 43.5,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce eldridge",
+    "corbin carroll",
+    "geraldo perdomo",
+    "lars nootbaar",
+    "rafael devers",
+    "turner hill"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "lars nootbaar"
+  },
+  {
+   "rank": "50",
+   "entry_id": "5232628740",
+   "username": "MikelRbrts",
+   "points": 37.25,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 30.5,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce eldridge",
+    "ildemaro vargas",
+    "jose cabrera",
+    "nolan arenado",
+    "rafael devers",
+    "turner hill"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "bryce eldridge"
+  },
+  {
+   "rank": "51",
+   "entry_id": "5231986860",
+   "username": "Stree",
+   "points": 37.125,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 29.94,
+   "n_cheap": 1,
+   "players_norm": [
+    "corbin carroll",
+    "gabriel moreno",
+    "jose cabrera",
+    "lars nootbaar",
+    "nate furman",
+    "tim tawa"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "jose cabrera"
+  },
+  {
+   "rank": "51",
+   "entry_id": "5232667866",
+   "username": "oshevach",
+   "points": 37.125,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 29.94,
+   "n_cheap": 1,
+   "players_norm": [
+    "corbin carroll",
+    "gabriel moreno",
+    "jose cabrera",
+    "lars nootbaar",
+    "nate furman",
+    "tim tawa"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "jose cabrera"
+  },
+  {
+   "rank": "53",
+   "entry_id": "5232011931",
+   "username": "whammy22",
+   "points": 36.5,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 41.52,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce eldridge",
+    "corbin carroll",
+    "geraldo perdomo",
+    "lars nootbaar",
+    "rafael devers",
+    "tim tawa"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "lars nootbaar"
+  },
+  {
+   "rank": "54",
+   "entry_id": "5232454529",
+   "username": "Footballchamp1967",
+   "points": 35.0,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 25.42,
+   "n_cheap": 0,
+   "players_norm": [
+    "gabriel moreno",
+    "grant mccray",
+    "ildemaro vargas",
+    "max kepler",
+    "rafael devers",
+    "ryan waldschmidt"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "gabriel moreno"
+  },
+  {
+   "rank": "55",
+   "entry_id": "5232660884",
+   "username": "gwarrick0639",
+   "points": 33.0,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 35.59,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce eldridge",
+    "corbin carroll",
+    "drew gilbert",
+    "lars nootbaar",
+    "max kepler",
+    "shay whitcomb"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "corbin carroll"
+  },
+  {
+   "rank": "56",
+   "entry_id": "5232631279",
+   "username": "seaone",
+   "points": 30.5,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 37.01,
+   "n_cheap": 0,
+   "players_norm": [
+    "corbin carroll",
+    "drew cavanaugh",
+    "gabriel moreno",
+    "lars nootbaar",
+    "rafael devers",
+    "shay whitcomb"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "lars nootbaar"
+  },
+  {
+   "rank": "57",
+   "entry_id": "5232490029",
+   "username": "dtapper29",
+   "points": 21.0,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 26.55,
+   "n_cheap": 0,
+   "players_norm": [
+    "ildemaro vargas",
+    "jose fernandez",
+    "lars nootbaar",
+    "max kepler",
+    "rafael devers",
+    "ryan waldschmidt"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "rafael devers"
+  },
+  {
+   "rank": "58",
+   "entry_id": "5232004953",
+   "username": "whoisjohngalt420",
+   "points": 19.75,
+   "salary_used": 48100,
+   "salary_left": 1900,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 16.66,
+   "n_cheap": 0,
+   "players_norm": [
+    "christian koss",
+    "ildemaro vargas",
+    "jose cabrera",
+    "max kepler",
+    "nolan arenado",
+    "tim tawa"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "nolan arenado"
+  }
+ ],
+ "player_table": [
+  {
+   "player": "Drew Gilbert",
+   "player_norm": "drew gilbert",
+   "roster_position": "UTIL",
+   "pct_drafted": 52.54,
+   "fpts": 16.0
+  },
+  {
+   "player": "Rafael Devers",
+   "player_norm": "rafael devers",
+   "roster_position": "UTIL",
+   "pct_drafted": 45.76,
+   "fpts": 8.0
+  },
+  {
+   "player": "Jonah Cox",
+   "player_norm": "jonah cox",
+   "roster_position": "UTIL",
+   "pct_drafted": 40.68,
+   "fpts": 17.0
+  },
+  {
+   "player": "Lars Nootbaar",
+   "player_norm": "lars nootbaar",
+   "roster_position": "UTIL",
+   "pct_drafted": 37.29,
+   "fpts": 3.0
+  },
+  {
+   "player": "Corbin Carroll",
+   "player_norm": "corbin carroll",
+   "roster_position": "UTIL",
+   "pct_drafted": 35.59,
+   "fpts": 0.0
+  },
+  {
+   "player": "Turner Hill",
+   "player_norm": "turner hill",
+   "roster_position": "UTIL",
+   "pct_drafted": 32.2,
+   "fpts": 5.0
+  },
+  {
+   "player": "Rafael Devers",
+   "player_norm": "rafael devers",
+   "roster_position": "CPT",
+   "pct_drafted": 30.51,
+   "fpts": 12.0
+  },
+  {
+   "player": "Gabriel Moreno",
+   "player_norm": "gabriel moreno",
+   "roster_position": "UTIL",
+   "pct_drafted": 30.51,
+   "fpts": 16.0
+  },
+  {
+   "player": "Bryce Eldridge",
+   "player_norm": "bryce eldridge",
+   "roster_position": "UTIL",
+   "pct_drafted": 28.81,
+   "fpts": 9.0
+  },
+  {
+   "player": "Geraldo Perdomo",
+   "player_norm": "geraldo perdomo",
+   "roster_position": "UTIL",
+   "pct_drafted": 27.12,
+   "fpts": 13.0
+  },
+  {
+   "player": "Landen Roupp",
+   "player_norm": "landen roupp",
+   "roster_position": "CPT",
+   "pct_drafted": 23.73,
+   "fpts": 23.48
+  },
+  {
+   "player": "Tim Tawa",
+   "player_norm": "tim tawa",
+   "roster_position": "UTIL",
+   "pct_drafted": 22.03,
+   "fpts": 2.0
+  },
+  {
+   "player": "Landen Roupp",
+   "player_norm": "landen roupp",
+   "roster_position": "UTIL",
+   "pct_drafted": 22.03,
+   "fpts": 15.65
+  },
+  {
+   "player": "Christian Koss",
+   "player_norm": "christian koss",
+   "roster_position": "UTIL",
+   "pct_drafted": 20.34,
+   "fpts": 4.0
+  },
+  {
+   "player": "Max Kepler",
+   "player_norm": "max kepler",
+   "roster_position": "UTIL",
+   "pct_drafted": 18.64,
+   "fpts": 3.0
+  },
+  {
+   "player": "Shay Whitcomb",
+   "player_norm": "shay whitcomb",
+   "roster_position": "UTIL",
+   "pct_drafted": 15.25,
+   "fpts": 2.0
+  },
+  {
+   "player": "Jose Cabrera",
+   "player_norm": "jose cabrera",
+   "roster_position": "UTIL",
+   "pct_drafted": 15.25,
+   "fpts": 10.75
+  },
+  {
+   "player": "Nate Furman",
+   "player_norm": "nate furman",
+   "roster_position": "UTIL",
+   "pct_drafted": 11.86,
+   "fpts": 0.0
+  },
+  {
+   "player": "Ildemaro Vargas",
+   "player_norm": "ildemaro vargas",
+   "roster_position": "UTIL",
+   "pct_drafted": 8.47,
+   "fpts": 0.0
+  },
+  {
+   "player": "Jose Cabrera",
+   "player_norm": "jose cabrera",
+   "roster_position": "CPT",
+   "pct_drafted": 6.78,
+   "fpts": 16.12
+  },
+  {
+   "player": "Lars Nootbaar",
+   "player_norm": "lars nootbaar",
+   "roster_position": "CPT",
+   "pct_drafted": 6.78,
+   "fpts": 4.5
+  },
+  {
+   "player": "Corbin Carroll",
+   "player_norm": "corbin carroll",
+   "roster_position": "CPT",
+   "pct_drafted": 6.78,
+   "fpts": 0.0
+  },
+  {
+   "player": "Drew Cavanaugh",
+   "player_norm": "drew cavanaugh",
+   "roster_position": "UTIL",
+   "pct_drafted": 6.78,
+   "fpts": 0.0
+  },
+  {
+   "player": "Ryan Waldschmidt",
+   "player_norm": "ryan waldschmidt",
+   "roster_position": "UTIL",
+   "pct_drafted": 6.78,
+   "fpts": 0.0
+  },
+  {
+   "player": "Gabriel Moreno",
+   "player_norm": "gabriel moreno",
+   "roster_position": "CPT",
+   "pct_drafted": 6.78,
+   "fpts": 24.0
+  },
+  {
+   "player": "Bryce Eldridge",
+   "player_norm": "bryce eldridge",
+   "roster_position": "CPT",
+   "pct_drafted": 6.78,
+   "fpts": 13.5
+  },
+  {
+   "player": "Nolan Arenado",
+   "player_norm": "nolan arenado",
+   "roster_position": "UTIL",
+   "pct_drafted": 5.08,
+   "fpts": 0.0
+  },
+  {
+   "player": "Grant McCray",
+   "player_norm": "grant mccray",
+   "roster_position": "UTIL",
+   "pct_drafted": 3.39,
+   "fpts": 0.0
+  },
+  {
+   "player": "Jose Fernandez",
+   "player_norm": "jose fernandez",
+   "roster_position": "UTIL",
+   "pct_drafted": 3.39,
+   "fpts": 3.0
+  },
+  {
+   "player": "Drew Gilbert",
+   "player_norm": "drew gilbert",
+   "roster_position": "CPT",
+   "pct_drafted": 3.39,
+   "fpts": 24.0
+  },
+  {
+   "player": "Jordan Lawlar",
+   "player_norm": "jordan lawlar",
+   "roster_position": "UTIL",
+   "pct_drafted": 1.69,
+   "fpts": 0.0
+  },
+  {
+   "player": "Nolan Arenado",
+   "player_norm": "nolan arenado",
+   "roster_position": "CPT",
+   "pct_drafted": 1.69,
+   "fpts": 0.0
+  },
+  {
+   "player": "Geraldo Perdomo",
+   "player_norm": "geraldo perdomo",
+   "roster_position": "CPT",
+   "pct_drafted": 1.69,
+   "fpts": 19.5
+  },
+  {
+   "player": "Turner Hill",
+   "player_norm": "turner hill",
+   "roster_position": "CPT",
+   "pct_drafted": 1.69,
+   "fpts": 7.5
+  },
+  {
+   "player": "Max Kepler",
+   "player_norm": "max kepler",
+   "roster_position": "CPT",
+   "pct_drafted": 1.69,
+   "fpts": 4.5
+  }
+ ],
+ "own_results": {
+  "matched": 1,
+  "requested": 1,
+  "field_size": 59,
+  "best_rank": 8,
+  "worst_rank": 8,
+  "best_finish_percentile": 88.14,
+  "median_finish_percentile": 88.14,
+  "best_points": 73.15,
+  "winning_points": 83.0,
+  "own_lineups_duplicated_by_field": 0,
+  "max_copies_of_an_own_lineup": 1,
+  "entry_fee": 0.1,
+  "fees_total": 0.1,
+  "winnings_total": 0.0,
+  "paid_places": 1,
+  "payout_breadth_observed": 0.0169,
+  "cashed_entries": 0,
+  "net": -0.1,
+  "labels": "observed outcomes from a completed contest; never a graded prediction, ROI model, win rate, or probability claim"
+ }
+}

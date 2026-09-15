@@ -1,0 +1,754 @@
+{
+ "label": "deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied",
+ "version": "0.5-review",
+ "coverage": "full",
+ "contest_id": "194429260",
+ "slate_date": "2026-08-26",
+ "contest_type": "showdown",
+ "meta": {
+  "entries_total": 19,
+  "entries_complete_lineups": 19,
+  "roster_size": 6,
+  "entries_unparsed": 0,
+  "winning_points": 87.5,
+  "winning_entry_id": "5230911169",
+  "multi_entry_flag": false
+ },
+ "duplication": {
+  "distinct_lineups": 19,
+  "entries_in_duplicated_lineups": 0,
+  "share_duplicated_pct": 0.0,
+  "max_copies": 1,
+  "copies_histogram": {
+   "1": 19
+  },
+  "winner_copies": 1
+ },
+ "construction": {
+  "cheap_salary_threshold": 3000,
+  "at_cap_entries": 7,
+  "at_cap_share_pct": 36.8,
+  "salary_left_histogram": {
+   "<= 0": 3,
+   "101-300": 4,
+   "301-700": 4,
+   "701-1500": 4,
+   "1-100": 4
+  },
+  "max_stack_histogram": {
+   "3": 5,
+   "4": 7,
+   "5": 7
+  },
+  "sp_pair_top": [],
+  "top_owned": [
+   {
+    "player": "Peter Lambert",
+    "pct_drafted": 57.89
+   },
+   {
+    "player": "Yordan Alvarez",
+    "pct_drafted": 52.63
+   },
+   {
+    "player": "Elmer Rodriguez",
+    "pct_drafted": 47.37
+   },
+   {
+    "player": "Taylor Trammell",
+    "pct_drafted": 36.84
+   },
+   {
+    "player": "Ben Rice",
+    "pct_drafted": 31.58
+   }
+  ],
+  "captain_table": [
+   {
+    "player": "Peter Lambert",
+    "captain_count": 5,
+    "captain_share_pct": 26.3,
+    "pct_drafted": 57.89
+   },
+   {
+    "player": "Luis Garcia Jr.",
+    "captain_count": 2,
+    "captain_share_pct": 10.5,
+    "pct_drafted": 26.32
+   },
+   {
+    "player": "Daulton Varsho",
+    "captain_count": 2,
+    "captain_share_pct": 10.5,
+    "pct_drafted": 31.58
+   },
+   {
+    "player": "Elmer Rodriguez",
+    "captain_count": 2,
+    "captain_share_pct": 10.5,
+    "pct_drafted": 47.37
+   },
+   {
+    "player": "Ben Rice",
+    "captain_count": 2,
+    "captain_share_pct": 10.5,
+    "pct_drafted": 31.58
+   },
+   {
+    "player": "Yordan Alvarez",
+    "captain_count": 2,
+    "captain_share_pct": 10.5,
+    "pct_drafted": 52.63
+   },
+   {
+    "player": "George Lombard Jr.",
+    "captain_count": 1,
+    "captain_share_pct": 5.3,
+    "pct_drafted": 31.58
+   },
+   {
+    "player": "Spencer Jones",
+    "captain_count": 1,
+    "captain_share_pct": 5.3,
+    "pct_drafted": 26.32
+   }
+  ],
+  "winner_captain": {
+   "player": "Luis Garcia Jr.",
+   "pct_drafted": 26.32,
+   "captain_share_pct": 10.5,
+   "was_top_owned_captain": false
+  }
+ },
+ "diagnostics": {
+  "salary_join_rate_pct": 100.0,
+  "unmatched_names_top": [],
+  "salary_name_collisions": [],
+  "ownership_recompute_max_diff_pts": 0.0,
+  "ownership_recompute_denominator": "all_entries",
+  "ownership_recompute_ok": true,
+  "parse_structural_ok": true,
+  "parsed_nothing": false,
+  "mostly_unparsed": false,
+  "contest_type_mismatch": false,
+  "salary_join_collapsed": false,
+  "entries_unparsed_share": 0.0,
+  "intra_entry_duplicate_entry_ids": [],
+  "roster_slots_observed": 114,
+  "roster_slots_expected": 114,
+  "recomputed_total_pct": 600.0,
+  "dk_table_total_pct": 600.0,
+  "dk_table_deficit_pts": 0.0,
+  "dk_table_agrees": true,
+  "verification_note": "parse structurally sound; DK %Drafted agrees with the lineup recompute"
+ },
+ "entries": [
+  {
+   "rank": "1",
+   "entry_id": "5230911169",
+   "username": "whoisjohngalt420",
+   "points": 87.5,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 29.83,
+   "n_cheap": 0,
+   "players_norm": [
+    "ben rice",
+    "elmer rodriguez",
+    "jose caballero",
+    "luis garcia",
+    "taylor trammell",
+    "trent grisham"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "luis garcia"
+  },
+  {
+   "rank": "2",
+   "entry_id": "5231084551",
+   "username": "ksatty707",
+   "points": 83.0,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 24.56,
+   "n_cheap": 0,
+   "players_norm": [
+    "george lombard",
+    "isaac paredes",
+    "jazz chisholm",
+    "jose altuve",
+    "luis garcia",
+    "trent grisham"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "luis garcia"
+  },
+  {
+   "rank": "3",
+   "entry_id": "5231203023",
+   "username": "KristianFTM",
+   "points": 80.0,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 28.95,
+   "n_cheap": 0,
+   "players_norm": [
+    "ben rice",
+    "george lombard",
+    "jazz chisholm",
+    "jeremy pena",
+    "luis garcia",
+    "spencer jones"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "george lombard"
+  },
+  {
+   "rank": "4",
+   "entry_id": "5231474427",
+   "username": "wittwerjoe",
+   "points": 79.0,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 35.97,
+   "n_cheap": 0,
+   "players_norm": [
+    "ben rice",
+    "christian walker",
+    "daulton varsho",
+    "elmer rodriguez",
+    "spencer jones",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "daulton varsho"
+  },
+  {
+   "rank": "5",
+   "entry_id": "5231018048",
+   "username": "howardwi",
+   "points": 77.25,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 34.21,
+   "n_cheap": 0,
+   "players_norm": [
+    "ben rice",
+    "cam smith",
+    "cody bellinger",
+    "jazz chisholm",
+    "peter lambert",
+    "spencer jones"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "spencer jones"
+  },
+  {
+   "rank": "6",
+   "entry_id": "5231542523",
+   "username": "BAlmeida402",
+   "points": 74.25,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 37.72,
+   "n_cheap": 0,
+   "players_norm": [
+    "cam smith",
+    "daulton varsho",
+    "isaac paredes",
+    "luis garcia",
+    "peter lambert",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "daulton varsho"
+  },
+  {
+   "rank": "7",
+   "entry_id": "5230861435",
+   "username": "bposluszny",
+   "points": 69.75,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 30.7,
+   "n_cheap": 0,
+   "players_norm": [
+    "christian walker",
+    "cody bellinger",
+    "elmer rodriguez",
+    "jazz chisholm",
+    "spencer jones",
+    "trent grisham"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "elmer rodriguez"
+  },
+  {
+   "rank": "8",
+   "entry_id": "5231500292",
+   "username": "patton22",
+   "points": 69.63,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 36.84,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin wells",
+    "elmer rodriguez",
+    "jeremy pena",
+    "luis garcia",
+    "peter lambert",
+    "taylor trammell"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "peter lambert"
+  },
+  {
+   "rank": "9",
+   "entry_id": "5231308643",
+   "username": "eddiesalazar",
+   "points": 61.0,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 27.19,
+   "n_cheap": 0,
+   "players_norm": [
+    "anthony volpe",
+    "ben rice",
+    "cam smith",
+    "cody bellinger",
+    "jose altuve",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "ben rice"
+  },
+  {
+   "rank": "10",
+   "entry_id": "5231544213",
+   "username": "Harmiles",
+   "points": 58.5,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 38.6,
+   "n_cheap": 0,
+   "players_norm": [
+    "cam smith",
+    "daulton varsho",
+    "elmer rodriguez",
+    "george lombard",
+    "jeremy pena",
+    "peter lambert"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "elmer rodriguez"
+  },
+  {
+   "rank": "11",
+   "entry_id": "5231469136",
+   "username": "josephje",
+   "points": 57.63,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 42.98,
+   "n_cheap": 0,
+   "players_norm": [
+    "cam smith",
+    "daulton varsho",
+    "elmer rodriguez",
+    "peter lambert",
+    "taylor trammell",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "peter lambert"
+  },
+  {
+   "rank": "12",
+   "entry_id": "5231265153",
+   "username": "zonaque",
+   "points": 52.0,
+   "salary_used": 48600,
+   "salary_left": 1400,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 24.56,
+   "n_cheap": 0,
+   "players_norm": [
+    "ben rice",
+    "christian vazquez",
+    "cody bellinger",
+    "george lombard",
+    "jeremy pena",
+    "jose caballero"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "ben rice"
+  },
+  {
+   "rank": "13",
+   "entry_id": "5231422197",
+   "username": "USAFJorgensen",
+   "points": 50.63,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 40.35,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin wells",
+    "elmer rodriguez",
+    "isaac paredes",
+    "peter lambert",
+    "taylor trammell",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "peter lambert"
+  },
+  {
+   "rank": "14",
+   "entry_id": "5231517601",
+   "username": "bleeski",
+   "points": 47.75,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 36.84,
+   "n_cheap": 0,
+   "players_norm": [
+    "christian walker",
+    "daulton varsho",
+    "isaac paredes",
+    "peter lambert",
+    "spencer jones",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "isaac paredes"
+  },
+  {
+   "rank": "15",
+   "entry_id": "5231534798",
+   "username": "SmokinJoe42069",
+   "points": 46.25,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 37.72,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin wells",
+    "daulton varsho",
+    "george lombard",
+    "jeremy pena",
+    "peter lambert",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "yordan alvarez"
+  },
+  {
+   "rank": "16",
+   "entry_id": "5230725443",
+   "username": "AZGiovanni",
+   "points": 45.0,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 32.46,
+   "n_cheap": 0,
+   "players_norm": [
+    "christian walker",
+    "cody bellinger",
+    "george lombard",
+    "isaac paredes",
+    "jazz chisholm",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "christian walker"
+  },
+  {
+   "rank": "17",
+   "entry_id": "5230997338",
+   "username": "KILLANADZ24",
+   "points": 41.25,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 37.72,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin wells",
+    "cody bellinger",
+    "peter lambert",
+    "taylor trammell",
+    "trent grisham",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "yordan alvarez"
+  },
+  {
+   "rank": "18",
+   "entry_id": "5231031003",
+   "username": "kudos72off",
+   "points": 40.63,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 38.6,
+   "n_cheap": 0,
+   "players_norm": [
+    "christian vazquez",
+    "christian walker",
+    "elmer rodriguez",
+    "peter lambert",
+    "taylor trammell",
+    "yordan alvarez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "peter lambert"
+  },
+  {
+   "rank": "18",
+   "entry_id": "5231386564",
+   "username": "DUI-Guy",
+   "points": 40.63,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 38.6,
+   "n_cheap": 0,
+   "players_norm": [
+    "cam smith",
+    "elmer rodriguez",
+    "jeremy pena",
+    "peter lambert",
+    "taylor trammell",
+    "trent grisham"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "peter lambert"
+  }
+ ],
+ "player_table": [
+  {
+   "player": "Peter Lambert",
+   "player_norm": "peter lambert",
+   "roster_position": "UTIL",
+   "pct_drafted": 57.89,
+   "fpts": 12.75
+  },
+  {
+   "player": "Yordan Alvarez",
+   "player_norm": "yordan alvarez",
+   "roster_position": "UTIL",
+   "pct_drafted": 52.63,
+   "fpts": 3.0
+  },
+  {
+   "player": "Elmer Rodriguez",
+   "player_norm": "elmer rodriguez",
+   "roster_position": "UTIL",
+   "pct_drafted": 47.37,
+   "fpts": 16.5
+  },
+  {
+   "player": "Taylor Trammell",
+   "player_norm": "taylor trammell",
+   "roster_position": "UTIL",
+   "pct_drafted": 36.84,
+   "fpts": 0.0
+  },
+  {
+   "player": "Ben Rice",
+   "player_norm": "ben rice",
+   "roster_position": "UTIL",
+   "pct_drafted": 31.58,
+   "fpts": 24.0
+  },
+  {
+   "player": "Jeremy Pena",
+   "player_norm": "jeremy pena",
+   "roster_position": "UTIL",
+   "pct_drafted": 31.58,
+   "fpts": 0.0
+  },
+  {
+   "player": "Cody Bellinger",
+   "player_norm": "cody bellinger",
+   "roster_position": "UTIL",
+   "pct_drafted": 31.58,
+   "fpts": 11.0
+  },
+  {
+   "player": "George Lombard Jr.",
+   "player_norm": "george lombard",
+   "roster_position": "UTIL",
+   "pct_drafted": 31.58,
+   "fpts": 2.0
+  },
+  {
+   "player": "Daulton Varsho",
+   "player_norm": "daulton varsho",
+   "roster_position": "UTIL",
+   "pct_drafted": 31.58,
+   "fpts": 19.0
+  },
+  {
+   "player": "Cam Smith",
+   "player_norm": "cam smith",
+   "roster_position": "UTIL",
+   "pct_drafted": 31.58,
+   "fpts": 0.0
+  },
+  {
+   "player": "Luis Garcia Jr.",
+   "player_norm": "luis garcia",
+   "roster_position": "UTIL",
+   "pct_drafted": 26.32,
+   "fpts": 26.0
+  },
+  {
+   "player": "Jazz Chisholm Jr.",
+   "player_norm": "jazz chisholm",
+   "roster_position": "UTIL",
+   "pct_drafted": 26.32,
+   "fpts": 22.0
+  },
+  {
+   "player": "Trent Grisham",
+   "player_norm": "trent grisham",
+   "roster_position": "UTIL",
+   "pct_drafted": 26.32,
+   "fpts": 5.0
+  },
+  {
+   "player": "Isaac Paredes",
+   "player_norm": "isaac paredes",
+   "roster_position": "UTIL",
+   "pct_drafted": 26.32,
+   "fpts": 4.0
+  },
+  {
+   "player": "Christian Walker",
+   "player_norm": "christian walker",
+   "roster_position": "UTIL",
+   "pct_drafted": 26.32,
+   "fpts": 2.0
+  },
+  {
+   "player": "Spencer Jones",
+   "player_norm": "spencer jones",
+   "roster_position": "UTIL",
+   "pct_drafted": 26.32,
+   "fpts": 5.0
+  },
+  {
+   "player": "Austin Wells",
+   "player_norm": "austin wells",
+   "roster_position": "UTIL",
+   "pct_drafted": 21.05,
+   "fpts": 8.0
+  },
+  {
+   "player": "Jose Altuve",
+   "player_norm": "jose altuve",
+   "roster_position": "UTIL",
+   "pct_drafted": 10.53,
+   "fpts": 11.0
+  },
+  {
+   "player": "Jose Caballero",
+   "player_norm": "jose caballero",
+   "roster_position": "UTIL",
+   "pct_drafted": 10.53,
+   "fpts": 3.0
+  },
+  {
+   "player": "Christian Vazquez",
+   "player_norm": "christian vazquez",
+   "roster_position": "UTIL",
+   "pct_drafted": 10.53,
+   "fpts": 0.0
+  },
+  {
+   "player": "Anthony Volpe",
+   "player_norm": "anthony volpe",
+   "roster_position": "UTIL",
+   "pct_drafted": 5.26,
+   "fpts": 0.0
+  }
+ ],
+ "own_results": {
+  "matched": 1,
+  "requested": 1,
+  "field_size": 19,
+  "best_rank": 14,
+  "worst_rank": 14,
+  "best_finish_percentile": 31.58,
+  "median_finish_percentile": 31.58,
+  "best_points": 47.75,
+  "winning_points": 87.5,
+  "own_lineups_duplicated_by_field": 0,
+  "max_copies_of_an_own_lineup": 1,
+  "entry_fee": 0.25,
+  "fees_total": 0.25,
+  "winnings_total": 0.0,
+  "paid_places": 1,
+  "payout_breadth_observed": 0.0526,
+  "cashed_entries": 0,
+  "net": -0.25,
+  "labels": "observed outcomes from a completed contest; never a graded prediction, ROI model, win rate, or probability claim"
+ }
+}

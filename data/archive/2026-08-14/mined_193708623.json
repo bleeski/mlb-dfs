@@ -1,0 +1,5876 @@
+{
+ "label": "deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied",
+ "version": "0.5-review",
+ "coverage": "full",
+ "contest_id": "193708623",
+ "slate_date": "2026-08-14",
+ "contest_type": "classic",
+ "meta": {
+  "entries_total": 185,
+  "entries_complete_lineups": 179,
+  "roster_size": 10,
+  "entries_unparsed": 6,
+  "winning_points": 129.9,
+  "winning_entry_id": "5218505702",
+  "multi_entry_flag": true
+ },
+ "duplication": {
+  "distinct_lineups": 161,
+  "entries_in_duplicated_lineups": 31,
+  "share_duplicated_pct": 17.3,
+  "max_copies": 4,
+  "copies_histogram": {
+   "1": 148,
+   "2": 10,
+   "3": 1,
+   "4": 2
+  },
+  "winner_copies": 2
+ },
+ "construction": {
+  "cheap_salary_threshold": 2300,
+  "at_cap_entries": 37,
+  "at_cap_share_pct": 20.7,
+  "salary_left_histogram": {
+   "<= 0": 20,
+   "301-700": 26,
+   "701-1500": 31,
+   "> 1500": 60,
+   "1-100": 17,
+   "101-300": 25
+  },
+  "max_stack_histogram": {
+   "2": 2,
+   "3": 17,
+   "4": 40,
+   "5": 120
+  },
+  "sp_pair_top": [
+   {
+    "pair": [
+     "Landen Roupp",
+     "Yoshinobu Yamamoto"
+    ],
+    "count": 90,
+    "field_share_pct": 50.3
+   },
+   {
+    "pair": [
+     "Kyle Freeland",
+     "Yoshinobu Yamamoto"
+    ],
+    "count": 40,
+    "field_share_pct": 22.3
+   },
+   {
+    "pair": [
+     "Kyle Freeland",
+     "Landen Roupp"
+    ],
+    "count": 21,
+    "field_share_pct": 11.7
+   },
+   {
+    "pair": [
+     "Kyle Freeland",
+     "Robert Gasser"
+    ],
+    "count": 12,
+    "field_share_pct": 6.7
+   },
+   {
+    "pair": [
+     "Landen Roupp",
+     "Robert Gasser"
+    ],
+    "count": 11,
+    "field_share_pct": 6.1
+   },
+   {
+    "pair": [
+     "Robert Gasser",
+     "Yoshinobu Yamamoto"
+    ],
+    "count": 5,
+    "field_share_pct": 2.8
+   }
+  ],
+  "top_owned": [
+   {
+    "player": "Mookie Betts",
+    "pct_drafted": 75.68
+   },
+   {
+    "player": "Shohei Ohtani",
+    "pct_drafted": 74.6
+   },
+   {
+    "player": "Yoshinobu Yamamoto",
+    "pct_drafted": 72.97
+   },
+   {
+    "player": "Landen Roupp",
+    "pct_drafted": 65.95
+   },
+   {
+    "player": "Tommy Edman",
+    "pct_drafted": 53.52
+   }
+  ],
+  "captain_table": [],
+  "winner_captain": null
+ },
+ "diagnostics": {
+  "salary_join_rate_pct": 100.0,
+  "unmatched_names_top": [],
+  "salary_name_collisions": [],
+  "ownership_recompute_max_diff_pts": 2.71,
+  "ownership_recompute_denominator": "all_entries",
+  "ownership_recompute_ok": false,
+  "parse_structural_ok": true,
+  "parsed_nothing": false,
+  "mostly_unparsed": false,
+  "contest_type_mismatch": false,
+  "salary_join_collapsed": false,
+  "entries_unparsed_share": 0.0324,
+  "intra_entry_duplicate_entry_ids": [],
+  "roster_slots_observed": 1790,
+  "roster_slots_expected": 1790,
+  "recomputed_total_pct": 967.6,
+  "dk_table_total_pct": 964.9,
+  "dk_table_deficit_pts": 2.7,
+  "dk_table_agrees": false,
+  "verification_note": "parse structurally sound (every complete entry carries 10 distinct players); DK's %Drafted table sums 2.7 pts short, which is DK omitting position rows for multi-position players. Lineup-derived ownership is authoritative for this contest."
+ },
+ "entries": [
+  {
+   "rank": "1",
+   "entry_id": "5218505702",
+   "username": "aarond23",
+   "points": 129.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 45.24,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "brett sullivan",
+    "kyle freeland",
+    "mookie betts",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tj rumfield",
+    "tommy edman",
+    "willi castro",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "1",
+   "entry_id": "5218866376",
+   "username": "d9144",
+   "points": 129.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 45.24,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "brett sullivan",
+    "kyle freeland",
+    "mookie betts",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tj rumfield",
+    "tommy edman",
+    "willi castro",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "3",
+   "entry_id": "5218505703",
+   "username": "aarond23",
+   "points": 127.9,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 42.98,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "brett sullivan",
+    "kyle freeland",
+    "kyle tucker",
+    "mookie betts",
+    "shohei ohtani",
+    "tommy edman",
+    "troy johnston",
+    "willi castro",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "4",
+   "entry_id": "5218840211",
+   "username": "sportsfan14",
+   "points": 122.9,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 39.73,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "brett sullivan",
+    "connor norby",
+    "kyle freeland",
+    "mickey moniak",
+    "mookie betts",
+    "shohei ohtani",
+    "tj rumfield",
+    "willi castro",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "5",
+   "entry_id": "5218842762",
+   "username": "cbmillport",
+   "points": 119.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 38.06,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "brett sullivan",
+    "ezequiel tovar",
+    "jake mccarthy",
+    "kyle freeland",
+    "mickey moniak",
+    "shohei ohtani",
+    "tommy edman",
+    "willi castro",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "6",
+   "entry_id": "5218851805",
+   "username": "ed8802",
+   "points": 119.25,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 48.98,
+   "n_cheap": 1,
+   "players_norm": [
+    "andy pages",
+    "brett sullivan",
+    "jonah cox",
+    "landen roupp",
+    "mookie betts",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tommy edman",
+    "willi castro",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "7",
+   "entry_id": "5218210594",
+   "username": "Stree",
+   "points": 116.25,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 47.08,
+   "n_cheap": 1,
+   "players_norm": [
+    "andrew knizner",
+    "andy pages",
+    "bryce eldridge",
+    "christian koss",
+    "landen roupp",
+    "mookie betts",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tommy edman",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "8",
+   "entry_id": "5218701803",
+   "username": "tdbaker13",
+   "points": 114.9,
+   "salary_used": 45600,
+   "salary_left": 4400,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 34.16,
+   "n_cheap": 0,
+   "players_norm": [
+    "brett sullivan",
+    "jake mccarthy",
+    "joey ortiz",
+    "kyle freeland",
+    "mookie betts",
+    "tj rumfield",
+    "tommy edman",
+    "troy johnston",
+    "willi castro",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "8",
+   "entry_id": "5218760916",
+   "username": "bleeski",
+   "points": 114.9,
+   "salary_used": 48800,
+   "salary_left": 1200,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 41.95,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "brett sullivan",
+    "connor norby",
+    "jake mccarthy",
+    "kyle freeland",
+    "mookie betts",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "willi castro",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "10",
+   "entry_id": "5218840208",
+   "username": "sportsfan14",
+   "points": 113.9,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 40.54,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "brett sullivan",
+    "connor norby",
+    "jake mccarthy",
+    "kyle freeland",
+    "mickey moniak",
+    "mookie betts",
+    "shohei ohtani",
+    "willi castro",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "11",
+   "entry_id": "5218761881",
+   "username": "yaopete",
+   "points": 113.25,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 42.54,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "christian koss",
+    "landen roupp",
+    "mookie betts",
+    "osleivis basabe",
+    "rafael devers",
+    "teoscar hernandez",
+    "tommy edman",
+    "william contreras",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "11",
+   "entry_id": "5218840207",
+   "username": "sportsfan14",
+   "points": 113.25,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 48.76,
+   "n_cheap": 2,
+   "players_norm": [
+    "andrew knizner",
+    "andy pages",
+    "jonah cox",
+    "landen roupp",
+    "max muncy",
+    "mookie betts",
+    "osleivis basabe",
+    "shohei ohtani",
+    "tommy edman",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "13",
+   "entry_id": "5218766479",
+   "username": "yaopete",
+   "points": 112.25,
+   "salary_used": 48400,
+   "salary_left": 1600,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 43.73,
+   "n_cheap": 1,
+   "players_norm": [
+    "andy pages",
+    "bryce eldridge",
+    "christian koss",
+    "hunter feduccia",
+    "landen roupp",
+    "mookie betts",
+    "shohei ohtani",
+    "tommy edman",
+    "victor bericoto",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "13",
+   "entry_id": "5218866379",
+   "username": "d9144",
+   "points": 112.25,
+   "salary_used": 47600,
+   "salary_left": 2400,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 48.11,
+   "n_cheap": 2,
+   "players_norm": [
+    "andrew knizner",
+    "andy pages",
+    "christian koss",
+    "jonah cox",
+    "landen roupp",
+    "mookie betts",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tommy edman",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "15",
+   "entry_id": "5218761163",
+   "username": "yaopete",
+   "points": 111.9,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 39.79,
+   "n_cheap": 0,
+   "players_norm": [
+    "brett sullivan",
+    "connor norby",
+    "kyle freeland",
+    "kyle tucker",
+    "max muncy",
+    "mookie betts",
+    "shohei ohtani",
+    "tj rumfield",
+    "tommy edman",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "15",
+   "entry_id": "5218828976",
+   "username": "wittwerjoe",
+   "points": 111.9,
+   "salary_used": 43200,
+   "salary_left": 6800,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 28.38,
+   "n_cheap": 1,
+   "players_norm": [
+    "brett sullivan",
+    "connor norby",
+    "ezequiel tovar",
+    "jonah cox",
+    "kike hernandez",
+    "kyle freeland",
+    "shohei ohtani",
+    "tj rumfield",
+    "troy johnston",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "15",
+   "entry_id": "5218849806",
+   "username": "RunWired",
+   "points": 111.9,
+   "salary_used": 48600,
+   "salary_left": 1400,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 38.38,
+   "n_cheap": 0,
+   "players_norm": [
+    "brett sullivan",
+    "kike hernandez",
+    "kyle freeland",
+    "mickey moniak",
+    "mookie betts",
+    "shohei ohtani",
+    "tj rumfield",
+    "tommy edman",
+    "troy johnston",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "18",
+   "entry_id": "5218210597",
+   "username": "Stree",
+   "points": 111.25,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 45.3,
+   "n_cheap": 1,
+   "players_norm": [
+    "andrew knizner",
+    "andy pages",
+    "bryce eldridge",
+    "christian koss",
+    "kyle tucker",
+    "landen roupp",
+    "mookie betts",
+    "shohei ohtani",
+    "tommy edman",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "19",
+   "entry_id": "5218755678",
+   "username": "yaopete",
+   "points": 110.25,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 46.87,
+   "n_cheap": 1,
+   "players_norm": [
+    "andrew knizner",
+    "andy pages",
+    "christian koss",
+    "landen roupp",
+    "mookie betts",
+    "osleivis basabe",
+    "rafael devers",
+    "shohei ohtani",
+    "tommy edman",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "19",
+   "entry_id": "5218848429",
+   "username": "jdub.14",
+   "points": 110.25,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 48.06,
+   "n_cheap": 2,
+   "players_norm": [
+    "andrew knizner",
+    "andy pages",
+    "jonah cox",
+    "landen roupp",
+    "max muncy",
+    "mookie betts",
+    "shohei ohtani",
+    "tommy edman",
+    "victor bericoto",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "19",
+   "entry_id": "5218865709",
+   "username": "BAlmeida402",
+   "points": 110.25,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 48.06,
+   "n_cheap": 2,
+   "players_norm": [
+    "andrew knizner",
+    "andy pages",
+    "jonah cox",
+    "landen roupp",
+    "max muncy",
+    "mookie betts",
+    "shohei ohtani",
+    "tommy edman",
+    "victor bericoto",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "22",
+   "entry_id": "5217965921",
+   "username": "minrobertson210",
+   "points": 109.25,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 50.65,
+   "n_cheap": 2,
+   "players_norm": [
+    "andrew knizner",
+    "andy pages",
+    "jonah cox",
+    "landen roupp",
+    "mookie betts",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tommy edman",
+    "willi castro",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "22",
+   "entry_id": "5218127881",
+   "username": "howardwi",
+   "points": 109.25,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 47.62,
+   "n_cheap": 1,
+   "players_norm": [
+    "andrew knizner",
+    "andy pages",
+    "christian koss",
+    "landen roupp",
+    "mookie betts",
+    "rafael devers",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tommy edman",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "22",
+   "entry_id": "5218180569",
+   "username": "Elwaysarmy",
+   "points": 109.25,
+   "salary_used": 44400,
+   "salary_left": 5600,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 31.03,
+   "n_cheap": 2,
+   "players_norm": [
+    "andrew knizner",
+    "andy pages",
+    "christian koss",
+    "connor norby",
+    "ezequiel tovar",
+    "jackson chourio",
+    "jonah cox",
+    "landen roupp",
+    "rafael devers",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "22",
+   "entry_id": "5218210596",
+   "username": "Stree",
+   "points": 109.25,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 47.62,
+   "n_cheap": 1,
+   "players_norm": [
+    "andrew knizner",
+    "andy pages",
+    "christian koss",
+    "landen roupp",
+    "mookie betts",
+    "rafael devers",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tommy edman",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "22",
+   "entry_id": "5218838255",
+   "username": "manomanomania",
+   "points": 109.25,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 43.89,
+   "n_cheap": 1,
+   "players_norm": [
+    "brett sullivan",
+    "bryce eldridge",
+    "jake mccarthy",
+    "landen roupp",
+    "mookie betts",
+    "shohei ohtani",
+    "tommy edman",
+    "willi castro",
+    "yoshinobu yamamoto",
+    "zac veen"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "22",
+   "entry_id": "5218852907",
+   "username": "neversummer",
+   "points": 109.25,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 39.24,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "kike hernandez",
+    "kyle tucker",
+    "landen roupp",
+    "mookie betts",
+    "rafael devers",
+    "tommy edman",
+    "troy johnston",
+    "william contreras",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "22",
+   "entry_id": "5218864268",
+   "username": "Rallycap",
+   "points": 109.25,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 47.62,
+   "n_cheap": 1,
+   "players_norm": [
+    "andrew knizner",
+    "andy pages",
+    "christian koss",
+    "landen roupp",
+    "mookie betts",
+    "rafael devers",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tommy edman",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "22",
+   "entry_id": "5218865714",
+   "username": "BAlmeida402",
+   "points": 109.25,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 46.92,
+   "n_cheap": 2,
+   "players_norm": [
+    "andrew knizner",
+    "andy pages",
+    "jonah cox",
+    "kike hernandez",
+    "landen roupp",
+    "mookie betts",
+    "rafael devers",
+    "shohei ohtani",
+    "tommy edman",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "30",
+   "entry_id": "5218505706",
+   "username": "aarond23",
+   "points": 108.9,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 35.89,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "brett sullivan",
+    "ezequiel tovar",
+    "kyle freeland",
+    "kyle tucker",
+    "max muncy",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "willi castro",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "31",
+   "entry_id": "5218828975",
+   "username": "wittwerjoe",
+   "points": 107.9,
+   "salary_used": 48200,
+   "salary_left": 1800,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 37.14,
+   "n_cheap": 1,
+   "players_norm": [
+    "jake mccarthy",
+    "kyle freeland",
+    "mickey moniak",
+    "mookie betts",
+    "tj rumfield",
+    "tommy edman",
+    "willi castro",
+    "william contreras",
+    "yoshinobu yamamoto",
+    "zac veen"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "31",
+   "entry_id": "5218842761",
+   "username": "cbmillport",
+   "points": 107.9,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 37.84,
+   "n_cheap": 1,
+   "players_norm": [
+    "andy pages",
+    "ezequiel tovar",
+    "hunter feduccia",
+    "jake mccarthy",
+    "kyle freeland",
+    "mickey moniak",
+    "shohei ohtani",
+    "tommy edman",
+    "willi castro",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "31",
+   "entry_id": "5218849807",
+   "username": "RunWired",
+   "points": 107.9,
+   "salary_used": 48400,
+   "salary_left": 1600,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 38.81,
+   "n_cheap": 0,
+   "players_norm": [
+    "brett sullivan",
+    "jake mccarthy",
+    "kike hernandez",
+    "kyle freeland",
+    "mookie betts",
+    "shohei ohtani",
+    "tj rumfield",
+    "tommy edman",
+    "troy johnston",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "34",
+   "entry_id": "5218210595",
+   "username": "Stree",
+   "points": 107.25,
+   "salary_used": 47400,
+   "salary_left": 2600,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 47.57,
+   "n_cheap": 3,
+   "players_norm": [
+    "andrew knizner",
+    "andy pages",
+    "buddy kennedy",
+    "jonah cox",
+    "landen roupp",
+    "mookie betts",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tommy edman",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "34",
+   "entry_id": "5218701807",
+   "username": "tdbaker13",
+   "points": 107.25,
+   "salary_used": 47400,
+   "salary_left": 2600,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 47.57,
+   "n_cheap": 3,
+   "players_norm": [
+    "andrew knizner",
+    "andy pages",
+    "buddy kennedy",
+    "jonah cox",
+    "landen roupp",
+    "mookie betts",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tommy edman",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "34",
+   "entry_id": "5218866375",
+   "username": "d9144",
+   "points": 107.25,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 43.35,
+   "n_cheap": 1,
+   "players_norm": [
+    "andrew knizner",
+    "andy pages",
+    "jung hoo lee",
+    "landen roupp",
+    "max muncy",
+    "mookie betts",
+    "rafael devers",
+    "teoscar hernandez",
+    "tommy edman",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "37",
+   "entry_id": "5218286898",
+   "username": "wondertwins17",
+   "points": 106.25,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 44.81,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "christian koss",
+    "drew cavanaugh",
+    "landen roupp",
+    "mookie betts",
+    "osleivis basabe",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tommy edman",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "38",
+   "entry_id": "5218721890",
+   "username": "Cobra777666777",
+   "points": 105.25,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 46.16,
+   "n_cheap": 2,
+   "players_norm": [
+    "andrew knizner",
+    "andy pages",
+    "landen roupp",
+    "max muncy",
+    "mookie betts",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "willi castro",
+    "yoshinobu yamamoto",
+    "zac veen"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "39",
+   "entry_id": "5218701806",
+   "username": "tdbaker13",
+   "points": 104.9,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 41.73,
+   "n_cheap": 0,
+   "players_norm": [
+    "brett sullivan",
+    "jake mccarthy",
+    "kyle freeland",
+    "mickey moniak",
+    "mookie betts",
+    "shohei ohtani",
+    "tommy edman",
+    "troy johnston",
+    "willi castro",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "39",
+   "entry_id": "5218840210",
+   "username": "sportsfan14",
+   "points": 104.9,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 41.73,
+   "n_cheap": 0,
+   "players_norm": [
+    "brett sullivan",
+    "jake mccarthy",
+    "kyle freeland",
+    "mickey moniak",
+    "mookie betts",
+    "shohei ohtani",
+    "tommy edman",
+    "troy johnston",
+    "willi castro",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "41",
+   "entry_id": "5217965919",
+   "username": "minrobertson210",
+   "points": 104.25,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 48.87,
+   "n_cheap": 2,
+   "players_norm": [
+    "andrew knizner",
+    "andy pages",
+    "jonah cox",
+    "kyle tucker",
+    "landen roupp",
+    "mookie betts",
+    "shohei ohtani",
+    "tommy edman",
+    "willi castro",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "41",
+   "entry_id": "5218210600",
+   "username": "Stree",
+   "points": 104.25,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 46.54,
+   "n_cheap": 1,
+   "players_norm": [
+    "andrew knizner",
+    "andy pages",
+    "joey ortiz",
+    "jung hoo lee",
+    "landen roupp",
+    "mookie betts",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tommy edman",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "41",
+   "entry_id": "5218822929",
+   "username": "peterjpacheco",
+   "points": 104.25,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 44.49,
+   "n_cheap": 1,
+   "players_norm": [
+    "andy pages",
+    "landen roupp",
+    "mookie betts",
+    "osleivis basabe",
+    "shohei ohtani",
+    "victor bericoto",
+    "willi castro",
+    "william contreras",
+    "yoshinobu yamamoto",
+    "zac veen"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "41",
+   "entry_id": "5218822932",
+   "username": "peterjpacheco",
+   "points": 104.25,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 39.46,
+   "n_cheap": 1,
+   "players_norm": [
+    "andy pages",
+    "jake bauers",
+    "jake mccarthy",
+    "landen roupp",
+    "mookie betts",
+    "osleivis basabe",
+    "willi castro",
+    "william contreras",
+    "yoshinobu yamamoto",
+    "zac veen"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "41",
+   "entry_id": "5218833772",
+   "username": "MGBlaze",
+   "points": 104.25,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 47.08,
+   "n_cheap": 2,
+   "players_norm": [
+    "andrew knizner",
+    "andy pages",
+    "buddy kennedy",
+    "landen roupp",
+    "mookie betts",
+    "rafael devers",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tommy edman",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "46",
+   "entry_id": "5218786255",
+   "username": "troubledsoe",
+   "points": 103.9,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 42.11,
+   "n_cheap": 0,
+   "players_norm": [
+    "brett sullivan",
+    "connor norby",
+    "jake mccarthy",
+    "kyle freeland",
+    "mickey moniak",
+    "mookie betts",
+    "shohei ohtani",
+    "tommy edman",
+    "willi castro",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "46",
+   "entry_id": "5218840126",
+   "username": "campbell.kevin",
+   "points": 103.9,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 41.89,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "brett sullivan",
+    "jake mccarthy",
+    "kike hernandez",
+    "kyle freeland",
+    "mookie betts",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "willi castro",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "46",
+   "entry_id": "5218840209",
+   "username": "sportsfan14",
+   "points": 103.9,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 42.11,
+   "n_cheap": 0,
+   "players_norm": [
+    "brett sullivan",
+    "connor norby",
+    "jake mccarthy",
+    "kyle freeland",
+    "mickey moniak",
+    "mookie betts",
+    "shohei ohtani",
+    "tommy edman",
+    "willi castro",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "46",
+   "entry_id": "5218851793",
+   "username": "Bleed4Birds",
+   "points": 103.9,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 41.14,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce eldridge",
+    "jake mccarthy",
+    "joey ortiz",
+    "kyle freeland",
+    "mookie betts",
+    "osleivis basabe",
+    "shohei ohtani",
+    "tommy edman",
+    "william contreras",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "50",
+   "entry_id": "5218822931",
+   "username": "peterjpacheco",
+   "points": 103.25,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 42.65,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "bryce eldridge",
+    "christian koss",
+    "landen roupp",
+    "mookie betts",
+    "osleivis basabe",
+    "shohei ohtani",
+    "victor bericoto",
+    "william contreras",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "51",
+   "entry_id": "5218026394",
+   "username": "Overheated84",
+   "points": 101.75,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Robert Gasser",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 37.3,
+   "n_cheap": 0,
+   "players_norm": [
+    "brett sullivan",
+    "christian koss",
+    "connor norby",
+    "jackson chourio",
+    "jung hoo lee",
+    "mookie betts",
+    "robert gasser",
+    "shohei ohtani",
+    "tommy edman",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "52",
+   "entry_id": "5218731576",
+   "username": "beerNsurf",
+   "points": 101.25,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 42.65,
+   "n_cheap": 1,
+   "players_norm": [
+    "andrew knizner",
+    "andy pages",
+    "christian koss",
+    "connor norby",
+    "jackson chourio",
+    "landen roupp",
+    "mookie betts",
+    "rafael devers",
+    "shohei ohtani",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "52",
+   "entry_id": "5218853837",
+   "username": "monsoonserge",
+   "points": 101.25,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 46.54,
+   "n_cheap": 2,
+   "players_norm": [
+    "andrew knizner",
+    "andy pages",
+    "jonah cox",
+    "landen roupp",
+    "max muncy",
+    "mookie betts",
+    "osleivis basabe",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "54",
+   "entry_id": "5218828973",
+   "username": "wittwerjoe",
+   "points": 100.9,
+   "salary_used": 44300,
+   "salary_left": 5700,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 34.16,
+   "n_cheap": 1,
+   "players_norm": [
+    "andrew knizner",
+    "connor norby",
+    "kyle freeland",
+    "mickey moniak",
+    "mookie betts",
+    "teoscar hernandez",
+    "tj rumfield",
+    "troy johnston",
+    "willi castro",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "55",
+   "entry_id": "5218752459",
+   "username": "crf_333",
+   "points": 100.25,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 42.22,
+   "n_cheap": 1,
+   "players_norm": [
+    "andrew knizner",
+    "andy pages",
+    "bryce eldridge",
+    "david hamilton",
+    "kyle tucker",
+    "landen roupp",
+    "mookie betts",
+    "osleivis basabe",
+    "shohei ohtani",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "55",
+   "entry_id": "5218865713",
+   "username": "BAlmeida402",
+   "points": 100.25,
+   "salary_used": 47900,
+   "salary_left": 2100,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 46.81,
+   "n_cheap": 2,
+   "players_norm": [
+    "andrew knizner",
+    "andy pages",
+    "buddy kennedy",
+    "landen roupp",
+    "mookie betts",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tommy edman",
+    "victor bericoto",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "57",
+   "entry_id": "5218760913",
+   "username": "bleeski",
+   "points": 99.35,
+   "salary_used": 48700,
+   "salary_left": 1300,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Landen Roupp"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 40.49,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "jackson chourio",
+    "jake bauers",
+    "kyle freeland",
+    "landen roupp",
+    "max muncy",
+    "mookie betts",
+    "teoscar hernandez",
+    "tommy edman",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "58",
+   "entry_id": "5218413439",
+   "username": "giveitu",
+   "points": 98.9,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 38.81,
+   "n_cheap": 1,
+   "players_norm": [
+    "brett sullivan",
+    "jake mccarthy",
+    "kyle freeland",
+    "max muncy",
+    "mickey moniak",
+    "mookie betts",
+    "shohei ohtani",
+    "willi castro",
+    "yoshinobu yamamoto",
+    "zac veen"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "59",
+   "entry_id": "5217965922",
+   "username": "minrobertson210",
+   "points": 98.25,
+   "salary_used": 48600,
+   "salary_left": 1400,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 47.68,
+   "n_cheap": 2,
+   "players_norm": [
+    "andrew knizner",
+    "andy pages",
+    "jonah cox",
+    "landen roupp",
+    "mookie betts",
+    "osleivis basabe",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "willi castro",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "59",
+   "entry_id": "5218494058",
+   "username": "slophound",
+   "points": 98.25,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 46.49,
+   "n_cheap": 2,
+   "players_norm": [
+    "andrew knizner",
+    "andy pages",
+    "jake bauers",
+    "jonah cox",
+    "landen roupp",
+    "mookie betts",
+    "osleivis basabe",
+    "shohei ohtani",
+    "willi castro",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "59",
+   "entry_id": "5218822930",
+   "username": "peterjpacheco",
+   "points": 98.25,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 41.24,
+   "n_cheap": 1,
+   "players_norm": [
+    "bryce eldridge",
+    "connor norby",
+    "jake bauers",
+    "landen roupp",
+    "mookie betts",
+    "shohei ohtani",
+    "willi castro",
+    "william contreras",
+    "yoshinobu yamamoto",
+    "zac veen"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "59",
+   "entry_id": "5218830010",
+   "username": "campbell.kevin",
+   "points": 98.25,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 46.7,
+   "n_cheap": 1,
+   "players_norm": [
+    "andrew knizner",
+    "andy pages",
+    "jung hoo lee",
+    "kike hernandez",
+    "landen roupp",
+    "mookie betts",
+    "osleivis basabe",
+    "shohei ohtani",
+    "tommy edman",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "63",
+   "entry_id": "5218866378",
+   "username": "d9144",
+   "points": 97.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 38.6,
+   "n_cheap": 0,
+   "players_norm": [
+    "brett sullivan",
+    "jake mccarthy",
+    "kyle freeland",
+    "max muncy",
+    "mookie betts",
+    "shohei ohtani",
+    "tj rumfield",
+    "troy johnston",
+    "willi castro",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "64",
+   "entry_id": "5217965923",
+   "username": "minrobertson210",
+   "points": 97.25,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 46.49,
+   "n_cheap": 1,
+   "players_norm": [
+    "andy pages",
+    "christian koss",
+    "jonah cox",
+    "landen roupp",
+    "mookie betts",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "willi castro",
+    "william contreras",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "64",
+   "entry_id": "5217965924",
+   "username": "minrobertson210",
+   "points": 97.25,
+   "salary_used": 47400,
+   "salary_left": 2600,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 46.49,
+   "n_cheap": 2,
+   "players_norm": [
+    "andrew knizner",
+    "andy pages",
+    "christian koss",
+    "jonah cox",
+    "landen roupp",
+    "mookie betts",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "willi castro",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "64",
+   "entry_id": "5218210598",
+   "username": "Stree",
+   "points": 97.25,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 46.92,
+   "n_cheap": 2,
+   "players_norm": [
+    "andrew knizner",
+    "andy pages",
+    "buddy kennedy",
+    "jung hoo lee",
+    "landen roupp",
+    "mookie betts",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tommy edman",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "64",
+   "entry_id": "5218701809",
+   "username": "tdbaker13",
+   "points": 97.25,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 46.92,
+   "n_cheap": 2,
+   "players_norm": [
+    "andrew knizner",
+    "andy pages",
+    "buddy kennedy",
+    "jung hoo lee",
+    "landen roupp",
+    "mookie betts",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tommy edman",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "64",
+   "entry_id": "5218822927",
+   "username": "peterjpacheco",
+   "points": 97.25,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 47.89,
+   "n_cheap": 2,
+   "players_norm": [
+    "andrew knizner",
+    "andy pages",
+    "jonah cox",
+    "landen roupp",
+    "max muncy",
+    "mookie betts",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "willi castro",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "64",
+   "entry_id": "5218862153",
+   "username": "jc000000",
+   "points": 97.25,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 38.97,
+   "n_cheap": 1,
+   "players_norm": [
+    "andy pages",
+    "hunter feduccia",
+    "landen roupp",
+    "mickey moniak",
+    "mookie betts",
+    "osleivis basabe",
+    "teoscar hernandez",
+    "tj rumfield",
+    "willi castro",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "64",
+   "entry_id": "5218865711",
+   "username": "BAlmeida402",
+   "points": 97.25,
+   "salary_used": 48300,
+   "salary_left": 1700,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 45.68,
+   "n_cheap": 2,
+   "players_norm": [
+    "andrew knizner",
+    "bryce eldridge",
+    "jonah cox",
+    "landen roupp",
+    "max muncy",
+    "mookie betts",
+    "shohei ohtani",
+    "tommy edman",
+    "victor bericoto",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "71",
+   "entry_id": "5218048759",
+   "username": "whoisjohngalt420",
+   "points": 96.25,
+   "salary_used": 47500,
+   "salary_left": 2500,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 43.78,
+   "n_cheap": 2,
+   "players_norm": [
+    "andrew knizner",
+    "andy pages",
+    "christian koss",
+    "jonah cox",
+    "jung hoo lee",
+    "landen roupp",
+    "mookie betts",
+    "osleivis basabe",
+    "shohei ohtani",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "71",
+   "entry_id": "5218281707",
+   "username": "Dicskstone32",
+   "points": 96.25,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 42.6,
+   "n_cheap": 2,
+   "players_norm": [
+    "hunter feduccia",
+    "landen roupp",
+    "max muncy",
+    "mookie betts",
+    "rafael devers",
+    "shohei ohtani",
+    "tommy edman",
+    "victor bericoto",
+    "yoshinobu yamamoto",
+    "zac veen"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "71",
+   "entry_id": "5218842756",
+   "username": "cbmillport",
+   "points": 96.25,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 36.16,
+   "n_cheap": 1,
+   "players_norm": [
+    "andy pages",
+    "bryce eldridge",
+    "hunter feduccia",
+    "jung hoo lee",
+    "kyle tucker",
+    "landen roupp",
+    "max muncy",
+    "mookie betts",
+    "osleivis basabe",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "74",
+   "entry_id": "5218505705",
+   "username": "aarond23",
+   "points": 95.9,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 34.27,
+   "n_cheap": 1,
+   "players_norm": [
+    "andy pages",
+    "ezequiel tovar",
+    "hunter feduccia",
+    "kyle freeland",
+    "kyle tucker",
+    "max muncy",
+    "mickey moniak",
+    "shohei ohtani",
+    "willi castro",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "75",
+   "entry_id": "5218682997",
+   "username": "psereda",
+   "points": 95.35,
+   "salary_used": 48300,
+   "salary_left": 1700,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Landen Roupp"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 44.7,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "andy pages",
+    "jake bauers",
+    "kyle freeland",
+    "landen roupp",
+    "mookie betts",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tommy edman",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "76",
+   "entry_id": "5218607250",
+   "username": "Mrboozer",
+   "points": 95.25,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 43.19,
+   "n_cheap": 2,
+   "players_norm": [
+    "brett sullivan",
+    "buddy kennedy",
+    "jackson chourio",
+    "jonah cox",
+    "landen roupp",
+    "mookie betts",
+    "rafael devers",
+    "shohei ohtani",
+    "tommy edman",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "77",
+   "entry_id": "5218505701",
+   "username": "aarond23",
+   "points": 94.9,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 42.97,
+   "n_cheap": 1,
+   "players_norm": [
+    "hunter feduccia",
+    "kyle freeland",
+    "mickey moniak",
+    "mookie betts",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tj rumfield",
+    "tommy edman",
+    "willi castro",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "78",
+   "entry_id": "5218454782",
+   "username": "dtapper29",
+   "points": 94.35,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Landen Roupp"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 38.7,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "jackson chourio",
+    "jake bauers",
+    "kyle freeland",
+    "kyle tucker",
+    "landen roupp",
+    "max muncy",
+    "mookie betts",
+    "tommy edman",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "79",
+   "entry_id": "5218807212",
+   "username": "137666",
+   "points": 94.25,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 45.52,
+   "n_cheap": 1,
+   "players_norm": [
+    "connor norby",
+    "jonah cox",
+    "landen roupp",
+    "max muncy",
+    "mookie betts",
+    "shohei ohtani",
+    "tommy edman",
+    "victor bericoto",
+    "william contreras",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "80",
+   "entry_id": "5218848430",
+   "username": "jdub.14",
+   "points": 93.9,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 37.14,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "andy pages",
+    "jake bauers",
+    "jake mccarthy",
+    "jung hoo lee",
+    "kyle freeland",
+    "mookie betts",
+    "willi castro",
+    "william contreras",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "81",
+   "entry_id": "5218454780",
+   "username": "dtapper29",
+   "points": 93.35,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Landen Roupp"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 37.35,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "andy pages",
+    "david hamilton",
+    "jackson chourio",
+    "jake bauers",
+    "kyle freeland",
+    "landen roupp",
+    "shohei ohtani",
+    "tommy edman",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "81",
+   "entry_id": "5218792373",
+   "username": "troubledsoe",
+   "points": 93.35,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Landen Roupp"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 37.35,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "andy pages",
+    "david hamilton",
+    "jackson chourio",
+    "jake bauers",
+    "kyle freeland",
+    "landen roupp",
+    "shohei ohtani",
+    "tommy edman",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "83",
+   "entry_id": "5217815888",
+   "username": "TheBabz",
+   "points": 92.25,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 47.68,
+   "n_cheap": 2,
+   "players_norm": [
+    "andrew knizner",
+    "jonah cox",
+    "landen roupp",
+    "max muncy",
+    "mookie betts",
+    "rafael devers",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tommy edman",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "83",
+   "entry_id": "5217965920",
+   "username": "minrobertson210",
+   "points": 92.25,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 47.68,
+   "n_cheap": 2,
+   "players_norm": [
+    "andrew knizner",
+    "jonah cox",
+    "landen roupp",
+    "max muncy",
+    "mookie betts",
+    "rafael devers",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tommy edman",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "83",
+   "entry_id": "5217965925",
+   "username": "minrobertson210",
+   "points": 92.25,
+   "salary_used": 48100,
+   "salary_left": 1900,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 46.49,
+   "n_cheap": 2,
+   "players_norm": [
+    "andrew knizner",
+    "andy pages",
+    "jonah cox",
+    "kike hernandez",
+    "landen roupp",
+    "mookie betts",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "willi castro",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "83",
+   "entry_id": "5218048758",
+   "username": "whoisjohngalt420",
+   "points": 92.25,
+   "salary_used": 45600,
+   "salary_left": 4400,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 43.73,
+   "n_cheap": 3,
+   "players_norm": [
+    "andrew knizner",
+    "bryce eldridge",
+    "buddy kennedy",
+    "jonah cox",
+    "landen roupp",
+    "mookie betts",
+    "shohei ohtani",
+    "tommy edman",
+    "victor bericoto",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "83",
+   "entry_id": "5218092845",
+   "username": "ktm4214",
+   "points": 92.25,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 41.73,
+   "n_cheap": 1,
+   "players_norm": [
+    "bryce eldridge",
+    "jackson chourio",
+    "jonah cox",
+    "jung hoo lee",
+    "landen roupp",
+    "mookie betts",
+    "tommy edman",
+    "willi castro",
+    "william contreras",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "83",
+   "entry_id": "5218782682",
+   "username": "uhatemenow",
+   "points": 92.25,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 46.38,
+   "n_cheap": 1,
+   "players_norm": [
+    "andrew knizner",
+    "bryce eldridge",
+    "landen roupp",
+    "max muncy",
+    "mookie betts",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tommy edman",
+    "victor bericoto",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "89",
+   "entry_id": "5218785905",
+   "username": "Cussdigg",
+   "points": 91.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 40.49,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "brett sullivan",
+    "jackson chourio",
+    "jake mccarthy",
+    "kike hernandez",
+    "kyle freeland",
+    "mookie betts",
+    "shohei ohtani",
+    "tommy edman",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "90",
+   "entry_id": "5218828979",
+   "username": "wittwerjoe",
+   "points": 91.85,
+   "salary_used": 39600,
+   "salary_left": 10400,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Robert Gasser"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 27.03,
+   "n_cheap": 3,
+   "players_norm": [
+    "andrew knizner",
+    "connor norby",
+    "ezequiel tovar",
+    "jonah cox",
+    "kyle freeland",
+    "mickey moniak",
+    "robert gasser",
+    "shohei ohtani",
+    "willi castro",
+    "zac veen"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "91",
+   "entry_id": "5218048753",
+   "username": "whoisjohngalt420",
+   "points": 91.25,
+   "salary_used": 47300,
+   "salary_left": 2700,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 43.24,
+   "n_cheap": 3,
+   "players_norm": [
+    "andrew knizner",
+    "andy pages",
+    "buddy kennedy",
+    "jonah cox",
+    "jung hoo lee",
+    "landen roupp",
+    "mookie betts",
+    "osleivis basabe",
+    "shohei ohtani",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "91",
+   "entry_id": "5218861797",
+   "username": "harshreality18",
+   "points": 91.25,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 45.03,
+   "n_cheap": 2,
+   "players_norm": [
+    "hunter feduccia",
+    "jonah cox",
+    "landen roupp",
+    "max muncy",
+    "mookie betts",
+    "osleivis basabe",
+    "rafael devers",
+    "shohei ohtani",
+    "tommy edman",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "93",
+   "entry_id": "5218505704",
+   "username": "aarond23",
+   "points": 90.9,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 43.41,
+   "n_cheap": 1,
+   "players_norm": [
+    "hunter feduccia",
+    "jake mccarthy",
+    "kyle freeland",
+    "mookie betts",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tj rumfield",
+    "tommy edman",
+    "willi castro",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "93",
+   "entry_id": "5218669347",
+   "username": "danielreeves999",
+   "points": 90.9,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 39.79,
+   "n_cheap": 0,
+   "players_norm": [
+    "kyle freeland",
+    "max muncy",
+    "mookie betts",
+    "shohei ohtani",
+    "tj rumfield",
+    "troy johnston",
+    "victor bericoto",
+    "willi castro",
+    "william contreras",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "95",
+   "entry_id": "5218792388",
+   "username": "troubledsoe",
+   "points": 90.35,
+   "salary_used": 48100,
+   "salary_left": 1900,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Landen Roupp"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 36.43,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "andy pages",
+    "david hamilton",
+    "jake bauers",
+    "kyle freeland",
+    "kyle tucker",
+    "landen roupp",
+    "shohei ohtani",
+    "tommy edman",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "95",
+   "entry_id": "5218865715",
+   "username": "BAlmeida402",
+   "points": 90.35,
+   "salary_used": 47600,
+   "salary_left": 2400,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Landen Roupp"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 43.57,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "andy pages",
+    "garrett mitchell",
+    "kyle freeland",
+    "landen roupp",
+    "mookie betts",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tommy edman",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "97",
+   "entry_id": "5218807213",
+   "username": "137666",
+   "points": 90.25,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-2",
+   "chalk_score": 41.57,
+   "n_cheap": 1,
+   "players_norm": [
+    "jackson chourio",
+    "jonah cox",
+    "landen roupp",
+    "mookie betts",
+    "tj rumfield",
+    "tommy edman",
+    "victor bericoto",
+    "willi castro",
+    "william contreras",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "98",
+   "entry_id": "5218766535",
+   "username": "yaopete",
+   "points": 89.9,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 30.38,
+   "n_cheap": 0,
+   "players_norm": [
+    "brett sullivan",
+    "connor norby",
+    "ezequiel tovar",
+    "jake mccarthy",
+    "kyle freeland",
+    "kyle tucker",
+    "max muncy",
+    "mickey moniak",
+    "shohei ohtani",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "99",
+   "entry_id": "5218828978",
+   "username": "wittwerjoe",
+   "points": 89.85,
+   "salary_used": 40900,
+   "salary_left": 9100,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Robert Gasser"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 26.32,
+   "n_cheap": 1,
+   "players_norm": [
+    "andrew knizner",
+    "ezequiel tovar",
+    "jake mccarthy",
+    "kyle freeland",
+    "robert gasser",
+    "teoscar hernandez",
+    "tj rumfield",
+    "tommy edman",
+    "troy johnston",
+    "willi castro"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "100",
+   "entry_id": "5217450483",
+   "username": "viking2790",
+   "points": 89.25,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 42.81,
+   "n_cheap": 1,
+   "players_norm": [
+    "andrew vaughn",
+    "bryce eldridge",
+    "landen roupp",
+    "mookie betts",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "willi castro",
+    "william contreras",
+    "yoshinobu yamamoto",
+    "zac veen"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "100",
+   "entry_id": "5218048755",
+   "username": "whoisjohngalt420",
+   "points": 89.25,
+   "salary_used": 48000,
+   "salary_left": 2000,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 43.03,
+   "n_cheap": 1,
+   "players_norm": [
+    "andrew knizner",
+    "andy pages",
+    "christian koss",
+    "jung hoo lee",
+    "landen roupp",
+    "mookie betts",
+    "osleivis basabe",
+    "shohei ohtani",
+    "victor bericoto",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "100",
+   "entry_id": "5218210599",
+   "username": "Stree",
+   "points": 89.25,
+   "salary_used": 48800,
+   "salary_left": 1200,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 44.65,
+   "n_cheap": 1,
+   "players_norm": [
+    "andrew knizner",
+    "bryce eldridge",
+    "christian koss",
+    "kyle tucker",
+    "landen roupp",
+    "mookie betts",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tommy edman",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "100",
+   "entry_id": "5218792427",
+   "username": "troubledsoe",
+   "points": 89.25,
+   "salary_used": 47800,
+   "salary_left": 2200,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 44.38,
+   "n_cheap": 2,
+   "players_norm": [
+    "andrew knizner",
+    "bryce eldridge",
+    "jonah cox",
+    "jung hoo lee",
+    "kike hernandez",
+    "landen roupp",
+    "mookie betts",
+    "shohei ohtani",
+    "tommy edman",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "104",
+   "entry_id": "5218847690",
+   "username": "bballz92",
+   "points": 88.75,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Robert Gasser",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 25.13,
+   "n_cheap": 0,
+   "players_norm": [
+    "brett sullivan",
+    "jackson chourio",
+    "jake bauers",
+    "jake mccarthy",
+    "joey ortiz",
+    "osleivis basabe",
+    "rafael devers",
+    "robert gasser",
+    "willi castro",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "105",
+   "entry_id": "5218822928",
+   "username": "peterjpacheco",
+   "points": 88.35,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Landen Roupp"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 44.54,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "jake mccarthy",
+    "jung hoo lee",
+    "kyle freeland",
+    "landen roupp",
+    "max muncy",
+    "mookie betts",
+    "shohei ohtani",
+    "tommy edman",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "106",
+   "entry_id": "5218335264",
+   "username": "davidlobo4",
+   "points": 88.25,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 44.33,
+   "n_cheap": 2,
+   "players_norm": [
+    "hunter feduccia",
+    "jonah cox",
+    "landen roupp",
+    "max muncy",
+    "mookie betts",
+    "rafael devers",
+    "shohei ohtani",
+    "tommy edman",
+    "victor bericoto",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "107",
+   "entry_id": "5218852908",
+   "username": "neversummer",
+   "points": 87.2,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Landen Roupp",
+    "Robert Gasser"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 35.3,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "andy pages",
+    "jackson chourio",
+    "jake bauers",
+    "kyle tucker",
+    "landen roupp",
+    "mookie betts",
+    "robert gasser",
+    "tommy edman",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "108",
+   "entry_id": "5218454785",
+   "username": "dtapper29",
+   "points": 86.35,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Landen Roupp"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 42.27,
+   "n_cheap": 0,
+   "players_norm": [
+    "andy pages",
+    "garrett mitchell",
+    "jackson chourio",
+    "kike hernandez",
+    "kyle freeland",
+    "landen roupp",
+    "mookie betts",
+    "shohei ohtani",
+    "tommy edman",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "109",
+   "entry_id": "5218830011",
+   "username": "campbell.kevin",
+   "points": 86.25,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 44.49,
+   "n_cheap": 1,
+   "players_norm": [
+    "andrew knizner",
+    "andy pages",
+    "jung hoo lee",
+    "kike hernandez",
+    "landen roupp",
+    "mookie betts",
+    "osleivis basabe",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "109",
+   "entry_id": "5218865710",
+   "username": "BAlmeida402",
+   "points": 86.25,
+   "salary_used": 48000,
+   "salary_left": 2000,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 42.33,
+   "n_cheap": 1,
+   "players_norm": [
+    "bryce eldridge",
+    "hunter feduccia",
+    "kike hernandez",
+    "landen roupp",
+    "mookie betts",
+    "osleivis basabe",
+    "shohei ohtani",
+    "tommy edman",
+    "victor bericoto",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "111",
+   "entry_id": "5218505700",
+   "username": "aarond23",
+   "points": 85.9,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 43.79,
+   "n_cheap": 1,
+   "players_norm": [
+    "hunter feduccia",
+    "jake mccarthy",
+    "kyle freeland",
+    "mickey moniak",
+    "mookie betts",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tommy edman",
+    "willi castro",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "111",
+   "entry_id": "5218760914",
+   "username": "bleeski",
+   "points": 85.9,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 39.73,
+   "n_cheap": 1,
+   "players_norm": [
+    "hunter feduccia",
+    "kyle freeland",
+    "max muncy",
+    "mickey moniak",
+    "mookie betts",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "troy johnston",
+    "willi castro",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "111",
+   "entry_id": "5218828974",
+   "username": "wittwerjoe",
+   "points": 85.9,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 32.38,
+   "n_cheap": 0,
+   "players_norm": [
+    "connor norby",
+    "ezequiel tovar",
+    "kyle freeland",
+    "kyle tucker",
+    "mickey moniak",
+    "shohei ohtani",
+    "tj rumfield",
+    "willi castro",
+    "william contreras",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "114",
+   "entry_id": "5218212099",
+   "username": "garverx",
+   "points": 85.25,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 47.52,
+   "n_cheap": 2,
+   "players_norm": [
+    "andrew knizner",
+    "jonah cox",
+    "jung hoo lee",
+    "landen roupp",
+    "max muncy",
+    "mookie betts",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tommy edman",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "114",
+   "entry_id": "5218745998",
+   "username": "Magyar56",
+   "points": 85.25,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 40.11,
+   "n_cheap": 2,
+   "players_norm": [
+    "bryce eldridge",
+    "hunter feduccia",
+    "kyle tucker",
+    "landen roupp",
+    "max muncy",
+    "mookie betts",
+    "shohei ohtani",
+    "willi castro",
+    "yoshinobu yamamoto",
+    "zac veen"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "114",
+   "entry_id": "5218804171",
+   "username": "beclark",
+   "points": 85.25,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 39.51,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "connor norby",
+    "ezequiel tovar",
+    "jake bauers",
+    "landen roupp",
+    "shohei ohtani",
+    "tommy edman",
+    "willi castro",
+    "william contreras",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "114",
+   "entry_id": "5218849805",
+   "username": "RunWired",
+   "points": 85.25,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 42.49,
+   "n_cheap": 0,
+   "players_norm": [
+    "brett sullivan",
+    "jung hoo lee",
+    "kike hernandez",
+    "landen roupp",
+    "mookie betts",
+    "rafael devers",
+    "shohei ohtani",
+    "tommy edman",
+    "victor bericoto",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "118",
+   "entry_id": "5218691996",
+   "username": "BulldogB",
+   "points": 84.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 42.11,
+   "n_cheap": 1,
+   "players_norm": [
+    "andrew knizner",
+    "kyle freeland",
+    "max muncy",
+    "mickey moniak",
+    "mookie betts",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tj rumfield",
+    "willi castro",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "118",
+   "entry_id": "5218814881",
+   "username": "Kdeesuperman42",
+   "points": 84.9,
+   "salary_used": 48400,
+   "salary_left": 1600,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 32.76,
+   "n_cheap": 1,
+   "players_norm": [
+    "andrew vaughn",
+    "christian yelich",
+    "garrett mitchell",
+    "hunter feduccia",
+    "jackson chourio",
+    "jake bauers",
+    "kyle freeland",
+    "mookie betts",
+    "tommy edman",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "118",
+   "entry_id": "5218853375",
+   "username": "dbec19741",
+   "points": 84.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 38.05,
+   "n_cheap": 0,
+   "players_norm": [
+    "brett sullivan",
+    "jake mccarthy",
+    "kike hernandez",
+    "kyle freeland",
+    "mickey moniak",
+    "mookie betts",
+    "shohei ohtani",
+    "tj rumfield",
+    "willi castro",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "121",
+   "entry_id": "5218048756",
+   "username": "whoisjohngalt420",
+   "points": 84.25,
+   "salary_used": 47800,
+   "salary_left": 2200,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 42.49,
+   "n_cheap": 2,
+   "players_norm": [
+    "andrew knizner",
+    "andy pages",
+    "buddy kennedy",
+    "jung hoo lee",
+    "landen roupp",
+    "mookie betts",
+    "osleivis basabe",
+    "shohei ohtani",
+    "victor bericoto",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "122",
+   "entry_id": "5218785903",
+   "username": "Cussdigg",
+   "points": 83.25,
+   "salary_used": 48600,
+   "salary_left": 1400,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 46.06,
+   "n_cheap": 2,
+   "players_norm": [
+    "andrew knizner",
+    "jonah cox",
+    "jung hoo lee",
+    "landen roupp",
+    "max muncy",
+    "mookie betts",
+    "shohei ohtani",
+    "tommy edman",
+    "victor bericoto",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "122",
+   "entry_id": "5218865712",
+   "username": "BAlmeida402",
+   "points": 83.25,
+   "salary_used": 47300,
+   "salary_left": 2700,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 42.92,
+   "n_cheap": 2,
+   "players_norm": [
+    "hunter feduccia",
+    "jonah cox",
+    "kike hernandez",
+    "landen roupp",
+    "mookie betts",
+    "rafael devers",
+    "shohei ohtani",
+    "tommy edman",
+    "victor bericoto",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "124",
+   "entry_id": "5218760917",
+   "username": "bleeski",
+   "points": 82.75,
+   "salary_used": 48600,
+   "salary_left": 1400,
+   "sp_pair": [
+    "Robert Gasser",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 25.14,
+   "n_cheap": 0,
+   "players_norm": [
+    "brett sullivan",
+    "ezequiel tovar",
+    "jake mccarthy",
+    "jung hoo lee",
+    "mickey moniak",
+    "osleivis basabe",
+    "rafael devers",
+    "robert gasser",
+    "willi castro",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "125",
+   "entry_id": "5218849802",
+   "username": "RunWired",
+   "points": 82.25,
+   "salary_used": 48300,
+   "salary_left": 1700,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 43.62,
+   "n_cheap": 1,
+   "players_norm": [
+    "andrew knizner",
+    "bryce eldridge",
+    "jung hoo lee",
+    "kike hernandez",
+    "landen roupp",
+    "mookie betts",
+    "shohei ohtani",
+    "tommy edman",
+    "victor bericoto",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "125",
+   "entry_id": "5218849803",
+   "username": "RunWired",
+   "points": 82.25,
+   "salary_used": 48300,
+   "salary_left": 1700,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 43.62,
+   "n_cheap": 1,
+   "players_norm": [
+    "andrew knizner",
+    "bryce eldridge",
+    "jung hoo lee",
+    "kike hernandez",
+    "landen roupp",
+    "mookie betts",
+    "shohei ohtani",
+    "tommy edman",
+    "victor bericoto",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "125",
+   "entry_id": "5218849804",
+   "username": "RunWired",
+   "points": 82.25,
+   "salary_used": 48300,
+   "salary_left": 1700,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 43.62,
+   "n_cheap": 1,
+   "players_norm": [
+    "andrew knizner",
+    "bryce eldridge",
+    "jung hoo lee",
+    "kike hernandez",
+    "landen roupp",
+    "mookie betts",
+    "shohei ohtani",
+    "tommy edman",
+    "victor bericoto",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "125",
+   "entry_id": "5218849808",
+   "username": "RunWired",
+   "points": 82.25,
+   "salary_used": 48300,
+   "salary_left": 1700,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 43.62,
+   "n_cheap": 1,
+   "players_norm": [
+    "andrew knizner",
+    "bryce eldridge",
+    "jung hoo lee",
+    "kike hernandez",
+    "landen roupp",
+    "mookie betts",
+    "shohei ohtani",
+    "tommy edman",
+    "victor bericoto",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "129",
+   "entry_id": "5218180570",
+   "username": "Elwaysarmy",
+   "points": 81.25,
+   "salary_used": 44900,
+   "salary_left": 5100,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 36.38,
+   "n_cheap": 2,
+   "players_norm": [
+    "andrew knizner",
+    "christian koss",
+    "christian yelich",
+    "jonah cox",
+    "landen roupp",
+    "mookie betts",
+    "osleivis basabe",
+    "rafael devers",
+    "teoscar hernandez",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "129",
+   "entry_id": "5218766510",
+   "username": "yaopete",
+   "points": 81.25,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 40.49,
+   "n_cheap": 2,
+   "players_norm": [
+    "bryce eldridge",
+    "hunter feduccia",
+    "jonah cox",
+    "kyle tucker",
+    "landen roupp",
+    "max muncy",
+    "mookie betts",
+    "osleivis basabe",
+    "shohei ohtani",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "131",
+   "entry_id": "5218828977",
+   "username": "wittwerjoe",
+   "points": 80.85,
+   "salary_used": 45700,
+   "salary_left": 4300,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Robert Gasser"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 33.14,
+   "n_cheap": 0,
+   "players_norm": [
+    "connor norby",
+    "jake mccarthy",
+    "kyle freeland",
+    "mookie betts",
+    "robert gasser",
+    "shohei ohtani",
+    "tj rumfield",
+    "troy johnston",
+    "willi castro",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "132",
+   "entry_id": "5218785904",
+   "username": "Cussdigg",
+   "points": 79.85,
+   "salary_used": 44200,
+   "salary_left": 5800,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Robert Gasser"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 22.59,
+   "n_cheap": 1,
+   "players_norm": [
+    "andrew vaughn",
+    "ezequiel tovar",
+    "jackson chourio",
+    "jake bauers",
+    "kyle freeland",
+    "max muncy",
+    "robert gasser",
+    "willi castro",
+    "william contreras",
+    "zac veen"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "133",
+   "entry_id": "5218453735",
+   "username": "wontgohome",
+   "points": 79.75,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Robert Gasser",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 30.0,
+   "n_cheap": 1,
+   "players_norm": [
+    "connor norby",
+    "ezequiel tovar",
+    "hunter feduccia",
+    "jackson chourio",
+    "mickey moniak",
+    "osleivis basabe",
+    "robert gasser",
+    "shohei ohtani",
+    "willi castro",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "134",
+   "entry_id": "5218048754",
+   "username": "whoisjohngalt420",
+   "points": 79.25,
+   "salary_used": 48400,
+   "salary_left": 1600,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 43.24,
+   "n_cheap": 2,
+   "players_norm": [
+    "andrew knizner",
+    "jonah cox",
+    "landen roupp",
+    "max muncy",
+    "mookie betts",
+    "osleivis basabe",
+    "rafael devers",
+    "shohei ohtani",
+    "victor bericoto",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "134",
+   "entry_id": "5218701804",
+   "username": "tdbaker13",
+   "points": 79.25,
+   "salary_used": 48400,
+   "salary_left": 1600,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 43.24,
+   "n_cheap": 2,
+   "players_norm": [
+    "andrew knizner",
+    "jonah cox",
+    "landen roupp",
+    "max muncy",
+    "mookie betts",
+    "osleivis basabe",
+    "rafael devers",
+    "shohei ohtani",
+    "victor bericoto",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "134",
+   "entry_id": "5218861798",
+   "username": "harshreality18",
+   "points": 79.25,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 42.81,
+   "n_cheap": 2,
+   "players_norm": [
+    "hunter feduccia",
+    "jonah cox",
+    "landen roupp",
+    "max muncy",
+    "mookie betts",
+    "osleivis basabe",
+    "rafael devers",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "137",
+   "entry_id": "5218180564",
+   "username": "Elwaysarmy",
+   "points": 78.85,
+   "salary_used": 42100,
+   "salary_left": 7900,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Robert Gasser"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 17.95,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "connor norby",
+    "ezequiel tovar",
+    "garrett mitchell",
+    "jake bauers",
+    "kyle freeland",
+    "mickey moniak",
+    "robert gasser",
+    "troy johnston",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "138",
+   "entry_id": "5218842760",
+   "username": "cbmillport",
+   "points": 77.9,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 32.65,
+   "n_cheap": 1,
+   "players_norm": [
+    "ezequiel tovar",
+    "hunter feduccia",
+    "jake mccarthy",
+    "kyle freeland",
+    "max muncy",
+    "mickey moniak",
+    "shohei ohtani",
+    "tj rumfield",
+    "willi castro",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "139",
+   "entry_id": "5218697791",
+   "username": "housekobe",
+   "points": 76.75,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Robert Gasser",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 33.08,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "bryce eldridge",
+    "jake mccarthy",
+    "kyle tucker",
+    "mookie betts",
+    "robert gasser",
+    "teoscar hernandez",
+    "willi castro",
+    "william contreras",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "140",
+   "entry_id": "5218725128",
+   "username": "markobrien67",
+   "points": 76.35,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Landen Roupp"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 41.3,
+   "n_cheap": 0,
+   "players_norm": [
+    "jackson chourio",
+    "jake bauers",
+    "kyle freeland",
+    "landen roupp",
+    "luis lara",
+    "max muncy",
+    "mookie betts",
+    "shohei ohtani",
+    "tommy edman",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "140",
+   "entry_id": "5218725136",
+   "username": "markobrien67",
+   "points": 76.35,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Landen Roupp"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 41.3,
+   "n_cheap": 0,
+   "players_norm": [
+    "jackson chourio",
+    "jake bauers",
+    "kyle freeland",
+    "landen roupp",
+    "luis lara",
+    "max muncy",
+    "mookie betts",
+    "shohei ohtani",
+    "tommy edman",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "140",
+   "entry_id": "5218725155",
+   "username": "markobrien67",
+   "points": 76.35,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Landen Roupp"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 41.3,
+   "n_cheap": 0,
+   "players_norm": [
+    "jackson chourio",
+    "jake bauers",
+    "kyle freeland",
+    "landen roupp",
+    "luis lara",
+    "max muncy",
+    "mookie betts",
+    "shohei ohtani",
+    "tommy edman",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "140",
+   "entry_id": "5218728185",
+   "username": "markobrien67",
+   "points": 76.35,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Landen Roupp"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 41.3,
+   "n_cheap": 0,
+   "players_norm": [
+    "jackson chourio",
+    "jake bauers",
+    "kyle freeland",
+    "landen roupp",
+    "luis lara",
+    "max muncy",
+    "mookie betts",
+    "shohei ohtani",
+    "tommy edman",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "144",
+   "entry_id": "5217578673",
+   "username": "stevmortc",
+   "points": 76.25,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 40.81,
+   "n_cheap": 2,
+   "players_norm": [
+    "andrew knizner",
+    "david hamilton",
+    "garrett mitchell",
+    "jackson chourio",
+    "landen roupp",
+    "mookie betts",
+    "shohei ohtani",
+    "willi castro",
+    "yoshinobu yamamoto",
+    "zac veen"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "145",
+   "entry_id": "5218842757",
+   "username": "cbmillport",
+   "points": 75.25,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 41.95,
+   "n_cheap": 1,
+   "players_norm": [
+    "christian koss",
+    "hunter feduccia",
+    "jung hoo lee",
+    "kyle tucker",
+    "landen roupp",
+    "mookie betts",
+    "rafael devers",
+    "shohei ohtani",
+    "tommy edman",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "146",
+   "entry_id": "5218840206",
+   "username": "sportsfan14",
+   "points": 74.25,
+   "salary_used": 47900,
+   "salary_left": 2100,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 38.05,
+   "n_cheap": 2,
+   "players_norm": [
+    "andrew knizner",
+    "jake mccarthy",
+    "jonah cox",
+    "jung hoo lee",
+    "landen roupp",
+    "max muncy",
+    "mookie betts",
+    "osleivis basabe",
+    "rafael devers",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "147",
+   "entry_id": "5218583414",
+   "username": "ewalduh",
+   "points": 73.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 40.22,
+   "n_cheap": 0,
+   "players_norm": [
+    "jake mccarthy",
+    "joey ortiz",
+    "kyle freeland",
+    "kyle tucker",
+    "mookie betts",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "willi castro",
+    "william contreras",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "148",
+   "entry_id": "5218048757",
+   "username": "whoisjohngalt420",
+   "points": 72.85,
+   "salary_used": 44200,
+   "salary_left": 5800,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Robert Gasser"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 21.73,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "ezequiel tovar",
+    "jackson chourio",
+    "jake mccarthy",
+    "kyle freeland",
+    "robert gasser",
+    "tj rumfield",
+    "troy johnston",
+    "willi castro",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "149",
+   "entry_id": "5218760915",
+   "username": "bleeski",
+   "points": 72.25,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 42.05,
+   "n_cheap": 1,
+   "players_norm": [
+    "hunter feduccia",
+    "landen roupp",
+    "max muncy",
+    "mookie betts",
+    "osleivis basabe",
+    "rafael devers",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "victor bericoto",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "149",
+   "entry_id": "5218786302",
+   "username": "troubledsoe",
+   "points": 72.25,
+   "salary_used": 48100,
+   "salary_left": 1900,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 43.08,
+   "n_cheap": 2,
+   "players_norm": [
+    "andrew knizner",
+    "jonah cox",
+    "jung hoo lee",
+    "landen roupp",
+    "max muncy",
+    "mookie betts",
+    "osleivis basabe",
+    "shohei ohtani",
+    "victor bericoto",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "151",
+   "entry_id": "5217707378",
+   "username": "Dave2zone",
+   "points": 72.2,
+   "salary_used": 47800,
+   "salary_left": 2200,
+   "sp_pair": [
+    "Landen Roupp",
+    "Robert Gasser"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 28.76,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "david hamilton",
+    "jackson chourio",
+    "jake bauers",
+    "landen roupp",
+    "rafael devers",
+    "robert gasser",
+    "teoscar hernandez",
+    "tommy edman",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "152",
+   "entry_id": "5218180565",
+   "username": "Elwaysarmy",
+   "points": 71.85,
+   "salary_used": 44900,
+   "salary_left": 5100,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Robert Gasser"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 19.03,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "christian yelich",
+    "connor norby",
+    "david hamilton",
+    "jackson chourio",
+    "jake mccarthy",
+    "kyle freeland",
+    "robert gasser",
+    "tj rumfield",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "153",
+   "entry_id": "5218454781",
+   "username": "dtapper29",
+   "points": 71.35,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Landen Roupp"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 34.54,
+   "n_cheap": 0,
+   "players_norm": [
+    "garrett mitchell",
+    "jackson chourio",
+    "jake bauers",
+    "joey ortiz",
+    "kyle freeland",
+    "landen roupp",
+    "max muncy",
+    "shohei ohtani",
+    "tommy edman",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "153",
+   "entry_id": "5218454783",
+   "username": "dtapper29",
+   "points": 71.35,
+   "salary_used": 48500,
+   "salary_left": 1500,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Landen Roupp"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 36.76,
+   "n_cheap": 0,
+   "players_norm": [
+    "david hamilton",
+    "jake bauers",
+    "kyle freeland",
+    "kyle tucker",
+    "landen roupp",
+    "max muncy",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tommy edman",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "155",
+   "entry_id": "5218792409",
+   "username": "troubledsoe",
+   "points": 71.25,
+   "salary_used": 47900,
+   "salary_left": 2100,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 41.95,
+   "n_cheap": 2,
+   "players_norm": [
+    "andrew knizner",
+    "jonah cox",
+    "jung hoo lee",
+    "kike hernandez",
+    "landen roupp",
+    "mookie betts",
+    "osleivis basabe",
+    "rafael devers",
+    "shohei ohtani",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "155",
+   "entry_id": "5218866380",
+   "username": "d9144",
+   "points": 71.25,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 40.11,
+   "n_cheap": 1,
+   "players_norm": [
+    "bryce eldridge",
+    "buddy kennedy",
+    "jung hoo lee",
+    "landen roupp",
+    "mookie betts",
+    "osleivis basabe",
+    "shohei ohtani",
+    "victor bericoto",
+    "william contreras",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "157",
+   "entry_id": "5218221616",
+   "username": "donj9903",
+   "points": 69.9,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 37.46,
+   "n_cheap": 1,
+   "players_norm": [
+    "hunter feduccia",
+    "jackson chourio",
+    "jake mccarthy",
+    "joey ortiz",
+    "kyle freeland",
+    "kyle tucker",
+    "mookie betts",
+    "shohei ohtani",
+    "willi castro",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "158",
+   "entry_id": "5218454784",
+   "username": "dtapper29",
+   "points": 69.35,
+   "salary_used": 48200,
+   "salary_left": 1800,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Landen Roupp"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 40.76,
+   "n_cheap": 1,
+   "players_norm": [
+    "andrew vaughn",
+    "hunter feduccia",
+    "jackson chourio",
+    "jake bauers",
+    "kyle freeland",
+    "landen roupp",
+    "max muncy",
+    "mookie betts",
+    "shohei ohtani",
+    "tommy edman"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "159",
+   "entry_id": "5218701808",
+   "username": "tdbaker13",
+   "points": 69.2,
+   "salary_used": 44000,
+   "salary_left": 6000,
+   "sp_pair": [
+    "Landen Roupp",
+    "Robert Gasser"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 19.13,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryce eldridge",
+    "christian yelich",
+    "david hamilton",
+    "joey ortiz",
+    "jung hoo lee",
+    "landen roupp",
+    "luis lara",
+    "osleivis basabe",
+    "robert gasser",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "160",
+   "entry_id": "5218701805",
+   "username": "tdbaker13",
+   "points": 68.35,
+   "salary_used": 47900,
+   "salary_left": 2100,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Landen Roupp"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 35.3,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "christian yelich",
+    "david hamilton",
+    "jackson chourio",
+    "kyle freeland",
+    "landen roupp",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "tommy edman",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "161",
+   "entry_id": "5218171652",
+   "username": "mrbig91",
+   "points": 68.25,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-2",
+   "chalk_score": 37.95,
+   "n_cheap": 0,
+   "players_norm": [
+    "garrett mitchell",
+    "jung hoo lee",
+    "landen roupp",
+    "mookie betts",
+    "osleivis basabe",
+    "teoscar hernandez",
+    "tj rumfield",
+    "willi castro",
+    "william contreras",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "161",
+   "entry_id": "5218761427",
+   "username": "yaopete",
+   "points": 68.25,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Landen Roupp",
+    "Yoshinobu Yamamoto"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 41.51,
+   "n_cheap": 1,
+   "players_norm": [
+    "connor norby",
+    "hunter feduccia",
+    "kyle tucker",
+    "landen roupp",
+    "mickey moniak",
+    "mookie betts",
+    "shohei ohtani",
+    "teoscar hernandez",
+    "willi castro",
+    "yoshinobu yamamoto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "163",
+   "entry_id": "5218786281",
+   "username": "troubledsoe",
+   "points": 66.35,
+   "salary_used": 47700,
+   "salary_left": 2300,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Landen Roupp"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 33.14,
+   "n_cheap": 0,
+   "players_norm": [
+    "garrett mitchell",
+    "jackson chourio",
+    "jake bauers",
+    "joey ortiz",
+    "kike hernandez",
+    "kyle freeland",
+    "landen roupp",
+    "shohei ohtani",
+    "tommy edman",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "163",
+   "entry_id": "5218842758",
+   "username": "cbmillport",
+   "points": 66.35,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Landen Roupp"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 40.87,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "garrett mitchell",
+    "jackson chourio",
+    "jake bauers",
+    "kyle freeland",
+    "landen roupp",
+    "mookie betts",
+    "shohei ohtani",
+    "tommy edman",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "165",
+   "entry_id": "5217707372",
+   "username": "Dave2zone",
+   "points": 66.2,
+   "salary_used": 48300,
+   "salary_left": 1700,
+   "sp_pair": [
+    "Landen Roupp",
+    "Robert Gasser"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 34.92,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "jake bauers",
+    "jake mccarthy",
+    "landen roupp",
+    "mickey moniak",
+    "mookie betts",
+    "robert gasser",
+    "teoscar hernandez",
+    "tommy edman",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "166",
+   "entry_id": "5218760781",
+   "username": "bleeski",
+   "points": 65.85,
+   "salary_used": 44700,
+   "salary_left": 5300,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Robert Gasser"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 21.89,
+   "n_cheap": 0,
+   "players_norm": [
+    "connor norby",
+    "ezequiel tovar",
+    "garrett mitchell",
+    "jackson chourio",
+    "jake bauers",
+    "jake mccarthy",
+    "kyle freeland",
+    "robert gasser",
+    "willi castro",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "167",
+   "entry_id": "5218454779",
+   "username": "dtapper29",
+   "points": 63.35,
+   "salary_used": 48300,
+   "salary_left": 1700,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Landen Roupp"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 39.95,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "garrett mitchell",
+    "jake bauers",
+    "kyle freeland",
+    "kyle tucker",
+    "landen roupp",
+    "mookie betts",
+    "shohei ohtani",
+    "tommy edman",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "168",
+   "entry_id": "5218180568",
+   "username": "Elwaysarmy",
+   "points": 61.85,
+   "salary_used": 45100,
+   "salary_left": 4900,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Robert Gasser"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 20.22,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "christian yelich",
+    "david hamilton",
+    "garrett mitchell",
+    "kyle freeland",
+    "mickey moniak",
+    "rafael devers",
+    "robert gasser",
+    "willi castro",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "168",
+   "entry_id": "5218858096",
+   "username": "MrPointman",
+   "points": 61.85,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Robert Gasser"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 30.0,
+   "n_cheap": 0,
+   "players_norm": [
+    "david hamilton",
+    "jackson chourio",
+    "jake bauers",
+    "jake mccarthy",
+    "kyle freeland",
+    "max muncy",
+    "robert gasser",
+    "shohei ohtani",
+    "willi castro",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "170",
+   "entry_id": "5218840205",
+   "username": "sportsfan14",
+   "points": 61.199997,
+   "salary_used": 44300,
+   "salary_left": 5700,
+   "sp_pair": [
+    "Landen Roupp",
+    "Robert Gasser"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 21.51,
+   "n_cheap": 0,
+   "players_norm": [
+    "david hamilton",
+    "garrett mitchell",
+    "jake bauers",
+    "joey ortiz",
+    "landen roupp",
+    "osleivis basabe",
+    "rafael devers",
+    "robert gasser",
+    "victor bericoto",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "171",
+   "entry_id": "5218842759",
+   "username": "cbmillport",
+   "points": 60.85,
+   "salary_used": 46900,
+   "salary_left": 3100,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Robert Gasser"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 23.3,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "david hamilton",
+    "jackson chourio",
+    "jake bauers",
+    "jake mccarthy",
+    "kyle freeland",
+    "mickey moniak",
+    "robert gasser",
+    "willi castro",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "171",
+   "entry_id": "5218866381",
+   "username": "d9144",
+   "points": 60.85,
+   "salary_used": 46900,
+   "salary_left": 3100,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Robert Gasser"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 23.3,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "david hamilton",
+    "jackson chourio",
+    "jake bauers",
+    "jake mccarthy",
+    "kyle freeland",
+    "mickey moniak",
+    "robert gasser",
+    "willi castro",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "173",
+   "entry_id": "5218847913",
+   "username": "SkyFlyDFS",
+   "points": 59.35,
+   "salary_used": 47000,
+   "salary_left": 3000,
+   "sp_pair": [
+    "Kyle Freeland",
+    "Landen Roupp"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 38.38,
+   "n_cheap": 1,
+   "players_norm": [
+    "andrew vaughn",
+    "garrett mitchell",
+    "hunter feduccia",
+    "jackson chourio",
+    "kyle freeland",
+    "kyle tucker",
+    "landen roupp",
+    "mookie betts",
+    "shohei ohtani",
+    "tommy edman"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "174",
+   "entry_id": "5218180566",
+   "username": "Elwaysarmy",
+   "points": 59.2,
+   "salary_used": 44700,
+   "salary_left": 5300,
+   "sp_pair": [
+    "Landen Roupp",
+    "Robert Gasser"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 22.7,
+   "n_cheap": 2,
+   "players_norm": [
+    "buddy kennedy",
+    "christian yelich",
+    "david hamilton",
+    "jackson chourio",
+    "jake bauers",
+    "jonah cox",
+    "landen roupp",
+    "osleivis basabe",
+    "robert gasser",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "174",
+   "entry_id": "5218180567",
+   "username": "Elwaysarmy",
+   "points": 59.199997,
+   "salary_used": 45100,
+   "salary_left": 4900,
+   "sp_pair": [
+    "Landen Roupp",
+    "Robert Gasser"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 22.49,
+   "n_cheap": 0,
+   "players_norm": [
+    "christian koss",
+    "christian yelich",
+    "david hamilton",
+    "jackson chourio",
+    "landen roupp",
+    "osleivis basabe",
+    "rafael devers",
+    "robert gasser",
+    "victor bericoto",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "176",
+   "entry_id": "5218821599",
+   "username": "Kdeesuperman42",
+   "points": 58.199997,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [
+    "Landen Roupp",
+    "Robert Gasser"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 29.68,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "christian yelich",
+    "jackson chourio",
+    "jake bauers",
+    "landen roupp",
+    "mookie betts",
+    "osleivis basabe",
+    "rafael devers",
+    "robert gasser",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "177",
+   "entry_id": "5218760918",
+   "username": "bleeski",
+   "points": 56.199997,
+   "salary_used": 47700,
+   "salary_left": 2300,
+   "sp_pair": [
+    "Landen Roupp",
+    "Robert Gasser"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 24.43,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "david hamilton",
+    "jackson chourio",
+    "jake bauers",
+    "jung hoo lee",
+    "landen roupp",
+    "osleivis basabe",
+    "rafael devers",
+    "robert gasser",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "178",
+   "entry_id": "5218866377",
+   "username": "d9144",
+   "points": 53.199997,
+   "salary_used": 47500,
+   "salary_left": 2500,
+   "sp_pair": [
+    "Landen Roupp",
+    "Robert Gasser"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 23.03,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "christian yelich",
+    "david hamilton",
+    "jackson chourio",
+    "jung hoo lee",
+    "landen roupp",
+    "osleivis basabe",
+    "rafael devers",
+    "robert gasser",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "179",
+   "entry_id": "5218820911",
+   "username": "mallemang",
+   "points": 50.2,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Landen Roupp",
+    "Robert Gasser"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 28.76,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "david hamilton",
+    "garrett mitchell",
+    "jackson chourio",
+    "landen roupp",
+    "mickey moniak",
+    "osleivis basabe",
+    "robert gasser",
+    "shohei ohtani",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  }
+ ],
+ "player_table": [
+  {
+   "player": "Mookie Betts",
+   "player_norm": "mookie betts",
+   "roster_position": "SS",
+   "pct_drafted": 75.68,
+   "fpts": 5.0
+  },
+  {
+   "player": "Yoshinobu Yamamoto",
+   "player_norm": "yoshinobu yamamoto",
+   "roster_position": "P",
+   "pct_drafted": 72.97,
+   "fpts": 29.9
+  },
+  {
+   "player": "Landen Roupp",
+   "player_norm": "landen roupp",
+   "roster_position": "P",
+   "pct_drafted": 65.95,
+   "fpts": 9.35
+  },
+  {
+   "player": "Tommy Edman",
+   "player_norm": "tommy edman",
+   "roster_position": "2B",
+   "pct_drafted": 46.49,
+   "fpts": 17.0
+  },
+  {
+   "player": "Shohei Ohtani",
+   "player_norm": "shohei ohtani",
+   "roster_position": "OF",
+   "pct_drafted": 39.46,
+   "fpts": 2.0
+  },
+  {
+   "player": "Kyle Freeland",
+   "player_norm": "kyle freeland",
+   "roster_position": "P",
+   "pct_drafted": 39.46,
+   "fpts": 21.0
+  },
+  {
+   "player": "Andy Pages",
+   "player_norm": "andy pages",
+   "roster_position": "OF",
+   "pct_drafted": 37.84,
+   "fpts": 27.0
+  },
+  {
+   "player": "Shohei Ohtani",
+   "player_norm": "shohei ohtani",
+   "roster_position": "1B",
+   "pct_drafted": 35.14,
+   "fpts": 2.0
+  },
+  {
+   "player": "William Contreras",
+   "player_norm": "william contreras",
+   "roster_position": "C",
+   "pct_drafted": 32.97,
+   "fpts": 2.0
+  },
+  {
+   "player": "Andrew Knizner",
+   "player_norm": "andrew knizner",
+   "roster_position": "C",
+   "pct_drafted": 32.97,
+   "fpts": 2.0
+  },
+  {
+   "player": "Teoscar Hernandez",
+   "player_norm": "teoscar hernandez",
+   "roster_position": "OF",
+   "pct_drafted": 31.35,
+   "fpts": 5.0
+  },
+  {
+   "player": "Max Muncy",
+   "player_norm": "max muncy",
+   "roster_position": "3B",
+   "pct_drafted": 25.95,
+   "fpts": 5.0
+  },
+  {
+   "player": "Jonah Cox",
+   "player_norm": "jonah cox",
+   "roster_position": "OF",
+   "pct_drafted": 24.32,
+   "fpts": 10.0
+  },
+  {
+   "player": "Osleivis Basabe",
+   "player_norm": "osleivis basabe",
+   "roster_position": "2B",
+   "pct_drafted": 23.78,
+   "fpts": 6.0
+  },
+  {
+   "player": "Jackson Chourio",
+   "player_norm": "jackson chourio",
+   "roster_position": "OF",
+   "pct_drafted": 22.7,
+   "fpts": 3.0
+  },
+  {
+   "player": "Jake McCarthy",
+   "player_norm": "jake mccarthy",
+   "roster_position": "OF",
+   "pct_drafted": 21.62,
+   "fpts": 0.0
+  },
+  {
+   "player": "Willi Castro",
+   "player_norm": "willi castro",
+   "roster_position": "3B",
+   "pct_drafted": 21.62,
+   "fpts": 2.0
+  },
+  {
+   "player": "Rafael Devers",
+   "player_norm": "rafael devers",
+   "roster_position": "1B",
+   "pct_drafted": 19.46,
+   "fpts": 7.0
+  },
+  {
+   "player": "Jung Hoo Lee",
+   "player_norm": "jung hoo lee",
+   "roster_position": "OF",
+   "pct_drafted": 17.84,
+   "fpts": 0.0
+  },
+  {
+   "player": "Mickey Moniak",
+   "player_norm": "mickey moniak",
+   "roster_position": "OF",
+   "pct_drafted": 17.3,
+   "fpts": 4.0
+  },
+  {
+   "player": "Victor Bericoto",
+   "player_norm": "victor bericoto",
+   "roster_position": "OF",
+   "pct_drafted": 16.76,
+   "fpts": 3.0
+  },
+  {
+   "player": "Brett Sullivan",
+   "player_norm": "brett sullivan",
+   "roster_position": "C",
+   "pct_drafted": 16.22,
+   "fpts": 12.0
+  },
+  {
+   "player": "Willi Castro",
+   "player_norm": "willi castro",
+   "roster_position": "2B",
+   "pct_drafted": 15.68,
+   "fpts": 2.0
+  },
+  {
+   "player": "Robert Gasser",
+   "player_norm": "robert gasser",
+   "roster_position": "P",
+   "pct_drafted": 15.14,
+   "fpts": 16.85
+  },
+  {
+   "player": "Andrew Vaughn",
+   "player_norm": "andrew vaughn",
+   "roster_position": "3B",
+   "pct_drafted": 14.05,
+   "fpts": 2.0
+  },
+  {
+   "player": "Bryce Eldridge",
+   "player_norm": "bryce eldridge",
+   "roster_position": "1B",
+   "pct_drafted": 14.05,
+   "fpts": 14.0
+  },
+  {
+   "player": "Hunter Feduccia",
+   "player_norm": "hunter feduccia",
+   "roster_position": "C",
+   "pct_drafted": 14.05,
+   "fpts": 0.0
+  },
+  {
+   "player": "Kyle Tucker",
+   "player_norm": "kyle tucker",
+   "roster_position": "OF",
+   "pct_drafted": 13.51,
+   "fpts": 0.0
+  },
+  {
+   "player": "TJ Rumfield",
+   "player_norm": "tj rumfield",
+   "roster_position": "1B",
+   "pct_drafted": 13.51,
+   "fpts": 9.0
+  },
+  {
+   "player": "Christian Koss",
+   "player_norm": "christian koss",
+   "roster_position": "3B",
+   "pct_drafted": 11.89,
+   "fpts": 5.0
+  },
+  {
+   "player": "Kike Hernandez",
+   "player_norm": "kike hernandez",
+   "roster_position": "3B",
+   "pct_drafted": 11.89,
+   "fpts": 0.0
+  },
+  {
+   "player": "Jake Bauers",
+   "player_norm": "jake bauers",
+   "roster_position": "1B",
+   "pct_drafted": 10.81,
+   "fpts": 5.0
+  },
+  {
+   "player": "Connor Norby",
+   "player_norm": "connor norby",
+   "roster_position": "2B",
+   "pct_drafted": 10.81,
+   "fpts": 11.0
+  },
+  {
+   "player": "Ezequiel Tovar",
+   "player_norm": "ezequiel tovar",
+   "roster_position": "SS",
+   "pct_drafted": 9.73,
+   "fpts": 5.0
+  },
+  {
+   "player": "Jake Bauers",
+   "player_norm": "jake bauers",
+   "roster_position": "OF",
+   "pct_drafted": 8.65,
+   "fpts": 5.0
+  },
+  {
+   "player": "David Hamilton",
+   "player_norm": "david hamilton",
+   "roster_position": "SS",
+   "pct_drafted": 8.65,
+   "fpts": 5.0
+  },
+  {
+   "player": "Troy Johnston",
+   "player_norm": "troy johnston",
+   "roster_position": "OF",
+   "pct_drafted": 8.65,
+   "fpts": 12.0
+  },
+  {
+   "player": "Garrett Mitchell",
+   "player_norm": "garrett mitchell",
+   "roster_position": "OF",
+   "pct_drafted": 8.11,
+   "fpts": 0.0
+  },
+  {
+   "player": "Zac Veen",
+   "player_norm": "zac veen",
+   "roster_position": "OF",
+   "pct_drafted": 7.03,
+   "fpts": 18.0
+  },
+  {
+   "player": "Tommy Edman",
+   "player_norm": "tommy edman",
+   "roster_position": "OF",
+   "pct_drafted": 7.03,
+   "fpts": 17.0
+  },
+  {
+   "player": "Buddy Kennedy",
+   "player_norm": "buddy kennedy",
+   "roster_position": "3B",
+   "pct_drafted": 6.49,
+   "fpts": 0.0
+  },
+  {
+   "player": "Christian Yelich",
+   "player_norm": "christian yelich",
+   "roster_position": "OF",
+   "pct_drafted": 5.41,
+   "fpts": 2.0
+  },
+  {
+   "player": "Joey Ortiz",
+   "player_norm": "joey ortiz",
+   "roster_position": "3B",
+   "pct_drafted": 2.7,
+   "fpts": 7.0
+  },
+  {
+   "player": "Luis Lara",
+   "player_norm": "luis lara",
+   "roster_position": "OF",
+   "pct_drafted": 2.7,
+   "fpts": 7.0
+  },
+  {
+   "player": "David Hamilton",
+   "player_norm": "david hamilton",
+   "roster_position": "3B",
+   "pct_drafted": 2.16,
+   "fpts": 5.0
+  },
+  {
+   "player": "Andrew Vaughn",
+   "player_norm": "andrew vaughn",
+   "roster_position": "1B",
+   "pct_drafted": 2.16,
+   "fpts": 2.0
+  },
+  {
+   "player": "Connor Norby",
+   "player_norm": "connor norby",
+   "roster_position": "1B",
+   "pct_drafted": 1.62,
+   "fpts": 11.0
+  },
+  {
+   "player": "Drew Cavanaugh",
+   "player_norm": "drew cavanaugh",
+   "roster_position": "C",
+   "pct_drafted": 0.54,
+   "fpts": 0.0
+  }
+ ],
+ "own_results": {
+  "matched": 7,
+  "requested": 7,
+  "field_size": 185,
+  "best_rank": 8,
+  "worst_rank": 177,
+  "best_finish_percentile": 96.22,
+  "median_finish_percentile": 33.51,
+  "best_points": 114.9,
+  "winning_points": 129.9,
+  "own_lineups_duplicated_by_field": 0,
+  "max_copies_of_an_own_lineup": 1,
+  "entry_fee": null,
+  "fees_total": null,
+  "winnings_total": null,
+  "paid_places": null,
+  "payout_breadth_observed": null,
+  "cashed_entries": null,
+  "net": null,
+  "labels": "observed outcomes from a completed contest; never a graded prediction, ROI model, win rate, or probability claim"
+ }
+}

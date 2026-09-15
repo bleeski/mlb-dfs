@@ -1,0 +1,1820 @@
+{
+ "label": "deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied",
+ "version": "0.5-review",
+ "coverage": "full",
+ "contest_id": "194445098",
+ "slate_date": "2026-08-25",
+ "contest_type": "showdown",
+ "meta": {
+  "entries_total": 61,
+  "entries_complete_lineups": 61,
+  "roster_size": 6,
+  "entries_unparsed": 0,
+  "winning_points": 66.275,
+  "winning_entry_id": "5230547023",
+  "multi_entry_flag": true
+ },
+ "duplication": {
+  "distinct_lineups": 53,
+  "entries_in_duplicated_lineups": 16,
+  "share_duplicated_pct": 26.2,
+  "max_copies": 2,
+  "copies_histogram": {
+   "1": 45,
+   "2": 8
+  },
+  "winner_copies": 1
+ },
+ "construction": {
+  "cheap_salary_threshold": 3000,
+  "at_cap_entries": 21,
+  "at_cap_share_pct": 34.4,
+  "salary_left_histogram": {
+   "301-700": 17,
+   "> 1500": 3,
+   "1-100": 11,
+   "101-300": 15,
+   "<= 0": 10,
+   "701-1500": 5
+  },
+  "max_stack_histogram": {
+   "3": 20,
+   "4": 23,
+   "5": 18
+  },
+  "sp_pair_top": [],
+  "top_owned": [
+   {
+    "player": "Brady Singer",
+    "pct_drafted": 63.93
+   },
+   {
+    "player": "Adrian Houser",
+    "pct_drafted": 59.02
+   },
+   {
+    "player": "Elly De La Cruz",
+    "pct_drafted": 59.02
+   },
+   {
+    "player": "Rafael Devers",
+    "pct_drafted": 50.82
+   },
+   {
+    "player": "Turner Hill",
+    "pct_drafted": 49.18
+   }
+  ],
+  "captain_table": [
+   {
+    "player": "Adrian Houser",
+    "captain_count": 17,
+    "captain_share_pct": 27.9,
+    "pct_drafted": 59.02
+   },
+   {
+    "player": "Brady Singer",
+    "captain_count": 15,
+    "captain_share_pct": 24.6,
+    "pct_drafted": 63.93
+   },
+   {
+    "player": "Elly De La Cruz",
+    "captain_count": 6,
+    "captain_share_pct": 9.8,
+    "pct_drafted": 59.02
+   },
+   {
+    "player": "Rafael Devers",
+    "captain_count": 6,
+    "captain_share_pct": 9.8,
+    "pct_drafted": 50.82
+   },
+   {
+    "player": "Jung Hoo Lee",
+    "captain_count": 4,
+    "captain_share_pct": 6.6,
+    "pct_drafted": 26.23
+   },
+   {
+    "player": "Drew Gilbert",
+    "captain_count": 2,
+    "captain_share_pct": 3.3,
+    "pct_drafted": 27.87
+   },
+   {
+    "player": "Sal Stewart",
+    "captain_count": 2,
+    "captain_share_pct": 3.3,
+    "pct_drafted": 42.62
+   },
+   {
+    "player": "Tyler Stephenson",
+    "captain_count": 2,
+    "captain_share_pct": 3.3,
+    "pct_drafted": 22.95
+   }
+  ],
+  "winner_captain": {
+   "player": "Brady Singer",
+   "pct_drafted": 63.93,
+   "captain_share_pct": 24.6,
+   "was_top_owned_captain": false
+  }
+ },
+ "diagnostics": {
+  "salary_join_rate_pct": 100.0,
+  "unmatched_names_top": [],
+  "salary_name_collisions": [],
+  "ownership_recompute_max_diff_pts": 0.01,
+  "ownership_recompute_denominator": "all_entries",
+  "ownership_recompute_ok": true,
+  "parse_structural_ok": true,
+  "parsed_nothing": false,
+  "mostly_unparsed": false,
+  "contest_type_mismatch": false,
+  "salary_join_collapsed": false,
+  "entries_unparsed_share": 0.0,
+  "intra_entry_duplicate_entry_ids": [],
+  "roster_slots_observed": 366,
+  "roster_slots_expected": 366,
+  "recomputed_total_pct": 600.0,
+  "dk_table_total_pct": 600.0,
+  "dk_table_deficit_pts": 0.0,
+  "dk_table_agrees": true,
+  "verification_note": "parse structurally sound; DK %Drafted agrees with the lineup recompute"
+ },
+ "entries": [
+  {
+   "rank": "1",
+   "entry_id": "5230547023",
+   "username": "ed8802",
+   "points": 66.275,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 42.62,
+   "n_cheap": 1,
+   "players_norm": [
+    "adrian houser",
+    "brady singer",
+    "drew cavanaugh",
+    "drew gilbert",
+    "nate furman",
+    "rafael devers"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "brady singer"
+  },
+  {
+   "rank": "2",
+   "entry_id": "5230610970",
+   "username": "wittwerjoe",
+   "points": 65.5,
+   "salary_used": 47800,
+   "salary_left": 2200,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 37.16,
+   "n_cheap": 0,
+   "players_norm": [
+    "drew cavanaugh",
+    "elly de la cruz",
+    "hector rodriguez",
+    "jj bleday",
+    "rafael devers",
+    "sal stewart"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "drew cavanaugh"
+  },
+  {
+   "rank": "3",
+   "entry_id": "5230610965",
+   "username": "Rallycap",
+   "points": 64.9,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 40.98,
+   "n_cheap": 1,
+   "players_norm": [
+    "adrian houser",
+    "brady singer",
+    "drew cavanaugh",
+    "jung hoo lee",
+    "nate furman",
+    "sal stewart"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "jung hoo lee"
+  },
+  {
+   "rank": "3",
+   "entry_id": "5230610975",
+   "username": "Rallycap",
+   "points": 64.9,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 40.98,
+   "n_cheap": 1,
+   "players_norm": [
+    "adrian houser",
+    "brady singer",
+    "drew cavanaugh",
+    "jung hoo lee",
+    "nate furman",
+    "sal stewart"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "jung hoo lee"
+  },
+  {
+   "rank": "5",
+   "entry_id": "5230611763",
+   "username": "EllaBella99",
+   "points": 62.25,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 41.26,
+   "n_cheap": 1,
+   "players_norm": [
+    "brady singer",
+    "drew cavanaugh",
+    "elly de la cruz",
+    "grant mccray",
+    "jung hoo lee",
+    "sal stewart"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "elly de la cruz"
+  },
+  {
+   "rank": "5",
+   "entry_id": "5230611783",
+   "username": "EllaBella99",
+   "points": 62.25,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 41.26,
+   "n_cheap": 1,
+   "players_norm": [
+    "brady singer",
+    "drew cavanaugh",
+    "elly de la cruz",
+    "grant mccray",
+    "jung hoo lee",
+    "sal stewart"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "elly de la cruz"
+  },
+  {
+   "rank": "7",
+   "entry_id": "5230605862",
+   "username": "drcrc",
+   "points": 59.125,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 42.08,
+   "n_cheap": 1,
+   "players_norm": [
+    "brady singer",
+    "drew cavanaugh",
+    "elly de la cruz",
+    "grant mccray",
+    "rafael devers",
+    "tyler stephenson"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "brady singer"
+  },
+  {
+   "rank": "8",
+   "entry_id": "5230553243",
+   "username": "kbrisacher",
+   "points": 58.725,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 45.08,
+   "n_cheap": 0,
+   "players_norm": [
+    "adrian houser",
+    "drew cavanaugh",
+    "elly de la cruz",
+    "jung hoo lee",
+    "rafael devers",
+    "turner hill"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "adrian houser"
+  },
+  {
+   "rank": "9",
+   "entry_id": "5230551890",
+   "username": "Jaycee37",
+   "points": 58.15,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 48.36,
+   "n_cheap": 1,
+   "players_norm": [
+    "adrian houser",
+    "elly de la cruz",
+    "grant mccray",
+    "rafael devers",
+    "sal stewart",
+    "turner hill"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "rafael devers"
+  },
+  {
+   "rank": "10",
+   "entry_id": "5230544964",
+   "username": "brandonbeene12",
+   "points": 57.75,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 43.72,
+   "n_cheap": 1,
+   "players_norm": [
+    "brady singer",
+    "drew gilbert",
+    "elly de la cruz",
+    "grant mccray",
+    "hector rodriguez",
+    "rafael devers"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "rafael devers"
+  },
+  {
+   "rank": "11",
+   "entry_id": "5230519829",
+   "username": "Jimbobwae42",
+   "points": 57.5,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 38.8,
+   "n_cheap": 0,
+   "players_norm": [
+    "drew cavanaugh",
+    "elly de la cruz",
+    "hector rodriguez",
+    "rafael devers",
+    "sal stewart",
+    "tyler stephenson"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "elly de la cruz"
+  },
+  {
+   "rank": "11",
+   "entry_id": "5230596238",
+   "username": "jc000000",
+   "points": 57.5,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 42.62,
+   "n_cheap": 0,
+   "players_norm": [
+    "drew gilbert",
+    "elly de la cruz",
+    "jung hoo lee",
+    "rafael devers",
+    "sal stewart",
+    "turner hill"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "drew gilbert"
+  },
+  {
+   "rank": "13",
+   "entry_id": "5230547024",
+   "username": "ed8802",
+   "points": 57.475,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 42.9,
+   "n_cheap": 2,
+   "players_norm": [
+    "adrian houser",
+    "brady singer",
+    "grant mccray",
+    "jung hoo lee",
+    "nate furman",
+    "rafael devers"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "adrian houser"
+  },
+  {
+   "rank": "13",
+   "entry_id": "5230605786",
+   "username": "eric1192",
+   "points": 57.475,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 42.9,
+   "n_cheap": 2,
+   "players_norm": [
+    "adrian houser",
+    "brady singer",
+    "grant mccray",
+    "jung hoo lee",
+    "nate furman",
+    "rafael devers"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "adrian houser"
+  },
+  {
+   "rank": "15",
+   "entry_id": "5230610971",
+   "username": "wittwerjoe",
+   "points": 56.5,
+   "salary_used": 48500,
+   "salary_left": 1500,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 36.89,
+   "n_cheap": 0,
+   "players_norm": [
+    "drew cavanaugh",
+    "elly de la cruz",
+    "eugenio suarez",
+    "hector rodriguez",
+    "rafael devers",
+    "sal stewart"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "hector rodriguez"
+  },
+  {
+   "rank": "16",
+   "entry_id": "5230603144",
+   "username": "rutgers81",
+   "points": 56.15,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 48.09,
+   "n_cheap": 1,
+   "players_norm": [
+    "adrian houser",
+    "elly de la cruz",
+    "nate furman",
+    "rafael devers",
+    "sal stewart",
+    "turner hill"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "rafael devers"
+  },
+  {
+   "rank": "17",
+   "entry_id": "5230605776",
+   "username": "riceraider75",
+   "points": 54.5,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 36.07,
+   "n_cheap": 0,
+   "players_norm": [
+    "drew gilbert",
+    "elly de la cruz",
+    "jj bleday",
+    "kebryan hayes",
+    "rafael devers",
+    "sal stewart"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "drew gilbert"
+  },
+  {
+   "rank": "18",
+   "entry_id": "5230532104",
+   "username": "edwardfingerhut",
+   "points": 52.725,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 41.8,
+   "n_cheap": 1,
+   "players_norm": [
+    "adrian houser",
+    "christian koss",
+    "elly de la cruz",
+    "nate furman",
+    "rafael devers",
+    "sal stewart"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "adrian houser"
+  },
+  {
+   "rank": "19",
+   "entry_id": "5230595911",
+   "username": "BigBizzle11",
+   "points": 51.275,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 44.81,
+   "n_cheap": 1,
+   "players_norm": [
+    "adrian houser",
+    "brady singer",
+    "drew cavanaugh",
+    "elly de la cruz",
+    "grant mccray",
+    "hector rodriguez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "brady singer"
+  },
+  {
+   "rank": "19",
+   "entry_id": "5230605861",
+   "username": "drcrc",
+   "points": 51.275,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 44.81,
+   "n_cheap": 1,
+   "players_norm": [
+    "adrian houser",
+    "brady singer",
+    "drew cavanaugh",
+    "elly de la cruz",
+    "grant mccray",
+    "hector rodriguez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "brady singer"
+  },
+  {
+   "rank": "21",
+   "entry_id": "5230604987",
+   "username": "riceraider75",
+   "points": 51.15,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 37.71,
+   "n_cheap": 0,
+   "players_norm": [
+    "adrian houser",
+    "drew gilbert",
+    "jung hoo lee",
+    "matt mclain",
+    "rafael devers",
+    "turner hill"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "rafael devers"
+  },
+  {
+   "rank": "22",
+   "entry_id": "5230598054",
+   "username": "qbjjj",
+   "points": 49.475,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 46.45,
+   "n_cheap": 1,
+   "players_norm": [
+    "adrian houser",
+    "brady singer",
+    "drew gilbert",
+    "nate furman",
+    "rafael devers",
+    "turner hill"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "adrian houser"
+  },
+  {
+   "rank": "22",
+   "entry_id": "5230604257",
+   "username": "qbjjj",
+   "points": 49.475,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 46.45,
+   "n_cheap": 1,
+   "players_norm": [
+    "adrian houser",
+    "brady singer",
+    "drew gilbert",
+    "nate furman",
+    "rafael devers",
+    "turner hill"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "adrian houser"
+  },
+  {
+   "rank": "24",
+   "entry_id": "5230605896",
+   "username": "jerrycracker",
+   "points": 49.0,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 34.43,
+   "n_cheap": 0,
+   "players_norm": [
+    "drew gilbert",
+    "jj bleday",
+    "rafael devers",
+    "sal stewart",
+    "turner hill",
+    "tyler stephenson"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "sal stewart"
+  },
+  {
+   "rank": "25",
+   "entry_id": "5230564708",
+   "username": "Aicirt",
+   "points": 48.475,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 43.72,
+   "n_cheap": 0,
+   "players_norm": [
+    "adrian houser",
+    "brady singer",
+    "christian koss",
+    "drew gilbert",
+    "rafael devers",
+    "turner hill"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "adrian houser"
+  },
+  {
+   "rank": "26",
+   "entry_id": "5230540772",
+   "username": "ronchico",
+   "points": 47.725,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 44.54,
+   "n_cheap": 0,
+   "players_norm": [
+    "adrian houser",
+    "elly de la cruz",
+    "jung hoo lee",
+    "kebryan hayes",
+    "rafael devers",
+    "turner hill"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "adrian houser"
+  },
+  {
+   "rank": "26",
+   "entry_id": "5230602767",
+   "username": "packersnat",
+   "points": 47.725,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 44.54,
+   "n_cheap": 0,
+   "players_norm": [
+    "adrian houser",
+    "elly de la cruz",
+    "jung hoo lee",
+    "kebryan hayes",
+    "rafael devers",
+    "turner hill"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "adrian houser"
+  },
+  {
+   "rank": "28",
+   "entry_id": "5230516997",
+   "username": "ivymoose",
+   "points": 47.475,
+   "salary_used": 46000,
+   "salary_left": 4000,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 46.72,
+   "n_cheap": 2,
+   "players_norm": [
+    "adrian houser",
+    "brady singer",
+    "grant mccray",
+    "nate furman",
+    "rafael devers",
+    "turner hill"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "adrian houser"
+  },
+  {
+   "rank": "28",
+   "entry_id": "5230520030",
+   "username": "sibobterminator",
+   "points": 47.475,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 45.35,
+   "n_cheap": 1,
+   "players_norm": [
+    "adrian houser",
+    "brady singer",
+    "drew gilbert",
+    "grant mccray",
+    "sal stewart",
+    "turner hill"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "adrian houser"
+  },
+  {
+   "rank": "30",
+   "entry_id": "5230518662",
+   "username": "FoxyGrandpa252",
+   "points": 47.125,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 41.53,
+   "n_cheap": 1,
+   "players_norm": [
+    "brady singer",
+    "elly de la cruz",
+    "grant mccray",
+    "hector rodriguez",
+    "kebryan hayes",
+    "sal stewart"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "brady singer"
+  },
+  {
+   "rank": "30",
+   "entry_id": "5230568794",
+   "username": "pwsk77",
+   "points": 47.125,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 41.53,
+   "n_cheap": 1,
+   "players_norm": [
+    "brady singer",
+    "elly de la cruz",
+    "grant mccray",
+    "hector rodriguez",
+    "kebryan hayes",
+    "sal stewart"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "brady singer"
+  },
+  {
+   "rank": "32",
+   "entry_id": "5230604651",
+   "username": "indyreds",
+   "points": 47.0,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 40.44,
+   "n_cheap": 0,
+   "players_norm": [
+    "drew gilbert",
+    "elly de la cruz",
+    "jj bleday",
+    "rafael devers",
+    "sal stewart",
+    "turner hill"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "turner hill"
+  },
+  {
+   "rank": "33",
+   "entry_id": "5230603609",
+   "username": "Boknowsalil",
+   "points": 46.65,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 44.54,
+   "n_cheap": 0,
+   "players_norm": [
+    "adrian houser",
+    "elly de la cruz",
+    "jung hoo lee",
+    "kebryan hayes",
+    "rafael devers",
+    "turner hill"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "elly de la cruz"
+  },
+  {
+   "rank": "34",
+   "entry_id": "5230605787",
+   "username": "eric1192",
+   "points": 46.475,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 37.98,
+   "n_cheap": 0,
+   "players_norm": [
+    "adrian houser",
+    "brady singer",
+    "drew cavanaugh",
+    "jung hoo lee",
+    "shay whitcomb",
+    "turner hill"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "adrian houser"
+  },
+  {
+   "rank": "35",
+   "entry_id": "5230545744",
+   "username": "KristianFTM",
+   "points": 44.125,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 33.61,
+   "n_cheap": 0,
+   "players_norm": [
+    "brady singer",
+    "drew gilbert",
+    "hector rodriguez",
+    "kebryan hayes",
+    "matt mclain",
+    "sal stewart"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "brady singer"
+  },
+  {
+   "rank": "36",
+   "entry_id": "5230605657",
+   "username": "Wildcat58",
+   "points": 43.25,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 38.52,
+   "n_cheap": 0,
+   "players_norm": [
+    "brady singer",
+    "drew cavanaugh",
+    "drew gilbert",
+    "elly de la cruz",
+    "hector rodriguez",
+    "tyler stephenson"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "elly de la cruz"
+  },
+  {
+   "rank": "37",
+   "entry_id": "5230596021",
+   "username": "bdoran16",
+   "points": 43.15,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 42.08,
+   "n_cheap": 0,
+   "players_norm": [
+    "adrian houser",
+    "elly de la cruz",
+    "eugenio suarez",
+    "kebryan hayes",
+    "rafael devers",
+    "turner hill"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "rafael devers"
+  },
+  {
+   "rank": "38",
+   "entry_id": "5230611349",
+   "username": "buisercruiser",
+   "points": 42.9,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 39.34,
+   "n_cheap": 1,
+   "players_norm": [
+    "adrian houser",
+    "brady singer",
+    "eugenio suarez",
+    "kebryan hayes",
+    "nate furman",
+    "rafael devers"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "eugenio suarez"
+  },
+  {
+   "rank": "39",
+   "entry_id": "5230569628",
+   "username": "bleeski",
+   "points": 42.475,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 36.61,
+   "n_cheap": 1,
+   "players_norm": [
+    "adrian houser",
+    "brady singer",
+    "christian koss",
+    "grant mccray",
+    "matt mclain",
+    "sal stewart"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "adrian houser"
+  },
+  {
+   "rank": "40",
+   "entry_id": "5230599246",
+   "username": "comotose",
+   "points": 42.0,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 34.16,
+   "n_cheap": 0,
+   "players_norm": [
+    "drew gilbert",
+    "elly de la cruz",
+    "hector rodriguez",
+    "matt mclain",
+    "rafael devers",
+    "tyler stephenson"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "rafael devers"
+  },
+  {
+   "rank": "41",
+   "entry_id": "5230609922",
+   "username": "r2phantom",
+   "points": 41.725,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 39.89,
+   "n_cheap": 0,
+   "players_norm": [
+    "adrian houser",
+    "hector rodriguez",
+    "jung hoo lee",
+    "rafael devers",
+    "turner hill",
+    "tyler stephenson"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "adrian houser"
+  },
+  {
+   "rank": "42",
+   "entry_id": "5230611149",
+   "username": "buisercruiser",
+   "points": 41.4,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 50.27,
+   "n_cheap": 1,
+   "players_norm": [
+    "adrian houser",
+    "brady singer",
+    "elly de la cruz",
+    "nate furman",
+    "sal stewart",
+    "turner hill"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "nate furman"
+  },
+  {
+   "rank": "43",
+   "entry_id": "5230601121",
+   "username": "dallascowboys4225",
+   "points": 41.275,
+   "salary_used": 48700,
+   "salary_left": 1300,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 42.08,
+   "n_cheap": 0,
+   "players_norm": [
+    "adrian houser",
+    "brady singer",
+    "drew cavanaugh",
+    "hector rodriguez",
+    "turner hill",
+    "tyler stephenson"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "brady singer"
+  },
+  {
+   "rank": "44",
+   "entry_id": "5230608293",
+   "username": "usaldrx",
+   "points": 41.125,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 45.63,
+   "n_cheap": 1,
+   "players_norm": [
+    "brady singer",
+    "elly de la cruz",
+    "hector rodriguez",
+    "nate furman",
+    "sal stewart",
+    "turner hill"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "brady singer"
+  },
+  {
+   "rank": "45",
+   "entry_id": "5230606082",
+   "username": "klink",
+   "points": 41.0,
+   "salary_used": 44200,
+   "salary_left": 5800,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 36.34,
+   "n_cheap": 0,
+   "players_norm": [
+    "drew cavanaugh",
+    "drew gilbert",
+    "elly de la cruz",
+    "matt mclain",
+    "sal stewart",
+    "turner hill"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "matt mclain"
+  },
+  {
+   "rank": "46",
+   "entry_id": "5230518661",
+   "username": "FoxyGrandpa252",
+   "points": 40.275,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 44.26,
+   "n_cheap": 1,
+   "players_norm": [
+    "adrian houser",
+    "brady singer",
+    "elly de la cruz",
+    "grant mccray",
+    "hector rodriguez",
+    "kebryan hayes"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "brady singer"
+  },
+  {
+   "rank": "47",
+   "entry_id": "5230605656",
+   "username": "Wildcat58",
+   "points": 38.9,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 39.89,
+   "n_cheap": 1,
+   "players_norm": [
+    "adrian houser",
+    "brady singer",
+    "jj bleday",
+    "jung hoo lee",
+    "nate furman",
+    "turner hill"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "jung hoo lee"
+  },
+  {
+   "rank": "48",
+   "entry_id": "5230584220",
+   "username": "jklodawizard",
+   "points": 38.0,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 34.98,
+   "n_cheap": 0,
+   "players_norm": [
+    "elly de la cruz",
+    "eugenio suarez",
+    "jung hoo lee",
+    "matt mclain",
+    "rafael devers",
+    "turner hill"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "jung hoo lee"
+  },
+  {
+   "rank": "49",
+   "entry_id": "5230609917",
+   "username": "Stay-Strong",
+   "points": 37.9,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 42.9,
+   "n_cheap": 0,
+   "players_norm": [
+    "adrian houser",
+    "brady singer",
+    "christian koss",
+    "rafael devers",
+    "turner hill",
+    "tyler stephenson"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "tyler stephenson"
+  },
+  {
+   "rank": "50",
+   "entry_id": "5230564815",
+   "username": "bleeski",
+   "points": 36.75,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 29.78,
+   "n_cheap": 1,
+   "players_norm": [
+    "brady singer",
+    "eugenio suarez",
+    "grant mccray",
+    "sal stewart",
+    "tj friedl",
+    "tyler stephenson"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "sal stewart"
+  },
+  {
+   "rank": "51",
+   "entry_id": "5230564709",
+   "username": "Aicirt",
+   "points": 36.125,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 29.23,
+   "n_cheap": 0,
+   "players_norm": [
+    "brady singer",
+    "christian koss",
+    "eugenio suarez",
+    "kebryan hayes",
+    "sal stewart",
+    "tyler stephenson"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "brady singer"
+  },
+  {
+   "rank": "52",
+   "entry_id": "5230550046",
+   "username": "tgoodw",
+   "points": 35.5,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 35.52,
+   "n_cheap": 0,
+   "players_norm": [
+    "drew gilbert",
+    "elly de la cruz",
+    "jj bleday",
+    "matt mclain",
+    "rafael devers",
+    "turner hill"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "elly de la cruz"
+  },
+  {
+   "rank": "53",
+   "entry_id": "5230598443",
+   "username": "comotose",
+   "points": 35.275,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 35.25,
+   "n_cheap": 1,
+   "players_norm": [
+    "adrian houser",
+    "brady singer",
+    "drew gilbert",
+    "grant mccray",
+    "tj friedl",
+    "tyler stephenson"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "brady singer"
+  },
+  {
+   "rank": "54",
+   "entry_id": "5230611756",
+   "username": "cbmillport",
+   "points": 33.75,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 43.44,
+   "n_cheap": 0,
+   "players_norm": [
+    "brady singer",
+    "elly de la cruz",
+    "kebryan hayes",
+    "sal stewart",
+    "turner hill",
+    "tyler stephenson"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "tyler stephenson"
+  },
+  {
+   "rank": "55",
+   "entry_id": "5230553244",
+   "username": "kbrisacher",
+   "points": 33.125,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 35.25,
+   "n_cheap": 1,
+   "players_norm": [
+    "brady singer",
+    "elly de la cruz",
+    "grant mccray",
+    "jj bleday",
+    "kebryan hayes",
+    "tyler stephenson"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "brady singer"
+  },
+  {
+   "rank": "56",
+   "entry_id": "5230606096",
+   "username": "Handcuff2006",
+   "points": 32.475,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 48.36,
+   "n_cheap": 1,
+   "players_norm": [
+    "adrian houser",
+    "brady singer",
+    "elly de la cruz",
+    "hector rodriguez",
+    "nate furman",
+    "turner hill"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "adrian houser"
+  },
+  {
+   "rank": "56",
+   "entry_id": "5230606098",
+   "username": "Handcuff2006",
+   "points": 32.475,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 48.36,
+   "n_cheap": 1,
+   "players_norm": [
+    "adrian houser",
+    "brady singer",
+    "elly de la cruz",
+    "hector rodriguez",
+    "nate furman",
+    "turner hill"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "adrian houser"
+  },
+  {
+   "rank": "58",
+   "entry_id": "5230568962",
+   "username": "pwsk77",
+   "points": 30.275,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 33.06,
+   "n_cheap": 0,
+   "players_norm": [
+    "adrian houser",
+    "brady singer",
+    "hector rodriguez",
+    "kebryan hayes",
+    "matt mclain",
+    "tj friedl"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "brady singer"
+  },
+  {
+   "rank": "59",
+   "entry_id": "5230545745",
+   "username": "KristianFTM",
+   "points": 29.275,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 33.61,
+   "n_cheap": 1,
+   "players_norm": [
+    "adrian houser",
+    "brady singer",
+    "eugenio suarez",
+    "hector rodriguez",
+    "nate furman",
+    "tj friedl"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "brady singer"
+  },
+  {
+   "rank": "60",
+   "entry_id": "5230572900",
+   "username": "CobraCommander100",
+   "points": 28.475,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 41.8,
+   "n_cheap": 0,
+   "players_norm": [
+    "adrian houser",
+    "brady singer",
+    "christian koss",
+    "elly de la cruz",
+    "tj friedl",
+    "turner hill"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "adrian houser"
+  },
+  {
+   "rank": "61",
+   "entry_id": "5230577933",
+   "username": "jklodawizard",
+   "points": 25.5,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 25.41,
+   "n_cheap": 0,
+   "players_norm": [
+    "christian koss",
+    "elly de la cruz",
+    "jj bleday",
+    "sal stewart",
+    "shay whitcomb",
+    "tyler stephenson"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "jj bleday"
+  }
+ ],
+ "player_table": [
+  {
+   "player": "Elly De La Cruz",
+   "player_norm": "elly de la cruz",
+   "roster_position": "UTIL",
+   "pct_drafted": 49.18,
+   "fpts": 5.0
+  },
+  {
+   "player": "Turner Hill",
+   "player_norm": "turner hill",
+   "roster_position": "UTIL",
+   "pct_drafted": 47.54,
+   "fpts": 0.0
+  },
+  {
+   "player": "Rafael Devers",
+   "player_norm": "rafael devers",
+   "roster_position": "UTIL",
+   "pct_drafted": 40.98,
+   "fpts": 18.0
+  },
+  {
+   "player": "Brady Singer",
+   "player_norm": "brady singer",
+   "roster_position": "UTIL",
+   "pct_drafted": 39.34,
+   "fpts": 10.75
+  },
+  {
+   "player": "Sal Stewart",
+   "player_norm": "sal stewart",
+   "roster_position": "UTIL",
+   "pct_drafted": 39.34,
+   "fpts": 14.0
+  },
+  {
+   "player": "Adrian Houser",
+   "player_norm": "adrian houser",
+   "roster_position": "UTIL",
+   "pct_drafted": 31.15,
+   "fpts": 7.15
+  },
+  {
+   "player": "Grant McCray",
+   "player_norm": "grant mccray",
+   "roster_position": "UTIL",
+   "pct_drafted": 29.51,
+   "fpts": 5.0
+  },
+  {
+   "player": "Hector Rodriguez",
+   "player_norm": "hector rodriguez",
+   "roster_position": "UTIL",
+   "pct_drafted": 29.51,
+   "fpts": 3.0
+  },
+  {
+   "player": "Adrian Houser",
+   "player_norm": "adrian houser",
+   "roster_position": "CPT",
+   "pct_drafted": 27.87,
+   "fpts": 10.73
+  },
+  {
+   "player": "Nate Furman",
+   "player_norm": "nate furman",
+   "roster_position": "UTIL",
+   "pct_drafted": 26.23,
+   "fpts": 3.0
+  },
+  {
+   "player": "Brady Singer",
+   "player_norm": "brady singer",
+   "roster_position": "CPT",
+   "pct_drafted": 24.59,
+   "fpts": 16.12
+  },
+  {
+   "player": "Drew Cavanaugh",
+   "player_norm": "drew cavanaugh",
+   "roster_position": "UTIL",
+   "pct_drafted": 24.59,
+   "fpts": 15.0
+  },
+  {
+   "player": "Drew Gilbert",
+   "player_norm": "drew gilbert",
+   "roster_position": "UTIL",
+   "pct_drafted": 24.59,
+   "fpts": 7.0
+  },
+  {
+   "player": "Ke'Bryan Hayes",
+   "player_norm": "kebryan hayes",
+   "roster_position": "UTIL",
+   "pct_drafted": 22.95,
+   "fpts": 4.0
+  },
+  {
+   "player": "Tyler Stephenson",
+   "player_norm": "tyler stephenson",
+   "roster_position": "UTIL",
+   "pct_drafted": 19.67,
+   "fpts": 0.0
+  },
+  {
+   "player": "Jung Hoo Lee",
+   "player_norm": "jung hoo lee",
+   "roster_position": "UTIL",
+   "pct_drafted": 19.67,
+   "fpts": 10.0
+  },
+  {
+   "player": "Christian Koss",
+   "player_norm": "christian koss",
+   "roster_position": "UTIL",
+   "pct_drafted": 11.48,
+   "fpts": 2.0
+  },
+  {
+   "player": "Matt McLain",
+   "player_norm": "matt mclain",
+   "roster_position": "UTIL",
+   "pct_drafted": 11.48,
+   "fpts": 0.0
+  },
+  {
+   "player": "JJ Bleday",
+   "player_norm": "jj bleday",
+   "roster_position": "UTIL",
+   "pct_drafted": 11.48,
+   "fpts": 3.0
+  },
+  {
+   "player": "Elly De La Cruz",
+   "player_norm": "elly de la cruz",
+   "roster_position": "CPT",
+   "pct_drafted": 9.84,
+   "fpts": 7.5
+  },
+  {
+   "player": "Rafael Devers",
+   "player_norm": "rafael devers",
+   "roster_position": "CPT",
+   "pct_drafted": 9.84,
+   "fpts": 27.0
+  },
+  {
+   "player": "Eugenio Suarez",
+   "player_norm": "eugenio suarez",
+   "roster_position": "UTIL",
+   "pct_drafted": 9.84,
+   "fpts": 0.0
+  },
+  {
+   "player": "TJ Friedl",
+   "player_norm": "tj friedl",
+   "roster_position": "UTIL",
+   "pct_drafted": 8.2,
+   "fpts": 0.0
+  },
+  {
+   "player": "Jung Hoo Lee",
+   "player_norm": "jung hoo lee",
+   "roster_position": "CPT",
+   "pct_drafted": 6.56,
+   "fpts": 15.0
+  },
+  {
+   "player": "Sal Stewart",
+   "player_norm": "sal stewart",
+   "roster_position": "CPT",
+   "pct_drafted": 3.28,
+   "fpts": 21.0
+  },
+  {
+   "player": "Shay Whitcomb",
+   "player_norm": "shay whitcomb",
+   "roster_position": "UTIL",
+   "pct_drafted": 3.28,
+   "fpts": 0.0
+  },
+  {
+   "player": "Drew Gilbert",
+   "player_norm": "drew gilbert",
+   "roster_position": "CPT",
+   "pct_drafted": 3.28,
+   "fpts": 10.5
+  },
+  {
+   "player": "Tyler Stephenson",
+   "player_norm": "tyler stephenson",
+   "roster_position": "CPT",
+   "pct_drafted": 3.28,
+   "fpts": 0.0
+  },
+  {
+   "player": "JJ Bleday",
+   "player_norm": "jj bleday",
+   "roster_position": "CPT",
+   "pct_drafted": 1.64,
+   "fpts": 4.5
+  },
+  {
+   "player": "Turner Hill",
+   "player_norm": "turner hill",
+   "roster_position": "CPT",
+   "pct_drafted": 1.64,
+   "fpts": 0.0
+  },
+  {
+   "player": "Matt McLain",
+   "player_norm": "matt mclain",
+   "roster_position": "CPT",
+   "pct_drafted": 1.64,
+   "fpts": 0.0
+  },
+  {
+   "player": "Drew Cavanaugh",
+   "player_norm": "drew cavanaugh",
+   "roster_position": "CPT",
+   "pct_drafted": 1.64,
+   "fpts": 22.5
+  },
+  {
+   "player": "Hector Rodriguez",
+   "player_norm": "hector rodriguez",
+   "roster_position": "CPT",
+   "pct_drafted": 1.64,
+   "fpts": 4.5
+  },
+  {
+   "player": "Nate Furman",
+   "player_norm": "nate furman",
+   "roster_position": "CPT",
+   "pct_drafted": 1.64,
+   "fpts": 4.5
+  },
+  {
+   "player": "Eugenio Suarez",
+   "player_norm": "eugenio suarez",
+   "roster_position": "CPT",
+   "pct_drafted": 1.64,
+   "fpts": 0.0
+  }
+ ],
+ "own_results": {
+  "matched": 2,
+  "requested": 2,
+  "field_size": 61,
+  "best_rank": 39,
+  "worst_rank": 50,
+  "best_finish_percentile": 37.7,
+  "median_finish_percentile": 28.69,
+  "best_points": 42.475,
+  "winning_points": 66.275,
+  "own_lineups_duplicated_by_field": 0,
+  "max_copies_of_an_own_lineup": 1,
+  "entry_fee": null,
+  "fees_total": null,
+  "winnings_total": null,
+  "paid_places": null,
+  "payout_breadth_observed": null,
+  "cashed_entries": null,
+  "net": null,
+  "labels": "observed outcomes from a completed contest; never a graded prediction, ROI model, win rate, or probability claim"
+ }
+}

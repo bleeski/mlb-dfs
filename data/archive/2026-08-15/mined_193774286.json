@@ -1,0 +1,1045 @@
+{
+ "label": "deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied",
+ "version": "0.5-review",
+ "coverage": "full",
+ "contest_id": "193774286",
+ "slate_date": "2026-08-15",
+ "contest_type": "showdown",
+ "meta": {
+  "entries_total": 31,
+  "entries_complete_lineups": 31,
+  "roster_size": 6,
+  "entries_unparsed": 0,
+  "winning_points": 88.13,
+  "winning_entry_id": "5219577029",
+  "multi_entry_flag": false
+ },
+ "duplication": {
+  "distinct_lineups": 29,
+  "entries_in_duplicated_lineups": 3,
+  "share_duplicated_pct": 9.7,
+  "max_copies": 3,
+  "copies_histogram": {
+   "1": 28,
+   "3": 1
+  },
+  "winner_copies": 1
+ },
+ "construction": {
+  "cheap_salary_threshold": 3800,
+  "at_cap_entries": 8,
+  "at_cap_share_pct": 25.8,
+  "salary_left_histogram": {
+   "<= 0": 7,
+   "701-1500": 5,
+   "301-700": 7,
+   "101-300": 11,
+   "1-100": 1
+  },
+  "max_stack_histogram": {
+   "3": 4,
+   "4": 12,
+   "5": 15
+  },
+  "sp_pair_top": [],
+  "top_owned": [
+   {
+    "player": "MacKenzie Gore",
+    "pct_drafted": 67.74
+   },
+   {
+    "player": "J.T. Ginn",
+    "pct_drafted": 51.61
+   },
+   {
+    "player": "Corey Seager",
+    "pct_drafted": 38.71
+   },
+   {
+    "player": "Henry Bolte",
+    "pct_drafted": 35.48
+   },
+   {
+    "player": "Brandon Nimmo",
+    "pct_drafted": 32.26
+   }
+  ],
+  "captain_table": [
+   {
+    "player": "MacKenzie Gore",
+    "captain_count": 15,
+    "captain_share_pct": 48.4,
+    "pct_drafted": 67.74
+   },
+   {
+    "player": "J.T. Ginn",
+    "captain_count": 6,
+    "captain_share_pct": 19.4,
+    "pct_drafted": 51.61
+   },
+   {
+    "player": "Lawrence Butler",
+    "captain_count": 2,
+    "captain_share_pct": 6.5,
+    "pct_drafted": 25.81
+   },
+   {
+    "player": "Zack Gelof",
+    "captain_count": 2,
+    "captain_share_pct": 6.5,
+    "pct_drafted": 32.26
+   },
+   {
+    "player": "Evan Carter",
+    "captain_count": 1,
+    "captain_share_pct": 3.2,
+    "pct_drafted": 29.03
+   },
+   {
+    "player": "Corey Seager",
+    "captain_count": 1,
+    "captain_share_pct": 3.2,
+    "pct_drafted": 38.71
+   },
+   {
+    "player": "Wyatt Langford",
+    "captain_count": 1,
+    "captain_share_pct": 3.2,
+    "pct_drafted": 32.26
+   },
+   {
+    "player": "Brandon Nimmo",
+    "captain_count": 1,
+    "captain_share_pct": 3.2,
+    "pct_drafted": 32.26
+   }
+  ],
+  "winner_captain": {
+   "player": "MacKenzie Gore",
+   "pct_drafted": 67.74,
+   "captain_share_pct": 48.4,
+   "was_top_owned_captain": true
+  }
+ },
+ "diagnostics": {
+  "salary_join_rate_pct": 100.0,
+  "unmatched_names_top": [],
+  "salary_name_collisions": [],
+  "ownership_recompute_max_diff_pts": 0.0,
+  "ownership_recompute_denominator": "all_entries",
+  "ownership_recompute_ok": true,
+  "parse_structural_ok": true,
+  "parsed_nothing": false,
+  "mostly_unparsed": false,
+  "contest_type_mismatch": false,
+  "salary_join_collapsed": false,
+  "entries_unparsed_share": 0.0,
+  "intra_entry_duplicate_entry_ids": [],
+  "roster_slots_observed": 186,
+  "roster_slots_expected": 186,
+  "recomputed_total_pct": 600.0,
+  "dk_table_total_pct": 600.0,
+  "dk_table_deficit_pts": 0.0,
+  "dk_table_agrees": true,
+  "verification_note": "parse structurally sound; DK %Drafted agrees with the lineup recompute"
+ },
+ "entries": [
+  {
+   "rank": "1",
+   "entry_id": "5219577029",
+   "username": "Extraqtt",
+   "points": 88.13,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 38.17,
+   "n_cheap": 1,
+   "players_norm": [
+    "austin wynns",
+    "corey seager",
+    "henry bolte",
+    "mackenzie gore",
+    "nicky lopez",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "mackenzie gore"
+  },
+  {
+   "rank": "2",
+   "entry_id": "5220154875",
+   "username": "johnbrock636",
+   "points": 82.5,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 30.64,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "evan carter",
+    "henry bolte",
+    "jonah heim",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "evan carter"
+  },
+  {
+   "rank": "3",
+   "entry_id": "5220089526",
+   "username": "bleeski",
+   "points": 75.0,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 32.79,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "henry bolte",
+    "joc pederson",
+    "nicky lopez",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "corey seager"
+  },
+  {
+   "rank": "4",
+   "entry_id": "5219362809",
+   "username": "howardwi",
+   "points": 74.83,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 40.32,
+   "n_cheap": 0,
+   "players_norm": [
+    "evan carter",
+    "henry bolte",
+    "j t ginn",
+    "mackenzie gore",
+    "max muncy",
+    "tommy white"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "mackenzie gore"
+  },
+  {
+   "rank": "5",
+   "entry_id": "5220139928",
+   "username": "DicVec",
+   "points": 72.83,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 39.25,
+   "n_cheap": 1,
+   "players_norm": [
+    "austin wynns",
+    "evan carter",
+    "henry bolte",
+    "j t ginn",
+    "mackenzie gore",
+    "max muncy"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "mackenzie gore"
+  },
+  {
+   "rank": "5",
+   "entry_id": "5220156879",
+   "username": "PhilaSnakehead",
+   "points": 72.83,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 40.86,
+   "n_cheap": 0,
+   "players_norm": [
+    "henry bolte",
+    "j t ginn",
+    "joc pederson",
+    "mackenzie gore",
+    "nicky lopez",
+    "tommy white"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "mackenzie gore"
+  },
+  {
+   "rank": "7",
+   "entry_id": "5220004858",
+   "username": "kudos72off",
+   "points": 70.13,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 33.33,
+   "n_cheap": 1,
+   "players_norm": [
+    "alika williams",
+    "evan carter",
+    "jake burger",
+    "joc pederson",
+    "mackenzie gore",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "mackenzie gore"
+  },
+  {
+   "rank": "8",
+   "entry_id": "5220124967",
+   "username": "corruption79",
+   "points": 69.75,
+   "salary_used": 48800,
+   "salary_left": 1200,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 37.63,
+   "n_cheap": 0,
+   "players_norm": [
+    "corey seager",
+    "lawrence butler",
+    "mackenzie gore",
+    "nicky lopez",
+    "tommy white",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "wyatt langford"
+  },
+  {
+   "rank": "9",
+   "entry_id": "5220065601",
+   "username": "JohnZaps",
+   "points": 66.13,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 33.87,
+   "n_cheap": 1,
+   "players_norm": [
+    "alika williams",
+    "brandon nimmo",
+    "ezequiel duran",
+    "mackenzie gore",
+    "nicky lopez",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "mackenzie gore"
+  },
+  {
+   "rank": "10",
+   "entry_id": "5220159263",
+   "username": "GuitarBet1",
+   "points": 65.83,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 39.78,
+   "n_cheap": 1,
+   "players_norm": [
+    "alika williams",
+    "brandon nimmo",
+    "evan carter",
+    "j t ginn",
+    "mackenzie gore",
+    "nicky lopez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "mackenzie gore"
+  },
+  {
+   "rank": "11",
+   "entry_id": "5220113884",
+   "username": "wittwerjoe",
+   "points": 64.2,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 34.95,
+   "n_cheap": 1,
+   "players_norm": [
+    "austin wynns",
+    "brandon nimmo",
+    "corey seager",
+    "henry bolte",
+    "j t ginn",
+    "jeff mcneil"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "brandon nimmo"
+  },
+  {
+   "rank": "12",
+   "entry_id": "5219435010",
+   "username": "oneupthedevil",
+   "points": 62.13,
+   "salary_used": 48800,
+   "salary_left": 1200,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 31.18,
+   "n_cheap": 0,
+   "players_norm": [
+    "ezequiel duran",
+    "henry bolte",
+    "jake burger",
+    "mackenzie gore",
+    "max muncy",
+    "tommy white"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "mackenzie gore"
+  },
+  {
+   "rank": "12",
+   "entry_id": "5220156692",
+   "username": "d9144",
+   "points": 62.13,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 37.63,
+   "n_cheap": 1,
+   "players_norm": [
+    "austin wynns",
+    "corey seager",
+    "joc pederson",
+    "mackenzie gore",
+    "tommy white",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "mackenzie gore"
+  },
+  {
+   "rank": "14",
+   "entry_id": "5219046709",
+   "username": "tbjones2121",
+   "points": 62.05,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 31.18,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "henry bolte",
+    "j t ginn",
+    "jeff mcneil",
+    "jonah heim",
+    "max muncy"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "j t ginn"
+  },
+  {
+   "rank": "14",
+   "entry_id": "5219164218",
+   "username": "whoisjohngalt420",
+   "points": 62.05,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 30.11,
+   "n_cheap": 0,
+   "players_norm": [
+    "brian serven",
+    "evan carter",
+    "henry bolte",
+    "j t ginn",
+    "lawrence butler",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "j t ginn"
+  },
+  {
+   "rank": "16",
+   "entry_id": "5220112923",
+   "username": "dafiidmichel",
+   "points": 57.13,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 33.33,
+   "n_cheap": 2,
+   "players_norm": [
+    "alika williams",
+    "austin wynns",
+    "ezequiel duran",
+    "mackenzie gore",
+    "wyatt langford",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "mackenzie gore"
+  },
+  {
+   "rank": "17",
+   "entry_id": "5220156649",
+   "username": "kdvorchak1",
+   "points": 56.83,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 39.25,
+   "n_cheap": 2,
+   "players_norm": [
+    "alika williams",
+    "austin wynns",
+    "brandon nimmo",
+    "j t ginn",
+    "joc pederson",
+    "mackenzie gore"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "mackenzie gore"
+  },
+  {
+   "rank": "18",
+   "entry_id": "5219746965",
+   "username": "Diesel",
+   "points": 56.13,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 34.95,
+   "n_cheap": 1,
+   "players_norm": [
+    "austin wynns",
+    "brandon nimmo",
+    "corey seager",
+    "jake burger",
+    "mackenzie gore",
+    "tommy white"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "mackenzie gore"
+  },
+  {
+   "rank": "19",
+   "entry_id": "5219895394",
+   "username": "fan21",
+   "points": 55.45,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 39.25,
+   "n_cheap": 0,
+   "players_norm": [
+    "henry bolte",
+    "j t ginn",
+    "jeff mcneil",
+    "joc pederson",
+    "mackenzie gore",
+    "max muncy"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "jeff mcneil"
+  },
+  {
+   "rank": "20",
+   "entry_id": "5220161780",
+   "username": "harshreality18",
+   "points": 54.83,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 39.78,
+   "n_cheap": 1,
+   "players_norm": [
+    "austin wynns",
+    "corey seager",
+    "j t ginn",
+    "mackenzie gore",
+    "max muncy",
+    "nicky lopez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "mackenzie gore"
+  },
+  {
+   "rank": "21",
+   "entry_id": "5219232653",
+   "username": "jazzyj0619",
+   "points": 51.8,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 39.78,
+   "n_cheap": 1,
+   "players_norm": [
+    "alika williams",
+    "j t ginn",
+    "jeff mcneil",
+    "mackenzie gore",
+    "tommy white",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "j t ginn"
+  },
+  {
+   "rank": "21",
+   "entry_id": "5220066691",
+   "username": "deathmetalbob",
+   "points": 51.8,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 39.78,
+   "n_cheap": 1,
+   "players_norm": [
+    "alika williams",
+    "j t ginn",
+    "jeff mcneil",
+    "mackenzie gore",
+    "tommy white",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "j t ginn"
+  },
+  {
+   "rank": "21",
+   "entry_id": "5220161045",
+   "username": "eric1192",
+   "points": 51.8,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 39.78,
+   "n_cheap": 1,
+   "players_norm": [
+    "alika williams",
+    "j t ginn",
+    "jeff mcneil",
+    "mackenzie gore",
+    "tommy white",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "j t ginn"
+  },
+  {
+   "rank": "24",
+   "entry_id": "5219591025",
+   "username": "Bears133",
+   "points": 51.0,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 25.81,
+   "n_cheap": 0,
+   "players_norm": [
+    "corey seager",
+    "jake burger",
+    "joc pederson",
+    "jonah heim",
+    "lawrence butler",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "lawrence butler"
+  },
+  {
+   "rank": "25",
+   "entry_id": "5219961132",
+   "username": "jholland1981",
+   "points": 50.83,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 34.41,
+   "n_cheap": 0,
+   "players_norm": [
+    "brian serven",
+    "evan carter",
+    "j t ginn",
+    "lawrence butler",
+    "mackenzie gore",
+    "max muncy"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "mackenzie gore"
+  },
+  {
+   "rank": "26",
+   "entry_id": "5219241972",
+   "username": "Stree",
+   "points": 49.13,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 38.17,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "joc pederson",
+    "mackenzie gore",
+    "nicky lopez",
+    "tommy white"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "mackenzie gore"
+  },
+  {
+   "rank": "27",
+   "entry_id": "5219827370",
+   "username": "Idonotcare76",
+   "points": 46.5,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 29.57,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "nicky lopez",
+    "wyatt langford",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "nicky lopez"
+  },
+  {
+   "rank": "28",
+   "entry_id": "5220026670",
+   "username": "Ldsimons3",
+   "points": 38.05,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 30.11,
+   "n_cheap": 0,
+   "players_norm": [
+    "evan carter",
+    "j t ginn",
+    "jonah heim",
+    "lawrence butler",
+    "max muncy",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "j t ginn"
+  },
+  {
+   "rank": "29",
+   "entry_id": "5220094384",
+   "username": "Roughdraft2332",
+   "points": 37.75,
+   "salary_used": 48500,
+   "salary_left": 1500,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 36.56,
+   "n_cheap": 1,
+   "players_norm": [
+    "alika williams",
+    "corey seager",
+    "jeff mcneil",
+    "lawrence butler",
+    "mackenzie gore",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "lawrence butler"
+  },
+  {
+   "rank": "30",
+   "entry_id": "5220108967",
+   "username": "SportsJoker12",
+   "points": 23.7,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 32.26,
+   "n_cheap": 0,
+   "players_norm": [
+    "evan carter",
+    "j t ginn",
+    "jeff mcneil",
+    "joc pederson",
+    "lawrence butler",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "zack gelof"
+  },
+  {
+   "rank": "31",
+   "entry_id": "5219718765",
+   "username": "RFinch_Kings",
+   "points": 9.0,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 13.98,
+   "n_cheap": 0,
+   "players_norm": [
+    "carlos cortes",
+    "jonah heim",
+    "justin foscue",
+    "lawrence butler",
+    "tyler soderstrom",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "zack gelof"
+  }
+ ],
+ "player_table": [
+  {
+   "player": "MacKenzie Gore",
+   "player_norm": "mackenzie gore",
+   "roster_position": "UTIL",
+   "pct_drafted": 67.74,
+   "fpts": 14.75
+  },
+  {
+   "player": "J.T. Ginn",
+   "player_norm": "j t ginn",
+   "roster_position": "UTIL",
+   "pct_drafted": 51.61,
+   "fpts": 14.7
+  },
+  {
+   "player": "Corey Seager",
+   "player_norm": "corey seager",
+   "roster_position": "UTIL",
+   "pct_drafted": 38.71,
+   "fpts": 10.0
+  },
+  {
+   "player": "Henry Bolte",
+   "player_norm": "henry bolte",
+   "roster_position": "UTIL",
+   "pct_drafted": 35.48,
+   "fpts": 26.0
+  },
+  {
+   "player": "Wyatt Langford",
+   "player_norm": "wyatt langford",
+   "roster_position": "UTIL",
+   "pct_drafted": 32.26,
+   "fpts": 22.0
+  },
+  {
+   "player": "Zack Gelof",
+   "player_norm": "zack gelof",
+   "roster_position": "UTIL",
+   "pct_drafted": 32.26,
+   "fpts": 0.0
+  },
+  {
+   "player": "Brandon Nimmo",
+   "player_norm": "brandon nimmo",
+   "roster_position": "UTIL",
+   "pct_drafted": 32.26,
+   "fpts": 7.0
+  },
+  {
+   "player": "Tommy White",
+   "player_norm": "tommy white",
+   "roster_position": "UTIL",
+   "pct_drafted": 32.26,
+   "fpts": 5.0
+  },
+  {
+   "player": "Joc Pederson",
+   "player_norm": "joc pederson",
+   "roster_position": "UTIL",
+   "pct_drafted": 29.03,
+   "fpts": 0.0
+  },
+  {
+   "player": "Evan Carter",
+   "player_norm": "evan carter",
+   "roster_position": "UTIL",
+   "pct_drafted": 29.03,
+   "fpts": 7.0
+  },
+  {
+   "player": "Nicky Lopez",
+   "player_norm": "nicky lopez",
+   "roster_position": "UTIL",
+   "pct_drafted": 29.03,
+   "fpts": 5.0
+  },
+  {
+   "player": "Alika Williams",
+   "player_norm": "alika williams",
+   "roster_position": "UTIL",
+   "pct_drafted": 29.03,
+   "fpts": 10.0
+  },
+  {
+   "player": "Lawrence Butler",
+   "player_norm": "lawrence butler",
+   "roster_position": "UTIL",
+   "pct_drafted": 25.81,
+   "fpts": 2.0
+  },
+  {
+   "player": "Jeff McNeil",
+   "player_norm": "jeff mcneil",
+   "roster_position": "UTIL",
+   "pct_drafted": 25.81,
+   "fpts": 0.0
+  },
+  {
+   "player": "Max Muncy",
+   "player_norm": "max muncy",
+   "roster_position": "UTIL",
+   "pct_drafted": 25.81,
+   "fpts": 0.0
+  },
+  {
+   "player": "Austin Wynns",
+   "player_norm": "austin wynns",
+   "roster_position": "UTIL",
+   "pct_drafted": 25.81,
+   "fpts": 3.0
+  },
+  {
+   "player": "Jonah Heim",
+   "player_norm": "jonah heim",
+   "roster_position": "UTIL",
+   "pct_drafted": 16.13,
+   "fpts": 7.0
+  },
+  {
+   "player": "Ezequiel Duran",
+   "player_norm": "ezequiel duran",
+   "roster_position": "UTIL",
+   "pct_drafted": 12.9,
+   "fpts": 0.0
+  },
+  {
+   "player": "Jake Burger",
+   "player_norm": "jake burger",
+   "roster_position": "UTIL",
+   "pct_drafted": 12.9,
+   "fpts": 9.0
+  },
+  {
+   "player": "Brian Serven",
+   "player_norm": "brian serven",
+   "roster_position": "UTIL",
+   "pct_drafted": 6.45,
+   "fpts": 5.0
+  },
+  {
+   "player": "Tyler Soderstrom",
+   "player_norm": "tyler soderstrom",
+   "roster_position": "UTIL",
+   "pct_drafted": 3.23,
+   "fpts": 0.0
+  },
+  {
+   "player": "Justin Foscue",
+   "player_norm": "justin foscue",
+   "roster_position": "UTIL",
+   "pct_drafted": 3.23,
+   "fpts": 0.0
+  },
+  {
+   "player": "Carlos Cortes",
+   "player_norm": "carlos cortes",
+   "roster_position": "UTIL",
+   "pct_drafted": 3.23,
+   "fpts": 0.0
+  }
+ ],
+ "own_results": {
+  "matched": 1,
+  "requested": 1,
+  "field_size": 31,
+  "best_rank": 3,
+  "worst_rank": 3,
+  "best_finish_percentile": 93.55,
+  "median_finish_percentile": 93.55,
+  "best_points": 75.0,
+  "winning_points": 88.13,
+  "own_lineups_duplicated_by_field": 0,
+  "max_copies_of_an_own_lineup": 1,
+  "entry_fee": 0.1,
+  "fees_total": 0.1,
+  "winnings_total": 0.0,
+  "paid_places": 1,
+  "payout_breadth_observed": 0.0323,
+  "cashed_entries": 0,
+  "net": -0.1,
+  "labels": "observed outcomes from a completed contest; never a graded prediction, ROI model, win rate, or probability claim"
+ }
+}

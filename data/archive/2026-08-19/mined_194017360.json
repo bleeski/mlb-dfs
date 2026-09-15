@@ -1,0 +1,3523 @@
+{
+ "label": "deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied",
+ "version": "0.5-review",
+ "coverage": "full",
+ "contest_id": "194017360",
+ "slate_date": "2026-08-19",
+ "contest_type": "classic",
+ "meta": {
+  "entries_total": 93,
+  "entries_complete_lineups": 91,
+  "roster_size": 10,
+  "entries_unparsed": 2,
+  "winning_points": 104.2,
+  "winning_entry_id": "5223351748",
+  "multi_entry_flag": true
+ },
+ "duplication": {
+  "distinct_lineups": 90,
+  "entries_in_duplicated_lineups": 2,
+  "share_duplicated_pct": 2.2,
+  "max_copies": 2,
+  "copies_histogram": {
+   "1": 89,
+   "2": 1
+  },
+  "winner_copies": 1
+ },
+ "construction": {
+  "cheap_salary_threshold": 2100,
+  "at_cap_entries": 39,
+  "at_cap_share_pct": 42.9,
+  "salary_left_histogram": {
+   "1-100": 14,
+   "301-700": 19,
+   "<= 0": 25,
+   "101-300": 19,
+   "> 1500": 5,
+   "701-1500": 9
+  },
+  "max_stack_histogram": {
+   "2": 1,
+   "3": 17,
+   "4": 22,
+   "5": 51
+  },
+  "sp_pair_top": [
+   {
+    "pair": [
+     "Michael King",
+     "Paul Skenes"
+    ],
+    "count": 17,
+    "field_share_pct": 18.7
+   },
+   {
+    "pair": [
+     "Paul Skenes",
+     "Taj Bradley"
+    ],
+    "count": 12,
+    "field_share_pct": 13.2
+   },
+   {
+    "pair": [
+     "Clay Holmes",
+     "Michael King"
+    ],
+    "count": 12,
+    "field_share_pct": 13.2
+   },
+   {
+    "pair": [
+     "Clay Holmes",
+     "Paul Skenes"
+    ],
+    "count": 10,
+    "field_share_pct": 11.0
+   },
+   {
+    "pair": [
+     "AJ Smith-Shawver",
+     "Paul Skenes"
+    ],
+    "count": 8,
+    "field_share_pct": 8.8
+   },
+   {
+    "pair": [
+     "Clay Holmes",
+     "Taj Bradley"
+    ],
+    "count": 7,
+    "field_share_pct": 7.7
+   },
+   {
+    "pair": [
+     "Michael King",
+     "Taj Bradley"
+    ],
+    "count": 4,
+    "field_share_pct": 4.4
+   },
+   {
+    "pair": [
+     "Paul Skenes",
+     "Robert Stock"
+    ],
+    "count": 4,
+    "field_share_pct": 4.4
+   }
+  ],
+  "top_owned": [
+   {
+    "player": "Paul Skenes",
+    "pct_drafted": 54.84
+   },
+   {
+    "player": "Michael King",
+    "pct_drafted": 40.86
+   },
+   {
+    "player": "Fernando Tatis Jr.",
+    "pct_drafted": 37.63
+   },
+   {
+    "player": "Clay Holmes",
+    "pct_drafted": 36.56
+   },
+   {
+    "player": "Jake Cronenworth",
+    "pct_drafted": 32.26
+   }
+  ],
+  "captain_table": [],
+  "winner_captain": null
+ },
+ "diagnostics": {
+  "salary_join_rate_pct": 100.0,
+  "unmatched_names_top": [],
+  "salary_name_collisions": [],
+  "ownership_recompute_max_diff_pts": 2.15,
+  "ownership_recompute_denominator": "all_entries",
+  "ownership_recompute_ok": false,
+  "parse_structural_ok": true,
+  "parsed_nothing": false,
+  "mostly_unparsed": false,
+  "contest_type_mismatch": false,
+  "salary_join_collapsed": false,
+  "entries_unparsed_share": 0.0215,
+  "intra_entry_duplicate_entry_ids": [],
+  "roster_slots_observed": 910,
+  "roster_slots_expected": 910,
+  "recomputed_total_pct": 978.5,
+  "dk_table_total_pct": 976.4,
+  "dk_table_deficit_pts": 2.1,
+  "dk_table_agrees": false,
+  "verification_note": "parse structurally sound (every complete entry carries 10 distinct players); DK's %Drafted table sums 2.1 pts short, which is DK omitting position rows for multi-position players. Lineup-derived ownership is authoritative for this contest."
+ },
+ "entries": [
+  {
+   "rank": "1",
+   "entry_id": "5223351748",
+   "username": "Wanna_Square_Up1567",
+   "points": 104.2,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Paul Skenes",
+    "Taj Bradley"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 18.82,
+   "n_cheap": 0,
+   "players_norm": [
+    "byron buxton",
+    "jake rogers",
+    "josh bell",
+    "kaelen culpepper",
+    "kody clemens",
+    "luke keaschall",
+    "miguel vargas",
+    "paul skenes",
+    "seiya suzuki",
+    "taj bradley"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "2",
+   "entry_id": "5223334888",
+   "username": "wazzu24",
+   "points": 102.2,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Paul Skenes",
+    "Taj Bradley"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 16.56,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew benintendi",
+    "colson montgomery",
+    "josh bell",
+    "kody clemens",
+    "luke keaschall",
+    "miguel vargas",
+    "paul skenes",
+    "royce lewis",
+    "taj bradley",
+    "victor caratini"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "3",
+   "entry_id": "5223099738",
+   "username": "TheBabz",
+   "points": 94.35,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Michael King",
+    "Paul Skenes"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 25.59,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon lowe",
+    "fernando tatis",
+    "josh bell",
+    "kaelen culpepper",
+    "luis campusano",
+    "manny machado",
+    "michael king",
+    "mike yastrzemski",
+    "oneil cruz",
+    "paul skenes"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "4",
+   "entry_id": "5223575986",
+   "username": "bleeski",
+   "points": 87.65,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Michael King",
+    "Taj Bradley"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 18.71,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew benintendi",
+    "henry davis",
+    "jackson merrill",
+    "michael king",
+    "miguel vargas",
+    "munetaka murakami",
+    "oneil cruz",
+    "sam antonacci",
+    "taj bradley",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "5",
+   "entry_id": "5223571567",
+   "username": "relevanthought",
+   "points": 87.2,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Paul Skenes",
+    "Taj Bradley"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 19.36,
+   "n_cheap": 0,
+   "players_norm": [
+    "byron buxton",
+    "henry davis",
+    "josh bell",
+    "kaelen culpepper",
+    "kody clemens",
+    "luke keaschall",
+    "paul skenes",
+    "pedro ramirez",
+    "pete crow armstrong",
+    "taj bradley"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "6",
+   "entry_id": "5223184891",
+   "username": "pgk8",
+   "points": 86.1,
+   "salary_used": 48300,
+   "salary_left": 1700,
+   "sp_pair": [
+    "Paul Skenes",
+    "Robert Stock"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 18.07,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin riley",
+    "byron buxton",
+    "drake baldwin",
+    "josh bell",
+    "kaelen culpepper",
+    "kody clemens",
+    "luke keaschall",
+    "paul skenes",
+    "robert stock",
+    "ronald acuna"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "7",
+   "entry_id": "5223474570",
+   "username": "willi55",
+   "points": 85.1,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [
+    "Paul Skenes",
+    "Robert Stock"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 18.93,
+   "n_cheap": 0,
+   "players_norm": [
+    "byron buxton",
+    "drake baldwin",
+    "francisco lindor",
+    "josh bell",
+    "kody clemens",
+    "luke keaschall",
+    "miguel vargas",
+    "paul skenes",
+    "robert stock",
+    "trevor larnach"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "8",
+   "entry_id": "5223303775",
+   "username": "bonedog84",
+   "points": 83.45,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [
+    "Clay Holmes",
+    "Taj Bradley"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 24.09,
+   "n_cheap": 0,
+   "players_norm": [
+    "a j ewing",
+    "carson benge",
+    "clay holmes",
+    "fernando tatis",
+    "francisco lindor",
+    "jake cronenworth",
+    "luis campusano",
+    "manny machado",
+    "taj bradley",
+    "ty france"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "9",
+   "entry_id": "5223500147",
+   "username": "tmoney88",
+   "points": 82.6,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Clay Holmes",
+    "Michael King"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 21.93,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon lowe",
+    "bryan reynolds",
+    "clay holmes",
+    "drake baldwin",
+    "luke keaschall",
+    "michael king",
+    "nick gonzales",
+    "oneil cruz",
+    "spencer horwitz",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "10",
+   "entry_id": "5223253162",
+   "username": "stock2mail",
+   "points": 81.35,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Michael King",
+    "Paul Skenes"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 25.27,
+   "n_cheap": 0,
+   "players_norm": [
+    "byron buxton",
+    "fernando tatis",
+    "josh bell",
+    "kaelen culpepper",
+    "luis campusano",
+    "luke keaschall",
+    "manny machado",
+    "michael king",
+    "paul skenes",
+    "royce lewis"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "11",
+   "entry_id": "5223474571",
+   "username": "willi55",
+   "points": 80.45,
+   "salary_used": 48400,
+   "salary_left": 1600,
+   "sp_pair": [
+    "Clay Holmes",
+    "Taj Bradley"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 19.89,
+   "n_cheap": 0,
+   "players_norm": [
+    "a j ewing",
+    "bo bichette",
+    "carson benge",
+    "clay holmes",
+    "fernando tatis",
+    "francisco alvarez",
+    "francisco lindor",
+    "jake cronenworth",
+    "spencer horwitz",
+    "taj bradley"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "12",
+   "entry_id": "5223642618",
+   "username": "AngerTornado",
+   "points": 78.6,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Clay Holmes",
+    "Michael King"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 25.16,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon lowe",
+    "clay holmes",
+    "fernando tatis",
+    "jackson merrill",
+    "jacob gonzalez",
+    "luis campusano",
+    "michael king",
+    "nick gonzales",
+    "oneil cruz",
+    "spencer horwitz"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "13",
+   "entry_id": "5223527196",
+   "username": "TOMHAY",
+   "points": 78.35,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Michael King",
+    "Paul Skenes"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 23.44,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon lowe",
+    "bryan reynolds",
+    "esmerlyn valdez",
+    "luis campusano",
+    "michael king",
+    "nick gonzales",
+    "oneil cruz",
+    "paul skenes",
+    "sung mun song",
+    "ty france"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "14",
+   "entry_id": "5223633961",
+   "username": "RyanCox421",
+   "points": 77.15,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Clay Holmes",
+    "Paul Skenes"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 19.25,
+   "n_cheap": 0,
+   "players_norm": [
+    "bo bichette",
+    "byron buxton",
+    "clay holmes",
+    "kaelen culpepper",
+    "kody clemens",
+    "luis torrens",
+    "luke keaschall",
+    "michael busch",
+    "oneil cruz",
+    "paul skenes"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "15",
+   "entry_id": "5223448084",
+   "username": "Emac",
+   "points": 76.65,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Michael King",
+    "Taj Bradley"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 23.55,
+   "n_cheap": 0,
+   "players_norm": [
+    "brett callahan",
+    "dillon dingler",
+    "fernando tatis",
+    "jake cronenworth",
+    "kevin mcgonigle",
+    "michael king",
+    "oneil cruz",
+    "spencer horwitz",
+    "taj bradley",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "16",
+   "entry_id": "5223587345",
+   "username": "TrueNorth79",
+   "points": 76.35,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Michael King",
+    "Paul Skenes"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 24.73,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew benintendi",
+    "colson montgomery",
+    "fernando tatis",
+    "jake cronenworth",
+    "luis campusano",
+    "michael king",
+    "miguel vargas",
+    "paul skenes",
+    "sam antonacci",
+    "ty france"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "16",
+   "entry_id": "5223644554",
+   "username": "AngerTornado",
+   "points": 76.35,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [
+    "Michael King",
+    "Paul Skenes"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 24.09,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon lowe",
+    "jackson merrill",
+    "jacob gonzalez",
+    "luis campusano",
+    "luis rengifo",
+    "michael king",
+    "nick gonzales",
+    "oneil cruz",
+    "paul skenes",
+    "spencer horwitz"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "18",
+   "entry_id": "5223470787",
+   "username": "traunt53",
+   "points": 75.6,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Clay Holmes",
+    "Michael King"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 19.25,
+   "n_cheap": 0,
+   "players_norm": [
+    "brett callahan",
+    "brooks lee",
+    "clay holmes",
+    "drake baldwin",
+    "jacob gonzalez",
+    "kody clemens",
+    "matt olson",
+    "michael harris",
+    "michael king",
+    "oneil cruz"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "19",
+   "entry_id": "5223575717",
+   "username": "bleeski",
+   "points": 75.45,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Clay Holmes",
+    "Taj Bradley"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 17.63,
+   "n_cheap": 0,
+   "players_norm": [
+    "a j ewing",
+    "brett callahan",
+    "byron buxton",
+    "clay holmes",
+    "dillon dingler",
+    "francisco lindor",
+    "gleyber torres",
+    "josh bell",
+    "kevin mcgonigle",
+    "taj bradley"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "20",
+   "entry_id": "5223546321",
+   "username": "cjcarlto",
+   "points": 72.4,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Robert Stock",
+    "Taj Bradley"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 14.09,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryan reynolds",
+    "colt keith",
+    "dillon dingler",
+    "esmerlyn valdez",
+    "gleyber torres",
+    "kevin mcgonigle",
+    "oneil cruz",
+    "robert stock",
+    "spencer horwitz",
+    "taj bradley"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "21",
+   "entry_id": "5223644551",
+   "username": "mntiny",
+   "points": 71.45,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Jackson Jobe",
+    "Taj Bradley"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 12.04,
+   "n_cheap": 0,
+   "players_norm": [
+    "jackson jobe",
+    "jake rogers",
+    "kaelen culpepper",
+    "miguel vargas",
+    "munetaka murakami",
+    "pete crow armstrong",
+    "sam antonacci",
+    "seiya suzuki",
+    "taj bradley",
+    "tristan peters"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "22",
+   "entry_id": "5223370798",
+   "username": "clags22",
+   "points": 71.1,
+   "salary_used": 48800,
+   "salary_left": 1200,
+   "sp_pair": [
+    "Paul Skenes",
+    "Robert Stock"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 15.27,
+   "n_cheap": 0,
+   "players_norm": [
+    "a j ewing",
+    "andrew benintendi",
+    "francisco lindor",
+    "luis torrens",
+    "miguel vargas",
+    "munetaka murakami",
+    "paul skenes",
+    "robert stock",
+    "sam antonacci",
+    "seiya suzuki"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "23",
+   "entry_id": "5223442641",
+   "username": "Celticsnc",
+   "points": 70.6,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Clay Holmes",
+    "Michael King"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 20.64,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon lowe",
+    "clay holmes",
+    "dominic smith",
+    "drake baldwin",
+    "esmerlyn valdez",
+    "jacob gonzalez",
+    "michael harris",
+    "michael king",
+    "nick gonzales",
+    "oneil cruz"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "24",
+   "entry_id": "5223411823",
+   "username": "sportsfan14",
+   "points": 70.2,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "Paul Skenes",
+    "Taj Bradley"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 18.5,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon lowe",
+    "byron buxton",
+    "henry davis",
+    "jacob gonzalez",
+    "jared triolo",
+    "paul skenes",
+    "pete crow armstrong",
+    "spencer horwitz",
+    "taj bradley",
+    "tyrone taylor"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "25",
+   "entry_id": "5223515742",
+   "username": "sugewhite41",
+   "points": 69.6,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Clay Holmes",
+    "Michael King"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 17.1,
+   "n_cheap": 0,
+   "players_norm": [
+    "brett callahan",
+    "brooks lee",
+    "clay holmes",
+    "drake baldwin",
+    "jim jarvis",
+    "kody clemens",
+    "matt olson",
+    "michael harris",
+    "michael king",
+    "ronald acuna"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "26",
+   "entry_id": "5223417591",
+   "username": "mailman13",
+   "points": 69.45,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Clay Holmes",
+    "Taj Bradley"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 24.62,
+   "n_cheap": 0,
+   "players_norm": [
+    "clay holmes",
+    "esmerlyn valdez",
+    "fernando tatis",
+    "jake cronenworth",
+    "jake rogers",
+    "manny machado",
+    "oneil cruz",
+    "taj bradley",
+    "ty france",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "27",
+   "entry_id": "5223579614",
+   "username": "stupacjmu",
+   "points": 69.35,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Michael King",
+    "Paul Skenes"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 18.39,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew benintendi",
+    "byron buxton",
+    "jake rogers",
+    "michael king",
+    "miguel vargas",
+    "munetaka murakami",
+    "paul skenes",
+    "sam antonacci",
+    "trevor larnach",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "28",
+   "entry_id": "5223326901",
+   "username": "cb777",
+   "points": 69.2,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [
+    "Paul Skenes",
+    "Taj Bradley"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 18.39,
+   "n_cheap": 0,
+   "players_norm": [
+    "brooks lee",
+    "byron buxton",
+    "francisco alvarez",
+    "jake cronenworth",
+    "kaelen culpepper",
+    "kody clemens",
+    "munetaka murakami",
+    "paul skenes",
+    "taj bradley",
+    "trevor larnach"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "29",
+   "entry_id": "5223546322",
+   "username": "cjcarlto",
+   "points": 69.1,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Paul Skenes",
+    "Robert Stock"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 18.92,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin riley",
+    "byron buxton",
+    "drake baldwin",
+    "francisco lindor",
+    "josh bell",
+    "luke keaschall",
+    "ozzie albies",
+    "paul skenes",
+    "robert stock",
+    "ronald acuna"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "30",
+   "entry_id": "5223459792",
+   "username": "UltimateWin4",
+   "points": 68.35,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Michael King",
+    "Paul Skenes"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 20.43,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon lowe",
+    "esmerlyn valdez",
+    "jacob gonzalez",
+    "jake rogers",
+    "michael harris",
+    "michael king",
+    "nick gonzales",
+    "paul skenes",
+    "ronald acuna",
+    "spencer horwitz"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "31",
+   "entry_id": "5223400443",
+   "username": "kl1717",
+   "points": 67.45,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Clay Holmes",
+    "Taj Bradley"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 24.09,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "byron buxton",
+    "clay holmes",
+    "fernando tatis",
+    "jake cronenworth",
+    "josh bell",
+    "luis campusano",
+    "luke keaschall",
+    "nico hoerner",
+    "taj bradley"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "32",
+   "entry_id": "5223587344",
+   "username": "TrueNorth79",
+   "points": 67.35,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Clay Holmes",
+    "Robert Stock"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 17.42,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon lowe",
+    "brett callahan",
+    "clay holmes",
+    "dillon dingler",
+    "jacob gonzalez",
+    "kevin mcgonigle",
+    "oneil cruz",
+    "pete crow armstrong",
+    "robert stock",
+    "spencer horwitz"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "33",
+   "entry_id": "5223459793",
+   "username": "UltimateWin4",
+   "points": 66.35,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Michael King",
+    "Paul Skenes"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 18.07,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew benintendi",
+    "colson montgomery",
+    "esmerlyn valdez",
+    "henry davis",
+    "michael king",
+    "miguel vargas",
+    "munetaka murakami",
+    "nick gonzales",
+    "paul skenes",
+    "sam antonacci"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "33",
+   "entry_id": "5223611153",
+   "username": "eaglezzz",
+   "points": 66.35,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Michael King",
+    "Paul Skenes"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 28.49,
+   "n_cheap": 0,
+   "players_norm": [
+    "bryan reynolds",
+    "drake baldwin",
+    "fernando tatis",
+    "jake cronenworth",
+    "josh bell",
+    "luke keaschall",
+    "manny machado",
+    "michael king",
+    "paul skenes",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "35",
+   "entry_id": "5223411822",
+   "username": "sportsfan14",
+   "points": 65.9,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "AJ Smith-Shawver",
+    "Paul Skenes"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 21.93,
+   "n_cheap": 0,
+   "players_norm": [
+    "aj smith shawver",
+    "austin riley",
+    "brandon lowe",
+    "fernando tatis",
+    "jackson merrill",
+    "luis campusano",
+    "luis rengifo",
+    "matt olson",
+    "paul skenes",
+    "sung mun song"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "36",
+   "entry_id": "5223647064",
+   "username": "LT2121",
+   "points": 64.45,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Jackson Jobe",
+    "Taj Bradley"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 11.51,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "carson benge",
+    "carson kelly",
+    "jackson jobe",
+    "jared young",
+    "nico hoerner",
+    "pedro ramirez",
+    "pete crow armstrong",
+    "sam antonacci",
+    "taj bradley"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "37",
+   "entry_id": "5223655301",
+   "username": "jc000000",
+   "points": 64.35,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Michael King",
+    "Paul Skenes"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 22.9,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon lowe",
+    "dominic smith",
+    "drake baldwin",
+    "esmerlyn valdez",
+    "jackson merrill",
+    "matt olson",
+    "michael king",
+    "nick gonzales",
+    "paul skenes",
+    "sung mun song"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "38",
+   "entry_id": "5223633960",
+   "username": "RyanCox421",
+   "points": 64.15,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Clay Holmes",
+    "Paul Skenes"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 26.67,
+   "n_cheap": 0,
+   "players_norm": [
+    "brooks lee",
+    "clay holmes",
+    "esmerlyn valdez",
+    "fernando tatis",
+    "jake cronenworth",
+    "luis campusano",
+    "oneil cruz",
+    "paul skenes",
+    "ty france",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "39",
+   "entry_id": "5223387973",
+   "username": "tigolebitties91",
+   "points": 63.6,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Clay Holmes",
+    "Michael King"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 19.25,
+   "n_cheap": 0,
+   "players_norm": [
+    "brett callahan",
+    "brooks lee",
+    "clay holmes",
+    "drake baldwin",
+    "josh bell",
+    "kevin mcgonigle",
+    "kody clemens",
+    "michael king",
+    "pete crow armstrong",
+    "trevor larnach"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "39",
+   "entry_id": "5223515482",
+   "username": "DeNoZaRo",
+   "points": 63.6,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Clay Holmes",
+    "Michael King"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 24.3,
+   "n_cheap": 0,
+   "players_norm": [
+    "byron buxton",
+    "clay holmes",
+    "jake cronenworth",
+    "luis campusano",
+    "michael king",
+    "nick gonzales",
+    "oneil cruz",
+    "pete crow armstrong",
+    "spencer horwitz",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "41",
+   "entry_id": "5223630991",
+   "username": "dcw331",
+   "points": 63.35,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Michael King",
+    "Paul Skenes"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-1-1-1-1-1",
+   "chalk_score": 27.42,
+   "n_cheap": 0,
+   "players_norm": [
+    "brett callahan",
+    "drake baldwin",
+    "fernando tatis",
+    "jake cronenworth",
+    "josh bell",
+    "michael king",
+    "nick gonzales",
+    "paul skenes",
+    "pete crow armstrong",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "42",
+   "entry_id": "5223493854",
+   "username": "drunkonpappy",
+   "points": 62.2,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Paul Skenes",
+    "Taj Bradley"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 26.99,
+   "n_cheap": 0,
+   "players_norm": [
+    "a j ewing",
+    "fernando tatis",
+    "francisco lindor",
+    "jackson merrill",
+    "jake cronenworth",
+    "luis torrens",
+    "manny machado",
+    "paul skenes",
+    "taj bradley",
+    "ty france"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "43",
+   "entry_id": "5223625366",
+   "username": "Packersfan203",
+   "points": 62.15,
+   "salary_used": 48700,
+   "salary_left": 1300,
+   "sp_pair": [
+    "AJ Smith-Shawver",
+    "Clay Holmes"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 22.26,
+   "n_cheap": 0,
+   "players_norm": [
+    "aj smith shawver",
+    "austin riley",
+    "clay holmes",
+    "fernando tatis",
+    "jackson merrill",
+    "luis campusano",
+    "oneil cruz",
+    "ozzie albies",
+    "ty france",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "44",
+   "entry_id": "5223399370",
+   "username": "whoisjohngalt420",
+   "points": 61.45,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Jackson Jobe",
+    "Taj Bradley"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 15.91,
+   "n_cheap": 0,
+   "players_norm": [
+    "brett callahan",
+    "dillon dingler",
+    "fernando tatis",
+    "gleyber torres",
+    "jackson jobe",
+    "kevin mcgonigle",
+    "luis rengifo",
+    "manny machado",
+    "spencer torkelson",
+    "taj bradley"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "45",
+   "entry_id": "5223448085",
+   "username": "Emac",
+   "points": 61.350002,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "AJ Smith-Shawver",
+    "Michael King"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 19.25,
+   "n_cheap": 0,
+   "players_norm": [
+    "aj smith shawver",
+    "brandon lowe",
+    "colson montgomery",
+    "henry davis",
+    "jackson merrill",
+    "manny machado",
+    "michael king",
+    "munetaka murakami",
+    "oneil cruz",
+    "sam antonacci"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "46",
+   "entry_id": "5223442640",
+   "username": "Celticsnc",
+   "points": 61.2,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Paul Skenes",
+    "Taj Bradley"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 24.19,
+   "n_cheap": 0,
+   "players_norm": [
+    "a j ewing",
+    "fernando tatis",
+    "francisco alvarez",
+    "jackson merrill",
+    "manny machado",
+    "paul skenes",
+    "sam antonacci",
+    "sung mun song",
+    "taj bradley",
+    "ty france"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "47",
+   "entry_id": "5223184890",
+   "username": "pgk8",
+   "points": 60.45,
+   "salary_used": 48400,
+   "salary_left": 1600,
+   "sp_pair": [
+    "Clay Holmes",
+    "Taj Bradley"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 25.16,
+   "n_cheap": 0,
+   "players_norm": [
+    "a j ewing",
+    "clay holmes",
+    "fernando tatis",
+    "francisco lindor",
+    "jackson merrill",
+    "jake cronenworth",
+    "luis torrens",
+    "manny machado",
+    "taj bradley",
+    "ty france"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "48",
+   "entry_id": "5223655829",
+   "username": "Toppodogg",
+   "points": 59.6,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Clay Holmes",
+    "Michael King"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 22.9,
+   "n_cheap": 0,
+   "players_norm": [
+    "brett callahan",
+    "clay holmes",
+    "drake baldwin",
+    "fernando tatis",
+    "gleyber torres",
+    "kevin mcgonigle",
+    "luis rengifo",
+    "manny machado",
+    "michael king",
+    "ty france"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "49",
+   "entry_id": "5223579615",
+   "username": "stupacjmu",
+   "points": 59.2,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Paul Skenes",
+    "Taj Bradley"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 24.95,
+   "n_cheap": 0,
+   "players_norm": [
+    "a j ewing",
+    "byron buxton",
+    "francisco lindor",
+    "jackson merrill",
+    "jake cronenworth",
+    "luis torrens",
+    "manny machado",
+    "paul skenes",
+    "taj bradley",
+    "ty france"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "50",
+   "entry_id": "5223571604",
+   "username": "salatso22",
+   "points": 59.15,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Clay Holmes",
+    "Paul Skenes"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 19.57,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "clay holmes",
+    "drake baldwin",
+    "josh bell",
+    "kody clemens",
+    "michael harris",
+    "mike yastrzemski",
+    "paul skenes",
+    "royce lewis",
+    "sung mun song"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "51",
+   "entry_id": "5223387974",
+   "username": "tigolebitties91",
+   "points": 58.6,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Clay Holmes",
+    "Michael King"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-1-1-1",
+   "chalk_score": 24.3,
+   "n_cheap": 0,
+   "players_norm": [
+    "brett callahan",
+    "clay holmes",
+    "colt keith",
+    "drake baldwin",
+    "fernando tatis",
+    "jake cronenworth",
+    "josh bell",
+    "kevin mcgonigle",
+    "michael king",
+    "pete crow armstrong"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "52",
+   "entry_id": "5223538027",
+   "username": "hcnpower",
+   "points": 57.35,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Michael King",
+    "Paul Skenes"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 17.31,
+   "n_cheap": 0,
+   "players_norm": [
+    "brett callahan",
+    "colt keith",
+    "dillon dingler",
+    "hao yu lee",
+    "kevin mcgonigle",
+    "michael busch",
+    "michael king",
+    "paul skenes",
+    "pete crow armstrong",
+    "tyrone taylor"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "53",
+   "entry_id": "5223493855",
+   "username": "drunkonpappy",
+   "points": 57.2,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Paul Skenes",
+    "Taj Bradley"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 26.77,
+   "n_cheap": 0,
+   "players_norm": [
+    "byron buxton",
+    "fernando tatis",
+    "francisco alvarez",
+    "jackson merrill",
+    "jake cronenworth",
+    "josh bell",
+    "manny machado",
+    "paul skenes",
+    "sung mun song",
+    "taj bradley"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "54",
+   "entry_id": "5223649380",
+   "username": "gtsml",
+   "points": 57.15,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Clay Holmes",
+    "Paul Skenes"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 19.89,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon lowe",
+    "clay holmes",
+    "dominic smith",
+    "drake baldwin",
+    "esmerlyn valdez",
+    "jim jarvis",
+    "matt olson",
+    "michael harris",
+    "paul skenes",
+    "sung mun song"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "55",
+   "entry_id": "5223263726",
+   "username": "jep4576",
+   "points": 56.15,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Clay Holmes",
+    "Paul Skenes"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-1-1-1",
+   "chalk_score": 18.6,
+   "n_cheap": 0,
+   "players_norm": [
+    "bo bichette",
+    "carson kelly",
+    "clay holmes",
+    "luis rengifo",
+    "luke keaschall",
+    "nick gonzales",
+    "nico hoerner",
+    "paul skenes",
+    "seiya suzuki",
+    "ty france"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "56",
+   "entry_id": "5223633041",
+   "username": "MrChowon23",
+   "points": 55.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "AJ Smith-Shawver",
+    "Paul Skenes"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 19.79,
+   "n_cheap": 0,
+   "players_norm": [
+    "aj smith shawver",
+    "alex bregman",
+    "brandon lowe",
+    "esmerlyn valdez",
+    "jacob gonzalez",
+    "luis campusano",
+    "luis rengifo",
+    "michael busch",
+    "oneil cruz",
+    "paul skenes"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "57",
+   "entry_id": "5223637285",
+   "username": "oshevach",
+   "points": 55.65,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Michael King",
+    "Taj Bradley"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 25.91,
+   "n_cheap": 0,
+   "players_norm": [
+    "dillon dingler",
+    "esmerlyn valdez",
+    "fernando tatis",
+    "jackson merrill",
+    "jake cronenworth",
+    "manny machado",
+    "michael king",
+    "spencer horwitz",
+    "taj bradley",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "58",
+   "entry_id": "5223625365",
+   "username": "Packersfan203",
+   "points": 55.6,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "Jackson Jobe",
+    "Michael King"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 14.08,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "chase meidroth",
+    "jackson jobe",
+    "jake rogers",
+    "josh bell",
+    "michael king",
+    "nico hoerner",
+    "pete crow armstrong",
+    "seiya suzuki",
+    "tyrone taylor"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "59",
+   "entry_id": "5223370797",
+   "username": "clags22",
+   "points": 55.350002,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "AJ Smith-Shawver",
+    "Michael King"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 14.73,
+   "n_cheap": 0,
+   "players_norm": [
+    "aj smith shawver",
+    "colt keith",
+    "dillon dingler",
+    "esmerlyn valdez",
+    "gleyber torres",
+    "kevin mcgonigle",
+    "michael king",
+    "oneil cruz",
+    "sam antonacci",
+    "spencer torkelson"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "60",
+   "entry_id": "5223399369",
+   "username": "whoisjohngalt420",
+   "points": 54.9,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "AJ Smith-Shawver",
+    "Paul Skenes"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 16.23,
+   "n_cheap": 0,
+   "players_norm": [
+    "a j ewing",
+    "aj smith shawver",
+    "austin riley",
+    "dominic smith",
+    "francisco lindor",
+    "luis torrens",
+    "matt olson",
+    "ozzie albies",
+    "paul skenes",
+    "ronald acuna"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "61",
+   "entry_id": "5223531462",
+   "username": "BearDown1985",
+   "points": 54.45,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Clay Holmes",
+    "Taj Bradley"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-1-1-1-1",
+   "chalk_score": 23.01,
+   "n_cheap": 0,
+   "players_norm": [
+    "clay holmes",
+    "dominic smith",
+    "jackson merrill",
+    "jake cronenworth",
+    "manny machado",
+    "oneil cruz",
+    "pete crow armstrong",
+    "taj bradley",
+    "victor caratini",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "62",
+   "entry_id": "5223635642",
+   "username": "SoCalHusker",
+   "points": 54.35,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Michael King",
+    "Paul Skenes"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 27.42,
+   "n_cheap": 0,
+   "players_norm": [
+    "fernando tatis",
+    "jake cronenworth",
+    "luis campusano",
+    "luke keaschall",
+    "michael king",
+    "nico hoerner",
+    "paul skenes",
+    "pete crow armstrong",
+    "sung mun song",
+    "ty france"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "63",
+   "entry_id": "5223189852",
+   "username": "jordanh415",
+   "points": 54.2,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Paul Skenes",
+    "Taj Bradley"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 25.48,
+   "n_cheap": 0,
+   "players_norm": [
+    "brett baty",
+    "fernando tatis",
+    "francisco lindor",
+    "jake cronenworth",
+    "luis campusano",
+    "paul skenes",
+    "pete crow armstrong",
+    "sung mun song",
+    "taj bradley",
+    "ty france"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "64",
+   "entry_id": "5223253163",
+   "username": "stock2mail",
+   "points": 53.35,
+   "salary_used": 48400,
+   "salary_left": 1600,
+   "sp_pair": [
+    "Michael King",
+    "Paul Skenes"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 18.49,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "byron buxton",
+    "kaelen culpepper",
+    "luke keaschall",
+    "michael busch",
+    "michael king",
+    "nico hoerner",
+    "paul skenes",
+    "trevor larnach",
+    "victor caratini"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "65",
+   "entry_id": "5223633042",
+   "username": "MrChowon23",
+   "points": 52.15,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Clay Holmes",
+    "Paul Skenes"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 21.94,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "brandon lowe",
+    "clay holmes",
+    "henry davis",
+    "ian happ",
+    "jackson merrill",
+    "oneil cruz",
+    "paul skenes",
+    "spencer horwitz",
+    "sung mun song"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "66",
+   "entry_id": "5223546597",
+   "username": "gitsum40",
+   "points": 51.6,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Clay Holmes",
+    "Michael King"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 22.15,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "bryan reynolds",
+    "carson kelly",
+    "clay holmes",
+    "fernando tatis",
+    "gleyber torres",
+    "jackson merrill",
+    "jacob gonzalez",
+    "michael king",
+    "ty france"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "67",
+   "entry_id": "5223625173",
+   "username": "iamtheky",
+   "points": 51.2,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Paul Skenes",
+    "Taj Bradley"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 27.31,
+   "n_cheap": 0,
+   "players_norm": [
+    "fernando tatis",
+    "francisco alvarez",
+    "francisco lindor",
+    "jackson merrill",
+    "jake cronenworth",
+    "luke keaschall",
+    "manny machado",
+    "paul skenes",
+    "spencer horwitz",
+    "taj bradley"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "67",
+   "entry_id": "5223626296",
+   "username": "sasmallen",
+   "points": 51.2,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Paul Skenes",
+    "Taj Bradley"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 27.31,
+   "n_cheap": 0,
+   "players_norm": [
+    "fernando tatis",
+    "francisco alvarez",
+    "francisco lindor",
+    "jackson merrill",
+    "jake cronenworth",
+    "luke keaschall",
+    "manny machado",
+    "paul skenes",
+    "spencer horwitz",
+    "taj bradley"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "69",
+   "entry_id": "5223268901",
+   "username": "befeld",
+   "points": 50.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "AJ Smith-Shawver",
+    "Paul Skenes"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 23.01,
+   "n_cheap": 0,
+   "players_norm": [
+    "aj smith shawver",
+    "fernando tatis",
+    "luis campusano",
+    "manny machado",
+    "paul skenes",
+    "pedro ramirez",
+    "pete crow armstrong",
+    "ty france",
+    "tyrone taylor",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "70",
+   "entry_id": "5223530521",
+   "username": "soonerbernie2002",
+   "points": 50.65,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Michael King",
+    "Taj Bradley"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 24.3,
+   "n_cheap": 0,
+   "players_norm": [
+    "fernando tatis",
+    "ian happ",
+    "jackson merrill",
+    "jake cronenworth",
+    "luis campusano",
+    "manny machado",
+    "michael busch",
+    "michael king",
+    "nico hoerner",
+    "taj bradley"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "71",
+   "entry_id": "5223637284",
+   "username": "oshevach",
+   "points": 50.35,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Michael King",
+    "Paul Skenes"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 27.85,
+   "n_cheap": 0,
+   "players_norm": [
+    "drake baldwin",
+    "fernando tatis",
+    "jackson merrill",
+    "jacob gonzalez",
+    "jake cronenworth",
+    "michael king",
+    "paul skenes",
+    "ronald acuna",
+    "sung mun song",
+    "ty france"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "72",
+   "entry_id": "5223296845",
+   "username": "jpeyton1219",
+   "points": 48.4,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Clay Holmes",
+    "Jackson Jobe"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-1-1-1",
+   "chalk_score": 17.63,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "andrew benintendi",
+    "brett baty",
+    "carson kelly",
+    "clay holmes",
+    "fernando tatis",
+    "francisco lindor",
+    "jackson jobe",
+    "josh bell",
+    "pete crow armstrong"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "73",
+   "entry_id": "5223500148",
+   "username": "tmoney88",
+   "points": 47.9,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "AJ Smith-Shawver",
+    "Paul Skenes"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 17.53,
+   "n_cheap": 0,
+   "players_norm": [
+    "aj smith shawver",
+    "dominic smith",
+    "francisco lindor",
+    "jared triolo",
+    "luis campusano",
+    "matt olson",
+    "michael harris",
+    "ozzie albies",
+    "paul skenes",
+    "ronald acuna"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "74",
+   "entry_id": "5223531461",
+   "username": "BearDown1985",
+   "points": 47.6,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "Clay Holmes",
+    "Michael King"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 27.63,
+   "n_cheap": 0,
+   "players_norm": [
+    "clay holmes",
+    "drake baldwin",
+    "fernando tatis",
+    "jackson merrill",
+    "jake cronenworth",
+    "manny machado",
+    "michael harris",
+    "michael king",
+    "spencer horwitz",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "75",
+   "entry_id": "5223571603",
+   "username": "salatso22",
+   "points": 46.4,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Clay Holmes",
+    "Jackson Jobe"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 16.45,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "brett callahan",
+    "clay holmes",
+    "drake baldwin",
+    "jackson jobe",
+    "jackson merrill",
+    "jim jarvis",
+    "matt olson",
+    "ozzie albies",
+    "ronald acuna"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "76",
+   "entry_id": "5223571566",
+   "username": "relevanthought",
+   "points": 46.350002,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "AJ Smith-Shawver",
+    "Michael King"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 16.02,
+   "n_cheap": 0,
+   "players_norm": [
+    "aj smith shawver",
+    "alex bregman",
+    "dominic smith",
+    "drake baldwin",
+    "kevin mcgonigle",
+    "michael harris",
+    "michael king",
+    "mike yastrzemski",
+    "ozzie albies",
+    "seiya suzuki"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "76",
+   "entry_id": "5223358094",
+   "username": "chex43",
+   "points": 46.35,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Michael King",
+    "Paul Skenes"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 24.62,
+   "n_cheap": 0,
+   "players_norm": [
+    "carson kelly",
+    "colson montgomery",
+    "esmerlyn valdez",
+    "fernando tatis",
+    "jackson merrill",
+    "jake cronenworth",
+    "michael busch",
+    "michael king",
+    "nick gonzales",
+    "paul skenes"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "78",
+   "entry_id": "5223382028",
+   "username": "seaone",
+   "points": 45.100002,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "AJ Smith-Shawver",
+    "Robert Stock"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-1-1",
+   "chalk_score": 12.04,
+   "n_cheap": 0,
+   "players_norm": [
+    "aj smith shawver",
+    "bo bichette",
+    "bryan reynolds",
+    "carson kelly",
+    "jacob gonzalez",
+    "munetaka murakami",
+    "ozzie albies",
+    "pete crow armstrong",
+    "robert stock",
+    "ronald acuna"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "79",
+   "entry_id": "5223319492",
+   "username": "LayFonMah1618",
+   "points": 44.15,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "AJ Smith-Shawver",
+    "Jackson Jobe"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 14.3,
+   "n_cheap": 0,
+   "players_norm": [
+    "aj smith shawver",
+    "alex bregman",
+    "bryan reynolds",
+    "chase meidroth",
+    "jackson jobe",
+    "jackson merrill",
+    "luis campusano",
+    "miguel vargas",
+    "nico hoerner",
+    "seiya suzuki"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "79",
+   "entry_id": "5223485918",
+   "username": "rphdallas",
+   "points": 44.15,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Clay Holmes",
+    "Paul Skenes"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 17.53,
+   "n_cheap": 0,
+   "players_norm": [
+    "bo bichette",
+    "brett baty",
+    "clay holmes",
+    "francisco lindor",
+    "jared young",
+    "luis torrens",
+    "michael harris",
+    "paul skenes",
+    "pete crow armstrong",
+    "sam antonacci"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "81",
+   "entry_id": "5223611915",
+   "username": "Joescrepes2020",
+   "points": 43.350002,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "AJ Smith-Shawver",
+    "Michael King"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 15.48,
+   "n_cheap": 0,
+   "players_norm": [
+    "aj smith shawver",
+    "alex bregman",
+    "bryan reynolds",
+    "hao yu lee",
+    "henry davis",
+    "jacob gonzalez",
+    "michael king",
+    "munetaka murakami",
+    "pete crow armstrong",
+    "seiya suzuki"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "82",
+   "entry_id": "5223538028",
+   "username": "hcnpower",
+   "points": 43.15,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "AJ Smith-Shawver",
+    "Clay Holmes"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 21.72,
+   "n_cheap": 0,
+   "players_norm": [
+    "aj smith shawver",
+    "clay holmes",
+    "drake baldwin",
+    "fernando tatis",
+    "jackson merrill",
+    "luis rengifo",
+    "manny machado",
+    "matt olson",
+    "ozzie albies",
+    "sung mun song"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "82",
+   "entry_id": "5223552167",
+   "username": "robbwarren1231",
+   "points": 43.15,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Clay Holmes",
+    "Paul Skenes"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 20.97,
+   "n_cheap": 0,
+   "players_norm": [
+    "a j ewing",
+    "brett baty",
+    "clay holmes",
+    "fernando tatis",
+    "francisco lindor",
+    "luis torrens",
+    "manny machado",
+    "marcus semien",
+    "munetaka murakami",
+    "paul skenes"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "84",
+   "entry_id": "5223072195",
+   "username": "JHart62",
+   "points": 42.6,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Clay Holmes",
+    "Michael King"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 22.58,
+   "n_cheap": 0,
+   "players_norm": [
+    "clay holmes",
+    "dominic smith",
+    "jackson merrill",
+    "luis campusano",
+    "manny machado",
+    "michael busch",
+    "michael king",
+    "ozzie albies",
+    "pete crow armstrong",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "85",
+   "entry_id": "5223351747",
+   "username": "Wanna_Square_Up1567",
+   "points": 40.15,
+   "salary_used": 47600,
+   "salary_left": 2400,
+   "sp_pair": [
+    "AJ Smith-Shawver",
+    "Jackson Jobe"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 11.94,
+   "n_cheap": 0,
+   "players_norm": [
+    "aj smith shawver",
+    "brett callahan",
+    "dillon dingler",
+    "jackson jobe",
+    "kevin mcgonigle",
+    "manny machado",
+    "ozzie albies",
+    "ronald acuna",
+    "spencer torkelson",
+    "zach mckinstry"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "86",
+   "entry_id": "5223198313",
+   "username": "DMATH",
+   "points": 37.9,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "AJ Smith-Shawver",
+    "Paul Skenes"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-1-1-1",
+   "chalk_score": 20.11,
+   "n_cheap": 0,
+   "players_norm": [
+    "aj smith shawver",
+    "bryan reynolds",
+    "colson montgomery",
+    "dominic smith",
+    "drake baldwin",
+    "jake cronenworth",
+    "michael harris",
+    "paul skenes",
+    "seiya suzuki",
+    "xander bogaerts"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "87",
+   "entry_id": "5223546598",
+   "username": "gitsum40",
+   "points": 37.15,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Clay Holmes",
+    "Paul Skenes"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 23.23,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "bryan reynolds",
+    "clay holmes",
+    "esmerlyn valdez",
+    "jake cronenworth",
+    "luis campusano",
+    "luis rengifo",
+    "nico hoerner",
+    "paul skenes",
+    "ty france"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "88",
+   "entry_id": "5223326902",
+   "username": "cb777",
+   "points": 36.15,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Clay Holmes",
+    "Paul Skenes"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 25.59,
+   "n_cheap": 0,
+   "players_norm": [
+    "clay holmes",
+    "dillon dingler",
+    "francisco lindor",
+    "jackson merrill",
+    "jake cronenworth",
+    "luke keaschall",
+    "manny machado",
+    "paul skenes",
+    "trevor larnach",
+    "ty france"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "89",
+   "entry_id": "5223654819",
+   "username": "lewiszach85",
+   "points": 35.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "AJ Smith-Shawver",
+    "Paul Skenes"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 21.72,
+   "n_cheap": 0,
+   "players_norm": [
+    "aj smith shawver",
+    "dominic smith",
+    "drake baldwin",
+    "jake cronenworth",
+    "manny machado",
+    "matt olson",
+    "michael harris",
+    "paul skenes",
+    "ronald acuna",
+    "sung mun song"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "90",
+   "entry_id": "5223621456",
+   "username": "tnstud46",
+   "points": 34.35,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Michael King",
+    "Paul Skenes"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 21.18,
+   "n_cheap": 0,
+   "players_norm": [
+    "alex bregman",
+    "bryan reynolds",
+    "esmerlyn valdez",
+    "ian happ",
+    "jacob gonzalez",
+    "luis campusano",
+    "michael king",
+    "nico hoerner",
+    "paul skenes",
+    "spencer horwitz"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "91",
+   "entry_id": "5223610640",
+   "username": "DMATH",
+   "points": 27.900002,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "AJ Smith-Shawver",
+    "Paul Skenes"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 14.52,
+   "n_cheap": 0,
+   "players_norm": [
+    "aj smith shawver",
+    "austin riley",
+    "bryan reynolds",
+    "carson kelly",
+    "colson montgomery",
+    "ian happ",
+    "paul skenes",
+    "pedro ramirez",
+    "seiya suzuki",
+    "spencer horwitz"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  }
+ ],
+ "player_table": [
+  {
+   "player": "Paul Skenes",
+   "player_norm": "paul skenes",
+   "roster_position": "P",
+   "pct_drafted": 54.84,
+   "fpts": 8.95
+  },
+  {
+   "player": "Michael King",
+   "player_norm": "michael king",
+   "roster_position": "P",
+   "pct_drafted": 40.86,
+   "fpts": 15.4
+  },
+  {
+   "player": "Fernando Tatis Jr.",
+   "player_norm": "fernando tatis",
+   "roster_position": "OF",
+   "pct_drafted": 37.63,
+   "fpts": 9.0
+  },
+  {
+   "player": "Clay Holmes",
+   "player_norm": "clay holmes",
+   "roster_position": "P",
+   "pct_drafted": 36.56,
+   "fpts": 7.2
+  },
+  {
+   "player": "Jake Cronenworth",
+   "player_norm": "jake cronenworth",
+   "roster_position": "2B",
+   "pct_drafted": 32.26,
+   "fpts": 2.0
+  },
+  {
+   "player": "Jackson Merrill",
+   "player_norm": "jackson merrill",
+   "roster_position": "OF",
+   "pct_drafted": 29.03,
+   "fpts": 0.0
+  },
+  {
+   "player": "Taj Bradley",
+   "player_norm": "taj bradley",
+   "roster_position": "P",
+   "pct_drafted": 29.03,
+   "fpts": 20.25
+  },
+  {
+   "player": "Manny Machado",
+   "player_norm": "manny machado",
+   "roster_position": "3B",
+   "pct_drafted": 27.96,
+   "fpts": 0.0
+  },
+  {
+   "player": "Luis Campusano",
+   "player_norm": "luis campusano",
+   "roster_position": "C",
+   "pct_drafted": 23.66,
+   "fpts": 4.0
+  },
+  {
+   "player": "Drake Baldwin",
+   "player_norm": "drake baldwin",
+   "roster_position": "C",
+   "pct_drafted": 23.66,
+   "fpts": 0.0
+  },
+  {
+   "player": "Oneil Cruz",
+   "player_norm": "oneil cruz",
+   "roster_position": "OF",
+   "pct_drafted": 22.58,
+   "fpts": 12.0
+  },
+  {
+   "player": "Pete Crow-Armstrong",
+   "player_norm": "pete crow armstrong",
+   "roster_position": "OF",
+   "pct_drafted": 21.51,
+   "fpts": 0.0
+  },
+  {
+   "player": "Ty France",
+   "player_norm": "ty france",
+   "roster_position": "1B",
+   "pct_drafted": 20.43,
+   "fpts": 7.0
+  },
+  {
+   "player": "Josh Bell",
+   "player_norm": "josh bell",
+   "roster_position": "1B",
+   "pct_drafted": 19.35,
+   "fpts": 11.0
+  },
+  {
+   "player": "Francisco Lindor",
+   "player_norm": "francisco lindor",
+   "roster_position": "SS",
+   "pct_drafted": 19.35,
+   "fpts": 3.0
+  },
+  {
+   "player": "Luke Keaschall",
+   "player_norm": "luke keaschall",
+   "roster_position": "OF",
+   "pct_drafted": 18.28,
+   "fpts": 8.0
+  },
+  {
+   "player": "AJ Smith-Shawver",
+   "player_norm": "aj smith shawver",
+   "roster_position": "P",
+   "pct_drafted": 18.28,
+   "fpts": 2.95
+  },
+  {
+   "player": "Spencer Horwitz",
+   "player_norm": "spencer horwitz",
+   "roster_position": "1B",
+   "pct_drafted": 18.28,
+   "fpts": 0.0
+  },
+  {
+   "player": "Xander Bogaerts",
+   "player_norm": "xander bogaerts",
+   "roster_position": "SS",
+   "pct_drafted": 17.2,
+   "fpts": 9.0
+  },
+  {
+   "player": "Byron Buxton",
+   "player_norm": "byron buxton",
+   "roster_position": "OF",
+   "pct_drafted": 17.2,
+   "fpts": 6.0
+  },
+  {
+   "player": "Brandon Lowe",
+   "player_norm": "brandon lowe",
+   "roster_position": "2B",
+   "pct_drafted": 16.13,
+   "fpts": 20.0
+  },
+  {
+   "player": "Alex Bregman",
+   "player_norm": "alex bregman",
+   "roster_position": "3B",
+   "pct_drafted": 16.13,
+   "fpts": 0.0
+  },
+  {
+   "player": "Esmerlyn Valdez",
+   "player_norm": "esmerlyn valdez",
+   "roster_position": "OF",
+   "pct_drafted": 16.13,
+   "fpts": 0.0
+  },
+  {
+   "player": "Brett Callahan",
+   "player_norm": "brett callahan",
+   "roster_position": "OF",
+   "pct_drafted": 13.98,
+   "fpts": 0.0
+  },
+  {
+   "player": "Jacob Gonzalez",
+   "player_norm": "jacob gonzalez",
+   "roster_position": "SS",
+   "pct_drafted": 13.98,
+   "fpts": 3.0
+  },
+  {
+   "player": "Bryan Reynolds",
+   "player_norm": "bryan reynolds",
+   "roster_position": "OF",
+   "pct_drafted": 12.9,
+   "fpts": 3.0
+  },
+  {
+   "player": "Michael Harris II",
+   "player_norm": "michael harris",
+   "roster_position": "OF",
+   "pct_drafted": 12.9,
+   "fpts": 5.0
+  },
+  {
+   "player": "Ronald Acuna Jr.",
+   "player_norm": "ronald acuna",
+   "roster_position": "OF",
+   "pct_drafted": 11.83,
+   "fpts": 5.0
+  },
+  {
+   "player": "Ozzie Albies",
+   "player_norm": "ozzie albies",
+   "roster_position": "2B",
+   "pct_drafted": 10.75,
+   "fpts": 7.0
+  },
+  {
+   "player": "A.J. Ewing",
+   "player_norm": "a j ewing",
+   "roster_position": "OF",
+   "pct_drafted": 10.75,
+   "fpts": 12.0
+  },
+  {
+   "player": "Seiya Suzuki",
+   "player_norm": "seiya suzuki",
+   "roster_position": "OF",
+   "pct_drafted": 10.75,
+   "fpts": 4.0
+  },
+  {
+   "player": "Munetaka Murakami",
+   "player_norm": "munetaka murakami",
+   "roster_position": "1B",
+   "pct_drafted": 10.75,
+   "fpts": 0.0
+  },
+  {
+   "player": "Dillon Dingler",
+   "player_norm": "dillon dingler",
+   "roster_position": "C",
+   "pct_drafted": 10.75,
+   "fpts": 0.0
+  },
+  {
+   "player": "Nick Gonzales",
+   "player_norm": "nick gonzales",
+   "roster_position": "3B",
+   "pct_drafted": 10.75,
+   "fpts": 8.0
+  },
+  {
+   "player": "Matt Olson",
+   "player_norm": "matt olson",
+   "roster_position": "1B",
+   "pct_drafted": 10.75,
+   "fpts": 12.0
+  },
+  {
+   "player": "Kaelen Culpepper",
+   "player_norm": "kaelen culpepper",
+   "roster_position": "SS",
+   "pct_drafted": 9.68,
+   "fpts": 11.0
+  },
+  {
+   "player": "Miguel Vargas",
+   "player_norm": "miguel vargas",
+   "roster_position": "3B",
+   "pct_drafted": 9.68,
+   "fpts": 16.0
+  },
+  {
+   "player": "Kevin McGonigle",
+   "player_norm": "kevin mcgonigle",
+   "roster_position": "SS",
+   "pct_drafted": 9.68,
+   "fpts": 9.0
+  },
+  {
+   "player": "Sung-Mun Song",
+   "player_norm": "sung mun song",
+   "roster_position": "SS",
+   "pct_drafted": 9.68,
+   "fpts": 0.0
+  },
+  {
+   "player": "Luis Torrens",
+   "player_norm": "luis torrens",
+   "roster_position": "C",
+   "pct_drafted": 8.6,
+   "fpts": 0.0
+  },
+  {
+   "player": "Kody Clemens",
+   "player_norm": "kody clemens",
+   "roster_position": "2B",
+   "pct_drafted": 8.6,
+   "fpts": 16.0
+  },
+  {
+   "player": "Nico Hoerner",
+   "player_norm": "nico hoerner",
+   "roster_position": "SS",
+   "pct_drafted": 8.6,
+   "fpts": 0.0
+  },
+  {
+   "player": "Luis Rengifo",
+   "player_norm": "luis rengifo",
+   "roster_position": "OF",
+   "pct_drafted": 8.6,
+   "fpts": 5.0
+  },
+  {
+   "player": "Jackson Jobe",
+   "player_norm": "jackson jobe",
+   "roster_position": "P",
+   "pct_drafted": 8.6,
+   "fpts": 11.2
+  },
+  {
+   "player": "Michael Busch",
+   "player_norm": "michael busch",
+   "roster_position": "1B",
+   "pct_drafted": 7.53,
+   "fpts": 0.0
+  },
+  {
+   "player": "Robert Stock",
+   "player_norm": "robert stock",
+   "roster_position": "P",
+   "pct_drafted": 7.53,
+   "fpts": 16.15
+  },
+  {
+   "player": "Carson Kelly",
+   "player_norm": "carson kelly",
+   "roster_position": "C",
+   "pct_drafted": 7.53,
+   "fpts": 0.0
+  },
+  {
+   "player": "Andrew Benintendi",
+   "player_norm": "andrew benintendi",
+   "roster_position": "OF",
+   "pct_drafted": 7.53,
+   "fpts": 7.0
+  },
+  {
+   "player": "Henry Davis",
+   "player_norm": "henry davis",
+   "roster_position": "C",
+   "pct_drafted": 7.53,
+   "fpts": 4.0
+  },
+  {
+   "player": "Dominic Smith",
+   "player_norm": "dominic smith",
+   "roster_position": "OF",
+   "pct_drafted": 6.45,
+   "fpts": 0.0
+  },
+  {
+   "player": "Austin Riley",
+   "player_norm": "austin riley",
+   "roster_position": "3B",
+   "pct_drafted": 6.45,
+   "fpts": 4.0
+  },
+  {
+   "player": "Trevor Larnach",
+   "player_norm": "trevor larnach",
+   "roster_position": "OF",
+   "pct_drafted": 6.45,
+   "fpts": 0.0
+  },
+  {
+   "player": "Francisco Alvarez",
+   "player_norm": "francisco alvarez",
+   "roster_position": "C",
+   "pct_drafted": 6.45,
+   "fpts": 0.0
+  },
+  {
+   "player": "Colson Montgomery",
+   "player_norm": "colson montgomery",
+   "roster_position": "SS",
+   "pct_drafted": 6.45,
+   "fpts": 3.0
+  },
+  {
+   "player": "Jake Rogers",
+   "player_norm": "jake rogers",
+   "roster_position": "C",
+   "pct_drafted": 6.45,
+   "fpts": 3.0
+  },
+  {
+   "player": "Gleyber Torres",
+   "player_norm": "gleyber torres",
+   "roster_position": "2B",
+   "pct_drafted": 6.45,
+   "fpts": 7.0
+  },
+  {
+   "player": "Sam Antonacci",
+   "player_norm": "sam antonacci",
+   "roster_position": "OF",
+   "pct_drafted": 6.45,
+   "fpts": 4.0
+  },
+  {
+   "player": "Bo Bichette",
+   "player_norm": "bo bichette",
+   "roster_position": "3B",
+   "pct_drafted": 5.38,
+   "fpts": 8.0
+  },
+  {
+   "player": "Brooks Lee",
+   "player_norm": "brooks lee",
+   "roster_position": "3B",
+   "pct_drafted": 5.38,
+   "fpts": 5.0
+  },
+  {
+   "player": "Sam Antonacci",
+   "player_norm": "sam antonacci",
+   "roster_position": "2B",
+   "pct_drafted": 5.38,
+   "fpts": 4.0
+  },
+  {
+   "player": "Sung-Mun Song",
+   "player_norm": "sung mun song",
+   "roster_position": "3B",
+   "pct_drafted": 4.3,
+   "fpts": 0.0
+  },
+  {
+   "player": "Dominic Smith",
+   "player_norm": "dominic smith",
+   "roster_position": "1B",
+   "pct_drafted": 4.3,
+   "fpts": 0.0
+  },
+  {
+   "player": "Tyrone Taylor",
+   "player_norm": "tyrone taylor",
+   "roster_position": "OF",
+   "pct_drafted": 4.3,
+   "fpts": 8.0
+  },
+  {
+   "player": "Colt Keith",
+   "player_norm": "colt keith",
+   "roster_position": "3B",
+   "pct_drafted": 4.3,
+   "fpts": 5.0
+  },
+  {
+   "player": "Ian Happ",
+   "player_norm": "ian happ",
+   "roster_position": "OF",
+   "pct_drafted": 4.3,
+   "fpts": 0.0
+  },
+  {
+   "player": "Mike Yastrzemski",
+   "player_norm": "mike yastrzemski",
+   "roster_position": "OF",
+   "pct_drafted": 3.23,
+   "fpts": 3.0
+  },
+  {
+   "player": "Royce Lewis",
+   "player_norm": "royce lewis",
+   "roster_position": "2B",
+   "pct_drafted": 3.23,
+   "fpts": 8.0
+  },
+  {
+   "player": "Victor Caratini",
+   "player_norm": "victor caratini",
+   "roster_position": "C",
+   "pct_drafted": 3.23,
+   "fpts": 4.0
+  },
+  {
+   "player": "Pedro Ramirez",
+   "player_norm": "pedro ramirez",
+   "roster_position": "2B",
+   "pct_drafted": 3.23,
+   "fpts": 2.0
+  },
+  {
+   "player": "Carson Benge",
+   "player_norm": "carson benge",
+   "roster_position": "OF",
+   "pct_drafted": 3.23,
+   "fpts": 19.0
+  },
+  {
+   "player": "Kody Clemens",
+   "player_norm": "kody clemens",
+   "roster_position": "OF",
+   "pct_drafted": 3.23,
+   "fpts": 16.0
+  },
+  {
+   "player": "Spencer Torkelson",
+   "player_norm": "spencer torkelson",
+   "roster_position": "1B",
+   "pct_drafted": 3.23,
+   "fpts": 0.0
+  },
+  {
+   "player": "Kevin McGonigle",
+   "player_norm": "kevin mcgonigle",
+   "roster_position": "3B",
+   "pct_drafted": 3.23,
+   "fpts": 9.0
+  },
+  {
+   "player": "Jim Jarvis",
+   "player_norm": "jim jarvis",
+   "roster_position": "SS",
+   "pct_drafted": 3.23,
+   "fpts": 4.0
+  },
+  {
+   "player": "Brett Baty",
+   "player_norm": "brett baty",
+   "roster_position": "OF",
+   "pct_drafted": 2.15,
+   "fpts": 0.0
+  },
+  {
+   "player": "Nico Hoerner",
+   "player_norm": "nico hoerner",
+   "roster_position": "2B",
+   "pct_drafted": 2.15,
+   "fpts": 0.0
+  },
+  {
+   "player": "Nick Gonzales",
+   "player_norm": "nick gonzales",
+   "roster_position": "2B",
+   "pct_drafted": 2.15,
+   "fpts": 8.0
+  },
+  {
+   "player": "Chase Meidroth",
+   "player_norm": "chase meidroth",
+   "roster_position": "2B",
+   "pct_drafted": 2.15,
+   "fpts": 3.0
+  },
+  {
+   "player": "Jared Triolo",
+   "player_norm": "jared triolo",
+   "roster_position": "3B",
+   "pct_drafted": 2.15,
+   "fpts": 0.0
+  },
+  {
+   "player": "Jared Young",
+   "player_norm": "jared young",
+   "roster_position": "1B",
+   "pct_drafted": 2.15,
+   "fpts": 8.0
+  },
+  {
+   "player": "Hao-Yu Lee",
+   "player_norm": "hao yu lee",
+   "roster_position": "2B",
+   "pct_drafted": 2.15,
+   "fpts": 11.0
+  },
+  {
+   "player": "Colson Montgomery",
+   "player_norm": "colson montgomery",
+   "roster_position": "3B",
+   "pct_drafted": 1.08,
+   "fpts": 3.0
+  },
+  {
+   "player": "Miguel Vargas",
+   "player_norm": "miguel vargas",
+   "roster_position": "1B",
+   "pct_drafted": 1.08,
+   "fpts": 16.0
+  },
+  {
+   "player": "Zach McKinstry",
+   "player_norm": "zach mckinstry",
+   "roster_position": "OF",
+   "pct_drafted": 1.08,
+   "fpts": 5.0
+  },
+  {
+   "player": "Marcus Semien",
+   "player_norm": "marcus semien",
+   "roster_position": "2B",
+   "pct_drafted": 1.08,
+   "fpts": 3.0
+  },
+  {
+   "player": "Pedro Ramirez",
+   "player_norm": "pedro ramirez",
+   "roster_position": "3B",
+   "pct_drafted": 1.08,
+   "fpts": 2.0
+  },
+  {
+   "player": "Tristan Peters",
+   "player_norm": "tristan peters",
+   "roster_position": "OF",
+   "pct_drafted": 1.08,
+   "fpts": 2.0
+  }
+ ],
+ "own_results": {
+  "matched": 2,
+  "requested": 2,
+  "field_size": 93,
+  "best_rank": 4,
+  "worst_rank": 19,
+  "best_finish_percentile": 96.77,
+  "median_finish_percentile": 88.71,
+  "best_points": 87.65,
+  "winning_points": 104.2,
+  "own_lineups_duplicated_by_field": 0,
+  "max_copies_of_an_own_lineup": 1,
+  "entry_fee": 0.25,
+  "fees_total": 0.5,
+  "winnings_total": 0.0,
+  "paid_places": 1,
+  "payout_breadth_observed": 0.0108,
+  "cashed_entries": 0,
+  "net": -0.5,
+  "labels": "observed outcomes from a completed contest; never a graded prediction, ROI model, win rate, or probability claim"
+ }
+}

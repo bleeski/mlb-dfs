@@ -1,0 +1,7630 @@
+{
+ "label": "deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied",
+ "version": "0.5-review",
+ "coverage": "full",
+ "contest_id": "193774256",
+ "slate_date": "2026-08-15",
+ "contest_type": "classic",
+ "meta": {
+  "entries_total": 237,
+  "entries_complete_lineups": 236,
+  "roster_size": 10,
+  "entries_unparsed": 1,
+  "winning_points": 144.95001,
+  "winning_entry_id": "5220089468",
+  "multi_entry_flag": true
+ },
+ "duplication": {
+  "distinct_lineups": 210,
+  "entries_in_duplicated_lineups": 42,
+  "share_duplicated_pct": 17.8,
+  "max_copies": 8,
+  "copies_histogram": {
+   "1": 194,
+   "2": 13,
+   "3": 1,
+   "5": 1,
+   "8": 1
+  },
+  "winner_copies": 1
+ },
+ "construction": {
+  "cheap_salary_threshold": 2400,
+  "at_cap_entries": 41,
+  "at_cap_share_pct": 17.4,
+  "salary_left_histogram": {
+   "701-1500": 30,
+   "101-300": 31,
+   "> 1500": 95,
+   "301-700": 39,
+   "1-100": 22,
+   "<= 0": 19
+  },
+  "max_stack_histogram": {
+   "2": 1,
+   "3": 41,
+   "4": 91,
+   "5": 103
+  },
+  "sp_pair_top": [
+   {
+    "pair": [
+     "MacKenzie Gore",
+     "Reid Detmers"
+    ],
+    "count": 115,
+    "field_share_pct": 48.7
+   },
+   {
+    "pair": [
+     "J.T. Ginn",
+     "Reid Detmers"
+    ],
+    "count": 41,
+    "field_share_pct": 17.4
+   },
+   {
+    "pair": [
+     "MacKenzie Gore",
+     "Randy Dobnak"
+    ],
+    "count": 29,
+    "field_share_pct": 12.3
+   },
+   {
+    "pair": [
+     "J.T. Ginn",
+     "Randy Dobnak"
+    ],
+    "count": 22,
+    "field_share_pct": 9.3
+   },
+   {
+    "pair": [
+     "Randy Dobnak",
+     "Reid Detmers"
+    ],
+    "count": 20,
+    "field_share_pct": 8.5
+   },
+   {
+    "pair": [
+     "J.T. Ginn",
+     "MacKenzie Gore"
+    ],
+    "count": 8,
+    "field_share_pct": 3.4
+   },
+   {
+    "pair": [
+     "Brady Basso",
+     "MacKenzie Gore"
+    ],
+    "count": 1,
+    "field_share_pct": 0.4
+   }
+  ],
+  "top_owned": [
+   {
+    "player": "Reid Detmers",
+    "pct_drafted": 74.26
+   },
+   {
+    "player": "MacKenzie Gore",
+    "pct_drafted": 64.56
+   },
+   {
+    "player": "Mike Trout",
+    "pct_drafted": 64.56
+   },
+   {
+    "player": "Brandon Nimmo",
+    "pct_drafted": 52.32
+   },
+   {
+    "player": "Ezequiel Duran",
+    "pct_drafted": 50.21
+   }
+  ],
+  "captain_table": [],
+  "winner_captain": null
+ },
+ "diagnostics": {
+  "salary_join_rate_pct": 100.0,
+  "unmatched_names_top": [],
+  "salary_name_collisions": [],
+  "ownership_recompute_max_diff_pts": 0.42,
+  "ownership_recompute_denominator": "all_entries",
+  "ownership_recompute_ok": true,
+  "parse_structural_ok": true,
+  "parsed_nothing": false,
+  "mostly_unparsed": false,
+  "contest_type_mismatch": false,
+  "salary_join_collapsed": false,
+  "entries_unparsed_share": 0.0042,
+  "intra_entry_duplicate_entry_ids": [],
+  "roster_slots_observed": 2360,
+  "roster_slots_expected": 2360,
+  "recomputed_total_pct": 995.8,
+  "dk_table_total_pct": 995.4,
+  "dk_table_deficit_pts": 0.4,
+  "dk_table_agrees": true,
+  "verification_note": "parse structurally sound; DK %Drafted agrees with the lineup recompute"
+ },
+ "entries": [
+  {
+   "rank": "1",
+   "entry_id": "5220089468",
+   "username": "bleeski",
+   "points": 144.95001,
+   "salary_used": 48600,
+   "salary_left": 1400,
+   "sp_pair": [
+    "Randy Dobnak",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 38.27,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "henry bolte",
+    "jake burger",
+    "jonah heim",
+    "max muncy",
+    "randy dobnak",
+    "reid detmers",
+    "wyatt langford",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "2",
+   "entry_id": "5220036290",
+   "username": "Gsmoney2469",
+   "points": 135.95001,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Randy Dobnak",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 43.38,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "henry bolte",
+    "joc pederson",
+    "jonah heim",
+    "randy dobnak",
+    "reid detmers",
+    "wyatt langford",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "3",
+   "entry_id": "5219420677",
+   "username": "Elwaysarmy",
+   "points": 134.55,
+   "salary_used": 45200,
+   "salary_left": 4800,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 34.18,
+   "n_cheap": 0,
+   "players_norm": [
+    "corey seager",
+    "evan carter",
+    "henry bolte",
+    "joc pederson",
+    "mackenzie gore",
+    "moises ballesteros",
+    "nicky lopez",
+    "reid detmers",
+    "tommy white",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "4",
+   "entry_id": "5219517713",
+   "username": "adonis112",
+   "points": 131.95,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Randy Dobnak",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 41.98,
+   "n_cheap": 0,
+   "players_norm": [
+    "corey seager",
+    "ezequiel duran",
+    "henry bolte",
+    "jeff mcneil",
+    "joc pederson",
+    "jonah heim",
+    "mike trout",
+    "randy dobnak",
+    "reid detmers",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "5",
+   "entry_id": "5220081936",
+   "username": "psereda",
+   "points": 129.55,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 44.22,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "henry bolte",
+    "jeff mcneil",
+    "joc pederson",
+    "jonah heim",
+    "mackenzie gore",
+    "reid detmers",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "6",
+   "entry_id": "5219150825",
+   "username": "winforsanto",
+   "points": 127.95,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "Randy Dobnak",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 33.8,
+   "n_cheap": 0,
+   "players_norm": [
+    "ezequiel duran",
+    "henry bolte",
+    "jake burger",
+    "jonah heim",
+    "randy dobnak",
+    "reid detmers",
+    "tyler soderstrom",
+    "tyler tolbert",
+    "wyatt langford",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "7",
+   "entry_id": "5220055142",
+   "username": "mrclean913",
+   "points": 127.55,
+   "salary_used": 48100,
+   "salary_left": 1900,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 40.13,
+   "n_cheap": 0,
+   "players_norm": [
+    "corey seager",
+    "henry bolte",
+    "jeff mcneil",
+    "joc pederson",
+    "jonah heim",
+    "mackenzie gore",
+    "reid detmers",
+    "tommy white",
+    "wyatt langford",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "8",
+   "entry_id": "5219186942",
+   "username": "ktm4214",
+   "points": 126.55,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 41.9,
+   "n_cheap": 1,
+   "players_norm": [
+    "adam frazier",
+    "brandon nimmo",
+    "corey seager",
+    "henry bolte",
+    "jac caglianone",
+    "jonah heim",
+    "mackenzie gore",
+    "max muncy",
+    "mike trout",
+    "reid detmers"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "8",
+   "entry_id": "5219697781",
+   "username": "bkukor",
+   "points": 126.55,
+   "salary_used": 46700,
+   "salary_left": 3300,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 38.57,
+   "n_cheap": 1,
+   "players_norm": [
+    "alika williams",
+    "brandon nimmo",
+    "corey seager",
+    "evan carter",
+    "ezequiel duran",
+    "mackenzie gore",
+    "moises ballesteros",
+    "nolan schanuel",
+    "reid detmers",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "10",
+   "entry_id": "5219822890",
+   "username": "auweglman",
+   "points": 126.5,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Reid Detmers"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 37.76,
+   "n_cheap": 0,
+   "players_norm": [
+    "ezequiel duran",
+    "henry bolte",
+    "j t ginn",
+    "jac caglianone",
+    "jake burger",
+    "moises ballesteros",
+    "reid detmers",
+    "wyatt langford",
+    "zach neto",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "11",
+   "entry_id": "5220112841",
+   "username": "137666",
+   "points": 125.55,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 45.82,
+   "n_cheap": 1,
+   "players_norm": [
+    "adam frazier",
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "jonah heim",
+    "mackenzie gore",
+    "mike trout",
+    "nolan schanuel",
+    "reid detmers",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "12",
+   "entry_id": "5220147092",
+   "username": "ed8802",
+   "points": 124.55,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 46.37,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "henry bolte",
+    "joc pederson",
+    "mackenzie gore",
+    "moises ballesteros",
+    "reid detmers",
+    "wyatt langford",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "13",
+   "entry_id": "5219697779",
+   "username": "bkukor",
+   "points": 122.950005,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [
+    "Randy Dobnak",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 39.58,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "henry bolte",
+    "jake burger",
+    "jeff mcneil",
+    "jonah heim",
+    "randy dobnak",
+    "reid detmers",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "14",
+   "entry_id": "5219072644",
+   "username": "bigb3132021yeah",
+   "points": 122.55,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 39.45,
+   "n_cheap": 0,
+   "players_norm": [
+    "henry bolte",
+    "jac caglianone",
+    "jeff mcneil",
+    "jonah heim",
+    "mackenzie gore",
+    "nick loftin",
+    "reid detmers",
+    "wyatt langford",
+    "zach neto",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "15",
+   "entry_id": "5219036655",
+   "username": "minrobertson210",
+   "points": 121.950005,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "Randy Dobnak",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 37.09,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "brandon nimmo",
+    "jake burger",
+    "jonah heim",
+    "mike trout",
+    "nicky lopez",
+    "randy dobnak",
+    "reid detmers",
+    "tommy white",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "15",
+   "entry_id": "5220125672",
+   "username": "blade39428",
+   "points": 121.950005,
+   "salary_used": 48600,
+   "salary_left": 1400,
+   "sp_pair": [
+    "Randy Dobnak",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 38.56,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "henry bolte",
+    "jac caglianone",
+    "joc pederson",
+    "jonah heim",
+    "max muncy",
+    "randy dobnak",
+    "reid detmers",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "17",
+   "entry_id": "5219218966",
+   "username": "titanhawks",
+   "points": 121.55,
+   "salary_used": 48300,
+   "salary_left": 1700,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 43.67,
+   "n_cheap": 1,
+   "players_norm": [
+    "adam frazier",
+    "austin wynns",
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "mackenzie gore",
+    "mike trout",
+    "nolan schanuel",
+    "reid detmers",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "17",
+   "entry_id": "5219243845",
+   "username": "Stree",
+   "points": 121.55,
+   "salary_used": 48300,
+   "salary_left": 1700,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 43.67,
+   "n_cheap": 1,
+   "players_norm": [
+    "adam frazier",
+    "austin wynns",
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "mackenzie gore",
+    "mike trout",
+    "nolan schanuel",
+    "reid detmers",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "17",
+   "entry_id": "5220055556",
+   "username": "seiferidjosh80",
+   "points": 121.55,
+   "salary_used": 48300,
+   "salary_left": 1700,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 43.67,
+   "n_cheap": 1,
+   "players_norm": [
+    "adam frazier",
+    "austin wynns",
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "mackenzie gore",
+    "mike trout",
+    "nolan schanuel",
+    "reid detmers",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "17",
+   "entry_id": "5220062950",
+   "username": "Dkouzios72",
+   "points": 121.55,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 37.85,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "brandon nimmo",
+    "henry bolte",
+    "jake burger",
+    "mackenzie gore",
+    "max muncy",
+    "nick loftin",
+    "reid detmers",
+    "salvador perez",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "17",
+   "entry_id": "5220106835",
+   "username": "troubledsoe",
+   "points": 121.55,
+   "salary_used": 48300,
+   "salary_left": 1700,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 43.67,
+   "n_cheap": 1,
+   "players_norm": [
+    "adam frazier",
+    "austin wynns",
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "mackenzie gore",
+    "mike trout",
+    "nolan schanuel",
+    "reid detmers",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "17",
+   "entry_id": "5220133282",
+   "username": "sportsfan14",
+   "points": 121.55,
+   "salary_used": 48300,
+   "salary_left": 1700,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 43.67,
+   "n_cheap": 1,
+   "players_norm": [
+    "adam frazier",
+    "austin wynns",
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "mackenzie gore",
+    "mike trout",
+    "nolan schanuel",
+    "reid detmers",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "23",
+   "entry_id": "5219334754",
+   "username": "Og9erFaithfull",
+   "points": 120.950005,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Randy Dobnak",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 40.34,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "jake burger",
+    "jonah heim",
+    "lawrence butler",
+    "randy dobnak",
+    "reid detmers",
+    "wyatt langford",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "24",
+   "entry_id": "5219036656",
+   "username": "minrobertson210",
+   "points": 120.55,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 44.89,
+   "n_cheap": 0,
+   "players_norm": [
+    "corey seager",
+    "ezequiel duran",
+    "henry bolte",
+    "joc pederson",
+    "mackenzie gore",
+    "mike trout",
+    "moises ballesteros",
+    "nick loftin",
+    "reid detmers",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "24",
+   "entry_id": "5220063802",
+   "username": "lions937",
+   "points": 120.55,
+   "salary_used": 47900,
+   "salary_left": 2100,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 40.8,
+   "n_cheap": 2,
+   "players_norm": [
+    "adam frazier",
+    "brandon nimmo",
+    "corey seager",
+    "jac caglianone",
+    "mackenzie gore",
+    "mike trout",
+    "reid detmers",
+    "tommy white",
+    "tyler heineman",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "26",
+   "entry_id": "5220095747",
+   "username": "TeamPop",
+   "points": 118.950005,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "Randy Dobnak",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 41.27,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "jake burger",
+    "jeff mcneil",
+    "jonah heim",
+    "randy dobnak",
+    "reid detmers",
+    "wyatt langford",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "27",
+   "entry_id": "5219243847",
+   "username": "Stree",
+   "points": 118.55,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 45.15,
+   "n_cheap": 1,
+   "players_norm": [
+    "adam frazier",
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "jake burger",
+    "mackenzie gore",
+    "mike trout",
+    "moises ballesteros",
+    "reid detmers",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "27",
+   "entry_id": "5220073728",
+   "username": "imadeit110",
+   "points": 118.55,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 45.15,
+   "n_cheap": 1,
+   "players_norm": [
+    "adam frazier",
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "jake burger",
+    "mackenzie gore",
+    "mike trout",
+    "moises ballesteros",
+    "reid detmers",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "27",
+   "entry_id": "5220146161",
+   "username": "jlegrand22",
+   "points": 118.55,
+   "salary_used": 48400,
+   "salary_left": 1600,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 40.93,
+   "n_cheap": 1,
+   "players_norm": [
+    "adam frazier",
+    "corey seager",
+    "evan carter",
+    "ezequiel duran",
+    "jake burger",
+    "mackenzie gore",
+    "mike trout",
+    "moises ballesteros",
+    "reid detmers",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "30",
+   "entry_id": "5220112843",
+   "username": "137666",
+   "points": 117.950005,
+   "salary_used": 44100,
+   "salary_left": 5900,
+   "sp_pair": [
+    "Randy Dobnak",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 29.91,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin wynns",
+    "brandon nimmo",
+    "corey seager",
+    "lawrence butler",
+    "max muncy",
+    "nicky lopez",
+    "randy dobnak",
+    "reid detmers",
+    "tommy white",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "31",
+   "entry_id": "5220096606",
+   "username": "sphere3d",
+   "points": 117.55,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 45.23,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin wynns",
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "henry bolte",
+    "mackenzie gore",
+    "mike trout",
+    "nolan schanuel",
+    "reid detmers",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "31",
+   "entry_id": "5220130254",
+   "username": "MissingManning",
+   "points": 117.55,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 45.23,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin wynns",
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "henry bolte",
+    "mackenzie gore",
+    "mike trout",
+    "nolan schanuel",
+    "reid detmers",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "31",
+   "entry_id": "5220130255",
+   "username": "MissingManning",
+   "points": 117.55,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 45.23,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin wynns",
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "henry bolte",
+    "mackenzie gore",
+    "mike trout",
+    "nolan schanuel",
+    "reid detmers",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "31",
+   "entry_id": "5220130256",
+   "username": "MissingManning",
+   "points": 117.55,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 45.23,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin wynns",
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "henry bolte",
+    "mackenzie gore",
+    "mike trout",
+    "nolan schanuel",
+    "reid detmers",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "31",
+   "entry_id": "5220130257",
+   "username": "MissingManning",
+   "points": 117.55,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 45.23,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin wynns",
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "henry bolte",
+    "mackenzie gore",
+    "mike trout",
+    "nolan schanuel",
+    "reid detmers",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "31",
+   "entry_id": "5220130258",
+   "username": "MissingManning",
+   "points": 117.55,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 45.23,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin wynns",
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "henry bolte",
+    "mackenzie gore",
+    "mike trout",
+    "nolan schanuel",
+    "reid detmers",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "31",
+   "entry_id": "5220130259",
+   "username": "MissingManning",
+   "points": 117.55,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 45.23,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin wynns",
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "henry bolte",
+    "mackenzie gore",
+    "mike trout",
+    "nolan schanuel",
+    "reid detmers",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "31",
+   "entry_id": "5220130260",
+   "username": "MissingManning",
+   "points": 117.55,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 45.23,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin wynns",
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "henry bolte",
+    "mackenzie gore",
+    "mike trout",
+    "nolan schanuel",
+    "reid detmers",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "31",
+   "entry_id": "5220150808",
+   "username": "loigwine",
+   "points": 117.55,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 44.43,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "mackenzie gore",
+    "mike trout",
+    "moises ballesteros",
+    "nicky lopez",
+    "nolan schanuel",
+    "reid detmers",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "40",
+   "entry_id": "5220109644",
+   "username": "kreise",
+   "points": 116.55,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 44.81,
+   "n_cheap": 1,
+   "players_norm": [
+    "alika williams",
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "jeff mcneil",
+    "jonah heim",
+    "mackenzie gore",
+    "mike trout",
+    "reid detmers",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "40",
+   "entry_id": "5220109667",
+   "username": "kreise",
+   "points": 116.55,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 44.81,
+   "n_cheap": 1,
+   "players_norm": [
+    "alika williams",
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "jeff mcneil",
+    "jonah heim",
+    "mackenzie gore",
+    "mike trout",
+    "reid detmers",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "42",
+   "entry_id": "5220107688",
+   "username": "troubledsoe",
+   "points": 115.950005,
+   "salary_used": 47100,
+   "salary_left": 2900,
+   "sp_pair": [
+    "Randy Dobnak",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 36.67,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "henry bolte",
+    "joc pederson",
+    "jonah heim",
+    "lawrence butler",
+    "max muncy",
+    "randy dobnak",
+    "reid detmers",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "43",
+   "entry_id": "5220049041",
+   "username": "TeamPop",
+   "points": 115.55,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 44.68,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "mackenzie gore",
+    "michael massey",
+    "mike trout",
+    "moises ballesteros",
+    "nolan schanuel",
+    "reid detmers",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "43",
+   "entry_id": "5220107854",
+   "username": "troubledsoe",
+   "points": 115.55,
+   "salary_used": 47100,
+   "salary_left": 2900,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 40.13,
+   "n_cheap": 2,
+   "players_norm": [
+    "adam frazier",
+    "austin wynns",
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "jac caglianone",
+    "josh lowe",
+    "mackenzie gore",
+    "reid detmers",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "43",
+   "entry_id": "5220133288",
+   "username": "sportsfan14",
+   "points": 115.55,
+   "salary_used": 44600,
+   "salary_left": 5400,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 36.71,
+   "n_cheap": 2,
+   "players_norm": [
+    "adam frazier",
+    "brandon nimmo",
+    "corey seager",
+    "denzer guzman",
+    "jake burger",
+    "josh lowe",
+    "mackenzie gore",
+    "moises ballesteros",
+    "reid detmers",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "46",
+   "entry_id": "5219402408",
+   "username": "yaopete",
+   "points": 114.950005,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Randy Dobnak",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 42.45,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "brian serven",
+    "corey seager",
+    "ezequiel duran",
+    "henry bolte",
+    "joc pederson",
+    "mike trout",
+    "randy dobnak",
+    "reid detmers",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "46",
+   "entry_id": "5220042044",
+   "username": "Daneog2333",
+   "points": 114.95,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Randy Dobnak",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 38.27,
+   "n_cheap": 0,
+   "players_norm": [
+    "brian serven",
+    "corey seager",
+    "ezequiel duran",
+    "jac caglianone",
+    "joc pederson",
+    "michael massey",
+    "mike trout",
+    "randy dobnak",
+    "reid detmers",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "48",
+   "entry_id": "5219036660",
+   "username": "minrobertson210",
+   "points": 114.55,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 44.01,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "henry bolte",
+    "jake burger",
+    "mackenzie gore",
+    "mike trout",
+    "moises ballesteros",
+    "nick loftin",
+    "reid detmers"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "49",
+   "entry_id": "5220088002",
+   "username": "wittwerjoe",
+   "points": 114.5,
+   "salary_used": 44000,
+   "salary_left": 6000,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 31.86,
+   "n_cheap": 2,
+   "players_norm": [
+    "adam frazier",
+    "henry bolte",
+    "j t ginn",
+    "jonah heim",
+    "josh lowe",
+    "max muncy",
+    "mike trout",
+    "nolan schanuel",
+    "reid detmers",
+    "zach neto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "50",
+   "entry_id": "5220083673",
+   "username": "imadeit110",
+   "points": 113.95,
+   "salary_used": 46000,
+   "salary_left": 4000,
+   "sp_pair": [
+    "Randy Dobnak",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 33.38,
+   "n_cheap": 0,
+   "players_norm": [
+    "corey seager",
+    "evan carter",
+    "henry bolte",
+    "jeff mcneil",
+    "joc pederson",
+    "jonah heim",
+    "max muncy",
+    "randy dobnak",
+    "reid detmers",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "51",
+   "entry_id": "5218946427",
+   "username": "wondertwins17",
+   "points": 112.55,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 43.71,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "mackenzie gore",
+    "mike trout",
+    "moises ballesteros",
+    "nolan schanuel",
+    "reid detmers",
+    "vaughn grissom",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "51",
+   "entry_id": "5219754099",
+   "username": "kemble12",
+   "points": 112.55,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 43.42,
+   "n_cheap": 1,
+   "players_norm": [
+    "alika williams",
+    "corey seager",
+    "ezequiel duran",
+    "jac caglianone",
+    "joc pederson",
+    "mackenzie gore",
+    "mike trout",
+    "moises ballesteros",
+    "reid detmers",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "51",
+   "entry_id": "5220082661",
+   "username": "kemble12",
+   "points": 112.55,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 43.42,
+   "n_cheap": 1,
+   "players_norm": [
+    "alika williams",
+    "corey seager",
+    "ezequiel duran",
+    "jac caglianone",
+    "joc pederson",
+    "mackenzie gore",
+    "mike trout",
+    "moises ballesteros",
+    "reid detmers",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "54",
+   "entry_id": "5220130963",
+   "username": "BigRedMachine1975",
+   "points": 111.95,
+   "salary_used": 46700,
+   "salary_left": 3300,
+   "sp_pair": [
+    "Randy Dobnak",
+    "Reid Detmers"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 35.53,
+   "n_cheap": 2,
+   "players_norm": [
+    "adam frazier",
+    "ezequiel duran",
+    "jac caglianone",
+    "luke maile",
+    "mike trout",
+    "randy dobnak",
+    "reid detmers",
+    "tommy white",
+    "wyatt langford",
+    "zach neto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "55",
+   "entry_id": "5220055140",
+   "username": "mrclean913",
+   "points": 111.55,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 39.16,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "evan carter",
+    "ezequiel duran",
+    "jake burger",
+    "jeff mcneil",
+    "jonah heim",
+    "mackenzie gore",
+    "reid detmers",
+    "wyatt langford",
+    "zach neto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "55",
+   "entry_id": "5220107886",
+   "username": "troubledsoe",
+   "points": 111.55,
+   "salary_used": 48000,
+   "salary_left": 2000,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 37.59,
+   "n_cheap": 1,
+   "players_norm": [
+    "adam frazier",
+    "austin wynns",
+    "evan carter",
+    "ezequiel duran",
+    "jake burger",
+    "mackenzie gore",
+    "mike trout",
+    "reid detmers",
+    "wyatt langford",
+    "zach neto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "57",
+   "entry_id": "5219243848",
+   "username": "Stree",
+   "points": 110.55,
+   "salary_used": 47100,
+   "salary_left": 2900,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 41.44,
+   "n_cheap": 1,
+   "players_norm": [
+    "adam frazier",
+    "austin wynns",
+    "brandon nimmo",
+    "corey seager",
+    "denzer guzman",
+    "joc pederson",
+    "mackenzie gore",
+    "mike trout",
+    "reid detmers",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "57",
+   "entry_id": "5219420680",
+   "username": "Elwaysarmy",
+   "points": 110.55,
+   "salary_used": 45000,
+   "salary_left": 5000,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 31.18,
+   "n_cheap": 1,
+   "players_norm": [
+    "corey seager",
+    "denzer guzman",
+    "evan carter",
+    "jake burger",
+    "josh lowe",
+    "mackenzie gore",
+    "nicky lopez",
+    "reid detmers",
+    "salvador perez",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "59",
+   "entry_id": "5219402409",
+   "username": "yaopete",
+   "points": 109.950005,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Randy Dobnak",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 42.83,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "jeff mcneil",
+    "joc pederson",
+    "jonah heim",
+    "randy dobnak",
+    "reid detmers",
+    "wyatt langford",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "60",
+   "entry_id": "5219064267",
+   "username": "goofybh207",
+   "points": 109.55,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 46.71,
+   "n_cheap": 1,
+   "players_norm": [
+    "adam frazier",
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "joc pederson",
+    "mackenzie gore",
+    "mike trout",
+    "moises ballesteros",
+    "reid detmers",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "60",
+   "entry_id": "5219243842",
+   "username": "Stree",
+   "points": 109.55,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 46.71,
+   "n_cheap": 1,
+   "players_norm": [
+    "adam frazier",
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "joc pederson",
+    "mackenzie gore",
+    "mike trout",
+    "moises ballesteros",
+    "reid detmers",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "60",
+   "entry_id": "5220041539",
+   "username": "dtapper29",
+   "points": 109.55,
+   "salary_used": 48600,
+   "salary_left": 1400,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 42.83,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "evan carter",
+    "ezequiel duran",
+    "henry bolte",
+    "joc pederson",
+    "mackenzie gore",
+    "moises ballesteros",
+    "reid detmers",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "60",
+   "entry_id": "5220041541",
+   "username": "dtapper29",
+   "points": 109.55,
+   "salary_used": 48000,
+   "salary_left": 2000,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 42.49,
+   "n_cheap": 1,
+   "players_norm": [
+    "adam frazier",
+    "corey seager",
+    "evan carter",
+    "ezequiel duran",
+    "joc pederson",
+    "mackenzie gore",
+    "mike trout",
+    "moises ballesteros",
+    "reid detmers",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "60",
+   "entry_id": "5220043446",
+   "username": "Gsmoney2469",
+   "points": 109.55,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 44.98,
+   "n_cheap": 1,
+   "players_norm": [
+    "alika williams",
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "joc pederson",
+    "mackenzie gore",
+    "mike trout",
+    "reid detmers",
+    "salvador perez",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "60",
+   "entry_id": "5220055136",
+   "username": "mrclean913",
+   "points": 109.55,
+   "salary_used": 48600,
+   "salary_left": 1400,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 42.83,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "evan carter",
+    "ezequiel duran",
+    "henry bolte",
+    "joc pederson",
+    "mackenzie gore",
+    "moises ballesteros",
+    "reid detmers",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "60",
+   "entry_id": "5220089467",
+   "username": "bleeski",
+   "points": 109.55,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 46.71,
+   "n_cheap": 1,
+   "players_norm": [
+    "adam frazier",
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "joc pederson",
+    "mackenzie gore",
+    "mike trout",
+    "moises ballesteros",
+    "reid detmers",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "60",
+   "entry_id": "5220114724",
+   "username": "criminalbob",
+   "points": 109.55,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 42.78,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "ezequiel duran",
+    "mackenzie gore",
+    "mike trout",
+    "moises ballesteros",
+    "nicky lopez",
+    "nolan schanuel",
+    "reid detmers",
+    "wyatt langford",
+    "zach neto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "60",
+   "entry_id": "5220135951",
+   "username": "FLYERSPOWER",
+   "points": 109.55,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 42.78,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "ezequiel duran",
+    "mackenzie gore",
+    "mike trout",
+    "moises ballesteros",
+    "nicky lopez",
+    "nolan schanuel",
+    "reid detmers",
+    "wyatt langford",
+    "zach neto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "60",
+   "entry_id": "5220144528",
+   "username": "peterjpacheco",
+   "points": 109.55,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 42.62,
+   "n_cheap": 2,
+   "players_norm": [
+    "adam frazier",
+    "bobby witt",
+    "brandon nimmo",
+    "ezequiel duran",
+    "henry bolte",
+    "jac caglianone",
+    "luke maile",
+    "mackenzie gore",
+    "mike trout",
+    "reid detmers"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "70",
+   "entry_id": "5220112926",
+   "username": "Rowdog31",
+   "points": 109.5,
+   "salary_used": 44700,
+   "salary_left": 5300,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 33.25,
+   "n_cheap": 1,
+   "players_norm": [
+    "alika williams",
+    "brandon nimmo",
+    "henry bolte",
+    "j t ginn",
+    "joc pederson",
+    "moises ballesteros",
+    "reid detmers",
+    "tommy white",
+    "zach neto",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "71",
+   "entry_id": "5218708386",
+   "username": "stevmortc",
+   "points": 108.55,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 42.53,
+   "n_cheap": 1,
+   "players_norm": [
+    "bobby witt",
+    "ezequiel duran",
+    "henry bolte",
+    "joc pederson",
+    "luke maile",
+    "mackenzie gore",
+    "mike trout",
+    "nick loftin",
+    "reid detmers",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "71",
+   "entry_id": "5219641697",
+   "username": "darren2326",
+   "points": 108.55,
+   "salary_used": 48700,
+   "salary_left": 1300,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 33.97,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "denzer guzman",
+    "evan carter",
+    "henry bolte",
+    "jake burger",
+    "jonah heim",
+    "lawrence butler",
+    "mackenzie gore",
+    "reid detmers",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "71",
+   "entry_id": "5220144526",
+   "username": "peterjpacheco",
+   "points": 108.55,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 43.71,
+   "n_cheap": 1,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "jake burger",
+    "jeff mcneil",
+    "mackenzie gore",
+    "mike trout",
+    "reid detmers",
+    "tyler heineman",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "74",
+   "entry_id": "5219121129",
+   "username": "starplay",
+   "points": 108.5,
+   "salary_used": 47300,
+   "salary_left": 2700,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 35.11,
+   "n_cheap": 0,
+   "players_norm": [
+    "henry bolte",
+    "j t ginn",
+    "jonah heim",
+    "max muncy",
+    "mike trout",
+    "nolan schanuel",
+    "reid detmers",
+    "wade meckler",
+    "zach neto",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "74",
+   "entry_id": "5220089466",
+   "username": "bleeski",
+   "points": 108.5,
+   "salary_used": 47100,
+   "salary_left": 2900,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 35.06,
+   "n_cheap": 0,
+   "players_norm": [
+    "denzer guzman",
+    "henry bolte",
+    "j t ginn",
+    "jonah heim",
+    "mike trout",
+    "nolan schanuel",
+    "reid detmers",
+    "wade meckler",
+    "zach neto",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "74",
+   "entry_id": "5220098120",
+   "username": "jazzyj0619",
+   "points": 108.5,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 36.88,
+   "n_cheap": 0,
+   "players_norm": [
+    "henry bolte",
+    "j t ginn",
+    "jac caglianone",
+    "jeff mcneil",
+    "jonah heim",
+    "mike trout",
+    "reid detmers",
+    "tommy white",
+    "zach neto",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "74",
+   "entry_id": "5220112917",
+   "username": "Rowdog31",
+   "points": 108.5,
+   "salary_used": 45900,
+   "salary_left": 4100,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 34.39,
+   "n_cheap": 0,
+   "players_norm": [
+    "henry bolte",
+    "j t ginn",
+    "mike trout",
+    "moises ballesteros",
+    "nolan schanuel",
+    "reid detmers",
+    "tommy white",
+    "wade meckler",
+    "zach neto",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "78",
+   "entry_id": "5219697775",
+   "username": "bkukor",
+   "points": 107.55,
+   "salary_used": 44000,
+   "salary_left": 6000,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 36.58,
+   "n_cheap": 2,
+   "players_norm": [
+    "adam frazier",
+    "austin wynns",
+    "brandon nimmo",
+    "corey seager",
+    "denzer guzman",
+    "joc pederson",
+    "josh lowe",
+    "mackenzie gore",
+    "reid detmers",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "78",
+   "entry_id": "5220133286",
+   "username": "sportsfan14",
+   "points": 107.55,
+   "salary_used": 44000,
+   "salary_left": 6000,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 36.58,
+   "n_cheap": 2,
+   "players_norm": [
+    "adam frazier",
+    "austin wynns",
+    "brandon nimmo",
+    "corey seager",
+    "denzer guzman",
+    "joc pederson",
+    "josh lowe",
+    "mackenzie gore",
+    "reid detmers",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "80",
+   "entry_id": "5219352855",
+   "username": "howardwi",
+   "points": 106.9,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Randy Dobnak"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 37.81,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "brandon nimmo",
+    "ezequiel duran",
+    "henry bolte",
+    "jake burger",
+    "jonah heim",
+    "mackenzie gore",
+    "nick loftin",
+    "randy dobnak",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "81",
+   "entry_id": "5220098114",
+   "username": "jazzyj0619",
+   "points": 106.55,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 41.05,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "joc pederson",
+    "jonah heim",
+    "mackenzie gore",
+    "michael massey",
+    "reid detmers",
+    "tyler tolbert",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "82",
+   "entry_id": "5220035965",
+   "username": "Gsmoney2469",
+   "points": 106.5,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Reid Detmers"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 38.44,
+   "n_cheap": 0,
+   "players_norm": [
+    "ezequiel duran",
+    "henry bolte",
+    "j t ginn",
+    "jake burger",
+    "jonah heim",
+    "mike trout",
+    "reid detmers",
+    "wade meckler",
+    "zach neto",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "82",
+   "entry_id": "5220055137",
+   "username": "mrclean913",
+   "points": 106.5,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 36.2,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "henry bolte",
+    "j t ginn",
+    "jonah heim",
+    "lawrence butler",
+    "max muncy",
+    "mike trout",
+    "nolan schanuel",
+    "reid detmers",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "84",
+   "entry_id": "5219191211",
+   "username": "weakglovehand",
+   "points": 105.55,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 43.25,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "ezequiel duran",
+    "jake burger",
+    "jonah heim",
+    "mackenzie gore",
+    "mike trout",
+    "nick loftin",
+    "reid detmers",
+    "tyler tolbert",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "85",
+   "entry_id": "5220145319",
+   "username": "jdn1991",
+   "points": 105.5,
+   "salary_used": 48400,
+   "salary_left": 1600,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 33.33,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "henry bolte",
+    "j t ginn",
+    "jac caglianone",
+    "jeff mcneil",
+    "jonah heim",
+    "reid detmers",
+    "tommy white",
+    "wade meckler",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "85",
+   "entry_id": "5220148739",
+   "username": "Emac",
+   "points": 105.5,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Reid Detmers"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 40.55,
+   "n_cheap": 0,
+   "players_norm": [
+    "corey seager",
+    "ezequiel duran",
+    "henry bolte",
+    "j t ginn",
+    "jonah heim",
+    "mike trout",
+    "reid detmers",
+    "salvador perez",
+    "wade meckler",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "87",
+   "entry_id": "5220116158",
+   "username": "Chitownkilla9913",
+   "points": 104.9,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Randy Dobnak"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 37.81,
+   "n_cheap": 1,
+   "players_norm": [
+    "alika williams",
+    "bobby witt",
+    "ezequiel duran",
+    "henry bolte",
+    "jac caglianone",
+    "mackenzie gore",
+    "mike trout",
+    "randy dobnak",
+    "salvador perez",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "88",
+   "entry_id": "5219170096",
+   "username": "whoisjohngalt420",
+   "points": 104.5,
+   "salary_used": 46800,
+   "salary_left": 3200,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 33.0,
+   "n_cheap": 0,
+   "players_norm": [
+    "brian serven",
+    "henry bolte",
+    "j t ginn",
+    "jeff mcneil",
+    "max muncy",
+    "mike trout",
+    "nolan schanuel",
+    "reid detmers",
+    "zach neto",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "89",
+   "entry_id": "5219697778",
+   "username": "bkukor",
+   "points": 103.55,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 40.38,
+   "n_cheap": 0,
+   "players_norm": [
+    "evan carter",
+    "ezequiel duran",
+    "joc pederson",
+    "jonah heim",
+    "mackenzie gore",
+    "mike trout",
+    "nicky lopez",
+    "reid detmers",
+    "wyatt langford",
+    "zach neto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "89",
+   "entry_id": "5220112922",
+   "username": "Rowdog31",
+   "points": 103.55,
+   "salary_used": 44900,
+   "salary_left": 5100,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 37.34,
+   "n_cheap": 1,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "denzer guzman",
+    "joc pederson",
+    "josh lowe",
+    "mackenzie gore",
+    "moises ballesteros",
+    "nicky lopez",
+    "reid detmers",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "91",
+   "entry_id": "5219235858",
+   "username": "PIGBEARMAN",
+   "points": 103.5,
+   "salary_used": 48800,
+   "salary_left": 1200,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 35.61,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "ezequiel duran",
+    "henry bolte",
+    "j t ginn",
+    "jeff mcneil",
+    "jonah heim",
+    "lawrence butler",
+    "nolan schanuel",
+    "reid detmers",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "92",
+   "entry_id": "5219036659",
+   "username": "minrobertson210",
+   "points": 102.55,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 42.83,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "evan carter",
+    "ezequiel duran",
+    "jonah heim",
+    "mackenzie gore",
+    "mike trout",
+    "nick loftin",
+    "nolan schanuel",
+    "reid detmers"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "92",
+   "entry_id": "5219243844",
+   "username": "Stree",
+   "points": 102.55,
+   "salary_used": 48600,
+   "salary_left": 1400,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 43.38,
+   "n_cheap": 1,
+   "players_norm": [
+    "adam frazier",
+    "austin wynns",
+    "brandon nimmo",
+    "ezequiel duran",
+    "joc pederson",
+    "mackenzie gore",
+    "mike trout",
+    "reid detmers",
+    "wyatt langford",
+    "zach neto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "92",
+   "entry_id": "5220133285",
+   "username": "sportsfan14",
+   "points": 102.55,
+   "salary_used": 45100,
+   "salary_left": 4900,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 39.49,
+   "n_cheap": 2,
+   "players_norm": [
+    "adam frazier",
+    "corey seager",
+    "denzer guzman",
+    "joc pederson",
+    "josh lowe",
+    "mackenzie gore",
+    "mike trout",
+    "moises ballesteros",
+    "reid detmers",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "92",
+   "entry_id": "5220144527",
+   "username": "peterjpacheco",
+   "points": 102.55,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 43.04,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "mackenzie gore",
+    "max muncy",
+    "mike trout",
+    "nolan schanuel",
+    "reid detmers",
+    "salvador perez",
+    "wyatt langford",
+    "zach neto",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "96",
+   "entry_id": "5220041545",
+   "username": "dtapper29",
+   "points": 102.5,
+   "salary_used": 48000,
+   "salary_left": 2000,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 35.99,
+   "n_cheap": 0,
+   "players_norm": [
+    "henry bolte",
+    "j t ginn",
+    "joc pederson",
+    "jonah heim",
+    "lawrence butler",
+    "mike trout",
+    "reid detmers",
+    "tommy white",
+    "zach neto",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "97",
+   "entry_id": "5220055139",
+   "username": "mrclean913",
+   "points": 101.55,
+   "salary_used": 48300,
+   "salary_left": 1700,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 42.15,
+   "n_cheap": 0,
+   "players_norm": [
+    "corey seager",
+    "ezequiel duran",
+    "joc pederson",
+    "mackenzie gore",
+    "mike trout",
+    "moises ballesteros",
+    "nicky lopez",
+    "reid detmers",
+    "wade meckler",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "97",
+   "entry_id": "5220073748",
+   "username": "SuperDavisms",
+   "points": 101.55,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 41.14,
+   "n_cheap": 0,
+   "players_norm": [
+    "corey seager",
+    "ezequiel duran",
+    "joc pederson",
+    "jonah heim",
+    "lawrence butler",
+    "mackenzie gore",
+    "michael massey",
+    "reid detmers",
+    "wyatt langford",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "99",
+   "entry_id": "5220088001",
+   "username": "wittwerjoe",
+   "points": 101.5,
+   "salary_used": 44200,
+   "salary_left": 5800,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 32.02,
+   "n_cheap": 1,
+   "players_norm": [
+    "henry bolte",
+    "j t ginn",
+    "jeff mcneil",
+    "josh lowe",
+    "max muncy",
+    "mike trout",
+    "moises ballesteros",
+    "nolan schanuel",
+    "reid detmers",
+    "zach neto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "99",
+   "entry_id": "5220112928",
+   "username": "Rowdog31",
+   "points": 101.5,
+   "salary_used": 45000,
+   "salary_left": 5000,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 31.9,
+   "n_cheap": 1,
+   "players_norm": [
+    "denzer guzman",
+    "j t ginn",
+    "jonah heim",
+    "josh lowe",
+    "nolan schanuel",
+    "reid detmers",
+    "wade meckler",
+    "wyatt langford",
+    "zach neto",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "99",
+   "entry_id": "5220123124",
+   "username": "Rowdog31",
+   "points": 101.5,
+   "salary_used": 45300,
+   "salary_left": 4700,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 33.5,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "henry bolte",
+    "j t ginn",
+    "jeff mcneil",
+    "moises ballesteros",
+    "reid detmers",
+    "tommy white",
+    "wade meckler",
+    "zach neto",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "102",
+   "entry_id": "5220096604",
+   "username": "sphere3d",
+   "points": 100.55,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 44.89,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "joc pederson",
+    "lawrence butler",
+    "mackenzie gore",
+    "moises ballesteros",
+    "reid detmers",
+    "wyatt langford",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "102",
+   "entry_id": "5220133283",
+   "username": "sportsfan14",
+   "points": 100.55,
+   "salary_used": 44400,
+   "salary_left": 5600,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 37.43,
+   "n_cheap": 3,
+   "players_norm": [
+    "adam frazier",
+    "corey seager",
+    "denzer guzman",
+    "joc pederson",
+    "josh lowe",
+    "mackenzie gore",
+    "mike trout",
+    "reid detmers",
+    "tyler heineman",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "102",
+   "entry_id": "5220144529",
+   "username": "peterjpacheco",
+   "points": 100.55,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 41.18,
+   "n_cheap": 1,
+   "players_norm": [
+    "brandon nimmo",
+    "jake burger",
+    "luke maile",
+    "mackenzie gore",
+    "max muncy",
+    "mike trout",
+    "reid detmers",
+    "wyatt langford",
+    "zach neto",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "105",
+   "entry_id": "5219420682",
+   "username": "Elwaysarmy",
+   "points": 100.5,
+   "salary_used": 44700,
+   "salary_left": 5300,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 29.66,
+   "n_cheap": 1,
+   "players_norm": [
+    "henry bolte",
+    "j t ginn",
+    "jonah heim",
+    "josh lowe",
+    "michael massey",
+    "reid detmers",
+    "salvador perez",
+    "tommy white",
+    "zach neto",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "106",
+   "entry_id": "5220131016",
+   "username": "Skizillzx",
+   "points": 99.95,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Randy Dobnak",
+    "Reid Detmers"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 39.92,
+   "n_cheap": 0,
+   "players_norm": [
+    "ezequiel duran",
+    "jake burger",
+    "mike trout",
+    "nick loftin",
+    "randy dobnak",
+    "reid detmers",
+    "salvador perez",
+    "wyatt langford",
+    "zach neto",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "107",
+   "entry_id": "5219243846",
+   "username": "Stree",
+   "points": 99.55,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 45.19,
+   "n_cheap": 1,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "joc pederson",
+    "mackenzie gore",
+    "mike trout",
+    "nick loftin",
+    "reid detmers",
+    "tyler heineman",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "108",
+   "entry_id": "5219091019",
+   "username": "davidlobo4",
+   "points": 98.55,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 44.13,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "ezequiel duran",
+    "joc pederson",
+    "mackenzie gore",
+    "mike trout",
+    "moises ballesteros",
+    "nicky lopez",
+    "reid detmers",
+    "wyatt langford",
+    "zach neto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "108",
+   "entry_id": "5220034668",
+   "username": "slophound",
+   "points": 98.55,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 44.73,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "joc pederson",
+    "mackenzie gore",
+    "reid detmers",
+    "salvador perez",
+    "wade meckler",
+    "wyatt langford",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "108",
+   "entry_id": "5220083671",
+   "username": "imadeit110",
+   "points": 98.55,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 44.13,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "ezequiel duran",
+    "joc pederson",
+    "mackenzie gore",
+    "mike trout",
+    "moises ballesteros",
+    "nicky lopez",
+    "reid detmers",
+    "wyatt langford",
+    "zach neto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "111",
+   "entry_id": "5220093101",
+   "username": "rpaulick7257",
+   "points": 97.55,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 43.42,
+   "n_cheap": 1,
+   "players_norm": [
+    "adam frazier",
+    "corey seager",
+    "ezequiel duran",
+    "jac caglianone",
+    "mackenzie gore",
+    "mike trout",
+    "nolan schanuel",
+    "reid detmers",
+    "salvador perez",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "111",
+   "entry_id": "5220137500",
+   "username": "BigRedMachine1975",
+   "points": 97.55,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 39.11,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin wynns",
+    "bobby witt",
+    "brandon nimmo",
+    "ezequiel duran",
+    "jac caglianone",
+    "jeff mcneil",
+    "mackenzie gore",
+    "reid detmers",
+    "starling marte",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "113",
+   "entry_id": "5219697776",
+   "username": "bkukor",
+   "points": 97.5,
+   "salary_used": 47600,
+   "salary_left": 2400,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 35.44,
+   "n_cheap": 0,
+   "players_norm": [
+    "henry bolte",
+    "j t ginn",
+    "jeff mcneil",
+    "jonah heim",
+    "max muncy",
+    "mike trout",
+    "reid detmers",
+    "wade meckler",
+    "zach neto",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "114",
+   "entry_id": "5220041544",
+   "username": "dtapper29",
+   "points": 96.55,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 44.73,
+   "n_cheap": 1,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "joc pederson",
+    "josh lowe",
+    "mackenzie gore",
+    "reid detmers",
+    "salvador perez",
+    "wyatt langford",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "115",
+   "entry_id": "5220129023",
+   "username": "msaliba21",
+   "points": 96.5,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Reid Detmers"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 34.01,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "denzer guzman",
+    "henry bolte",
+    "j t ginn",
+    "jac caglianone",
+    "jeff mcneil",
+    "lawrence butler",
+    "mike trout",
+    "reid detmers",
+    "salvador perez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "116",
+   "entry_id": "5220070399",
+   "username": "sparky162",
+   "points": 95.5,
+   "salary_used": 46000,
+   "salary_left": 4000,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 32.45,
+   "n_cheap": 1,
+   "players_norm": [
+    "henry bolte",
+    "j t ginn",
+    "jeff mcneil",
+    "lawrence butler",
+    "mike trout",
+    "reid detmers",
+    "tommy white",
+    "tyler heineman",
+    "zach neto",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "116",
+   "entry_id": "5220148213",
+   "username": "bosoxeric722",
+   "points": 95.5,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 39.11,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "denzer guzman",
+    "j t ginn",
+    "jac caglianone",
+    "jonah heim",
+    "mike trout",
+    "nolan schanuel",
+    "reid detmers",
+    "zach neto",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "118",
+   "entry_id": "5219243843",
+   "username": "Stree",
+   "points": 94.55,
+   "salary_used": 47800,
+   "salary_left": 2200,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 43.17,
+   "n_cheap": 1,
+   "players_norm": [
+    "adam frazier",
+    "brandon nimmo",
+    "corey seager",
+    "evan carter",
+    "ezequiel duran",
+    "joc pederson",
+    "mackenzie gore",
+    "mike trout",
+    "moises ballesteros",
+    "reid detmers"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "119",
+   "entry_id": "5219420678",
+   "username": "Elwaysarmy",
+   "points": 94.5,
+   "salary_used": 44800,
+   "salary_left": 5200,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 34.73,
+   "n_cheap": 1,
+   "players_norm": [
+    "brandon nimmo",
+    "denzer guzman",
+    "henry bolte",
+    "j t ginn",
+    "joc pederson",
+    "josh lowe",
+    "moises ballesteros",
+    "reid detmers",
+    "zach neto",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "119",
+   "entry_id": "5220122810",
+   "username": "Rowdog31",
+   "points": 94.5,
+   "salary_used": 45000,
+   "salary_left": 5000,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 31.86,
+   "n_cheap": 1,
+   "players_norm": [
+    "j t ginn",
+    "josh lowe",
+    "nick loftin",
+    "nolan schanuel",
+    "reid detmers",
+    "salvador perez",
+    "wade meckler",
+    "wyatt langford",
+    "zach neto",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "121",
+   "entry_id": "5220032718",
+   "username": "Daneog2333",
+   "points": 93.95,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "Randy Dobnak",
+    "Reid Detmers"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 38.94,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "brandon nimmo",
+    "jac caglianone",
+    "jeff mcneil",
+    "joc pederson",
+    "jonah heim",
+    "mike trout",
+    "randy dobnak",
+    "reid detmers",
+    "tommy white"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "122",
+   "entry_id": "5220144530",
+   "username": "peterjpacheco",
+   "points": 93.55,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 41.35,
+   "n_cheap": 1,
+   "players_norm": [
+    "bobby witt",
+    "ezequiel duran",
+    "isaac collins",
+    "luke maile",
+    "mackenzie gore",
+    "mike trout",
+    "nolan schanuel",
+    "reid detmers",
+    "wyatt langford",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "123",
+   "entry_id": "5220096605",
+   "username": "sphere3d",
+   "points": 92.55,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-2",
+   "chalk_score": 45.44,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "lawrence butler",
+    "mackenzie gore",
+    "mike trout",
+    "moises ballesteros",
+    "nolan schanuel",
+    "reid detmers",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "124",
+   "entry_id": "5220123582",
+   "username": "JOZZ",
+   "points": 91.85,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Randy Dobnak"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 35.11,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "j t ginn",
+    "jac caglianone",
+    "jonah heim",
+    "mike trout",
+    "nolan schanuel",
+    "randy dobnak",
+    "tommy white",
+    "wyatt langford",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "125",
+   "entry_id": "5220055557",
+   "username": "seiferidjosh80",
+   "points": 91.55,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 36.84,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "henry bolte",
+    "jac caglianone",
+    "jeff mcneil",
+    "mackenzie gore",
+    "max muncy",
+    "nick loftin",
+    "reid detmers",
+    "salvador perez",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "126",
+   "entry_id": "5219402406",
+   "username": "yaopete",
+   "points": 90.9,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Randy Dobnak"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 44.18,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "mackenzie gore",
+    "mike trout",
+    "moises ballesteros",
+    "nolan schanuel",
+    "randy dobnak",
+    "wyatt langford",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "127",
+   "entry_id": "5220032845",
+   "username": "stevek814",
+   "points": 90.55,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 39.49,
+   "n_cheap": 1,
+   "players_norm": [
+    "bobby witt",
+    "jac caglianone",
+    "jeff mcneil",
+    "joc pederson",
+    "luke maile",
+    "mackenzie gore",
+    "max muncy",
+    "mike trout",
+    "reid detmers",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "127",
+   "entry_id": "5220041540",
+   "username": "dtapper29",
+   "points": 90.55,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 40.55,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "evan carter",
+    "ezequiel duran",
+    "joc pederson",
+    "mackenzie gore",
+    "moises ballesteros",
+    "reid detmers",
+    "wade meckler",
+    "wyatt langford",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "127",
+   "entry_id": "5220055141",
+   "username": "mrclean913",
+   "points": 90.55,
+   "salary_used": 48000,
+   "salary_left": 2000,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 38.27,
+   "n_cheap": 0,
+   "players_norm": [
+    "jac caglianone",
+    "mackenzie gore",
+    "mike trout",
+    "moises ballesteros",
+    "nolan schanuel",
+    "reid detmers",
+    "tommy white",
+    "wade meckler",
+    "zach neto",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "127",
+   "entry_id": "5220089465",
+   "username": "bleeski",
+   "points": 90.55,
+   "salary_used": 46300,
+   "salary_left": 3700,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 33.38,
+   "n_cheap": 1,
+   "players_norm": [
+    "brandon nimmo",
+    "denzer guzman",
+    "evan carter",
+    "jake burger",
+    "mackenzie gore",
+    "mike trout",
+    "nicky lopez",
+    "reid detmers",
+    "tyler heineman",
+    "zach neto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "131",
+   "entry_id": "5219402405",
+   "username": "yaopete",
+   "points": 89.9,
+   "salary_used": 47900,
+   "salary_left": 2100,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Randy Dobnak"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 39.58,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "jeff mcneil",
+    "joc pederson",
+    "jonah heim",
+    "mackenzie gore",
+    "mike trout",
+    "randy dobnak",
+    "tommy white",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "132",
+   "entry_id": "5218622552",
+   "username": "Dgyonxrypr",
+   "points": 89.55,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 35.15,
+   "n_cheap": 1,
+   "players_norm": [
+    "carter jensen",
+    "ezequiel duran",
+    "jac caglianone",
+    "kyle isbel",
+    "mackenzie gore",
+    "reid detmers",
+    "tyler tolbert",
+    "wyatt langford",
+    "zach neto",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "132",
+   "entry_id": "5220149803",
+   "username": "mitchellmorse30",
+   "points": 89.55,
+   "salary_used": 47400,
+   "salary_left": 2600,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 43.76,
+   "n_cheap": 1,
+   "players_norm": [
+    "adam frazier",
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "joc pederson",
+    "mackenzie gore",
+    "mike trout",
+    "moises ballesteros",
+    "reid detmers",
+    "wade meckler"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "132",
+   "entry_id": "5220149804",
+   "username": "mitchellmorse30",
+   "points": 89.55,
+   "salary_used": 45700,
+   "salary_left": 4300,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 40.17,
+   "n_cheap": 1,
+   "players_norm": [
+    "adam frazier",
+    "brandon nimmo",
+    "corey seager",
+    "denzer guzman",
+    "joc pederson",
+    "mackenzie gore",
+    "mike trout",
+    "moises ballesteros",
+    "reid detmers",
+    "wade meckler"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "135",
+   "entry_id": "5219915738",
+   "username": "TeamPop",
+   "points": 88.55,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 44.18,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "isaac collins",
+    "jake burger",
+    "mackenzie gore",
+    "mike trout",
+    "moises ballesteros",
+    "reid detmers",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "136",
+   "entry_id": "5220133284",
+   "username": "sportsfan14",
+   "points": 87.55,
+   "salary_used": 44900,
+   "salary_left": 5100,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 40.17,
+   "n_cheap": 2,
+   "players_norm": [
+    "adam frazier",
+    "brandon nimmo",
+    "corey seager",
+    "denzer guzman",
+    "joc pederson",
+    "josh lowe",
+    "mackenzie gore",
+    "mike trout",
+    "moises ballesteros",
+    "reid detmers"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "136",
+   "entry_id": "5220149806",
+   "username": "mitchellmorse30",
+   "points": 87.55,
+   "salary_used": 45000,
+   "salary_left": 5000,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 38.1,
+   "n_cheap": 2,
+   "players_norm": [
+    "adam frazier",
+    "brandon nimmo",
+    "corey seager",
+    "denzer guzman",
+    "joc pederson",
+    "mackenzie gore",
+    "mike trout",
+    "reid detmers",
+    "tyler heineman",
+    "wade meckler"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "136",
+   "entry_id": "5220149807",
+   "username": "mitchellmorse30",
+   "points": 87.55,
+   "salary_used": 46600,
+   "salary_left": 3400,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 43.76,
+   "n_cheap": 2,
+   "players_norm": [
+    "adam frazier",
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "joc pederson",
+    "josh lowe",
+    "mackenzie gore",
+    "mike trout",
+    "moises ballesteros",
+    "reid detmers"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "136",
+   "entry_id": "5220149809",
+   "username": "mitchellmorse30",
+   "points": 87.55,
+   "salary_used": 44900,
+   "salary_left": 5100,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 40.17,
+   "n_cheap": 2,
+   "players_norm": [
+    "adam frazier",
+    "brandon nimmo",
+    "corey seager",
+    "denzer guzman",
+    "joc pederson",
+    "josh lowe",
+    "mackenzie gore",
+    "mike trout",
+    "moises ballesteros",
+    "reid detmers"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "140",
+   "entry_id": "5220116157",
+   "username": "Chitownkilla9913",
+   "points": 87.5,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 38.56,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "brandon nimmo",
+    "j t ginn",
+    "jonah heim",
+    "lawrence butler",
+    "max muncy",
+    "mike trout",
+    "nolan schanuel",
+    "reid detmers",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "141",
+   "entry_id": "5219170092",
+   "username": "whoisjohngalt420",
+   "points": 86.9,
+   "salary_used": 45900,
+   "salary_left": 4100,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Randy Dobnak"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 31.9,
+   "n_cheap": 1,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "isaac collins",
+    "jake burger",
+    "luke maile",
+    "mackenzie gore",
+    "michael massey",
+    "randy dobnak",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "142",
+   "entry_id": "5219152316",
+   "username": "Dave2zone",
+   "points": 86.85,
+   "salary_used": 47500,
+   "salary_left": 2500,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Randy Dobnak"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 32.83,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "henry bolte",
+    "j t ginn",
+    "jeff mcneil",
+    "joc pederson",
+    "max muncy",
+    "mike trout",
+    "randy dobnak",
+    "salvador perez",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "143",
+   "entry_id": "5220041543",
+   "username": "dtapper29",
+   "points": 86.55,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 44.68,
+   "n_cheap": 1,
+   "players_norm": [
+    "ezequiel duran",
+    "joc pederson",
+    "josh lowe",
+    "mackenzie gore",
+    "mike trout",
+    "moises ballesteros",
+    "reid detmers",
+    "wyatt langford",
+    "zach neto",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "143",
+   "entry_id": "5220073764",
+   "username": "envymygrind",
+   "points": 86.55,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 43.71,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "joc pederson",
+    "jonah heim",
+    "lawrence butler",
+    "mackenzie gore",
+    "max muncy",
+    "mike trout",
+    "reid detmers",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "143",
+   "entry_id": "5220144531",
+   "username": "peterjpacheco",
+   "points": 86.55,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 42.45,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "joc pederson",
+    "mackenzie gore",
+    "max muncy",
+    "mike trout",
+    "moises ballesteros",
+    "reid detmers",
+    "wade meckler",
+    "wyatt langford",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "146",
+   "entry_id": "5220032716",
+   "username": "Daneog2333",
+   "points": 85.55,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 39.66,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "ezequiel duran",
+    "jake burger",
+    "lawrence butler",
+    "mackenzie gore",
+    "michael massey",
+    "mike trout",
+    "moises ballesteros",
+    "reid detmers",
+    "zach neto"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "146",
+   "entry_id": "5220133287",
+   "username": "sportsfan14",
+   "points": 85.55,
+   "salary_used": 44200,
+   "salary_left": 5800,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 38.1,
+   "n_cheap": 3,
+   "players_norm": [
+    "adam frazier",
+    "brandon nimmo",
+    "corey seager",
+    "denzer guzman",
+    "joc pederson",
+    "josh lowe",
+    "mackenzie gore",
+    "mike trout",
+    "reid detmers",
+    "tyler heineman"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "146",
+   "entry_id": "5220149808",
+   "username": "mitchellmorse30",
+   "points": 85.55,
+   "salary_used": 44200,
+   "salary_left": 5800,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 38.1,
+   "n_cheap": 3,
+   "players_norm": [
+    "adam frazier",
+    "brandon nimmo",
+    "corey seager",
+    "denzer guzman",
+    "joc pederson",
+    "josh lowe",
+    "mackenzie gore",
+    "mike trout",
+    "reid detmers",
+    "tyler heineman"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "149",
+   "entry_id": "5220087997",
+   "username": "wittwerjoe",
+   "points": 84.9,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Randy Dobnak"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 36.08,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin wynns",
+    "bobby witt",
+    "brandon nimmo",
+    "ezequiel duran",
+    "jac caglianone",
+    "jake burger",
+    "mackenzie gore",
+    "nick loftin",
+    "randy dobnak",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "150",
+   "entry_id": "5219152315",
+   "username": "Dave2zone",
+   "points": 84.55,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 2,
+   "stack_pattern": "2-2-2-2",
+   "chalk_score": 39.45,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "jeff mcneil",
+    "joc pederson",
+    "mackenzie gore",
+    "max muncy",
+    "mike trout",
+    "reid detmers",
+    "salvador perez",
+    "wade meckler",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "150",
+   "entry_id": "5219946533",
+   "username": "flintmonster",
+   "points": 84.55,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 37.43,
+   "n_cheap": 1,
+   "players_norm": [
+    "bobby witt",
+    "denzer guzman",
+    "jac caglianone",
+    "jake burger",
+    "jeff mcneil",
+    "jonah heim",
+    "josh lowe",
+    "mackenzie gore",
+    "mike trout",
+    "reid detmers"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "150",
+   "entry_id": "5220149805",
+   "username": "mitchellmorse30",
+   "points": 84.55,
+   "salary_used": 45600,
+   "salary_left": 4400,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 39.24,
+   "n_cheap": 1,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "denzer guzman",
+    "joc pederson",
+    "josh lowe",
+    "mackenzie gore",
+    "mike trout",
+    "moises ballesteros",
+    "nicky lopez",
+    "reid detmers"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "153",
+   "entry_id": "5220046368",
+   "username": "TeamPop",
+   "points": 84.5,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Reid Detmers"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 36.58,
+   "n_cheap": 1,
+   "players_norm": [
+    "bobby witt",
+    "denzer guzman",
+    "j t ginn",
+    "jac caglianone",
+    "jake burger",
+    "jonah heim",
+    "josh lowe",
+    "mike trout",
+    "reid detmers",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "154",
+   "entry_id": "5220097954",
+   "username": "jazzyj0619",
+   "points": 82.55,
+   "salary_used": 48100,
+   "salary_left": 1900,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 40.84,
+   "n_cheap": 1,
+   "players_norm": [
+    "ezequiel duran",
+    "jonah heim",
+    "josh lowe",
+    "mackenzie gore",
+    "mike trout",
+    "nolan schanuel",
+    "reid detmers",
+    "wade meckler",
+    "zach neto",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "155",
+   "entry_id": "5219420679",
+   "username": "Elwaysarmy",
+   "points": 82.5,
+   "salary_used": 45100,
+   "salary_left": 4900,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 30.84,
+   "n_cheap": 1,
+   "players_norm": [
+    "j t ginn",
+    "lawrence butler",
+    "mike trout",
+    "nolan schanuel",
+    "reid detmers",
+    "tommy white",
+    "tyler heineman",
+    "wade meckler",
+    "zach neto",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "155",
+   "entry_id": "5220098350",
+   "username": "AKJeff",
+   "points": 82.5,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 37.89,
+   "n_cheap": 0,
+   "players_norm": [
+    "ezequiel duran",
+    "j t ginn",
+    "jeff mcneil",
+    "jonah heim",
+    "lawrence butler",
+    "mike trout",
+    "nolan schanuel",
+    "reid detmers",
+    "zach neto",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "157",
+   "entry_id": "5220043399",
+   "username": "jakeupjohnson",
+   "points": 81.95,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "Randy Dobnak",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 34.14,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "brian serven",
+    "jac caglianone",
+    "jeff mcneil",
+    "lawrence butler",
+    "max muncy",
+    "mike trout",
+    "randy dobnak",
+    "reid detmers",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "158",
+   "entry_id": "5218814546",
+   "username": "TheBabz",
+   "points": 81.85,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Randy Dobnak"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 33.84,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "henry bolte",
+    "j t ginn",
+    "jac caglianone",
+    "jonah heim",
+    "lawrence butler",
+    "mike trout",
+    "nick loftin",
+    "randy dobnak",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "158",
+   "entry_id": "5219170097",
+   "username": "whoisjohngalt420",
+   "points": 81.85,
+   "salary_used": 45300,
+   "salary_left": 4700,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Randy Dobnak"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 25.53,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "henry bolte",
+    "j t ginn",
+    "jac caglianone",
+    "jonah heim",
+    "nick loftin",
+    "randy dobnak",
+    "salvador perez",
+    "tommy white",
+    "tyler tolbert"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "158",
+   "entry_id": "5220046543",
+   "username": "Gsmoney2469",
+   "points": 81.85,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Randy Dobnak"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 33.84,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "henry bolte",
+    "j t ginn",
+    "jac caglianone",
+    "jonah heim",
+    "lawrence butler",
+    "mike trout",
+    "nick loftin",
+    "randy dobnak",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "161",
+   "entry_id": "5219823752",
+   "username": "auweglman",
+   "points": 81.55,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 41.14,
+   "n_cheap": 1,
+   "players_norm": [
+    "brandon nimmo",
+    "ezequiel duran",
+    "jake burger",
+    "mackenzie gore",
+    "michael massey",
+    "mike trout",
+    "reid detmers",
+    "tyler heineman",
+    "zach neto",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "162",
+   "entry_id": "5219249450",
+   "username": "ppster",
+   "points": 80.850006,
+   "salary_used": 49000,
+   "salary_left": 1000,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Randy Dobnak"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 33.08,
+   "n_cheap": 0,
+   "players_norm": [
+    "j t ginn",
+    "jac caglianone",
+    "jonah heim",
+    "max muncy",
+    "michael massey",
+    "mike trout",
+    "randy dobnak",
+    "wyatt langford",
+    "zach neto",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "163",
+   "entry_id": "5220079466",
+   "username": "dcw331",
+   "points": 80.55,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 37.47,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "brandon nimmo",
+    "brian serven",
+    "denzer guzman",
+    "jac caglianone",
+    "jeff mcneil",
+    "mackenzie gore",
+    "mike trout",
+    "reid detmers",
+    "tyler tolbert"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "163",
+   "entry_id": "5220147652",
+   "username": "ds1974",
+   "points": 80.55,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 35.87,
+   "n_cheap": 1,
+   "players_norm": [
+    "bobby witt",
+    "ezequiel duran",
+    "jac caglianone",
+    "jake burger",
+    "mackenzie gore",
+    "michael massey",
+    "mike trout",
+    "reid detmers",
+    "starling marte",
+    "tyler heineman"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "165",
+   "entry_id": "5219821734",
+   "username": "donj9903",
+   "points": 80.5,
+   "salary_used": 48100,
+   "salary_left": 1900,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Reid Detmers"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 34.26,
+   "n_cheap": 0,
+   "players_norm": [
+    "ezequiel duran",
+    "j t ginn",
+    "jac caglianone",
+    "jake burger",
+    "jeff mcneil",
+    "moises ballesteros",
+    "reid detmers",
+    "wade meckler",
+    "zach neto",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "165",
+   "entry_id": "5220032717",
+   "username": "Daneog2333",
+   "points": 80.5,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 35.27,
+   "n_cheap": 0,
+   "players_norm": [
+    "j t ginn",
+    "jac caglianone",
+    "jeff mcneil",
+    "jonah heim",
+    "max muncy",
+    "michael massey",
+    "mike trout",
+    "reid detmers",
+    "zach neto",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "167",
+   "entry_id": "5219690873",
+   "username": "JRaab",
+   "points": 79.9,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Randy Dobnak"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 36.62,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "brandon nimmo",
+    "evan carter",
+    "ezequiel duran",
+    "jac caglianone",
+    "mackenzie gore",
+    "nick loftin",
+    "randy dobnak",
+    "salvador perez",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "168",
+   "entry_id": "5220105486",
+   "username": "jackson_0824",
+   "points": 79.55,
+   "salary_used": 46100,
+   "salary_left": 3900,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 37.64,
+   "n_cheap": 1,
+   "players_norm": [
+    "adam frazier",
+    "denzer guzman",
+    "evan carter",
+    "joc pederson",
+    "mackenzie gore",
+    "mike trout",
+    "moises ballesteros",
+    "reid detmers",
+    "zach neto",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "169",
+   "entry_id": "5220139268",
+   "username": "rynstien",
+   "points": 79.5,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 39.49,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "brandon nimmo",
+    "j t ginn",
+    "jeff mcneil",
+    "jonah heim",
+    "mike trout",
+    "reid detmers",
+    "salvador perez",
+    "tommy white",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "170",
+   "entry_id": "5218655715",
+   "username": "jane8824",
+   "points": 78.95,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "Randy Dobnak",
+    "Reid Detmers"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 24.94,
+   "n_cheap": 0,
+   "players_norm": [
+    "carter jensen",
+    "donovan walton",
+    "jake burger",
+    "michael massey",
+    "mike trout",
+    "randy dobnak",
+    "reid detmers",
+    "tyler soderstrom",
+    "vaughn grissom",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "171",
+   "entry_id": "5220144547",
+   "username": "jlegrand22",
+   "points": 78.85,
+   "salary_used": 47700,
+   "salary_left": 2300,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Randy Dobnak"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 29.71,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "henry bolte",
+    "j t ginn",
+    "jac caglianone",
+    "jeff mcneil",
+    "jonah heim",
+    "lawrence butler",
+    "nick loftin",
+    "randy dobnak",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "172",
+   "entry_id": "5220032720",
+   "username": "Daneog2333",
+   "points": 77.9,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Randy Dobnak"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 37.43,
+   "n_cheap": 1,
+   "players_norm": [
+    "bobby witt",
+    "brandon nimmo",
+    "ezequiel duran",
+    "jac caglianone",
+    "luke maile",
+    "mackenzie gore",
+    "nicky lopez",
+    "randy dobnak",
+    "wyatt langford",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "172",
+   "entry_id": "5220127242",
+   "username": "rizzoringer",
+   "points": 77.9,
+   "salary_used": 45000,
+   "salary_left": 5000,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Randy Dobnak"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 33.59,
+   "n_cheap": 1,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "joc pederson",
+    "josh lowe",
+    "mackenzie gore",
+    "michael massey",
+    "nick loftin",
+    "randy dobnak",
+    "salvador perez",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "174",
+   "entry_id": "5219170094",
+   "username": "whoisjohngalt420",
+   "points": 77.5,
+   "salary_used": 45300,
+   "salary_left": 4700,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 33.16,
+   "n_cheap": 1,
+   "players_norm": [
+    "j t ginn",
+    "josh lowe",
+    "lawrence butler",
+    "max muncy",
+    "mike trout",
+    "moises ballesteros",
+    "nolan schanuel",
+    "reid detmers",
+    "zach neto",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "174",
+   "entry_id": "5219829793",
+   "username": "auweglman",
+   "points": 77.5,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 38.36,
+   "n_cheap": 1,
+   "players_norm": [
+    "bobby witt",
+    "brandon nimmo",
+    "j t ginn",
+    "jac caglianone",
+    "luke maile",
+    "mike trout",
+    "nick loftin",
+    "reid detmers",
+    "wade meckler",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "176",
+   "entry_id": "5219036658",
+   "username": "minrobertson210",
+   "points": 76.9,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Randy Dobnak"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 36.33,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "evan carter",
+    "ezequiel duran",
+    "jake burger",
+    "mackenzie gore",
+    "mike trout",
+    "nick loftin",
+    "randy dobnak",
+    "salvador perez",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "177",
+   "entry_id": "5220113845",
+   "username": "corruption79",
+   "points": 76.55,
+   "salary_used": 48100,
+   "salary_left": 1900,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 37.55,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "evan carter",
+    "mackenzie gore",
+    "mike trout",
+    "moises ballesteros",
+    "reid detmers",
+    "salvador perez",
+    "tommy white",
+    "wade meckler",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "178",
+   "entry_id": "5219831970",
+   "username": "auweglman",
+   "points": 75.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Randy Dobnak"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 39.49,
+   "n_cheap": 1,
+   "players_norm": [
+    "bobby witt",
+    "brandon nimmo",
+    "denzer guzman",
+    "jac caglianone",
+    "mackenzie gore",
+    "mike trout",
+    "randy dobnak",
+    "tyler heineman",
+    "wyatt langford",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "179",
+   "entry_id": "5220056998",
+   "username": "sir19tom",
+   "points": 75.850006,
+   "salary_used": 44800,
+   "salary_left": 5200,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Randy Dobnak"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 22.11,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "henry bolte",
+    "j t ginn",
+    "jake burger",
+    "lawrence butler",
+    "michael massey",
+    "nick loftin",
+    "randy dobnak",
+    "salvador perez",
+    "tyler tolbert"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "179",
+   "entry_id": "5219170095",
+   "username": "whoisjohngalt420",
+   "points": 75.85,
+   "salary_used": 45000,
+   "salary_left": 5000,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Randy Dobnak"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 26.33,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "henry bolte",
+    "j t ginn",
+    "jonah heim",
+    "lawrence butler",
+    "nick loftin",
+    "randy dobnak",
+    "tommy white",
+    "tyler tolbert",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "181",
+   "entry_id": "5219170098",
+   "username": "whoisjohngalt420",
+   "points": 75.5,
+   "salary_used": 44100,
+   "salary_left": 5900,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 28.86,
+   "n_cheap": 1,
+   "players_norm": [
+    "j t ginn",
+    "jeff mcneil",
+    "jonah heim",
+    "josh lowe",
+    "lawrence butler",
+    "reid detmers",
+    "tommy white",
+    "wade meckler",
+    "zach neto",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "182",
+   "entry_id": "5219698410",
+   "username": "hitch0403",
+   "points": 74.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Randy Dobnak"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 31.06,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "carter jensen",
+    "ezequiel duran",
+    "jac caglianone",
+    "jake burger",
+    "mackenzie gore",
+    "nick loftin",
+    "randy dobnak",
+    "tyler tolbert",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "183",
+   "entry_id": "5219170093",
+   "username": "whoisjohngalt420",
+   "points": 74.85,
+   "salary_used": 45600,
+   "salary_left": 4400,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Randy Dobnak"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 25.95,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "henry bolte",
+    "isaac collins",
+    "j t ginn",
+    "jac caglianone",
+    "max muncy",
+    "randy dobnak",
+    "salvador perez",
+    "tommy white",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "183",
+   "entry_id": "5220106828",
+   "username": "troubledsoe",
+   "points": 74.85,
+   "salary_used": 45800,
+   "salary_left": 4200,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Randy Dobnak"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 25.06,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "brian serven",
+    "henry bolte",
+    "isaac collins",
+    "j t ginn",
+    "jac caglianone",
+    "jeff mcneil",
+    "max muncy",
+    "randy dobnak",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "185",
+   "entry_id": "5219152314",
+   "username": "Dave2zone",
+   "points": 74.55,
+   "salary_used": 44100,
+   "salary_left": 5900,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 32.36,
+   "n_cheap": 1,
+   "players_norm": [
+    "jac caglianone",
+    "jeff mcneil",
+    "joc pederson",
+    "jonah heim",
+    "josh lowe",
+    "mackenzie gore",
+    "nick loftin",
+    "reid detmers",
+    "tyler tolbert",
+    "wade meckler"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "185",
+   "entry_id": "5220132905",
+   "username": "Lizana1319",
+   "points": 74.55,
+   "salary_used": 46000,
+   "salary_left": 4000,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 37.17,
+   "n_cheap": 2,
+   "players_norm": [
+    "adam frazier",
+    "bobby witt",
+    "brandon nimmo",
+    "ezequiel duran",
+    "jeff mcneil",
+    "josh lowe",
+    "mackenzie gore",
+    "reid detmers",
+    "salvador perez",
+    "wade meckler"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "185",
+   "entry_id": "5220144324",
+   "username": "DuckFan94",
+   "points": 74.55,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 34.73,
+   "n_cheap": 1,
+   "players_norm": [
+    "bobby witt",
+    "ezequiel duran",
+    "jake burger",
+    "lawrence butler",
+    "luke maile",
+    "mackenzie gore",
+    "michael massey",
+    "mike trout",
+    "reid detmers",
+    "tyler tolbert"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "188",
+   "entry_id": "5219036661",
+   "username": "minrobertson210",
+   "points": 73.9,
+   "salary_used": 48400,
+   "salary_left": 1600,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Randy Dobnak"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 35.11,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "brandon nimmo",
+    "ezequiel duran",
+    "jake burger",
+    "mackenzie gore",
+    "nick loftin",
+    "randy dobnak",
+    "salvador perez",
+    "tyler tolbert",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "189",
+   "entry_id": "5220041542",
+   "username": "dtapper29",
+   "points": 73.55,
+   "salary_used": 48000,
+   "salary_left": 2000,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 41.77,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "denzer guzman",
+    "joc pederson",
+    "mackenzie gore",
+    "mike trout",
+    "moises ballesteros",
+    "reid detmers",
+    "wade meckler",
+    "zach neto",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "189",
+   "entry_id": "5220107871",
+   "username": "troubledsoe",
+   "points": 73.55,
+   "salary_used": 44500,
+   "salary_left": 5500,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 34.05,
+   "n_cheap": 1,
+   "players_norm": [
+    "bobby witt",
+    "brandon nimmo",
+    "denzer guzman",
+    "joc pederson",
+    "josh lowe",
+    "mackenzie gore",
+    "moises ballesteros",
+    "nicky lopez",
+    "reid detmers",
+    "wade meckler"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "191",
+   "entry_id": "5219697777",
+   "username": "bkukor",
+   "points": 72.9,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Randy Dobnak"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 36.62,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "brandon nimmo",
+    "ezequiel duran",
+    "jac caglianone",
+    "mackenzie gore",
+    "nick loftin",
+    "randy dobnak",
+    "salvador perez",
+    "tyler tolbert",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "191",
+   "entry_id": "5220045868",
+   "username": "Gsmoney2469",
+   "points": 72.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Randy Dobnak"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 38.95,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "brandon nimmo",
+    "ezequiel duran",
+    "jac caglianone",
+    "joc pederson",
+    "mackenzie gore",
+    "nick loftin",
+    "randy dobnak",
+    "salvador perez",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "191",
+   "entry_id": "5220087822",
+   "username": "Ozarkian",
+   "points": 72.9,
+   "salary_used": 50000,
+   "salary_left": 0,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Randy Dobnak"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 38.95,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "brandon nimmo",
+    "ezequiel duran",
+    "jac caglianone",
+    "joc pederson",
+    "mackenzie gore",
+    "nick loftin",
+    "randy dobnak",
+    "salvador perez",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "191",
+   "entry_id": "5220087996",
+   "username": "wittwerjoe",
+   "points": 72.9,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Randy Dobnak"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 36.62,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "brandon nimmo",
+    "ezequiel duran",
+    "jac caglianone",
+    "mackenzie gore",
+    "nick loftin",
+    "randy dobnak",
+    "salvador perez",
+    "tyler tolbert",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "191",
+   "entry_id": "5220087998",
+   "username": "wittwerjoe",
+   "points": 72.9,
+   "salary_used": 48100,
+   "salary_left": 1900,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Randy Dobnak"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 34.98,
+   "n_cheap": 1,
+   "players_norm": [
+    "bobby witt",
+    "brandon nimmo",
+    "ezequiel duran",
+    "jac caglianone",
+    "luke maile",
+    "mackenzie gore",
+    "nick loftin",
+    "randy dobnak",
+    "tyler tolbert",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "191",
+   "entry_id": "5220094704",
+   "username": "hacker33",
+   "points": 72.9,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Randy Dobnak"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 38.9,
+   "n_cheap": 1,
+   "players_norm": [
+    "bobby witt",
+    "brandon nimmo",
+    "ezequiel duran",
+    "jac caglianone",
+    "luke maile",
+    "mackenzie gore",
+    "nick loftin",
+    "randy dobnak",
+    "wyatt langford",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "191",
+   "entry_id": "5220131957",
+   "username": "womana1mighty",
+   "points": 72.9,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Randy Dobnak"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 35.95,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "brandon nimmo",
+    "ezequiel duran",
+    "isaac collins",
+    "jac caglianone",
+    "mackenzie gore",
+    "nick loftin",
+    "randy dobnak",
+    "salvador perez",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "198",
+   "entry_id": "5220032721",
+   "username": "Daneog2333",
+   "points": 72.85,
+   "salary_used": 49600,
+   "salary_left": 400,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Randy Dobnak"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 31.9,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "brandon nimmo",
+    "j t ginn",
+    "jac caglianone",
+    "jake burger",
+    "jonah heim",
+    "max muncy",
+    "michael massey",
+    "mike trout",
+    "randy dobnak"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "199",
+   "entry_id": "5219895013",
+   "username": "fan21",
+   "points": 72.55,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 38.27,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "ezequiel duran",
+    "jac caglianone",
+    "jeff mcneil",
+    "mackenzie gore",
+    "michael massey",
+    "moises ballesteros",
+    "reid detmers",
+    "wade meckler",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "199",
+   "entry_id": "5220101146",
+   "username": "Roughdraft2332",
+   "points": 72.55,
+   "salary_used": 48400,
+   "salary_left": 1600,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 37.51,
+   "n_cheap": 1,
+   "players_norm": [
+    "denzer guzman",
+    "jac caglianone",
+    "josh lowe",
+    "lawrence butler",
+    "mackenzie gore",
+    "mike trout",
+    "reid detmers",
+    "salvador perez",
+    "zach neto",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "201",
+   "entry_id": "5219055733",
+   "username": "Dicskstone32",
+   "points": 72.5,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 32.11,
+   "n_cheap": 0,
+   "players_norm": [
+    "j t ginn",
+    "jeff mcneil",
+    "jonah heim",
+    "max muncy",
+    "michael massey",
+    "mike trout",
+    "reid detmers",
+    "tyler soderstrom",
+    "zach neto",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "202",
+   "entry_id": "5220089464",
+   "username": "bleeski",
+   "points": 71.85,
+   "salary_used": 47100,
+   "salary_left": 2900,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Randy Dobnak"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 28.1,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "henry bolte",
+    "j t ginn",
+    "jac caglianone",
+    "jeff mcneil",
+    "lawrence butler",
+    "max muncy",
+    "randy dobnak",
+    "salvador perez",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "203",
+   "entry_id": "5219420681",
+   "username": "Elwaysarmy",
+   "points": 71.5,
+   "salary_used": 44400,
+   "salary_left": 5600,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 32.62,
+   "n_cheap": 1,
+   "players_norm": [
+    "j t ginn",
+    "josh lowe",
+    "max muncy",
+    "mike trout",
+    "moises ballesteros",
+    "reid detmers",
+    "tommy white",
+    "wade meckler",
+    "zach neto",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "203",
+   "entry_id": "5220011871",
+   "username": "Ldsimons3",
+   "points": 71.5,
+   "salary_used": 46700,
+   "salary_left": 3300,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 33.88,
+   "n_cheap": 1,
+   "players_norm": [
+    "j t ginn",
+    "jonah heim",
+    "josh lowe",
+    "lawrence butler",
+    "max muncy",
+    "mike trout",
+    "reid detmers",
+    "salvador perez",
+    "zach neto",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "203",
+   "entry_id": "5220011891",
+   "username": "Ldsimons3",
+   "points": 71.5,
+   "salary_used": 46700,
+   "salary_left": 3300,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 33.88,
+   "n_cheap": 1,
+   "players_norm": [
+    "j t ginn",
+    "jonah heim",
+    "josh lowe",
+    "lawrence butler",
+    "max muncy",
+    "mike trout",
+    "reid detmers",
+    "salvador perez",
+    "zach neto",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "203",
+   "entry_id": "5220112915",
+   "username": "Rowdog31",
+   "points": 71.5,
+   "salary_used": 45000,
+   "salary_left": 5000,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Reid Detmers"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 34.47,
+   "n_cheap": 1,
+   "players_norm": [
+    "j t ginn",
+    "joc pederson",
+    "josh lowe",
+    "mike trout",
+    "moises ballesteros",
+    "reid detmers",
+    "tommy white",
+    "wade meckler",
+    "zach neto",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "207",
+   "entry_id": "5220142096",
+   "username": "CaptainMack",
+   "points": 70.55,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 39.66,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "isaac collins",
+    "jac caglianone",
+    "jeff mcneil",
+    "mackenzie gore",
+    "mike trout",
+    "moises ballesteros",
+    "nick loftin",
+    "reid detmers",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "208",
+   "entry_id": "5219966807",
+   "username": "crowe41",
+   "points": 70.5,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Reid Detmers"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 34.77,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "denzer guzman",
+    "j t ginn",
+    "jac caglianone",
+    "lawrence butler",
+    "mike trout",
+    "reid detmers",
+    "salvador perez",
+    "tyler tolbert",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "209",
+   "entry_id": "5219420676",
+   "username": "Elwaysarmy",
+   "points": 69.9,
+   "salary_used": 46800,
+   "salary_left": 3200,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Randy Dobnak"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 25.74,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "evan carter",
+    "jac caglianone",
+    "jake burger",
+    "jonah heim",
+    "mackenzie gore",
+    "michael massey",
+    "nick loftin",
+    "randy dobnak",
+    "starling marte"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "209",
+   "entry_id": "5220107861",
+   "username": "troubledsoe",
+   "points": 69.9,
+   "salary_used": 46300,
+   "salary_left": 3700,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Randy Dobnak"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 32.41,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "brandon nimmo",
+    "joc pederson",
+    "mackenzie gore",
+    "nick loftin",
+    "nicky lopez",
+    "randy dobnak",
+    "salvador perez",
+    "tyler tolbert",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "211",
+   "entry_id": "5220088000",
+   "username": "wittwerjoe",
+   "points": 69.85,
+   "salary_used": 44100,
+   "salary_left": 5900,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Randy Dobnak"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 23.38,
+   "n_cheap": 1,
+   "players_norm": [
+    "bobby witt",
+    "henry bolte",
+    "j t ginn",
+    "jac caglianone",
+    "jeff mcneil",
+    "luke maile",
+    "max muncy",
+    "randy dobnak",
+    "salvador perez",
+    "tyler tolbert"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "211",
+   "entry_id": "5220107586",
+   "username": "austino999",
+   "points": 69.85,
+   "salary_used": 45500,
+   "salary_left": 4500,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Randy Dobnak"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 26.84,
+   "n_cheap": 1,
+   "players_norm": [
+    "bobby witt",
+    "henry bolte",
+    "j t ginn",
+    "jac caglianone",
+    "jeff mcneil",
+    "luke maile",
+    "nick loftin",
+    "randy dobnak",
+    "tyler tolbert",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "213",
+   "entry_id": "5220083679",
+   "username": "SuperDavisms",
+   "points": 68.45,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "J.T. Ginn",
+    "MacKenzie Gore"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-2",
+   "chalk_score": 36.67,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "henry bolte",
+    "j t ginn",
+    "jac caglianone",
+    "mackenzie gore",
+    "mike trout",
+    "nick loftin",
+    "salvador perez",
+    "wade meckler",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "214",
+   "entry_id": "5220113189",
+   "username": "JOZZ",
+   "points": 67.5,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Reid Detmers"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 38.35,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "ezequiel duran",
+    "j t ginn",
+    "joc pederson",
+    "mike trout",
+    "nicky lopez",
+    "reid detmers",
+    "salvador perez",
+    "wade meckler",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "215",
+   "entry_id": "5219402404",
+   "username": "yaopete",
+   "points": 64.9,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Randy Dobnak"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 42.83,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "joc pederson",
+    "jonah heim",
+    "lawrence butler",
+    "mackenzie gore",
+    "mike trout",
+    "randy dobnak",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "216",
+   "entry_id": "5220055138",
+   "username": "mrclean913",
+   "points": 64.45,
+   "salary_used": 48100,
+   "salary_left": 1900,
+   "sp_pair": [
+    "J.T. Ginn",
+    "MacKenzie Gore"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 31.31,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "j t ginn",
+    "jac caglianone",
+    "joc pederson",
+    "mackenzie gore",
+    "michael massey",
+    "nick loftin",
+    "salvador perez",
+    "wade meckler",
+    "wyatt langford"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "217",
+   "entry_id": "5219402407",
+   "username": "yaopete",
+   "points": 63.9,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Randy Dobnak"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 41.18,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "jac caglianone",
+    "joc pederson",
+    "mackenzie gore",
+    "mike trout",
+    "nick loftin",
+    "randy dobnak",
+    "salvador perez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "217",
+   "entry_id": "5220048032",
+   "username": "TxIslandBum",
+   "points": 63.9,
+   "salary_used": 49800,
+   "salary_left": 200,
+   "sp_pair": [
+    "Brady Basso",
+    "MacKenzie Gore"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 42.19,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "brady basso",
+    "brandon nimmo",
+    "ezequiel duran",
+    "jac caglianone",
+    "mackenzie gore",
+    "mike trout",
+    "moises ballesteros",
+    "wyatt langford",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "219",
+   "entry_id": "5219402403",
+   "username": "yaopete",
+   "points": 62.9,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Randy Dobnak"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 43.76,
+   "n_cheap": 0,
+   "players_norm": [
+    "brandon nimmo",
+    "corey seager",
+    "ezequiel duran",
+    "jeff mcneil",
+    "joc pederson",
+    "jonah heim",
+    "mackenzie gore",
+    "mike trout",
+    "randy dobnak",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "220",
+   "entry_id": "5219036657",
+   "username": "minrobertson210",
+   "points": 61.9,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Randy Dobnak"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 37.01,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "brandon nimmo",
+    "evan carter",
+    "ezequiel duran",
+    "jake burger",
+    "mackenzie gore",
+    "mike trout",
+    "nick loftin",
+    "randy dobnak",
+    "salvador perez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "221",
+   "entry_id": "5219697780",
+   "username": "bkukor",
+   "points": 59.45,
+   "salary_used": 46500,
+   "salary_left": 3500,
+   "sp_pair": [
+    "J.T. Ginn",
+    "MacKenzie Gore"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 31.22,
+   "n_cheap": 1,
+   "players_norm": [
+    "adam frazier",
+    "bobby witt",
+    "j t ginn",
+    "jac caglianone",
+    "mackenzie gore",
+    "mike trout",
+    "nick loftin",
+    "nolan schanuel",
+    "salvador perez",
+    "starling marte"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "222",
+   "entry_id": "5220090542",
+   "username": "melly37",
+   "points": 58.85,
+   "salary_used": 48600,
+   "salary_left": 1400,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Randy Dobnak"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 33.12,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "j t ginn",
+    "jac caglianone",
+    "jeff mcneil",
+    "jonah heim",
+    "mike trout",
+    "nick loftin",
+    "randy dobnak",
+    "tommy white",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "223",
+   "entry_id": "5220156901",
+   "username": "klavastj",
+   "points": 57.9,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Randy Dobnak"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 35.32,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "brandon nimmo",
+    "evan carter",
+    "jac caglianone",
+    "joc pederson",
+    "mackenzie gore",
+    "nick loftin",
+    "randy dobnak",
+    "salvador perez",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "224",
+   "entry_id": "5220102986",
+   "username": "TeamPop",
+   "points": 56.850002,
+   "salary_used": 49400,
+   "salary_left": 600,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Randy Dobnak"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-3-1",
+   "chalk_score": 32.91,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "j t ginn",
+    "jac caglianone",
+    "jeff mcneil",
+    "jonah heim",
+    "michael massey",
+    "mike trout",
+    "nick loftin",
+    "randy dobnak",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "225",
+   "entry_id": "5220098128",
+   "username": "jazzyj0619",
+   "points": 53.9,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Randy Dobnak"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-1-1-1",
+   "chalk_score": 34.22,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "evan carter",
+    "jac caglianone",
+    "mackenzie gore",
+    "mike trout",
+    "nick loftin",
+    "randy dobnak",
+    "salvador perez",
+    "tyler tolbert",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "226",
+   "entry_id": "5220124115",
+   "username": "ttownresider36088",
+   "points": 53.85,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Randy Dobnak"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 35.23,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "j t ginn",
+    "jac caglianone",
+    "jeff mcneil",
+    "joc pederson",
+    "jonah heim",
+    "mike trout",
+    "nick loftin",
+    "randy dobnak",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "226",
+   "entry_id": "5220129977",
+   "username": "BigRedMachine1975",
+   "points": 53.85,
+   "salary_used": 47300,
+   "salary_left": 2700,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Randy Dobnak"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-2-1",
+   "chalk_score": 29.49,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "j t ginn",
+    "jac caglianone",
+    "jeff mcneil",
+    "jonah heim",
+    "mike trout",
+    "nick loftin",
+    "randy dobnak",
+    "salvador perez",
+    "starling marte"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "226",
+   "entry_id": "5220134153",
+   "username": "ds1974",
+   "points": 53.85,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Randy Dobnak"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 36.29,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "brandon nimmo",
+    "j t ginn",
+    "jac caglianone",
+    "jeff mcneil",
+    "mike trout",
+    "nick loftin",
+    "randy dobnak",
+    "salvador perez",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "229",
+   "entry_id": "5220047136",
+   "username": "Gsmoney2469",
+   "points": 53.45,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [
+    "J.T. Ginn",
+    "MacKenzie Gore"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-3-1-1",
+   "chalk_score": 35.95,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "ezequiel duran",
+    "j t ginn",
+    "jac caglianone",
+    "jeff mcneil",
+    "mackenzie gore",
+    "mike trout",
+    "nolan schanuel",
+    "salvador perez",
+    "wade meckler"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "230",
+   "entry_id": "5220089469",
+   "username": "bleeski",
+   "points": 51.45,
+   "salary_used": 46800,
+   "salary_left": 3200,
+   "sp_pair": [
+    "J.T. Ginn",
+    "MacKenzie Gore"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 32.28,
+   "n_cheap": 1,
+   "players_norm": [
+    "bobby witt",
+    "denzer guzman",
+    "j t ginn",
+    "jac caglianone",
+    "josh lowe",
+    "mackenzie gore",
+    "mike trout",
+    "nick loftin",
+    "nolan schanuel",
+    "salvador perez"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "231",
+   "entry_id": "5220087999",
+   "username": "wittwerjoe",
+   "points": 50.9,
+   "salary_used": 48400,
+   "salary_left": 1600,
+   "sp_pair": [
+    "MacKenzie Gore",
+    "Randy Dobnak"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 35.4,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "brandon nimmo",
+    "ezequiel duran",
+    "jac caglianone",
+    "joc pederson",
+    "mackenzie gore",
+    "nick loftin",
+    "randy dobnak",
+    "salvador perez",
+    "tyler tolbert"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "232",
+   "entry_id": "5219895014",
+   "username": "fan21",
+   "points": 50.850002,
+   "salary_used": 48700,
+   "salary_left": 1300,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Randy Dobnak"
+   ],
+   "max_stack": 3,
+   "stack_pattern": "3-2-2-1",
+   "chalk_score": 34.01,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "ezequiel duran",
+    "j t ginn",
+    "jeff mcneil",
+    "jonah heim",
+    "michael massey",
+    "mike trout",
+    "randy dobnak",
+    "wade meckler",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "232",
+   "entry_id": "5220089259",
+   "username": "bleeski",
+   "points": 50.85,
+   "salary_used": 43700,
+   "salary_left": 6300,
+   "sp_pair": [
+    "J.T. Ginn",
+    "Randy Dobnak"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 22.7,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "isaac collins",
+    "j t ginn",
+    "jonah heim",
+    "michael massey",
+    "nick loftin",
+    "randy dobnak",
+    "starling marte",
+    "tommy white",
+    "zack gelof"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "234",
+   "entry_id": "5220112842",
+   "username": "137666",
+   "points": 44.45,
+   "salary_used": 44400,
+   "salary_left": 5600,
+   "sp_pair": [
+    "J.T. Ginn",
+    "MacKenzie Gore"
+   ],
+   "max_stack": 5,
+   "stack_pattern": "5-3",
+   "chalk_score": 24.3,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "denzer guzman",
+    "j t ginn",
+    "jac caglianone",
+    "mackenzie gore",
+    "michael massey",
+    "moises ballesteros",
+    "starling marte",
+    "tyler tolbert",
+    "wade meckler"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "235",
+   "entry_id": "5220032719",
+   "username": "Daneog2333",
+   "points": 42.45,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [
+    "J.T. Ginn",
+    "MacKenzie Gore"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-2-1-1",
+   "chalk_score": 34.77,
+   "n_cheap": 0,
+   "players_norm": [
+    "bobby witt",
+    "ezequiel duran",
+    "j t ginn",
+    "jac caglianone",
+    "jeff mcneil",
+    "lawrence butler",
+    "mackenzie gore",
+    "mike trout",
+    "salvador perez",
+    "tyler tolbert"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  },
+  {
+   "rank": "236",
+   "entry_id": "5220111505",
+   "username": "Apples00",
+   "points": 34.45,
+   "salary_used": 44400,
+   "salary_left": 5600,
+   "sp_pair": [
+    "J.T. Ginn",
+    "MacKenzie Gore"
+   ],
+   "max_stack": 4,
+   "stack_pattern": "4-4",
+   "chalk_score": 30.63,
+   "n_cheap": 1,
+   "players_norm": [
+    "bobby witt",
+    "denzer guzman",
+    "j t ginn",
+    "josh lowe",
+    "mackenzie gore",
+    "mike trout",
+    "moises ballesteros",
+    "nick loftin",
+    "salvador perez",
+    "tyler tolbert"
+   ],
+   "lineup_complete": true,
+   "captain_norm": null
+  }
+ ],
+ "player_table": [
+  {
+   "player": "Reid Detmers",
+   "player_norm": "reid detmers",
+   "roster_position": "P",
+   "pct_drafted": 74.26,
+   "fpts": 42.8
+  },
+  {
+   "player": "MacKenzie Gore",
+   "player_norm": "mackenzie gore",
+   "roster_position": "P",
+   "pct_drafted": 64.56,
+   "fpts": 14.75
+  },
+  {
+   "player": "Mike Trout",
+   "player_norm": "mike trout",
+   "roster_position": "OF",
+   "pct_drafted": 64.56,
+   "fpts": 3.0
+  },
+  {
+   "player": "Brandon Nimmo",
+   "player_norm": "brandon nimmo",
+   "roster_position": "OF",
+   "pct_drafted": 52.32,
+   "fpts": 7.0
+  },
+  {
+   "player": "Ezequiel Duran",
+   "player_norm": "ezequiel duran",
+   "roster_position": "3B",
+   "pct_drafted": 50.21,
+   "fpts": 0.0
+  },
+  {
+   "player": "Wyatt Langford",
+   "player_norm": "wyatt langford",
+   "roster_position": "OF",
+   "pct_drafted": 45.57,
+   "fpts": 22.0
+  },
+  {
+   "player": "Corey Seager",
+   "player_norm": "corey seager",
+   "roster_position": "SS",
+   "pct_drafted": 39.24,
+   "fpts": 10.0
+  },
+  {
+   "player": "Bobby Witt Jr.",
+   "player_norm": "bobby witt",
+   "roster_position": "SS",
+   "pct_drafted": 35.86,
+   "fpts": 0.0
+  },
+  {
+   "player": "Zack Gelof",
+   "player_norm": "zack gelof",
+   "roster_position": "2B",
+   "pct_drafted": 34.18,
+   "fpts": 0.0
+  },
+  {
+   "player": "Joc Pederson",
+   "player_norm": "joc pederson",
+   "roster_position": "1B",
+   "pct_drafted": 33.33,
+   "fpts": 0.0
+  },
+  {
+   "player": "Jonah Heim",
+   "player_norm": "jonah heim",
+   "roster_position": "C",
+   "pct_drafted": 30.8,
+   "fpts": 7.0
+  },
+  {
+   "player": "Randy Dobnak",
+   "player_norm": "randy dobnak",
+   "roster_position": "P",
+   "pct_drafted": 29.96,
+   "fpts": 21.15
+  },
+  {
+   "player": "J.T. Ginn",
+   "player_norm": "j t ginn",
+   "roster_position": "P",
+   "pct_drafted": 29.96,
+   "fpts": 14.7
+  },
+  {
+   "player": "Henry Bolte",
+   "player_norm": "henry bolte",
+   "roster_position": "OF",
+   "pct_drafted": 28.69,
+   "fpts": 26.0
+  },
+  {
+   "player": "Moises Ballesteros",
+   "player_norm": "moises ballesteros",
+   "roster_position": "C",
+   "pct_drafted": 26.16,
+   "fpts": 2.0
+  },
+  {
+   "player": "Zach Neto",
+   "player_norm": "zach neto",
+   "roster_position": "SS",
+   "pct_drafted": 22.78,
+   "fpts": 2.0
+  },
+  {
+   "player": "Nolan Schanuel",
+   "player_norm": "nolan schanuel",
+   "roster_position": "1B",
+   "pct_drafted": 19.83,
+   "fpts": 11.0
+  },
+  {
+   "player": "Jac Caglianone",
+   "player_norm": "jac caglianone",
+   "roster_position": "OF",
+   "pct_drafted": 19.41,
+   "fpts": 8.0
+  },
+  {
+   "player": "Salvador Perez",
+   "player_norm": "salvador perez",
+   "roster_position": "C",
+   "pct_drafted": 18.14,
+   "fpts": 0.0
+  },
+  {
+   "player": "Jake Burger",
+   "player_norm": "jake burger",
+   "roster_position": "1B",
+   "pct_drafted": 17.72,
+   "fpts": 9.0
+  },
+  {
+   "player": "Adam Frazier",
+   "player_norm": "adam frazier",
+   "roster_position": "2B",
+   "pct_drafted": 16.88,
+   "fpts": 8.0
+  },
+  {
+   "player": "Wade Meckler",
+   "player_norm": "wade meckler",
+   "roster_position": "OF",
+   "pct_drafted": 16.03,
+   "fpts": 2.0
+  },
+  {
+   "player": "Josh Lowe",
+   "player_norm": "josh lowe",
+   "roster_position": "OF",
+   "pct_drafted": 16.03,
+   "fpts": 0.0
+  },
+  {
+   "player": "Zack Gelof",
+   "player_norm": "zack gelof",
+   "roster_position": "OF",
+   "pct_drafted": 15.19,
+   "fpts": 0.0
+  },
+  {
+   "player": "Max Muncy",
+   "player_norm": "max muncy",
+   "roster_position": "3B",
+   "pct_drafted": 14.77,
+   "fpts": 0.0
+  },
+  {
+   "player": "Jeff McNeil",
+   "player_norm": "jeff mcneil",
+   "roster_position": "2B",
+   "pct_drafted": 14.77,
+   "fpts": 0.0
+  },
+  {
+   "player": "Denzer Guzman",
+   "player_norm": "denzer guzman",
+   "roster_position": "3B",
+   "pct_drafted": 14.35,
+   "fpts": 0.0
+  },
+  {
+   "player": "Lawrence Butler",
+   "player_norm": "lawrence butler",
+   "roster_position": "OF",
+   "pct_drafted": 13.92,
+   "fpts": 2.0
+  },
+  {
+   "player": "Jac Caglianone",
+   "player_norm": "jac caglianone",
+   "roster_position": "1B",
+   "pct_drafted": 13.5,
+   "fpts": 8.0
+  },
+  {
+   "player": "Nick Loftin",
+   "player_norm": "nick loftin",
+   "roster_position": "2B",
+   "pct_drafted": 12.24,
+   "fpts": 0.0
+  },
+  {
+   "player": "Michael Massey",
+   "player_norm": "michael massey",
+   "roster_position": "2B",
+   "pct_drafted": 10.13,
+   "fpts": 3.0
+  },
+  {
+   "player": "Nick Loftin",
+   "player_norm": "nick loftin",
+   "roster_position": "3B",
+   "pct_drafted": 10.13,
+   "fpts": 0.0
+  },
+  {
+   "player": "Evan Carter",
+   "player_norm": "evan carter",
+   "roster_position": "OF",
+   "pct_drafted": 10.13,
+   "fpts": 7.0
+  },
+  {
+   "player": "Tommy White",
+   "player_norm": "tommy white",
+   "roster_position": "3B",
+   "pct_drafted": 9.7,
+   "fpts": 5.0
+  },
+  {
+   "player": "Austin Wynns",
+   "player_norm": "austin wynns",
+   "roster_position": "C",
+   "pct_drafted": 9.28,
+   "fpts": 3.0
+  },
+  {
+   "player": "Tyler Tolbert",
+   "player_norm": "tyler tolbert",
+   "roster_position": "OF",
+   "pct_drafted": 8.86,
+   "fpts": 0.0
+  },
+  {
+   "player": "Jeff McNeil",
+   "player_norm": "jeff mcneil",
+   "roster_position": "1B",
+   "pct_drafted": 8.44,
+   "fpts": 0.0
+  },
+  {
+   "player": "Nicky Lopez",
+   "player_norm": "nicky lopez",
+   "roster_position": "2B",
+   "pct_drafted": 7.59,
+   "fpts": 5.0
+  },
+  {
+   "player": "Luke Maile",
+   "player_norm": "luke maile",
+   "roster_position": "C",
+   "pct_drafted": 5.91,
+   "fpts": 0.0
+  },
+  {
+   "player": "Tyler Heineman",
+   "player_norm": "tyler heineman",
+   "roster_position": "C",
+   "pct_drafted": 5.49,
+   "fpts": 0.0
+  },
+  {
+   "player": "Salvador Perez",
+   "player_norm": "salvador perez",
+   "roster_position": "1B",
+   "pct_drafted": 4.22,
+   "fpts": 0.0
+  },
+  {
+   "player": "Isaac Collins",
+   "player_norm": "isaac collins",
+   "roster_position": "OF",
+   "pct_drafted": 3.38,
+   "fpts": 0.0
+  },
+  {
+   "player": "Alika Williams",
+   "player_norm": "alika williams",
+   "roster_position": "2B",
+   "pct_drafted": 3.38,
+   "fpts": 10.0
+  },
+  {
+   "player": "Starling Marte",
+   "player_norm": "starling marte",
+   "roster_position": "OF",
+   "pct_drafted": 2.95,
+   "fpts": 0.0
+  },
+  {
+   "player": "Tommy White",
+   "player_norm": "tommy white",
+   "roster_position": "1B",
+   "pct_drafted": 2.53,
+   "fpts": 5.0
+  },
+  {
+   "player": "Brian Serven",
+   "player_norm": "brian serven",
+   "roster_position": "C",
+   "pct_drafted": 2.53,
+   "fpts": 5.0
+  },
+  {
+   "player": "Carter Jensen",
+   "player_norm": "carter jensen",
+   "roster_position": "C",
+   "pct_drafted": 1.27,
+   "fpts": 0.0
+  },
+  {
+   "player": "Tyler Soderstrom",
+   "player_norm": "tyler soderstrom",
+   "roster_position": "OF",
+   "pct_drafted": 1.27,
+   "fpts": 0.0
+  },
+  {
+   "player": "Tyler Tolbert",
+   "player_norm": "tyler tolbert",
+   "roster_position": "SS",
+   "pct_drafted": 1.27,
+   "fpts": 0.0
+  },
+  {
+   "player": "Kyle Isbel",
+   "player_norm": "kyle isbel",
+   "roster_position": "OF",
+   "pct_drafted": 0.42,
+   "fpts": 0.0
+  },
+  {
+   "player": "Donovan Walton",
+   "player_norm": "donovan walton",
+   "roster_position": "SS",
+   "pct_drafted": 0.42,
+   "fpts": 0.0
+  },
+  {
+   "player": "Vaughn Grissom",
+   "player_norm": "vaughn grissom",
+   "roster_position": "3B",
+   "pct_drafted": 0.42,
+   "fpts": 0.0
+  },
+  {
+   "player": "Brady Basso",
+   "player_norm": "brady basso",
+   "roster_position": "P",
+   "pct_drafted": 0.42,
+   "fpts": 7.15
+  }
+ ],
+ "own_results": {
+  "matched": 7,
+  "requested": 7,
+  "field_size": 237,
+  "best_rank": 1,
+  "worst_rank": 232,
+  "best_finish_percentile": 100.0,
+  "median_finish_percentile": 46.84,
+  "best_points": 144.95001,
+  "winning_points": 144.95001,
+  "own_lineups_duplicated_by_field": 1,
+  "max_copies_of_an_own_lineup": 3,
+  "entry_fee": null,
+  "fees_total": null,
+  "winnings_total": null,
+  "paid_places": null,
+  "payout_breadth_observed": null,
+  "cashed_entries": null,
+  "net": null,
+  "labels": "observed outcomes from a completed contest; never a graded prediction, ROI model, win rate, or probability claim"
+ }
+}

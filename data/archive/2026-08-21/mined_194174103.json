@@ -1,0 +1,759 @@
+{
+ "label": "deterministic review proxy / observed outcome; not ROI, win rate, or a probability claim; never auto-applied",
+ "version": "0.5-review",
+ "coverage": "full",
+ "contest_id": "194174103",
+ "slate_date": "2026-08-21",
+ "contest_type": "showdown",
+ "meta": {
+  "entries_total": 20,
+  "entries_complete_lineups": 20,
+  "roster_size": 6,
+  "entries_unparsed": 0,
+  "winning_points": 73.55,
+  "winning_entry_id": "5225703084",
+  "multi_entry_flag": false
+ },
+ "duplication": {
+  "distinct_lineups": 17,
+  "entries_in_duplicated_lineups": 5,
+  "share_duplicated_pct": 25.0,
+  "max_copies": 3,
+  "copies_histogram": {
+   "1": 15,
+   "2": 1,
+   "3": 1
+  },
+  "winner_copies": 1
+ },
+ "construction": {
+  "cheap_salary_threshold": 3000,
+  "at_cap_entries": 2,
+  "at_cap_share_pct": 10.0,
+  "salary_left_histogram": {
+   "1-100": 2,
+   "301-700": 5,
+   "101-300": 6,
+   "701-1500": 6,
+   "> 1500": 1
+  },
+  "max_stack_histogram": {
+   "3": 5,
+   "4": 9,
+   "5": 6
+  },
+  "sp_pair_top": [],
+  "top_owned": [
+   {
+    "player": "Jacob Misiorowski",
+    "pct_drafted": 90.0
+   },
+   {
+    "player": "Chris Sale",
+    "pct_drafted": 70.0
+   },
+   {
+    "player": "Joey Ortiz",
+    "pct_drafted": 70.0
+   },
+   {
+    "player": "Mike Yastrzemski",
+    "pct_drafted": 65.0
+   },
+   {
+    "player": "Andrew Vaughn",
+    "pct_drafted": 50.0
+   }
+  ],
+  "captain_table": [
+   {
+    "player": "Jacob Misiorowski",
+    "captain_count": 12,
+    "captain_share_pct": 60.0,
+    "pct_drafted": 90.0
+   },
+   {
+    "player": "Chris Sale",
+    "captain_count": 2,
+    "captain_share_pct": 10.0,
+    "pct_drafted": 70.0
+   },
+   {
+    "player": "Joey Ortiz",
+    "captain_count": 2,
+    "captain_share_pct": 10.0,
+    "pct_drafted": 70.0
+   },
+   {
+    "player": "Jackson Chourio",
+    "captain_count": 1,
+    "captain_share_pct": 5.0,
+    "pct_drafted": 25.0
+   },
+   {
+    "player": "Jake Bauers",
+    "captain_count": 1,
+    "captain_share_pct": 5.0,
+    "pct_drafted": 25.0
+   },
+   {
+    "player": "Drake Baldwin",
+    "captain_count": 1,
+    "captain_share_pct": 5.0,
+    "pct_drafted": 10.0
+   },
+   {
+    "player": "Ronald Acuna Jr.",
+    "captain_count": 1,
+    "captain_share_pct": 5.0,
+    "pct_drafted": 10.0
+   }
+  ],
+  "winner_captain": {
+   "player": "Jacob Misiorowski",
+   "pct_drafted": 90.0,
+   "captain_share_pct": 60.0,
+   "was_top_owned_captain": true
+  }
+ },
+ "diagnostics": {
+  "salary_join_rate_pct": 100.0,
+  "unmatched_names_top": [],
+  "salary_name_collisions": [],
+  "ownership_recompute_max_diff_pts": 0.0,
+  "ownership_recompute_denominator": "all_entries",
+  "ownership_recompute_ok": true,
+  "parse_structural_ok": true,
+  "parsed_nothing": false,
+  "mostly_unparsed": false,
+  "contest_type_mismatch": false,
+  "salary_join_collapsed": false,
+  "entries_unparsed_share": 0.0,
+  "intra_entry_duplicate_entry_ids": [],
+  "roster_slots_observed": 120,
+  "roster_slots_expected": 120,
+  "recomputed_total_pct": 600.0,
+  "dk_table_total_pct": 600.0,
+  "dk_table_deficit_pts": 0.0,
+  "dk_table_agrees": true,
+  "verification_note": "parse structurally sound; DK %Drafted agrees with the lineup recompute"
+ },
+ "entries": [
+  {
+   "rank": "1",
+   "entry_id": "5225703084",
+   "username": "pat_the_hat2",
+   "points": 73.55,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 46.67,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin riley",
+    "chris sale",
+    "cooper pratt",
+    "jacob misiorowski",
+    "luis lara",
+    "mike yastrzemski"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "jacob misiorowski"
+  },
+  {
+   "rank": "2",
+   "entry_id": "5225738353",
+   "username": "lpapesh",
+   "points": 72.55,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 63.33,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "chris sale",
+    "jacob misiorowski",
+    "joey ortiz",
+    "mike yastrzemski",
+    "ozzie albies"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "jacob misiorowski"
+  },
+  {
+   "rank": "2",
+   "entry_id": "5225757517",
+   "username": "chelterbrand",
+   "points": 72.55,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 63.33,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "chris sale",
+    "jacob misiorowski",
+    "joey ortiz",
+    "mike yastrzemski",
+    "ozzie albies"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "jacob misiorowski"
+  },
+  {
+   "rank": "2",
+   "entry_id": "5225770764",
+   "username": "bamamammith",
+   "points": 72.55,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 63.33,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "chris sale",
+    "jacob misiorowski",
+    "joey ortiz",
+    "mike yastrzemski",
+    "ozzie albies"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "jacob misiorowski"
+  },
+  {
+   "rank": "5",
+   "entry_id": "5225730236",
+   "username": "CyclopeanCyborg",
+   "points": 71.1,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 56.67,
+   "n_cheap": 0,
+   "players_norm": [
+    "chris sale",
+    "jackson chourio",
+    "jacob misiorowski",
+    "joey ortiz",
+    "luis lara",
+    "mike yastrzemski"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "jackson chourio"
+  },
+  {
+   "rank": "6",
+   "entry_id": "5225721873",
+   "username": "Ezilodi",
+   "points": 70.6,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 45.0,
+   "n_cheap": 0,
+   "players_norm": [
+    "chris sale",
+    "drake baldwin",
+    "jacob misiorowski",
+    "mauricio dubon",
+    "mike yastrzemski",
+    "trevor megill"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "chris sale"
+  },
+  {
+   "rank": "7",
+   "entry_id": "5225745021",
+   "username": "eaglezzz",
+   "points": 70.55,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 60.0,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "chris sale",
+    "gary sanchez",
+    "jacob misiorowski",
+    "joey ortiz",
+    "mike yastrzemski"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "jacob misiorowski"
+  },
+  {
+   "rank": "7",
+   "entry_id": "5225782332",
+   "username": "Rallycap",
+   "points": 70.55,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 60.0,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "chris sale",
+    "gary sanchez",
+    "jacob misiorowski",
+    "joey ortiz",
+    "mike yastrzemski"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "jacob misiorowski"
+  },
+  {
+   "rank": "9",
+   "entry_id": "5225735082",
+   "username": "bposluszny",
+   "points": 69.85,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 48.33,
+   "n_cheap": 0,
+   "players_norm": [
+    "jackson chourio",
+    "jacob misiorowski",
+    "jake bauers",
+    "joey ortiz",
+    "mike yastrzemski",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "jacob misiorowski"
+  },
+  {
+   "rank": "10",
+   "entry_id": "5225752020",
+   "username": "wittwerjoe",
+   "points": 68.55,
+   "salary_used": 49900,
+   "salary_left": 100,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 52.5,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "chris sale",
+    "cooper pratt",
+    "jacob misiorowski",
+    "joey ortiz",
+    "luis lara"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "jacob misiorowski"
+  },
+  {
+   "rank": "11",
+   "entry_id": "5225707755",
+   "username": "KristianFTM",
+   "points": 67.85,
+   "salary_used": 48700,
+   "salary_left": 1300,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 43.33,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "gary sanchez",
+    "jacob misiorowski",
+    "jake bauers",
+    "mike yastrzemski",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "jacob misiorowski"
+  },
+  {
+   "rank": "12",
+   "entry_id": "5225764336",
+   "username": "wackkattack34",
+   "points": 66.85,
+   "salary_used": 49700,
+   "salary_left": 300,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 47.5,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "jackson chourio",
+    "jacob misiorowski",
+    "joey ortiz",
+    "ozzie albies",
+    "william contreras"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "jacob misiorowski"
+  },
+  {
+   "rank": "13",
+   "entry_id": "5225782365",
+   "username": "vavo27",
+   "points": 66.55,
+   "salary_used": 49300,
+   "salary_left": 700,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 54.17,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "chris sale",
+    "cooper pratt",
+    "jacob misiorowski",
+    "joey ortiz",
+    "mauricio dubon"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "jacob misiorowski"
+  },
+  {
+   "rank": "14",
+   "entry_id": "5225772795",
+   "username": "ffwaiverwiz",
+   "points": 63.85,
+   "salary_used": 49500,
+   "salary_left": 500,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 40.83,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin riley",
+    "jackson chourio",
+    "jacob misiorowski",
+    "jake bauers",
+    "luis lara",
+    "mike yastrzemski"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "jacob misiorowski"
+  },
+  {
+   "rank": "15",
+   "entry_id": "5225757495",
+   "username": "scaliscal80",
+   "points": 62.95,
+   "salary_used": 49100,
+   "salary_left": 900,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 58.33,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin riley",
+    "chris sale",
+    "jacob misiorowski",
+    "joey ortiz",
+    "mike yastrzemski",
+    "ozzie albies"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "chris sale"
+  },
+  {
+   "rank": "16",
+   "entry_id": "5225755314",
+   "username": "newulmspeedy",
+   "points": 58.6,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [],
+   "max_stack": 3,
+   "stack_pattern": "3-3",
+   "chalk_score": 50.0,
+   "n_cheap": 0,
+   "players_norm": [
+    "chris sale",
+    "jacob misiorowski",
+    "jake bauers",
+    "joey ortiz",
+    "mauricio dubon",
+    "michael harris"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "joey ortiz"
+  },
+  {
+   "rank": "17",
+   "entry_id": "5225768952",
+   "username": "Dandys",
+   "points": 53.6,
+   "salary_used": 49200,
+   "salary_left": 800,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 55.83,
+   "n_cheap": 0,
+   "players_norm": [
+    "andrew vaughn",
+    "chris sale",
+    "jacob misiorowski",
+    "jake bauers",
+    "joey ortiz",
+    "mauricio dubon"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "jake bauers"
+  },
+  {
+   "rank": "18",
+   "entry_id": "5225707436",
+   "username": "tresta1965",
+   "points": 47.9,
+   "salary_used": 48800,
+   "salary_left": 1200,
+   "sp_pair": [],
+   "max_stack": 4,
+   "stack_pattern": "4-2",
+   "chalk_score": 41.67,
+   "n_cheap": 0,
+   "players_norm": [
+    "brice turang",
+    "jackson chourio",
+    "jacob misiorowski",
+    "joey ortiz",
+    "michael harris",
+    "ozzie albies"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "joey ortiz"
+  },
+  {
+   "rank": "19",
+   "entry_id": "5225745790",
+   "username": "corruption79",
+   "points": 39.7,
+   "salary_used": 48900,
+   "salary_left": 1100,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 33.33,
+   "n_cheap": 0,
+   "players_norm": [
+    "brice turang",
+    "chris sale",
+    "drake baldwin",
+    "mauricio dubon",
+    "mike yastrzemski",
+    "ronald acuna"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "drake baldwin"
+  },
+  {
+   "rank": "20",
+   "entry_id": "5225724623",
+   "username": "bleeski",
+   "points": 27.0,
+   "salary_used": 45400,
+   "salary_left": 4600,
+   "sp_pair": [],
+   "max_stack": 5,
+   "stack_pattern": "5-1",
+   "chalk_score": 20.83,
+   "n_cheap": 0,
+   "players_norm": [
+    "austin riley",
+    "brice turang",
+    "mauricio dubon",
+    "michael harris",
+    "ozzie albies",
+    "ronald acuna"
+   ],
+   "lineup_complete": true,
+   "captain_norm": "ronald acuna"
+  }
+ ],
+ "player_table": [
+  {
+   "player": "Jacob Misiorowski",
+   "player_norm": "jacob misiorowski",
+   "roster_position": "UTIL",
+   "pct_drafted": 90.0,
+   "fpts": 25.9
+  },
+  {
+   "player": "Chris Sale",
+   "player_norm": "chris sale",
+   "roster_position": "UTIL",
+   "pct_drafted": 70.0,
+   "fpts": 16.7
+  },
+  {
+   "player": "Joey Ortiz",
+   "player_norm": "joey ortiz",
+   "roster_position": "UTIL",
+   "pct_drafted": 70.0,
+   "fpts": 0.0
+  },
+  {
+   "player": "Mike Yastrzemski",
+   "player_norm": "mike yastrzemski",
+   "roster_position": "UTIL",
+   "pct_drafted": 65.0,
+   "fpts": 10.0
+  },
+  {
+   "player": "Andrew Vaughn",
+   "player_norm": "andrew vaughn",
+   "roster_position": "UTIL",
+   "pct_drafted": 50.0,
+   "fpts": 5.0
+  },
+  {
+   "player": "Ozzie Albies",
+   "player_norm": "ozzie albies",
+   "roster_position": "UTIL",
+   "pct_drafted": 35.0,
+   "fpts": 2.0
+  },
+  {
+   "player": "Mauricio Dubon",
+   "player_norm": "mauricio dubon",
+   "roster_position": "UTIL",
+   "pct_drafted": 30.0,
+   "fpts": 6.0
+  },
+  {
+   "player": "Jackson Chourio",
+   "player_norm": "jackson chourio",
+   "roster_position": "UTIL",
+   "pct_drafted": 25.0,
+   "fpts": 7.0
+  },
+  {
+   "player": "Jake Bauers",
+   "player_norm": "jake bauers",
+   "roster_position": "UTIL",
+   "pct_drafted": 25.0,
+   "fpts": 0.0
+  },
+  {
+   "player": "Austin Riley",
+   "player_norm": "austin riley",
+   "roster_position": "UTIL",
+   "pct_drafted": 20.0,
+   "fpts": 0.0
+  },
+  {
+   "player": "Luis Lara",
+   "player_norm": "luis lara",
+   "roster_position": "UTIL",
+   "pct_drafted": 20.0,
+   "fpts": 8.0
+  },
+  {
+   "player": "Brice Turang",
+   "player_norm": "brice turang",
+   "roster_position": "UTIL",
+   "pct_drafted": 15.0,
+   "fpts": 3.0
+  },
+  {
+   "player": "Michael Harris II",
+   "player_norm": "michael harris",
+   "roster_position": "UTIL",
+   "pct_drafted": 15.0,
+   "fpts": 10.0
+  },
+  {
+   "player": "William Contreras",
+   "player_norm": "william contreras",
+   "roster_position": "UTIL",
+   "pct_drafted": 15.0,
+   "fpts": 14.0
+  },
+  {
+   "player": "Gary Sanchez",
+   "player_norm": "gary sanchez",
+   "roster_position": "UTIL",
+   "pct_drafted": 15.0,
+   "fpts": 0.0
+  },
+  {
+   "player": "Cooper Pratt",
+   "player_norm": "cooper pratt",
+   "roster_position": "UTIL",
+   "pct_drafted": 15.0,
+   "fpts": 0.0
+  },
+  {
+   "player": "Ronald Acuna Jr.",
+   "player_norm": "ronald acuna",
+   "roster_position": "UTIL",
+   "pct_drafted": 10.0,
+   "fpts": 4.0
+  },
+  {
+   "player": "Drake Baldwin",
+   "player_norm": "drake baldwin",
+   "roster_position": "UTIL",
+   "pct_drafted": 10.0,
+   "fpts": 0.0
+  },
+  {
+   "player": "Trevor Megill",
+   "player_norm": "trevor megill",
+   "roster_position": "UTIL",
+   "pct_drafted": 5.0,
+   "fpts": 3.65
+  }
+ ],
+ "own_results": {
+  "matched": 1,
+  "requested": 1,
+  "field_size": 20,
+  "best_rank": 20,
+  "worst_rank": 20,
+  "best_finish_percentile": 5.0,
+  "median_finish_percentile": 5.0,
+  "best_points": 27.0,
+  "winning_points": 73.55,
+  "own_lineups_duplicated_by_field": 0,
+  "max_copies_of_an_own_lineup": 1,
+  "entry_fee": 0.25,
+  "fees_total": 0.25,
+  "winnings_total": 0.0,
+  "paid_places": 1,
+  "payout_breadth_observed": 0.05,
+  "cashed_entries": 0,
+  "net": -0.25,
+  "labels": "observed outcomes from a completed contest; never a graded prediction, ROI model, win rate, or probability claim"
+ }
+}
