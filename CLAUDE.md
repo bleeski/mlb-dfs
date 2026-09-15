@@ -5,7 +5,7 @@ R338 commit one (`5b1b574`) and R302 stage 0 (`3fcc161`) landed on `main` on
 2026-09-11, and on 2026-09-15 a Claude Code DEV session ran what they owed on
 Ben's machine: `python tools/audit.py --run-tests --terse` printed
 `PASS  v2.26.0  40 modules  2072 tests` (the count moved 2066 -> 2072 in that
-session's own R348, below), and `python tools/solver_probe.py --date 2026-09-08`
+session's own R348, and again to 2089 when R340 landed after it), and `python tools/solver_probe.py --date 2026-09-08`
 FITS at 32s against a 130s budget, which is the schema-2 digest evidence step 8
 asked for. R338 is closed and its board entry is deleted; roadmap **CC-0** is
 done and the NEXT pointer is **CC-1**. What is still owed is not a session's to
@@ -481,7 +481,7 @@ The steps are in SKILL.md. These five hold whatever path a build takes:
    device VM at all, and this clone can carry a stale `origin/master`
    indefinitely because a push never prunes.
 2. `python tools/audit.py --run-tests --terse` must print
-   `PASS  v2.26.0  40 modules  2072 tests`. The module count comes off the
+   `PASS  v2.26.0  40 modules  2089 tests`. The module count comes off the
    filesystem and moves on its own; the test count is a pin, and since R62 it
    is a PER-SUITE pin (`EXPECTED_SUITE_COUNTS`) that the total is derived
    from. Each audited suite runs in its own subprocess, so a shortfall names

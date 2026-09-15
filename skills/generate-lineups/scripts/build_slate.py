@@ -553,6 +553,65 @@ def fraction_or_problem(value: Any) -> tuple:
     return coerced, None
 
 
+def _merge_bank_slice_reports(reports: list) -> dict:
+    """One bank report out of the per-stack-size slices R340 made necessary.
+
+    The sliced door asks `extend_bank` for one stack size per call, so a slate
+    that wants a five-stack takes two calls against the same cache. Everything
+    downstream -- `bank_warnings`, the allocator's `bank_report` remedy branch,
+    the run record -- reads ONE report, and the merge has to preserve what each
+    of them means rather than just taking the last one:
+
+    * counts SUM, because they are counts of work done across the slices;
+    * `job_list_exhausted` is an AND, because the bank is only fully searched
+      when every size's grid is; taking the last call's value would report a
+      partial search as complete whenever the final slice happened to finish,
+      which is exactly the reading R98(2) tells the allocator to act on;
+    * `total_candidates` is the LAST value, because the cache is shared and each
+      call already reports the running total rather than its own contribution;
+    * per-size detail is kept under `slices`, so a reader can see that the five
+      request built 12 and the four request built 95 instead of one blended
+      number that hides which size the bank actually holds.
+
+    A single-slice list is passed through with `slices` added, so the ordinary
+    no-five-stack slate's report is the same report it has always been.
+    """
+    if not reports:
+        return {}
+    merged = dict(reports[-1])
+    if len(reports) > 1:
+        summed = ("built_this_slice", "jobs_attempted", "jobs_total",
+                  "jobs_timed_out", "time_limited_accepted", "jobs_raised",
+                  "jobs_unanswered", "superseded_jobs_dropped")
+        for key in summed:
+            values = [r.get(key) for r in reports if isinstance(r.get(key), int)]
+            if values:
+                merged[key] = sum(values)
+        merged["job_list_exhausted"] = all(
+            bool(r.get("job_list_exhausted")) for r in reports)
+        for key in ("raised_by_reason", "unanswered_by_status"):
+            combined: dict = {}
+            for r in reports:
+                for name, count in dict(r.get(key) or {}).items():
+                    combined[name] = combined.get(name, 0) + int(count)
+            if combined:
+                merged[key] = dict(sorted(combined.items()))
+        examples: list = []
+        for r in reports:
+            examples.extend(list(r.get("raised_examples") or []))
+        if examples:
+            merged["raised_examples"] = examples[:3]
+    merged["slices"] = [
+        {"stack_min_requested": r.get("stack_min_requested"),
+         "built_this_slice": r.get("built_this_slice"),
+         "jobs_attempted": r.get("jobs_attempted"),
+         "jobs_total": r.get("jobs_total"),
+         "job_list_exhausted": r.get("job_list_exhausted")}
+        for r in reports
+    ]
+    return merged
+
+
 def resolve_bank_budget(computed_s: float, *, label: str) -> tuple[float, bool]:
     """Return ``(budget_s, floored)`` and SAY SO when the floor wins (R98(1))."""
     floored = float(computed_s) < BANK_BUDGET_FLOOR_S
@@ -2041,6 +2100,13 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
                 feed: dict, deadline: float) -> tuple[int, dict]:
     from mlb_engine.intake.live_data_adapters import build_slate_pool
     from mlb_engine.optimize.bank_cache import BankCache, extend_bank, pool_signature
+    # R340. The one derivation of what to ask the bank for, and the two
+    # clamps that keep either stack size from being starved of budget.
+    from mlb_engine.pipeline.execution_pipeline import (
+        resolve_bank_stack_request,
+        BANK_FIVE_STACK_BUDGET_MIN_SHARE,
+        BANK_FIVE_STACK_BUDGET_MAX_SHARE,
+    )
     # R293 moved this import into `anti_correlation_brief_block`, which is now
     # the one reader: R288 put it here to keep the brief's `applied` from
     # disagreeing with the solver, and agreement enforced by construction is
@@ -2327,31 +2393,22 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         # 5.0 with no way to tell it apart from a chosen budget.
         slice_budget, bank_budget_floored = resolve_bank_budget(
             remaining - 8.0, label="sliced bank")
-        bank_report = extend_bank(
-            cache, projections,
-            time_budget_s=slice_budget,
-            max_candidates=max(n_entries * 12, 60),
-            # R246. This is the bank that is DELIVERED on this path: its
-            # candidates go to run_slate as candidates_override, so run_slate
-            # builds no bank of its own and the auto-bank passthrough never
-            # runs. Both had to be wired or --leverage would be a no-op on
-            # whichever path a given slate's clock happened to choose.
-            leverage=leverage,
-            # R288: same reason as leverage above -- the sliced bank is what most
-            # builds deliver from, so a control wired only to the auto path is a
-            # silent no-op on whichever path the clock happens to choose.
-            max_opposing_hitters_per_sp=getattr(
-                args, "max_opposing_hitters_per_sp", None),
-        )
-        bank_report["budget_floored"] = bank_budget_floored
-        # F15: score each contest shape the reserved CSV actually contains. A
-        # single wta score is a ceiling-max ranking, and the allocator's cash
-        # branch then applies its floor weighting on top of it, so cash entries
-        # ranked on inverted weights. The shapes are known from the entries file,
-        # so there is nothing to guess.
+        # F15 + R340, resolved ONCE and before the bank rather than twice and
+        # after it. F15 needs the contest shapes the reserved CSV actually
+        # contains, so a cash entry is not ranked on a ceiling-max score; R340
+        # needs the merged portfolio controls, because they are what says whether
+        # this entered set asked for a five-stack at all. Both come from the same
+        # two resolutions, and doing them before the bank is what lets the stack
+        # request reach it. Every function here is the one `run_slate` itself
+        # calls, so this is not a second copy of R34's merge rule.
+        slice_shapes = None
+        bank_stack_request = resolve_bank_stack_request(None)
         try:
             from mlb_engine.entries.dk_entries_manager import parse_dk_entry_rows
-            from mlb_engine.pipeline.execution_pipeline import _resolve_contest_postures
+            from mlb_engine.pipeline.execution_pipeline import (
+                _resolve_contest_postures, _merged_controls_for_build,
+                resolve_shape_bands, slate_game_count,
+            )
             reserved_rows = parse_dk_entry_rows(str(entries))
             postures = _resolve_contest_postures(
                 reserved_rows, parse_postures_arg(getattr(args, "postures", None)), None)
@@ -2360,9 +2417,63 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
                     "contest_shape", "large_field_gpp")
                 for r in reserved_rows
             })
-        except Exception as exc:  # noqa: BLE001 - shape scoring is a refinement
-            print(f"shape resolution failed, scoring wta only: {exc}", file=sys.stderr)
-            slice_shapes = None
+            _bands = resolve_shape_bands(
+                postures, game_count=slate_game_count(projections))
+            bank_stack_request = resolve_bank_stack_request(
+                _merged_controls_for_build(postures, None, shape_bands=_bands))
+        except Exception as exc:  # noqa: BLE001 - both are refinements
+            print(f"shape resolution failed, scoring wta only and asking the "
+                  f"bank for the default stack size: {exc}", file=sys.stderr)
+
+        # R340. The sliced door asks for ONE size per call, so a slate that wants
+        # a five-stack takes two calls and the cache unions them -- R101's own
+        # documented behaviour, since the two calls bucket under different
+        # conditions signatures (`bank_cache.conditions_signature` hashes
+        # `stack_min:stack_max`) and `drop_stale_jobs` keeps a sibling bucket
+        # registered under the same projection digest. The five goes FIRST
+        # because it is the scarcer shape and the one that has never been built;
+        # its budget share is the quota it has to satisfy, CLAMPED so neither
+        # size is ever starved (a bank with no fours risks a blank reserved row,
+        # which blocks certification, and that is a worse failure than a missing
+        # five). Whatever the first call does not spend rolls into the second.
+        _slice_reports = []
+        _sizes = list(bank_stack_request["sizes"])
+        _total_max = max(n_entries * 12, 60)
+        _started_slices = time.monotonic()
+        for _idx, _size in enumerate(_sizes):
+            _left = slice_budget - (time.monotonic() - _started_slices)
+            if _idx == len(_sizes) - 1:
+                _call_budget, _call_max = max(1.0, _left), _total_max
+            else:
+                _share = min(BANK_FIVE_STACK_BUDGET_MAX_SHARE,
+                             max(BANK_FIVE_STACK_BUDGET_MIN_SHARE,
+                                 float(bank_stack_request["five_share_target"])))
+                _call_budget = max(1.0, _left * _share)
+                _call_max = max(int(_total_max * _share), 30)
+            _rep = extend_bank(
+                cache, projections,
+                time_budget_s=_call_budget,
+                max_candidates=_call_max,
+                # R246. This is the bank that is DELIVERED on this path: its
+                # candidates go to run_slate as candidates_override, so run_slate
+                # builds no bank of its own and the auto-bank passthrough never
+                # runs. Both had to be wired or --leverage would be a no-op on
+                # whichever path a given slate's clock happened to choose.
+                leverage=leverage,
+                # R288: same reason as leverage above -- the sliced bank is what
+                # most builds deliver from, so a control wired only to the auto
+                # path is a silent no-op on whichever path the clock happens to
+                # choose.
+                max_opposing_hitters_per_sp=getattr(
+                    args, "max_opposing_hitters_per_sp", None),
+                # R340. The argument no production caller has ever passed.
+                stack_min=int(_size),
+            )
+            _rep["stack_min_requested"] = int(_size)
+            _slice_reports.append(_rep)
+        bank_report = _merge_bank_slice_reports(_slice_reports)
+        bank_report["stack_request"] = bank_stack_request
+        bank_report["budget_floored"] = bank_budget_floored
         candidates = cache.as_candidates(
             projections, requested_n=n_entries, contest_shapes=slice_shapes)
         if len(candidates) < n_entries * 2 and not bank_report["job_list_exhausted"]:

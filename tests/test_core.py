@@ -18443,6 +18443,240 @@ class InertFactorReportingTests(unittest.TestCase):
                 ["allocation_certified", "selection_certified", "workflow_valid"])
 
 
+class BankStackRequestReachesBothDoorsTests(unittest.TestCase):
+    """R340: the five-stack controls were dead from every production door.
+
+    `primary_stack_min_size=5` (R37(2)(a)) and `min_five_stack_share_pct`
+    (R37(2)(b)) both shipped 2026-08-28 as allocator FILTERS over the candidate
+    bank, and no caller anywhere passed a stack size to either bank builder --
+    so both filtered a bank that is never asked for a five-stack. Measured on
+    1907_8g (2026-09-14, 38 entries): `BANK PRIMARY STACK SIZE DIST: {4: 107}`,
+    quota 0.60 -> zero five-stacks, reported as `relaxed_off /
+    no_qualifying_candidate_in_bank`, which reads as a bank that came up short.
+
+    The assertion whose absence let that sit for a year is the first one below:
+    a requested five REACHES both doors. It is pinned against the source of the
+    call sites rather than by running a bank, because what was wrong was the
+    ARGUMENT LIST, and a test that solved a bank could pass while the argument
+    stayed absent -- which is exactly what every existing bank test did.
+    """
+
+    def _pipeline_source(self):
+        return (Path(__file__).resolve().parents[1] / "mlb_engine" / "pipeline"
+                / "execution_pipeline.py").read_text(encoding="utf-8")
+
+    def _build_slate_source(self):
+        return (Path(__file__).resolve().parents[1] / "skills"
+                / "generate-lineups" / "scripts" / "build_slate.py"
+                ).read_text(encoding="utf-8")
+
+    def test_the_bank_default_is_named_once_and_matches_both_builders(self):
+        """R233: the derivation hardcodes no 4. If either builder's default
+        moves, this fails rather than the derivation silently disagreeing."""
+        import inspect
+        from mlb_engine.optimize import bank_cache
+        self.assertEqual(
+            epi.BANK_DEFAULT_STACK_MIN,
+            inspect.signature(opt.build_diverse_candidate_bank)
+            .parameters["bank_stack_min_size"].default)
+        self.assertEqual(
+            epi.BANK_DEFAULT_STACK_MIN,
+            inspect.signature(bank_cache.extend_bank).parameters["stack_min"].default)
+
+    def test_no_request_asks_for_the_default_and_nothing_else(self):
+        """The no-op case has to stay a no-op: a slate whose postures ask for
+        neither control must build the bank it has always built."""
+        for controls in ({}, {"primary_stack_min_size": 4},
+                         {"primary_stack_min_size": 4,
+                          "min_five_stack_share_pct": 0.0}):
+            req = epi.resolve_bank_stack_request(controls)
+            self.assertEqual(req["sizes"], [epi.BANK_DEFAULT_STACK_MIN])
+            self.assertEqual(req["bank_stack_min_size"], epi.BANK_DEFAULT_STACK_MIN)
+            self.assertFalse(req["wants_five"])
+            self.assertEqual(req["five_share_target"], 0.0)
+
+    def test_a_floor_of_five_asks_for_five_AND_four(self):
+        """Both sizes, and the four is not optional. R34's merge means a floor
+        binds only when every contest asked for it, but a bank with no fours
+        still risks a blank reserved row on a thin slice, and a blank row blocks
+        certification -- a worse failure than a missing five."""
+        req = epi.resolve_bank_stack_request({"primary_stack_min_size": 5})
+        self.assertEqual(req["sizes"], [5, epi.BANK_DEFAULT_STACK_MIN])
+        self.assertEqual(req["bank_stack_min_size"], 5)
+        self.assertEqual(req["five_share_target"], 1.0)
+
+    def test_a_quota_asks_for_five_at_the_quotas_own_share(self):
+        req = epi.resolve_bank_stack_request({
+            "primary_stack_min_size": 4, "min_five_stack_share_pct": 0.6,
+            "five_stack_min_size": 5})
+        self.assertEqual(req["sizes"], [5, epi.BANK_DEFAULT_STACK_MIN])
+        self.assertAlmostEqual(req["five_share_target"], 0.6)
+
+    def test_a_requested_five_reaches_the_AUTO_door(self):
+        """`execution_pipeline`'s `build_diverse_candidate_bank` call. The
+        argument list is the thing under test."""
+        src = self._pipeline_source()
+        call = src.split("bank = build_diverse_candidate_bank(", 1)[1].split("\n        )", 1)[0]
+        self.assertIn("bank_stack_min_size=", call,
+                      "the auto door must pass the stack floor it was given")
+        self.assertIn("bank_secondary_size=", call)
+        self.assertIn('bank_stack_request["bank_stack_min_size"]', call,
+                      "and it must come from the one derivation, not a literal")
+
+    def test_a_requested_five_reaches_the_SLICED_door(self):
+        """`build_slate.py`'s `extend_bank` call -- the bank most builds
+        actually deliver from, since its candidates go to run_slate as
+        candidates_override and the auto path never runs."""
+        src = self._build_slate_source()
+        call = src.split("_rep = extend_bank(", 1)[1].split("\n            )", 1)[0]
+        self.assertIn("stack_min=int(_size)", call,
+                      "the sliced door must pass the size it is iterating")
+        self.assertIn("resolve_bank_stack_request", src,
+                      "and the sizes must come from the one derivation")
+
+    def test_a_requested_five_reaches_the_PLAN_LEG(self):
+        """The third production door, which R340's own entry does not name and
+        its own grep finds. `_plan_joint_allocation` exists to solve THE SAME
+        MILP the build will solve; a plan bank built at four while the build's
+        is built at five is a verdict about a different question."""
+        src = self._pipeline_source()
+        call = src.split("report = extend_bank(", 1)[1].split("\n                )", 1)[0]
+        self.assertIn('stack_min=_plan_stack_request["bank_stack_min_size"]', call)
+
+    def test_the_sliced_bank_buckets_by_size_rather_than_colliding(self):
+        """R340 fix (4). Two calls at different sizes must write different
+        buckets, or the second serves the first's four-stacks back."""
+        from mlb_engine.optimize import bank_cache
+        frame = pd.DataFrame({
+            "Player_ID": ["1", "2"], "Name": ["a", "b"], "Position": ["P", "OF"],
+            "Team": ["AAA", "BBB"], "Opponent": ["BBB", "AAA"],
+            "Salary": [5000, 4000], "Base": [10.0, 8.0], "Ceiling": [20.0, 16.0],
+            "Floor": [5.0, 4.0], "Game_ID": ["g1", "g1"],
+        })
+        four = bank_cache.conditions_signature(frame, [], 4, 5)
+        five = bank_cache.conditions_signature(frame, [], 5, 5)
+        self.assertNotEqual(four, five,
+                            "a 5-request must not reuse the 4-bucket")
+
+    def test_the_auto_door_needs_no_bucket_because_it_persists_no_bank(self):
+        """The other half of fix (4), answered by evidence rather than by adding
+        machinery: `build_diverse_candidate_bank` builds in memory per call and
+        touches no `BankCache`, so there is no bucket for a stack request to
+        collide in on that door."""
+        src = (Path(__file__).resolve().parents[1] / "mlb_engine" / "optimize"
+               / "optimizer_v3.py").read_text(encoding="utf-8")
+        self.assertNotIn("BankCache", src)
+        self.assertNotIn("conditions_signature", src)
+
+
+class BankNeverAskedVersusCouldNotTests(unittest.TestCase):
+    """R340 fix (2): "no candidate qualifies" had one vocabulary for two facts.
+
+    A bank that was ASKED for the size and could not produce it is evidence
+    about the pool or the clock. A bank that was NEVER asked is a control with
+    no wire. Both reported `no_qualifying_candidate_in_bank`, so for a year the
+    second wore the first's clothes and R37(2)'s 12-slate checkpoint read a
+    no-op as a measurement.
+    """
+
+    def test_a_report_with_no_stack_request_is_unknown_and_says_so(self):
+        """Three values, and the third is not a hedge: an older report cannot
+        answer the question, and the reader is told that rather than given the
+        likelier answer."""
+        for report in (None, {}, {"stack_request": "nonsense"},
+                       {"stack_request": {"sizes": []}}):
+            verdict = ca.bank_stack_size_verdict(report, 5)
+            self.assertEqual(verdict["status"], "unknown")
+            self.assertTrue(verdict["note"])
+
+    def test_asked_for_four_and_filtered_at_five_is_NEVER_ASKED(self):
+        verdict = ca.bank_stack_size_verdict({"stack_request": {"sizes": [4]}}, 5)
+        self.assertEqual(verdict["status"], "bank_never_asked_for_size")
+        self.assertEqual(verdict["requested_sizes"], [4])
+
+    def test_asked_for_five_and_finding_none_is_COULD_NOT(self):
+        verdict = ca.bank_stack_size_verdict({"stack_request": {"sizes": [5, 4]}}, 5)
+        self.assertEqual(verdict["status"], "bank_asked_and_could_not")
+
+    def test_the_quota_reports_the_never_asked_trigger_on_a_four_only_bank(self):
+        """Through the production function, on the exact condition the 1907_8g
+        build hit: a quota of 0.60 over a bank of 107 four-stacks."""
+        report = ca._resolve_five_stack_quota(
+            [4] * 107, 38,
+            {"min_five_stack_share_pct": 0.6, "five_stack_min_size": 5},
+            bank_report={"stack_request": {"sizes": [4]}})
+        self.assertEqual(report["status"], "relaxed_off")
+        self.assertEqual(report["relaxation_steps"][-1]["trigger"],
+                         "bank_never_asked_for_size")
+        self.assertEqual(report["bank_stack_request"]["status"],
+                         "bank_never_asked_for_size")
+
+    def test_the_same_quota_on_an_ASKED_bank_reports_could_not(self):
+        report = ca._resolve_five_stack_quota(
+            [4] * 107, 38,
+            {"min_five_stack_share_pct": 0.6, "five_stack_min_size": 5},
+            bank_report={"stack_request": {"sizes": [5, 4]}})
+        self.assertEqual(report["relaxation_steps"][-1]["trigger"],
+                         "bank_asked_and_could_not")
+
+    def test_an_absent_bank_report_keeps_the_old_trigger_verbatim(self):
+        """A caller that passes no report must read exactly as it did before
+        R340, because nothing new is known about it."""
+        report = ca._resolve_five_stack_quota(
+            [4] * 107, 38,
+            {"min_five_stack_share_pct": 0.6, "five_stack_min_size": 5})
+        self.assertEqual(report["relaxation_steps"][-1]["trigger"],
+                         "no_qualifying_candidate_in_bank")
+
+
+class BankSliceReportMergeTests(unittest.TestCase):
+    """R340: two `extend_bank` calls, one report for everything downstream."""
+
+    @staticmethod
+    def _build_slate():
+        import importlib.util
+        path = (Path(__file__).resolve().parents[1] / "skills"
+                / "generate-lineups" / "scripts" / "build_slate.py")
+        spec = importlib.util.spec_from_file_location("_bs_merge", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def test_one_slice_passes_through_unchanged(self):
+        mod = self._build_slate()
+        one = {"built_this_slice": 7, "job_list_exhausted": True,
+               "total_candidates": 7, "stack_min_requested": 4}
+        merged = mod._merge_bank_slice_reports([one])
+        self.assertEqual(merged["built_this_slice"], 7)
+        self.assertTrue(merged["job_list_exhausted"])
+        self.assertEqual(len(merged["slices"]), 1)
+
+    def test_counts_sum_and_exhaustion_is_an_AND(self):
+        """The AND is the load-bearing half. `job_list_exhausted` False is what
+        tells the allocator a refusal is a fact about a PARTIAL search (R98(2)),
+        so taking the last slice's value would report a partial bank as fully
+        searched whenever the final slice happened to finish."""
+        mod = self._build_slate()
+        merged = mod._merge_bank_slice_reports([
+            {"built_this_slice": 12, "jobs_attempted": 30, "jobs_total": 100,
+             "job_list_exhausted": False, "total_candidates": 12,
+             "stack_min_requested": 5},
+            {"built_this_slice": 95, "jobs_attempted": 100, "jobs_total": 100,
+             "job_list_exhausted": True, "total_candidates": 107,
+             "stack_min_requested": 4},
+        ])
+        self.assertEqual(merged["built_this_slice"], 107)
+        self.assertEqual(merged["jobs_attempted"], 130)
+        self.assertFalse(merged["job_list_exhausted"])
+        self.assertEqual(merged["total_candidates"], 107,
+                         "the cache is shared, so the running total is the "
+                         "last call's, never the sum")
+        self.assertEqual([s["stack_min_requested"] for s in merged["slices"]],
+                         [5, 4],
+                         "per-size detail survives, so a reader can see which "
+                         "size the bank actually holds")
+
+
 class PytestTempRootObstructionTests(unittest.TestCase):
     """R348: a host whose pytest temp root is unusable must not read as a red tree.
 
@@ -21249,7 +21483,12 @@ class LeveragePassthroughTests(unittest.TestCase):
                          "build_slate must call the engine's shared attach, not "
                          "mint a second copy of it")
         attach = src.index("apply_leverage_ownership(projections, leverage)")
-        bank = src.index("bank_report = extend_bank(")
+        # R340 moved this anchor: the sliced door now calls `extend_bank` once
+        # per requested stack size inside a loop, so the call is `_rep =` and the
+        # merged report is assigned after it. The ASSERTION is unchanged and is
+        # the point -- the ownership column must land before the first solve,
+        # whichever name the call site wears.
+        bank = src.index("_rep = extend_bank(")
         self.assertLess(attach, bank,
                         "the column must land before the sliced bank solves")
         resolve = src.index("leverage, leverage_brief = resolve_leverage(")

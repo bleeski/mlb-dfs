@@ -25,6 +25,170 @@ performance claim.
 
 ---
 
+## 2026-09-15 — R340: the five-stack controls were dead from every production door, and there were three doors, not two
+
+**Scope.** `mlb_engine/pipeline/execution_pipeline.py`,
+`mlb_engine/allocate/contest_allocator.py`,
+`skills/generate-lineups/scripts/build_slate.py`, `tests/test_core.py`,
+`tests/golden/golden_replay_2026-06-03.json` (RE-FROZEN, see below),
+`tools/audit.py` (the per-suite pin), `CLAUDE.md`,
+`skills/generate-lineups/SKILL.md`, `docs/backlog.md`, this file. Roadmap CC-1,
+the head of the prize-first board.
+
+**What was wrong.** R37(2)(a)'s `primary_stack_min_size` floor and (b)'s
+`min_five_stack_share_pct` quota shipped 2026-08-28 as allocator FILTERS over the
+candidate bank. No caller anywhere passed a stack size to either bank builder, so
+both filtered a bank that is never asked for a five-stack.
+`build_diverse_candidate_bank` takes `bank_stack_min_size=4` and its own
+docstring says "Raising the floor to 5 with a secondary of 2 is what produces
+5-2-1 candidates; nothing else in the solve does"; `extend_bank` takes
+`stack_min=4` and builds one job per team at that size. Measured on 1907_8g
+(2026-09-14, 38 Classic entries): `BANK PRIMARY STACK SIZE DIST: {4: 107}`, 107
+of 107 candidates a four-stack, `min_five_stack_share_pct=0.60` -> zero
+five-stacks, and the quota reported `relaxed_off` with trigger
+`no_qualifying_candidate_in_bank` — which reads as a bank that came up short
+rather than as a control with no wire. R37(2)'s 12-slate review checkpoint has
+therefore been reading a no-op since 08-28.
+
+**The R233 enumeration, and it is the reason this entry is not the entry the
+board wrote.** `grep -rn "extend_bank(\|build_diverse_candidate_bank(" --include=*.py mlb_engine tools skills`,
+non-test, at this head returns SIX call sites across FIVE files. The board's
+R340 names two. The three it does not:
+
+* `execution_pipeline.py` `_plan_joint_allocation` — `extend_bank`, the R28/R63
+  plan leg. **Fixed here, and it is not cosmetic.** The comment immediately above
+  that call says the leg's whole job is to solve THE SAME MILP the build will
+  solve, because "a verdict produced under a different constraint matrix is a
+  verdict about a different question" and `would_certify` is exactly the kind of
+  label CLAUDE.md's truthful-labels rule covers. Wiring the two build doors and
+  not this one would have made that comment false on the first slate that asks
+  for a five.
+* `tools/late_swap.py:663` and `:694` — `extend_bank` twice, the refine path.
+  **NOT fixed here, deliberately.** This is R284's shape exactly — that item is
+  the same two calls missing `leverage`, and its own reasoning applies unchanged:
+  a late-swap pool has 3 to 9 slots already pinned, so it is strictly tighter
+  than the build pool the control was chosen against, and a stack floor that
+  refuses inside a lock window is worse than an unconstrained refinement.
+  `extend_bank` already relaxes `stack_min` to the free hitter slots and reports
+  `stack_min_relaxed_to`, so the machinery exists; what is missing is the
+  measurement of where the edge moves under pins. Filed as a rider on R284 rather
+  than guessed at in a commit landing at a slate boundary.
+* `skills/generate-lineups-workspace/deepen_bank.py:64` — untracked operator
+  driver, not in the DEV write set, and it writes the SAME date-keyed cache the
+  build reads. Named here because an operator who deepens a bank with it fills
+  the four-bucket only; it is not a shippable fix.
+
+**Fix (1): one derivation, three doors.** `resolve_bank_stack_request(controls)`
+reads the MERGED portfolio controls — not the bands directly, which matters,
+because R34's floor merge has already applied unanimity (floor 5 binds only when
+EVERY contest is narrow-breadth, the quota only when every contest is
+mid-breadth) and reading the bands again here would be a second copy of that rule
+that can disagree with the first. It returns `bank_stack_min_size` for the door
+that takes one value and `sizes` for the door that takes one per call. The
+auto-bank door needs only the single value: there the base bank supplies the
+fours and only the forced-augmentation pass reads the floor, so the mix is
+automatic. The sliced door takes two calls and the cache unions them, which is
+R101's own documented behaviour rather than a new mechanism.
+
+**`sizes` always keeps the four, and that is a decision, not an oversight.** A
+bank with no five-stacks is the defect this item is about; a bank with no
+four-stacks is a DIFFERENT defect. The four is what serves the contests that
+never asked for the floor under R34's merge, and what keeps a budgeted slice from
+leaving a blank reserved row — and a blank reserved row blocks certification,
+which CLAUDE.md calls the MAXIMUM washout. So the five-stack request takes the
+quota's own share of the slice budget, CLAMPED to [0.25, 0.75] so neither size is
+ever starved, the five goes first because it is the scarcer shape and the one
+that has never been built, and whatever the first call does not spend rolls into
+the second.
+
+**Fix (2): `bank_never_asked_for_size` vs `bank_asked_and_could_not`.** "No
+candidate qualifies" had one vocabulary for two facts that call for opposite
+responses. `bank_stack_size_verdict` reads the request off the bank report — the
+channel `select_and_assign_entries` already documents as "the caller's
+bank-construction record", so no new plumbing — and both the quota report and the
+floor report carry the verdict. The quota's relaxation trigger is now the verdict
+where one can be read, and the brief prints a warning naming the wiring fact when
+it is one. There is a third value, `unknown`, and it is not a hedge: a report
+from before this record existed cannot answer the question, and a caller that
+passes no report keeps the old trigger VERBATIM, because nothing new is known
+about it.
+
+**Fix (4): bank identity, both halves.** The sliced bank already keys jobs on
+`stack_min:stack_max` (`bank_cache.conditions_signature`), so a five-request
+buckets rather than reusing the four-bucket, and `drop_stale_jobs` keeps a
+sibling bucket registered under the same projection digest — the two calls union
+instead of one destroying the other. Pinned by a test that the two signatures
+differ. The auto-bank door needs no bucket at all, and that is answered with
+evidence rather than machinery: `optimizer_v3` imports no `BankCache` and
+computes no `conditions_signature` (pinned by a test), so it builds in memory per
+call and there is nothing for a stack request to collide in.
+
+**Tests (seventeen; `tests.test_core` 1221 -> 1238, pinned line 2072 -> 2089).**
+The one whose absence let this sit for a year is `a requested five REACHES both
+doors` — three tests, one per door, asserted against the CALL SITES rather than
+by building a bank, because what was wrong was the argument list and a test that
+solves a bank passes just fine while the argument stays absent, which is what
+every existing bank test did. The default pin is kept and strengthened: rather
+than asserting the literal 4, it asserts `BANK_DEFAULT_STACK_MIN` equals BOTH
+builders' signature defaults, so a builder default that moves fails here instead
+of letting the derivation disagree silently. Six tests cover the never-asked /
+could-not distinction, including the exact 1907_8g condition (a 0.60 quota over
+107 four-stacks) through the production function, and one pins that an absent
+bank report keeps the old trigger unchanged. Two cover the slice-report merge,
+where `job_list_exhausted` is an AND: taking the last slice's value would report
+a partial search as complete whenever the final slice happened to finish, and
+that flag is what R98(2) tells the allocator to act on.
+
+**The golden baseline is RE-FROZEN, and that is the part to review.** R340's own
+entry warned this moves golden bytes on the bank, and it does. Measured on the
+golden fixture (2026-06-03, 18 entries, three contests: two `wta_satellite` and
+one `large_gpp`), before and after, out of the run's own diagnostics:
+
+| | before | after |
+| :--- | :--- | :--- |
+| bank primary-stack size histogram | `{3: 1, 4: 21, 5: 6}` | `{3: 1, 4: 10, 5: 17}` |
+| `five_stack_quota` qualifying candidates | 6 | 17 |
+| `five_stack_quota` status / need / relaxations | applied / 2 / 0 | applied / 2 / 0 |
+| `primary_stack_floor` requested / applied / relaxations | 4 / 4 / 0 | 4 / 4 / 0 |
+
+That slate carries `min_five_stack_share_pct = 0.15` from the mid-breadth band,
+so it has been ASKING for five-stacks the whole time; what changed is that the
+bank is now asked too. The re-frozen baseline keeps `entry_count` at 18 and the
+SP-pair distribution BYTE-IDENTICAL (`43205901+43205902`: 5, `+43206001`: 7,
+`+43206009`: 5, `43205902+43206009`: 1), so the pitcher structure is untouched
+and only which stack shapes were selected moved: 4 of 18 assignments are
+unchanged, 14 are different lineups. All three certification gates pass on the
+new run, and both the floor and the quota still report zero relaxations. The old
+baseline is in git history at the parent commit.
+
+**One thing the board's R340 overstates, corrected here rather than repeated.**
+"The bank holds no five-stack" is true of the SLICED door, where every job is
+built at `stack_min=4` and the measured 1907_8g bank was 107 of 107 four-stacks.
+It is NOT true of the auto door: only the forced-augmentation pass reads the
+floor, and `build_candidate_lineup_bank`'s base bank produced 6 five-stacks on
+the golden fixture incidentally. So the effect differs by door -- the sliced door
+went from structurally unable to produce the shape, the auto door from producing
+it by accident to producing it on request -- and the quota on this fixture was
+already `applied` rather than `relaxed_off`. The defect is the same on both
+doors; its severity is not, and saying so is cheaper than the next session
+re-measuring it.
+
+**What is NOT claimed.** Not that five-stacks win. None of the mine's 52 primary
+comparisons clears the corrected 5% threshold, the top-1% five-over-four ratio's
+CI includes zero (1.130 [0.960, 1.348]), and the verified paid-position table has
+four-stacks +6.0 pp and five-stacks +5.9 pp, both spanning zero, on 123 small
+satellites. The claim is narrower and checkable: the engine has never been ABLE
+to build the shape its own shipped controls ask for, and until it can, neither
+R37(2)'s checkpoint nor R118's replay can grade the question. Not that the
+secondary is sized: `bank_secondary_size` is threaded so it is reachable and
+defaults to 0, because the mine finds the arrangement inside the five family
+indistinguishable at top 1% (5-2-1 1.040 [0.995, 1.101], 5-3 0.937, 5-1-1-1
+0.979) and forcing a bringback of 2 would be a strategy change the archive does
+not support. R37(2)(c)'s 4-2-x cap is still the only secondary control worth
+sizing and still comes after this.
+
+---
+
 ## 2026-09-15 — CC-0 closes the thirteenth edition on Ben's machine, and R348: the gate could not run on this host, reported that as a failing tree, and deleted its own isolation while doing it
 
 **Scope.** `tools/audit.py`, `tests/test_core.py`, `CLAUDE.md`,
@@ -240,7 +404,7 @@ rosterable, Workstream 1, CC-3). Two findings deliberately got NO number: the
 `--max-opposing-hitters-per-sp` default (the archive supports the default and the
 R276 rider adds the panel that makes a relaxation visible), and a Showdown 5-1
 control would ratify a mix the engine already builds 95% of the time (R306 step 5
-rider). Next free number: R349 (R348 is the 2026-09-15 CC-0 entry above).
+rider). Next free number: R349 (R348 is the 2026-09-15 CC-0 entry above; R340 landed the same date as CC-1).
 
 **Riders (twenty):** R10 (hierarchical fit, per-player popularity term, field-size
 transfer, two new control halves after the bar), R37(2)(c) (the secondary is

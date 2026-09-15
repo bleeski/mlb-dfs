@@ -1894,6 +1894,105 @@ def resolve_shape_bands(
     }
 
 
+#: The stack floor BOTH bank builders default to, named once here so the
+#: derivation below cannot drift from them silently. R340: the defaults live in
+#: `optimizer_v3.build_diverse_candidate_bank(bank_stack_min_size=4)` and
+#: `bank_cache.extend_bank(stack_min=4)`, and a test pins all three equal.
+BANK_DEFAULT_STACK_MIN = 4
+
+#: How much of a budgeted slice the five-stack request may take, and how much it
+#: must leave behind. R340: a bank with no five-stacks is the defect; a bank with
+#: no four-stacks is a DIFFERENT defect, because the four is what fills the
+#: contests that never asked for the floor (R34's merge rule) and what keeps a
+#: thin slice from leaving a blank reserved row, which blocks certification.
+#: Neither size is ever starved, whatever the quota says.
+BANK_FIVE_STACK_BUDGET_MIN_SHARE = 0.25
+BANK_FIVE_STACK_BUDGET_MAX_SHARE = 0.75
+
+
+def resolve_bank_stack_request(
+    controls: Optional[Mapping[str, Any]],
+) -> Dict[str, Any]:
+    """What to ASK the candidate bank for, derived from the merged controls.
+
+    R340, and the defect is that this function did not exist. R37(2)(a)'s
+    ``primary_stack_min_size`` floor and (b)'s ``min_five_stack_share_pct`` quota
+    shipped 2026-08-28 as allocator FILTERS over a bank, and no caller anywhere
+    passed a stack size to either bank builder -- so both controls filtered a
+    bank that is never asked for a five-stack. Measured on 1907_8g (2026-09-14,
+    38 entries): ``BANK PRIMARY STACK SIZE DIST: {4: 107}``, 107 of 107
+    candidates a four-stack, quota 0.60 -> zero five-stacks, and the quota
+    reported ``relaxed_off / no_qualifying_candidate_in_bank``, which reads as a
+    bank that came up short rather than as a control with no wire.
+
+    The derivation is the SAME breadth routing the floor and the quota already
+    use, so a five-stack request reaches the bank on exactly the contests they
+    target and on no others. It reads the MERGED controls rather than the bands
+    directly, which matters: R34's floor merge already applied unanimity (floor 5
+    binds only when EVERY contest is narrow-breadth, the quota only when every
+    contest is mid-breadth) and reading the bands again here would be a second
+    copy of that rule that can disagree with the first.
+
+    ``sizes`` is what a builder with ONE size per call (``extend_bank``) asks
+    for, in priority order, and it holds BOTH sizes whenever a five is wanted --
+    "a slate mixing both breadths asks the bank for both sizes". The auto-bank
+    door needs only ``bank_stack_min_size``, because there the base bank supplies
+    the fours and only the forced-augmentation pass reads the floor, so one value
+    already produces the mix.
+
+    Truthful labels: this chooses what to SEARCH for. It is not a claim that a
+    five-stack scores better, and nothing here relaxes a control or reduces a
+    player pool.
+    """
+    merged = dict(controls or {})
+    try:
+        floor = int(merged.get("primary_stack_min_size") or 0)
+    except (TypeError, ValueError):
+        floor = 0
+    try:
+        quota = float(merged.get("min_five_stack_share_pct") or 0.0)
+    except (TypeError, ValueError):
+        quota = 0.0
+    try:
+        five_size = int(merged.get("five_stack_min_size") or
+                        NARROW_BREADTH_PRIMARY_STACK_FLOOR)
+    except (TypeError, ValueError):
+        five_size = NARROW_BREADTH_PRIMARY_STACK_FLOOR
+
+    if floor >= five_size:
+        # Every contest in the entered set asked for the floor, so every
+        # delivered lineup needs one. The bank is still asked for fours as well:
+        # see BANK_FIVE_STACK_BUDGET_MIN_SHARE.
+        target = 1.0
+        reason = (f"primary_stack_min_size {floor} >= five_stack_min_size "
+                  f"{five_size}: every entry needs a stack of {five_size}")
+    elif quota > 0.0:
+        target = quota
+        reason = (f"min_five_stack_share_pct {quota} over stacks of "
+                  f"{five_size}: that share of the entered set needs one")
+    else:
+        target = 0.0
+        reason = ("neither primary_stack_min_size nor min_five_stack_share_pct "
+                  "asks for a stack above the bank default")
+
+    wants_five = target > 0.0
+    return {
+        "primary_floor": floor or None,
+        "quota_share": quota or None,
+        "five_min_size": five_size,
+        "five_share_target": target,
+        "wants_five": wants_five,
+        # The auto door's single value. The sliced door's list.
+        "bank_stack_min_size": five_size if wants_five else BANK_DEFAULT_STACK_MIN,
+        "sizes": ([five_size, BANK_DEFAULT_STACK_MIN] if wants_five
+                  else [BANK_DEFAULT_STACK_MIN]),
+        "reason": reason,
+        "note": "deterministic search-effort routing derived from the same "
+                "breadth bands R37(2)(a) and (b) already apply; never a win "
+                "rate, cash rate, or probability claim",
+    }
+
+
 def _payout_breadth_by_shape_from_csv(archetypes_path: Optional[str]) -> Dict[str, float]:
     """Read the optional payout_breadth column from the archetype CSV, aggregated
     by payout_shape_default. Falls back to the in-code priors for any shape absent
@@ -3454,6 +3553,7 @@ def _plan_joint_allocation(
                     bank_projections["Excluded"] = False
                 mask = bank_projections["Player_ID"].astype(str).isin(set(excl))
                 bank_projections.loc[mask, "Excluded"] = True
+            _plan_stack_request = resolve_bank_stack_request(controls)
             with _tempfile.TemporaryDirectory(prefix="plan_bank_") as tmp:
                 cache = BankCache(_Path(tmp) / "plan_bank.json")
                 report = extend_bank(
@@ -3467,6 +3567,16 @@ def _plan_joint_allocation(
                     # the kind of label CLAUDE.md's truthful-labels rule covers.
                     max_opposing_hitters_per_sp=controls.get(
                         "max_opposing_hitters_per_sp"),
+                    # R340, and this site is NOT one of the two the item names --
+                    # it is the third, found by re-running its own grep. The
+                    # comment directly above says this leg's whole job is to
+                    # solve THE SAME MILP the build will solve, and after R340
+                    # wires the two build doors that stops being true here: the
+                    # build would ask its bank for a five-stack and the plan leg
+                    # would keep asking for four, so `would_certify` would be a
+                    # verdict about a different question. Same derivation, same
+                    # merged controls.
+                    stack_min=_plan_stack_request["bank_stack_min_size"],
                 )
                 if not report.get("job_list_exhausted"):
                     built = len(cache.candidates)
@@ -4847,6 +4957,7 @@ def run_slate(
         # which arrives here as `candidates_override` and never reaches this
         # branch -- carries them through `bank_cache._leverage_kwargs`.
         from mlb_engine.optimize.bank_cache import _leverage_kwargs
+        bank_stack_request = resolve_bank_stack_request(controls)
         bank = build_diverse_candidate_bank(
             bank_projections, requested_n=n, mode=mode, target="ceiling",
             contest_shapes=sorted(shape_counts) or None,
@@ -4863,11 +4974,26 @@ def run_slate(
             # wired at `build_slate.py`'s `extend_bank` call and the auto path
             # was not, which is R153's "on every rung" one rung short again.
             max_opposing_hitters_per_sp=controls.get("max_opposing_hitters_per_sp"),
+            # R340. The two arguments that decide whether this bank can CONTAIN
+            # the shape R37(2)(a)'s floor and (b)'s quota filter for. Neither was
+            # ever passed by any caller, so both controls filtered a bank of
+            # four-stacks and reported as if they were working. Derived from the
+            # merged controls, which already carry R34's unanimity rule, so a
+            # five is requested on exactly the contests the floor and the quota
+            # target. On THIS door one value is enough for the mix: the base
+            # bank supplies the fours and only the forced-augmentation pass
+            # reads the floor.
+            bank_stack_min_size=bank_stack_request["bank_stack_min_size"],
+            bank_secondary_size=controls.get("bank_secondary_size") or 0,
             **_leverage_kwargs(leverage),
         )
         candidates = _bank_records_to_candidates(bank.get("candidate_lineups") or [])
         bank_diag = {
             "source": "build_diverse_candidate_bank", "mode": mode, "requested_n": n,
+            # R340. What this bank was ASKED for, carried to the allocator so a
+            # floor or quota that finds nothing can say whether the bank was
+            # asked and could not, or was never asked at all.
+            "stack_request": bank_stack_request,
             "candidate_count": len(candidates),
             "excluded_player_ids_applied": bank_excludes,
             "solver_report": bank.get("solver_report"),

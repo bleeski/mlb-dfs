@@ -710,7 +710,13 @@ EXPECTED_SUITE_COUNTS = {
     # the unusable root, the one cleanup helper that replaced three copies of
     # the same pair, and -- the rider's regression -- that a nested in-process
     # `run_audit` deletes neither of the OUTER gate's two throwaway roots.
-    "tests.test_core": 1221,
+    # R340, 2026-09-15: 1221 -> 1238, the seventeen that pin the bank stack
+    # request. Nine on the derivation and the three doors it now reaches
+    # (including the plan leg, which R340's own entry does not name), six on
+    # telling `bank_never_asked_for_size` from `bank_asked_and_could_not`, and
+    # two on merging the sliced door's two per-size reports into the one report
+    # everything downstream reads.
+    "tests.test_core": 1238,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps

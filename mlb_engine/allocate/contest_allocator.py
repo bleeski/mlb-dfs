@@ -2202,11 +2202,56 @@ def five_stack_quota_rungs(requested_share: float) -> List[Optional[float]]:
     return rungs
 
 
+def bank_stack_size_verdict(
+    bank_report: Optional[Mapping[str, Any]],
+    min_size: int,
+) -> Dict[str, Any]:
+    """Was the bank ever ASKED for a primary stack of ``min_size``?
+
+    R340 fix (2). Without this the floor report and the quota report have one
+    vocabulary for two different facts: a bank that was asked and could not
+    produce the shape (a real fact about the pool or the clock) and a bank that
+    was never asked (a control with no wire). The first is evidence; the second
+    is a defect, and for a year it wore the first one's clothes.
+
+    Three values, and the third is not a hedge. ``bank_asked_and_could_not`` and
+    ``bank_never_asked_for_size`` both require a bank report that RECORDS what it
+    asked for; a caller that passes no report, or an older report from before
+    this record existed, gets ``unknown`` and the reader is told the question
+    could not be answered rather than being given the likelier answer.
+    """
+    report = dict(bank_report or {})
+    request = report.get("stack_request")
+    if not isinstance(request, Mapping):
+        return {"status": "unknown", "requested_sizes": None,
+                "note": "this bank report records no stack request, so whether "
+                        "the bank was asked for this size cannot be read off it"}
+    sizes = request.get("sizes")
+    try:
+        asked = [int(x) for x in (sizes or [])]
+    except (TypeError, ValueError):
+        asked = []
+    if not asked:
+        return {"status": "unknown", "requested_sizes": None,
+                "note": "the stack request carries no sizes"}
+    if max(asked) >= int(min_size):
+        return {"status": "bank_asked_and_could_not", "requested_sizes": asked,
+                "note": f"the bank WAS asked for a primary stack of "
+                        f"{max(asked)} and did not produce one that qualifies "
+                        f"at >= {int(min_size)}; this is a fact about the pool "
+                        f"or the search budget, not an unwired control"}
+    return {"status": "bank_never_asked_for_size", "requested_sizes": asked,
+            "note": f"the bank was asked for {asked} and never for "
+                    f">= {int(min_size)}, so no candidate could have qualified. "
+                    f"This is a wiring fact, not a thin pool (R340)"}
+
+
 def _resolve_five_stack_quota(
     stack_sizes: Sequence[int],
     n_entries: int,
     controls: Mapping[str, Any],
     quota_state: Optional[Mapping[str, Any]] = None,
+    bank_report: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Resolve the five-stack share quota to a need count this bank can carry.
 
@@ -2235,6 +2280,8 @@ def _resolve_five_stack_quota(
     infeasibility with no control attached to it.
     """
     state = dict(quota_state or {})
+    verdict = bank_stack_size_verdict(
+        bank_report, int(controls.get("five_stack_min_size") or 5))
     requested = controls.get("min_five_stack_share_pct")
     E = max(0, int(n_entries))
     report: Dict[str, Any] = {
@@ -2249,6 +2296,11 @@ def _resolve_five_stack_quota(
         "relaxations": int(state.get("relaxations") or 0),
         "relaxation_steps": list(state.get("relaxation_steps") or []),
         "rung_index": int(state.get("rung_index") or 0),
+        # R340 fix (2). "No candidate qualifies" has two causes that used to
+        # share one sentence, and they call for opposite responses: a bank that
+        # was ASKED and could not is a fact about the pool or the clock, and a
+        # bank that was NEVER asked is a control with no wire.
+        "bank_stack_request": verdict,
         "note": "deterministic construction control sized off a MEASURED field "
                 "share; observed-outcome rationale, never a win rate, cash "
                 "rate, or ROI claim",
@@ -2291,10 +2343,13 @@ def _resolve_five_stack_quota(
             "reason": (
                 f"min_five_stack_share_pct {applied} requires {need} of {E} "
                 f"entries at primary stack size >= {min_size}, and the bank "
-                f"contains 0 such candidates. Lowering the share cannot help; "
-                f"raise bank_stack_min_size on the bank build. Never trim the "
-                f"pool to fit"),
-            "trigger": "no_qualifying_candidate_in_bank",
+                f"contains 0 such candidates. {verdict['note']}. Lowering the "
+                f"share cannot help. Never trim the pool to fit"),
+            # R340 fix (2). Was always `no_qualifying_candidate_in_bank`, which
+            # reads as a bank that came up short. Where the report says what the
+            # bank was asked for, the trigger says which of the two it was.
+            "trigger": (verdict["status"] if verdict["status"] != "unknown"
+                        else "no_qualifying_candidate_in_bank"),
         })
         report["relaxations"] = int(report["relaxations"]) + 1
         report["relaxation_steps"] = stepped
@@ -2316,6 +2371,7 @@ def _resolve_primary_stack_floor(
     entry_ids: Sequence[str],
     controls: Mapping[str, Any],
     floor_state: Optional[Mapping[str, Any]] = None,
+    bank_report: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Pick the tightest primary-stack floor this bank can actually carry.
 
@@ -2361,6 +2417,12 @@ def _resolve_primary_stack_floor(
         "candidates_eligible": len(candidates),
         "excluded_candidate_idx": [],
         "size_histogram": {},
+        # R340 fix (2). Same distinction the quota report carries, for the same
+        # reason: a floor that relaxes because the bank holds nothing at that
+        # size is reporting a bank that was ASKED and could not, or one that was
+        # never asked. Only the second is a defect, and it used to be invisible.
+        "bank_stack_request": bank_stack_size_verdict(
+            bank_report, int(controls.get("primary_stack_min_size") or 0) or 5),
         "note": "deterministic construction control; observed-outcome rationale, "
                 "never a win rate, cash rate, or ROI claim",
     }
@@ -2747,7 +2809,8 @@ def select_and_assign_entries(
     # spends its keep-target on candidates that can actually be selected rather
     # than discarding eligible ones in favour of ineligible ones.
     floor_report = _resolve_primary_stack_floor(
-        candidates, full_compatible, entry_ids, controls, _floor_state
+        candidates, full_compatible, entry_ids, controls, _floor_state,
+        bank_report=bank_report,
     )
     if floor_report.get("applied") is not None:
         for k in floor_report["excluded_candidate_idx"]:
@@ -2972,7 +3035,8 @@ def select_and_assign_entries(
     # the step, and reports the rung it landed on. A quota that cannot be carried
     # costs a named relaxation; it no longer costs the delivery.
     quota_report = _resolve_five_stack_quota(stack_sizes, E, controls,
-                                             quota_state=_quota_state)
+                                             quota_state=_quota_state,
+                                             bank_report=bank_report)
     if quota_report.get("applied_need"):
         qualifying = [k for k in range(K)
                       if stack_sizes[k] >= int(quota_report["min_size"])]
@@ -3536,6 +3600,22 @@ def select_and_assign_entries(
                 f"first control to suspect if a later solve on this bank proves "
                 f"infeasible"
             )
+    # R340 fix (2). The brief says WHICH of the two a missing size was, on
+    # either report that carries the verdict. `bank_never_asked_for_size` is a
+    # defect in the wiring and reads as one; `bank_asked_and_could_not` is a
+    # fact about the pool or the clock and reads as one. Reported for both
+    # reports from one loop so the two can never drift apart.
+    for _label, _rep in (("min_five_stack_share_pct", _qr),
+                         ("primary_stack_min_size",
+                          (floor_block or {}).get("primary_stack_floor"))):
+        _verdict = (_rep or {}).get("bank_stack_request") or {}
+        if _verdict.get("status") == "bank_never_asked_for_size":
+            floor_warnings.append(
+                f"{_label} found no qualifying candidate because the BANK WAS "
+                f"NEVER ASKED for that stack size (asked for "
+                f"{_verdict.get('requested_sizes')}). That is a wiring fact, "
+                f"not a thin pool: the control filtered a bank that could not "
+                f"contain what it was filtering for (R340)")
     _fr = floor_block.get("primary_stack_floor") if floor_block else None
     if _fr:
         if _fr.get("relaxations"):
