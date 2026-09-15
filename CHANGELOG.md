@@ -25,6 +25,133 @@ performance claim.
 
 ---
 
+## 2026-09-15 — Board: the 2026-09-14/15 standings mine adjudicated, thirteen fragments consumed into R340-R347 and twenty riders, the roadmap rewritten prize-first and re-chunked for Claude Code DEV sessions; R315(c) done; CLAUDE.md's stale status note corrected
+
+**Scope: docs, one data file, one contract status note.** This commit touches
+`docs/backlog.md`, this file, `CLAUDE.md` (the 09-11 status note only, below),
+`data/reference/statsapi_season_pitching.csv` (R315(c): tracked by explicit path;
+54,217 bytes, mtime 2026-08-30, the file `build_slate.py:1220` reads under the
+key `fangraphs_pitching`), and moves thirteen consumed fragments out of
+`docs/backlog_inbox/` into its `_to_delete/` with `git rm --cached` on the
+tracked ones (the mount refuses `rm`; Ben purges the directory). No engine code,
+no test, no other contract file. The gate was not run for this commit and that
+is stated rather than skipped quietly, per the board commits of 2026-08-27,
+09-03, 09-08 and 09-09; the tree it sits on is the one R338 landed at `3fcc161`,
+whose gate on the real tree is roadmap CC-0's job.
+
+**Why a board rewrite rather than an amendment.** Ben's instruction this date:
+synthesize the second-pass standings research and its 09-15 entry-history update,
+accept, reject or modify each element, update the backlog from it and from the
+inbox, reprioritize for items that change the chance of winning a LARGE prize
+with dependencies honoured, and chunk the result for single DEV sessions that
+run in Claude Code. The 2026-09-10 roadmap ranked six criteria equally and
+carried the Cowork sandbox in its complexity column; nine of its first twelve
+sessions were referee and record work. The new table (`docs/backlog.md`, "What
+do we tackle next") leads with the two things the archive says build toward a top
+finish and the engine cannot currently do, then Showdown pool and prior truth,
+then the instrument and the ownership fit, then slate-lock reliability, then the
+modeling trio, then the referee; every old Session ID is carried in a `Was` cell
+so the entries' "Roadmap: Session N" lines still resolve; Phase 6's fillers keep
+their old IDs. The element-by-element adjudication is the 2026-09-15 DEV note
+under the table; the evidence paragraph at the top of the table carries the
+numbers with their labels.
+
+**The head of the roadmap, and the R233 enumeration behind it (R340).** R37(2)(a)'s
+`primary_stack_min_size=5` floor and (b)'s `min_five_stack_share_pct` quota shipped
+2026-08-28 as allocator FILTERS over the candidate bank, and the bank is never asked
+for a five-stack from either production door. Run on this tree:
+
+    grep -rn "bank_stack_min_size\|bank_secondary_size\|stack_min\b\|stack_min=" \
+      --include=*.py mlb_engine tools skills | grep -v "_scratch\|tests/"
+
+    mlb_engine/allocate/contest_allocator.py:2295   the allocator's own remedy string
+    mlb_engine/optimize/bank_cache.py:630,663        conditions_signature param + digest
+    mlb_engine/optimize/bank_cache.py:716,762-773    extend_bank param, relaxation, use
+    mlb_engine/optimize/bank_cache.py:927-928        per-job stack_constraints
+    mlb_engine/optimize/optimizer_v3.py:4310-4311    build_diverse_candidate_bank defaults
+    mlb_engine/optimize/optimizer_v3.py:4516,4555-4566  internal reads
+    mlb_engine/production/*                          the strangler's own, isolated
+
+    -> definitions and internal reads only; NO caller passes either argument.
+       execution_pipeline.py:4850 (auto-bank door) omits both;
+       build_slate.py:2330 (sliced door) omits stack_min.  Count: 2 fix sites.
+
+Measured on 1907_8g (2026-09-14): `BANK PRIMARY STACK SIZE DIST: {4: 107}`, quota
+0.60 -> zero five-stacks, no relaxation recorded. The archive says the five-hitter
+primary stack is the most consistent Classic top-1% signal in both research passes
+(+11.9 pp [+3.9, +18.9] date-balanced; pooled lift 1.124 [1.036, 1.202]) and Ben's
+deliveries were 81% four-stacks against a 22% field share. The second pass's [BEN]
+question (is the four-stack default deliberate?) is answered by the grep: neither
+deliberate nor a ladder artifact, an unwired keyword argument. Not claimed: that
+five-stacks win; none of the 52 primary comparisons clears the corrected 5%
+threshold. Claimed: the engine cannot build the shape its own shipped controls ask
+for, so neither R37(2)'s checkpoint nor R118 can grade the question until CC-1.
+
+**Numbers filed (all premises checked against the tree before filing; the site
+lines are in each entry):** R340 (five-stack controls dead from both doors,
+Workstream 2, CC-1); R341 (ownership truth is the entry block, not DK's column;
+runbook step 7 inverted; team stack share to the archive block, Workstream 7,
+CC-7); R342 (availability separated from popularity in the ownership prior, graded
+on held-out dates; the first pass's 40.8% holdout improvement, Workstream 2, CC-8);
+R343 (team footprint across all stack roles unmeasured and uncapped, Workstream 2,
+CC-2); R344 (the agentic adversarial QA brief with the re-pull-last and
+clock-stamp requirements, Workstream 6, CC-12); R345 (`autobuild` cannot forward
+`--declare-pitcher`, Workstream 4, CC-11); R346 (a hand-written feed without
+game-level `game_date_utc` zeroes the DK order in the status map, Workstream 3,
+CC-15); R347 (a PO opener is unrosterable in Showdown while the module says he is
+rosterable, Workstream 1, CC-3). Two findings deliberately got NO number: the
+"no hitter against a rostered own SP" finding is the existing
+`--max-opposing-hitters-per-sp` default (the archive supports the default and the
+R276 rider adds the panel that makes a relaxation visible), and a Showdown 5-1
+control would ratify a mix the engine already builds 95% of the time (R306 step 5
+rider). Next free number: R348.
+
+**Riders (twenty):** R10 (hierarchical fit, per-player popularity term, field-size
+transfer, two new control halves after the bar), R37(2)(c) (the secondary is
+indistinguishable at top 1%; size after CC-1), R118 (satellite payout curve on
+disk; FPTS agreement as the draftgroup key), R258 (paid-place coverage 611; the
+satellite threshold is the win line), R30 (data half partly discharged; export is
+satellite-only; tool halves (d)(e)), R38 (cash vs ticket columns), R44 (the
+`processed/` incident and the two legal destinations), R200 (mechanism (a) answered
+by events; (b) superseded by R341), R307 (captain popularity inverts between bands;
+Showdown total ownership does not hurt at the top), R139 (first archive input),
+R306 (step 5's evidence), R311 (the interaction refusal fires on a bank-limited
+slate; check sampled vs viable SP pairs first), R203 (reads the BANK-LIMITED line
+first), R315 ((c) done), R276 (four report panels + the emit-schema readability
+fix), R13 (the satellite leg's number; no GPP number), R75 (name-majority team
+assignment is not reusable), R162 (the substitution trap; missing K-rate source is
+a named blocker), R333 (R150's default decided for the wiring), R338 (status:
+committed, CC-0 owes the gate).
+
+**Fragments consumed (thirteen, moved to `docs/backlog_inbox/_to_delete/`):**
+`2026-09-10_BUILD_container-build-loses-k-rate-and-plr-answer`,
+`2026-09-10_BUILD_operator-feed-needs-game-date-utc`,
+`2026-09-10_BUILD_showdown-po-opener-unrosterable`,
+`2026-09-12_BUILD_agentic-adversarial-qa-pass`,
+`2026-09-12_BUILD_bank-limited-reads-as-cap-interaction`,
+`2026-09-14_ARCHIVE_fpts-agreement-identifies-slates-and-price-lists`,
+`2026-09-14_ARCHIVE_ownership-truth-is-the-entry-block-not-dk-column`,
+`2026-09-14_BUILD_five-stack-quota-is-dead-from-every-production-door`,
+`2026-09-14_BUILD_pitcher-opposing-own-stack-is-a-constraint`,
+`2026-09-14_BUILD_showdown-5-1-split-and-classic-stack-size`,
+`2026-09-14_DEV_ownership-model-should-be-hierarchical-with-a-player-prior`,
+`2026-09-15_ARCHIVE_a-hand-run-inbox-clear-hid-156-pulled-contests-from-every-tool`,
+`2026-09-15_ARCHIVE_entry-history-export-omits-gpp-entries-so-money-capture-is-satellite-only`.
+RETAINED with conditions re-checked: `2026-08-09_DEV_ben-decision-curated-satellite-archetypes`
+(`dk_contest_archetypes.csv` still carries only the generic rows) and
+`2026-09-04_BUILD_fangraphs-platoon-refresh-procedure` (R317(c) unshipped).
+
+**CLAUDE.md.** The 09-11 status note's first sentence ("WRITTEN, not COMMITTED")
+was false as of `5b1b574`/`3fcc161` and a session reading it would have treated
+`git status` dirt as DEV's landing. It now says committed, gate owed (CC-0), and
+that DEV sessions run in Claude Code, where the Sandbox section does not bind.
+Nothing else in CLAUDE.md changed; the Authority section is untouched.
+
+**Truthful labels.** Every figure above and in the board is a deterministic
+descriptive statistic of an observed contest result or a labeled prior; nothing
+is a win rate, an ROI or a probability claim, and no strategy default was changed
+by this commit.
+
 ## 2026-09-11 — R302 stage 0: the strangler package lands, committed, isolated, and not the build path (R302 status; two XS fixes)
 
 **Scope.** `mlb_engine/production/` (twelve modules, 5,698 lines), `tools/dfs.py`,

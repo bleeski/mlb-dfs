@@ -1,24 +1,25 @@
 # CLAUDE.md - MLB DFS Engine (personal project)
 
-## Status note, 2026-09-11: the thirteenth edition's landing is WRITTEN, not COMMITTED
-R338 is done to disk and short of git. The 24-file compatibility patch, its four
-repairs, all four step-5 riders, R302 stage 0 (`mlb_engine/production/` +
-`tools/dfs.py` and its three siblings), CHANGELOG.md's two 2026-09-11 entries and
-docs/backlog.md's migrations are all on this disk and in NO commit: the device
-shell has been unable to mount this folder since 2026-09-09 (a Windows update
-released 2026-09-08), so a session can do the engineering and none of the git.
-Three things are left and all three need Ben's machine: two `git add`-by-path
-commits, the gate, and `solver_probe` (the schema-2 projection digest orphaned
-every bank bucket on disk). The commands are in the R338 rider in docs/backlog.md.
+## Status note, 2026-09-15: the thirteenth edition's landing is COMMITTED; its gate on the real tree is still owed
+R338 commit one (`5b1b574`) and R302 stage 0 (`3fcc161`) landed on `main` on
+2026-09-11; the 09-11 note that read "WRITTEN, not COMMITTED" is history. Still
+owed, and needing Ben's machine: the gate on the real tree (`python
+tools/audit.py --run-tests --terse`, expecting `PASS  v2.26.0  40 modules  2066
+tests`), `solver_probe` (the schema-2 projection digest orphaned every bank
+bucket on disk), and the push. That is roadmap **CC-0** in docs/backlog.md, the
+first act of the next DEV session. Per Ben (2026-09-15) DEV sessions now run in
+**Claude Code on his machine**, not Cowork: the Sandbox section below is
+Cowork's and does not bind a Claude Code session (the full gate runs in one
+call, `rm` works), while the claims protocol, explicit-path `git add`, and the
+CHANGELOG-in-the-same-commit rule bind every session whatever runs it.
 
 Nothing below is superseded and NEITHER package is the build path: the Authority
 section governs, builds enter at `execution_pipeline.run_slate` through
-`skills/generate-lineups/SKILL.md`, and `mlb_engine/production/` is stage 0 —
+`skills/generate-lineups/SKILL.md`, and `mlb_engine/production/` is stage 0,
 verified offline, not canonical, no projection, ownership, field or archive
-source. Do not commit engine files from a BUILD session. **Until those two
-commits exist, `git status` on this mount shows the whole landing as dirt: it is
-DEV's, it is described here and in the R338 rider, and it is not foreign dirt to
-work around.** Do not revert, restore or clean it.
+source. Do not commit engine files from a BUILD session. `git status` on this
+mount no longer shows the landing as dirt; dirt you see is another session's,
+and the multi-session contract's foreign-dirt rule applies to it.
 
 ## Context wall
 This is Ben's personal DFS project. Never mix in Blue Cypress, Elastik Teams,
