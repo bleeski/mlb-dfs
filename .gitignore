@@ -161,3 +161,9 @@ docs/greenfield/*/raw_artifact_hashes.json
 docs/greenfield/*/raw_preservation_verification.json
 docs/greenfield/*/safe_recovery_verification.json
 docs/greenfield/*/schema_inventory.json
+
+# Claude Code (R301, 2026-09-15). The shared settings, hooks, rules and skills
+# under .claude/ are tracked; the personal overlay and the per-host notes file
+# are this machine's and never history.
+.claude/settings.local.json
+CLAUDE.local.md

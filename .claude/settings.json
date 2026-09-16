@@ -1,0 +1,96 @@
+{
+  "$comment": "Project-shared Claude Code settings for mlb-dfs DEV sessions (R301, 2026-09-15). Personal overrides go in .claude/settings.local.json (gitignored). Deny rules are enforced by the client; CLAUDE.md is advisory. The command guard hook covers the regex cases a prefix rule cannot.",
+  "env": {
+    "BASH_DEFAULT_TIMEOUT_MS": "900000",
+    "BASH_MAX_TIMEOUT_MS": "1800000"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(python tools/audit.py*)",
+      "Bash(python tools/claim.py*)",
+      "Bash(python tools/solver_probe.py*)",
+      "Bash(python tools/sync_check.py*)",
+      "Bash(python tools/awaiting_standings.py*)",
+      "Bash(python tools/qa_portfolio.py*)",
+      "Bash(python tools/preflight_upload.py*)",
+      "Bash(python tools/verify_export.py*)",
+      "Bash(python -m pytest*)",
+      "Bash(python -m unittest*)",
+      "Bash(git status*)",
+      "Bash(git log*)",
+      "Bash(git diff*)",
+      "Bash(git show*)",
+      "Bash(git ls-files*)",
+      "Bash(git ls-remote*)",
+      "Bash(git fetch*)",
+      "PowerShell(python tools/audit.py*)",
+      "PowerShell(python tools/claim.py*)",
+      "PowerShell(python tools/solver_probe.py*)",
+      "PowerShell(python tools/sync_check.py*)",
+      "PowerShell(python tools/awaiting_standings.py*)",
+      "PowerShell(python tools/qa_portfolio.py*)",
+      "PowerShell(python tools/preflight_upload.py*)",
+      "PowerShell(python tools/verify_export.py*)",
+      "PowerShell(python -m pytest*)",
+      "PowerShell(python -m unittest*)",
+      "PowerShell(git status*)",
+      "PowerShell(git log*)",
+      "PowerShell(git diff*)",
+      "PowerShell(git show*)",
+      "PowerShell(git ls-files*)",
+      "PowerShell(git ls-remote*)",
+      "PowerShell(git fetch*)"
+    ],
+    "deny": [
+      "Bash(git push*)",
+      "PowerShell(git push*)",
+      "Bash(pip install -r requirements.txt*)",
+      "PowerShell(pip install -r requirements.txt*)",
+      "Read(./.env)",
+      "Read(.env)",
+      "WebFetch(domain:draftkings.com)",
+      "WebFetch(domain:www.draftkings.com)",
+      "WebFetch(domain:api.draftkings.com)",
+      "WebFetch(domain:myaccount.draftkings.com)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/session_start.py"],
+            "timeout": 30
+          }
+        ]
+      },
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/session_start.py", "--compact"],
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/guard_commands.py"],
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -12183,6 +12183,101 @@ class ChangelogDebtTests(unittest.TestCase):
                       "it is guidance wearing a MUST's clothes")
 
 
+class RootContractBudgetTests(unittest.TestCase):
+    """R301(2), 2026-09-15. CLAUDE.md loads into every session of every role on
+    every host before its first command. It was 923 lines / 62,846 bytes before
+    the rewrite and 135 of 271 commits had touched it. These pin the budget so it
+    cannot regrow silently, pin that every path it points at exists (a moved
+    procedure must not leave a dead pointer, which is the doc-truth failure
+    R301(1) catalogues), and pin the command guard hook to the contract bans it
+    exists to enforce. A rule that needs more room than the budget allows goes in
+    a skill, a path-scoped rule under `.claude/rules/`, `docs/`, or the CHANGELOG
+    entry it cites; CLAUDE.md says so under "Editing this file"."""
+
+    MAX_LINES = 200
+    MAX_BYTES = 18_000
+    ROOT = Path(__file__).resolve().parent.parent
+
+    def _claude_md(self) -> str:
+        return (self.ROOT / "CLAUDE.md").read_text(encoding="utf-8").replace("\r\n", "\n")
+
+    def test_claude_md_stays_inside_the_root_contract_budget(self):
+        text = self._claude_md()
+        lines = text.count("\n")
+        self.assertLessEqual(
+            lines, self.MAX_LINES,
+            f"CLAUDE.md is {lines} lines; the budget is {self.MAX_LINES}. Move the "
+            f"addition to a skill, .claude/rules/, docs/, or its CHANGELOG entry.")
+        size = len(text.encode("utf-8"))
+        self.assertLessEqual(
+            size, self.MAX_BYTES,
+            f"CLAUDE.md is {size} bytes (line endings normalized); the budget is "
+            f"{self.MAX_BYTES}. Every session pays this on every start.")
+
+    def test_every_path_claude_md_points_at_exists(self):
+        text = self._claude_md()
+        pointers = (
+            ".claude/skills/dev-session/SKILL.md",
+            ".claude/skills/land/SKILL.md",
+            ".claude/settings.json",
+            ".claude/hooks/guard_commands.py",
+            ".claude/hooks/session_start.py",
+            ".claude/rules",
+            "docs/cowork_sandbox.md",
+            "docs/cowork_sync_protocol.md",
+            "docs/cowork_archival_runbook.md",
+            "skills/generate-lineups/SKILL.md",
+            "tools/claim.py",
+            "tools/audit.py",
+            "tools/solver_probe.py",
+            "tools/preflight_upload.py",
+            "tools/qa_portfolio.py",
+            "tools/awaiting_standings.py",
+            "tools/sync_check.py",
+            "tools/repair_entry.py",
+            "tools/autobuild.py",
+            "MLB_Classic.md",
+            "ledger/MLB_Classic_Calibration_Ledger.md",
+        )
+        for rel in pointers:
+            self.assertTrue((self.ROOT / rel).exists(), f"CLAUDE.md points at {rel}, which is absent")
+        # The two substrings other tests and the audit rely on stay in the file.
+        for needle in ("CHANGELOG.md carries its entry", "changelog_debt",
+                       "PASS  <version>  <N> modules  <N> tests",
+                       "## Sandbox", "T-15", "## Showdown"):
+            self.assertIn(needle, text, f"CLAUDE.md lost the pinned text {needle!r}")
+
+    def test_the_command_guard_denies_the_contract_bans(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "guard_commands", self.ROOT / ".claude" / "hooks" / "guard_commands.py")
+        guard = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(guard)
+
+        def verdict(command: str):
+            out = guard.judge(command)
+            return None if out is None else out["hookSpecificOutput"]["permissionDecision"]
+
+        for banned in ("git add -A", "git add --all", "git add . && git commit -m x",
+                       "git checkout -- CLAUDE.md", "git -C repo reset --hard", "git stash",
+                       "git restore tools/audit.py", "git clean -fd", "git push origin main",
+                       "pip install -r requirements.txt",
+                       "python -m pip install -r requirements.txt",
+                       "curl https://www.draftkings.com/lineup/upload",
+                       "Invoke-WebRequest https://api.draftkings.com/x"):
+            self.assertEqual(verdict(banned), "deny", banned)
+        for asked in ("git commit -m \"R301: lean CLAUDE.md\"", "git commit -F -", "git commit"):
+            self.assertEqual(verdict(asked), "ask", asked)
+        for allowed in ("git add CLAUDE.md .claude/settings.json",
+                        "git commit -m \"R301\" -- CLAUDE.md CHANGELOG.md",
+                        "git commit -F - CLAUDE.md docs/backlog.md",
+                        "git commit --amend --no-edit",
+                        "git status --short; git log --oneline -12",
+                        "python tools/env_probe.py --install",
+                        "python tools/audit.py --run-tests --terse"):
+            self.assertIsNone(verdict(allowed), allowed)
+
+
 class EnvLockTests(unittest.TestCase):
     """R7: pinned runtime. The lock is the resolution authority, the probe is
     the one instructed command, and every manifest names the versions it ran
@@ -13281,9 +13376,10 @@ class AuditSkipHonestyTests(unittest.TestCase):
         self.assertIsNone(verdict["advice"])
 
     def test_the_clean_pass_line_is_the_one_CLAUDE_md_quotes(self):
-        """CLAUDE.md's session-start step quotes this string exactly, so the
-        clean line stays byte-identical and everything new prints only when
-        there is something to say."""
+        """The clean line stays byte-identical and everything new prints only
+        when there is something to say. CLAUDE.md describes the line's SHAPE;
+        R301(6) stopped it quoting the count, so a pin move is no longer a
+        CLAUDE.md edit."""
         audit = self._audit()
         root = Path(__file__).resolve().parent.parent
         modules = audit.engine_module_count(root)
@@ -13300,9 +13396,10 @@ class AuditSkipHonestyTests(unittest.TestCase):
             line,
             f"PASS  {audit.PROJECT_VERSION}  {modules} modules  "
             f"{audit.EXPECTED_TEST_COUNT} tests")
-        self.assertIn(line, (root / "CLAUDE.md").read_text(encoding="utf-8"),
-                      "CLAUDE.md's session-start line and the audit's clean "
-                      "output have drifted apart")
+        self.assertIn("PASS  <version>  <N> modules  <N> tests",
+                      (root / "CLAUDE.md").read_text(encoding="utf-8"),
+                      "CLAUDE.md's session-start step no longer describes the "
+                      "audit's clean line (R301(6): the shape, not the count)")
 
     def test_the_pass_line_shows_skips_and_the_suite_that_is_off_its_pin(self):
         audit = self._audit()
@@ -19000,7 +19097,10 @@ class SplitGateTests(unittest.TestCase):
             line,
             f"PASS  {module.PROJECT_VERSION}  {modules} modules  "
             f"{module.EXPECTED_TEST_COUNT} tests")
-        self.assertIn(line, (root / "CLAUDE.md").read_text(encoding="utf-8"))
+        # R301(6): CLAUDE.md quotes the shape, not the count; the count is the
+        # generated line compared above.
+        self.assertIn("PASS  <version>  <N> modules  <N> tests",
+                      (root / "CLAUDE.md").read_text(encoding="utf-8"))
 
     def test_completeness_is_class_coverage_and_not_the_count(self):
         """The count can be reached while coverage is lost: one class grows by

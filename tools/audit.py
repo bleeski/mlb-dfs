@@ -728,7 +728,12 @@ EXPECTED_SUITE_COUNTS = {
     # R233 grep: the deadline governor's T-15 open-controls rung, R98(2)'s
     # strategy-versus-structural split, the untouchable-row conflict check, and
     # the vacuous-row guard that keeps an OPENED cap from moving a solve.
-    "tests.test_core": 1278,
+    # R301(2)(6), 2026-09-15: 1278 -> 1281, the three in
+    # RootContractBudgetTests: the CLAUDE.md size budget, every path the
+    # root contract points at exists, and the command guard hook denies the
+    # contract bans. The two PASS-line prose pins now pin the shape, not
+    # the count, so this move is the last one that needed a CLAUDE.md edit.
+    "tests.test_core": 1281,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps

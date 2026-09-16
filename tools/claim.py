@@ -78,7 +78,7 @@ ROLES = ("BUILD", "ARCHIVE", "DEV", "SOLO")
 WRITE_SETS = {
     "BUILD": (),
     "ARCHIVE": ("ledger/", "data/archive/", "data/standings/", "data/reference/"),
-    "DEV": ("mlb_engine/", "tools/", "tests/", "docs/", "skills/", "CLAUDE.md",
+    "DEV": ("mlb_engine/", "tools/", "tests/", "docs/", "skills/", ".claude/", "CLAUDE.md",
             "MLB_Classic.md", "MANIFEST.md", ".gitignore", ".gitattributes",
             "requirements.txt"),
 }
