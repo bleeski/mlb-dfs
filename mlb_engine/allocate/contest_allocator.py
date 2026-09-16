@@ -43,7 +43,8 @@ from collections import Counter, defaultdict
 import csv
 import json
 import math
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
+from typing import (Any, Dict, FrozenSet, Iterable, List, Mapping, Optional,
+                    Sequence, Tuple)
 
 # R116. The shape vocabulary, read for one question: is this whole solve cash?
 # `contest_shapes` imports nothing from the engine, so this is the acyclic
@@ -563,6 +564,63 @@ def _candidate_primary_stack_size(candidate: Dict[str, Any]) -> int:
         return 0
 
 
+#: R343. How many hitters from one team make an ENTRY exposed to that team for
+#: ``max_team_exposure_pct``. Two, not one, and the reason is arithmetic rather
+#: than taste: a DK Classic lineup holds eight hitters and at most five from one
+#: team, so every entry touches at least two teams and usually four or five. At
+#: a threshold of one, a team's footprint on a three-game slate is near 1.0 for
+#: every team by construction, and a cap over it would bind on ordinary builds
+#: while measuring nothing. Two is also what "stack ROLE" means in R343's own
+#: title: a secondary stack is two or more, a lone filler bat is not a role.
+#: Operators may set ``team_exposure_min_hitters`` through --controls-override.
+TEAM_EXPOSURE_MIN_HITTERS = 2
+
+
+def _team_exposure_min_hitters(controls: Mapping[str, Any]) -> int:
+    """The threshold above, read off the controls with the engine default."""
+    try:
+        value = int(controls.get("team_exposure_min_hitters")
+                    or TEAM_EXPOSURE_MIN_HITTERS)
+    except (TypeError, ValueError):
+        return TEAM_EXPOSURE_MIN_HITTERS
+    return max(1, value)
+
+
+def candidate_team_footprint(
+    hitter_ids: Iterable[str],
+    team_by_player: Mapping[str, str],
+    min_hitters: int = TEAM_EXPOSURE_MIN_HITTERS,
+) -> FrozenSet[str]:
+    """Teams this candidate is materially exposed to, over ALL stack roles.
+
+    R343. ``max_primary_stack_exposure_pct`` counts the PRIMARY stack only, so a
+    team can reach two-thirds of the entered set through secondary stacks with
+    no control binding and no line reporting it -- measured on 1310_9g, NYY in
+    15 of 21 entries and 17 of 21 after the rebuild. This is the footprint that
+    cap was never over: every hitter slot, whatever role the optimizer labelled
+    it, and nothing about which team the candidate calls primary.
+
+    Hitters only, deliberately, and it is a different answer from R333's game
+    footprint on purpose. A rostered arm is already capped on its own axis
+    (``max_pitcher_exposure_pct``) and the failure this measures is an OFFENSE
+    going quiet, which an opposing starter causes and a teammate arm does not.
+    R333's game cap counts every rostered player including arms, because there a
+    washout is a GAME outcome and the arm is in it (Ben, 2026-09-15). Two
+    definitions, each stated where it is used, neither inferred from the other.
+
+    A player the map does not know contributes to no team. That is the safe
+    direction for a CEILING: an unknown never invents an exposure, and the
+    absent map is reported by the caller rather than being read as "no teams".
+    """
+    counts: Dict[str, int] = defaultdict(int)
+    for pid in hitter_ids:
+        team = str(team_by_player.get(str(pid)) or "").strip().upper()
+        if team:
+            counts[team] += 1
+    floor = max(1, int(min_hitters))
+    return frozenset(t for t, n in counts.items() if n >= floor)
+
+
 # ---------------------------------------------------------------------------
 # v1.11 (F13) allocator solver semantics
 #
@@ -593,6 +651,8 @@ def _diagnose_binding_constraints(
     largest_contest_entries: int,
     controls: Dict[str, Any],
     feasibility_inputs: Optional[Mapping[str, Any]] = None,
+    team_exposure: Optional[Mapping[str, Any]] = None,
+    game_exposure: Optional[Mapping[str, Any]] = None,
 ) -> List[str]:
     """Name the controls that cannot be satisfied by this bank, arithmetically.
 
@@ -674,6 +734,36 @@ def _diagnose_binding_constraints(
                     f"before relaxing this cap"
                 )
             findings.append(finding)
+
+    # R343 / R333. The two washout-axis caps, in the same counting form. Both
+    # are only reachable once their id map is wired, so a `map_status` of
+    # `unknown` produces no finding at all rather than a finding computed over
+    # an empty bucket set -- "asked and could not answer" is not "nothing is
+    # binding", and R333's whole defect was a control whose absence read as the
+    # bank's fault.
+    team = dict(team_exposure or {})
+    if team.get("map_status") == "wired" and team.get("count"):
+        buckets = len(team.get("teams_capped") or [])
+        cap = int(team["count"])
+        per_entry = int(team.get("min_teams_per_candidate") or 0)
+        if buckets and per_entry and buckets * cap < total * per_entry:
+            findings.append(
+                f"max_team_exposure_pct: {buckets} distinct teams x cap {cap} = "
+                f"{buckets * cap} < {total * per_entry} team slots "
+                f"({total} entries x {per_entry} teams each, at "
+                f"{team.get('min_hitters_per_entry')}+ hitters per team)"
+            )
+    game = dict(game_exposure or {})
+    if game.get("map_status") == "wired" and game.get("all_games_capped"):
+        capped = list(game.get("games_capped") or [])
+        capacity = sum(int(x.get("count") or 0) for x in capped)
+        per_entry = int(game.get("min_games_per_candidate") or 0)
+        if capped and per_entry and capacity < total * per_entry:
+            findings.append(
+                f"max_game_exposure_pct_by_game: {len(capped)} capped games "
+                f"summing to {capacity} entry-slots < {total * per_entry} "
+                f"({total} entries x {per_entry} games each)"
+            )
     return findings
 
 
@@ -692,6 +782,13 @@ STRUCTURAL_FLOOR_CONTROLS = frozenset({"max_shared_players", "max_sp_pair_repeti
 STRATEGY_CAP_CONTROLS = frozenset({
     "max_player_exposure_pct", "max_pitcher_exposure_pct",
     "max_primary_stack_exposure_pct", "max_candidate_reuse",
+    # R343. Same class as the three above it and for the same reason: the
+    # engine can compute the minimum value that makes a GIVEN build feasible
+    # (`floor_team_exposure_pct`), but that number is a consequence of the bank
+    # it was handed, and adopting it concentrates the portfolio. It is not a
+    # structural floor in R98(2)'s sense, so `late_swap` must not steer an
+    # operator to raise it as though it were arithmetic.
+    "max_team_exposure_pct",
 })
 
 # R116, 2026-08-15. `max_candidate_reuse` sits in STRATEGY_CAP_CONTROLS above
@@ -828,6 +925,22 @@ CHECKED_CONTROLS = frozenset({
     "max_sp_pair_repetition", "max_shared_players",
     "max_pitcher_exposure_pct", "max_primary_stack_exposure_pct",
     "max_player_exposure_pct",
+    # R343 / R333, 2026-09-15. Both new washout-axis ceilings are CHECKED and
+    # neither is ladder-relaxed, and that pairing is the item's one deliberate
+    # departure from what its board entries asked for. They asked for the caps
+    # to be "relaxable in the standard order after player exposure" -- but the
+    # order they name is R153's SHOWDOWN ladder, and on Classic there is no
+    # player-exposure rung to come after: `LADDER_RELAXED_CONTROLS` holds three
+    # LOWER bounds and the engine's own reuse default, and every exposure
+    # CEILING is handled instead by the structural floor merge
+    # (`feasibility_floors_from`), which raises an arithmetically impossible cap
+    # to a feasible value BEFORE the solve. So the faithful reading of "handled
+    # after player exposure" is "handled the way player exposure is handled",
+    # and these two are. Putting them in both sets would also fail the
+    # disjointness assert directly above, which exists because a ladder that
+    # moves a control a threaded verdict was computed from makes that verdict
+    # stale.
+    "max_team_exposure_pct", "max_game_exposure_pct",
 })
 LADDER_RELAXED_CONTROLS = frozenset({
     "max_candidate_reuse", "five_stack_share_quota", "primary_stack_min_size",
@@ -901,6 +1014,10 @@ def compose_infeasibility_errors(
                     "max_player_exposure_pct", "max_pitcher_exposure_pct",
                     "max_primary_stack_exposure_pct", "max_sp_pair_repetition",
                     "max_shared_players", "max_candidate_reuse",
+                    # R343 / R333. The interaction message names what was
+                    # ACTIVE, so a washout-axis cap missing from this list makes
+                    # the sentence false on exactly the builds it binds.
+                    "max_team_exposure_pct", "max_game_exposure_pct",
                 )) if controls.get(k) is not None
             ) + bank_flag
         )
@@ -1030,6 +1147,15 @@ def _untouchable_cap_conflicts(
         ("max_primary_stack_exposure_pct", "primary stack",
          fixed.get("primary_stack_counts") or {},
          _cap_count(total, controls.get("max_primary_stack_exposure_pct"))),
+        # R343. The fourth, and it is not optional: `headroom()` clamps a
+        # negative at 0, so without this check a late swap whose untouchable
+        # rows have ALREADY overspent the team cap gets a silent zero-headroom
+        # row instead of the refusal every sibling cap produces. The docstring
+        # above says these are decidable from the file before any MILP runs;
+        # that was true of three of the four.
+        ("max_team_exposure_pct", "team footprint",
+         fixed.get("team_counts") or {},
+         _cap_count(total, controls.get("max_team_exposure_pct"))),
     )
     for control, noun, counts, cap in checks:
         if not cap:
@@ -3044,8 +3170,21 @@ def select_and_assign_entries(
             float(quota_report["applied_need"]), np.inf)
 
     game_caps = dict(controls.get("max_game_exposure_pct_by_game") or {})
+    game_by_player = {str(k): str(v)
+                      for k, v in (controls.get("player_game_by_id") or {}).items()}
+    game_cap_report: Dict[str, Any] = {
+        "requested": {str(k): float(v) for k, v in sorted(game_caps.items())} or None,
+        # R333. Three values, never a bool, and the third is the one that
+        # matters: `unknown` says the map was absent so the question could not
+        # be answered, which for a year was reported as an ERROR on the one
+        # control `late_swap.py` steers an operator to. `bank_stack_size_verdict`
+        # is the shape being copied (R340 fix 2).
+        "map_status": ("not_requested" if not game_caps
+                       else ("wired" if game_by_player else "unknown")),
+        "games_capped": [], "counts": "roster_footprint",
+        "min_games_per_candidate": None, "all_games_capped": None,
+    }
     if game_caps:
-        game_by_player = {str(k): str(v) for k, v in (controls.get("player_game_by_id") or {}).items()}
         if not game_by_player:
             return {
                 "passed": False, "assignments": [], "selection_certified": False,
@@ -3059,6 +3198,14 @@ def select_and_assign_entries(
                     candidates_in_game[gid].append(k)
         fixed_games = ({str(k): int(v) for k, v in (fixed.get("game_counts") or {}).items()}
                        if fixed_rows else {})
+        game_cap_report["min_games_per_candidate"] = min(
+            (len({game_by_player.get(pid) for pid in pset} - {None, ""})
+             for pset in player_sets), default=0)
+        # The counting argument below is only valid when no game is exempt: an
+        # uncapped game is an unconstrained bucket and capacity cannot be summed
+        # over the capped ones alone.
+        game_cap_report["all_games_capped"] = bool(candidates_in_game) and all(
+            str(g) in {str(x) for x in game_caps} for g in candidates_in_game)
         for gid, pct in sorted(game_caps.items()):
             # R61: `total`, not E, and minus what the untouchable rows hold. This
             # cap floors at 0 rather than 1 (_game_cap_count's contract: an
@@ -3066,8 +3213,81 @@ def select_and_assign_entries(
             cap = max(0, int(math.floor(total * min(1.0, max(0.0, float(pct))) + 1e-9)))
             members = candidates_in_game.get(str(gid), [])
             if members:
+                game_cap_report["games_capped"].append(
+                    {"game_id": str(gid), "pct": float(pct), "count": cap,
+                     "candidates_in_game": len(members)})
                 add({x_idx(e, k): 1.0 for e in range(E) for k in members},
                     -np.inf, headroom(cap, fixed_games.get(str(gid), 0)))
+
+    # R343. The team footprint cap, over EVERY hitter slot rather than over the
+    # primary stack alone. Same row shape as the game cap one screen up and the
+    # same three-value wiring verdict, because the two defects are one defect:
+    # a correlated-failure axis with a control that cannot reach it. What
+    # differs is what an entry has to hold to be counted -- see
+    # `candidate_team_footprint`, which states both definitions in one place.
+    team_pct = controls.get("max_team_exposure_pct")
+    team_by_player = {str(k): str(v)
+                      for k, v in (controls.get("player_team_by_id") or {}).items()}
+    team_min_hitters = _team_exposure_min_hitters(controls)
+    team_cap = _cap_count(total, team_pct)
+    team_cap_report: Dict[str, Any] = {
+        "requested_pct": float(team_pct) if team_pct is not None else None,
+        "count": team_cap,
+        "min_hitters_per_entry": team_min_hitters,
+        "map_status": ("not_requested" if not team_cap
+                       else ("wired" if team_by_player else "unknown")),
+        "teams_capped": [], "counts": "hitter_slots",
+        "min_teams_per_candidate": None,
+    }
+    if team_cap and team_by_player:
+        footprints = [candidate_team_footprint(
+            player_sets[k] - pitcher_sets[k], team_by_player, team_min_hitters)
+            for k in range(K)]
+        candidates_on_team: Dict[str, List[int]] = defaultdict(list)
+        for k, teams_k in enumerate(footprints):
+            for team in teams_k:
+                candidates_on_team[team].append(k)
+        fixed_teams = ({str(k): int(v) for k, v in (fixed.get("team_counts") or {}).items()}
+                       if fixed_rows else {})
+        team_cap_report["min_teams_per_candidate"] = min(
+            (len(f) for f in footprints), default=0)
+        for team in sorted(candidates_on_team):
+            members = candidates_on_team[team]
+            bound = headroom(team_cap, fixed_teams.get(team, 0))
+            # A row that CANNOT bind does not enter the matrix. Each entry takes
+            # exactly one candidate, so this sum is at most E whatever the bank
+            # holds, and a bound at or above E is vacuous: the feasible set is
+            # identical with or without the row. Skipping it is not an
+            # optimisation, it is what keeps a cap OPENED to 1.0 from moving a
+            # solve it does not constrain -- measured on the golden replay,
+            # where adding eight vacuous rows left `exposure_summary` and
+            # `sp_pair_distribution` byte-identical and still moved 15 of 18
+            # entry-to-lineup assignments through scipy's branch order. A
+            # baseline that shuffles for no semantic reason is a baseline that
+            # has stopped reporting construction drift.
+            #
+            # Deliberately NOT retrofitted to the three sibling ceilings above:
+            # the same guard there would be correct and would move the frozen
+            # baseline for a reason that has nothing to do with this item. Filed
+            # rather than smuggled in.
+            team_cap_report["teams_capped"].append(
+                {"team": team, "count": team_cap,
+                 "candidates_on_team": len(members),
+                 "row_added": bool(bound < E)})
+            if bound < E:
+                add({x_idx(e, k): 1.0 for e in range(E) for k in members},
+                    -np.inf, bound)
+    elif team_cap and not team_by_player:
+        # NOT a refusal, and the asymmetry with the game cap above is deliberate.
+        # `max_game_exposure_pct_by_game` is only ever set by an operator who
+        # typed it, so a missing map means that operator's instruction cannot be
+        # honoured and silence would be the R289 failure. This cap ships as a
+        # POSTURE DEFAULT on every Classic build, so refusing here would turn a
+        # caller that never passed a team map -- the legacy wrapper, a test, an
+        # older door -- into a dead build. It is recorded as `unknown` and the
+        # brief says the cap did not bind, which is the honest reading of "asked
+        # and could not answer" rather than a cap silently reported as held.
+        pass
 
     if use_y:
         for k in range(K):
@@ -3416,7 +3636,8 @@ def select_and_assign_entries(
         solver_report["binding_constraints"] = (
             _diagnose_binding_constraints(
                 E, stacks, sp_pairs, signatures, largest_contest, controls,
-                feasibility_inputs=feasibility_inputs)
+                feasibility_inputs=feasibility_inputs,
+                team_exposure=team_cap_report, game_exposure=game_cap_report)
             if proven_infeasible else []
         )
         return {
@@ -3676,7 +3897,17 @@ def select_and_assign_entries(
             # than the caller was the one control missing from it.
             "max_candidate_reuse": int(max_reuse) if max_reuse is not None else None,
             "max_game_exposure_pct_by_game": game_caps or None,
+            # R343. The resolved COUNT, beside the four that were already here.
+            # A reader consulting this block to answer "what actually
+            # constrained this solve" got no answer about the team footprint at
+            # all, which is the same gap R116 closed for the reuse cap.
+            "max_team_count": team_cap,
         },
+        # R333 / R343. Both washout-axis caps report whether they were WIRED,
+        # not just what was asked for: `unknown` means the id map was absent, so
+        # the cap did not bind and nothing here should be read as though it did.
+        "game_exposure": game_cap_report,
+        "team_exposure": team_cap_report,
         "summary": f"Entry-level joint MILP assigned {E} exact Entry IDs",
     }
 

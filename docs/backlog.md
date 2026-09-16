@@ -39,7 +39,7 @@ lives under "Board history" near the bottom of this file.
 
 Ordered, with the reason:
 
-## Execution roadmap (2026-09-15, reprioritized for LARGE-PRIZE impact after the 2026-09-14/15 standings mine; DEV sessions now run in Claude Code) -- NEXT: CC-2, then CC-3 (CC-0 and CC-1 DONE 2026-09-15)
+## Execution roadmap (2026-09-15, reprioritized for LARGE-PRIZE impact after the 2026-09-14/15 standings mine; DEV sessions now run in Claude Code) -- NEXT: CC-3, then CC-4 (CC-0, CC-1 and CC-2 DONE 2026-09-15)
 
 **What changed in this rewrite and why.** Ben's instruction, 2026-09-15: reprioritize the board for items that change the chance of winning a LARGE prize, honour dependencies, and chunk it for single DEV sessions that run in **Claude Code on his machine** rather than Cowork. Two consequences. First, the ordering rule that ranked criteria (1)-(6) equally is replaced by a prize-first rule: **P (prize)** = changes the construction that reaches a top finish, or grades whether a construction does; **L (lost slate)** = a legal file on every slate, because a slate with no file is a zero; **G (guard)** = the referee and the record; **H** = hygiene. P and L lead; G and H follow. Second, the Cowork sandbox constraints that shaped the old Phase D ordering (the 130s inner budget, the six-call gate, the mount's refused `unlink`) do not apply to a Claude Code DEV session: `python tools/audit.py --run-tests --terse` runs in one call (~9 min on the pinned `.venv`), `rm` works, and an M item fits one session with its gate. BUILD and ARCHIVE sessions may still be Cowork, so the claims protocol, explicit-path `git add`, and the CHANGELOG-in-the-same-commit rule are unchanged, and any control that is only reachable from one door is still a defect.
 
@@ -58,8 +58,7 @@ Ordered, with the reason:
 | Session ID | Execution Type | Item Name & Detailed Scope | Source | Shared Subsystem / Files | Impact | Complexity | Blocker Dependencies |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **CC-1** (new) | `Standalone` | **R340 -- the five-stack controls were dead from both production doors. DONE 2026-09-15.** One derivation (`execution_pipeline.resolve_bank_stack_request`) over the MERGED controls, threaded to THREE doors -- the entry named two and its own grep finds a third, `_plan_joint_allocation`, whose verdict would otherwise be about a different MILP than the build's. The sliced door asks one size per call and the cache unions the buckets; `sizes` always keeps the four so a thin slice cannot leave a blank reserved row. Floor and quota reports now distinguish `bank_never_asked_for_size` from `bank_asked_and_could_not` and the brief says which. Golden baseline RE-FROZEN (bank histogram `{3:1,4:21,5:6}` -> `{3:1,4:10,5:17}`, SP-pair distribution byte-identical, all three gates still pass). `late_swap.py`'s two calls ride as a rider on R284. Gate `PASS  v2.26.0  40 modules  2089 tests`; `solver_probe --date 2026-09-08` FITS. | Inbox 2026-09-14 (`five-stack-quota-is-dead-from-every-production-door`) / Mine | `execution_pipeline.py`, `build_slate.py`, `bank_cache.py`, `optimizer_v3.py`, `contest_allocator.py`, `tests/test_core.py`, `tests/golden/` | **P, highest on the board** | Low-Med | CC-0 |
-| **CC-2** (new + was Session 19 Batch 3) | `Batch (1 of 2)` | **R343 (NEW) -- team footprint across ALL stack roles is unmeasured and uncapped.** The brief reports `primary_stacks` only (`build_slate.py:4238`) and `max_primary_stack_exposure_pct` counts the primary only; on 1310_9g NYY reached 15 of 21 entries, then 17 of 21 on the rebuild, through SECONDARY stacks and nothing flagged it. One opposing starter is a tighter washout event than the two-offense game the brief does flag. Fix: (a) report per-team footprint over every hitter slot in the brief and `qa_portfolio.py`'s washout line; (b) `max_team_exposure_pct` (any role), counted and relaxable in the standard order after player exposure; default is Ben's, posture-sized like the other caps. | Inbox 2026-09-12 (`agentic-adversarial-qa-pass`, its last section) | `build_slate.py:4238`, `execution_pipeline.py` control merge, `contest_allocator.py`, `tools/qa_portfolio.py:531` | P (the portfolio-level washout axis; the dual objective's second half) | Low | CC-1 (same allocator surface; land after) |
-| **CC-2** | `Batch (2 of 2)` | **R333 -- the game-exposure control is DEAD from every production door.** Populate `player_game_by_id` from the frame's `Game_ID` at the control merge; add scalar `max_game_exposure_pct` expanding to every game, in the fraction gate and the relaxation order after player exposure; wire the F5 weather cap by MIN; name it in `qa_portfolio.py:531` and SKILL.md. **R150's default (what the count counts, arms or bats) is decided for the wiring: count every rostered player in the game, arms included, because a washout is a game outcome and the arm is in it; Ben may override in one line.** | Backlog | `execution_pipeline.py`, `contest_allocator.py:2966-2990`, `build_slate.py:527, 1626`, `tools/qa_portfolio.py:531`, SKILL.md | P (CIN@LAD took 39 of 150 slots on 2140_5g with nothing binding) | Low | With Batch 1 |
+| **CC-2** (new + was Session 19 Batch 3) | `Batch (2 of 2)` | **R343 + R333 -- the two washout-axis caps. DONE 2026-09-15.** `max_team_exposure_pct` over EVERY hitter slot (any stack role, 2+ hitters per entry), posture-sized 0.55/0.65/0.70/0.75/1.0 about 0.20 above each posture's primary-stack cap, with a `floor_team_exposure_pct` under it so a default-ON ceiling cannot refuse a thin slate; and the game control WIRED from a production writer for the first time (`derive_roster_id_maps` at the control merge, reaching all three doors), plus the slate-wide `max_game_exposure_pct` scalar (ships OFF, recorded either way) and the F5 weather cap merged by MIN. R150 decided: the game count is every rostered player, arms included; the team count is hitters only, and both labels are in the brief. R233 enumeration: the class is 13 files, 8 fixed, 5 deliberately not -- `deadline_governor.OPEN_CONTROL_VALUES` is the site neither entry names and the one that would have cost a slate. Neither cap is ladder-relaxed (the order the entries cite is R153's SHOWDOWN ladder; on Classic every exposure CEILING goes through the floor merge, and R286 forbids a control being in both sets) -- a rung stays available if Ben wants one. LOOSE golden baseline UNCHANGED byte for byte; PRODUCTION baseline re-frozen with `.assignments` the only field that moved, the delivered lineup multiset identical and all three gates passing at zero relaxations. Gate `PASS  v2.26.0  40 modules  2129 tests`. | Inbox 2026-09-12 / Backlog | `contest_allocator.py`, `execution_pipeline.py`, `deadline_governor.py`, `dk_entries_manager.py`, `build_slate.py`, `qa_portfolio.py`, `late_swap.py`, `tests/golden/` | P (the dual objective's second half) | Low-Med | CC-1 |
 | **CC-3** (new + was Session 10 Batch 4, Session 11 Batch 1, Session 39 Batch 2 (a)) | `Batch (1 of 4)` | **R347 (NEW) -- a PO opener is unrosterable in Showdown while `showdown.py:319-322` says he is rosterable.** `_is_declared` returns False for `PO`, `_participation` (`:366`) falls to `confirmed_nonstarter` on a decided side, `starters_only` drops him (`:386`); `Is_Declared_Opener` is set (`:379`) and nothing reads it; `--declare-pitcher` cannot reach a Showdown pool by its own help text (`build_slate.py:4577-4581`). Measured 1940_1g_sd: Hagen Smith, the only CWS arm DK marked as taking the ball, absent from a 20-man pool, brief clean. An invisible pool reduction (CLAUDE.md hard guardrail). Fix: an opener branch in `_participation` that keeps him under `starters_only` on `Is_Declared_Opener` (a third participation value, never `confirmed_starter`), the brief naming him, and the comment and CLI help made true. | Inbox 2026-09-10 (`showdown-po-opener-unrosterable`) | `mlb_engine/optimize/showdown.py:146-152, 319-386`, `build_slate.py` `run_showdown` brief and `--declare-pitcher` help | P (one arm per side; the pool is the whole Showdown game) | Low | None |
 | **CC-3** | `Batch (2 of 4)` | **R334(a) -- apply the existing F1 implied-team-total factor to the Showdown APPG prior** (pulled forward from Session 39 on the mine's evidence that the Showdown side split is the strongest effect in the archive and F1 reaches no Showdown hitter today, `build_slate.py:4697`, R249). Re-measure the 1.77x side split with it live. (b), the opposing-arm term, stays gated on (a)'s residual in Phase 4. | Backlog / Inbox | `build_slate.py` `run_showdown`, `showdown.py` melt, `projection_builder.build_f1_factors` | P | Low-Med | An odds packet for the measurement; the wiring needs none |
 | **CC-3** | `Batch (3 of 4)` | **R334(c)(d) -- the Showdown APPG Base is blind to the opposing arm; warning and sanity-pass halves.** A brief NOTE when the two declared arms' expected stats differ by more than a stated margin; a `--projections` sanity pass naming hitters whose Base rank contradicts their Savant rate-stat rank. Report, never a gate. | Inbox 2026-09-08 | `build_slate.py` `run_showdown` brief, `showdown.py` beside `small_sample_base_report`, `data/reference/expected_stats_*.csv` | P | Low | None |
@@ -156,7 +155,7 @@ Take these in the listed order absent a reason, one batch per session, between p
 
 ### Decisions owed and externally gated -- no session until answered
 
-**[BEN: GPP payout data.]** The entry-history export omits every GPP entry (78 contests on the mine's own slates where his entries appear in the standings). Whether a re-download with every contest type selected recovers them, or ticket-funded entries are invisible by construction, decides whether R118 can ever settle a GPP in dollars and whether R13 has a GPP number. One download, then one line. **[BEN: R150 / R333 / R343 defaults]** -- CC-2 proposes counting every rostered player in the game, arms included; the cap values are posture-sized like the others; override in one line. **[BEN: R37(2)(a) floor scope]** -- the 4-stack penalty is slate-size dependent in the archive (top-1% lift 1.099 on <=6-team slates, 0.946 on 13-20), so after CC-1 lands, whether floor 5 extends beyond `payout_breadth <= 0.02` on 7g+ slates is a one-line decision ARCHIVE's checkpoint can inform. **[BEN: R308]** the RotoWire RST% transport (signed-in Chrome + subscription); once settled it is an S-M session before CC-9. **R41** (Showdown under the three gates, L, decision first). **R206** (controls count entries, not dollars; decision then M; the 09-15 money map makes the dollar denominator computable per delivery). **R262** (scenario-coverage selection's production switch, with **R13** the stakes decision; R13 now has 611 contests of observed satellite money through 09-14, fees $196.40 against $1.67 cash and $175 in ticket face value across 1,046 entries by the research update's arithmetic, and no GPP number). **R240** (punt-captain template). **R139** (captain-leverage tier targets; the mine's captain-quartile inversion is its first archive evidence). **R125** policy half. **R40** (one-seat satellite routing). **R188**'s decision. **R273**, **R281**, **R282** (P3). **R9b**. **R81**. **R256** (gated on R255 residuals). **R263** remainder. **R121** standing order. **R315(c)** is DONE in the 2026-09-15 board commit (`data/reference/statsapi_season_pitching.csv` tracked). **[BEN, from the research doc]** two standings research outputs were written for 2026-09-14 by separate sessions minutes apart; whether that was intended is his to say, and the second pass's section 8.1 question (is the 4-stack default deliberate?) is ANSWERED by R340: neither deliberate nor a ladder artifact, an unwired argument. Rejected from the twelfth edition and filed nowhere: F32, F36, stage E, stage F, as before.
+**[BEN: GPP payout data.]** The entry-history export omits every GPP entry (78 contests on the mine's own slates where his entries appear in the standings). Whether a re-download with every contest type selected recovers them, or ticket-funded entries are invisible by construction, decides whether R118 can ever settle a GPP in dollars and whether R13 has a GPP number. One download, then one line. **[BEN: R150 / R333 / R343 cap VALUES]** -- the count question is SETTLED and shipped in CC-2 (game = every rostered player, arms included; team = hitters only, 2+ per entry). What is still one line of yours is the numbers: `max_team_exposure_pct` ships posture-sized at 0.55/0.65/0.70/0.75/1.0 (about 0.20 above each posture's primary-stack cap, no archive number prices a team footprint) and `max_game_exposure_pct` ships OFF per R333's own fix. Say the word and either moves. **[BEN: R37(2)(a) floor scope]** -- the 4-stack penalty is slate-size dependent in the archive (top-1% lift 1.099 on <=6-team slates, 0.946 on 13-20), so after CC-1 lands, whether floor 5 extends beyond `payout_breadth <= 0.02` on 7g+ slates is a one-line decision ARCHIVE's checkpoint can inform. **[BEN: R308]** the RotoWire RST% transport (signed-in Chrome + subscription); once settled it is an S-M session before CC-9. **R41** (Showdown under the three gates, L, decision first). **R206** (controls count entries, not dollars; decision then M; the 09-15 money map makes the dollar denominator computable per delivery). **R262** (scenario-coverage selection's production switch, with **R13** the stakes decision; R13 now has 611 contests of observed satellite money through 09-14, fees $196.40 against $1.67 cash and $175 in ticket face value across 1,046 entries by the research update's arithmetic, and no GPP number). **R240** (punt-captain template). **R139** (captain-leverage tier targets; the mine's captain-quartile inversion is its first archive evidence). **R125** policy half. **R40** (one-seat satellite routing). **R188**'s decision. **R273**, **R281**, **R282** (P3). **R9b**. **R81**. **R256** (gated on R255 residuals). **R263** remainder. **R121** standing order. **R315(c)** is DONE in the 2026-09-15 board commit (`data/reference/statsapi_season_pitching.csv` tracked). **[BEN, from the research doc]** two standings research outputs were written for 2026-09-14 by separate sessions minutes apart; whether that was intended is his to say, and the second pass's section 8.1 question (is the 4-stack default deliberate?) is ANSWERED by R340: neither deliberate nor a ladder artifact, an unwired argument. Rejected from the twelfth edition and filed nowhere: F32, F36, stage E, stage F, as before.
 
 
 *2026-09-15, DEV, claim `engine` (`engine_2026-09-15`): **the 2026-09-14/15 standings mine is adjudicated, the thirteen-fragment inbox is consumed, eight numbers are filed (R340-R347), twenty riders land, and the roadmap is REWRITTEN prize-first and re-chunked for Claude Code DEV sessions on Ben's instruction.** Two ARCHIVE sessions this date (the morning mine and this one, before it took the DEV claim) mined the whole 235-contest 2026-09-14 backlog with money capture from the entry-history export (`63d5193`, `58218c3`), so every number below rests on an archive that is on disk and in git. No engine code changed by this merge. Beyond this file: CHANGELOG.md, CLAUDE.md's 09-11 status note (now false in its first sentence and corrected), `data/reference/statsapi_season_pitching.csv` tracked (R315(c), ARCHIVE's one `git add`, done here by explicit path), and the consumed fragments.*
@@ -4668,7 +4667,7 @@ function over the merged controls. The floor and quota reports tell
 which. `tools/late_swap.py`'s two calls are deliberately NOT wired and ride as a
 rider on R284; `deepen_bank.py` is untracked. The golden baseline was re-frozen
 with the before/after bank histogram in the changelog entry. Gate
-`PASS  v2.26.0  40 modules  2089 tests`.
+`PASS  v2.26.0  40 modules  2129 tests`.
 
 ### R342. Separate AVAILABILITY from POPULARITY in the ownership prior, graded on held-out dates before it reaches `--leverage` or the sleeve (P1, S-M; roadmap CC-8) | new 2026-09-15, from `outputs/standings_research_2026-09-14/REPORT.md` section 1 (68 saved pre-lock Classic predictions, SHA-matched to their salary snapshots, generated before first pitch); precedes R10's fit and does not replace it
 
@@ -4677,11 +4676,7 @@ with the before/after bank histogram in the changelog entry. Gate
 - **Why P1.** The prior already steers: R246 wired it into `--leverage`, R307's sleeve will read its captain marginals, and `qa_portfolio` section 4 scores every delivery against it. A prior spending half its budget on players who will not play produces leverage reads and chalk-positive scores that are about the wrong players. This is also the cheapest large improvement on the board and it costs no new data.
 - **Fix.** (1) An availability component in `ownership_prior.py`: P(rosterable/starting role) from the status map the build already carries (confirmed lineup, probable, DK `Starting` column, role uncertainty, minutes to lock), and popularity conditional on it; an unknown lineup is UNCERTAIN, never equally eligible. (2) Grade with R306 step 1's tool (297 contests, per contest, never pooled) on held-out DATES with all contests of a slate kept together, reporting complete-pool MAE, rostered-player MAE, prediction-bin calibration, top-10 recall and legal budgets; the challenger must beat the saved prior on every one before the emitted version string leaves `v0.1-prior`. (3) Classic pitchers and hitters get separate concentration; Showdown CPT and roster markets are graded separately and not against a Classic budget. (4) `qa_portfolio`'s "the two scales do not meet until the prior is fit" caveat deletes when the grade says so. Labeled prior throughout; nothing trains at T-10, artifacts are precomputed and versioned. R10 then fits popularity hierarchically on top of it.
 
-### R343. Team footprint across ALL stack roles is unmeasured and uncapped: a team can reach 17 of 21 entries through secondary stacks with nothing reporting it (P1, S; roadmap CC-2) | new 2026-09-15, merged from BUILD fragment `2026-09-12_BUILD_agentic-adversarial-qa-pass.md`, last section; premise VERIFIED in tree (`build_slate.py:4238` is the only stack-share line in the brief and it is `primary_stacks`)
-
-- **What.** `max_primary_stack_exposure_pct` caps a team's share of PRIMARY stacks; the brief reports `primary_stacks` only. On 1310_9g (9 games, 21 entries) NYY sat in 15 of 21 entries through secondary stacks, and 17 of 21 after the rebuild, and no control bound and no line flagged it. One opposing starter having a night is a tighter and more achievable failure event than the two-offense game-level washout the brief does flag (R333's axis), and it is invisible today.
-- **Why P1.** The dual objective's second half (no total washout) has one live lever, player exposure, and two dead or partial ones (R333's game cap, this). A team-level correlated failure across two-thirds of the entered set is exactly what the portfolio-level washout clause in CLAUDE.md names.
-- **Fix.** (a) Report: per-team footprint over every hitter slot (any role) in the brief and in `qa_portfolio.py`'s washout line (`:531`), beside `primary_stacks`. (b) Control: `max_team_exposure_pct` (any role), counted and relaxable in the standard order after player exposure and before the captain lock on Showdown; posture-sized defaults like the other caps, the value Ben's. Not a pool edit. Lands with R333 in CC-2 because both are the control merge plus the allocator, and after R340 because R340 changes what the bank offers the allocator.
+### R343. CLOSED 2026-09-15 -- SHIPPED with R333 as roadmap CC-2, entry migrated to CHANGELOG.md
 
 ### R334. The Showdown Base is blind to the opposing arm: APPG is a season mean over every opponent, one game has one arm per side, and no factor on the Showdown path carries either the implied team total or the declared arm's quality to a hitter's prior (P1; S for the wiring half, M for the factor; Showdown-scoped) | new 2026-09-09, merged from BUILD fragment `2026-09-08_BUILD_2210_1g_sd_appg-is-blind-to-opponent-quality.md`; measured on 2210_1g_sd (CIN@LAD, 2026-09-08) against a supplied external Base; the third APPG failure mode after R310 (small sample) and R122 (handedness)
 
@@ -6965,97 +6960,7 @@ for anything retrospective; forward-going, the snapshots are the record.
 - **Why P1.** A lost fast path under a clock is the L class; September is bullpen-game season. This is not the docstring's "WILL NOT DO, EVER" boundary: a declaration is an operator INPUT, not an exposure cap, a pool reduction or an unclassified blocker.
 - **Fix.** Pass `--declare-pitcher` through verbatim (repeatable) and record it in `autobuild_decisions.json` as an operator input, never as a decision the supervisor took.
 
-### R333. The game-level exposure control exists in the allocator and the validator and is DEAD from every production door: nothing writes `player_game_by_id`, so the one lever on the washout axis `qa_portfolio` names refuses when it is asked for (P1, S) | new 2026-09-09, merged from BUILD fragment `2026-09-08_BUILD_2140_5g-no-game-level-exposure-control.md`; the fragment's premise ("no available control") corrected against the tree, VERIFIED-read by grep and by the allocator's own error string; the field measurement is the fragment's
-
-**Rider 2026-09-15 (DEV; roadmap CC-2 with R343).** R150's default is decided for the wiring: count every rostered player in the game, arms included, because a washout is a game outcome and the arm is in it; Ben may override in one line. R343 (team footprint over all roles) lands in the same session because both are the control merge plus the allocator's exposure rows, and both follow R340 because the bank's stack args change what the allocator is offered.
-
-**What the fragment measured, which stands.** 2140_5g (2026-09-08, 15 entries,
-5 games): CIN@LAD took 39 of 150 roster slots and `frontier.washout` named it
-binding at 81.3% retained, while none of the three portfolio controls bound,
-because the exposure arrived as individually legal one-offs (Skubal 6/15 under
-the 0.43 pitcher cap, LAD 1/15 as a PRIMARY stack under the 0.35 stack cap, then
-Betts 7, Smith 7, Freeman 5, Teoscar 3, Muncy 2, Edman 1 as ordinary filler).
-`max_player_exposure_pct` at 0.35 and 0.40 both REFUSED (the R157 trigger) and
-0.50 certified with four bats pinned at exactly 7/15, so the person cap has no
-room left and cannot decorrelate this by tightening. `qa_portfolio.py` printed
-`washout axis 'game': most-shared value is CIN@LAD at 7/15 (47%)` and named no
-control.
-
-**What the fragment got wrong, and what is true instead.** It proposed a new
-`max_game_exposure_pct`. A game cap already exists: `max_game_exposure_pct_by_game`
-(game id -> fraction) builds MILP rows in `contest_allocator.py:2966-2990` over
-every candidate touching the game, the post-export validator enforces it through
-`dk_entries_manager._game_cap_count` (`:769`, `:1055-1063`), R215(a) routes each
-value through the fraction gate in `build_slate.py:527` and
-`execution_pipeline.py:2880`, and `late_swap.py:214` names it as THE binding
-control on a `game G exposure N>M` refusal. It is dead in production on one fact:
-the allocator requires `controls['player_game_by_id']` (`:2968-2974`) and NOTHING
-in `mlb_engine/`, `tools/` or `skills/` writes that key. The only writers
-repo-wide are `tests/test_core.py:1302` and `:1473`, which hand the map in by
-hand, which is why the gap never showed. An operator who does what `late_swap.py`
-steers them to and passes `--controls-override
-'{"max_game_exposure_pct_by_game": {...}}'` gets `passed: False` with
-`max_game_exposure_pct_by_game requires controls['player_game_by_id']`. (The
-validator half derives the game from the salary file and works without the map,
-so a hand-corrected file CAN be checked against a game cap; it cannot be built
-under one.) Three further facts follow. (a) No posture default and no slate-wide
-form exist: the only shape is a per-game dict an operator has to type, so the
-R153/CLAUDE.md relaxation order has three members and this is not one of them,
-and `skills/generate-lineups/SKILL.md` does not mention the control at all
-(grep, 0 hits), which is how a BUILD session came to write "no available
-control" in good faith. (b) The one engine path that COMPUTES a game cap,
-`slate_intake_manager.material_weather_adjustments` (`:1054-1071`, 0.25 on
-medium postponement risk, plus the `Game_Exposure_Cap` column read at `:1786`),
-lands in the F5 report only (`build_slate.py:1626`,
-`report["game_exposure_caps"]`) and nothing carries it into the control: a
-writer no reader reads, R197's shape mirrored. (c) The existing rows count an
-ENTRY as exposed to a game if ANY rostered player is in it, arms included, so the
-control has already answered R150's question one way (roster footprint),
-silently, while the run's `compute_portfolio_frontier` counts bats only. Making
-the control live makes that disagreement load-bearing, so R150's decision is
-this item's default, not a side note.
-
-**Why P1.** The dual objective's washout half binds at the portfolio level
-(CLAUDE.md), the tool that reports it names the game axis, and the only control
-on that axis refuses when used: a control the swap tool steers operators toward
-and that cannot be used, on the file's largest correlated exposure. It changes
-no delivered byte until wired, which is why the fix is S and not a strategy
-decision: the DEFAULT value is Ben's, the wiring is not.
-
-**Fix (S).** (1) Populate `player_game_by_id` from the projection frame's
-`Game_ID` at the control merge in `execution_pipeline` (the frame already
-carries it; `:1677`, `:1956`, `:2363` read the same column), so the existing
-control is live from `--controls-override` and from `late_swap.py`'s steer; a
-test that runs the PRODUCTION merge with the cap and no hand-built map. (2) A
-slate-wide scalar `max_game_exposure_pct` that expands to every game id in the
-frame, sitting in the fraction gate beside the other five and in the relaxation
-order at the position R153's argument puts it (after player exposure: it spreads
-a cost thin rather than concentrating one). Default OFF until Ben sets one;
-record the scalar and its expansion in the brief's `merged_controls` on every
-Classic build so the default's absence is visible. (3) Wire the F5 weather cap:
-`game_exposure_caps` merges into the per-game dict by MIN, named in the brief as
-`weather_game_caps_applied`. (4) `qa_portfolio.py:531` names the control beside
-the axis, the way `late_swap.py` does on a refusal. (5) SKILL.md gains the
-control in its portfolio-controls list, with the 2140_5g reading as the reason
-it exists. Decide R150 first (what the count counts); until decided, the count
-stays roster footprint and the brief SAYS `game_exposure_counts: roster_footprint`.
-
-**Done when.** A build with `--controls-override
-'{"max_game_exposure_pct_by_game": {"<gid>": 0.4}}'` and no hand-built map
-certifies with the cap in `merged_controls` and the validator's game check
-passing; the 2140_5g bank re-solved at `max_game_exposure_pct: 0.60` either
-certifies with CIN@LAD in at most floor(0.60 * 15) = 9 entries or refuses naming
-THIS control as binding (R311's discipline), never silently; the F5 report's
-`game_exposure_caps` and `merged_controls.max_game_exposure_pct_by_game` agree
-on a medium-postponement fixture; `grep -rn player_game_by_id mlb_engine/`
-returns a production writer. Roadmap: Session 19, Batch (3 of 3), same file and
-same theme as R166 (caps that do not bind where they should).
-
-**The fragment's second half, `--leverage` near-inert at the skill's recommended
-cap, is filed as a rider on R197 rather than here:** it is a brief-truth gap
-(the realized cumulative sum is not printed, so "the cap never bound" was
-hand-computed) plus a SKILL.md correction, and R197 already owns the realized
-low-owned count that sits beside it.
+### R333. CLOSED 2026-09-15 -- SHIPPED with R343 as roadmap CC-2, entry migrated to CHANGELOG.md
 
 ### R326. CLOSED 2026-09-09 -- SHIPPED, entry migrated to CHANGELOG.md
 

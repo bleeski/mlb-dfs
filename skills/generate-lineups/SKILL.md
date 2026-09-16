@@ -530,6 +530,64 @@ Four things follow:
   conservative construction is the right default even though the wall is wrong
   at build time.
 
+### The two washout-axis caps: team footprint and game exposure (R343, R333, Classic only)
+
+Ben's dual objective has two halves and the washout half binds at the PORTFOLIO
+level (CLAUDE.md), not inside a lineup. Until 2026-09-15 it had one live lever,
+`max_player_exposure_pct`, and two that could not reach it.
+
+**`max_team_exposure_pct` — a team's footprint over EVERY hitter slot, any stack
+role.** `max_primary_stack_exposure_pct` counts the PRIMARY stack alone, so a
+team can arrive in most of the entered set through secondary stacks with nothing
+binding and nothing reporting it: on 1310_9g (9 games, 21 entries) NYY sat in 15
+of 21 entries, then 17 of 21 on the rebuild. Posture defaults ship at 0.55
+(`wta_satellite`), 0.65 (`mme`), 0.70 (`large_gpp`), 0.75 (`small_gpp`), 1.0
+(`single_entry`) — each about 0.20 above that posture's primary-stack cap, so
+the primary cap stays the binding one on an ordinary build. An entry counts
+toward a team at **2+ hitters** from it (`team_exposure_min_hitters`): a lone
+filler bat is not a stack role, and at 1+ every team on a small slate reads near
+1.0 by arithmetic.
+
+**`max_game_exposure_pct` — a slate-wide scalar that expands to every game.**
+It **ships OFF** and the brief says so on every Classic build, so its absence is
+visible rather than merely true. The per-game form
+`max_game_exposure_pct_by_game` is unchanged and wins where it is tighter. The
+count is **every rostered player in the game, arms included** (R150, Ben
+2026-09-15: a washout is a game outcome and the arm is in it) — which is a
+DIFFERENT definition from the team cap's hitters-only one, on purpose, because a
+teammate arm does not go quiet when the offense does.
+
+```bash
+python skills/generate-lineups/scripts/build_slate.py ...     --controls-override '{"max_team_exposure_pct": 0.6, "max_game_exposure_pct": 0.6}'
+```
+
+Both are fractions of the entered set and both go through the units gate, so a
+`60` typed for `0.60` is refused rather than silently disabling the cap. Both
+are floored UP to a slate-feasible value before the solve
+(`floor_team_exposure_pct`, `floor_game_exposure_pct`) the same way the other
+exposure ceilings have been since v1.9 — a one-game Classic slate floors the
+team cap to 1.0 rather than refusing — and an arithmetically impossible value is
+named in `feasibility.checks` as `team_exposure_capacity` /
+`game_exposure_capacity` with the value to raise it to. Neither is relaxed by
+the allocator's ladder; exposure CEILINGS on Classic are handled by that floor
+merge, and the ladder relaxes only lower bounds and the engine's own reuse
+default.
+
+Where to read the result: the brief's `team_footprint_any_role` (beside
+`primary_stacks`, which is the primary-only line it completes),
+`game_exposure_request` and `team_exposure` in the checkpoint, and
+`tools/qa_portfolio.py`'s washout section, which now carries a
+`team_footprint` axis and names the control on every axis it reports.
+`tools/late_swap.py` maps a `team T footprint N>M` refusal to this control the
+way it already mapped `game G exposure N>M`.
+
+The F5 material-weather cap (0.25 on medium postponement risk) is merged into
+the per-game dict by MIN and named in `weather_game_caps_applied`. It was
+computed and read by nobody before R333.
+
+These are deterministic portfolio-shape controls. No archive number prices a
+team footprint; neither cap is a win rate, a cash rate, or a probability.
+
 ### Projection enrichment (this is what makes the build more than APPG)
 
 The build applies six deterministic priors: the xwOBA Base correction, xISO
@@ -1221,7 +1279,7 @@ Before a build, when there is time:
 ```bash
 cd <repo> && git status --short
 python tools/audit.py --gate-run --gate-budget 130 --gate-ceiling 165  # repeat to GATE COMPLETE
-python tools/audit.py --gate-report --terse  # expect PASS v2.26.0, 40 modules, 2089 tests
+python tools/audit.py --gate-report --terse  # expect PASS v2.26.0, 40 modules, 2129 tests
 ```
 
 **`--run-tests` in one call is not the supported path here and CLAUDE.md says

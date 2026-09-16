@@ -810,6 +810,7 @@ def fixed_portfolio_exposure(
     solved_entry_ids: Iterable[str],
     *,
     salary_csv_path: Optional[str | Path] = None,
+    team_exposure_min_hitters: Optional[int] = None,
 ) -> Dict[str, Any]:
     """R61. The exposure a solve cannot change, read off the rows it cannot touch.
 
@@ -841,6 +842,10 @@ def fixed_portfolio_exposure(
     ``solved_entry_ids`` contribute nothing, because the solve is about to
     replace them.
     """
+    from mlb_engine.allocate.contest_allocator import (
+        TEAM_EXPOSURE_MIN_HITTERS, candidate_team_footprint)
+    min_hitters = int(TEAM_EXPOSURE_MIN_HITTERS if team_exposure_min_hitters is None
+                      else team_exposure_min_hitters)
     solved = {str(x).strip() for x in solved_entry_ids}
     players: Dict[str, SalaryPlayer] = {}
     if salary_csv_path:
@@ -852,6 +857,7 @@ def fixed_portfolio_exposure(
     stack_counts: Counter = Counter()
     pair_counts: Counter = Counter()
     game_counts: Counter = Counter()
+    team_counts: Counter = Counter()
     signatures_by_contest: Dict[str, List[List[str]]] = defaultdict(list)
     for entry in parse_dk_entry_rows(path):
         if not entry.is_complete or entry.entry_id in solved:
@@ -871,6 +877,13 @@ def fixed_portfolio_exposure(
             for gid in {players[pid].game_id for pid in roster
                         if pid in players and players[pid].game_id}:
                 game_counts[gid] += 1
+            # R343. The team FOOTPRINT offset, over hitter slots only (roster[2:]
+            # is the eight hitters), through the allocator's own definition so
+            # the offset and the cap it is subtracted from cannot drift apart.
+            for team in candidate_team_footprint(
+                    roster[2:], {pid: p.team for pid, p in players.items()},
+                    min_hitters):
+                team_counts[team] += 1
         signatures_by_contest[entry.contest_id].append(sorted(roster))
     return {
         "row_count": len(entry_ids),
@@ -881,6 +894,8 @@ def fixed_portfolio_exposure(
         "primary_stack_counts": dict(stack_counts),
         "sp_pair_counts": dict(pair_counts),
         "game_counts": dict(game_counts),
+        "team_counts": dict(team_counts),
+        "team_counts_min_hitters": min_hitters,
         "signatures_by_contest": {k: v for k, v in signatures_by_contest.items()},
         "stacks_derived": bool(players),
     }
@@ -1095,6 +1110,29 @@ def validate_dk_entries_file(
             count = game_counts.get(str(gid), 0)
             if count > cap:
                 portfolio_errors.append(f"game {gid} exposure {count}>{cap}")
+    # R343. The post-export half of the team footprint cap, the same shape the
+    # game cap above has had since R215. Without it the build enforces a control
+    # the referee cannot grade, which is the asymmetry R292 is filed on.
+    team_pct = controls.get("max_team_exposure_pct")
+    if team_pct is not None and players:
+        from mlb_engine.allocate.contest_allocator import (
+            TEAM_EXPOSURE_MIN_HITTERS, candidate_team_footprint)
+        try:
+            min_hitters = int(controls.get("team_exposure_min_hitters")
+                              or TEAM_EXPOSURE_MIN_HITTERS)
+        except (TypeError, ValueError):
+            min_hitters = TEAM_EXPOSURE_MIN_HITTERS
+        team_cap = _cap_count(total, team_pct)
+        if team_cap:
+            team_counts: Counter = Counter()
+            team_by_pid = {pid: p.team for pid, p in players.items()}
+            for _, roster in legal_rosters:
+                for team in candidate_team_footprint(
+                        roster[2:], team_by_pid, max(1, min_hitters)):
+                    team_counts[team] += 1
+            portfolio_errors += [
+                f"team {team} footprint {count}>{team_cap}"
+                for team, count in team_counts.items() if count > team_cap]
     if max_overlap is not None:
         for i, (entry_a, roster_a) in enumerate(legal_rosters):
             for entry_b, roster_b in legal_rosters[i + 1:]:
@@ -1108,7 +1146,7 @@ def validate_dk_entries_file(
     if blank_entries and not require_all_reserved_filled:
         warnings.append(f"{len(blank_entries)} blank/incomplete reserved entries")
 
-    roster_legality_errors = [e for e in errors if not e.startswith(("player ", "pitcher ", "primary stack ", "SP pair ", "entries ", "game "))]
+    roster_legality_errors = [e for e in errors if not e.startswith(("player ", "pitcher ", "primary stack ", "SP pair ", "entries ", "game ", "team "))]
     return {
         "passed": not errors,
         "errors": errors,
@@ -1136,6 +1174,7 @@ def validate_dk_entries_file(
             "max_primary_stack_count": stack_cap, "max_sp_pair_repetition": pair_cap,
             "max_shared_players": max_overlap,
             "max_game_exposure_pct_by_game": game_caps or None,
+            "max_team_exposure_pct": team_pct,
         },
         "summary": "DKEntries validation passed" if not errors else f"DKEntries validation failed with {len(errors)} error(s)",
     }

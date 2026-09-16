@@ -25,6 +25,277 @@ performance claim.
 
 ---
 
+## 2026-09-15 — CC-2: the two washout-axis caps. R343, the team footprint no control could see; R333, the game-exposure control that was dead from every production door
+
+**Scope.** `mlb_engine/allocate/contest_allocator.py`,
+`mlb_engine/pipeline/execution_pipeline.py`,
+`mlb_engine/pipeline/deadline_governor.py`,
+`mlb_engine/entries/dk_entries_manager.py`,
+`skills/generate-lineups/scripts/build_slate.py`, `tools/qa_portfolio.py`,
+`tools/late_swap.py`, `tests/test_core.py`, `tests/test_golden_replay.py`,
+`tests/golden/golden_replay_production_2026-06-03.json` (RE-FROZEN, see below),
+`tools/audit.py` (the per-suite pin), `CLAUDE.md`,
+`skills/generate-lineups/SKILL.md`, `docs/backlog.md`, this file. Roadmap CC-2,
+landed after CC-1 because R340 changes what the bank offers the allocator.
+
+**The one thing both items are about.** Ben's dual objective has two halves and
+the washout half binds at the PORTFOLIO level (CLAUDE.md). Until this date it had
+one live lever, `max_player_exposure_pct`, and two axes that could not be
+reached: a team's footprint across all stack roles had no control and no report
+at all, and the game axis had a complete control in the allocator and in the
+post-export validator that refused when it was used.
+
+### R343 — team footprint across ALL stack roles was unmeasured and uncapped
+
+**What was wrong.** `max_primary_stack_exposure_pct` counts a team's share of
+PRIMARY stacks, and `build_slate.portfolio_exposure`'s `primary_stacks` was the
+only stack-share line the brief has ever had. On 1310_9g (9 games, 21 entries)
+NYY sat in 15 of 21 entries, then 17 of 21 after the rebuild, entirely through
+SECONDARY stacks — no control bound and no line reported it. `qa_portfolio.py`
+could not see it either: its `stack_team` axis counts each entry's HEAVIEST team
+and only at 3+, so a team arriving in two-thirds of the portfolio as a 2-3 bat
+secondary is invisible there by construction.
+
+**What shipped.** `max_team_exposure_pct`, a ceiling over every hitter slot
+whatever role the optimizer labelled it, with MILP rows in the allocator, a
+structural floor, a capacity check, a binding diagnosis, posture defaults, the
+units gate, the post-export validator, and reports at three surfaces.
+
+**Two definitions, stated where each is used, and they differ on purpose.** The
+team cap counts HITTERS only: a rostered arm is already capped on its own axis
+and the failure being measured is an offense going quiet, which an opposing
+starter causes and a teammate arm does not. R333's game cap counts EVERY rostered
+player including arms — R150, decided by Ben 2026-09-15, because a washout is a
+game outcome and the arm is in it. The brief carries both labels
+(`team_exposure.counts: hitter_slots`, `game_exposure_request.counts:
+roster_footprint`) rather than leaving a reader to infer either.
+
+**An entry counts toward a team at 2+ hitters** (`team_exposure_min_hitters`, and
+an operator may move it). Not 1: a DK Classic lineup holds eight hitters and at
+most five from one team, so on a three-game slate a 1+ footprint is near 1.0 for
+every team by arithmetic and a cap over it would bind on ordinary builds while
+measuring nothing. 2+ is also what "stack ROLE" means in R343's own title — a
+secondary stack is two or more, a lone filler bat is not a role. The brief
+reports BOTH thresholds (`team_footprint_any_role` at 2+,
+`team_footprint_any_hitter` at 1+) so the choice is visible rather than buried.
+
+**The posture defaults, and how the five numbers were chosen.** 0.55
+(`wta_satellite`), 0.65 (`mme`), 0.70 (`large_gpp`), 0.75 (`small_gpp`), 1.0
+(`single_entry`); `cash` declares none. Each sits about 0.20 above that posture's
+`max_primary_stack_exposure_pct`. A team's footprint is a superset of its
+primary-stack share by construction, so a value at or near the primary cap would
+be a second primary cap under another name and would bind on builds with nothing
+wrong with them. No archive number prices a team footprint: these are
+decorrelation preferences, not win rates, cash rates, or probability claims, and
+the value is Ben's to move (his [BEN] line of 2026-09-15 asked for posture-sized
+defaults and left the numbers to this session).
+
+**Arithmetic safety, measured rather than asserted.** Every entry footprints at
+least ceil(8 / MAX_HITTERS_PER_TEAM) = 2 teams, so some team must take
+ceil(2E / T) of E entries on a slate with T stackable teams.
+`_slate_feasibility` computes that as `floor_team_exposure_pct` and
+`feasibility_floors_from` raises the cap to it, which is what stops a default-ON
+ceiling refusing a slate it cannot fit: a one-game Classic slate (T = 2) floors to
+1.0 and the cap goes inert. `stackable_team_count` is the denominator and is the
+conservative choice — a team too weak to be stackable can still supply two filler
+bats, so the true floor is at most this one, and erring here loosens a ceiling
+rather than tightening one. An impossible value is named pre-solve as
+`team_exposure_capacity` with the value to raise it to.
+
+### R333 — the game-exposure control was dead from every production door
+
+**What was wrong, and the grep is the evidence.**
+`git grep -n player_game_by_id b0eaa2c -- mlb_engine tools skills tests` at the
+parent commit returns SIX hits: three in `contest_allocator.py` (a docstring, the
+reader at `:3048`, and the refusal string at `:3053`) and three in
+`tests/test_core.py` (`:1303`, `:1474`, `:1485`), which hand the map in by hand.
+**Zero production writers.** So `max_game_exposure_pct_by_game` — complete in the
+allocator since R61, enforced by the post-export validator since R215, and named
+by `late_swap.py:214` as THE binding control on a `game G exposure N>M` refusal —
+returned `passed: False` with
+`max_game_exposure_pct_by_game requires controls['player_game_by_id']` to any
+operator who did what the swap tool steers them to do. Measured on 2140_5g
+(2026-09-08, 15 entries, 5 games): CIN@LAD took 39 of 150 roster slots,
+`frontier.washout` named it binding, `qa_portfolio.py` printed the axis and named
+no control, and none of the three live portfolio controls bound.
+
+**What shipped.** (1) `derive_roster_id_maps(projections)` reads `Player_ID` ->
+`TeamAbbrev` and `Player_ID` -> `Game_ID` off the frame and the control merge
+stamps both maps, so every door inherits them. (2) `max_game_exposure_pct`, a
+slate-wide scalar that expands to every game id, in the units gate beside its five
+siblings and with a `floor_game_exposure_pct` under it. It ships ABSENT, per the
+item's own decision, and `game_exposure_request` is published on every Classic
+build so the default's absence is visible rather than merely true. (3) The F5
+material-weather cap is merged into the per-game dict by MIN and named in
+`weather_game_caps_applied`. (4) `qa_portfolio.py` names the control on every
+washout axis it reports, the way `late_swap.py` does on a refusal. (5) SKILL.md
+documents both controls; it mentioned the game control zero times before this
+date, which is how a BUILD session came to write "no available control" in good
+faith.
+
+**One thing the item did not know about its own wiring.** `build_slate`'s F5
+report keys `game_exposure_caps` by TEAM, while
+`slate_intake_manager.material_weather_adjustments` keys its own dict of the same
+name by GAME ID — two keyings under one name. The F5 report now also emits
+`game_exposure_caps_by_game_id`, resolved through the `game_by_team` map it
+already builds, and that is what reaches the control. The team-keyed key is
+unchanged.
+
+### The R233 enumeration: the class is 13 files, 8 fixed, 5 deliberately not
+
+`git grep -ln max_player_exposure_pct b0eaa2c -- mlb_engine tools skills` returns
+ELEVEN tracked files; `tools/qa_portfolio.py` and the untracked
+`skills/generate-lineups-workspace/build_apex.py` make thirteen sites a new
+exposure ceiling has to be reasoned about. **Fixed (8):**
+
+* `mlb_engine/allocate/contest_allocator.py` — MILP rows, `CHECKED_CONTROLS`,
+  `STRATEGY_CAP_CONTROLS`, `_untouchable_cap_conflicts`,
+  `compose_infeasibility_errors`' Active list, `_diagnose_binding_constraints`,
+  `direct_constraints`, and the two report blocks.
+* `mlb_engine/pipeline/execution_pipeline.py` — postures, `pct_keys`, the units
+  gate, `_slate_feasibility`, `feasibility_floors_from`, `_feasibility_report`,
+  `run_slate`, and `controls_for_report`.
+* `mlb_engine/pipeline/deadline_governor.py` — **the site neither board entry
+  names, and the one that would have cost a slate.** `OPEN_CONTROL_VALUES` is the
+  whole content of the T-15 rung ("every portfolio control to its open value at
+  once", CLAUDE.md), so a ceiling missing from it survives the crude move that
+  exists to rescue a refusal inside a lock window — and the team cap ships ON by
+  posture default. `max_game_exposure_pct` opens too;
+  `max_game_exposure_pct_by_game` deliberately does not, because that map holds a
+  control -> VALUE and the per-game form's keys are the slate's game ids, which
+  that module does not have. Stated in the source rather than left as a silent gap.
+* `mlb_engine/entries/dk_entries_manager.py` — the post-export validator grades
+  the team cap, `fixed_portfolio_exposure` emits `team_counts` at the same
+  threshold the cap is enforced at (R61: an offset counted at a different
+  threshold is subtracted from a cap it was never measured against), and
+  `resolved_caps` names it.
+* `skills/generate-lineups/scripts/build_slate.py` — units gate, the two brief
+  footprint lines, the F5 wiring.
+* `tools/late_swap.py` — the id maps reach its merge (the THIRD door), and
+  `_CONTROL_BY_ERROR_PREFIX` maps `team T footprint N>M` to the control, the gap
+  R61 closed for the two prefixes before it.
+* `tools/qa_portfolio.py` — the `team_footprint` axis and the control names.
+* `skills/generate-lineups/SKILL.md`.
+
+**Deliberately NOT fixed (5), each with the reason:**
+
+* `mlb_engine/optimize/showdown.py`, `mlb_engine/optimize/showdown_theses.py`,
+  `skills/generate-lineups/references/showdown.md` — Showdown is one game and two
+  teams, so both entries' offenses appear in nearly every entry by construction.
+  A team footprint cap there would bind at ~1.0 on every build and a game cap
+  would be the entry count. The roadmap's CC-2 row lists no Showdown file.
+* `tools/autobuild.py` — it names the exposure caps only in prose about what it
+  will not do; there is no enumeration to extend. Its docstring's "WHAT IT WILL
+  NOT DO, EVER" still holds for these two.
+* `skills/generate-lineups-workspace/build_apex.py` — untracked workspace script,
+  not a production door. Its decorrelation override tightens three caps and never
+  named this one; the posture default applies under it unchanged.
+
+**One more deliberate non-fix, inside a file that WAS fixed.** The vacuous-row
+guard added to the team cap (a row whose bound is at or above E cannot bind,
+because each entry takes exactly one candidate) is NOT retrofitted to the three
+sibling ceilings. The same guard there would be correct and would move the frozen
+golden baseline for a reason that has nothing to do with this item.
+
+### Why neither cap is ladder-relaxed, which is this item's one departure from what the board asked for
+
+Both entries asked for the caps to be "counted and relaxable in the standard
+order after player exposure". The order they name is R153's SHOWDOWN ladder, and
+on Classic there is no player-exposure rung to come after:
+`LADDER_RELAXED_CONTROLS` holds three LOWER bounds (`max_candidate_reuse`, the
+five-stack quota, the primary-stack floor) and nothing else, while every exposure
+CEILING on Classic is handled by the structural floor merge, which raises an
+arithmetically impossible cap to a feasible value BEFORE the solve. So the
+faithful reading of "handled after player exposure" is "handled the way player
+exposure is handled", and both new caps are. Putting them in both sets would also
+fail `test_checkpoint_verdicts_cannot_go_stale_across_a_ladder_re_entry`
+directly: R286 asserts `CHECKED_CONTROLS` and `LADDER_RELAXED_CONTROLS` stay
+disjoint, because a ladder that moves a control a threaded verdict was computed
+from makes that verdict stale. A ladder rung for either cap remains available if
+Ben wants one; it is a decision, not an oversight.
+
+### The golden replay moved, and here is the proof it moved for the right reason
+
+Both baselines drifted on the first run. Neither was re-frozen on sight.
+
+**The LOOSE front-door baseline is UNCHANGED, byte for byte.** Its first drift
+was real and the cause was not the cap binding: `LOOSE_CONTROLS` opens the three
+exposure ceilings to 1.0 and a fourth arrived at its posture default, so the
+replay stopped measuring what it exists to measure. `max_team_exposure_pct: 1.0`
+joined that dict — its own name is the argument. That alone did not settle it:
+eight rows at a bound of 18 over 18 entries are vacuous, and adding them still
+moved 15 of 18 entry-to-lineup assignments through scipy's branch order while
+leaving `exposure_summary` and `sp_pair_distribution` byte-identical. A baseline
+that shuffles for no semantic reason has stopped reporting construction drift, so
+the fix is the guard above and not a re-freeze. `golden_replay_2026-06-03.json` is
+untouched by this commit.
+
+**The PRODUCTION baseline was re-frozen, and the diff is one field.** That replay
+runs real postures, so the team cap arrives at 0.55 (the `wta_satellite` /
+`large_gpp` min-merge) and binds — which is the intended change. Measured on one
+identical 30-candidate bank, the same slate, the cap opened to 1.0 versus at its
+posture default:
+
+| | BEFORE (cap 1.0) | AFTER (cap 0.55) |
+| :--- | :--- | :--- |
+| `max_team_exposure_pct` merged | 1.0 | 0.55 |
+| resolved team count | 18 of 18 | 9 of 18 |
+| MILP rows added | 0 of 4 teams (all vacuous) | 4 of 4 teams |
+| realized max team footprint | 9/18 = 50% | 9/18 = 50% |
+| primary stack histogram | BOS 5, PHI 5, SD 4, BAL 4 | identical |
+| SP-pair distribution | 11 pairs | byte-identical |
+| `exposure_summary` | 36 players | byte-identical |
+| delivered lineup multiset | 11 distinct | **identical** |
+| relaxations (reuse / quota / floor) | 0 / 0 / 0 | 0 / 0 / 0 |
+| `workflow_valid` / `selection_certified` / `allocation_certified` | pass / pass / pass | pass / pass / pass |
+| entry-to-lineup assignments moved | — | 18 of 18 |
+
+A field-by-field diff of the frozen file against the parent commit says exactly
+what changed, and it is TWO keys out of the whole file:
+
+* `.assignments` — 18 of 18 rows, the re-assignment above. The delivered
+  PORTFOLIO is the same portfolio: the cap bound at exactly the structural floor
+  (ceil(2 x 18 / 4) = 9 on this two-game, four-team, 18-entry grid) and scipy
+  returned a different, equally optimal assignment of the same eleven lineups to
+  the same eighteen entry ids.
+* `.pure_verdict.errors` — one control name appended:
+  `..., max_sp_pair_repetition=2, max_team_exposure_pct=0.55`. That sentence
+  enumerates what was ACTIVE on a proven-infeasible solve, so leaving the new cap
+  out would have made it false on exactly the builds the cap binds on. The
+  refusal itself is unchanged.
+
+Everything else — meta, the certification block, the exposure summary, the
+SP-pair distribution, the enrichment record, the aggregates — is byte-identical.
+The suite was run green twice in a row after re-freezing, per the file's own
+contract.
+
+**One test MODIFIED rather than added, and it is worth naming.**
+`test_the_swap_applies_the_same_feasibility_floors_the_build_applies` compares
+the swap's derived controls against the build's. The swap now derives the id maps
+from the same frame, so the comparison derives them too; left alone the test
+would have asserted that the swap inherits LESS than the build, which is the
+failure it exists to catch.
+
+**A host note for the next session, because it cost this one twenty minutes.**
+Running `python -m unittest tests.test_core` WITHOUT `PYTHONHASHSEED=0` makes the
+four `late_swap.py` subprocess tests fail with Windows exit 3221225477
+(0xC0000005). It is not a tree failure and it is not new: `late_swap.py:54`
+re-execs itself to pin the seed when it is unset, and `os.execve` on Windows
+takes an access violation doing it. `tools/audit.py:1709` sets the variable, so
+the gate never sees it; a hand-run does. Reproduced identically at the parent
+commit `b0eaa2c`. Set `PYTHONHASHSEED=0` on any hand-run of this suite. The
+re-exec itself is filed, not fixed here.
+
+**Tests.** `tests.test_core` 1238 -> 1278, forty. Eleven on the team footprint
+(the definition, the hitters-only reading against the game cap's roster-footprint
+one, the MILP rows, and one assertion that the cap binds where
+`max_primary_stack_exposure_pct` cannot); eleven on the game control being wired
+from a production writer for the first time, plus the scalar, the MIN merge and
+the F5 weather cap; nine on the floors and the capacity checks that keep a
+default-ON ceiling from refusing a thin slate; nine on the reporting surfaces —
+four of those nine on class members the two board entries do not name, found by
+the R233 grep above. Total pin 2089 -> 2129.
+
 ## 2026-09-15 — R340: the five-stack controls were dead from every production door, and there were three doors, not two
 
 **Scope.** `mlb_engine/pipeline/execution_pipeline.py`,

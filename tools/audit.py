@@ -716,7 +716,19 @@ EXPECTED_SUITE_COUNTS = {
     # telling `bank_never_asked_for_size` from `bank_asked_and_could_not`, and
     # two on merging the sliced door's two per-size reports into the one report
     # everything downstream reads.
-    "tests.test_core": 1238,
+    # R343+R333 (CC-2), 2026-09-15: 1238 -> 1274, the thirty-six that pin the
+    # two washout-axis caps. Eleven on the team footprint over ALL stack roles
+    # (the definition, the arm exclusion, the MILP rows, and the one assertion
+    # that says the cap binds where `max_primary_stack_exposure_pct` cannot),
+    # eleven on the game control being wired from a PRODUCTION writer for the
+    # first time plus the scalar, the MIN merge and the F5 weather cap, nine on
+    # the floors and the capacity checks that keep a default-on ceiling from
+    # refusing a thin slate, and nine on the reporting surfaces -- four of those
+    # nine on class members the two board entries do NOT name, found by the
+    # R233 grep: the deadline governor's T-15 open-controls rung, R98(2)'s
+    # strategy-versus-structural split, the untouchable-row conflict check, and
+    # the vacuous-row guard that keeps an OPENED cap from moving a solve.
+    "tests.test_core": 1278,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps

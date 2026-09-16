@@ -123,6 +123,15 @@ LOOSE_CONTROLS = {
     "max_player_exposure_pct": 1.0,
     "max_pitcher_exposure_pct": 1.0,
     "max_primary_stack_exposure_pct": 1.0,
+    # R343 (CC-2), 2026-09-15. The fourth exposure ceiling joins the three
+    # above it at 1.0, and the reason is this dict's own name: the loose replay
+    # exists to hold the CAPS out of the way so the baseline measures the front
+    # door's construction. A new cap arriving at its posture default would
+    # quietly change what this gate is a gate on. Opened here, the frozen
+    # baseline is byte-identical across CC-2, which is the evidence that the
+    # item moves nothing except where a cap is actually asked for -- the
+    # production replay below runs the posture default and DOES move.
+    "max_team_exposure_pct": 1.0,
     "max_sp_pair_repetition": 50,
     "max_shared_players": 9,
     "max_candidate_reuse": 20,

@@ -11524,7 +11524,13 @@ class SwapControlsInheritanceTests(unittest.TestCase):
             floors = epi.feasibility_floors_from(epi._slate_feasibility(
                 postures, requirements, projections, None))
             expected = epi._merged_controls_for_build(
-                postures, None, feasibility_floors=floors)
+                postures, None, feasibility_floors=floors,
+                # R333/R343 (CC-2). The swap is the third production door
+                # through this merge and now derives the id maps from the same
+                # frame the build does, so the comparison has to derive them
+                # too -- otherwise this test asserts the swap inherits LESS
+                # than the build, which is the failure it exists to catch.
+                roster_id_maps=epi.derive_roster_id_maps(projections))
             derived = ls.resolve_swap_controls(
                 postures, None, None,
                 requirements=requirements, projections=projections)
@@ -24672,6 +24678,617 @@ class FullBankRetryBeforeStrategyRelaxationTests(unittest.TestCase):
         self.assertEqual(report["status"], "time_limit")
         self.assertEqual(report["search_scope"], "restricted")
         self.assertFalse(report["full_bank_retry"]["triggered"])
+
+
+# CC-2 (R343, R333). Module level rather than per-test, the way `ca` above is:
+# every class below reads the pipeline, and four of them read it in an assertion
+# whose whole point is that one derivation reaches every door.
+from mlb_engine.pipeline import execution_pipeline as ep  # noqa: E402
+
+
+class TeamFootprintCapTests(unittest.TestCase):
+    """R343: a team reached 17 of 21 entries through SECONDARY stacks, and
+    `max_primary_stack_exposure_pct` counts the primary alone while the brief's
+    only stack-share line reports `primary_stacks`. Neither could see it."""
+
+    _TEAMS = {"h1": "NYY", "h2": "NYY", "h3": "NYY", "h4": "BOS", "h5": "BOS",
+              "h6": "LAD", "h7": "LAD", "h8": "SEA", "sp1": "NYY", "sp2": "TEX",
+              "sp3": "TEX", "sp4": "TEX", "sp5": "TEX", "sp6": "TEX",
+              "sp7": "TEX"}
+
+    #: A bank map with two DISJOINT footprints, so a cap of 0.5 over four
+    #: entries has somewhere to go. Every candidate in `_bank` is a five-stack
+    #: plus a three-bat secondary, which is the construction the archive
+    #: rewards (CC-1) and the one `max_primary_stack_exposure_pct` measures half
+    #: of.
+    _BANK_TEAMS = {
+        **{f"n{i}": "NYY" for i in range(5)}, **{f"t{i}": "TEX" for i in range(3)},
+        **{f"b{i}": "BOS" for i in range(5)}, **{f"s{i}": "SEA" for i in range(3)},
+        **{f"sp{i}": "LAD" for i in range(10)},
+    }
+
+    def test_footprint_counts_every_hitter_slot_not_the_primary_stack(self):
+        # Three NYY, two BOS, two LAD, one SEA: the primary is NYY, but BOS and
+        # LAD are footprints too and the primary-stack line names neither.
+        fp = ca.candidate_team_footprint(
+            ["h1", "h2", "h3", "h4", "h5", "h6", "h7", "h8"], self._TEAMS, 2)
+        self.assertEqual(sorted(fp), ["BOS", "LAD", "NYY"])
+
+    def test_the_threshold_is_two_and_a_lone_bat_is_not_a_stack_role(self):
+        self.assertEqual(ca.TEAM_EXPOSURE_MIN_HITTERS, 2)
+        self.assertNotIn("SEA", ca.candidate_team_footprint(
+            ["h1", "h2", "h4", "h5", "h8"], self._TEAMS, 2))
+        self.assertIn("SEA", ca.candidate_team_footprint(
+            ["h1", "h2", "h4", "h5", "h8"], self._TEAMS, 1))
+
+    def test_an_unknown_player_contributes_to_no_team(self):
+        """The safe direction for a CEILING: an absent map entry never invents
+        an exposure. R237's rule about not-checked versus checked-and-failed,
+        applied to a player the frame does not know."""
+        self.assertEqual(
+            sorted(ca.candidate_team_footprint(["h1", "h2", "ghost"],
+                                               self._TEAMS, 2)),
+            ["NYY"])
+
+    def test_the_arm_is_excluded_by_the_caller_and_the_game_cap_includes_it(self):
+        """The two definitions differ on purpose and both are stated where they
+        are used: the team cap is hitters-only (an opposing starter silences an
+        OFFENSE), the game cap counts every rostered player including arms
+        (R150, Ben 2026-09-15). `sp1` is an NYY arm and does not make an NYY
+        footprint on its own."""
+        self.assertEqual(sorted(ca.candidate_team_footprint(
+            ["sp1", "h4", "h5"], self._TEAMS, 2)), ["BOS"])
+
+    @classmethod
+    def _bank(cls):
+        """Four NYY-stack candidates and four BOS-stack ones, with DISJOINT
+        team footprints, NYY scoring higher."""
+        nyy = [f"n{i}" for i in range(5)] + [f"t{i}" for i in range(3)]
+        bos = [f"b{i}" for i in range(5)] + [f"s{i}" for i in range(3)]
+        out = []
+        for i in range(4):
+            out.append({"candidate_id": f"N{i}",
+                        "roster_slot_ids": ["sp0", f"sp{i + 1}"] + nyy,
+                        "sp_ids": ["sp0", f"sp{i + 1}"], "primary_stack": "NYY",
+                        "primary_stack_size": 5, "proj_points": 100.0 - i})
+            out.append({"candidate_id": f"B{i}",
+                        "roster_slot_ids": ["sp5", f"sp{i + 6}"] + bos,
+                        "sp_ids": ["sp5", f"sp{i + 6}"], "primary_stack": "BOS",
+                        "primary_stack_size": 5, "proj_points": 90.0 - i})
+        return out
+
+    @staticmethod
+    def _entries(n=4):
+        return [{"entry_id": f"e{i}", "contest_id": "C1", "contest_name": "T",
+                 "contest_shape": "large_field_gpp"} for i in range(n)]
+
+    def test_the_cap_builds_milp_rows_and_reports_that_it_was_wired(self):
+        out = ca.select_and_assign_entries(
+            self._bank(), self._entries(),
+            {"max_team_exposure_pct": 1.0,
+             "player_team_by_id": self._BANK_TEAMS, "max_candidate_reuse": 4})
+        self.assertTrue(out["passed"], out.get("errors"))
+        report = out["team_exposure"]
+        self.assertEqual(report["map_status"], "wired")
+        self.assertEqual(report["counts"], "hitter_slots")
+        self.assertEqual(report["min_hitters_per_entry"], 2)
+        self.assertEqual(report["count"], 4)  # floor(1.0 * 4)
+        # TEX and SEA are three-bat SECONDARIES and appear here beside the two
+        # primaries, which is the whole point: the footprint is over the bank's
+        # hitters and `max_primary_stack_exposure_pct` would see only NYY/BOS.
+        self.assertEqual(sorted(x["team"] for x in report["teams_capped"]),
+                         ["BOS", "NYY", "SEA", "TEX"])
+
+    def _realized(self, out):
+        by_id = {c["candidate_id"]: c for c in self._bank()}
+        counts = Counter()
+        for a in out["assignments"]:
+            cand = by_id[a["candidate_id"]]
+            counts.update(ca.candidate_team_footprint(
+                cand["roster_slot_ids"][2:], self._BANK_TEAMS, 2))
+        return counts
+
+    def test_the_cap_actually_binds_on_the_footprint_the_primary_cap_misses(self):
+        """The whole item in one assertion, and stated as a property of the
+        DELIVERED set rather than of which side the objective happened to like:
+        uncapped, one team reaches every entry; capped at 0.5, none exceeds
+        floor(0.5 * 4) = 2. `max_primary_stack_exposure_pct` cannot produce the
+        second outcome, because the teams piling up here are secondaries."""
+        controls = {"player_team_by_id": self._BANK_TEAMS,
+                    "max_candidate_reuse": 4}
+        loose = ca.select_and_assign_entries(
+            self._bank(), self._entries(), dict(controls))
+        self.assertTrue(loose["passed"], loose.get("errors"))
+        self.assertEqual(max(self._realized(loose).values()), 4)
+
+        capped = ca.select_and_assign_entries(
+            self._bank(), self._entries(),
+            dict(controls, max_team_exposure_pct=0.5))
+        self.assertTrue(capped["passed"], capped.get("errors"))
+        self.assertLessEqual(max(self._realized(capped).values()), 2)
+
+    def test_a_missing_team_map_reports_unknown_and_does_not_refuse(self):
+        """The asymmetry with the game cap is deliberate and is the reason this
+        test exists. The game cap is only ever set by an operator who typed it,
+        so a missing map has to refuse. THIS cap ships as a posture default on
+        every Classic build, so refusing would turn any caller that never passed
+        a frame -- the legacy wrapper, an older door -- into a dead build."""
+        candidates = [{"candidate_id": "c0",
+                       "roster_slot_ids": ["sp1", "sp2", "h1", "h2", "h3",
+                                           "h4", "h5", "h6", "h7", "h8"],
+                       "sp_ids": ["sp1", "sp2"], "primary_stack": "NYY",
+                       "primary_stack_size": 3, "proj_points": 100.0}]
+        out = ca.select_and_assign_entries(
+            candidates, [{"entry_id": "e0", "contest_id": "C1",
+                          "contest_name": "T", "contest_shape": "large_field_gpp"}],
+            {"max_team_exposure_pct": 0.5})
+        self.assertTrue(out["passed"], out.get("errors"))
+        self.assertEqual(out["team_exposure"]["map_status"], "unknown")
+        self.assertEqual(out["team_exposure"]["teams_capped"], [])
+
+    def test_not_requested_is_a_third_value_and_not_unknown(self):
+        """R340 fix (2)'s shape, copied: "never asked" and "asked and could not
+        answer" are different facts and a bool cannot carry both."""
+        candidates = [{"candidate_id": "c0",
+                       "roster_slot_ids": ["sp1", "sp2", "h1", "h2", "h3",
+                                           "h4", "h5", "h6", "h7", "h8"],
+                       "sp_ids": ["sp1", "sp2"], "primary_stack": "NYY",
+                       "primary_stack_size": 3, "proj_points": 100.0}]
+        out = ca.select_and_assign_entries(
+            candidates, [{"entry_id": "e0", "contest_id": "C1",
+                          "contest_name": "T", "contest_shape": "large_field_gpp"}],
+            {})
+        self.assertEqual(out["team_exposure"]["map_status"], "not_requested")
+        self.assertEqual(out["game_exposure"]["map_status"], "not_requested")
+
+    def test_the_binding_diagnosis_names_the_control(self):
+        """R311's discipline: a refusal on this axis names THIS control rather
+        than arriving as a bare infeasibility with nothing attached."""
+        findings = ca._diagnose_binding_constraints(
+            20, ["NYY"] * 4, [("sp1", "sp2")] * 4,
+            [(f"a{i}",) for i in range(20)], 20, {},
+            team_exposure={"map_status": "wired", "count": 2,
+                           "min_teams_per_candidate": 3,
+                           "min_hitters_per_entry": 2,
+                           "teams_capped": [{"team": "NYY"}, {"team": "BOS"}]})
+        self.assertTrue(any("max_team_exposure_pct" in f for f in findings),
+                        findings)
+
+    def test_an_unwired_cap_produces_no_finding_at_all(self):
+        """Asked-and-could-not-answer is not the same as nothing-is-binding.
+        Computing the counting argument over an empty bucket set would name a
+        control that never ran."""
+        self.assertEqual(ca._diagnose_binding_constraints(
+            20, ["NYY"] * 4, [("sp1", "sp2")] * 4,
+            [(f"a{i}",) for i in range(20)], 20, {},
+            team_exposure={"map_status": "unknown", "count": 2,
+                           "min_teams_per_candidate": 3, "teams_capped": []}),
+            [])
+
+    def test_the_two_spellings_of_the_threshold_agree(self):
+        """R167's class. `build_slate` and `qa_portfolio` read delivered bytes
+        and import no engine, so each spells the number; this pins all three
+        equal instead of trusting three comments."""
+        import importlib.util
+        for rel in (("skills", "generate-lineups", "scripts", "build_slate.py"),
+                    ("tools", "qa_portfolio.py")):
+            path = REPO.joinpath(*rel)
+            spec = importlib.util.spec_from_file_location(
+                f"_thr_{path.stem}", path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            self.assertEqual(module.TEAM_FOOTPRINT_MATERIAL,
+                             ca.TEAM_EXPOSURE_MIN_HITTERS, path.name)
+
+
+class GameExposureControlIsWiredTests(unittest.TestCase):
+    """R333: the control was complete in the allocator (R61) and in the
+    post-export validator (R215), `late_swap.py:214` named it as THE binding
+    control on a `game G exposure N>M` refusal, and NOTHING in `mlb_engine/`,
+    `tools/` or `skills/` ever wrote `controls['player_game_by_id']` -- so an
+    operator who did what the swap tool steers them to got `passed: False`."""
+
+    @staticmethod
+    def _frame():
+        import pandas as pd
+        return pd.DataFrame([
+            {"Player_ID": "p1", "TeamAbbrev": "CIN", "Game_ID": "G1"},
+            {"Player_ID": "p2", "TeamAbbrev": "LAD", "Game_ID": "G1"},
+            {"Player_ID": "p3", "TeamAbbrev": "NYY", "Game_ID": "G2"},
+            {"Player_ID": "p4", "TeamAbbrev": "BOS", "Game_ID": "G2"},
+        ])
+
+    def test_a_production_writer_of_the_map_exists(self):
+        """R333's own Done-when: `grep -rn player_game_by_id mlb_engine/`
+        returns a production writer. The two writers used to be test lines."""
+        maps = ep.derive_roster_id_maps(self._frame())
+        self.assertEqual(maps["player_game_by_id"],
+                         {"p1": "G1", "p2": "G1", "p3": "G2", "p4": "G2"})
+        self.assertEqual(maps["games"], ["G1", "G2"])
+        self.assertEqual(maps["teams"], ["BOS", "CIN", "LAD", "NYY"])
+
+    def test_the_merge_stamps_both_maps_so_every_door_inherits_them(self):
+        """The merge, not the caller: `run_slate`, `_plan_joint_allocation` and
+        `late_swap.py` all pass through this one boundary, and a per-caller
+        copy is what R340 found three doors of."""
+        merged = ep._merged_controls_for_build(
+            {"c1": {"posture": "large_gpp"}}, None,
+            roster_id_maps=ep.derive_roster_id_maps(self._frame()))
+        self.assertEqual(merged["player_game_by_id"]["p1"], "G1")
+        self.assertEqual(merged["player_team_by_id"]["p1"], "CIN")
+
+    def test_the_production_merge_makes_the_operator_override_work(self):
+        """R333's first Done-when, end to end and with NO hand-built map: the
+        exact `--controls-override` the swap tool steers an operator to used to
+        return `max_game_exposure_pct_by_game requires
+        controls['player_game_by_id']`."""
+        merged = ep._merged_controls_for_build(
+            {"c1": {"posture": "large_gpp"}},
+            {"max_game_exposure_pct_by_game": {"G1": 1.0}},
+            roster_id_maps=ep.derive_roster_id_maps(self._frame()))
+        candidates = [{
+            "candidate_id": f"c{i}",
+            "roster_slot_ids": (["p1", "p3", "p2", "p4"]
+                                + [f"x{i}{j}" for j in range(6)]),
+            "sp_ids": ["p1", "p3"], "primary_stack": "CIN",
+            "primary_stack_size": 1, "proj_points": 100.0 - i} for i in range(4)]
+        out = ca.select_and_assign_entries(
+            candidates,
+            [{"entry_id": "e0", "contest_id": "C1", "contest_name": "T",
+              "contest_shape": "large_field_gpp"}],
+            dict(merged, max_candidate_reuse=4))
+        self.assertTrue(out["passed"], out.get("errors"))
+        self.assertNotIn(
+            "max_game_exposure_pct_by_game requires controls['player_game_by_id']",
+            out.get("errors") or [])
+        self.assertEqual(out["game_exposure"]["map_status"], "wired")
+        self.assertEqual(out["game_exposure"]["counts"], "roster_footprint")
+        self.assertEqual([x["game_id"] for x in out["game_exposure"]["games_capped"]],
+                         ["G1"])
+
+    def test_the_scalar_expands_to_every_game(self):
+        req = ep.resolve_game_exposure_request(
+            {"max_game_exposure_pct": 0.6}, ["G1", "G2"])
+        self.assertEqual(req["per_game"], {"G1": 0.6, "G2": 0.6})
+        self.assertEqual(req["scalar_expanded_to"], ["G1", "G2"])
+
+    def test_an_explicit_per_game_value_wins_where_it_is_tighter(self):
+        req = ep.resolve_game_exposure_request(
+            {"max_game_exposure_pct": 0.6,
+             "max_game_exposure_pct_by_game": {"G1": 0.3, "G2": 0.9}},
+            ["G1", "G2"])
+        # MIN in both directions: every source here is a CEILING and one
+        # portfolio has to satisfy all of them.
+        self.assertEqual(req["per_game"], {"G1": 0.3, "G2": 0.6})
+
+    def test_the_f5_weather_cap_merges_by_min_and_is_named(self):
+        """R333 fix (3). `build_slate`'s F5 report has carried
+        `game_exposure_caps` since the factor shipped and nothing read it into a
+        control -- a writer with no reader, R197's shape."""
+        req = ep.resolve_game_exposure_request(
+            {"max_game_exposure_pct": 0.6}, ["G1", "G2"],
+            weather_game_caps={"G2": 0.25})
+        self.assertEqual(req["per_game"], {"G1": 0.6, "G2": 0.25})
+        applied = req["weather_game_caps_applied"]
+        self.assertEqual([x["game_id"] for x in applied], ["G2"])
+        self.assertEqual(applied[0]["from"], 0.6)
+        self.assertEqual(applied[0]["to"], 0.25)
+
+    def test_a_weather_cap_never_loosens_a_tighter_operator_cap(self):
+        req = ep.resolve_game_exposure_request(
+            {"max_game_exposure_pct_by_game": {"G2": 0.10}}, ["G1", "G2"],
+            weather_game_caps={"G2": 0.25})
+        self.assertEqual(req["per_game"]["G2"], 0.10)
+        self.assertEqual(req["weather_game_caps_applied"], [])
+
+    def test_the_scalar_ships_off_and_the_absence_is_recorded(self):
+        """R333 fix (2): default OFF until Ben sets one, and the expansion is
+        recorded either way so the absence of a default is visible."""
+        for posture in ep.STRATEGY_DEFAULTS.values():
+            self.assertNotIn("max_game_exposure_pct", posture["controls"])
+        req = ep.resolve_game_exposure_request({}, ["G1", "G2"])
+        self.assertIsNone(req["scalar_pct"])
+        self.assertEqual(req["per_game"], {})
+        self.assertEqual(req["games_known"], ["G1", "G2"])
+        self.assertEqual(req["counts"], "roster_footprint")
+
+    def test_both_scalars_are_in_the_fraction_gate(self):
+        """R215(a)'s class. A `60` typed for `0.60` silently disables a cap."""
+        for key in ("max_team_exposure_pct", "max_game_exposure_pct"):
+            with self.assertRaises(ValueError) as ctx:
+                ep._merged_controls_for_build(
+                    {"c1": {"posture": "large_gpp"}}, {key: 60})
+            self.assertIn(key, str(ctx.exception))
+        import importlib.util
+        path = (REPO / "skills" / "generate-lineups" / "scripts" / "build_slate.py")
+        spec = importlib.util.spec_from_file_location("_bs_frac", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        for key in ("max_team_exposure_pct", "max_game_exposure_pct"):
+            self.assertIn(key, module.FRACTION_CONTROL_KEYS)
+
+    def test_a_frame_without_a_game_column_yields_a_stated_absence(self):
+        """Defensive by construction: it never raises and never invents an id."""
+        import pandas as pd
+        maps = ep.derive_roster_id_maps(
+            pd.DataFrame([{"Player_ID": "p1", "TeamAbbrev": "CIN"}]))
+        self.assertEqual(maps["player_game_by_id"], {})
+        self.assertEqual(maps["player_team_by_id"], {"p1": "CIN"})
+        self.assertIn("Game_ID", maps["note"])
+        self.assertEqual(ep.derive_roster_id_maps(None)["games"], [])
+
+
+class WashoutCapFeasibilityFloorTests(unittest.TestCase):
+    """Both new ceilings are CHECKED and floored, not ladder-relaxed. The board
+    entries asked for them to be relaxable "in the standard order after player
+    exposure", but that order is R153's SHOWDOWN ladder and Classic has no
+    player-exposure rung: `LADDER_RELAXED_CONTROLS` holds three LOWER bounds
+    plus the engine's own reuse default, and every exposure CEILING is handled
+    by the structural floor merge instead. These pin that reading."""
+
+    def test_the_new_caps_are_checked_and_never_ladder_relaxed(self):
+        for key in ("max_team_exposure_pct", "max_game_exposure_pct"):
+            self.assertIn(key, ca.CHECKED_CONTROLS)
+            self.assertNotIn(key, ca.LADDER_RELAXED_CONTROLS)
+        self.assertEqual(ca.CHECKED_CONTROLS & ca.LADDER_RELAXED_CONTROLS,
+                         frozenset())
+
+    def test_the_floors_reach_the_controls(self):
+        floors = ep.feasibility_floors_from({
+            "available": True, "floor_team_exposure_pct": 0.5,
+            "floor_game_exposure_pct": 0.2})
+        self.assertEqual(floors["max_team_exposure_pct"], 0.5)
+        self.assertEqual(floors["max_game_exposure_pct"], 0.2)
+
+    def test_a_floor_only_relaxes_a_cap_the_merge_already_made(self):
+        """v1.9's rule, restated here because the game scalar ships ABSENT: a
+        floor may never ADD a control nobody asked for."""
+        merged = ep._merged_controls_for_build(
+            {"c1": {"posture": "wta_satellite"}}, None,
+            feasibility_floors={"max_team_exposure_pct": 0.8,
+                                "max_game_exposure_pct": 0.9})
+        self.assertEqual(merged["max_team_exposure_pct"], 0.8)
+        self.assertNotIn("max_game_exposure_pct", merged)
+
+    def test_the_capacity_check_names_the_value_to_raise_it_to(self):
+        report = ep._feasibility_report(
+            {"available": True, "entries": 20, "stackable_team_count": 4,
+             "viable_sp_count": 10, "viable_sp_pairs": 20, "max_stack_size": 5,
+             "game_count": 5, "largest_contest_entries": 20},
+            {"max_team_exposure_pct": 0.30})
+        check = next(c for c in report["checks"]
+                     if c["name"] == "team_exposure_capacity")
+        self.assertFalse(check["passed"])
+        self.assertIn("raise max_team_exposure_pct", check["remedy"])
+
+    def test_a_feasible_team_cap_passes_its_own_check(self):
+        report = ep._feasibility_report(
+            {"available": True, "entries": 20, "stackable_team_count": 18,
+             "viable_sp_count": 18, "viable_sp_pairs": 100, "max_stack_size": 5,
+             "game_count": 9, "largest_contest_entries": 20},
+            {"max_team_exposure_pct": 0.70})
+        check = next(c for c in report["checks"]
+                     if c["name"] == "team_exposure_capacity")
+        self.assertTrue(check["passed"], check)
+
+    def test_the_posture_defaults_clear_their_own_floor_from_two_games_up(self):
+        """The arithmetic safety argument in MAX_TEAM_EXPOSURE_NOTE, as a test
+        rather than as a comment. A one-game Classic slate (T = 2) floors to
+        1.0, which is what stops a default-on cap refusing a slate."""
+        for posture, spec in ep.STRATEGY_DEFAULTS.items():
+            pct = spec["controls"].get("max_team_exposure_pct")
+            if pct is None:
+                continue
+            self.assertGreaterEqual(pct, 2 / 4, posture)  # T = 4, two games
+
+    def test_every_team_default_sits_above_its_own_primary_stack_cap(self):
+        """A footprint is a superset of a primary-stack share by construction,
+        so a value at or near the primary cap would be a second primary cap
+        under another name and would bind on builds with nothing wrong."""
+        for posture, spec in ep.STRATEGY_DEFAULTS.items():
+            team = spec["controls"].get("max_team_exposure_pct")
+            primary = spec["controls"].get("max_primary_stack_exposure_pct")
+            if team is None or primary is None:
+                continue
+            self.assertGreater(team, primary - 1e-9, posture)
+
+    def test_the_team_cap_is_a_ceiling_that_merges_to_the_tightest(self):
+        merged = ep._merged_controls_for_build(
+            {"a": {"posture": "wta_satellite"}, "b": {"posture": "small_gpp"}},
+            None)
+        self.assertEqual(merged["max_team_exposure_pct"], 0.55)
+
+    def test_every_posture_but_cash_declares_it(self):
+        for name, spec in ep.STRATEGY_DEFAULTS.items():
+            if name == "cash":
+                continue
+            self.assertIn("max_team_exposure_pct", spec["controls"], name)
+
+
+class WashoutControlReportingTests(unittest.TestCase):
+    """R343(a) and R333(4)(5): the axes are reported and the control is named."""
+
+    def test_the_id_maps_are_redacted_from_every_reporting_surface(self):
+        """R290(c)'s lesson about what a refusal reads like at T-5: two
+        few-hundred-entry dictionaries would bury the six numbers
+        `merged_controls` exists to show."""
+        view = ep.controls_for_report(
+            {"max_team_exposure_pct": 0.7,
+             "player_team_by_id": {"p1": "NYY", "p2": "NYY", "p3": "BOS"},
+             "player_game_by_id": {"p1": "G1", "p2": "G1", "p3": "G1"}})
+        self.assertEqual(view["max_team_exposure_pct"], 0.7)
+        self.assertEqual(view["player_team_by_id"],
+                         {"wired": True, "players_mapped": 3,
+                          "distinct_values": 2})
+        self.assertEqual(view["player_game_by_id"]["distinct_values"], 1)
+
+    def test_run_slate_publishes_both_axes_on_every_classic_build(self):
+        src = (REPO / "mlb_engine" / "pipeline"
+               / "execution_pipeline.py").read_text(encoding="utf-8")
+        self.assertEqual(
+            src.count('"game_exposure_request": game_exposure_request'), 2)
+        self.assertEqual(
+            src.count('"merged_controls": controls_for_report(controls)'), 2)
+
+    def test_qa_portfolio_carries_a_team_footprint_axis_and_names_controls(self):
+        """`stack_team` counts each entry's HEAVIEST team at 3+, so a team
+        reaching two-thirds of the portfolio as a 2-3 bat secondary is invisible
+        on that line -- 1310_9g exactly."""
+        import importlib.util
+        path = REPO / "tools" / "qa_portfolio.py"
+        spec = importlib.util.spec_from_file_location("_qa_fp", path)
+        qa = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(qa)
+        hdr = ["Entry ID", "Contest Name", "Contest ID", "Entry Fee",
+               "P", "P", "C", "1B", "2B", "3B", "SS", "OF", "OF", "OF"]
+        sal = {}
+        for pid, team, pos in (("sp1", "TEX", "SP"), ("sp2", "TEX", "SP"),
+                               ("h1", "NYY", "C"), ("h2", "NYY", "1B"),
+                               ("h3", "BOS", "2B"), ("h4", "BOS", "3B"),
+                               ("h5", "LAD", "SS"), ("h6", "LAD", "OF"),
+                               ("h7", "SEA", "OF"), ("h8", "SEA", "OF")):
+            sal[pid] = {"Name": pid, "TeamAbbrev": team, "Position": pos,
+                        "Roster Position": pos, "Game Info": "AAA@BBB 07:05PM ET",
+                        "Salary": "4000", "ID": pid}
+        row = ["1", "c", "1", "$1", "sp1", "sp2", "h1", "h2", "h3", "h4",
+               "h5", "h6", "h7", "h8"]
+        out = "\n".join(qa.section_frontier(sal, hdr, [row, list(row)]))
+        # Every team is a 2-hitter footprint; NONE is a 3+ primary stack, so the
+        # old line reports nothing and the new one reports all four.
+        self.assertIn("washout axis 'team_footprint'", out)
+        self.assertIn("max_team_exposure_pct", out)
+        self.assertIn("max_game_exposure_pct", out)
+
+    def test_the_brief_reports_the_footprint_beside_the_primary_stack_line(self):
+        """R343(a). `build_slate.py`'s `primary_stacks` was the ONLY stack-share
+        line in the brief and it counts the primary alone."""
+        import csv as _csv
+        import importlib.util
+        path = (REPO / "skills" / "generate-lineups" / "scripts" / "build_slate.py")
+        spec = importlib.util.spec_from_file_location("_bs_fp", path)
+        bs = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(bs)
+        with tempfile.TemporaryDirectory() as tmp:
+            tmpdir = Path(tmp)
+            salary = tmpdir / "sal.csv"
+            with salary.open("w", encoding="utf-8", newline="") as fh:
+                w = _csv.writer(fh)
+                w.writerow(["Position", "Name + ID", "Name", "ID",
+                            "Roster Position", "Salary", "Game Info",
+                            "TeamAbbrev", "AvgPointsPerGame"])
+                for pid, team, pos in (("sp1", "TEX", "SP"), ("sp2", "TEX", "SP"),
+                                       ("h1", "NYY", "C"), ("h2", "NYY", "1B"),
+                                       ("h3", "NYY", "2B"), ("h4", "BOS", "3B"),
+                                       ("h5", "BOS", "SS"), ("h6", "LAD", "OF"),
+                                       ("h7", "LAD", "OF"), ("h8", "SEA", "OF")):
+                    w.writerow([pos, f"{pid} ({pid})", pid, pid, pos, "4000",
+                                "AAA@BBB 07:05PM ET", team, "5.0"])
+            entries = tmpdir / "e.csv"
+            with entries.open("w", encoding="utf-8", newline="") as fh:
+                w = _csv.writer(fh)
+                w.writerow(["Entry ID", "Contest Name", "Contest ID", "Entry Fee",
+                            "P", "P", "C", "1B", "2B", "3B", "SS", "OF", "OF", "OF"])
+                for eid in ("1", "2"):
+                    w.writerow([eid, "c", "111", "$1", "sp1", "sp2", "h1", "h2",
+                                "h3", "h4", "h5", "h6", "h7", "h8"])
+            out = bs.portfolio_exposure(salary, entries)
+        self.assertEqual(out["primary_stacks"], {"NYY (3)": "2/2"})
+        # The line it completes: BOS and LAD are two-hitter footprints in every
+        # entry and the primary-stack line above names neither.
+        self.assertEqual(out["team_footprint_any_role"],
+                         {"NYY": "2/2", "BOS": "2/2", "LAD": "2/2"})
+        self.assertEqual(out["team_footprint_any_hitter"]["SEA"], "2/2")
+        self.assertNotIn("SEA", out["team_footprint_any_role"])
+        self.assertEqual(out["max_team_footprint_pct"], 1.0)
+
+    def test_the_validator_grades_the_team_cap_and_late_swap_names_it(self):
+        """R292's two-referee discipline: the build enforcing a control the
+        post-export referee cannot grade is the asymmetry that item is filed on.
+        `_CONTROL_BY_ERROR_PREFIX` is what turns a refusal into a named lever."""
+        src = (REPO / "tools" / "late_swap.py").read_text(encoding="utf-8")
+        self.assertIn('("team ", "max_team_exposure_pct")', src)
+        dk_src = (REPO / "mlb_engine" / "entries"
+                  / "dk_entries_manager.py").read_text(encoding="utf-8")
+        self.assertIn('f"team {team} footprint {count}>{team_cap}"', dk_src)
+        # And the prefix is excluded from the roster-legality split, or a
+        # portfolio-cap error would read as an illegal roster.
+        self.assertIn('"game ", "team "', dk_src)
+
+    def test_the_deadline_governor_opens_the_new_ceilings(self):
+        """R233's rule, and this site is the one CC-2's board entries do not
+        name. `OPEN_CONTROL_VALUES` is the T-15 rung's whole content -- "every
+        portfolio control to its open value at once" -- so a ceiling missing
+        from it survives the crude move that exists to rescue a refusal under a
+        lock window. The team cap ships ON by posture default."""
+        from mlb_engine.pipeline import deadline_governor as dg
+        self.assertEqual(dg.OPEN_CONTROL_VALUES["max_team_exposure_pct"], 1.0)
+        self.assertEqual(dg.OPEN_CONTROL_VALUES["max_game_exposure_pct"], 1.0)
+        # The per-game dict is deliberately absent: this map holds VALUES and
+        # the dict's keys are the slate's game ids, which that module has no
+        # access to. Stated in the source, pinned here.
+        self.assertNotIn("max_game_exposure_pct_by_game", dg.OPEN_CONTROL_VALUES)
+
+    def test_the_team_cap_is_a_strategy_cap_not_a_structural_floor(self):
+        """R98(2)'s split, which `late_swap` reads to decide what to steer an
+        operator to. The engine CAN compute a floor that makes a given build
+        feasible, and adopting it still concentrates the portfolio, so the team
+        cap sits with player/pitcher/stack and not with the arithmetic ones."""
+        self.assertIn("max_team_exposure_pct", ca.STRATEGY_CAP_CONTROLS)
+        self.assertNotIn("max_team_exposure_pct", ca.STRUCTURAL_FLOOR_CONTROLS)
+
+    def test_an_untouchable_row_that_overspent_the_team_cap_refuses(self):
+        """R61 + R343. `headroom()` clamps a negative to zero, so without this
+        check a swap whose frozen rows have already blown the team cap gets a
+        silent zero-headroom row where every sibling cap produces a refusal."""
+        lines = ca._untouchable_cap_conflicts(
+            {"row_count": 12, "team_counts": {"NYY": 11}},
+            {"max_team_exposure_pct": 0.5}, 18)
+        self.assertTrue(any("max_team_exposure_pct" in x and "NYY" in x
+                            for x in lines), lines)
+        # Equality is zero headroom, not a conflict (the docstring's own rule).
+        self.assertEqual(ca._untouchable_cap_conflicts(
+            {"row_count": 12, "team_counts": {"NYY": 9}},
+            {"max_team_exposure_pct": 0.5}, 18), [])
+
+    def test_a_vacuous_team_row_never_enters_the_matrix(self):
+        """Each entry takes exactly one candidate, so the row's sum is at most
+        E and a bound at or above E cannot bind. Skipping it is what keeps a cap
+        OPENED to 1.0 from moving a solve it does not constrain -- measured on
+        the golden replay, where eight vacuous rows left every aggregate
+        byte-identical and still moved 15 of 18 assignments."""
+        out = ca.select_and_assign_entries(
+            self._bank_for_rows(), self._entries_for_rows(),
+            {"max_team_exposure_pct": 1.0,
+             "player_team_by_id": TeamFootprintCapTests._BANK_TEAMS,
+             "max_candidate_reuse": 4})
+        rows = out["team_exposure"]["teams_capped"]
+        self.assertTrue(rows)
+        self.assertTrue(all(r["row_added"] is False for r in rows), rows)
+        tight = ca.select_and_assign_entries(
+            self._bank_for_rows(), self._entries_for_rows(),
+            {"max_team_exposure_pct": 0.5,
+             "player_team_by_id": TeamFootprintCapTests._BANK_TEAMS,
+             "max_candidate_reuse": 4})
+        self.assertTrue(all(r["row_added"] is True
+                            for r in tight["team_exposure"]["teams_capped"]))
+
+    @staticmethod
+    def _bank_for_rows():
+        return TeamFootprintCapTests._bank()
+
+    @staticmethod
+    def _entries_for_rows():
+        return TeamFootprintCapTests._entries()
+
+    def test_skill_md_documents_both_controls(self):
+        """R333 fix (5): SKILL.md did not mention the game control at all
+        (grep, 0 hits), which is how a BUILD session wrote "no available
+        control" in good faith."""
+        text = (REPO / "skills" / "generate-lineups"
+                / "SKILL.md").read_text(encoding="utf-8")
+        for key in ("max_team_exposure_pct", "max_game_exposure_pct",
+                    "max_game_exposure_pct_by_game", "weather_game_caps_applied"):
+            self.assertIn(key, text, key)
 
 
 if __name__ == "__main__":

@@ -467,6 +467,13 @@ def frontier_from_brief(brief: dict) -> List[str]:
     return out
 
 
+#: R343. Hitters from one team that make an entry materially exposed to it.
+#: The same value `contest_allocator.TEAM_EXPOSURE_MIN_HITTERS` enforces the cap
+#: at, spelled here because this tool reads delivered bytes and imports no
+#: engine; a test pins the two equal.
+TEAM_FOOTPRINT_MATERIAL = 2
+
+
 def section_frontier(
     sal: Dict[str, dict], hdr: List[str], body: List[List[str]]
 ) -> List[str]:
@@ -476,6 +483,14 @@ def section_frontier(
         return []
     axes: Dict[str, Dict[str, int]] = {
         "game": defaultdict(int), "stack_team": defaultdict(int),
+        # R343. `stack_team` counts each entry's HEAVIEST team and only at 3+,
+        # so a team reaching two-thirds of the portfolio as a 2-3 bat secondary
+        # is invisible on this line -- which is how 1310_9g delivered NYY in 17
+        # of 21 entries with the washout section reporting something else as
+        # binding. This axis counts EVERY team an entry holds
+        # `TEAM_FOOTPRINT_MATERIAL`+ hitters from, which is the same threshold
+        # the `max_team_exposure_pct` cap is enforced at.
+        "team_footprint": defaultdict(int),
         "starting_pitcher": defaultdict(int),
     }
     # A lineup is only WASHED OUT by an axis it is materially exposed to. Counting
@@ -500,6 +515,9 @@ def section_frontier(
             top = max(tm.items(), key=lambda kv: kv[1])
             if top[1] >= MATERIAL:
                 axes["stack_team"][top[0]] += 1
+        for t, c in tm.items():
+            if c >= TEAM_FOOTPRINT_MATERIAL:
+                axes["team_footprint"][t] += 1
         for g, c in gm.items():
             if c >= MATERIAL:
                 axes["game"][g] += 1
@@ -519,7 +537,20 @@ def section_frontier(
            "belongs in a washout count at all is open (an arm can benefit from "
            "the script that kills the bats); until it is decided, read the "
            "run's number as the bat exposure and this one as the roster "
-           "footprint."]
+           "footprint.",
+           # R343 / R333. The axes now name the control that binds them, the way
+           # `late_swap.py` names one on a refusal. Before this, the washout
+           # section reported the game axis as binding and the reader had no way
+           # to know from here that a game cap existed at all -- SKILL.md did not
+           # mention it either (grep, 0 hits) and the control was unreachable
+           # from every production door until R333 wired it.
+           f"CONTROLS on these axes: 'game' -> max_game_exposure_pct (slate-"
+           f"wide scalar, ships OFF) or max_game_exposure_pct_by_game (per "
+           f"game); 'team_footprint' -> max_team_exposure_pct, counted at "
+           f"{TEAM_FOOTPRINT_MATERIAL}+ hitters from one team in an entry, any "
+           f"stack role; 'stack_team' -> max_primary_stack_exposure_pct, which "
+           f"counts the PRIMARY stack only and is why 'team_footprint' can run "
+           f"far above it; 'starting_pitcher' -> max_pitcher_exposure_pct."]
     worst = []
     for axis, ct in axes.items():
         if not ct:

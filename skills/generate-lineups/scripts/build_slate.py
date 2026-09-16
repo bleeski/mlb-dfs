@@ -514,6 +514,12 @@ FRACTION_CONTROL_KEYS = (
     "max_primary_stack_exposure_pct",
     "min_five_stack_share_pct",
     "max_cpt_exposure_pct",
+    # R343 / R333, 2026-09-15. The seventh and eighth: the team-footprint
+    # ceiling over all stack roles and the slate-wide game ceiling. Both are
+    # fractions of the entered set, so a `55` typed for `0.55` is the same
+    # silent-disable R215(a) closed for the per-game dict.
+    "max_team_exposure_pct",
+    "max_game_exposure_pct",
 )
 
 # R215(a). The sixth fraction control, and the reason it needs its own tuple:
@@ -1685,6 +1691,22 @@ def build_f5_map(pool: dict, args, venues_by_game_id: dict | None = None) -> tup
     report["game_exposure_caps"] = {
         t: r["game_exposure_cap"] for t, r in sorted(f5_by_team.items())
         if r.get("game_exposure_cap") is not None}
+    # R333 fix (3). The same caps keyed by GAME ID, which is what the control
+    # takes. The key above is a TEAM and has been since the factor shipped,
+    # while `slate_intake_manager.material_weather_adjustments` keys its own
+    # `game_exposure_caps` by game id -- two keyings under one name, which is
+    # exactly the kind of thing a wiring item discovers by reading rather than
+    # by assuming. Both sides of a game resolve to the same id and to the same
+    # cap, so `min` is a no-op today and is there so a future per-side cap
+    # cannot silently pick a winner.
+    by_game: dict = {}
+    for team, record in sorted(f5_by_team.items()):
+        cap = record.get("game_exposure_cap")
+        gid = game_by_team.get(str(team).strip().upper())
+        if cap is None or not gid:
+            continue
+        by_game[gid] = min(by_game[gid], float(cap)) if gid in by_game else float(cap)
+    report["game_exposure_caps_by_game_id"] = by_game
     report["excluded_games"] = sorted(
         t for t, r in f5_by_team.items() if r.get("exclude_game"))
     report["note"] = (
@@ -2489,6 +2511,17 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
             return 10, {}
 
     slate_kwargs = dict(kwargs)
+    # R333 fix (3). The F5 material-weather game cap reaches the control merge.
+    # It was computed at line ~1685 and read by nobody: a writer with no reader,
+    # R197's shape. `run_slate` merges it into the per-game dict by MIN, so a
+    # tighter operator cap still wins and a postponement-risk game cannot be
+    # loosened by a slate-wide scalar.
+    weather_caps = (f5_report or {}).get("game_exposure_caps_by_game_id") or {}
+    if weather_caps:
+        slate_kwargs["weather_game_caps"] = dict(weather_caps)
+        print(f"F5 GAME CAP: material weather caps {len(weather_caps)} game(s) "
+              f"at {sorted(set(weather_caps.values()))}; merged into "
+              f"max_game_exposure_pct_by_game by MIN.", file=sys.stderr)
     postures = parse_postures_arg(getattr(args, "postures", None))
     if postures:
         slate_kwargs["contest_postures"] = postures
@@ -4297,6 +4330,14 @@ def format_degraded_line(degraded: dict | None) -> str:
             f"{degraded.get('median_proxy')}; a REPORT, never a gate]")
 
 
+#: R343. Hitters from one team that make an entry materially exposed to it.
+#: Mirrors `contest_allocator.TEAM_EXPOSURE_MIN_HITTERS`, which is the value the
+#: CAP is enforced at; this module reads the delivered bytes and imports no
+#: engine, so the number is spelled here and a test pins the two equal rather
+#: than letting them drift (R167's class).
+TEAM_FOOTPRINT_MATERIAL = 2
+
+
 def portfolio_exposure(salary_csv: Path, entries_csv: Path) -> dict:
     """Aggregate stack and SP-pair exposure across the delivered portfolio.
 
@@ -4314,6 +4355,10 @@ def portfolio_exposure(salary_csv: Path, entries_csv: Path) -> dict:
     with salary_csv.open(encoding="utf-8-sig", newline="") as fh:
         salary = {r["ID"]: r for r in csv.DictReader(fh)}
     primary, pitchers, pairs, n = collections.Counter(), collections.Counter(), set(), 0
+    # R343. Two thresholds, both over every hitter slot and neither over the
+    # primary stack alone.
+    team_material: collections.Counter = collections.Counter()
+    team_any: collections.Counter = collections.Counter()
     # R116. Counted off the DELIVERED bytes, on the same sorted-roster signature
     # the allocator keys its reuse rows with
     # (`contest_allocator._candidate_player_signature`), so the brief carries an
@@ -4338,6 +4383,19 @@ def portfolio_exposure(salary_csv: Path, entries_csv: Path) -> dict:
             teams = collections.Counter(salary[p]["TeamAbbrev"] for p in ids[2:])
             team, size = teams.most_common(1)[0]
             primary[f"{team} ({size})"] += 1
+            # R343. The footprint over EVERY hitter slot, whatever role. The
+            # line above counts the PRIMARY stack alone, and it is the only
+            # stack-share line this brief has ever had: on 1310_9g NYY sat in
+            # 15 of 21 entries and then 17 of 21 through SECONDARY stacks, with
+            # this function reporting nothing about it. Both thresholds are
+            # reported because the CONTROL counts at 2+ (a lone filler bat is
+            # not a stack role, and at 1+ every team on a small slate reads near
+            # 1.0 by arithmetic) while "any hitter at all" is the number an
+            # operator asks for next. Neither is a probability.
+            for t, c in teams.items():
+                team_any[t] += 1
+                if c >= TEAM_FOOTPRINT_MATERIAL:
+                    team_material[t] += 1
             for p in ids[:2]:
                 pitchers[salary[p]["Name"]] += 1
             pairs.add(frozenset(ids[:2]))
@@ -4347,6 +4405,12 @@ def portfolio_exposure(salary_csv: Path, entries_csv: Path) -> dict:
     return {
         "lineups": n,
         "primary_stacks": pct(primary),
+        # R343, the missing half of the line above it.
+        "team_footprint_any_role": pct(team_material),
+        "team_footprint_min_hitters": TEAM_FOOTPRINT_MATERIAL,
+        "team_footprint_any_hitter": pct(team_any),
+        "max_team_footprint_pct": (
+            round(max(team_material.values()) / n, 4) if team_material and n else None),
         "pitcher_exposure": pct(pitchers),
         "distinct_sp_pairs": len(pairs),
         "distinct_lineups": len(rosters),

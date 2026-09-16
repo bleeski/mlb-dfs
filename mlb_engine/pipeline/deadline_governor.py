@@ -116,6 +116,18 @@ OPEN_CONTROL_VALUES: Dict[str, Any] = {
     "max_player_exposure_pct": 1.0,
     "max_pitcher_exposure_pct": 1.0,
     "max_primary_stack_exposure_pct": 1.0,
+    # R343 / R333, 2026-09-15. The rung's own contract is "every portfolio
+    # control to its open value at once" (CLAUDE.md's T-15), so a ceiling
+    # missing from this dict is a control the crude move does not make. The
+    # team cap ships ON by posture default and would otherwise survive rung 1.
+    "max_team_exposure_pct": 1.0,
+    # The game SCALAR opens too. `max_game_exposure_pct_by_game` deliberately
+    # does NOT: this dict maps a control to a VALUE and the per-game form's keys
+    # are the slate's game ids, which this module does not have. Stated rather
+    # than left as a silent gap -- opening the scalar does not loosen an
+    # explicit per-game entry, because the two merge by MIN. That dict is only
+    # ever operator-typed, so the operator who set it is the one who can open it.
+    "max_game_exposure_pct": 1.0,
 }
 
 #: Showdown's three controls, same rung, same one crude move. Kept separate

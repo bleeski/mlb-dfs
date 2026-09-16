@@ -72,6 +72,7 @@ from mlb_engine.entries.upload_manifest import (  # noqa: E402
 )
 from mlb_engine.pipeline.execution_pipeline import (  # noqa: E402
     _assemble_projection_frame, _merged_controls_for_build, _slate_feasibility,
+    derive_roster_id_maps,
     resolve_shape_bands, slate_game_count,
     _resolve_contest_postures, _slate_tag, feasibility_floors_from,
     promote_deferred_run, run_late_swap, unresolved_contest_blockers,
@@ -187,8 +188,18 @@ def resolve_swap_controls(postures, override, solver_budget,
         postures,
         game_count=slate_game_count(projections) if projections is not None else None,
     )
+    # R333 / R343. The swap is the THIRD production door through this merge and
+    # the one `late_swap.py:214` below already names the game cap on: without
+    # the id maps a swap re-derives controls the build enforced and cannot
+    # enforce them, which is the exact failure R29(3) closed for the feasibility
+    # floors, arriving through a new control. Derived from the same frame by the
+    # same function the build uses; None where no frame was supplied, which is
+    # the same condition that skips the floors and the bands above.
+    roster_id_maps = (derive_roster_id_maps(projections)
+                      if projections is not None else None)
     controls = dict(_merged_controls_for_build(
-        postures, None, feasibility_floors=floors, shape_bands=shape_bands))
+        postures, None, feasibility_floors=floors, shape_bands=shape_bands,
+        roster_id_maps=roster_id_maps))
     if solver_budget is not None:
         controls["time_limit"] = float(solver_budget)
     controls.update(override or {})
@@ -212,6 +223,11 @@ _CONTROL_BY_ERROR_PREFIX = (
     ("SP pair ", "max_sp_pair_repetition"),
     ("entries ", "max_shared_players"),
     ("game ", "max_game_exposure_pct_by_game"),
+    # R343 adds the seventh. The validator reports a team footprint violation as
+    # "team T footprint N>M"; without this prefix it would fall through to the
+    # bare else branch with no control named, which is the gap R61 closed for
+    # the two above it.
+    ("team ", "max_team_exposure_pct"),
 )
 
 # R61: the allocator's own refusals arrive here already carrying their ordered

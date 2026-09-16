@@ -169,7 +169,7 @@ from mlb_engine.pipeline.build_state_manager import (
     sha256_file, snapshot_run_inputs, update_run_certification,
 )
 from mlb_engine.allocate.contest_allocator import (
-    assert_fraction_cap, select_and_assign_entries,
+    TEAM_EXPOSURE_MIN_HITTERS, assert_fraction_cap, select_and_assign_entries,
 )
 from mlb_engine.contest_shapes import (
     SATELLITE_PAYOUT_TOKENS, SATELLITE_TYPE_TOKENS, WTA_CONSTRUCTION_SHAPES,
@@ -376,6 +376,10 @@ def execute_portfolio(
             entries_csv,
             [str(req["entry_id"]) for req in entry_requirements],
             salary_csv_path=salary_csv,
+            # R343 + R61. The offset has to be counted at the SAME threshold the
+            # cap is enforced at, or the untouched rows are subtracted from a
+            # cap they were never measured against.
+            team_exposure_min_hitters=controls.get("team_exposure_min_hitters"),
         )
     # R98(2): the bank record travels with the candidates it produced. The
     # allocator can prove infeasibility against a bank; it cannot see whether
@@ -812,6 +816,36 @@ def run_late_swap(
 # cap is deferred and sized separately after this lands, no contrarian push is
 # added on top, and the salary-left gap is left alone.
 
+# R343, 2026-09-15. `max_team_exposure_pct` caps a team's footprint over EVERY
+# hitter slot, whatever stack role the optimizer labelled it, where
+# `max_primary_stack_exposure_pct` counts the primary stack alone. Measured on
+# 1310_9g (9 games, 21 entries): NYY in 15 of 21 entries and 17 of 21 after the
+# rebuild, entirely through SECONDARY stacks, with no control binding and no
+# line in the brief reporting it.
+#
+# How these five numbers were chosen, because "posture-sized like the other
+# caps" is a shape and not a value. Each sits about 0.20 above that posture's
+# `max_primary_stack_exposure_pct`, which is the smallest gap that leaves the
+# primary cap as the binding one on an ordinary build -- a team's footprint is
+# a superset of its primary-stack share by construction, so a value at or near
+# the primary cap would be a second primary cap wearing a different name and
+# would bind on builds that have nothing wrong with them.
+#
+# Arithmetic safety, stated rather than assumed. A DK Classic lineup holds eight
+# hitters and at most five from one team, so every entry footprints at least two
+# teams and some team must take ceil(2E / T) of E entries on a slate with T
+# stackable teams. At 0.55 that needs T >= 4, which is two games. A one-game
+# Classic slate (T = 2) floors arithmetically at 1.0, and
+# `floor_team_exposure_pct` raises the cap to exactly that rather than letting a
+# posture default refuse a slate it cannot fit -- the same mechanism that has
+# carried `max_primary_stack_exposure_pct` through thin slates since v1.9.
+#
+# Truthful labels: these are deterministic portfolio-shape controls on the
+# washout half of Ben's dual objective. Nothing here is a win rate, a cash rate,
+# or a probability, and no archive number prices a team footprint -- the value
+# is a decorrelation preference, and Ben's to move.
+MAX_TEAM_EXPOSURE_NOTE = "R343: team footprint over all hitter slots, any role"
+
 STRATEGY_DEFAULTS: Dict[str, Dict[str, Any]] = {
     "single_entry": {
         "construction": "single",
@@ -822,7 +856,7 @@ STRATEGY_DEFAULTS: Dict[str, Dict[str, Any]] = {
         "controls": {
             "max_player_exposure_pct": 1.0, "max_pitcher_exposure_pct": 1.0,
             "max_primary_stack_exposure_pct": 1.0, "max_sp_pair_repetition": 1,
-            "primary_stack_min_size": 4,
+            "primary_stack_min_size": 4, "max_team_exposure_pct": 1.0,
         },
         "note": "one max-ceiling lineup; no decorrelation needed at one entry",
     },
@@ -845,6 +879,9 @@ STRATEGY_DEFAULTS: Dict[str, Dict[str, Any]] = {
             "max_player_exposure_pct": 0.45, "max_pitcher_exposure_pct": 0.43,
             "max_primary_stack_exposure_pct": 0.35, "max_sp_pair_repetition": 2,
             "max_shared_players": 5,
+            # R343, 2026-09-15. See MAX_TEAM_EXPOSURE_NOTE below for how these
+            # five numbers were chosen and what they are not.
+            "max_team_exposure_pct": 0.55,
             # R34, 2026-07-30. Ships at 0.0, which is today's behaviour exactly.
             # The archive (138 contests, 43,045 Classic field entries) shows
             # 5-2-1 is the only shape whose within-contest top-decile lift
@@ -873,6 +910,7 @@ STRATEGY_DEFAULTS: Dict[str, Dict[str, Any]] = {
             "max_player_exposure_pct": 0.50, "max_pitcher_exposure_pct": 0.60,
             "max_primary_stack_exposure_pct": 0.55, "max_sp_pair_repetition": 2,
             "max_shared_players": 6, "primary_stack_min_size": 4,
+            "max_team_exposure_pct": 0.75,
         },
         "note": "tight consecutive stacks; cover viable SP pairs only on deep slates",
     },
@@ -886,6 +924,7 @@ STRATEGY_DEFAULTS: Dict[str, Dict[str, Any]] = {
             "max_player_exposure_pct": 0.40, "max_pitcher_exposure_pct": 0.55,
             "max_primary_stack_exposure_pct": 0.50, "max_sp_pair_repetition": 3,
             "max_shared_players": 6, "primary_stack_min_size": 4,
+            "max_team_exposure_pct": 0.70,
         },
         "note": "top-heavy field rewards a tight five-stack plus a secondary",
     },
@@ -909,6 +948,7 @@ STRATEGY_DEFAULTS: Dict[str, Dict[str, Any]] = {
             "max_player_exposure_pct": 0.35, "max_pitcher_exposure_pct": 0.50,
             "max_primary_stack_exposure_pct": 0.45, "max_sp_pair_repetition": 3,
             "max_shared_players": 6, "primary_stack_min_size": 4,
+            "max_team_exposure_pct": 0.65,
         },
         "note": "wider exposure and higher decorrelation; deployed count scales with bank coverage",
     },
@@ -2933,11 +2973,180 @@ def build_waterfall_block(
     }
 
 
+def derive_roster_id_maps(projections: Any) -> Dict[str, Any]:
+    """player id -> team and player id -> game, read off the projection frame.
+
+    R333, and the defect is that this function did not exist. The game-exposure
+    control has been complete in the allocator since R61 and in the post-export
+    validator since R215, ``late_swap.py:214`` names it as THE binding control
+    on a ``game G exposure N>M`` refusal, and no production caller anywhere ever
+    wrote ``controls['player_game_by_id']`` -- so an operator who did exactly
+    what the swap tool steers them to do got ``passed: False`` and
+    ``max_game_exposure_pct_by_game requires controls['player_game_by_id']``.
+    The only writers repo-wide were two lines of ``tests/test_core.py`` handing
+    the map in by hand, which is why the gap never showed.
+
+    R343's team footprint needs the same shape from the same frame, so both maps
+    are derived here, once, and threaded to every door through the control merge
+    rather than assembled per caller. That is CC-1's lesson applied: R340 found
+    THREE production doors where its entry named two, and a second derivation
+    would be the copy that disagrees.
+
+    Defensive by construction. A frame without ``Game_ID`` or ``TeamAbbrev``
+    yields an empty map for that axis and the consumers report ``unknown``,
+    which is a stated absence. It never raises and never invents an id.
+    """
+    out: Dict[str, Any] = {
+        "player_team_by_id": {}, "player_game_by_id": {},
+        "teams": [], "games": [], "note": "",
+    }
+    try:
+        import pandas as _pd  # noqa: F401
+        frame = projections
+        if not hasattr(frame, "columns"):
+            out["note"] = "projections is not a frame; no id maps derived"
+            return out
+        cols = {str(c) for c in frame.columns}
+        id_col = "Player_ID" if "Player_ID" in cols else None
+        if id_col is None:
+            out["note"] = "frame carries no Player_ID column"
+            return out
+        team_col = "TeamAbbrev" if "TeamAbbrev" in cols else (
+            "Team" if "Team" in cols else None)
+        game_col = "Game_ID" if "Game_ID" in cols else None
+        for _, row in frame.iterrows():
+            pid = str(row[id_col]).strip()
+            if not pid:
+                continue
+            if team_col:
+                team = str(row[team_col] or "").strip().upper()
+                if team:
+                    out["player_team_by_id"][pid] = team
+            if game_col:
+                gid = str(row[game_col] or "").strip()
+                if gid and gid.lower() not in {"nan", "none"}:
+                    out["player_game_by_id"][pid] = gid
+        out["teams"] = sorted(set(out["player_team_by_id"].values()))
+        out["games"] = sorted(set(out["player_game_by_id"].values()))
+        if not game_col:
+            out["note"] = "frame carries no Game_ID column"
+    except Exception as exc:  # defensive: an id map never blocks a build
+        out["note"] = f"id maps unavailable: {exc}"
+    return out
+
+
+def resolve_game_exposure_request(
+    controls: Optional[Mapping[str, Any]],
+    games: Sequence[str],
+    weather_game_caps: Optional[Mapping[str, float]] = None,
+) -> Dict[str, Any]:
+    """The per-game cap dict the allocator enforces, from the three sources.
+
+    R333 fix (2) and (3). Three writers, one reader, merged by MIN because every
+    one of them is a CEILING and a portfolio has to satisfy all of them:
+
+    ``max_game_exposure_pct`` -- the slate-wide scalar this item adds, which
+    expands to every game id in the frame. Until it existed the only shape was a
+    per-game dict an operator had to type, which is why the control had no
+    posture default, no place in the relaxation vocabulary, and no mention in
+    SKILL.md (grep, 0 hits). Ships ABSENT: R333's own fix says default OFF until
+    Ben sets one, and the expansion is recorded either way so the default's
+    absence is visible rather than merely true.
+
+    ``max_game_exposure_pct_by_game`` -- the operator's explicit per-game dict,
+    unchanged, and it wins where it is tighter.
+
+    ``weather_game_caps`` -- the F5 material-weather cap (0.25 on medium
+    postponement risk). It was computed and then dropped: ``build_slate``'s F5
+    report has carried ``game_exposure_caps`` since the factor shipped and
+    nothing read it into a control, R197's shape exactly. One warning about it,
+    which cost this item a re-read rather than a guess: the F5 report keys that
+    dict by TEAM while ``slate_intake_manager.material_weather_adjustments``
+    keys its own by GAME ID, two different keyings under one name. The caller
+    resolves teams to game ids before handing them here; this function takes
+    game ids only.
+
+    Truthful labels: a cap is search and portfolio shape, never a probability
+    that a game is washed out.
+    """
+    merged = dict(controls or {})
+    explicit = {str(k): float(v)
+                for k, v in (merged.get("max_game_exposure_pct_by_game") or {}).items()}
+    weather = {str(k): float(v) for k, v in (weather_game_caps or {}).items()}
+    try:
+        scalar = merged.get("max_game_exposure_pct")
+        scalar = float(scalar) if scalar is not None else None
+    except (TypeError, ValueError):
+        scalar = None
+    if scalar is not None and scalar <= 0:
+        scalar = None
+
+    per_game: Dict[str, float] = {}
+    if scalar is not None:
+        for gid in sorted({str(g) for g in games if str(g)}):
+            per_game[gid] = scalar
+    for gid, pct in sorted(explicit.items()):
+        per_game[gid] = min(per_game[gid], pct) if gid in per_game else pct
+    weather_applied: List[Dict[str, Any]] = []
+    for gid, pct in sorted(weather.items()):
+        before = per_game.get(gid)
+        after = pct if before is None else min(before, pct)
+        if before is None or after < before:
+            weather_applied.append(
+                {"game_id": gid, "from": before, "to": after,
+                 "reason": "F5 material weather (postponement risk)"})
+        per_game[gid] = after
+
+    return {
+        "scalar_pct": scalar,
+        "scalar_expanded_to": sorted(per_game) if scalar is not None else [],
+        "explicit_by_game": explicit or None,
+        "weather_game_caps_applied": weather_applied,
+        "per_game": per_game,
+        "games_known": sorted({str(g) for g in games if str(g)}),
+        "counts": "roster_footprint",
+        "note": ("R150, decided 2026-09-15 (Ben): the count is every rostered "
+                 "player in the game, arms included, because a washout is a "
+                 "game outcome and the arm is in it. The allocator's rows have "
+                 "always counted this way; the decision makes it load-bearing "
+                 "rather than silent."),
+    }
+
+
+#: The two id maps the merge stamps into the controls for the allocator. They
+#: are inputs to a constraint, not controls an operator reads, and a slate's
+#: worth of them is several hundred rows -- so every REPORTING surface publishes
+#: their size instead of their contents. `controls_for_report` is the one place
+#: that redaction happens; the allocator always receives the whole thing.
+CONTROL_ID_MAP_KEYS = ("player_team_by_id", "player_game_by_id")
+
+
+def controls_for_report(controls: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
+    """The merged controls as a reader should see them: maps summarised.
+
+    R333 / R343. `merged_controls` is published in the checkpoint and in the
+    approved result and read by an operator under a clock. Dropping two
+    few-hundred-entry dictionaries into it would bury the six numbers that block
+    actually exists to show, and R290(c)'s lesson is precisely about what a
+    refusal reads like at T-5. The summary keeps the fact that the map was
+    WIRED, which is the only thing about it a reader needs here.
+    """
+    out = dict(controls or {})
+    for key in CONTROL_ID_MAP_KEYS:
+        value = out.get(key)
+        if isinstance(value, Mapping):
+            out[key] = {"wired": True, "players_mapped": len(value),
+                        "distinct_values": len({str(v) for v in value.values()})}
+    return out
+
+
 def _merged_controls_for_build(
     posture_by_contest: Mapping[str, Mapping[str, Any]],
     override: Optional[Mapping[str, Any]],
     feasibility_floors: Optional[Mapping[str, Any]] = None,
     shape_bands: Optional[Mapping[str, Any]] = None,
+    roster_id_maps: Optional[Mapping[str, Any]] = None,
+    weather_game_caps: Optional[Mapping[str, float]] = None,
 ) -> Dict[str, Any]:
     """Merge strategy-default controls across contests (tightest cap wins), floor to
     feasibility, then apply overrides.
@@ -2948,7 +3157,12 @@ def _merged_controls_for_build(
     pre-v1.8 behavior unchanged.
     """
     merged: Dict[str, Any] = {}
-    pct_keys = ("max_player_exposure_pct", "max_pitcher_exposure_pct", "max_primary_stack_exposure_pct")
+    # R343 adds the seventh fraction control and the fourth ceiling that merges
+    # to the tightest across contests. It belongs with the other three and not
+    # in a set of its own: one portfolio has to satisfy every contest's team
+    # ceiling exactly as it satisfies every contest's player ceiling.
+    pct_keys = ("max_player_exposure_pct", "max_pitcher_exposure_pct",
+                "max_primary_stack_exposure_pct", "max_team_exposure_pct")
     rep_keys = ("max_sp_pair_repetition", "max_shared_players")
     # R167. The override is the ONLY unvalidated way a control reaches the
     # build: postures and feasibility floors are engine-authored, an override
@@ -2982,7 +3196,12 @@ def _merged_controls_for_build(
     # `"0.5"` raised TypeError at `"0.5" >= 0.33` in brief assembly and
     # ValueError at `f"{pct:.0%}"` -- both after the full solve. The coerced
     # float is what gets stored.
-    _fraction_control_keys = pct_keys + ("min_five_stack_share_pct",)
+    #
+    # R333 adds `max_game_exposure_pct`, the slate-wide scalar. It is a fraction
+    # of the entered set like its five siblings, so it routes through the same
+    # units rule; the per-game dict beside it keeps routing each VALUE.
+    _fraction_control_keys = pct_keys + ("min_five_stack_share_pct",
+                                         "max_game_exposure_pct")
     _fraction_control_dict_keys = ("max_game_exposure_pct_by_game",)
     coerced_override: Dict[str, Any] = dict(override or {})
     for key, value in list(coerced_override.items()):
@@ -3105,6 +3324,29 @@ def _merged_controls_for_build(
     # R215(c). The COERCED override, not the raw one: validating a copy and
     # storing the original is a gate that looks and then lets the value past.
     merged.update(coerced_override)
+
+    # R333 / R343. The id maps and the resolved per-game caps land HERE, after
+    # the override, because this is the one boundary every production door
+    # passes through: `run_slate` (the build), `_plan_joint_allocation` (the
+    # plan leg, which inherits these controls and must solve the SAME MILP the
+    # build will -- the door R340's entry did not name and its own grep found),
+    # and `late_swap.py`. Threading them from each caller instead would be the
+    # second copy R34's merge rule already taught this file not to keep.
+    maps = dict(roster_id_maps or {})
+    if maps.get("player_team_by_id"):
+        merged["player_team_by_id"] = dict(maps["player_team_by_id"])
+    if maps.get("player_game_by_id"):
+        merged["player_game_by_id"] = dict(maps["player_game_by_id"])
+    game_request = resolve_game_exposure_request(
+        merged, list(maps.get("games") or []), weather_game_caps=weather_game_caps)
+    if game_request["per_game"]:
+        merged["max_game_exposure_pct_by_game"] = dict(game_request["per_game"])
+    # The request record itself is deliberately NOT stashed in the controls.
+    # `resolve_game_exposure_request` is a pure function of the merged controls,
+    # the game list and the weather caps, so a reporting caller re-derives it
+    # from the same three inputs and cannot disagree with this one -- which is
+    # the CC-1 shape (one derivation function called at each door) rather than a
+    # value carried around in a bag that other readers then have to ignore.
     return merged
 
 
@@ -3134,6 +3376,13 @@ def feasibility_floors_from(feasibility_inputs: Mapping[str, Any]) -> Dict[str, 
         ("floor_player_exposure_pct", "max_player_exposure_pct"),
         ("floor_pitcher_exposure_pct", "max_pitcher_exposure_pct"),
         ("floor_stack_exposure_pct", "max_primary_stack_exposure_pct"),
+        # R343 / R333. Both new ceilings join the v1.9 rule unchanged: a floor
+        # may only relax a cap the merge already produced, never add one. That
+        # is why `max_game_exposure_pct_by_game` is absent here -- it is
+        # dict-valued and ships OFF, so there is nothing to floor until an
+        # operator sets one, and the scalar below is what a floor can reach.
+        ("floor_team_exposure_pct", "max_team_exposure_pct"),
+        ("floor_game_exposure_pct", "max_game_exposure_pct"),
     ):
         if feasibility_inputs.get(floor_key):
             floors[control_key] = feasibility_inputs[floor_key]
@@ -3263,6 +3512,9 @@ def _slate_feasibility(
         "largest_contest_entries": None, "max_stack_size": None,
         "floor_sp_pair_repetition": None, "floor_shared_players": None,
         "stackable_team_count": None,
+        "game_count": None,
+        "floor_team_exposure_count": None, "floor_team_exposure_pct": None,
+        "floor_game_exposure_count": None, "floor_game_exposure_pct": None,
         "floor_pitcher_exposure_count": None, "floor_pitcher_exposure_pct": None,
         "floor_stack_exposure_count": None, "floor_stack_exposure_pct": None,
         "floor_player_exposure_count": None, "floor_player_exposure_pct": None,
@@ -3290,6 +3542,10 @@ def _slate_feasibility(
         info["viable_sp_pairs"] = n_pairs
         n_stackable = len(_stackable_teams_by_strength(projections))
         info["stackable_team_count"] = n_stackable
+        # R333. The game denominator, from the same derivation the control merge
+        # uses, so the floor and the cap are counted over one game list.
+        n_games = len(derive_roster_id_maps(projections)["games"])
+        info["game_count"] = n_games or None
 
         stack_sizes = []
         for meta in (posture_by_contest or {}).values():
@@ -3324,6 +3580,38 @@ def _slate_feasibility(
                      info["floor_stack_exposure_count"] or 1)
             info["floor_player_exposure_count"] = pl
             info["floor_player_exposure_pct"] = min(1.0, pl / entries)
+
+            # R343. The team FOOTPRINT floor, the same counting argument as the
+            # pitcher floor one screen up and for the same reason. A DK Classic
+            # lineup holds eight hitters and at most MAX_HITTERS_PER_TEAM from
+            # one team, so every entry footprints at least
+            # ceil(8 / MAX_HITTERS_PER_TEAM) = 2 teams and some team must take
+            # ceil(2E / T) of E entries. Below that value the posture default is
+            # arithmetically impossible and the cap is floored UP to it, which is
+            # what keeps a one-game Classic slate (T = 2, floor 1.0) from being
+            # refused by a control that ships on by default.
+            #
+            # `stackable_team_count` is the denominator and it is the
+            # CONSERVATIVE choice: a team too weak to be stackable can still
+            # supply two filler bats, so the true denominator is at least this,
+            # the true floor is at most this, and erring here loosens a ceiling
+            # rather than tightening one.
+            if n_stackable >= 1:
+                from mlb_engine.optimize.optimizer_v3 import MAX_HITTERS_PER_TEAM
+                per_entry = int(_ceil(8 / max(1, int(MAX_HITTERS_PER_TEAM))))
+                tc = int(_ceil((per_entry * entries) / n_stackable))
+                info["floor_team_exposure_count"] = tc
+                info["floor_team_exposure_pct"] = min(1.0, tc / entries)
+
+            # R333. Every entry touches at least one game -- a DK Classic roster
+            # of ten CAN come from a single game -- so the game floor is
+            # ceil(E / G), a much looser bound than the team one and usually
+            # inert. It exists so a slate-wide scalar cannot be set to a value
+            # no portfolio could meet.
+            if n_games >= 1:
+                gc = int(_ceil(entries / n_games))
+                info["floor_game_exposure_count"] = gc
+                info["floor_game_exposure_pct"] = min(1.0, gc / entries)
 
         info["available"] = True
     except Exception as exc:  # defensive: never block the checkpoint on this
@@ -3402,11 +3690,25 @@ def _feasibility_report(feas: Mapping[str, Any], controls: Mapping[str, Any]) ->
     if entries > 1:
         n_sps = feas.get("viable_sp_count")
         n_stackable = feas.get("stackable_team_count")
+        # R343 / R333, the two washout-axis ceilings, in the same counting form
+        # and for the same reason: an arithmetically impossible cap is a
+        # one-read fix here and a bare infeasibility at the solve. Their demand
+        # terms differ and the difference is the whole content of each check --
+        # an entry footprints at least two TEAMS (eight hitters, five per team
+        # maximum) and at least one GAME (a ten-man roster can legally come from
+        # one), so the team check is the binding one and the game check is
+        # usually inert.
+        n_games = feas.get("game_count")
+        _team_per_entry = 2
         pct_specs = (
             ("max_pitcher_exposure_pct", "pitcher_exposure_capacity", n_sps,
              2 * entries, "viable SPs", "pitcher slots"),
             ("max_primary_stack_exposure_pct", "stack_exposure_capacity", n_stackable,
              entries, "stackable teams", "entries"),
+            ("max_team_exposure_pct", "team_exposure_capacity", n_stackable,
+             _team_per_entry * entries, "stackable teams", "team footprint slots"),
+            ("max_game_exposure_pct", "game_exposure_capacity", n_games,
+             entries, "games", "entries"),
         )
         for key, check_name, n_units, demand, unit_label, demand_label in pct_specs:
             pct = controls.get(key)
@@ -4534,6 +4836,12 @@ def run_slate(
     bank_time_budget_s: Optional[float] = None,
     solver_time_limit_s: Optional[float] = None,
     plan_solve_budget_s: Optional[float] = None,
+    # R333 fix (3). The F5 material-weather game cap, game-id keyed. Optional
+    # because the factor is computed in `build_slate`, outside this module: the
+    # caller that HAS the F5 report hands it in rather than this module
+    # recomputing weather. Absent means no weather cap, which is today's
+    # behaviour and every existing caller's.
+    weather_game_caps: Optional[Mapping[str, float]] = None,
     leverage: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Single front door: raw slate inputs -> certified DKEntries file plus diagnostics.
@@ -4667,13 +4975,25 @@ def run_slate(
         archetypes_path=archetypes_path,
     )
     checkpoint["shape_bands"] = shape_bands
+    # R333 / R343. Derived once from the frame and handed to BOTH merges, the
+    # same rule `shape_bands` follows two lines up: passing the maps to one and
+    # not the other would report every wired control as an override.
+    roster_id_maps = derive_roster_id_maps(projections)
     merged_default = _merged_controls_for_build(
-        posture_by_contest, None, shape_bands=shape_bands)
+        posture_by_contest, None, shape_bands=shape_bands,
+        roster_id_maps=roster_id_maps, weather_game_caps=weather_game_caps)
     floors = feasibility_floors_from(feasibility_inputs)
     controls = _merged_controls_for_build(
         posture_by_contest, portfolio_controls_override, feasibility_floors=floors,
-        shape_bands=shape_bands,
+        shape_bands=shape_bands, roster_id_maps=roster_id_maps,
+        weather_game_caps=weather_game_caps,
     )
+    # Re-derived from the merged controls rather than carried out of the merge:
+    # same pure function, same three inputs, so the record and the enforced dict
+    # cannot disagree (CC-1's pattern).
+    game_exposure_request = resolve_game_exposure_request(
+        controls, list(roster_id_maps.get("games") or []),
+        weather_game_caps=weather_game_caps)
 
     override_keys = set(dict(portfolio_controls_override or {}).keys())
     controls_feasibility: Dict[str, Any] = {"floors_applied": {}, "notes": []}
@@ -4818,7 +5138,19 @@ def run_slate(
         "optimizer_preflight": preflight,
         "entry_requirements": entry_requirements,
         "posture_by_contest": posture_by_contest,
-        "merged_controls": controls,
+        "merged_controls": controls_for_report(controls),
+        # R333 / R343. The washout-axis controls, on every Classic build
+        # including the ones that set neither, so the ABSENCE of a game cap is
+        # visible rather than merely true -- R333's fix asks for exactly this.
+        "game_exposure_request": game_exposure_request,
+        "team_exposure": {
+            "max_team_exposure_pct": controls.get("max_team_exposure_pct"),
+            "min_hitters_per_entry": controls.get(
+                "team_exposure_min_hitters", TEAM_EXPOSURE_MIN_HITTERS),
+            "counts": "hitter_slots",
+            "map_wired": bool(controls.get("player_team_by_id")),
+            "note": MAX_TEAM_EXPOSURE_NOTE,
+        },
         "controls_feasibility": controls_feasibility,
         "feasibility": checkpoint["feasibility"],
         "exclusions": exclusion_block,
@@ -5068,7 +5400,19 @@ def run_slate(
         "checkpoint_plan": checkpoint,
         "projection_schema": schema,
         "posture_by_contest": posture_by_contest,
-        "merged_controls": controls,
+        "merged_controls": controls_for_report(controls),
+        # R333 / R343. The washout-axis controls, on every Classic build
+        # including the ones that set neither, so the ABSENCE of a game cap is
+        # visible rather than merely true -- R333's fix asks for exactly this.
+        "game_exposure_request": game_exposure_request,
+        "team_exposure": {
+            "max_team_exposure_pct": controls.get("max_team_exposure_pct"),
+            "min_hitters_per_entry": controls.get(
+                "team_exposure_min_hitters", TEAM_EXPOSURE_MIN_HITTERS),
+            "counts": "hitter_slots",
+            "map_wired": bool(controls.get("player_team_by_id")),
+            "note": MAX_TEAM_EXPOSURE_NOTE,
+        },
         "controls_feasibility": controls_feasibility,
         "feasibility": checkpoint["feasibility"],
         "exclusions": exclusion_block,
