@@ -90,16 +90,28 @@ _PYLIBS = REPO / ".pylibs"
 if _PYLIBS.is_dir() and str(_PYLIBS) not in sys.path:
     sys.path.insert(0, str(_PYLIBS))
 
+# Safe at module level only because the sys.path insert above already ran; see
+# the R296(e) note there for what happens when it has not.
+from mlb_engine.repo_env import call_budget_s, call_budget_source  # noqa: E402
+
 BUILD = REPO / "skills" / "generate-lineups" / "scripts" / "build_slate.py"
 ASSERTED = REPO / "tools" / "build_asserted.py"
 
-# R296(f). CLAUDE.md pins the safe inner bash budget at 130s. The defaults here
-# (8 attempts, each up to --per-build-seconds + 90 = 110s, under a 12-minute
-# wall) describe a process that CANNOT finish inside one call, and until this
-# change the decision log was flushed only at terminal exits -- so the outer
-# kill that ends the call took every decision with it. First bad moment is the
-# first run that grows the bank once.
-DEFAULT_CALL_BUDGET_S = 130.0
+# R296(f). CLAUDE.md pins the safe inner bash budget at 130s on Cowork. The
+# defaults here (8 attempts, each up to --per-build-seconds + 90 = 110s, under a
+# 12-minute wall) describe a process that CANNOT finish inside one call there,
+# and until that change the decision log was flushed only at terminal exits --
+# so the outer kill that ends the call took every decision with it. First bad
+# moment is the first run that grows the bank once.
+#
+# R349, 2026-09-16: 130 is now ONE host's number rather than every host's. On a
+# Claude Code container declaring a 900s ceiling the same eight attempts fit one
+# call comfortably, and planning them against 130 is what turns a supervisor with
+# room to work into one that stops cleanly at exit 5 for no reason. The
+# resolution, its precedence and the conservative 130 floor all live in
+# mlb_engine.repo_env; this stays the only place autobuild names it.
+DEFAULT_CALL_BUDGET_S = call_budget_s()
+DEFAULT_CALL_BUDGET_SOURCE = call_budget_source()
 
 # build_slate.py's documented exit vocabulary. Anything else is a crash wearing
 # a refusal's label; see the off-contract branch in main().
@@ -315,8 +327,8 @@ def main() -> int:
     ap.add_argument("--call-budget-seconds", type=float,
                     default=DEFAULT_CALL_BUDGET_S,
                     help=f"wall clock for THIS process, distinct from the slate "
-                         f"budget (default {DEFAULT_CALL_BUDGET_S:.0f}, the safe "
-                         f"inner budget under Cowork's ~180s call ceiling). When "
+                         f"budget (default {DEFAULT_CALL_BUDGET_S:.0f}, resolved "
+                         f"for this host -- {DEFAULT_CALL_BUDGET_SOURCE}). When "
                          f"the next attempt cannot finish inside it, the run "
                          f"stops at exit 5 with resumable=true; re-invoke with "
                          f"--resume. 0 disables the check.")

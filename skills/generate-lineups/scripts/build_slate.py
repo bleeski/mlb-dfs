@@ -58,26 +58,48 @@ def _find_repo() -> Path:
 
     An installed skill lives outside the repo, so the root cannot be derived from
     __file__ alone. Order: explicit env var, then a walk up from this file (works
-    when the skill is versioned inside the repo), then the usual workspace mount
-    paths. Failing loudly here beats importing a half-present package later.
+    when the skill is versioned inside the repo), then a walk up from the working
+    directory, then the known workspace layouts. Failing loudly here beats
+    importing a half-present package later.
+
+    This function CANNOT delegate to ``mlb_engine.repo_env.repo_root``, which is
+    the same authority for every other caller: it runs before the sys.path insert
+    below, so ``mlb_engine`` is not importable yet. It is the bootstrap, so it
+    carries its own copy of the question by necessity rather than by neglect.
+
+    R349, 2026-09-16. The layout list was two literals and one glob, and it named
+    exactly two hosts -- ``~/Documents/Claude/mlb-dfs`` and ``/sessions[/*]/mnt/
+    mlb-dfs``. On a Claude Code container the repo is at ``/home/user/mlb-dfs``
+    and none of them matched; the __file__ walk happened to succeed first, so the
+    gap was invisible from a build. It stopped being invisible in SKILL.md, whose
+    opening instruction told the session to resolve the repo with
+    ``ls -d /sessions/*/mnt/mlb-dfs``, which returns nothing there -- and the
+    skill's own first rule is that a session which cannot read the repo must stop.
+    Adding another literal would repeat the mistake, so what goes in is a walk
+    from the CWD (host-agnostic: a session that is in the repo finds it) plus
+    globs broad enough to cover a container's home directory.
     """
     import os
 
     env = os.environ.get("MLB_DFS_ROOT")
     if env and (Path(env) / "mlb_engine").is_dir():
         return Path(env)
-    for parent in Path(__file__).resolve().parents:
-        if (parent / "mlb_engine").is_dir() and (parent / "CLAUDE.md").exists():
-            return parent
+    for start in (Path(__file__).resolve(), Path.cwd().resolve()):
+        for parent in (start, *start.parents):
+            if (parent / "mlb_engine").is_dir() and (parent / "CLAUDE.md").exists():
+                return parent
     for guess in (
         Path.home() / "Documents" / "Claude" / "mlb-dfs",
+        Path.home() / "mlb-dfs",
         Path("/sessions") / "mnt" / "mlb-dfs",
     ):
         if (guess / "mlb_engine").is_dir():
             return guess
-    for mount in Path("/sessions").glob("*/mnt/mlb-dfs"):
-        if (mount / "mlb_engine").is_dir():
-            return mount
+    for pattern in ("*/mnt/mlb-dfs", "*/mlb-dfs"):
+        for base in (Path("/sessions"), Path("/home")):
+            for mount in base.glob(pattern):
+                if (mount / "mlb_engine").is_dir():
+                    return mount
     raise SystemExit(
         "cannot locate the mlb-dfs engine. Set MLB_DFS_ROOT to the repo root."
     )
@@ -104,6 +126,43 @@ MIN_GAMES_PER_LINEUP = 2
 # bank as a considered set of caps. So a floored budget announces itself, both
 # on stderr and in the record.
 BANK_BUDGET_FLOOR_S = 5.0
+
+# R349, 2026-09-16. `--max-seconds` defaulted to 35.0 while SKILL.md taught 100
+# in both of its invocations, and 100 is not a preference: it is 130 (Cowork's
+# call ceiling) minus the ~30s that the engine import, certify and write need
+# after the search stops. So the default was a third number agreeing with
+# neither the docs nor any host, and a caller who trusted it got a third of the
+# search the same call could afford. A 14-second budget is what leaves a bank 2%
+# explored, and an under-explored bank reads as a tight exposure cap.
+#
+# Deriving it keeps the relationship the docs describe instead of restating a
+# number: on Cowork this resolves to exactly the 100 SKILL.md teaches, and on a
+# Claude Code container declaring 900s it resolves to 600.
+MAX_SECONDS_RESERVE_S = 30.0
+
+# What to use when the host cannot be resolved because the engine is not
+# importable. 100.0 is Cowork's 130 less the reserve, which is the pair SKILL.md
+# has always taught, so an unresolved host behaves exactly as the docs describe.
+UNRESOLVED_MAX_SECONDS_S = 100.0
+
+
+def default_max_seconds() -> float:
+    """This invocation's default wall clock: the host's call budget, less the
+    reserve the post-search tail needs. Floored so a host declaring a tiny
+    ceiling still gets a budget the bank floor can work inside.
+
+    The engine import is INSIDE this function, and that placement is pinned by
+    ``test_the_script_still_loads_without_the_engine_on_the_path``. This script
+    has to load with no engine on the path, because ``missing_dependencies`` is a
+    refusal it PRINTS rather than a crash it takes -- and argparse builds this
+    default while assembling its help, which is upstream of that refusal. The
+    first cut of R349 put the import at module level and reddened that test.
+    """
+    try:
+        from mlb_engine.repo_env import call_budget_s
+    except Exception:
+        return UNRESOLVED_MAX_SECONDS_S
+    return max(BANK_BUDGET_FLOOR_S * 2, call_budget_s() - MAX_SECONDS_RESERVE_S)
 
 # --------------------------------------------------------------------------- #
 # R290(c) commit 1, 2026-09-03. Every refusal this script can hand its caller,
@@ -4734,9 +4793,12 @@ def main() -> int:
     ap.set_defaults(rotowire=True)
     ap.add_argument("--entries-count", dest="entries", type=int,
                     help="override the reserved-entry count")
-    ap.add_argument("--max-seconds", type=float, default=35.0,
-                    help="wall clock this invocation may use before saving and "
-                         "asking to be rerun")
+    ap.add_argument("--max-seconds", type=float, default=default_max_seconds(),
+                    help=f"wall clock this invocation may use before saving and "
+                         f"asking to be rerun (default "
+                         f"{default_max_seconds():.0f}, this host's call budget "
+                         f"less {MAX_SECONDS_RESERVE_S:.0f}s for the engine "
+                         f"import, certify and write)")
     ap.add_argument("--brief", help="write the brief JSON here")
     ap.add_argument("--declare-pitcher", dest="declare_pitcher", action="append",
                     default=[], metavar="ID[=ROLE]",

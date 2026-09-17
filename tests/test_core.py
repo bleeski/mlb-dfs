@@ -5343,6 +5343,27 @@ class BuildSlateScriptTests(unittest.TestCase):
                   if isinstance(n, ast.ImportFrom) and (n.module or "").startswith("mlb_engine")]
         self.assertEqual(engine, [], "build_slate grew a top-level engine import")
 
+    def test_the_default_budget_falls_back_when_the_engine_is_absent(self):
+        """R349. argparse builds --max-seconds' default while assembling its
+        help, which runs BEFORE the missing_dependencies refusal, so an
+        unresolvable host must not raise out of a script whose whole job at that
+        moment is to PRINT that refusal. The first cut imported the resolver at
+        module level and reddened the sibling test above; this pins the
+        behaviour rather than only the import's position."""
+        import sys as _sys
+        missing = object()
+        mod = self._module()
+        saved = _sys.modules.get("mlb_engine.repo_env", missing)
+        _sys.modules["mlb_engine.repo_env"] = None
+        try:
+            self.assertEqual(mod.default_max_seconds(),
+                             mod.UNRESOLVED_MAX_SECONDS_S)
+        finally:
+            if saved is missing:
+                _sys.modules.pop("mlb_engine.repo_env", None)
+            else:
+                _sys.modules["mlb_engine.repo_env"] = saved
+
     @staticmethod
     def _module():
         import importlib.util
@@ -22681,15 +22702,57 @@ class BlankRowVersusPartialRowTests(unittest.TestCase):
 
 
 class ProbeBudgetDefaultTests(unittest.TestCase):
-    """R290(c) rider, from R296(g). `solver_probe --budget` defaulted to 43.0,
-    the ninth and last live member of the retired 45-second ceiling. R271 left
-    it because changing it changes this tool's VERDICT rather than a doc
-    string; R290(c) is the item about refusals an operator reads under a clock,
-    which is exactly what a stale EXCEEDS is."""
+    """R290(c) rider, from R296(g); reframed by R349, 2026-09-16.
 
-    def test_the_default_is_the_one_sandbox_number(self):
+    `solver_probe --budget` defaulted to 43.0, the ninth and last live member of
+    the retired 45-second ceiling. R271 left it because changing it changes this
+    tool's VERDICT rather than a doc string; R290(c) is the item about refusals
+    an operator reads under a clock, which is exactly what a stale EXCEEDS is.
+
+    R349 MOVED this pin rather than dropping it. 130.0 was right for Cowork and
+    wrong by a factor of five on a Claude Code container declaring a 900s
+    ceiling, so the budget is now resolved per host. The three things these
+    tests have always protected still hold: 130.0 is what a host that stated
+    nothing gets, the parser reads the constant instead of carrying a second
+    copy, and the verdict names the ceiling it measured against.
+    """
+
+    def test_the_unknown_host_still_gets_the_one_sandbox_number(self):
+        from mlb_engine import repo_env
+        self.assertEqual(repo_env.call_budget_s(env={}), 130.0)
+        self.assertEqual(
+            repo_env.HOST_PROFILES[repo_env.HOST_UNKNOWN]["call_budget_s"],
+            130.0)
+
+    def test_a_stated_cowork_host_is_not_widened_by_an_ambient_ceiling(self):
+        """The first cut of R349 read the declared ceiling regardless of the
+        resolved host and answered 630.0 for MLB_DFS_HOST=cowork -- the 130s
+        budget lost again by a different route, which is the whole failure this
+        class exists about."""
+        from mlb_engine import repo_env
+        self.assertEqual(
+            repo_env.call_budget_s(env={"MLB_DFS_HOST": "cowork",
+                                        "BASH_DEFAULT_TIMEOUT_MS": "900000"}),
+            130.0)
+
+    def test_the_default_is_resolved_and_not_a_hardcoded_constant(self):
+        """Asked of the module BODY rather than by comparing values: another
+        test mutating os.environ would make a value comparison flake, and what
+        this needs to pin is that no literal came back."""
+        import ast
         from tools import solver_probe as sp
-        self.assertEqual(sp.DEFAULT_BUDGET_S, 130.0)
+        self.assertGreater(sp.DEFAULT_BUDGET_S, 0.0)
+        path = Path(__file__).resolve().parents[1] / "tools" / "solver_probe.py"
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        assigned_from = None
+        for node in ast.walk(tree):
+            if (isinstance(node, ast.Assign)
+                    and any(getattr(t, "id", "") == "DEFAULT_BUDGET_S"
+                            for t in node.targets)):
+                assigned_from = node.value
+                break
+        self.assertIsInstance(assigned_from, ast.Call)
+        self.assertEqual(getattr(assigned_from.func, "id", ""), "call_budget_s")
 
     def test_the_argparse_default_is_not_a_second_copy(self):
         """The class this repo keeps finding: one number, two places, and they
@@ -22721,6 +22784,78 @@ class ProbeBudgetDefaultTests(unittest.TestCase):
         survived eight sweeps."""
         from tools import solver_probe as sp
         self.assertIn("CLAUDE.md", sp.DEFAULT_BUDGET_SOURCE)
+
+
+class HostProfileTests(unittest.TestCase):
+    """R349, 2026-09-16. Three hosts, one resolver, and every signal PROBED.
+
+    Two of the three hosts are "Claude Code" (Ben's Windows machine and a web
+    container), which is why the repo's docs conflated the host with the client
+    and why detection reads what the host asserts about itself -- a mount path,
+    os.name, its own exported ceiling -- rather than a session flavour.
+
+    Every case passes `env=` explicitly so nothing here mutates os.environ and
+    no sibling test can perturb it.
+    """
+
+    def test_nothing_declared_is_unknown_and_conservative(self):
+        from mlb_engine import repo_env
+        self.assertEqual(repo_env.detect_host(root="/srv/x", env={}),
+                         repo_env.HOST_UNKNOWN)
+        self.assertEqual(repo_env.call_budget_s(env={}), 130.0)
+
+    def test_a_mount_path_is_cowork(self):
+        """Cowork's one reliable signature. The repo lives under
+        /sessions/<id>/mnt/mlb-dfs there and nowhere else."""
+        from mlb_engine import repo_env
+        self.assertEqual(
+            repo_env.detect_host(root="/sessions/abc123/mnt/mlb-dfs", env={}),
+            repo_env.HOST_COWORK)
+
+    def test_a_declared_ceiling_is_claude_code_and_sets_the_budget(self):
+        from mlb_engine import repo_env
+        env = {"BASH_DEFAULT_TIMEOUT_MS": "900000"}
+        self.assertEqual(repo_env.detect_host(root="/home/user/mlb-dfs", env=env),
+                         repo_env.HOST_CLAUDE_CODE)
+        self.assertEqual(repo_env.call_budget_s(env=env),
+                         round(900.0 * repo_env.CALL_BUDGET_SAFE_FRACTION, 1))
+
+    def test_a_small_declared_ceiling_is_respected_not_floored_up(self):
+        """Flooring a stated ceiling UP to 130 would hand back a budget that
+        overruns the call, which is the failure the resolver exists to stop."""
+        from mlb_engine import repo_env
+        env = {"BASH_DEFAULT_TIMEOUT_MS": "60000"}
+        self.assertEqual(repo_env.call_budget_s(env=env),
+                         round(60.0 * repo_env.CALL_BUDGET_SAFE_FRACTION, 1))
+
+    def test_an_explicit_host_wins_over_every_probe(self):
+        from mlb_engine import repo_env
+        self.assertEqual(
+            repo_env.detect_host(root="/sessions/abc/mnt/mlb-dfs",
+                                 env={"MLB_DFS_HOST": "windows"}),
+            repo_env.HOST_WINDOWS)
+
+    def test_precedence_explicit_arg_then_env_then_host(self):
+        from mlb_engine import repo_env
+        env = {"MLB_DFS_CALL_BUDGET_S": "42", "BASH_DEFAULT_TIMEOUT_MS": "900000"}
+        self.assertEqual(repo_env.call_budget_s(explicit=77.0, env=env), 77.0)
+        self.assertEqual(repo_env.call_budget_s(env=env), 42.0)
+
+    def test_repo_root_rejects_an_override_that_is_not_this_repo(self):
+        """A path with no mlb_engine/ and no CLAUDE.md is not this repo, and
+        honouring it silently would point a build at an engineless directory."""
+        from mlb_engine import repo_env
+        self.assertEqual(repo_env.repo_root(stated="/nonexistent/not-a-repo"),
+                         repo_env.REPO_ROOT)
+
+    def test_every_profile_carries_the_keys_callers_read(self):
+        from mlb_engine import repo_env
+        for name, profile in repo_env.HOST_PROFILES.items():
+            for key in ("call_budget_s", "has_rm", "tmp_shared"):
+                self.assertIn(key, profile, f"{name} profile lacks {key}")
+        resolved = repo_env.host_profile(env={})
+        self.assertEqual(resolved["host"], repo_env.HOST_UNKNOWN)
+        self.assertIsNone(resolved["declared_ceiling_s"])
 
 
 class DeadlineGovernorTests(unittest.TestCase):

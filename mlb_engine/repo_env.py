@@ -1,4 +1,9 @@
-"""repo_env.py -- one place that knows where this repo keeps its secrets.
+"""repo_env.py -- one place that knows the environment this repo runs in.
+
+Three authorities live here, each because the alternative was every caller
+answering the same question differently: the secrets loader (R29(5a), below),
+the ET calendar (R65), and the host profile (R349). Nothing here fetches, and
+nothing here logs a secret.
 
 R29(5a). The repo's ``.env`` holds THE_ODDS_API_KEY, and it is loaded for every
 session that runs ``tools/fetch_slate_bundle.py``, because that script carries a
@@ -157,3 +162,222 @@ def et_day_offsets(days: int = 1, now=None):
     from datetime import timedelta
     base = now_et(now).date()
     return base.isoformat(), (base + timedelta(days=days)).isoformat()
+
+
+# ---------------------------------------------------------------------------
+# The one host authority (R349)
+# ---------------------------------------------------------------------------
+# Until 2026-09-16 this project knew two hosts and named exactly one budget:
+# CLAUDE.md's "The Cowork inner bash budget is 130s. One number, this one."
+# That number then became the argparse default of `solver_probe --budget` and
+# `autobuild --call-budget-seconds`, so a host with a fifteen-minute ceiling was
+# planning its calls against a two-minute one.
+#
+# The cost is not hypothetical. On the 2026-09-16 1910_7g slate the repo was at
+# /home/user/mlb-dfs on a Claude Code container whose BASH_DEFAULT_TIMEOUT_MS is
+# 900000, and the build ran a 420-second call without trouble -- while every
+# default in the tree still described 130.
+#
+# So the budget stops being a constant and becomes a resolved fact, with the
+# precedence `gate_call_ceiling()` in tools/audit.py already uses for its own
+# ceiling: an explicit argument, then an environment variable, then a host
+# profile, then a conservative default for a host that has told us nothing.
+# PROBE, never guess: every signal below is something the host asserts about
+# itself (a mount path, os.name, its own exported ceiling), never an inference
+# from a session's flavour. A host that says nothing gets Cowork's 130, because
+# under-spending a budget costs a slice and over-spending it costs the call.
+#
+# Two things this deliberately does NOT do. It never widens a budget a caller
+# passed explicitly, and it is not a capability check: `has_rm` and `tmp_shared`
+# describe what the sandbox allows, and a caller that can simply try the cheap
+# thing and handle the failure should keep doing that rather than branch on a
+# profile.
+
+HOST_ENV = "MLB_DFS_HOST"
+CALL_BUDGET_ENV = "MLB_DFS_CALL_BUDGET_S"
+ROOT_ENV = "MLB_DFS_ROOT"
+
+HOST_COWORK = "cowork"
+HOST_CLAUDE_CODE = "claude_code"
+HOST_WINDOWS = "windows"
+HOST_UNKNOWN = "unknown"
+
+# The floor for a host that has told us nothing. This is the number CLAUDE.md's
+# ## Sandbox section has always named; what changed is that it is now one
+# profile's value rather than every caller's default.
+UNKNOWN_HOST_BUDGET_S = 130.0
+
+# What fraction of a host's OWN declared ceiling is safe to plan inside. The
+# remainder pays for container start, the ~15s engine import off a cold
+# __pycache__, and the certify-and-write tail. 0.7 of 900s is 630s, which is
+# comfortably past the 420s call that 1910_7g actually needed.
+CALL_BUDGET_SAFE_FRACTION = 0.7
+
+# Claude Code states its own bash ceiling in the environment (.claude/settings.json
+# sets BASH_DEFAULT_TIMEOUT_MS / BASH_MAX_TIMEOUT_MS, and the client exports
+# them), which is why this is a probe and not a guess about the session.
+DECLARED_CEILING_ENV = "BASH_DEFAULT_TIMEOUT_MS"
+DECLARED_MAX_CEILING_ENV = "BASH_MAX_TIMEOUT_MS"
+
+HOST_PROFILES: Dict[str, Dict[str, object]] = {
+    # No `rm` (mv into _to_delete/), /tmp is not shared between calls, and the
+    # host-backed mount stalls intermittently. docs/cowork_sandbox.md owns the
+    # rest of the procedure.
+    HOST_COWORK: {"call_budget_s": 130.0, "has_rm": False, "tmp_shared": False},
+    # Measured 2026-09-16: /tmp persisted across four calls, rm works, and a
+    # 420s build fit one call. The budget is derived from the host's own
+    # declared ceiling when it states one, so this value is only the fallback.
+    HOST_CLAUDE_CODE: {"call_budget_s": 600.0, "has_rm": True, "tmp_shared": True},
+    # Ben's machine. PowerShell, so `TZ=... date` and `nohup` are not available,
+    # but there is no inner call ceiling and the full gate runs in one call.
+    HOST_WINDOWS: {"call_budget_s": 540.0, "has_rm": True, "tmp_shared": True},
+    HOST_UNKNOWN: {"call_budget_s": UNKNOWN_HOST_BUDGET_S,
+                   "has_rm": False, "tmp_shared": False},
+}
+
+
+def repo_root(stated: Optional[str] = None) -> Path:
+    """This repo's root. ``MLB_DFS_ROOT`` wins when it names a real checkout.
+
+    The override is validated rather than trusted: a path that does not carry
+    both ``mlb_engine/`` and ``CLAUDE.md`` is not this repo, and silently
+    honouring it would point a build at a directory with no engine in it.
+    """
+    raw = stated if stated is not None else os.environ.get(ROOT_ENV, "")
+    raw = (raw or "").strip()
+    if raw:
+        candidate = Path(raw).expanduser()
+        if (candidate / "mlb_engine").is_dir() and (candidate / "CLAUDE.md").is_file():
+            return candidate.resolve()
+    return REPO_ROOT
+
+
+def detect_host(root: Optional[Path] = None,
+                env: Optional[Dict[str, str]] = None) -> str:
+    """Which host this process is running on, by probing what it asserts.
+
+    Order: an explicit ``MLB_DFS_HOST``; the repo living under a
+    ``/sessions/*/mnt/`` mount, which is Cowork's one reliable signature;
+    ``os.name == "nt"`` for Ben's machine; a host that exported its own bash
+    ceiling, which is Claude Code; otherwise unknown.
+
+    Returns a key of ``HOST_PROFILES``, never ``None``, so no caller needs a
+    fallback branch of its own.
+    """
+    environ = os.environ if env is None else env
+    stated = (environ.get(HOST_ENV) or "").strip().lower()
+    if stated in HOST_PROFILES and stated != HOST_UNKNOWN:
+        return stated
+    where = Path(root) if root is not None else repo_root()
+    try:
+        parts = where.resolve().parts
+    except OSError:
+        parts = where.parts
+    if "sessions" in parts and "mnt" in parts:
+        return HOST_COWORK
+    if os.name == "nt":
+        return HOST_WINDOWS
+    for key in (DECLARED_CEILING_ENV, DECLARED_MAX_CEILING_ENV):
+        if (environ.get(key) or "").strip():
+            return HOST_CLAUDE_CODE
+    return HOST_UNKNOWN
+
+
+def declared_ceiling_s(env: Optional[Dict[str, str]] = None) -> Optional[float]:
+    """The host's own bash ceiling in seconds, when it states one.
+
+    ``None`` when nothing is declared or the value does not parse, so a caller
+    can tell "this host says nothing" from "this host says zero".
+    """
+    environ = os.environ if env is None else env
+    raw = (environ.get(DECLARED_CEILING_ENV) or "").strip()
+    if not raw:
+        return None
+    try:
+        seconds = float(raw) / 1000.0
+    except ValueError:
+        return None
+    return seconds if seconds > 0 else None
+
+
+def call_budget_s(explicit: Optional[float] = None,
+                  host: Optional[str] = None,
+                  env: Optional[Dict[str, str]] = None) -> float:
+    """Seconds of real work it is safe to plan inside ONE call on this host.
+
+    Precedence, matching ``tools/audit.py``'s ``gate_call_ceiling``: an explicit
+    argument, then ``MLB_DFS_CALL_BUDGET_S``, then this host's own declared
+    ceiling discounted by ``CALL_BUDGET_SAFE_FRACTION``, then the host profile,
+    then 130.0.
+
+    A host's declared ceiling is used as stated even when it is SMALLER than
+    130: flooring it up would hand back a budget that overruns the call, which
+    is the failure this function exists to prevent.
+
+    The declared ceiling is read for ``claude_code`` ONLY. Cowork and Ben's
+    machine take their profile number, because a stated host is a claim about
+    which sandbox this is and an ambient ``BASH_DEFAULT_TIMEOUT_MS`` from
+    whatever shell wrapped the call is not evidence against it. The first cut
+    read the ceiling unconditionally and answered 630.0 for
+    ``MLB_DFS_HOST=cowork``, which is the 130s budget quietly lost again by a
+    different route.
+    """
+    environ = os.environ if env is None else env
+    if explicit is not None:
+        return float(explicit)
+    raw = (environ.get(CALL_BUDGET_ENV) or "").strip()
+    if raw:
+        try:
+            stated = float(raw)
+            if stated > 0:
+                return stated
+        except ValueError:
+            pass
+    resolved_host = host or detect_host(env=environ)
+    if resolved_host == HOST_CLAUDE_CODE:
+        declared = declared_ceiling_s(env=environ)
+        if declared is not None:
+            return round(declared * CALL_BUDGET_SAFE_FRACTION, 1)
+    return float(HOST_PROFILES[resolved_host]["call_budget_s"])
+
+
+def host_profile(host: Optional[str] = None,
+                 env: Optional[Dict[str, str]] = None) -> Dict[str, object]:
+    """This host's profile, with ``host`` and the resolved budget folded in.
+
+    One call answers every host question a caller has, so nothing has to pair a
+    ``detect_host`` with a separate lookup and risk the two disagreeing.
+    """
+    environ = os.environ if env is None else env
+    resolved = host or detect_host(env=environ)
+    profile = dict(HOST_PROFILES[resolved])
+    profile["host"] = resolved
+    profile["call_budget_s"] = call_budget_s(host=resolved, env=environ)
+    profile["declared_ceiling_s"] = declared_ceiling_s(env=environ)
+    return profile
+
+
+def call_budget_source(explicit: Optional[float] = None,
+                       env: Optional[Dict[str, str]] = None) -> str:
+    """Where the budget in force came from, for a verdict to quote.
+
+    R290(c) established that a refusal an operator reads under a clock has to
+    name the ceiling it was measured against. Now that the ceiling is resolved
+    rather than constant, it has to name the SOURCE too, or a session cannot
+    tell a real overrun from a host mismatch.
+    """
+    environ = os.environ if env is None else env
+    if explicit is not None:
+        return "supplied by the caller"
+    if (environ.get(CALL_BUDGET_ENV) or "").strip():
+        return f"CLAUDE.md Hosts: stated by {CALL_BUDGET_ENV}"
+    resolved = detect_host(env=environ)
+    if (resolved == HOST_CLAUDE_CODE
+            and declared_ceiling_s(env=environ) is not None):
+        return (f"CLAUDE.md Hosts: {resolved}, "
+                f"{CALL_BUDGET_SAFE_FRACTION:g} of its own declared "
+                f"{DECLARED_CEILING_ENV}")
+    if resolved == HOST_UNKNOWN:
+        return ("CLAUDE.md Sandbox: this host stated nothing, so the "
+                "conservative Cowork budget applies")
+    return f"CLAUDE.md Hosts: the {resolved} profile"

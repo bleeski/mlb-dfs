@@ -16,8 +16,11 @@ Usage:
     python tools/solver_probe.py --date 2026-07-22 [--entries 10] [--budget 130]
     python tools/solver_probe.py --salary path/to/DKSalaries.csv --lineups feed.json
 
-The default budget is 130s, which is the inner bash budget a build on this
-mount actually gets (CLAUDE.md, Sandbox). It was 43.0 until 2026-09-03 -- the
+The default budget is RESOLVED for this host (R349), not a constant: an explicit
+--budget, then MLB_DFS_CALL_BUDGET_S, then the host's own declared bash ceiling
+discounted for container start and the engine import, then its profile, then
+130s for a host that has stated nothing. 130 is Cowork's inner bash budget
+(CLAUDE.md, Sandbox) and it stays the conservative floor. It was 43.0 until 2026-09-03 -- the
 ninth and last live member of the retired 45-second ceiling R271 swept out of
 five other files, deliberately left in place there because changing it changes
 this probe's VERDICT rather than a doc string. R290(c) is the item about
@@ -54,13 +57,20 @@ from mlb_engine.optimize.optimizer_v3 import (  # noqa: E402
     build_multi_lineup, build_single_lineup, resolve_candidate_bank_size,
 )
 from mlb_engine.pipeline.execution_pipeline import _assemble_projection_frame  # noqa: E402
+from mlb_engine.repo_env import call_budget_s, call_budget_source  # noqa: E402
 
-# The one number, named once. CLAUDE.md's Sandbox section: "The inner bash
-# timeout is 130s. One number, this one." Do not re-derive it per call; that is
-# how 43.0 outlived the ceiling it described.
-DEFAULT_BUDGET_S = 130.0
-DEFAULT_BUDGET_SOURCE = ("CLAUDE.md Sandbox: the inner bash budget a build on "
-                         "this mount gets")
+# The one number, named once -- and since R349 (2026-09-16) RESOLVED once rather
+# than hardcoded once. It was 130.0, CLAUDE.md's Cowork inner bash budget, which
+# is right on Cowork and wrong by a factor of five on a Claude Code container
+# that declares a 900s ceiling. The lesson of 43.0 was not "pin the number", it
+# was "never let a verdict quote a ceiling that does not exist here", and a
+# constant cannot satisfy that on three hosts.
+#
+# `mlb_engine.repo_env.call_budget_s` holds the precedence and the host probe;
+# 130.0 survives there as the profile for a host that has told us nothing. Do
+# not re-derive either value per call.
+DEFAULT_BUDGET_S = call_budget_s()
+DEFAULT_BUDGET_SOURCE = call_budget_source()
 
 
 def _resolve_inputs(args) -> tuple[Path, Path]:
@@ -96,8 +106,8 @@ def main() -> int:
     # is why R271 left it and why this item is the right place to decide it.
     ap.add_argument("--budget", type=float, default=DEFAULT_BUDGET_S,
                     help=f"seconds of compute available per call "
-                         f"(default {DEFAULT_BUDGET_S:.0f}, the inner bash "
-                         f"budget a build on this mount gets)")
+                         f"(default {DEFAULT_BUDGET_S:.0f}, resolved for this "
+                         f"host -- {DEFAULT_BUDGET_SOURCE})")
     ap.add_argument("--json", action="store_true", help="emit JSON only")
     args = ap.parse_args()
 

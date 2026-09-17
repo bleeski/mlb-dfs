@@ -25,6 +25,46 @@ performance claim.
 
 ---
 
+## 2026-09-16 — R349: the call budget stops being a constant and becomes a resolved host fact, and the repo root resolves on a third host
+
+**Scope.** `mlb_engine/repo_env.py` (the new host authority), `tools/solver_probe.py`, `tools/autobuild.py`, `skills/generate-lineups/scripts/build_slate.py` (`_find_repo`, the `--max-seconds` default), `tests/test_core.py`, `tools/audit.py` (the `tests.test_core` pin), this file. Found by the 2026-09-16 1910_7g BUILD session, which delivered a certified 29-entry portfolio and spent roughly a third of a 35-minute lock window on problems that were not about baseball.
+
+**What was wrong.** CLAUDE.md's `## Sandbox` says "The Cowork inner bash budget is 130s. One number, this one (R271); do not re-derive it per call." That instruction was followed exactly, and the number then became the argparse default of `solver_probe --budget` (`DEFAULT_BUDGET_S = 130.0`) and of `autobuild --call-budget-seconds` (`DEFAULT_CALL_BUDGET_S = 130.0`). Both are correct on Cowork and wrong by a factor of five on a Claude Code container, which declares `BASH_DEFAULT_TIMEOUT_MS=900000` in `.claude/settings.json` and honours it: the 1910_7g session ran a 420-second build in one call while every default in the tree still described 130. `autobuild`'s own header comment already said its defaults "describe a process that CANNOT finish inside one call" — true on the host the number came from, and the reason a supervisor with room to work would stop cleanly at exit 5 for no reason.
+
+`build_slate.py --max-seconds` was a third number agreeing with neither: `35.0`, while SKILL.md taught `100` in both of its invocations. 100 is not a preference, it is 130 minus the ~30s the engine import, certify and write need after the search stops — so the default handed a caller who trusted it a third of the search the same call could afford, and a thin bank reads as a tight exposure cap rather than as an unfinished search.
+
+`_find_repo()` named exactly two hosts, `~/Documents/Claude/mlb-dfs` and `/sessions[/*]/mnt/mlb-dfs`. On a Claude Code container the repo is at `/home/user/mlb-dfs` and neither matched; the `__file__` walk happened to succeed first, so the gap was invisible from a build. It stopped being invisible in `skills/generate-lineups/SKILL.md`, whose opening instruction tells the session to resolve the repo with `ls -d /sessions/*/mnt/mlb-dfs`, which returns nothing there — and that skill's own first rule is that a session which cannot read the repo must say so and stop.
+
+**What shipped.** `mlb_engine.repo_env` gains the host authority beside the secrets loader and the ET calendar: `detect_host`, `call_budget_s`, `declared_ceiling_s`, `host_profile`, `call_budget_source`, `repo_root`, and `HOST_PROFILES` for `cowork` / `claude_code` / `windows` / `unknown`. Precedence is copied from `tools/audit.py`'s `gate_call_ceiling` rather than invented: an explicit argument, then an environment variable (`MLB_DFS_CALL_BUDGET_S`), then the host's own declared ceiling discounted by `CALL_BUDGET_SAFE_FRACTION = 0.7`, then the profile, then `130.0`.
+
+Every signal is PROBED, never inferred from a session's flavour: a repo under a `/sessions/*/mnt/` path is Cowork, `os.name == "nt"` is Ben's machine, a host that exported its own bash ceiling is Claude Code. Two of the three hosts are "Claude Code", which is why the repo's docs conflated the host with the client and why detection reads what the host asserts about itself.
+
+The derivation validates itself: on Cowork `default_max_seconds()` resolves to exactly the `100` SKILL.md has always taught, and on this container to 600. That was not fitted — the reserve is the documented 30s tail — so the model reproduces the docs on the host the docs were written for.
+
+`_find_repo()` gains a walk up from the working directory (host-agnostic: a session inside the repo finds it) and broader globs, instead of a third literal. It cannot delegate to `repo_root()` and says so in place: it runs before the `sys.path` insert, so it is the bootstrap and carries its own copy of the question by necessity.
+
+**Two corrections the first cut needed, both caught before landing.** `call_budget_s` read the declared ceiling regardless of the resolved host and answered `630.0` for `MLB_DFS_HOST=cowork` — the 130s budget lost again by a different route, which is the exact failure the function exists to prevent; the ceiling is now read for `claude_code` only, and a stated host is treated as a claim about which sandbox this is rather than something an ambient variable can override. And the resolver was imported at `build_slate.py` module level, which reddened `test_the_script_still_loads_without_the_engine_on_the_path`: that script has to load with no engine on the path because `missing_dependencies` is a refusal it PRINTS rather than a crash it takes, and argparse builds this default while assembling its help, upstream of that refusal. The import moved inside `default_max_seconds()` with a documented fallback to `UNRESOLVED_MAX_SECONDS_S = 100.0`, which is Cowork's pair, so an unresolved host behaves exactly as the docs describe.
+
+**R233 grep — the class this closes.** `grep -rn "130" --include=*.py mlb_engine/ tools/ skills/`, live values only:
+
+- `mlb_engine/repo_env.py:208` — `UNKNOWN_HOST_BUDGET_S = 130.0`, the floor for a host that has stated nothing. **Kept, and now the only definition.**
+- `mlb_engine/repo_env.py:226` — the `cowork` profile's `call_budget_s`. **Kept:** it is the host the number was measured on.
+- `tools/solver_probe.py:72` — was `130.0`, now `call_budget_s()`.
+- `tools/autobuild.py:113` — was `130.0`, now `call_budget_s()`.
+- `skills/generate-lineups/scripts/build_slate.py:4796` — was `35.0`, now `default_max_seconds()`.
+- `tools/audit.py:3195` — "pass 130 there" in `--gate-budget`'s help. **Deliberately kept:** the gate's own 28.0/39.0 floors are out of scope here, the comment at `tools/audit.py:2005-2013` already explains that they are floors for a host that has told us nothing, and `MLB_GATE_CEILING_S` is the existing way a better host says so.
+- The remaining `130` hits are unrelated: pasted American odds prices (`mlb_engine/intake/paste_odds.py`, `tools/odds_from_paste.py`) and references to incident R130.
+
+Prose still citing the number (`CLAUDE.md`, `skills/generate-lineups/SKILL.md`, `docs/cowork_sandbox.md`, `.claude/rules/engine.md`, `.claude/rules/skills.md`) is **not** rewritten here. `.claude/rules/engine.md` already carries "The 130s budget is Cowork's, not the engine's", which is the correct statement; making `CLAUDE.md`'s `## Hosts` and `## Sandbox` describe three hosts is the docs half and lands separately so this entry stays a code change.
+
+**Gate.** `PASS  v2.26.0  40 modules  2143 tests  4 skipped  {test_core 1292/1292 (4 skipped) skipped_in_place}`. `tests.test_core` 1281 -> 1292. The golden replay did not move; no bank or solver behaviour changed, only the default a caller gets when it passes no flag. The 4 skips are host facts, not lost tree coverage: no vendored `.pylibs/scipy`, no `.env` on this machine, two unstaged 2026-08-16 salary fixtures.
+
+**Two host facts this session established, recorded because they are not in the tree anywhere.** On a Claude Code container `/tmp` DOES persist between bash calls (wheels staged in one call were read in four later ones) and `rm` works, so the `_to_delete/` convention and the "`/tmp` is not shared" warning are Cowork's, not universal. `HOST_PROFILES` carries both as `tmp_shared` and `has_rm` so a caller can ask rather than assume — though a caller that can simply try the cheap thing and handle the failure should keep doing that.
+
+**Not fixed here, and not new.** The fixture evals report 7 PASS with eval 5 (`adversarial-multi-ticket-satellite`) FAIL on `forbidden claim present: /large_wta/`. That is the standing red already recorded at `docs/backlog.md:7898-7908`, whose fix is eval-side (R181, scope the forbidden regex). Measured both ways to be sure it was not this change: at the OLD `--max-seconds 35.0` default and at the new 600, the brief is identical (`strategy: direct`, `contest_shape: large_wta`), which matches the pristine-copy result the board already records.
+
+---
+
 ## 2026-09-15 — R301 parts (2), (5), (6): CLAUDE.md becomes a root contract, and the repo learns to host DEV in Claude Code
 
 **Scope.** `CLAUDE.md` (rewritten), `.claude/settings.json`, `.claude/hooks/session_start.py`, `.claude/hooks/guard_commands.py`, `.claude/rules/engine.md`, `.claude/rules/board.md`, `.claude/rules/skills.md`, `.claude/skills/dev-session/SKILL.md`, `.claude/skills/land/SKILL.md` (all new), `docs/cowork_sandbox.md` (new), `docs/next_session_prompts.md` (deleted), `tests/test_core.py`, `tools/audit.py` (the per-suite pin), `tools/claim.py` (`WRITE_SETS["DEV"]` gains `.claude/`), `.gitignore`, `docs/backlog.md` (the R301 rider and the CC-40 row), this file. Ben's instruction, 2026-09-15: all DEV work moves to Claude Code on his machine; make the supporting files fit that, apply the published CLAUDE.md guidance, and cut what every session pays to read. That is roadmap **CC-40** (R301) pulled forward; parts (2), (5) and (6) land here, (1), (3) and (4) stay open below.
@@ -716,7 +756,7 @@ rosterable, Workstream 1, CC-3). Two findings deliberately got NO number: the
 `--max-opposing-hitters-per-sp` default (the archive supports the default and the
 R276 rider adds the panel that makes a relaxation visible), and a Showdown 5-1
 control would ratify a mix the engine already builds 95% of the time (R306 step 5
-rider). Next free number: R349 (R348 is the 2026-09-15 CC-0 entry above; R340 landed the same date as CC-1).
+rider). Next free number: R350 (R349 is the 2026-09-16 host-resolver entry above; R348 is the 2026-09-15 CC-0 entry; R340 landed the same date as CC-1).
 
 **Riders (twenty):** R10 (hierarchical fit, per-player popularity term, field-size
 transfer, two new control halves after the bar), R37(2)(c) (the secondary is
