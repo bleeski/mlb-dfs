@@ -78,9 +78,11 @@ This file's predecessor asserted the device VM had no network, and measured on
 2026-09-06 every clause was false: the audit fetched, `sync_check.py` reached
 GitHub, and `curl` returned 200 from api.github.com, statsapi.mlb.com,
 baseballsavant.mlb.com, fangraphs.com and pypi.org. MEASURE egress in either
-direction; the audit names which of three things stopped a fetch (R147). What no
-fetch can fix: sessions COMMIT and Ben PUSHES, so disk routinely runs ahead of
-GitHub and the audit names that too. GitHub's default branch is `main` and
+direction; the audit names which of three things stopped a fetch (R147). Disk can
+still run ahead of GitHub whenever a session commits without pushing, and the
+audit names that too -- though since R350 (Ben, 2026-09-16) sessions PUSH as well
+as commit, so it is no longer the standing state it was when this paragraph was
+written. GitHub's default branch is `main` and
 `master` is deleted (verified 2026-08-18 with `git ls-remote --symref origin
 HEAD`); a clone can carry a stale `origin/master` indefinitely because a push
 never prunes.

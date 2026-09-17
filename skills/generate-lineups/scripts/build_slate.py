@@ -58,26 +58,48 @@ def _find_repo() -> Path:
 
     An installed skill lives outside the repo, so the root cannot be derived from
     __file__ alone. Order: explicit env var, then a walk up from this file (works
-    when the skill is versioned inside the repo), then the usual workspace mount
-    paths. Failing loudly here beats importing a half-present package later.
+    when the skill is versioned inside the repo), then a walk up from the working
+    directory, then the known workspace layouts. Failing loudly here beats
+    importing a half-present package later.
+
+    This function CANNOT delegate to ``mlb_engine.repo_env.repo_root``, which is
+    the same authority for every other caller: it runs before the sys.path insert
+    below, so ``mlb_engine`` is not importable yet. It is the bootstrap, so it
+    carries its own copy of the question by necessity rather than by neglect.
+
+    R349, 2026-09-16. The layout list was two literals and one glob, and it named
+    exactly two hosts -- ``~/Documents/Claude/mlb-dfs`` and ``/sessions[/*]/mnt/
+    mlb-dfs``. On a Claude Code container the repo is at ``/home/user/mlb-dfs``
+    and none of them matched; the __file__ walk happened to succeed first, so the
+    gap was invisible from a build. It stopped being invisible in SKILL.md, whose
+    opening instruction told the session to resolve the repo with
+    ``ls -d /sessions/*/mnt/mlb-dfs``, which returns nothing there -- and the
+    skill's own first rule is that a session which cannot read the repo must stop.
+    Adding another literal would repeat the mistake, so what goes in is a walk
+    from the CWD (host-agnostic: a session that is in the repo finds it) plus
+    globs broad enough to cover a container's home directory.
     """
     import os
 
     env = os.environ.get("MLB_DFS_ROOT")
     if env and (Path(env) / "mlb_engine").is_dir():
         return Path(env)
-    for parent in Path(__file__).resolve().parents:
-        if (parent / "mlb_engine").is_dir() and (parent / "CLAUDE.md").exists():
-            return parent
+    for start in (Path(__file__).resolve(), Path.cwd().resolve()):
+        for parent in (start, *start.parents):
+            if (parent / "mlb_engine").is_dir() and (parent / "CLAUDE.md").exists():
+                return parent
     for guess in (
         Path.home() / "Documents" / "Claude" / "mlb-dfs",
+        Path.home() / "mlb-dfs",
         Path("/sessions") / "mnt" / "mlb-dfs",
     ):
         if (guess / "mlb_engine").is_dir():
             return guess
-    for mount in Path("/sessions").glob("*/mnt/mlb-dfs"):
-        if (mount / "mlb_engine").is_dir():
-            return mount
+    for pattern in ("*/mnt/mlb-dfs", "*/mlb-dfs"):
+        for base in (Path("/sessions"), Path("/home")):
+            for mount in base.glob(pattern):
+                if (mount / "mlb_engine").is_dir():
+                    return mount
     raise SystemExit(
         "cannot locate the mlb-dfs engine. Set MLB_DFS_ROOT to the repo root."
     )
@@ -104,6 +126,43 @@ MIN_GAMES_PER_LINEUP = 2
 # bank as a considered set of caps. So a floored budget announces itself, both
 # on stderr and in the record.
 BANK_BUDGET_FLOOR_S = 5.0
+
+# R349, 2026-09-16. `--max-seconds` defaulted to 35.0 while SKILL.md taught 100
+# in both of its invocations, and 100 is not a preference: it is 130 (Cowork's
+# call ceiling) minus the ~30s that the engine import, certify and write need
+# after the search stops. So the default was a third number agreeing with
+# neither the docs nor any host, and a caller who trusted it got a third of the
+# search the same call could afford. A 14-second budget is what leaves a bank 2%
+# explored, and an under-explored bank reads as a tight exposure cap.
+#
+# Deriving it keeps the relationship the docs describe instead of restating a
+# number: on Cowork this resolves to exactly the 100 SKILL.md teaches, and on a
+# Claude Code container declaring 900s it resolves to 600.
+MAX_SECONDS_RESERVE_S = 30.0
+
+# What to use when the host cannot be resolved because the engine is not
+# importable. 100.0 is Cowork's 130 less the reserve, which is the pair SKILL.md
+# has always taught, so an unresolved host behaves exactly as the docs describe.
+UNRESOLVED_MAX_SECONDS_S = 100.0
+
+
+def default_max_seconds() -> float:
+    """This invocation's default wall clock: the host's call budget, less the
+    reserve the post-search tail needs. Floored so a host declaring a tiny
+    ceiling still gets a budget the bank floor can work inside.
+
+    The engine import is INSIDE this function, and that placement is pinned by
+    ``test_the_script_still_loads_without_the_engine_on_the_path``. This script
+    has to load with no engine on the path, because ``missing_dependencies`` is a
+    refusal it PRINTS rather than a crash it takes -- and argparse builds this
+    default while assembling its help, which is upstream of that refusal. The
+    first cut of R349 put the import at module level and reddened that test.
+    """
+    try:
+        from mlb_engine.repo_env import call_budget_s
+    except Exception:
+        return UNRESOLVED_MAX_SECONDS_S
+    return max(BANK_BUDGET_FLOOR_S * 2, call_budget_s() - MAX_SECONDS_RESERVE_S)
 
 # --------------------------------------------------------------------------- #
 # R290(c) commit 1, 2026-09-03. Every refusal this script can hand its caller,
@@ -557,6 +616,74 @@ def fraction_or_problem(value: Any) -> tuple:
     if coerced > 1.0:
         return None, "above 1.0"
     return coerced, None
+
+
+def distinct_sp_pairs(candidates: list):
+    """How many distinct SP PAIRS this bank holds, or None if it cannot be read.
+
+    R351 / R115. The resume gate counted CANDIDATES, and since R340 split the
+    sliced door into one `extend_bank` call per stack size, one SP pair yields
+    TWO candidates (same pair, different `stack_min`, so different job keys).
+    Pair coverage therefore grows at half the candidate rate, and a gate written
+    in candidates opens at roughly `n_entries` pairs however many the slate has.
+
+    **This is R115's SLICED half and it is NOT verified end to end.** It was
+    written believing 1910_7g (2026-09-16) hit it. It did not: every build on
+    that slate ran `strategy: direct`, which reaches no resume gate at all, and
+    its refusals were bounded by TIME -- replayed on the same inputs with only
+    the budget varying, 120s gave 8 distinct pairs of 84 and refused while 600s
+    certified in 345.7s. R349's host budget is what fixed that slate.
+
+    What survives is the arithmetic, which the board already evidences
+    independently (`docs/backlog.md:7732`, R115: "at 66 candidates against 13
+    entries the documented resume path is unreachable however unexhausted the
+    jobs"). The candidate-count gate opens at roughly `n_entries` pairs because
+    of the R340 doubling, whatever the slate holds. Treat that as the claim; do
+    not cite 1910_7g for it.
+
+    `_candidate_pitcher_ids` is the allocator's own reader (it derives `sp_pairs`
+    from it at `contest_allocator.py:1543` and `:2993`), so this is the same
+    question the refusal asks, not a second definition of a pair. None means the
+    reader was unavailable, which leaves the gate on its candidate-count term
+    rather than guessing a coverage number.
+    """
+    try:
+        from mlb_engine.allocate.contest_allocator import _candidate_pitcher_ids
+    except Exception:  # noqa: BLE001 - the count is a refinement, not a gate input
+        return None
+    pairs = set()
+    for cand in candidates:
+        try:
+            ids = _candidate_pitcher_ids(cand) or []
+        except Exception:  # noqa: BLE001
+            continue
+        pair = tuple(sorted(str(i) for i in ids))
+        if len(pair) == 2:
+            pairs.add(pair)
+    return len(pairs)
+
+
+def sp_pairs_needed(n_entries: int, pair_cap) -> int:
+    """Distinct SP pairs an entered set of `n_entries` needs at `pair_cap`.
+
+    The same arithmetic the allocator's own refusal prints
+    (`contest_allocator.py:686-700`), computed BEFORE the solve instead of after
+    it: at a cap of 1, 29 entries need 29 distinct pairs.
+
+    Deliberately NOT floored at the slate's viable pair count, which the plan for
+    this change proposed. `job_list_exhausted` already terminates the loop when
+    the grid runs out, so a `min(viable_sp_pairs, ...)` term would only duplicate
+    a stop that exists -- and `viable_sp_pairs` comes from `_slate_feasibility`
+    inside `run_slate`, which has not run when this gate is read. One terminator
+    is better than two that can disagree.
+    """
+    try:
+        cap = int(pair_cap or 0)
+    except (TypeError, ValueError):
+        return 0
+    if cap <= 0:
+        return 0
+    return -(-int(n_entries) // cap)      # integer ceil; math is not imported here
 
 
 def _merge_bank_slice_reports(reports: list) -> dict:
@@ -2425,6 +2552,10 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         # calls, so this is not a second copy of R34's merge rule.
         slice_shapes = None
         bank_stack_request = resolve_bank_stack_request(None)
+        # R351. The same merge the stack request already needed, kept so the
+        # resume gate below can read `max_sp_pair_repetition` from it. None when
+        # shape resolution failed, which leaves the gate on candidate count.
+        _merged_controls = None
         try:
             from mlb_engine.entries.dk_entries_manager import parse_dk_entry_rows
             from mlb_engine.pipeline.execution_pipeline import (
@@ -2441,8 +2572,9 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
             })
             _bands = resolve_shape_bands(
                 postures, game_count=slate_game_count(projections))
-            bank_stack_request = resolve_bank_stack_request(
-                _merged_controls_for_build(postures, None, shape_bands=_bands))
+            _merged_controls = _merged_controls_for_build(
+                postures, None, shape_bands=_bands)
+            bank_stack_request = resolve_bank_stack_request(_merged_controls)
         except Exception as exc:  # noqa: BLE001 - both are refinements
             print(f"shape resolution failed, scoring wta only and asking the "
                   f"bank for the default stack size: {exc}", file=sys.stderr)
@@ -2498,7 +2630,22 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         bank_report["budget_floored"] = bank_budget_floored
         candidates = cache.as_candidates(
             projections, requested_n=n_entries, contest_shapes=slice_shapes)
-        if len(candidates) < n_entries * 2 and not bank_report["job_list_exhausted"]:
+        # R351 / R115 (CC-36 Batch 1). The gate is thin-by-COUNT **or**
+        # thin-by-PAIR-COVERAGE. Counting candidates alone stopped the resume at
+        # roughly `n_entries` distinct SP pairs, because R340 makes one pair
+        # yield two candidates; on 1910_7g that left 61 of 84 viable pairs never
+        # solved and handed the allocator a refusal that reads like a strategy
+        # problem. `job_list_exhausted` stays the single terminator, so a slate
+        # with genuinely few pairs still stops instead of looping.
+        _pairs_have = distinct_sp_pairs(candidates)
+        _pairs_want = sp_pairs_needed(
+            n_entries, (_merged_controls or {}).get("max_sp_pair_repetition"))
+        _thin_by_count = len(candidates) < n_entries * 2
+        _thin_by_pairs = (_pairs_have is not None and _pairs_want > 0
+                          and _pairs_have < _pairs_want)
+        bank_report["distinct_sp_pairs"] = _pairs_have
+        bank_report["sp_pairs_needed"] = _pairs_want
+        if (_thin_by_count or _thin_by_pairs) and not bank_report["job_list_exhausted"]:
             print(json.dumps({
                 "status": "partial",
                 **refusal_stamp("bank_thin_partial"),
@@ -2506,6 +2653,10 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
                 "strategy": strategy,
                 "candidates": len(candidates),
                 "needed_at_least": n_entries * 2,
+                "distinct_sp_pairs": _pairs_have,
+                "sp_pairs_needed": _pairs_want,
+                "thin_by": ([k for k, v in (("candidates", _thin_by_count),
+                                            ("sp_pair_coverage", _thin_by_pairs)) if v]),
                 "note": "bank still thin; run the same command again to add a slice",
             }, indent=1))
             return 10, {}
@@ -4734,9 +4885,12 @@ def main() -> int:
     ap.set_defaults(rotowire=True)
     ap.add_argument("--entries-count", dest="entries", type=int,
                     help="override the reserved-entry count")
-    ap.add_argument("--max-seconds", type=float, default=35.0,
-                    help="wall clock this invocation may use before saving and "
-                         "asking to be rerun")
+    ap.add_argument("--max-seconds", type=float, default=default_max_seconds(),
+                    help=f"wall clock this invocation may use before saving and "
+                         f"asking to be rerun (default "
+                         f"{default_max_seconds():.0f}, this host's call budget "
+                         f"less {MAX_SECONDS_RESERVE_S:.0f}s for the engine "
+                         f"import, certify and write)")
     ap.add_argument("--brief", help="write the brief JSON here")
     ap.add_argument("--declare-pitcher", dest="declare_pitcher", action="append",
                     default=[], metavar="ID[=ROLE]",

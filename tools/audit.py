@@ -733,7 +733,16 @@ EXPECTED_SUITE_COUNTS = {
     # root contract points at exists, and the command guard hook denies the
     # contract bans. The two PASS-line prose pins now pin the shape, not
     # the count, so this move is the last one that needed a CLAUDE.md edit.
-    "tests.test_core": 1281,
+    # R349, 2026-09-16: 1281 -> 1292, the eleven that pin the host resolver --
+    # two added to ProbeBudgetDefaultTests (the unknown host still gets 130, and
+    # a STATED cowork host is not widened by an ambient BASH_DEFAULT_TIMEOUT_MS,
+    # which the first cut got wrong), eight in HostProfileTests (the four probe
+    # branches, the small-ceiling-not-floored-up case, the three-level
+    # precedence, repo_root rejecting a non-repo override, and every profile
+    # carrying the keys callers read), and one in BuildSlateScriptTests for the
+    # engine-absent fallback -- the first cut put that import at module level and
+    # reddened the sibling test that keeps this script loadable with no engine.
+    "tests.test_core": 1292,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps

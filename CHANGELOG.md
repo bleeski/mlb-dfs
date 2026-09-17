@@ -25,6 +25,110 @@ performance claim.
 
 ---
 
+## 2026-09-17 — R351: the bank's resume gate gains an SP-pair-coverage term (R115's sliced half; CC-36 Batch 1 stays OPEN)
+
+**Scope.** `skills/generate-lineups/scripts/build_slate.py` (`distinct_sp_pairs`, `sp_pairs_needed`, the exit-10 gate, and `_merged_controls` captured for it), this file.
+
+**What was wrong.** The sliced door's resume gate is `len(candidates) < n_entries * 2`. Since R340 that door makes one `extend_bank` call per stack size, and a pair solved under `stack_min=5` and again under `stack_min=4` is two candidates under two job keys — so SP-pair coverage grows at half the candidate rate and a gate written in candidates opens at roughly `n_entries` distinct pairs however many the slate holds. R115 on the board (`docs/backlog.md:7732`) is this: "at 66 candidates against 13 entries the documented resume path is unreachable however unexhausted the jobs."
+
+**What shipped.** `distinct_sp_pairs(candidates)` counts pairs through `_candidate_pitcher_ids`, which is the allocator's own reader (`contest_allocator.py:1543`, `:2993`), so this asks the same question the refusal asks rather than defining a second notion of a pair; it returns `None` when that reader is unavailable, which leaves the gate on its candidate term instead of guessing. `sp_pairs_needed(n_entries, cap)` is `ceil(n_entries / cap)`, the arithmetic the refusal already prints at `contest_allocator.py:686-700`, computed before the solve instead of after it. The gate is now thin-by-count **or** thin-by-coverage, and `job_list_exhausted` remains the single terminator. `bank_report` and the exit-10 payload carry `distinct_sp_pairs`, `sp_pairs_needed` and `thin_by`.
+
+**One deviation from the plan, with its reason.** The plan specified `pairs_needed = min(viable_sp_pairs, ceil(n_entries / cap))`. The `min` is dropped. `viable_sp_pairs` comes from `_slate_feasibility` inside `run_slate`, which has not run when this gate is read, and `job_list_exhausted` already stops the loop when the grid runs out — so the floor would duplicate a terminator that exists and add a second one that could disagree with it.
+
+**This half is NOT verified end to end, and the item stays open.** It was written believing the 2026-09-16 1910_7g slate had hit this gate. It had not: every build there ran `strategy: direct`, which reaches no resume gate, and its refusals were time-bounded (see the R349 entry's replay table — 120s gave 8 pairs of 84 and refused, 600s certified in 345.7s). The arithmetic above stands on R115's own filed evidence, not on that slate. **CC-36 Batch 1 therefore stays OPEN on the board**, with the coverage term landed and the end-to-end reproduction outstanding; nothing migrated out of `docs/backlog.md`.
+
+**The risk this carries, named rather than discovered later.** The change can only make the sliced path ask for MORE slices, never fewer, and every extra slice costs a call. On a live slate that is a real cost, bounded by two things: `job_list_exhausted`, and `--deliver-by`, whose governor already owns the clock from T-6. A thin bank that refuses is the worse failure, so the trade is deliberate — but if a sliced build starts returning exit 10 where it used to proceed, this is the change that did it.
+
+**Verification.** Unit, since the path is not reproducible on the slate to hand: `sp_pairs_needed` over seven (entries, cap) pairs including the 1910_7g arithmetic (29 entries at cap 1 -> 29 pairs) and the degenerate `cap=None`/`cap=0` cases; `distinct_sp_pairs` over both candidate spellings (`sp_ids` and `contest_fit.sp_ids`), reversed-order collapse, a single-arm candidate, and an empty bank. The first run of that check returned 0 on a fixture using a `pitcher_ids` key that does not exist — the helper was right and the fixture was wrong, which is the reason the real key is named in this entry.
+
+**Gate.** `PASS  v2.26.0  40 modules  2143 tests  4 skipped  {test_core 1292/1292 (4 skipped) skipped_in_place}`. No pin moves: the new helpers are exercised by a scratch harness, not by added test methods. Golden replay unmoved — the gate governs whether a slice is requested, not what the solver builds.
+
+---
+
+## 2026-09-16 — R350: sessions push, a force-push is refused, and the command guard stops denying the act of reading about a rule
+
+**Scope.** `.claude/hooks/guard_commands.py`, `.claude/settings.json`, `tests/test_core.py`, `CLAUDE.md`, `docs/cowork_sandbox.md`, `docs/cowork_sync_protocol.md`, this file. Ben's decision, 2026-09-16: sessions may push to any branch including `main`. The over-match half is a defect found the same evening, twice, in the course of using the hook.
+
+**What was wrong, part one: the push rule had stopped paying for itself.** R301 gave the rule two enforcement layers, `permissions.deny` for the client and `GIT_PUSH` in the hook, and CLAUDE.md stated it as "Sessions COMMIT, Ben PUSHES". `docs/cowork_sync_protocol.md` was always explicit that this is "a CONVENTION rather than a capability limit". On 2026-09-16 the convention cost a full stop: a BUILD session finished the 1910_7g slate, committed a backlog fragment, and then hit both layers on the push that the harness's own stop-hook was asking for. There was no resolution available to the session except to report the contradiction to Ben and stand down. An ordinary push is additive and revertible. A force-push is the operation that discards commits, and in a tree the multi-session contract assumes is shared, the commits it discards may not be yours. So the force-push is what stays denied, and it is denied in both layers.
+
+**What was wrong, part two: every rule searched the RAW command string.** So a read-only `grep` whose pattern contained a banned literal was denied — the hook blocking someone reading *about* a rule rather than breaking it. Confirmed live twice on 2026-09-16: once on an ordinary search, and once on a `grep` that was diagnosing this very file, which is the instance that makes it more than untidy. The file's own docstring claimed it "fails open, never closed", which is true of a command it does not recognise and false of one it over-matches.
+
+**What shipped.** `judge()` keeps its signature and its job moves inside: `segments()` splits the command on `&&`, `||`, `|`, `;` and newlines with quote awareness (via `shlex`'s `punctuation_chars`, because a naive `str.split` would reintroduce this same class from the other side — a separator inside a quoted argument is not a separator), `real_command()` resolves each segment's actual command past `VAR=value` prefixes and wrappers, and a segment whose command is in `READ_ONLY_TOOLS` is exempt from the content rules. `judge_segment()` then judges one segment.
+
+**Round two, forced by this change's own commit.** Scoping the regexes to a segment was not enough. The commit that shipped the paragraph above was DENIED BY THE GUARD: its message documents `git add -A` while explaining the rule, and a regex over the segment text reads a banned literal inside a quoted argument as the banned act. That is the same defect as the read-only `grep`, one level down, and rewording the message would have left it in place for the next person who documents a rule. So the git rules stopped reading text at all. `resolved_argv()` returns the segment's argv from its real command onward, `git_subcommand()` returns `(subcommand, its arguments)`, and push / banned-subcommand / add / commit are each answered from argv. `judge_commit()` carries the pathless-commit logic over unchanged in behaviour.
+
+Answering from argv is only safe BECAUSE `resolved_argv` walks past wrappers: an `argv[0] == "git"` test alone lets `timeout 130 git add -A` through, which is exactly why the first cut kept the regexes. `COMMAND_WRAPPERS` is therefore load-bearing rather than cosmetic, and the deny fixtures include the wrapped spellings to pin it. The trade is worth naming: an argv rule is exact about what it sees and blind to what it does not, where the regex was the reverse.
+
+Three things about that shape, each load-bearing:
+
+- **Wrapper resolution is required for the fix not to be a regression.** The design this replaced tested `argv[0] == "git"`, which would have let `timeout 130 git add -A` through, because `argv[0]` is `timeout`. Resolving past wrappers can only ever GRANT an exemption — the deny rules still run their own regexes over the whole segment — so a wrapper the list misses costs a false positive on a search, never a missed denial.
+- **The exemption is per segment, so a read-only first segment cannot launder a second.** `grep -rn foo docs/ && git push --force` is denied on the second segment; the long-standing `git add . && git commit -m x` case proves the converse still holds.
+- **`shlex.join`, never `" ".join`.** Caught by the pinned test rather than by review: the rules re-tokenize their own captures, so a segment rebuilt without quoting changes meaning. `git commit -m "R301: lean CLAUDE.md"` rejoined bare becomes `git commit -m R301: lean CLAUDE.md`, whose re-tokenization finds `CLAUDE.md` sitting loose and reads a commit MESSAGE as a pathspec — silently disabling the pathless-commit prompt that the same test exists to keep. Red with `" ".join`, green with `shlex.join`; that is the mutation check, run for real rather than simulated.
+
+The force deny is token-wise (`forced_push`) rather than a regex, so `--follow-tags` is not mistaken for `--force` and a combined short flag like `-fu` is still caught.
+
+**`permissions.deny` is a fast path, not the guarantee.** It carries four force-only prefixes (`Bash`/`PowerShell` x `--force`/`-f `), and a prefix rule structurally cannot catch a TRAILING flag: `git push origin main --force` does not match any of them. The hook does, and `test_the_command_guard_denies_the_contract_bans` pins that exact spelling. Anyone tightening this later should tighten the hook, not the prefix list.
+
+**R233 grep — the class this closes.** After round two, `grep -n "\.search(command)\|\.finditer(command)" .claude/hooks/guard_commands.py` returns exactly **two** hits, not six: `DRAFTKINGS` at line 237 and `PIP_UNPINNED` at line 259. Both still match text deliberately — DraftKings is a hard wall that should fail closed, and the pip rule reads both `pip install` and `python -m pip install` spellings. The four git rules are gone from that grep entirely, because `grep -n "sub == \|sub in \|git_subcommand("` shows them answered from argv at lines 240, 241, 245, 248, 255. `grep -n "GIT_ADD\|GIT_COMMIT\|GIT_PUSH"` returns ONE hit, line 280, and it is a docstring reference in `judge_commit` naming the loop it replaced — no live regex survives. `judge_segment` has exactly one caller, `judge()`'s segment loop at line 230, and `grep -n "judge(command)"` returns a single hit, `main()` at line 316. No path judges the raw command string.
+
+The DraftKings rule is deliberately NOT narrowed to known network clients. A broad match plus the read-only exemption is strictly safer than an allowlist of fetchers, and it is a hard wall, so it should fail closed. The measured consequence, worth knowing before someone files it as a bug: an ad-hoc bash harness that spells out a banned literal is still denied, because `python` is not a read-only tool and a heredoc naming a banned command is indistinguishable from one running it. Verifying this change by hand therefore required building every literal from fragments. The test suite is unaffected — pytest reads test files from disk and never invokes the hook.
+
+**One unrelated correction made in passing**, because leaving a known-wrong string next to a corrected one is the drift this repo keeps finding: the `PIP_UNPINNED` denial told the reader that `tools/env_probe.py --install` installs `requirements-production.lock`. It installs `requirements.lock` (`LOCK_NAME` in that file). Two locks with overlapping names, and the message named the other one.
+
+**Gate.** `PASS  v2.26.0  40 modules  2143 tests  4 skipped  {test_core 1292/1292 (4 skipped) skipped_in_place}`. **The pin does not move:** `test_the_command_guard_denies_the_contract_bans` grew its fixtures, not the method count, so `tests.test_core` stays at 1292. Golden replay unmoved; nothing here reaches the engine.
+
+---
+
+## 2026-09-16 — R349: the call budget stops being a constant and becomes a resolved host fact, and the repo root resolves on a third host
+
+**Scope.** `mlb_engine/repo_env.py` (the new host authority), `tools/solver_probe.py`, `tools/autobuild.py`, `skills/generate-lineups/scripts/build_slate.py` (`_find_repo`, the `--max-seconds` default), `tests/test_core.py`, `tools/audit.py` (the `tests.test_core` pin), this file. Found by the 2026-09-16 1910_7g BUILD session, which delivered a certified 29-entry portfolio and spent roughly a third of a 35-minute lock window on problems that were not about baseball.
+
+**What was wrong.** CLAUDE.md's `## Sandbox` says "The Cowork inner bash budget is 130s. One number, this one (R271); do not re-derive it per call." That instruction was followed exactly, and the number then became the argparse default of `solver_probe --budget` (`DEFAULT_BUDGET_S = 130.0`) and of `autobuild --call-budget-seconds` (`DEFAULT_CALL_BUDGET_S = 130.0`). Both are correct on Cowork and wrong by a factor of five on a Claude Code container, which declares `BASH_DEFAULT_TIMEOUT_MS=900000` in `.claude/settings.json` and honours it: the 1910_7g session ran a 420-second build in one call while every default in the tree still described 130. `autobuild`'s own header comment already said its defaults "describe a process that CANNOT finish inside one call" — true on the host the number came from, and the reason a supervisor with room to work would stop cleanly at exit 5 for no reason.
+
+`build_slate.py --max-seconds` was a third number agreeing with neither: `35.0`, while SKILL.md taught `100` in both of its invocations. 100 is not a preference, it is 130 minus the ~30s the engine import, certify and write need after the search stops — so the default handed a caller who trusted it a third of the search the same call could afford, and a thin bank reads as a tight exposure cap rather than as an unfinished search.
+
+`_find_repo()` named exactly two hosts, `~/Documents/Claude/mlb-dfs` and `/sessions[/*]/mnt/mlb-dfs`. On a Claude Code container the repo is at `/home/user/mlb-dfs` and neither matched; the `__file__` walk happened to succeed first, so the gap was invisible from a build. It stopped being invisible in `skills/generate-lineups/SKILL.md`, whose opening instruction tells the session to resolve the repo with `ls -d /sessions/*/mnt/mlb-dfs`, which returns nothing there — and that skill's own first rule is that a session which cannot read the repo must say so and stop.
+
+**What shipped.** `mlb_engine.repo_env` gains the host authority beside the secrets loader and the ET calendar: `detect_host`, `call_budget_s`, `declared_ceiling_s`, `host_profile`, `call_budget_source`, `repo_root`, and `HOST_PROFILES` for `cowork` / `claude_code` / `windows` / `unknown`. Precedence is copied from `tools/audit.py`'s `gate_call_ceiling` rather than invented: an explicit argument, then an environment variable (`MLB_DFS_CALL_BUDGET_S`), then the host's own declared ceiling discounted by `CALL_BUDGET_SAFE_FRACTION = 0.7`, then the profile, then `130.0`.
+
+Every signal is PROBED, never inferred from a session's flavour: a repo under a `/sessions/*/mnt/` path is Cowork, `os.name == "nt"` is Ben's machine, a host that exported its own bash ceiling is Claude Code. Two of the three hosts are "Claude Code", which is why the repo's docs conflated the host with the client and why detection reads what the host asserts about itself.
+
+The derivation validates itself: on Cowork `default_max_seconds()` resolves to exactly the `100` SKILL.md has always taught, and on this container to 600. That was not fitted — the reserve is the documented 30s tail — so the model reproduces the docs on the host the docs were written for.
+
+`_find_repo()` gains a walk up from the working directory (host-agnostic: a session inside the repo finds it) and broader globs, instead of a third literal. It cannot delegate to `repo_root()` and says so in place: it runs before the `sys.path` insert, so it is the bootstrap and carries its own copy of the question by necessity.
+
+**Two corrections the first cut needed, both caught before landing.** `call_budget_s` read the declared ceiling regardless of the resolved host and answered `630.0` for `MLB_DFS_HOST=cowork` — the 130s budget lost again by a different route, which is the exact failure the function exists to prevent; the ceiling is now read for `claude_code` only, and a stated host is treated as a claim about which sandbox this is rather than something an ambient variable can override. And the resolver was imported at `build_slate.py` module level, which reddened `test_the_script_still_loads_without_the_engine_on_the_path`: that script has to load with no engine on the path because `missing_dependencies` is a refusal it PRINTS rather than a crash it takes, and argparse builds this default while assembling its help, upstream of that refusal. The import moved inside `default_max_seconds()` with a documented fallback to `UNRESOLVED_MAX_SECONDS_S = 100.0`, which is Cowork's pair, so an unresolved host behaves exactly as the docs describe.
+
+**R233 grep — the class this closes.** `grep -rn "130" --include=*.py mlb_engine/ tools/ skills/`, live values only:
+
+- `mlb_engine/repo_env.py:208` — `UNKNOWN_HOST_BUDGET_S = 130.0`, the floor for a host that has stated nothing. **Kept, and now the only definition.**
+- `mlb_engine/repo_env.py:226` — the `cowork` profile's `call_budget_s`. **Kept:** it is the host the number was measured on.
+- `tools/solver_probe.py:72` — was `130.0`, now `call_budget_s()`.
+- `tools/autobuild.py:113` — was `130.0`, now `call_budget_s()`.
+- `skills/generate-lineups/scripts/build_slate.py:4796` — was `35.0`, now `default_max_seconds()`.
+- `tools/audit.py:3195` — "pass 130 there" in `--gate-budget`'s help. **Deliberately kept:** the gate's own 28.0/39.0 floors are out of scope here, the comment at `tools/audit.py:2005-2013` already explains that they are floors for a host that has told us nothing, and `MLB_GATE_CEILING_S` is the existing way a better host says so.
+- The remaining `130` hits are unrelated: pasted American odds prices (`mlb_engine/intake/paste_odds.py`, `tools/odds_from_paste.py`) and references to incident R130.
+
+Prose still citing the number (`CLAUDE.md`, `skills/generate-lineups/SKILL.md`, `docs/cowork_sandbox.md`, `.claude/rules/engine.md`, `.claude/rules/skills.md`) is **not** rewritten here. `.claude/rules/engine.md` already carries "The 130s budget is Cowork's, not the engine's", which is the correct statement; making `CLAUDE.md`'s `## Hosts` and `## Sandbox` describe three hosts is the docs half and lands separately so this entry stays a code change.
+
+**Measured afterwards: this entry is what fixed the 1910_7g slate, and the session's first diagnosis of that slate was wrong.** The BUILD session read the refusal `23 distinct SP pairs x cap 1 = 23 < 29 entries` and concluded the bank's resume gate in `build_slate.py` had closed early — that raising the budget "would have changed nothing". Replaying the slate against its own staged inputs says otherwise. Every 1910_7g build ran `strategy: direct`, which reaches no resume gate at all; that path's bank is bounded by TIME. Same inputs, budget the only variable:
+
+| `--max-seconds` | outcome |
+|---|---|
+| 120 | exit 3, **8** distinct SP pairs of 84 viable |
+| 420 (the live v1 delivery) | exit 0, certified |
+| 600 (this entry's resolved default here) | exit 0, certified, 345.7s elapsed |
+
+The build needed about 346 seconds and the old default handed it 35. The 23-pair refusal came from `autobuild --per-build-seconds 90`, not from the 420s build that certified, so the original reading also attributed one run's number to a different run. Recorded because the wrong diagnosis is the more useful half: a refusal that names a control reads like a strategy problem and was an unfinished search, and the artifact that settles it is the replay, not the message.
+
+**Gate.** `PASS  v2.26.0  40 modules  2143 tests  4 skipped  {test_core 1292/1292 (4 skipped) skipped_in_place}`. `tests.test_core` 1281 -> 1292. The golden replay did not move; no bank or solver behaviour changed, only the default a caller gets when it passes no flag. The 4 skips are host facts, not lost tree coverage: no vendored `.pylibs/scipy`, no `.env` on this machine, two unstaged 2026-08-16 salary fixtures.
+
+**Two host facts this session established, recorded because they are not in the tree anywhere.** On a Claude Code container `/tmp` DOES persist between bash calls (wheels staged in one call were read in four later ones) and `rm` works, so the `_to_delete/` convention and the "`/tmp` is not shared" warning are Cowork's, not universal. `HOST_PROFILES` carries both as `tmp_shared` and `has_rm` so a caller can ask rather than assume — though a caller that can simply try the cheap thing and handle the failure should keep doing that.
+
+**Not fixed here, and not new.** The fixture evals report 7 PASS with eval 5 (`adversarial-multi-ticket-satellite`) FAIL on `forbidden claim present: /large_wta/`. That is the standing red already recorded at `docs/backlog.md:7898-7908`, whose fix is eval-side (R181, scope the forbidden regex). Measured both ways to be sure it was not this change: at the OLD `--max-seconds 35.0` default and at the new 600, the brief is identical (`strategy: direct`, `contest_shape: large_wta`), which matches the pristine-copy result the board already records.
+
+---
+
 ## 2026-09-15 — R301 parts (2), (5), (6): CLAUDE.md becomes a root contract, and the repo learns to host DEV in Claude Code
 
 **Scope.** `CLAUDE.md` (rewritten), `.claude/settings.json`, `.claude/hooks/session_start.py`, `.claude/hooks/guard_commands.py`, `.claude/rules/engine.md`, `.claude/rules/board.md`, `.claude/rules/skills.md`, `.claude/skills/dev-session/SKILL.md`, `.claude/skills/land/SKILL.md` (all new), `docs/cowork_sandbox.md` (new), `docs/next_session_prompts.md` (deleted), `tests/test_core.py`, `tools/audit.py` (the per-suite pin), `tools/claim.py` (`WRITE_SETS["DEV"]` gains `.claude/`), `.gitignore`, `docs/backlog.md` (the R301 rider and the CC-40 row), this file. Ben's instruction, 2026-09-15: all DEV work moves to Claude Code on his machine; make the supporting files fit that, apply the published CLAUDE.md guidance, and cut what every session pays to read. That is roadmap **CC-40** (R301) pulled forward; parts (2), (5) and (6) land here, (1), (3) and (4) stay open below.
@@ -716,7 +820,7 @@ rosterable, Workstream 1, CC-3). Two findings deliberately got NO number: the
 `--max-opposing-hitters-per-sp` default (the archive supports the default and the
 R276 rider adds the panel that makes a relaxation visible), and a Showdown 5-1
 control would ratify a mix the engine already builds 95% of the time (R306 step 5
-rider). Next free number: R349 (R348 is the 2026-09-15 CC-0 entry above; R340 landed the same date as CC-1).
+rider). Next free number: R352 (R351 is the 2026-09-17 entry above; R350 and R349 are 2026-09-16; R348 is the 2026-09-15 CC-0 entry).
 
 **Riders (twenty):** R10 (hierarchical fit, per-player popularity term, field-size
 transfer, two new control halves after the bar), R37(2)(c) (the secondary is
