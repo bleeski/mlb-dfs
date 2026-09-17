@@ -25,6 +25,26 @@ performance claim.
 
 ---
 
+## 2026-09-17 — R351: the bank's resume gate gains an SP-pair-coverage term (R115's sliced half; CC-36 Batch 1 stays OPEN)
+
+**Scope.** `skills/generate-lineups/scripts/build_slate.py` (`distinct_sp_pairs`, `sp_pairs_needed`, the exit-10 gate, and `_merged_controls` captured for it), this file.
+
+**What was wrong.** The sliced door's resume gate is `len(candidates) < n_entries * 2`. Since R340 that door makes one `extend_bank` call per stack size, and a pair solved under `stack_min=5` and again under `stack_min=4` is two candidates under two job keys — so SP-pair coverage grows at half the candidate rate and a gate written in candidates opens at roughly `n_entries` distinct pairs however many the slate holds. R115 on the board (`docs/backlog.md:7732`) is this: "at 66 candidates against 13 entries the documented resume path is unreachable however unexhausted the jobs."
+
+**What shipped.** `distinct_sp_pairs(candidates)` counts pairs through `_candidate_pitcher_ids`, which is the allocator's own reader (`contest_allocator.py:1543`, `:2993`), so this asks the same question the refusal asks rather than defining a second notion of a pair; it returns `None` when that reader is unavailable, which leaves the gate on its candidate term instead of guessing. `sp_pairs_needed(n_entries, cap)` is `ceil(n_entries / cap)`, the arithmetic the refusal already prints at `contest_allocator.py:686-700`, computed before the solve instead of after it. The gate is now thin-by-count **or** thin-by-coverage, and `job_list_exhausted` remains the single terminator. `bank_report` and the exit-10 payload carry `distinct_sp_pairs`, `sp_pairs_needed` and `thin_by`.
+
+**One deviation from the plan, with its reason.** The plan specified `pairs_needed = min(viable_sp_pairs, ceil(n_entries / cap))`. The `min` is dropped. `viable_sp_pairs` comes from `_slate_feasibility` inside `run_slate`, which has not run when this gate is read, and `job_list_exhausted` already stops the loop when the grid runs out — so the floor would duplicate a terminator that exists and add a second one that could disagree with it.
+
+**This half is NOT verified end to end, and the item stays open.** It was written believing the 2026-09-16 1910_7g slate had hit this gate. It had not: every build there ran `strategy: direct`, which reaches no resume gate, and its refusals were time-bounded (see the R349 entry's replay table — 120s gave 8 pairs of 84 and refused, 600s certified in 345.7s). The arithmetic above stands on R115's own filed evidence, not on that slate. **CC-36 Batch 1 therefore stays OPEN on the board**, with the coverage term landed and the end-to-end reproduction outstanding; nothing migrated out of `docs/backlog.md`.
+
+**The risk this carries, named rather than discovered later.** The change can only make the sliced path ask for MORE slices, never fewer, and every extra slice costs a call. On a live slate that is a real cost, bounded by two things: `job_list_exhausted`, and `--deliver-by`, whose governor already owns the clock from T-6. A thin bank that refuses is the worse failure, so the trade is deliberate — but if a sliced build starts returning exit 10 where it used to proceed, this is the change that did it.
+
+**Verification.** Unit, since the path is not reproducible on the slate to hand: `sp_pairs_needed` over seven (entries, cap) pairs including the 1910_7g arithmetic (29 entries at cap 1 -> 29 pairs) and the degenerate `cap=None`/`cap=0` cases; `distinct_sp_pairs` over both candidate spellings (`sp_ids` and `contest_fit.sp_ids`), reversed-order collapse, a single-arm candidate, and an empty bank. The first run of that check returned 0 on a fixture using a `pitcher_ids` key that does not exist — the helper was right and the fixture was wrong, which is the reason the real key is named in this entry.
+
+**Gate.** `PASS  v2.26.0  40 modules  2143 tests  4 skipped  {test_core 1292/1292 (4 skipped) skipped_in_place}`. No pin moves: the new helpers are exercised by a scratch harness, not by added test methods. Golden replay unmoved — the gate governs whether a slice is requested, not what the solver builds.
+
+---
+
 ## 2026-09-16 — R350: sessions push, a force-push is refused, and the command guard stops denying the act of reading about a rule
 
 **Scope.** `.claude/hooks/guard_commands.py`, `.claude/settings.json`, `tests/test_core.py`, `CLAUDE.md`, `docs/cowork_sandbox.md`, `docs/cowork_sync_protocol.md`, this file. Ben's decision, 2026-09-16: sessions may push to any branch including `main`. The over-match half is a defect found the same evening, twice, in the course of using the hook.
@@ -90,6 +110,16 @@ The derivation validates itself: on Cowork `default_max_seconds()` resolves to e
 - The remaining `130` hits are unrelated: pasted American odds prices (`mlb_engine/intake/paste_odds.py`, `tools/odds_from_paste.py`) and references to incident R130.
 
 Prose still citing the number (`CLAUDE.md`, `skills/generate-lineups/SKILL.md`, `docs/cowork_sandbox.md`, `.claude/rules/engine.md`, `.claude/rules/skills.md`) is **not** rewritten here. `.claude/rules/engine.md` already carries "The 130s budget is Cowork's, not the engine's", which is the correct statement; making `CLAUDE.md`'s `## Hosts` and `## Sandbox` describe three hosts is the docs half and lands separately so this entry stays a code change.
+
+**Measured afterwards: this entry is what fixed the 1910_7g slate, and the session's first diagnosis of that slate was wrong.** The BUILD session read the refusal `23 distinct SP pairs x cap 1 = 23 < 29 entries` and concluded the bank's resume gate in `build_slate.py` had closed early — that raising the budget "would have changed nothing". Replaying the slate against its own staged inputs says otherwise. Every 1910_7g build ran `strategy: direct`, which reaches no resume gate at all; that path's bank is bounded by TIME. Same inputs, budget the only variable:
+
+| `--max-seconds` | outcome |
+|---|---|
+| 120 | exit 3, **8** distinct SP pairs of 84 viable |
+| 420 (the live v1 delivery) | exit 0, certified |
+| 600 (this entry's resolved default here) | exit 0, certified, 345.7s elapsed |
+
+The build needed about 346 seconds and the old default handed it 35. The 23-pair refusal came from `autobuild --per-build-seconds 90`, not from the 420s build that certified, so the original reading also attributed one run's number to a different run. Recorded because the wrong diagnosis is the more useful half: a refusal that names a control reads like a strategy problem and was an unfinished search, and the artifact that settles it is the replay, not the message.
 
 **Gate.** `PASS  v2.26.0  40 modules  2143 tests  4 skipped  {test_core 1292/1292 (4 skipped) skipped_in_place}`. `tests.test_core` 1281 -> 1292. The golden replay did not move; no bank or solver behaviour changed, only the default a caller gets when it passes no flag. The 4 skips are host facts, not lost tree coverage: no vendored `.pylibs/scipy`, no `.env` on this machine, two unstaged 2026-08-16 salary fixtures.
 
@@ -790,7 +820,7 @@ rosterable, Workstream 1, CC-3). Two findings deliberately got NO number: the
 `--max-opposing-hitters-per-sp` default (the archive supports the default and the
 R276 rider adds the panel that makes a relaxation visible), and a Showdown 5-1
 control would ratify a mix the engine already builds 95% of the time (R306 step 5
-rider). Next free number: R351 (R350 and R349 are the 2026-09-16 entries above; R348 is the 2026-09-15 CC-0 entry; R340 landed the same date as CC-1).
+rider). Next free number: R352 (R351 is the 2026-09-17 entry above; R350 and R349 are 2026-09-16; R348 is the 2026-09-15 CC-0 entry).
 
 **Riders (twenty):** R10 (hierarchical fit, per-player popularity term, field-size
 transfer, two new control halves after the bar), R37(2)(c) (the secondary is

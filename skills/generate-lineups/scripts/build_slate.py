@@ -618,6 +618,74 @@ def fraction_or_problem(value: Any) -> tuple:
     return coerced, None
 
 
+def distinct_sp_pairs(candidates: list):
+    """How many distinct SP PAIRS this bank holds, or None if it cannot be read.
+
+    R351 / R115. The resume gate counted CANDIDATES, and since R340 split the
+    sliced door into one `extend_bank` call per stack size, one SP pair yields
+    TWO candidates (same pair, different `stack_min`, so different job keys).
+    Pair coverage therefore grows at half the candidate rate, and a gate written
+    in candidates opens at roughly `n_entries` pairs however many the slate has.
+
+    **This is R115's SLICED half and it is NOT verified end to end.** It was
+    written believing 1910_7g (2026-09-16) hit it. It did not: every build on
+    that slate ran `strategy: direct`, which reaches no resume gate at all, and
+    its refusals were bounded by TIME -- replayed on the same inputs with only
+    the budget varying, 120s gave 8 distinct pairs of 84 and refused while 600s
+    certified in 345.7s. R349's host budget is what fixed that slate.
+
+    What survives is the arithmetic, which the board already evidences
+    independently (`docs/backlog.md:7732`, R115: "at 66 candidates against 13
+    entries the documented resume path is unreachable however unexhausted the
+    jobs"). The candidate-count gate opens at roughly `n_entries` pairs because
+    of the R340 doubling, whatever the slate holds. Treat that as the claim; do
+    not cite 1910_7g for it.
+
+    `_candidate_pitcher_ids` is the allocator's own reader (it derives `sp_pairs`
+    from it at `contest_allocator.py:1543` and `:2993`), so this is the same
+    question the refusal asks, not a second definition of a pair. None means the
+    reader was unavailable, which leaves the gate on its candidate-count term
+    rather than guessing a coverage number.
+    """
+    try:
+        from mlb_engine.allocate.contest_allocator import _candidate_pitcher_ids
+    except Exception:  # noqa: BLE001 - the count is a refinement, not a gate input
+        return None
+    pairs = set()
+    for cand in candidates:
+        try:
+            ids = _candidate_pitcher_ids(cand) or []
+        except Exception:  # noqa: BLE001
+            continue
+        pair = tuple(sorted(str(i) for i in ids))
+        if len(pair) == 2:
+            pairs.add(pair)
+    return len(pairs)
+
+
+def sp_pairs_needed(n_entries: int, pair_cap) -> int:
+    """Distinct SP pairs an entered set of `n_entries` needs at `pair_cap`.
+
+    The same arithmetic the allocator's own refusal prints
+    (`contest_allocator.py:686-700`), computed BEFORE the solve instead of after
+    it: at a cap of 1, 29 entries need 29 distinct pairs.
+
+    Deliberately NOT floored at the slate's viable pair count, which the plan for
+    this change proposed. `job_list_exhausted` already terminates the loop when
+    the grid runs out, so a `min(viable_sp_pairs, ...)` term would only duplicate
+    a stop that exists -- and `viable_sp_pairs` comes from `_slate_feasibility`
+    inside `run_slate`, which has not run when this gate is read. One terminator
+    is better than two that can disagree.
+    """
+    try:
+        cap = int(pair_cap or 0)
+    except (TypeError, ValueError):
+        return 0
+    if cap <= 0:
+        return 0
+    return -(-int(n_entries) // cap)      # integer ceil; math is not imported here
+
+
 def _merge_bank_slice_reports(reports: list) -> dict:
     """One bank report out of the per-stack-size slices R340 made necessary.
 
@@ -2484,6 +2552,10 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         # calls, so this is not a second copy of R34's merge rule.
         slice_shapes = None
         bank_stack_request = resolve_bank_stack_request(None)
+        # R351. The same merge the stack request already needed, kept so the
+        # resume gate below can read `max_sp_pair_repetition` from it. None when
+        # shape resolution failed, which leaves the gate on candidate count.
+        _merged_controls = None
         try:
             from mlb_engine.entries.dk_entries_manager import parse_dk_entry_rows
             from mlb_engine.pipeline.execution_pipeline import (
@@ -2500,8 +2572,9 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
             })
             _bands = resolve_shape_bands(
                 postures, game_count=slate_game_count(projections))
-            bank_stack_request = resolve_bank_stack_request(
-                _merged_controls_for_build(postures, None, shape_bands=_bands))
+            _merged_controls = _merged_controls_for_build(
+                postures, None, shape_bands=_bands)
+            bank_stack_request = resolve_bank_stack_request(_merged_controls)
         except Exception as exc:  # noqa: BLE001 - both are refinements
             print(f"shape resolution failed, scoring wta only and asking the "
                   f"bank for the default stack size: {exc}", file=sys.stderr)
@@ -2557,7 +2630,22 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         bank_report["budget_floored"] = bank_budget_floored
         candidates = cache.as_candidates(
             projections, requested_n=n_entries, contest_shapes=slice_shapes)
-        if len(candidates) < n_entries * 2 and not bank_report["job_list_exhausted"]:
+        # R351 / R115 (CC-36 Batch 1). The gate is thin-by-COUNT **or**
+        # thin-by-PAIR-COVERAGE. Counting candidates alone stopped the resume at
+        # roughly `n_entries` distinct SP pairs, because R340 makes one pair
+        # yield two candidates; on 1910_7g that left 61 of 84 viable pairs never
+        # solved and handed the allocator a refusal that reads like a strategy
+        # problem. `job_list_exhausted` stays the single terminator, so a slate
+        # with genuinely few pairs still stops instead of looping.
+        _pairs_have = distinct_sp_pairs(candidates)
+        _pairs_want = sp_pairs_needed(
+            n_entries, (_merged_controls or {}).get("max_sp_pair_repetition"))
+        _thin_by_count = len(candidates) < n_entries * 2
+        _thin_by_pairs = (_pairs_have is not None and _pairs_want > 0
+                          and _pairs_have < _pairs_want)
+        bank_report["distinct_sp_pairs"] = _pairs_have
+        bank_report["sp_pairs_needed"] = _pairs_want
+        if (_thin_by_count or _thin_by_pairs) and not bank_report["job_list_exhausted"]:
             print(json.dumps({
                 "status": "partial",
                 **refusal_stamp("bank_thin_partial"),
@@ -2565,6 +2653,10 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
                 "strategy": strategy,
                 "candidates": len(candidates),
                 "needed_at_least": n_entries * 2,
+                "distinct_sp_pairs": _pairs_have,
+                "sp_pairs_needed": _pairs_want,
+                "thin_by": ([k for k, v in (("candidates", _thin_by_count),
+                                            ("sp_pair_coverage", _thin_by_pairs)) if v]),
                 "note": "bank still thin; run the same command again to add a slice",
             }, indent=1))
             return 10, {}
