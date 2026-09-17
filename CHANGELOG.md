@@ -25,6 +25,68 @@ performance claim.
 
 ---
 
+## 2026-09-17 — R354, R355: the DK files reach a cloud build and the finished file reaches Ben; the repo-resolution line stops being a Cowork path
+
+**Scope.** `skills/generate-lineups/SKILL.md`, `tools/stage_slate.py`, `tools/audit.py` (`EXPECTED_SUITE_COUNTS`), `tests/test_core.py` (`StageSlateAttachmentIntakeTests` new), `docs/hosts.md` (new), `.claude/rules/skills.md`, `docs/backlog.md`, this file.
+
+**Why.** CC-A3. Ben's workflow is now Claude Code in a cloud container reached from the desktop and iOS apps, and a container is built from the repo and nothing else: the slate arrives as a chat attachment and the deliverable has to leave the same way. Neither end existed.
+
+### (a) R355 — the first command of every build session could not work on any host but one
+
+`SKILL.md`'s preflight opened with:
+
+    REPO=$(ls -d /sessions/*/mnt/mlb-dfs | head -1)
+    cd "$REPO" && python tools/env_probe.py --install
+
+`/sessions/*/mnt/mlb-dfs` is a Cowork mount path. Anywhere else the glob matches nothing, `REPO` is empty, `cd ""` fails, and the preflight silently never runs — while this file's own first rule is that a session which cannot read the repo must stop. `build_slate.py:_find_repo` had already been rewritten away from that same literal, and its docstring at 75-80 names this exact incident; only the prose was left behind. Now `git rev-parse --show-toplevel`, which answers on every host, plus `--venv` per R353 with the two hosts that manage their own interpreter named as the exceptions.
+
+### (b) R354, intake — the attachment door, built by extending `stage_slate.py` rather than adding a tool
+
+`tools/stage_slate.py` already owned this job and already did the hard parts: `_find_salary_and_entries` sniffs by header rather than filename, `_sole`/`AmbiguousSlateInput` **refuse to guess** when two files match one role (R70), `_resolve_override` accepts an absolute path, and an input from outside the slate dir already warns. So the only thing missing was DISCOVERY.
+
+`--from-attachments` searches the host's attachment locations, sniffs each candidate with the same header logic, copies matches into `data/slates/<date>/`, and prints the directory it used plus each staged sha256.
+
+**`ATTACHMENT_ROOTS` is a ranked search and not a constant, deliberately.** The path differs per host and has already moved once: `docs/cowork_sync_protocol.md` records Cowork putting attachments in `/root/.claude/uploads/`, which is neither mount a Claude Code container exposes. Hardcoding whichever one this host happened to use would be R353's `packaging` mistake again — correct reasoning from a premise measured on one machine — and the failure is worse here, because a search that finds nothing is indistinguishable from an operator who attached nothing. Every root is probed, the one that yielded the files is REPORTED, and a file somewhere unsearched is one `--salary-csv` argument away rather than a dead end.
+
+Finding nothing is not an error (the operator may be building from already-staged files) but it is never silent: the tool says so and says explicitly not to build from whatever is already in the slate dir without confirming it is tonight's slate. A stale-but-valid salary file certifies clean for the wrong slate and nothing downstream catches it.
+
+**Not yet confirmed against a real attachment.** On this container the three roots that exist (`/mnt/user-data/working`, `/mnt/user-data`, `/mnt/attach`) were all empty, so the search is verified against a simulated directory holding real archived DK exports, not against a live upload. Which root actually receives an attachment is an open measurement; when it is taken, either it is already in the list or one line adds it.
+
+### (c) R354, delivery — "present the delivered file" named no mechanism
+
+`SKILL.md` ended its reporting section with "Then present the delivered file so he can open it." On Cowork that meant a file-send; on a cloud host nothing said. And `outputs/<date>/` is gitignored while the container is destroyed at session end, so **a certified file that only ever exists on disk is a build that produced nothing Ben can upload**. On Windows a path alone survives because the disk is his; nowhere else.
+
+Now an explicit step: send the file itself into the conversation with its sha256 in the same message; a path is not a delivery. Order is fixed — `preflight_upload.py` exits 0 first, then the file goes over, never the reverse and never skipped at T-5. The stated sha256 must match `outputs/<date>/upload_manifest.json`, and a mismatch stops the delivery, because two files in play means Ben is about to upload the wrong one. The money-and-entry wall does not move: Ben uploads by hand, always.
+
+### (d) 147 lines of host mechanics out of SKILL.md, into `docs/hosts.md`
+
+`## Running inside the Cowork sandbox` was 147 lines, most of it device-VM mechanics that are false on two of three hosts: the 130s inner budget, mount stall behaviour, the no-`rm` rule, `/tmp` not persisting between calls, the separate-stdout-and-stderr workaround. It is now 75 lines of `## Running a build: what costs time, and the traps`.
+
+**What was deliberately carried forward, because it is host-neutral and some of it is the only record of a silent failure:** the two `statsapi.mlb.com` URLs and the handedness gap (the schedule hydrate returns neither `batSide` nor `pitchHand`, both feed the F4 platoon prior, and a hand-rolled feed that omits them zeroes that component with no warning — check `enrichment.counts.f4_platoon_applied`); one expensive thing per call and the pre-fetch pattern; the `pgrep -f` / `ps | grep` self-match that reports RUNNING forever; `$?` after a pipe into `head` being head's exit code; retry once before concluding the environment is broken, and deliver from what is certified rather than waiting out a stall; dependencies not persisting between sessions; the exit-10 resume and "shrink the bank, never the pool".
+
+`docs/hosts.md` is new and holds the three-host table — how each is reached, call budget, whether `rm` works, where slate files come from, how the deliverable leaves — with the standing instruction to ask `repo_env.host_profile()` rather than the table for any number a program needs. This is CC-A1's first half, pulled forward because (d) cannot land without a target. CC-A1's remainder (CLAUDE.md's `## Hosts`/`## Sandbox`, `audit.py`'s Cowork-derived gate constants) stays OPEN on the board.
+
+Two dangling references were fixed with it: the `--call-budget-seconds` paragraph still described the default as "130, matching CLAUDE.md's inner bash budget" when R349 made it per-host, and a "Read 'Running inside the Cowork sandbox' below" pointer named a section that no longer exists. `.claude/rules/skills.md` asserted two SKILL.md paragraphs cite "CLAUDE.md's `## Sandbox`"; after this change none do, and that rule now says so. The T-15 citation it also names still resolves.
+
+**Grep for the class (R233).** Every surviving mention of Cowork in the build procedure:
+
+    $ grep -n "Cowork" skills/generate-lineups/SKILL.md
+    131:is a Cowork mount path.** On any other host that glob matches nothing, `REPO` is
+    138:pinned `.venv`; Cowork, with its vendored `.pylibs/`). On a Linux container the
+    784:R354, 2026-09-17: this section used to be 147 lines of Cowork device-VM mechanics
+
+Three hits, all deliberate: two naming Cowork as one host among three, one dating this change.
+
+**Gate.**
+
+    PASS  v2.26.0  40 modules  2153 tests  5 skipped  {test_core 1302/1302 (4 skipped) skipped_in_place; test_showdown 219/219 (1 skipped) skipped_in_place}
+
+Pin moved `tests.test_core` 1295 -> 1302. Golden histogram unmoved. The two prose pins on this file (`PreflightContractDocumentationTests`, `test_docs_instruct_the_probe_not_raw_pip`) pass; the `## Always run the preflight` heading and the `tools/env_probe.py --install` literal both survive the edits, which is what they exist to protect.
+
+**Mutation-checked.** Making the sniffer read filenames instead of headers fails with `None is not true : salary must resolve from its schema`. Removing the two-files-one-role block fails with `AmbiguousSlateInput not raised`. Both restored green.
+
+**SKILL.md is 1,358 lines, down from 1,371.** R301(3) wants 150 plus `references/`. This change moved host mechanics out and added intake and delivery back in, so the net is small; the remaining bulk is build procedure that belongs in `references/`, and that stays open.
+
 ## 2026-09-17 — R353: a cloud session can install, gate, and ship; the lock covers three interpreters and the test deps
 
 **Scope.** `requirements.lock`, `tools/env_probe.py`, `tools/claim.py`, `tools/audit.py` (`EXPECTED_SUITE_COUNTS`), `tests/test_core.py` (`EnvLockTests`, `ClaimWriteSetTests` new), `.claude/hooks/session_start_deps.py` (new), `.claude/hooks/session_start.py`, `.claude/settings.json`, `.claude/skills/land/SKILL.md`, `.claude/skills/ship/SKILL.md` (new), `.github/workflows/gate.yml` (new), `.github/pull_request_template.md` (new), `CLAUDE.md`, `docs/backlog_inbox/2026-09-16_BUILD_requirements-lock-is-cp310-only.md` (retired into this entry), this file.

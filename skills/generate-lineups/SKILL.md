@@ -118,13 +118,26 @@ optimizer will use. Without it there is no build at all, so this is not a slow
 start you can skip under deadline pressure. It is measured at about 9 seconds,
 which fits one call with room to spare, and skipping it costs a whole build.
 
-Resolve the repo first. The mount directory name changes between sessions, so
-never hardcode the path you saw last time:
+Resolve the repo first, and never hardcode a path you saw last time. The repo
+sits somewhere different on each of the three hosts (`docs/hosts.md`), so ask git
+where it is:
 
 ```bash
-REPO=$(ls -d /sessions/*/mnt/mlb-dfs | head -1)
-cd "$REPO" && python tools/env_probe.py --install
+REPO=$(git rev-parse --show-toplevel) && cd "$REPO"
+python tools/env_probe.py --install --venv
 ```
+
+**This line used to read `REPO=$(ls -d /sessions/*/mnt/mlb-dfs | head -1)`, which
+is a Cowork mount path.** On any other host that glob matches nothing, `REPO` is
+empty, `cd ""` fails, and the preflight silently never runs -- while this file's
+own first rule is that a session which cannot read the repo must stop. R355,
+2026-09-17. `build_slate.py`'s own `_find_repo` had already been rewritten away
+from that literal for the same reason; only this prose was left behind.
+
+Drop `--venv` only on a host that manages its own interpreter (Windows, with its
+pinned `.venv`; Cowork, with its vendored `.pylibs/`). On a Linux container the
+interpreter is shared with the OS package manager and the install belongs in a
+virtualenv (R353).
 
 Probe-then-install (R7): a warm sandbox prints `env warm ... pip skipped` and
 exits 0 in about a second, never touching pip. A cold one installs the exact
@@ -148,10 +161,11 @@ python <repo>/tools/autobuild.py \
 ```
 
 **Two clocks, and they are not the same number** (R296(f)).
-`--stop-after-minutes` is the SLATE's budget; `--call-budget-seconds` (default
-130, matching CLAUDE.md's inner bash budget) is THIS PROCESS's. The defaults
-describe eight attempts of up to 110s under a twelve-minute wall, which cannot
-fit one Cowork call, so the supervisor stops CLEANLY before an attempt that
+`--stop-after-minutes` is the SLATE's budget; `--call-budget-seconds` is THIS
+PROCESS's, and it is resolved per host by `mlb_engine.repo_env.call_budget_s()`
+(R349) rather than being the constant 130 it once was -- see `docs/hosts.md`. The
+defaults describe eight attempts of up to 110s under a twelve-minute wall, which
+on a short-budget host cannot fit one call, so the supervisor stops CLEANLY before an attempt that
 cannot finish, exits 5 with `resumable: true`, and the next call picks it up
 with **`--resume`**: attempt numbering, the structural floors already applied,
 and the pool override are all restored. Without `--resume` a second call
@@ -320,9 +334,9 @@ and the other two clocks are budgets; the clamp lands in the decision log as
 `clock_clamped`. `--call-budget-seconds` is untouched: it is a fact about the
 shell, not about the slate.
 
-Inside Cowork's bash sandbox this command usually will not fit in one call. Read
-"Running inside the Cowork sandbox" below before you start, and confirm the salary
-file is the slate Ben meant.
+On a host with a short per-call ceiling this command will not fit in one call.
+Read "Running a build: what costs time, and the traps" below before you start,
+and confirm the salary file is the slate Ben meant.
 
 ### Better data when there is time
 
@@ -762,32 +776,20 @@ Handedness is in the paste as `(R)/(L)/(S)`, and with no TBD teams the platoon
 reference is never read, so the 7-day staleness warning has nothing to gate.
 That is the fast path: one conversion call, then build.
 
-## Running inside the Cowork sandbox
+## Running a build: what costs time, and the traps
 
-**The inner bash timeout is 130s. One number, and CLAUDE.md's `## Sandbox`
-section owns it.** The real per-call ceiling is about 180 seconds when the call
-passes an explicit timeout, and 130 is the safe inner budget underneath it. Do
-not re-derive it per call: a session reached for `timeout 168` against a ~164s
-harness ceiling on 2026-09-01 and lost the call and its work with it.
+Host facts -- call budgets, whether `rm` works, where the repo sits, where
+attachments land -- live in `docs/hosts.md` and are resolved in code by
+`mlb_engine.repo_env.host_profile()`. Ask those, not this file, for a number.
+R354, 2026-09-17: this section used to be 147 lines of Cowork device-VM mechanics
+with the durable advice mixed in. The mechanics moved; what follows is what stays
+true on every host.
 
-This paragraph said **45 seconds** until 2026-09-02, and that number is retired
-(R271(b)). It was wrong in the expensive direction: it told a session under a
-lock clock that only 15 to 20 seconds of real work fit per call, so a build that
-needs one call got five. Under a deadline the minimal move is the expensive one,
-which is the same lesson the T-15 rung of CLAUDE.md's T-schedule now carries.
-`tools/rebuild_registry.py` had the right figure (170-180s) the whole time.
-
-What has not changed: the window includes container startup, so budget the inner
-timeout below the wall you are aiming at; importing
-`mlb_engine.optimize.optimizer_v3` off the mounted filesystem costs about 15
-seconds by itself; and you cannot escape the ceiling by backgrounding, because
-processes do not survive between calls.
-
-**Put one expensive thing in each call.** The default path does two
-network fetches inside the build: the MLB Stats API lineups pull, which alone has
-a 25-second timeout, and the RotoWire merge. Either can consume the whole
-remaining budget. Do the fetch in its own call instead, with a short standalone
-`urllib` script that hits
+**Put one expensive thing in each call.** The default path does two network
+fetches inside the build: the MLB Stats API lineups pull, which alone has a
+25-second timeout, and the RotoWire merge. Either can consume the whole remaining
+budget on a constrained host. Do the fetch in its own call instead, with a short
+standalone `urllib` script that hits
 
 ```
 https://statsapi.mlb.com/api/v1/schedule?sportId=1&date=<date>&hydrate=lineups,probablePitcher,team
@@ -797,11 +799,12 @@ shapes the response into the same structure `fetch_lineups` produces, and writes
 it into the slate directory. That call is cheap because it imports nothing from
 the engine.
 
-**The hydrate does not return handedness.** The schedule response gives lineup
-players and probable pitchers as id plus name, with neither `batSide` nor
-`pitchHand`. Both are inputs to the F4 platoon prior, so a hand-shaped feed that
-omits them silently zeroes that component. `fetch_lineups` fills them with one
-batched call; a hand-rolled pre-fetch must do the same:
+**The hydrate does not return handedness, and the omission is silent.** The
+schedule response gives lineup players and probable pitchers as id plus name,
+with neither `batSide` nor `pitchHand`. Both are inputs to the F4 platoon prior,
+so a hand-shaped feed that omits them silently zeroes that component.
+`fetch_lineups` fills them with one batched call; a hand-rolled pre-fetch must do
+the same:
 
 ```
 https://statsapi.mlb.com/api/v1/people?personIds=<ids>&fields=people,id,batSide,pitchHand,code
@@ -814,101 +817,66 @@ on a slate with confirmed lineups means the feed was missing handedness.
 Then build:
 
 ```bash
-timeout 130 python -u <repo>/skills/generate-lineups/scripts/build_slate.py \
-  --salary <DKSalaries.csv> --entries <DKEntries.csv> \
-  --lineups <the feed you just wrote> --no-rotowire --max-seconds 100 \
-  > outputs/<date>/_build.log 2>&1
+python -u "$REPO/skills/generate-lineups/scripts/build_slate.py" \
+  --date <date> --salary <salary.csv> --entries <entries.csv> \
+  --lineups <feed.json> --no-rotowire \
+  > "$REPO/outputs/<date>/build.log" 2>&1
 ```
 
-**130 is CLAUDE.md's `## Sandbox` number and it is the only one to use.** This
-block read `timeout 33 ... --max-seconds 14` until 2026-09-06, a leftover of the
-45-second call ceiling R271 retired; the real ceiling is ~180s when the call
-passes an explicit timeout and 130 is the safe inner budget (the same number as
-`--gate-budget` and `solver_probe.py --budget`). The old pair was expensive in
-the direction that matters: a 14-second solver budget is what leaves a bank 2%
-explored, and an under-explored bank reads as a tight exposure cap. Leave ~30s
-under the timeout for the ~15s engine import plus certify and write; that is
-where `--max-seconds 100` comes from. Do not re-derive 130 per call, and do not
-reach past it — a session that tried `timeout 168` against a ~164s harness
-ceiling on 2026-09-01 lost the call and its work with it.
+Pass `--max-seconds` only to fit a host that has told you its budget; the default
+is resolved per host and is usually right. On a host with a short per-call
+ceiling, read `docs/hosts.md` before you pick a number rather than deriving one.
 
-On 2026-07-24 that took a 16-entry Classic build to 10.8 seconds elapsed and it
-certified on the first attempt, after three runs with in-build fetching had been
-killed at the wall.
+### Three shell traps, each of which has cost a session
 
-**The mount stalls intermittently, and it recovers.** Late on 2026-07-24 a single
-engine module import stopped fitting in 40 seconds and `git status` hung
-indefinitely; roughly half an hour later, with nothing changed, the same import
-took 0.2 seconds, `git status` returned in 2.4 seconds, and the suite ran in
-0.028 seconds. This is a transient I/O stall on the host-backed mount, most
-likely antivirus or file-sync contention on the repo path, not progressive decay.
+- **`python -u`, and redirect the log into the repo.** Unbuffered, or a killed
+  call leaves you an empty log and no idea how far it got.
+- **Never `pgrep -f build_slate.py` or `ps | grep build_slate`.** The pattern
+  matches the grep itself, so it reports RUNNING forever and you wait on a
+  process that exited.
+- **`$?` after a pipe into `head` is `head`'s exit code, not the command's.** A
+  failed build reads as success. Capture the log, then read it.
 
-So do not conclude the environment is broken from one observation. Pause, retry
-once, and only then decide. On 2026-07-24 I declared the test suite unrunnable and
-handed it to Ben when it would have run fine twenty minutes later. Keep per-call
-work bounded so a stall costs one call instead of a build, and if a stall persists
+### When something looks broken
+
+Do not conclude the environment is broken from one observation. Pause, retry
+once, and check whether a second attempt behaves differently. If a stall persists
 across retries during a live slate, deliver from what is already certified rather
-than waiting it out.
+than waiting it out -- a certified file in hand beats a better one that misses
+lock.
 
-**Diagnostics, which matter more than they sound.** Always run `python -u` and
-redirect the log inside the repo. `/tmp` is not shared between calls, and
-buffered stdout vanishes when the call is killed; on 2026-07-24 fourteen minutes
-went to a build whose real error, a missing scipy, sat unread in a log that no
-longer existed. Never check liveness with `pgrep -f build_slate.py`, because the
-pattern matches the checking command's own command line and reports RUNNING
-forever. The same self-match trap applies to `ps | grep`. And note that a
-repo-wide `grep -rn` on this mount can return empty without erroring, which reads
-exactly like "no matches"; scope greps to specific files before concluding a
-symbol is absent. When you pipe a command into `head`, `$?` is head's exit code,
-not the command's; capture to a file and check the real status.
+**Dependencies do not persist between sessions.** The preflight at the top of
+this file is the whole answer; run it rather than diagnosing an import error.
 
-**Capture stdout and stderr to SEPARATE files when a command exits non-zero.**
-This is not a style preference, it cost most of an hour on 2026-07-29. Several
-`late_swap.py` calls returned exit 3 with a `2>&1` log that ended abruptly right
-after `joint solve next: ...` and no error text at all, despite `python -u`. The
-real failure (`no compatible candidate for Entry ID ...`, and later the
-informative `SP pair ... count 2>1`) only appeared once the two streams went to
-separate files. The process really had exited 3 and really had printed the reason;
-the merged stream did not show it inside the window it was captured in. A silent
-exit therefore looks identical to "still building the bank", and the session
-re-ran the same command with the same budget several times expecting different
-output. So:
+**On exit 10 the bank is thin, not wrong.** Use the exit-10 resume and run the
+identical command again; the bank persists between invocations and each pass adds
+to it. Shrink the bank, never the pool.
+
+## Where the files come from
+
+Ben attaches the DKSalaries and DKEntries CSVs to the chat. Find them, stage them,
+and never commit them: `data/slates/<date>/` is gitignored and that is where they
+belong.
 
 ```bash
-timeout 130 python -u <cmd> > outputs/<date>/_x.out 2> outputs/<date>/_x.err
-echo "exit=$?"; tail -30 outputs/<date>/_x.err
+python tools/stage_slate.py --from-attachments --date <date>
 ```
 
-Read the `.err` file first on any non-zero exit. This is a sandbox quirk, not
-repo behavior, so no engine change fixes it.
+That searches the host's attachment locations, identifies each file **by its
+header rather than its name**, copies the matches into `data/slates/<date>/`, and
+prints the directory it used and the sha256 of each staged copy. Two files
+matching one role is a block, not a guess (R70) -- it names both and exits 4, and
+you resolve it by passing `--salary-csv` / `--entries-csv` explicitly. Those flags
+accept an absolute path, so a file somewhere the search did not look is one
+argument away, never a dead end.
 
-**Odds fetches need the key resolved, and the default output shape now works.**
-`build_slate.py`'s own auto-fetch resolves `THE_ODDS_API_KEY` from the environment
-or `REPO/.env`, so a build needs no export. The standalone `mlb-game-odds` skill
-still reads only two `/mnt/...` paths and the env var, none of which is this
-repo's `.env`, so when you call that skill directly, put the key in the
-environment without putting it on a command line (a `grep | cut` pipeline leaves
-it in shell history and in `ps`, and the guardrail says never echo a key):
+**Read back the directory it used.** Attachment paths differ per host and have
+moved before; if the tool reports a location you did not expect, say so rather
+than assuming it found the right slate. If it finds nothing, ask Ben to re-attach
+rather than building from a stale copy already sitting in `data/slates/`.
 
-```bash
-python -c "import sys; sys.path.insert(0,'<repo>'); from mlb_engine.repo_env import load_repo_dotenv as l; print(','.join(l()))"
-# then, in the SAME call, run the fetch under env -S or via os.environ in one script
-```
-
-Simpler in practice: prefer the build's own auto-fetch, or pass `--odds` a file
-you already have. Passing the skill's output to `--odds` works with or without
-`--raw`: the default
-`games`-keyed schema is recognised as of 2026-07-29. If an odds file is not
-understood, the build now says which keys it found instead of reporting the game
-as having no moneyline.
-
-**Dependencies do not persist across sessions.** The preflight at the top of this
-file is the whole answer, and it is never the step you skip to save time. A
-sandbox that looks identical to yesterday's still has no scipy today.
-
-If the build still will not fit, use the exit-10 resume and run the identical
-command again. The bank persists between invocations, so each call adds a slice.
-Shrink the bank, never the pool.
+Never correct the DKSalaries CSV against real-world rosters. It is authoritative
+for player IDs, salaries, teams, and eligibility, whatever it says.
 
 ## Confirm which slate you were handed
 
@@ -917,9 +885,9 @@ the `Game Info` column, and the entries file's contest IDs. Compare them against
 the games Ben named. Two traps, both seen on 2026-07-24:
 
 - A re-uploaded file can land under a hashed filename while the generic
-  `DKSalaries.csv` still resolves to the earlier upload. Run `ls -la` on the
-  uploads directory and read mtimes; be suspicious whenever a generic name and a
-  hashed variant coexist.
+  `DKSalaries.csv` still resolves to the earlier upload. `--from-attachments`
+  prints the directory it searched; run `ls -la` on THAT directory and read
+  mtimes. Be suspicious whenever a generic name and a hashed variant coexist.
 - If the entries file's contest IDs match a build already delivered this session,
   treat it as a stale upload until proven otherwise, not a new slate.
 
@@ -973,8 +941,28 @@ is refused outright rather than overridden.
 Keep it to a handful of lines. Ben can open the JSON if he wants the rest. Do not
 narrate the steps you took; he watched them happen.
 
-Then present the delivered file so he can open it, and remind him the upload is
-manual.
+### Hand the file over, do not just name it
+
+**Send the delivered file itself into the conversation**, with its sha256 in the
+same message, and remind Ben the upload is manual. A path is not a delivery.
+
+This is the step a cloud session cannot skip. `outputs/<date>/` is gitignored and
+a cloud container is destroyed when the session ends, so a certified file that
+only ever exists on disk is a build that produced nothing Ben can upload. On
+Windows a path alone is survivable because the disk is his; nowhere else. R354,
+2026-09-17 -- before it, this read "present the delivered file so he can open
+it", which named no mechanism at all.
+
+Order matters and does not bend: `preflight_upload.py` exits 0 FIRST, then the
+file goes over. Never hand over a file you have not preflighted, and never at
+T-5 "to save a step" -- the preflight is under two seconds and it is the last
+thing standing between a bad file and an upload.
+
+The sha256 you state must be the one in `outputs/<date>/upload_manifest.json`.
+If they differ, say so and stop: two files are in play and Ben is about to
+upload the wrong one.
+
+Nothing here touches DraftKings. Ben uploads by hand, always.
 
 ## Always run the preflight before presenting a file
 

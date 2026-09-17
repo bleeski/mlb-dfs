@@ -88,6 +88,145 @@ def _read_header(path: Path) -> List[str]:
         return next(csv.reader(handle), [])
 
 
+# Where a file the operator attached to the chat can land. R354, 2026-09-17.
+#
+# This is a RANKED SEARCH and not a constant, deliberately. The path differs per
+# host and has already moved once: `docs/cowork_sync_protocol.md` records Cowork
+# putting attachments in `/root/.claude/uploads/`, which is neither of the mounts
+# a Claude Code container exposes. Hardcoding whichever one this host happened to
+# use would be the same mistake as R353's `packaging` pin -- correct reasoning
+# from a premise measured on exactly one machine -- and the failure mode is worse
+# here, because a search that finds nothing is indistinguishable from an operator
+# who attached nothing.
+#
+# So: every root is probed, the one that yielded the files is REPORTED, and an
+# operator whose file is somewhere else passes --salary-csv / --entries-csv,
+# which already accept an absolute path. Adding a host means adding a root here.
+ATTACHMENT_ROOTS = (
+    "/mnt/user-data/uploads",
+    "/mnt/user-data/working",
+    "/mnt/user-data",
+    "/mnt/attach",
+    "~/.claude/uploads",
+    "/root/.claude/uploads",
+)
+
+# A cap on the walk. These roots are small by nature; a deep recursive scan of an
+# unexpected mount is how a T-20 step becomes a T-12 step.
+ATTACHMENT_SEARCH_DEPTH = 2
+
+
+def attachment_candidates(roots=ATTACHMENT_ROOTS, depth=ATTACHMENT_SEARCH_DEPTH):
+    """Every readable .csv under the attachment roots, newest first per root.
+
+    Returns [(root, [paths])] for roots that exist, in ATTACHMENT_ROOTS order.
+    A root that does not exist is skipped silently; a root that exists and is
+    empty is reported with an empty list, because "the directory is there and has
+    nothing in it" and "the directory is not there" are different answers for the
+    operator.
+    """
+    found = []
+    for raw in roots:
+        root = Path(raw).expanduser()
+        try:
+            if not root.is_dir():
+                continue
+        except OSError:
+            continue
+        hits = []
+        for d in range(depth + 1):
+            hits.extend(root.glob("/".join(["*"] * d + ["*.csv"])) if d else root.glob("*.csv"))
+        # Deduplicate while keeping order, then newest first: a re-attached file
+        # is the one the operator means, and SKILL.md tells the session to read
+        # mtimes for exactly this reason.
+        seen, ordered = set(), []
+        for h in hits:
+            if h not in seen and h.is_file():
+                seen.add(h)
+                ordered.append(h)
+        ordered.sort(key=lambda q: q.stat().st_mtime, reverse=True)
+        found.append((root, ordered))
+    return found
+
+
+def _sniff_roles(paths):
+    """Split candidate CSVs into (salary, entries) by HEADER, never by name.
+
+    Same discipline as `_find_salary_and_entries`, which owns the in-slate-dir
+    case: the entries file by its exact 4-column header, the salary file by
+    validate_salary_schema. Filenames are not authority -- a re-upload arrives
+    hashed, and `DKSalaries.csv` is as likely to be last week's.
+    """
+    from mlb_engine.intake.slate_intake_manager import validate_salary_schema
+
+    salary, entries = [], []
+    for path in paths:
+        try:
+            header = _read_header(path)
+            if not header:
+                continue
+            if [c.strip() for c in header[:4]] == ENTRIES_HEADER_PREFIX:
+                entries.append(path)
+                continue
+            if validate_salary_schema(str(path)).get("passed"):
+                salary.append(path)
+        except Exception:
+            continue  # unreadable or undecodable: not a candidate for either role
+    return salary, entries
+
+
+def stage_from_attachments(slate_dir: Path, roots=ATTACHMENT_ROOTS):
+    """Copy the attached salary and entries CSVs into the slate dir. R354.
+
+    Returns a report dict; the caller prints it. Raises AmbiguousSlateInput when
+    one role has more than one match, which is R70's rule and not a new one: a
+    sniffer cannot choose which slate the operator meant, and picking by mtime or
+    sort order is how a showdown pair got staged on a Classic day.
+
+    Copies rather than moves. The attachment area is not ours to empty, and a
+    second run that finds the source gone would be a worse failure than one that
+    finds it twice.
+    """
+    import shutil
+
+    report = {"searched": [], "root": None, "salary": None, "entries": None,
+              "copied": [], "skipped_identical": []}
+    for root, paths in attachment_candidates(roots):
+        report["searched"].append({"root": str(root), "csv_files": len(paths)})
+        salary, entries = _sniff_roles(paths)
+        if not salary and not entries:
+            continue
+        if len(salary) > 1:
+            raise AmbiguousSlateInput("salary", salary, "--salary-csv")
+        if len(entries) > 1:
+            raise AmbiguousSlateInput("entries", entries, "--entries-csv")
+        report["root"] = str(root)
+        slate_dir.mkdir(parents=True, exist_ok=True)
+        for role, src in (("salary", salary[0] if salary else None),
+                          ("entries", entries[0] if entries else None)):
+            if src is None:
+                continue
+            dest = slate_dir / src.name
+            if dest.exists() and dest.stat().st_size == src.stat().st_size \
+                    and _sha256(dest) == _sha256(src):
+                report["skipped_identical"].append(str(dest))
+            else:
+                shutil.copy2(src, dest)
+                report["copied"].append(str(dest))
+            report[role] = str(dest)
+        break
+    return report
+
+
+def _sha256(path: Path) -> str:
+    import hashlib
+    h = hashlib.sha256()
+    with path.open("rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
 class AmbiguousSlateInput(ValueError):
     """More than one file in the slate dir matches one intake role (R70).
 
@@ -717,7 +856,43 @@ def main() -> int:
     parser.add_argument("--stale-platoon-policy", default="warn", choices=("warn", "block"),
                         help="R27 age gate on the platoon reference; 'warn' matches the "
                              "other scripted doors (default), 'block' is the engine default")
+    parser.add_argument("--from-attachments", action="store_true",
+                        help="R354: before staging, search this host's attachment "
+                             "locations for the DK salary and entries CSVs, identify "
+                             "them by header, and copy them into the slate dir. "
+                             "Prints the directory it used -- read it back.")
     args = parser.parse_args()
+
+    if args.from_attachments:
+        slate_dir = Path(args.slates_dir) / args.date
+        try:
+            found = stage_from_attachments(slate_dir)
+        except AmbiguousSlateInput as exc:
+            print(f"stage_slate: {exc}", file=sys.stderr)
+            return 4
+        except OSError as exc:
+            print(f"stage_slate: could not stage attachments: {exc}", file=sys.stderr)
+            return 2
+        for entry in found["searched"]:
+            print(f"  searched {entry['root']}: {entry['csv_files']} csv file(s)")
+        if found["root"] is None:
+            # Not an error in itself: the operator may be building from files
+            # already staged. But it is never silent, because "found nothing"
+            # and "found last week's copy" look identical downstream.
+            print("stage_slate: no DK salary or entries CSV found in any attachment "
+                  "location. If Ben attached them, say which directory he sees them "
+                  "in and pass --salary-csv / --entries-csv (absolute paths are "
+                  "accepted). Do NOT build from whatever is already in the slate dir "
+                  "without confirming it is tonight's slate.", file=sys.stderr)
+        else:
+            print(f"  attachments resolved from {found['root']}")
+            for role in ("salary", "entries"):
+                if found[role]:
+                    print(f"  {role}: {found[role]}  sha256={_sha256(Path(found[role]))}")
+                else:
+                    print(f"  {role}: NOT FOUND in {found['root']}")
+            for path in found["skipped_identical"]:
+                print(f"  already staged, byte-identical: {path}")
 
     try:
         staged = stage_slate(

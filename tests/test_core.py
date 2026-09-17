@@ -14037,6 +14037,112 @@ class StageSlateRoleResolutionTests(unittest.TestCase):
         self.assertIn("--salary-csv", str(ctx.exception))
 
 
+class StageSlateAttachmentIntakeTests(unittest.TestCase):
+    """R354: the DK files arrive as chat attachments and nothing knew where.
+
+    A cloud container is built from the repo and nothing else, so the only way a
+    slate reaches it is an attachment. Before this, SKILL.md's one reference told
+    a session to `ls -la` "the uploads directory" and named no directory, and no
+    code in the tree resolved one.
+
+    These reuse `StageSlateRoleResolutionTests`'s frozen fixtures -- real DK
+    content, vendored by R62 -- so the intake is exercised against files with
+    genuine headers rather than a stub that would pass a sniffer it shouldn't.
+    """
+
+    FIXTURES = REPO / "tests" / "fixtures" / "slates"
+    ENTRIES_HEADER = "Entry ID,Contest Name,Contest ID,Entry Fee,Contest Entries\n"
+
+    def _attach_dir(self, salary_count=1, entries_count=1):
+        import shutil
+        d = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: shutil.rmtree(d, ignore_errors=True))
+        src = sorted(self.FIXTURES.glob("DKSalaries_*.csv"))
+        self.assertGreaterEqual(len(src), 2, "needs R62's two vendored exports")
+        for i in range(salary_count):
+            shutil.copy(src[i % len(src)], d / f"DKSalaries_{i}.csv")
+        for i in range(entries_count):
+            (d / f"DKEntries_{i}.csv").write_text(
+                self.ENTRIES_HEADER + ",,,,\n", encoding="utf-8")
+        return d
+
+    def _slate_dir(self):
+        import shutil
+        d = Path(tempfile.mkdtemp()) / "2026-06-03"
+        self.addCleanup(lambda: shutil.rmtree(d.parent, ignore_errors=True))
+        return d
+
+    def test_it_stages_both_roles_and_names_the_directory_it_used(self):
+        attach, slate = self._attach_dir(), self._slate_dir()
+        rep = stage_slate_mod.stage_from_attachments(slate, roots=(str(attach),))
+        self.assertEqual(rep["root"], str(attach),
+                         "the directory used must be reported; attachment paths "
+                         "differ per host and the session has to read it back")
+        self.assertTrue(rep["salary"] and rep["entries"])
+        self.assertTrue(Path(rep["salary"]).exists())
+        self.assertTrue(Path(rep["entries"]).exists())
+
+    def test_roles_come_from_the_header_not_the_filename(self):
+        """A re-uploaded DK file arrives under a hashed name. Naming is not
+        authority, and `DKSalaries.csv` is as likely to be last week's."""
+        import shutil
+        attach, slate = self._attach_dir(), self._slate_dir()
+        for path in list(attach.glob("*.csv")):
+            shutil.move(str(path), attach / f"{abs(hash(path.name)) % 10**12}.csv")
+        rep = stage_slate_mod.stage_from_attachments(slate, roots=(str(attach),))
+        self.assertTrue(rep["salary"], "salary must resolve from its schema")
+        self.assertTrue(rep["entries"], "entries must resolve from its 4-col header")
+
+    def test_two_files_for_one_role_block_rather_than_guess(self):
+        """R70's rule, at the attachment door. Staging the wrong draftgroup is
+        silent all the way to the upload file, so a guess here is unrecoverable."""
+        attach, slate = self._attach_dir(salary_count=2), self._slate_dir()
+        with self.assertRaises(stage_slate_mod.AmbiguousSlateInput) as ctx:
+            stage_slate_mod.stage_from_attachments(slate, roots=(str(attach),))
+        self.assertEqual(ctx.exception.role, "salary")
+        self.assertEqual(len(ctx.exception.candidates), 2,
+                         "the block names every candidate; a count is not actionable")
+
+    def test_a_second_run_copies_nothing_and_says_so(self):
+        attach, slate = self._attach_dir(), self._slate_dir()
+        stage_slate_mod.stage_from_attachments(slate, roots=(str(attach),))
+        again = stage_slate_mod.stage_from_attachments(slate, roots=(str(attach),))
+        self.assertEqual(again["copied"], [], "byte-identical files are not recopied")
+        self.assertEqual(len(again["skipped_identical"]), 2)
+
+    def test_finding_nothing_reports_root_none_rather_than_raising(self):
+        """Not an error: the operator may be building from already-staged files.
+        But the caller must be able to tell, because 'found nothing' and 'found
+        last week's copy' are indistinguishable downstream."""
+        import shutil
+        empty = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: shutil.rmtree(empty, ignore_errors=True))
+        rep = stage_slate_mod.stage_from_attachments(self._slate_dir(), roots=(str(empty),))
+        self.assertIsNone(rep["root"])
+        self.assertEqual(rep["searched"][0]["root"], str(empty),
+                         "a root that exists and is empty is still reported")
+
+    def test_a_missing_root_is_skipped_not_fatal(self):
+        """ATTACHMENT_ROOTS is a ranked search across hosts, so most entries do
+        not exist on any given host. That is the normal case, not a failure."""
+        attach, slate = self._attach_dir(), self._slate_dir()
+        rep = stage_slate_mod.stage_from_attachments(
+            slate, roots=("/nonexistent/one", "/nonexistent/two", str(attach)))
+        self.assertEqual(rep["root"], str(attach))
+        self.assertEqual([e["root"] for e in rep["searched"]], [str(attach)],
+                         "absent roots are skipped silently; present ones are named")
+
+    def test_the_roots_are_a_ranked_list_not_a_single_constant(self):
+        """R354 pins the SHAPE, not the paths. Attachment locations differ per
+        host and have moved before (Cowork used /root/.claude/uploads, which is
+        neither mount a Claude Code container exposes), so a single hardcoded
+        path is the defect this search exists to avoid."""
+        roots = stage_slate_mod.ATTACHMENT_ROOTS
+        self.assertGreater(len(roots), 1, "one root is a guess, not a search")
+        self.assertTrue(any("user-data" in r for r in roots))
+        self.assertTrue(any("uploads" in r for r in roots))
+
+
 class StageSlatePlatoonShapeTests(unittest.TestCase):
     """R70(a), platoon half: the unvalidated fallback took the first remaining
     JSON in the dir, which on the real 07-30 layout is a lineups feed.
