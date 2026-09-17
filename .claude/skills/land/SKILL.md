@@ -16,4 +16,4 @@ Every step prints evidence. Show the output, not a summary of it.
 6. **Commit by explicit path**, the same list to both commands:
    `git add <paths>` then `git commit -F <msgfile> -- <paths>` (or `-m`). Subject at most 100 characters carrying the R-numbers; body: one sentence on what moved and why, and the CHANGELOG entry title. Verify with `git show --stat HEAD` that only your paths landed.
 7. **Release**: `python tools/claim.py release engine` (add `--date <date>` if the claim was minted on an earlier UTC day). Sweep `tools/_scratch_<tag>/`.
-8. **Do not push.** Say the commit sha and that the push is Ben's; `python tools/sync_check.py` measures disk against GitHub if he asks.
+8. **Ship it.** Run `/ship`: push the branch, open the PR against `.github/pull_request_template.md`, drive the `gate` check to green, merge. R350 (Ben, 2026-09-16) ended "the push is Ben's"; R353 (Ben, 2026-09-17) made the PR and the merge the session's too. `main` is never committed to directly, and a force-push is still refused.

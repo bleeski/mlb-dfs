@@ -1,5 +1,5 @@
 {
-  "$comment": "Project-shared Claude Code settings for mlb-dfs DEV sessions (R301, 2026-09-15). Personal overrides go in .claude/settings.local.json (gitignored). Deny rules are enforced by the client; CLAUDE.md is advisory. The command guard hook covers the regex cases a prefix rule cannot.",
+  "$comment": "Project-shared Claude Code settings for mlb-dfs (R301 2026-09-15, R353 2026-09-17). Personal overrides go in .claude/settings.local.json (gitignored). Deny rules are enforced by the client; CLAUDE.md is advisory. The command guard hook covers the regex cases a prefix rule cannot. Hosts: docs/hosts.md.",
   "env": {
     "BASH_DEFAULT_TIMEOUT_MS": "900000",
     "BASH_MAX_TIMEOUT_MS": "1800000"
@@ -39,7 +39,21 @@
       "PowerShell(git show*)",
       "PowerShell(git ls-files*)",
       "PowerShell(git ls-remote*)",
-      "PowerShell(git fetch*)"
+      "PowerShell(git fetch*)",
+      "Bash(git push -u origin*)",
+      "Bash(git push origin*)",
+      "Bash(git checkout -b*)",
+      "Bash(git switch -c*)",
+      "Bash(git branch*)",
+      "Bash(git merge origin/main*)",
+      "Bash(python tools/env_probe.py*)",
+      "PowerShell(git push -u origin*)",
+      "PowerShell(git push origin*)",
+      "PowerShell(git checkout -b*)",
+      "PowerShell(git switch -c*)",
+      "PowerShell(git branch*)",
+      "PowerShell(git merge origin/main*)",
+      "PowerShell(python tools/env_probe.py*)"
     ],
     "deny": [
       "Bash(git push --force*)",
@@ -64,7 +78,17 @@
           {
             "type": "command",
             "command": "python",
-            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/session_start.py"],
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/session_start_deps.py"
+            ],
+            "timeout": 620
+          },
+          {
+            "type": "command",
+            "command": "python",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/session_start.py"
+            ],
             "timeout": 30
           }
         ]
@@ -75,7 +99,10 @@
           {
             "type": "command",
             "command": "python",
-            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/session_start.py", "--compact"],
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/session_start.py",
+              "--compact"
+            ],
             "timeout": 30
           }
         ]
@@ -88,7 +115,9 @@
           {
             "type": "command",
             "command": "python",
-            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/guard_commands.py"],
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/guard_commands.py"
+            ],
             "timeout": 10
           }
         ]
