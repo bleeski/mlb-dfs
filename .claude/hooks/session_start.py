@@ -135,7 +135,8 @@ def compact() -> str:
         "claims: " + "; ".join(held_claims()),
         "backlog: " + next_pointer(),
         "Re-read CLAUDE.md's Hard walls and Roles, claims, and git before the next write. "
-        "Explicit-path git add and commit; CHANGELOG entry in the same commit; never push.",
+        "Explicit-path git add and commit; CHANGELOG entry in the same commit; "
+        "then /ship (branch, push, PR, merge on green). Force-push is refused.",
     ])
 
 

@@ -31,11 +31,38 @@ import sys
 from pathlib import Path
 from typing import Dict, Optional
 
-VERSION = "v1.1"
+VERSION = "v1.2"
 ENGINE_DEPS = ("numpy", "pandas", "scipy")
+
+# R353. The gate imports these; `tests/conftest.py`,
+# `tests/test_greenfield_regressions.py` and `tests/test_production.py` all fail
+# to LOAD without them, and the gate then prints "test suite FAILED", which
+# reads as a code defect and is a missing dependency. Before R353 the lock did
+# not carry them at all, so a *successful* install still could not reach PASS.
+# Checked by import name, not by pinned version: a host carrying a newer pytest
+# runs the same tests, where a newer numpy does not run the same solver.
+TEST_DEPS = ("pytest", "pydantic")
+
+# The interpreters `requirements.lock` carries wheel hashes for. Adding a host
+# outside this set means adding its hashes to the lock, never `--no-deps` and
+# never an unpinned fallback resolve.
+SUPPORTED_CP_TAGS = ("cp310", "cp311", "cp313")
+
 LOCK_NAME = "requirements.lock"
 VENDORED_DIRNAME = ".pylibs"
-_PIN_RE = re.compile(r"^([A-Za-z0-9_.\-]+)==([^\s\\]+)")
+_PIN_RE = re.compile(r"^([A-Za-z0-9_.\-]+)==([^\s\\;]+)")
+_HASH_RE = re.compile(r"--hash=sha256:([0-9a-f]{64})")
+
+
+def interpreter_tag() -> str:
+    """This interpreter's cp tag, e.g. `cp311`. R353.
+
+    pip's hash failure names neither the host's tag nor the lock's, so the
+    operator reads "someone may have tampered with them" when the real fact is
+    "cp311 host, cp310 lock". Every message this tool prints about hashes says
+    the tag.
+    """
+    return f"cp{sys.version_info.major}{sys.version_info.minor}"
 
 
 def repo_root() -> Path:
@@ -95,6 +122,31 @@ def parse_lock(text: str) -> Dict[str, str]:
     return pins
 
 
+def parse_lock_hashes(text: str) -> Dict[str, list]:
+    """Return {distribution_name: [sha256, ...]} from lock text. R353.
+
+    A pin owns every `--hash` line up to the next pin, whether they sit on the
+    same logical line behind backslash continuations or on their own lines. The
+    lock deliberately carries SEVERAL hashes per binary pin -- one per supported
+    interpreter -- because pip accepts the wheel matching any one of them. Before
+    R353 it carried one, belonging to cp310, and `--require-hashes` turned every
+    other host into a hard failure.
+    """
+    hashes: Dict[str, list] = {}
+    current: Optional[str] = None
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        match = _PIN_RE.match(stripped)
+        if match:
+            current = match.group(1).lower()
+            hashes.setdefault(current, [])
+        if current is not None:
+            hashes[current].extend(_HASH_RE.findall(stripped))
+    return hashes
+
+
 def installed_versions() -> Dict[str, Optional[str]]:
     """Import each engine dep in-process; None where the import fails."""
     found: Dict[str, Optional[str]] = {}
@@ -107,6 +159,19 @@ def installed_versions() -> Dict[str, Optional[str]]:
     return found
 
 
+def test_deps_present() -> Dict[str, bool]:
+    """Import each test dep in-process. R353. Importability only: see TEST_DEPS."""
+    return {name: _importable(name) for name in TEST_DEPS}
+
+
+def _importable(name: str) -> bool:
+    try:
+        __import__(name)
+        return True
+    except ImportError:
+        return False
+
+
 def milp_available() -> bool:
     try:
         from scipy.optimize import milp  # noqa: F401
@@ -116,9 +181,19 @@ def milp_available() -> bool:
 
 
 def evaluate(installed: Dict[str, Optional[str]], pins: Dict[str, str],
-             milp_ok: bool) -> Dict[str, object]:
-    """Pure decision: warm iff every engine dep imports at its pinned version
-    and the solver entry point resolves. Tested directly; keep it pure."""
+             milp_ok: bool,
+             test_deps: Optional[Dict[str, bool]] = None) -> Dict[str, object]:
+    """Pure decision: warm iff every engine dep imports at its pinned version,
+    the solver entry point resolves, and every test dep imports. Tested
+    directly; keep it pure.
+
+    R353 added the test-dep tier. `test_deps` defaults to None, meaning NOT
+    PROBED, and a caller that does not probe them gets the pre-R353 answer
+    rather than a silent pass -- the callers that matter (main, the gate) pass
+    them. A session whose engine deps are warm while pytest is absent used to
+    read "env warm" here and then "test suite FAILED" from the gate three
+    minutes later, which is the confusion this tier exists to end.
+    """
     missing = [n for n in ENGINE_DEPS if installed.get(n) is None]
     unpinned = [n for n in ENGINE_DEPS if n not in pins]
     mismatched = [
@@ -126,23 +201,105 @@ def evaluate(installed: Dict[str, Optional[str]], pins: Dict[str, str],
         for n in ENGINE_DEPS
         if installed.get(n) is not None and n in pins and installed[n] != pins[n]
     ]
-    warm = not missing and not mismatched and not unpinned and milp_ok
+    missing_test = ([n for n in TEST_DEPS if not test_deps.get(n)]
+                    if test_deps is not None else [])
+    warm = (not missing and not mismatched and not unpinned and milp_ok
+            and not missing_test)
     return {"warm": warm, "missing": missing, "mismatched": mismatched,
-            "unpinned": unpinned, "milp_ok": milp_ok}
+            "unpinned": unpinned, "milp_ok": milp_ok,
+            "missing_test_deps": missing_test}
 
 
-def _install_command(lock_path: Path) -> list:
+VENV_DIRNAME = ".venv"
+
+
+def venv_python(root: Path) -> Path:
+    """Where a repo-local virtualenv puts its interpreter, per platform."""
+    if sys.platform == "win32":
+        return root / VENV_DIRNAME / "Scripts" / "python.exe"
+    return root / VENV_DIRNAME / "bin" / "python"
+
+
+def ensure_venv(root: Path) -> tuple:
+    """Create `<root>/.venv` if absent; return (python_path, created). R353.
+
+    Why a virtualenv rather than the system interpreter. `--require-hashes`
+    refuses the install unless EVERY transitive requirement is pinned, which
+    includes `packaging` (pytest needs it). Debian ships `packaging` into the
+    system interpreter with no RECORD file, so pip cannot uninstall it to honour
+    that pin: measured 2026-09-17, "Cannot uninstall packaging 24.0, RECORD file
+    not found. Hint: The package was installed by debian." Leaving it unpinned
+    instead fails the other way, on a clean runner that has no `packaging` at
+    all. The two only conflict inside a SHARED interpreter. A virtualenv has
+    neither problem, and it retires `--break-system-packages`, which was always
+    a way of saying "write into a directory the OS owns".
+    """
+    python = venv_python(root)
+    if python.exists():
+        return python, False
+    subprocess.run([sys.executable, "-m", "venv", str(root / VENV_DIRNAME)],
+                   check=True)
+    return python, True
+
+
+def _install_command(lock_path: Path, python: Optional[Path] = None) -> list:
+    """The one install command. `python` selects the interpreter to install into.
+
+    `--break-system-packages` is present ONLY for the legacy system-interpreter
+    path (a Cowork sandbox, or a host that predates `--venv`); a virtualenv is
+    not a system interpreter and does not need it.
+    """
+    if python is not None:
+        return [str(python), "-m", "pip", "install", "-r", str(lock_path),
+                "--require-hashes", "-q"]
     return [sys.executable, "-m", "pip", "install", "-r", str(lock_path),
             "--require-hashes", "--break-system-packages", "-q"]
 
 
-def _reprobe_subprocess() -> bool:
-    """Fresh interpreter, because this process's failed imports are cached."""
-    code = ("import numpy, pandas, scipy; from scipy.optimize import milp; "
+def _reprobe_subprocess(python: Optional[Path] = None) -> bool:
+    """Fresh interpreter, because this process's failed imports are cached.
+
+    R353: also re-probes the TEST deps. An install that leaves pytest missing is
+    not a warm environment, and reporting it as one is what sent a session into
+    the gate to be told `test suite FAILED`.
+    """
+    code = ("import numpy, pandas, scipy, pytest, pydantic; "
+            "from scipy.optimize import milp; "
             "print(numpy.__version__, pandas.__version__, scipy.__version__)")
-    result = subprocess.run([sys.executable, "-c", code],
-                            capture_output=True, text=True)
+    exe = str(python) if python is not None else sys.executable
+    result = subprocess.run([exe, "-c", code], capture_output=True, text=True)
     return result.returncode == 0
+
+
+def _hash_coverage_note(lock_path: Path) -> str:
+    """What to read a pip hash failure as. R353.
+
+    pip's message on a hash mismatch is "THESE PACKAGES DO NOT MATCH THE HASHES
+    FROM THE REQUIREMENTS FILE ... someone may have tampered with them". On
+    2026-09-16 that cost a session several minutes of the wrong investigation:
+    the bytes were authentic and the lock was single-platform. So whenever an
+    install fails, say this host's tag and how many hashes each binary pin
+    carries, which is the fact that distinguishes the two readings.
+    """
+    tag = interpreter_tag()
+    try:
+        hashes = parse_lock_hashes(lock_path.read_text(encoding="utf-8"))
+    except OSError:
+        return f"env_probe: host is {tag}; could not re-read {lock_path} to count hashes."
+    thin = sorted(n for n in ENGINE_DEPS if len(hashes.get(n, [])) < 2)
+    lines = [
+        f"env_probe: this host is {tag}. If pip reported a HASH MISMATCH, read it "
+        f"as a lock that does not cover {tag}, not as tampering: the binary "
+        f"wheels differ per interpreter and each needs its own --hash line.",
+        f"env_probe: {lock_path.name} is meant to cover "
+        f"{', '.join(SUPPORTED_CP_TAGS)}.",
+    ]
+    if thin:
+        lines.append(
+            f"env_probe: single-hash pins found for {thin} -- that is the "
+            f"pre-R353 shape and it fails on every interpreter but one. "
+            f"Regenerate per the lock header.")
+    return "\n".join(lines)
 
 
 def main(argv: Optional[list] = None) -> int:
@@ -151,6 +308,11 @@ def main(argv: Optional[list] = None) -> int:
                     "warm exits 0 without touching pip.")
     parser.add_argument("--install", action="store_true",
                         help="on a cold probe, run the locked install and re-probe")
+    parser.add_argument("--venv", action="store_true",
+                        help="install into <repo>/.venv instead of this "
+                             "interpreter, creating it if absent (R353). Use this "
+                             "anywhere the interpreter is shared with an OS "
+                             "package manager, which is every Linux container.")
     parser.add_argument("--lock", default=None,
                         help="lock file path (default: repo requirements.lock)")
     args = parser.parse_args(argv)
@@ -168,7 +330,8 @@ def main(argv: Optional[list] = None) -> int:
         return 3
 
     vendored = ensure_vendored_on_path(root)
-    verdict = evaluate(installed_versions(), pins, milp_available())
+    verdict = evaluate(installed_versions(), pins, milp_available(),
+                       test_deps=test_deps_present())
     if verdict["warm"]:
         versions = " ".join(f"{n} {pins[n]}" for n in ENGINE_DEPS)
         if vendored is not None:
@@ -183,7 +346,10 @@ def main(argv: Optional[list] = None) -> int:
     detail = "; ".join(
         [f"missing {verdict['missing']}" if verdict["missing"] else ""] +
         [f"mismatched {verdict['mismatched']}" if verdict["mismatched"] else ""] +
-        ["milp unavailable" if not verdict["milp_ok"] else ""])
+        ["milp unavailable" if not verdict["milp_ok"] else ""] +
+        [f"test deps missing {verdict['missing_test_deps']} (the gate cannot "
+         f"load two suites without them)"
+         if verdict["missing_test_deps"] else ""])
     detail = "; ".join(p for p in detail.split("; ") if p)
     if vendored is not None:
         detail += f" (checked {vendored} first, not sufficient)"
@@ -192,15 +358,36 @@ def main(argv: Optional[list] = None) -> int:
         print("install: " + " ".join(_install_command(lock_path)))
         return 2
 
-    print(f"env cold: {detail}; installing from {lock_path.name}")
-    result = subprocess.run(_install_command(lock_path))
+    target: Optional[Path] = None
+    if args.venv:
+        try:
+            target, created = ensure_venv(root)
+        except (OSError, subprocess.CalledProcessError) as exc:
+            print(f"env_probe: could not create {root / VENV_DIRNAME}: {exc}")
+            return 2
+        print(f"env cold: {detail}; installing from {lock_path.name} into "
+              f"{VENV_DIRNAME}/ "
+              f"({'created' if created else 'existing'}, host {interpreter_tag()})")
+    else:
+        print(f"env cold: {detail}; installing from {lock_path.name} "
+              f"(host {interpreter_tag()})")
+
+    result = subprocess.run(_install_command(lock_path, target))
     if result.returncode != 0:
         print(f"env_probe: locked install failed (pip exit {result.returncode})")
+        print(_hash_coverage_note(lock_path))
         return 2
-    if not _reprobe_subprocess():
+    if not _reprobe_subprocess(target):
         print("env_probe: install ran but the re-probe still fails; stop and say so")
         return 2
-    print("env warm after locked install")
+    if target is not None:
+        # The caller's shell does not inherit this; say so rather than letting a
+        # session install successfully and then run the gate on the wrong python.
+        print(f"env warm after locked install into {VENV_DIRNAME}. "
+              f"Every command this session runs must use {target}, or put "
+              f"{target.parent} first on PATH.")
+    else:
+        print("env warm after locked install")
     return 0
 
 

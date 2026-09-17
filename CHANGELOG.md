@@ -25,6 +25,113 @@ performance claim.
 
 ---
 
+## 2026-09-17 — R353: a cloud session can install, gate, and ship; the lock covers three interpreters and the test deps
+
+**Scope.** `requirements.lock`, `tools/env_probe.py`, `tools/claim.py`, `tools/audit.py` (`EXPECTED_SUITE_COUNTS`), `tests/test_core.py` (`EnvLockTests`, `ClaimWriteSetTests` new), `.claude/hooks/session_start_deps.py` (new), `.claude/hooks/session_start.py`, `.claude/settings.json`, `.claude/skills/land/SKILL.md`, `.claude/skills/ship/SKILL.md` (new), `.github/workflows/gate.yml` (new), `.github/pull_request_template.md` (new), `CLAUDE.md`, `docs/backlog_inbox/2026-09-16_BUILD_requirements-lock-is-cp310-only.md` (retired into this entry), this file.
+
+**Why now.** Ben, 2026-09-17: the workflow moves to Claude Code sessions in cloud containers, reached from the Claude Windows desktop app and the Claude iOS app, with the repo living in GitHub, and the session acting as architect and senior developer — it branches, commits, pushes, opens the PR, and merges it. Windows local stays as a second host. Measured on the first such container, none of that was possible.
+
+### (a) The blocker: a cold cloud container could not run a single test
+
+A container is built from the repo and nothing else. Measured here on arrival, cp311:
+
+    scipy MISSING   numpy MISSING   pandas MISSING   pytest MISSING   pydantic MISSING
+
+CLAUDE.md's session-start step 2 asks for a gate and says a failing suite blocks, so every cold session was blocked on arrival with no remedy in the tree. The cause was already filed by BUILD on 2026-09-16 and is three defects in one file, retired into this entry:
+
+1. **`requirements.lock` was single-platform.** One `--hash` per package, and for numpy/pandas/scipy that hash belonged to the **cp310** wheel. Under `--require-hashes` a cp311 host got a hard failure worded as possible tampering. The bytes were authentic; the lock did not cover the host. Confirmed both ways: the lock's three binary hashes are exactly PyPI's cp310 digests, and the four pure-python pins (`py2.py3-none-any`) matched on the same host, which is the control.
+2. **It omitted pytest**, so `tests/conftest.py`, `tests/test_greenfield_regressions.py` and `tests/test_production.py` could not load and the gate printed `test suite FAILED`, which reads as a code defect and was a missing dependency.
+3. **It omitted the pydantic stack**, which arrived with R302's production strangler and was never added.
+
+Net, and this is the part worth keeping: **`PASS` was unreachable from the documented install path on every host, not only cp311.**
+
+**What shipped.** `requirements.lock` now carries cp310 + cp311 + cp313 manylinux x86_64 hashes for every binary pin (pip accepts several `--hash` lines and takes the wheel matching any one), and pins the test dependencies the gate imports — pytest with iniconfig/pluggy/pygments and its conditional `exceptiongroup`/`tomli`/`colorama`, plus pydantic, pydantic-core, annotated-types, typing-extensions, typing-inspection. Its header now says what each of the three dependency files is FOR, which is the drift that hid defects 2 and 3: two locks with overlapping names, and the one the probe installs was the one that could not run the tests.
+
+`ruff` stays in `requirements-production.lock`; it is a platform-specific binary wanted only by `tools/verify_engine.py`, which is not the gate. On `packaging`, the first cut of this entry said it was deliberately unpinned; that was wrong and section (h) below records what happened.
+
+**Verified by installing, not by reading.** From the cold state above, `python tools/env_probe.py --install` → `env warm after locked install`, then `numpy 2.2.6 / pandas 2.3.3 / scipy 1.15.3 / pytest 8.4.2 / pydantic 2.12.5`, `scipy.optimize.milp` resolves.
+
+### (b) `env_probe` gains a test-dep tier and says the interpreter tag
+
+`ENGINE_DEPS` alone meant a host with numpy/pandas/scipy and no pytest read `env warm` and then got `test suite FAILED` from the gate minutes later. `TEST_DEPS = ("pytest", "pydantic")` is checked by importability, not pinned version — a newer pytest runs the same tests, where a newer numpy does not run the same solver. `evaluate`'s new `test_deps` argument defaults to `None` meaning NOT PROBED, so a caller that does not probe gets the pre-R353 answer rather than a silent pass.
+
+`interpreter_tag()` and `_hash_coverage_note()` make a hash failure legible: every install message now names the host's cp tag, and a failed install prints that the lock is meant to cover cp310/cp311/cp313 and flags any pin that still carries a single hash. On 2026-09-16 pip's "someone may have tampered with them" cost a session several minutes of the wrong investigation.
+
+**A fourth item in the fragment was already fixed and is recorded as declined.** It reported `guard_commands.py:65` naming the wrong lock file. R350 corrected it; the deny message now says the probe installs `requirements.lock` and explains the prior error in place. Nothing to do.
+
+### (c) The test that pinned the defect
+
+`EnvLockTests.test_lock_pins_engine_deps_with_hashes_and_satisfies_floors` asserted `len(dists) == len(hashes)` — **one hash per pin**, which is precisely the single-platform shape. It now asserts at least one hash for every pin, at least `len(SUPPORTED_CP_TAGS)` for each binary pin, exactly one for a `py3-none-any` pin (more would be wrong), and that the lock pins what the gate imports. It reads the lock through `env_probe.parse_lock_hashes`, production code, rather than re-implementing the parse (R300).
+
+Mutation-checked: collapsing the lock back to one hash per pin fails with `1 not greater than or equal to 3 : numpy is a binary wheel and needs one hash per supported interpreter`. Restored, green.
+
+### (d) The install becomes a hook, so the next session does not repeat any of this
+
+`.claude/hooks/session_start_deps.py` probes and installs only when cold, and is a no-op unless `CLAUDE_CODE_REMOTE=true` — a Windows or Cowork session manages its own interpreter (a pinned `.venv`, a vendored `.pylibs`) and must never have a hook install into it behind the operator's back. Written in Python, not bash, because one of this repo's hosts is Windows, where a `.sh` hook does not run. It calls `python tools/env_probe.py --install` and adds no second install path. A failed install never fails session start; it prints that the gate is not runnable and says not to work around it.
+
+It also writes `PYTHONHASHSEED=0` to `CLAUDE_ENV_FILE`. The determinism rule says entry points pin it and they do, but a session runs plenty that is not an entry point.
+
+### (e) Shipping is the session's, end to end
+
+Three places disagreed about the push, which R350 had already settled in CLAUDE.md: `land/SKILL.md` step 8 still said "**Do not push.** ... the push is Ben's", and `session_start.py`'s post-compaction text still said "never push". Both corrected. Nothing anywhere authorized opening or merging a PR, which is now the whole workflow.
+
+CLAUDE.md's git bullet splits: the commit rules stay as they were, and a new bullet carries the authority — branch, commit, push, open the PR, merge once the `gate` check is green; never commit to `main` directly; never force-push. `/ship` (new) is that as a checklist, and `/land` step 8 hands off to it. `.claude/settings.json` allows the branch/push/merge spellings without a prompt, because a mobile session blocked on a permission tap is a session that stops; every force-push deny is untouched.
+
+### (f) The gate runs in GitHub, not only in the session that wrote the code
+
+`.github/workflows/gate.yml` runs `python tools/audit.py --run-tests --terse` on a clean ubuntu / cp311 checkout, on every branch push and every PR into `main`. The contract has always said a session gates before it commits; that held while one operator worked on one machine, and does not survive a mobile session that can be closed mid-run with nothing but its own word that the gate ran. `fetch-depth: 0` because the audit measures distance from `origin/main` and is built to report a measurement it could not take rather than guess. A `grep` for the `PASS` line backs up the exit code, since a suite that collects nothing can exit clean. `.github/pull_request_template.md` mirrors this file's entry shape so the two do not drift, and carries a truthful-labels checklist.
+
+**Gate, on the real tree, after every change above:**
+
+    PASS  v2.26.0  40 modules  2146 tests  5 skipped  {test_core 1295/1295 (4 skipped) skipped_in_place; test_showdown 219/219 (1 skipped) skipped_in_place}
+
+The five skips are absent optional files and are identical on a fresh CI clone: no vendored `.pylibs/scipy`, no `.env`, two unstaged 2026-08-16 salary fixtures, no Classic salary file for the Showdown case. One pin moved, `tests.test_core` 1292 -> 1295, for the two tests in (g) and the one in (h). Golden histogram unmoved.
+
+### (g) Found while shipping this: the claim mutex was blind to the changelog
+
+`python tools/claim.py dirt --role DEV` on this session's own work reported `CHANGELOG.md` as `note (outside DEV write set, report and leave alone)`. CLAUDE.md's `- Roles.` bullet names `CHANGELOG.md` and `requirements*` for DEV; `tools/claim.py`'s `WRITE_SETS["DEV"]` named neither, carrying `requirements.txt` alone. `.github/` was in neither, having not existed.
+
+The consequence is the opposite of harmless. `dirt` is the only reader of that tuple, and the changelog is the most contended file in the tree by construction -- "one entry per shipped change, newest first", touched by every DEV commit. Another session's uncommitted entry there was reported and waved past instead of blocking.
+
+Both lists corrected (`.github/` added to CLAUDE.md's bullet as well as the tuple), and `ClaimWriteSetTests` now READS the two files and compares them rather than restating either, because a restatement here would be a third thing to drift. Mutation-checked: removing `CHANGELOG.md` from the tuple fails with `Lists differ: ['CHANGELOG.md'] != []` and, separately, `'CHANGELOG.md' not found in (...) : CHANGELOG.md must be in DEV's write set for dirt to BLOCK`.
+
+**Grep for the class (R233).** Every place that told a session not to push:
+
+    $ grep -rn "never push\|the push is Ben\|Do not push" .claude/ CLAUDE.md docs/ skills/ | grep -v backlog.md
+    .claude/skills/land/SKILL.md:19:8. **Ship it.** ... R350 ... ended "the push is Ben's"; R353 ... made the PR and the merge the session's too.
+
+One hit, and it is this entry's own replacement text quoting what it replaced.
+
+### (h) CI rejected the first cut, and it was right
+
+The workflow this entry ships failed on its own first run, in 20 seconds, at the install step:
+
+    ERROR: In --require-hashes mode, all requirements must have their versions
+    pinned with ==. These do not:
+        packaging>=20 ... (from pytest==8.4.2->-r requirements.lock)
+
+**The reasoning that produced the defect, since it is the reusable part.** `packaging` was left out of the lock on purpose, with the reason written into both the lock header and this entry: Debian ships `packaging` into the system interpreter with no RECORD file, so pip cannot uninstall it and a pin fails the install. Measured again here, that is true:
+
+    Cannot uninstall packaging 24.0, RECORD file not found.
+    Hint: The package was installed by debian.
+
+What was wrong is the generalisation. `--require-hashes` refuses the entire file unless EVERY transitive requirement is pinned with `==`, with no exceptions, and a clean CI runner has no `packaging` at all. So one host needs the pin and the other cannot take it. The local install succeeded for a reason that does not generalise -- Debian had already put `packaging` there -- which is precisely why a clean runner was the host that could find this, and precisely the argument for the workflow landing in the same change it checks.
+
+**What shipped.** The two observations conflict only inside a SHARED interpreter, so the install moves into a virtualenv, `packaging==26.3` is pinned like everything else, and `--break-system-packages` is retired from the venv path (it was always a way of saying "write into a directory the OS owns"). `env_probe --venv` creates and installs into `<repo>/.venv`, and it stays the ONE install path: the SessionStart hook calls it, and so does CI. The first cut of the workflow had its own `pip install` line, and that second spelling is exactly how the workflow and the lock came to disagree.
+
+The hook now probes THROUGH the venv when one exists (probing with the system interpreter would report cold forever, since the deps are deliberately not there) and exports `VIRTUAL_ENV` and `PATH` through `CLAUDE_ENV_FILE`. That PATH line is load-bearing: without it every command a session runs would miss the deps and the gate would fail in a way that reads like a code defect.
+
+**The test that should have caught it.** `EnvLockTests.test_every_transitive_requirement_is_pinned` reads each pinned distribution's own installed metadata and asserts every non-extra requirement is itself in the lock. No network. It guards itself, too: if nothing was importable it fails rather than passing vacuously, because a silent pass is the shape the original defect took. Mutation-checked by removing the `packaging` pin again -- `Lists differ: ['pytest requires packaging, which the lock does not pin'] != []`, which is CI's finding reproduced locally.
+
+**End to end, from a genuinely cold state** (all five packages uninstalled from the system interpreter, `.venv` removed), the hook run exactly as Claude Code invokes it:
+
+    env cold: missing ['numpy', 'pandas', 'scipy']; milp unavailable; test deps
+    missing ['pytest', 'pydantic'] ...; installing from requirements.lock into .venv/ (created, host cp311)
+    env warm after locked install into .venv.
+    pinned: PYTHONHASHSEED=0, VIRTUAL_ENV=..., PATH=...
+
+**What is NOT in this change, and is filed rather than dropped.** The host model still names two hosts where there are now three, and `.claude/rules/engine.md` still calls `/tmp` and `rm` Cowork-only where both work in this container. `claims/` is gitignored and a cloud container is isolated, so a cloud session takes a claim no other session can see — a false exclusivity that is worse than none. `skills/generate-lineups/SKILL.md` has no path for a DK CSV attached in chat and no way to hand a finished file back before the container is reclaimed. All of it is on the board as CC-A1 through CC-A3.
+
 ## 2026-09-17 — R351: the bank's resume gate gains an SP-pair-coverage term (R115's sliced half; CC-36 Batch 1 stays OPEN)
 
 **Scope.** `skills/generate-lineups/scripts/build_slate.py` (`distinct_sp_pairs`, `sp_pairs_needed`, the exit-10 gate, and `_merged_controls` captured for it), this file.

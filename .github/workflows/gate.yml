@@ -1,0 +1,85 @@
+# The gate, run by GitHub rather than by the session that wrote the code.
+#
+# R353, 2026-09-17. This repo's contract has always said a session runs
+# `python tools/audit.py --run-tests --terse` before it commits, and that a
+# failing suite blocks. That held while one operator worked on one machine. It
+# does not survive the move to cloud containers reached from a phone: the gate
+# takes about nine minutes, a mobile session can be closed mid-run, and nothing
+# but the session's own word said it ever ran. This workflow is the check that
+# gates the merge, so "merged" means "the gate passed on these exact bytes".
+#
+# It does not replace the local gate. A session still runs it before committing
+# (`.claude/skills/land/SKILL.md` step 1); this catches what a session got wrong
+# about its own host.
+name: gate
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: [main]
+
+# A new push supersedes the run in flight on the same ref. The gate is nine
+# minutes; queueing three of them behind a branch that is being iterated wastes
+# the runner and tells you nothing the last one will not.
+concurrency:
+  group: gate-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The audit measures this checkout's distance from origin/main and
+          # says so in its output. At the default depth of 1 that measurement is
+          # meaningless, and the audit is built to report a measurement it could
+          # not take rather than to guess.
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          # One of the interpreters requirements.lock carries hashes for
+          # (env_probe.SUPPORTED_CP_TAGS). Changing this means checking that the
+          # lock covers the new tag, not adding a fallback resolve.
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: requirements.lock
+
+      - name: Install the locked runtime
+        # Through the probe, into `.venv`, which is the ONE install path -- the
+        # same command `.claude/hooks/session_start_deps.py` runs on a cloud
+        # container. A second spelling here is a second thing to drift, and the
+        # first cut of this workflow had one: it installed into the runner's
+        # interpreter and passed no `--venv`, which is how it and the lock
+        # disagreed about whether `packaging` had to be pinned.
+        run: |
+          python -m pip install --upgrade pip
+          python tools/env_probe.py --install --venv
+
+      - name: Probe
+        run: .venv/bin/python tools/env_probe.py
+
+      - name: Gate
+        env:
+          # CLAUDE.md's determinism rule. Entry points pin it; the ones reached
+          # through pytest do not all go through an entry point.
+          PYTHONHASHSEED: '0'
+        run: |
+          set -o pipefail
+          .venv/bin/python tools/audit.py --run-tests --terse 2>&1 | tee gate.out
+          # The audit's own exit code is the verdict. The grep is a second,
+          # independent read of the same run: a zero exit with no PASS line has
+          # happened before (a suite that collected nothing still exits clean),
+          # and this is cheap insurance against it.
+          grep -qE '^PASS  v[0-9]' gate.out \
+            || { echo "::error::no PASS line in the gate output"; exit 1; }
+
+      - name: Gate output
+        if: always()
+        run: cat gate.out || echo "(the gate produced no output)"

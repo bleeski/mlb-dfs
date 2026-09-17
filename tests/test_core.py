@@ -9688,6 +9688,73 @@ class EnvironmentFactorOwnershipTests(unittest.TestCase):
         self.assertAlmostEqual(f1_report["park_run_factor_by_team"]["MIN"], park)
 
 
+class ClaimWriteSetTests(unittest.TestCase):
+    """R353: `claim.py`'s DEV write set must cover what CLAUDE.md's DEV bullet
+    names, because `dirt` is the only thing that reads it.
+
+    These two drifted, and the drift was the wrong way round: CLAUDE.md named
+    `CHANGELOG.md` and `requirements*`, `claim.py` named neither (it had
+    `requirements.txt` alone), and `.github/` did not exist when that tuple was
+    written. So `dirt` classified another session's uncommitted CHANGELOG entry
+    as `note (outside DEV write set, report and leave alone)` rather than BLOCK
+    -- on the single most contended file in the repo, the one every DEV commit
+    touches by contract. Comparing the two files is the only pin that survives
+    the next path being added to one of them.
+    """
+
+    def _claim_module(self):
+        import sys as _sys
+        repo = Path(__file__).resolve().parents[1]
+        _sys.path.insert(0, str(repo / "tools"))
+        try:
+            import claim
+            import importlib
+            return importlib.reload(claim)
+        finally:
+            _sys.path.pop(0)
+
+    def _contract_dev_paths(self):
+        """The paths CLAUDE.md's `- Roles.` bullet lists for DEV.
+
+        Read from the contract, not restated here: a copy in this test would be
+        a third place to drift.
+        """
+        import re
+        repo = Path(__file__).resolve().parents[1]
+        text = (repo / "CLAUDE.md").read_text(encoding="utf-8")
+        line = next((ln for ln in text.splitlines()
+                     if ln.startswith("- Roles.") and "DEV:" in ln), None)
+        self.assertIsNotNone(line, "CLAUDE.md lost its `- Roles.` bullet")
+        dev = line.split("DEV:", 1)[1]
+        # backticked tokens up to the sentence that ends the enumeration
+        dev = dev.split(". Building lineups", 1)[0]
+        return [m for m in re.findall(r"`([^`]+)`", dev)]
+
+    def test_dev_write_set_covers_every_path_the_contract_names(self):
+        claim = self._claim_module()
+        write_set = claim.WRITE_SETS["DEV"]
+        missing = []
+        for token in self._contract_dev_paths():
+            if token.endswith("*"):  # `requirements*` -> every requirements file
+                stem = token[:-1]
+                if not any(p.startswith(stem) for p in write_set):
+                    missing.append(token)
+            elif token not in write_set:
+                missing.append(token)
+        self.assertEqual(
+            missing, [],
+            f"CLAUDE.md names {missing} for DEV and tools/claim.py does not, so "
+            f"`dirt` will not BLOCK on them")
+
+    def test_the_contended_surfaces_are_in_the_set_by_name(self):
+        """The three this test was written for, pinned individually so the
+        failure message says which one came back rather than 'sets differ'."""
+        write_set = self._claim_module().WRITE_SETS["DEV"]
+        for path in ("CHANGELOG.md", ".github/", "requirements.lock"):
+            self.assertIn(path, write_set,
+                          f"{path} must be in DEV's write set for dirt to BLOCK")
+
+
 class ClaimToolTests(unittest.TestCase):
     """R19: the multi-session claim protocol as one command.
 
@@ -12351,19 +12418,94 @@ class EnvLockTests(unittest.TestCase):
         pins = env_probe.parse_lock(text)
         for name in ("numpy", "pandas", "scipy"):
             self.assertIn(name, pins, f"lock must pin {name}")
-        # every pinned distribution carries a hash line
-        pin_lines = [ln for ln in text.splitlines()
-                     if ln.strip() and not ln.strip().startswith("#")]
-        dists = [ln for ln in pin_lines if "==" in ln]
-        hashes = [ln for ln in pin_lines if ln.strip().startswith("--hash=sha256:")]
-        self.assertEqual(len(dists), len(hashes),
-                         "one sha256 hash per pinned distribution")
+        # R353: the lock must also pin what the GATE imports. Without these,
+        # a *successful* install still leaves two suites unable to load and the
+        # gate prints "test suite FAILED", which reads as a code defect.
+        for name in ("pytest", "pydantic", "pydantic-core"):
+            self.assertIn(name, pins, f"lock must pin {name} (the gate imports it)")
+        # Every pinned distribution carries at least one sha256.
+        hashes = env_probe.parse_lock_hashes(text)
+        for name in pins:
+            self.assertTrue(hashes.get(name),
+                            f"{name} is pinned with no --hash line")
+        # R353: this assertion USED to be `one hash per pin`, and that is
+        # precisely the defect it let through. One hash per binary pin means one
+        # interpreter, and `--require-hashes` turns every other host into a hard
+        # failure that pip words as possible tampering. Measured 2026-09-16: a
+        # cp311 host could not install a cp310-only lock. Binary wheels differ
+        # per interpreter, so each supported tag needs its own hash.
+        for name in ("numpy", "pandas", "scipy", "pydantic-core"):
+            self.assertGreaterEqual(
+                len(hashes[name]), len(env_probe.SUPPORTED_CP_TAGS),
+                f"{name} is a binary wheel and needs one hash per supported "
+                f"interpreter {env_probe.SUPPORTED_CP_TAGS}; single-platform "
+                f"locks fail everywhere but the host they were cut on")
+        # Pure-python wheels (`-none-any`) are one wheel for every interpreter,
+        # so one hash is correct for them and more would be wrong.
+        self.assertEqual(len(hashes["pytest"]), 1,
+                         "pytest ships a py3-none-any wheel: exactly one hash")
         # floors in requirements.txt hold under the pins
         floors = {"numpy": (2, 0), "pandas": (2, 2), "scipy": (1, 13)}
         for name, floor in floors.items():
             got = tuple(int(p) for p in pins[name].split(".")[:2])
             self.assertGreaterEqual(got, floor,
                                     f"{name} pin below requirements.txt floor")
+
+    def test_every_transitive_requirement_is_pinned(self):
+        """R353: `--require-hashes` refuses the install unless EVERY requirement
+        of every pinned distribution is itself pinned with `==`.
+
+        This test exists because the first cut of R353 violated exactly that and
+        the local gate could not see it. `packaging` was left out deliberately --
+        Debian owns a copy in the system interpreter that pip cannot uninstall --
+        and the install succeeded HERE for that same reason: Debian had already
+        put it there. On a clean CI runner with no `packaging` at all, pip
+        refused the whole file in 20 seconds. The property is read from each
+        distribution's own installed metadata, so it holds without a network
+        call and fails on the host that omitted the pin rather than one push
+        later.
+        """
+        import sys
+        from importlib import metadata
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
+        try:
+            import env_probe
+        finally:
+            sys.path.pop(0)
+        pins = env_probe.parse_lock(self._lock_path().read_text(encoding="utf-8"))
+
+        def canonical(name):
+            return re.sub(r"[-_.]+", "-", name).lower()
+
+        pinned = {canonical(n) for n in pins}
+        unpinned, unchecked = [], []
+        for name in sorted(pins):
+            try:
+                dist = metadata.distribution(name)
+            except metadata.PackageNotFoundError:
+                unchecked.append(name)  # not installed here; nothing to read
+                continue
+            for req in (dist.requires or []):
+                # `; extra == "..."` requirements are optional and pip does not
+                # resolve them unless the extra is requested. Environment
+                # markers on a non-extra requirement (python_version,
+                # sys_platform) still have to be pinned, because pip evaluates
+                # them per host and this lock serves several.
+                if "extra ==" in req:
+                    continue
+                dep = canonical(re.split(r"[\s\[<>=!;(]", req.strip(), 1)[0])
+                if dep and dep not in pinned:
+                    unpinned.append(f"{name} requires {dep}, which the lock does "
+                                    f"not pin")
+        self.assertEqual(
+            unpinned, [],
+            "every transitive requirement must be pinned or --require-hashes "
+            "refuses the entire install: " + "; ".join(unpinned))
+        # Guard the guard: if nothing was installed, this test proved nothing,
+        # and a silent pass is what let the original defect through.
+        self.assertLess(len(unchecked), len(pins),
+                        f"no pinned distribution was importable here "
+                        f"({unchecked}), so this test checked nothing")
 
     def test_probe_decision_table(self):
         import sys
@@ -12387,6 +12529,21 @@ class EnvLockTests(unittest.TestCase):
         # scipy importable but milp gone is cold: the solver is the point
         v = env_probe.evaluate(warm, pins, milp_ok=False)
         self.assertFalse(v["warm"])
+        # R353, the test-dep tier. Engine deps green and pytest absent is COLD:
+        # it used to read "env warm" here and "test suite FAILED" from the gate
+        # three minutes later.
+        v = env_probe.evaluate(warm, pins, milp_ok=True,
+                               test_deps={"pytest": False, "pydantic": True})
+        self.assertFalse(v["warm"])
+        self.assertEqual(v["missing_test_deps"], ["pytest"])
+        v = env_probe.evaluate(warm, pins, milp_ok=True,
+                               test_deps={"pytest": True, "pydantic": True})
+        self.assertTrue(v["warm"])
+        # Not probing the tier keeps the pre-R353 answer rather than inventing
+        # a pass: `test_deps=None` means NOT PROBED, not "all present".
+        v = env_probe.evaluate(warm, pins, milp_ok=True)
+        self.assertTrue(v["warm"])
+        self.assertEqual(v["missing_test_deps"], [])
 
     def test_manifest_records_environment_and_lock_sha(self):
         import numpy, pandas, scipy  # noqa: E401

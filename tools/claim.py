@@ -78,9 +78,20 @@ ROLES = ("BUILD", "ARCHIVE", "DEV", "SOLO")
 WRITE_SETS = {
     "BUILD": (),
     "ARCHIVE": ("ledger/", "data/archive/", "data/standings/", "data/reference/"),
-    "DEV": ("mlb_engine/", "tools/", "tests/", "docs/", "skills/", ".claude/", "CLAUDE.md",
-            "MLB_Classic.md", "MANIFEST.md", ".gitignore", ".gitattributes",
-            "requirements.txt"),
+    # R353: `CHANGELOG.md`, `.github/` and the two locks were MISSING here while
+    # CLAUDE.md's DEV bullet named them (it says `requirements*`, not
+    # `requirements.txt`). The consequence was the opposite of harmless: the
+    # changelog is the most contended file in the tree -- "one entry per shipped
+    # change, newest first", every DEV commit touching it -- and `dirt` reported
+    # another session's uncommitted entry as `note (outside DEV write set,
+    # report and leave alone)` instead of BLOCK. `.github/` did not exist when
+    # this tuple was written. `ClaimWriteSetTests` now reads both files and
+    # compares, so the next addition to CLAUDE.md cannot drift from this list.
+    "DEV": ("mlb_engine/", "tools/", "tests/", "docs/", "skills/", ".claude/",
+            ".github/", "CLAUDE.md", "CHANGELOG.md", "MLB_Classic.md",
+            "MANIFEST.md", ".gitignore", ".gitattributes",
+            "requirements.txt", "requirements.lock",
+            "requirements-production.lock"),
 }
 WRITE_SETS["SOLO"] = tuple(sorted(set(WRITE_SETS["ARCHIVE"]) | set(WRITE_SETS["DEV"])))
 

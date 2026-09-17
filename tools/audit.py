@@ -742,7 +742,17 @@ EXPECTED_SUITE_COUNTS = {
     # carrying the keys callers read), and one in BuildSlateScriptTests for the
     # engine-absent fallback -- the first cut put that import at module level and
     # reddened the sibling test that keeps this script loadable with no engine.
-    "tests.test_core": 1292,
+    # R353, 2026-09-17: 1292 -> 1294, the two in ClaimWriteSetTests that compare
+    # claim.py's DEV write set against CLAUDE.md's own `- Roles.` bullet. They
+    # were written because the two had drifted apart on CHANGELOG.md, so a pin
+    # that restated either list here would have drifted the same way; both tests
+    # read the two files instead.
+    # R353 round two, 2026-09-17: 1294 -> 1295, the one that pins every
+    # transitive requirement of a pinned distribution as itself pinned. CI
+    # rejected the first cut for exactly that (`packaging>=20` unpinned under
+    # --require-hashes) and the local gate could not see it, because Debian had
+    # already put packaging on this host. The test reads installed metadata.
+    "tests.test_core": 1295,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps
