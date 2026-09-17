@@ -210,17 +210,64 @@ def evaluate(installed: Dict[str, Optional[str]], pins: Dict[str, str],
             "missing_test_deps": missing_test}
 
 
-def _install_command(lock_path: Path) -> list:
+VENV_DIRNAME = ".venv"
+
+
+def venv_python(root: Path) -> Path:
+    """Where a repo-local virtualenv puts its interpreter, per platform."""
+    if sys.platform == "win32":
+        return root / VENV_DIRNAME / "Scripts" / "python.exe"
+    return root / VENV_DIRNAME / "bin" / "python"
+
+
+def ensure_venv(root: Path) -> tuple:
+    """Create `<root>/.venv` if absent; return (python_path, created). R353.
+
+    Why a virtualenv rather than the system interpreter. `--require-hashes`
+    refuses the install unless EVERY transitive requirement is pinned, which
+    includes `packaging` (pytest needs it). Debian ships `packaging` into the
+    system interpreter with no RECORD file, so pip cannot uninstall it to honour
+    that pin: measured 2026-09-17, "Cannot uninstall packaging 24.0, RECORD file
+    not found. Hint: The package was installed by debian." Leaving it unpinned
+    instead fails the other way, on a clean runner that has no `packaging` at
+    all. The two only conflict inside a SHARED interpreter. A virtualenv has
+    neither problem, and it retires `--break-system-packages`, which was always
+    a way of saying "write into a directory the OS owns".
+    """
+    python = venv_python(root)
+    if python.exists():
+        return python, False
+    subprocess.run([sys.executable, "-m", "venv", str(root / VENV_DIRNAME)],
+                   check=True)
+    return python, True
+
+
+def _install_command(lock_path: Path, python: Optional[Path] = None) -> list:
+    """The one install command. `python` selects the interpreter to install into.
+
+    `--break-system-packages` is present ONLY for the legacy system-interpreter
+    path (a Cowork sandbox, or a host that predates `--venv`); a virtualenv is
+    not a system interpreter and does not need it.
+    """
+    if python is not None:
+        return [str(python), "-m", "pip", "install", "-r", str(lock_path),
+                "--require-hashes", "-q"]
     return [sys.executable, "-m", "pip", "install", "-r", str(lock_path),
             "--require-hashes", "--break-system-packages", "-q"]
 
 
-def _reprobe_subprocess() -> bool:
-    """Fresh interpreter, because this process's failed imports are cached."""
-    code = ("import numpy, pandas, scipy; from scipy.optimize import milp; "
+def _reprobe_subprocess(python: Optional[Path] = None) -> bool:
+    """Fresh interpreter, because this process's failed imports are cached.
+
+    R353: also re-probes the TEST deps. An install that leaves pytest missing is
+    not a warm environment, and reporting it as one is what sent a session into
+    the gate to be told `test suite FAILED`.
+    """
+    code = ("import numpy, pandas, scipy, pytest, pydantic; "
+            "from scipy.optimize import milp; "
             "print(numpy.__version__, pandas.__version__, scipy.__version__)")
-    result = subprocess.run([sys.executable, "-c", code],
-                            capture_output=True, text=True)
+    exe = str(python) if python is not None else sys.executable
+    result = subprocess.run([exe, "-c", code], capture_output=True, text=True)
     return result.returncode == 0
 
 
@@ -261,6 +308,11 @@ def main(argv: Optional[list] = None) -> int:
                     "warm exits 0 without touching pip.")
     parser.add_argument("--install", action="store_true",
                         help="on a cold probe, run the locked install and re-probe")
+    parser.add_argument("--venv", action="store_true",
+                        help="install into <repo>/.venv instead of this "
+                             "interpreter, creating it if absent (R353). Use this "
+                             "anywhere the interpreter is shared with an OS "
+                             "package manager, which is every Linux container.")
     parser.add_argument("--lock", default=None,
                         help="lock file path (default: repo requirements.lock)")
     args = parser.parse_args(argv)
@@ -306,17 +358,36 @@ def main(argv: Optional[list] = None) -> int:
         print("install: " + " ".join(_install_command(lock_path)))
         return 2
 
-    print(f"env cold: {detail}; installing from {lock_path.name} "
-          f"(host {interpreter_tag()})")
-    result = subprocess.run(_install_command(lock_path))
+    target: Optional[Path] = None
+    if args.venv:
+        try:
+            target, created = ensure_venv(root)
+        except (OSError, subprocess.CalledProcessError) as exc:
+            print(f"env_probe: could not create {root / VENV_DIRNAME}: {exc}")
+            return 2
+        print(f"env cold: {detail}; installing from {lock_path.name} into "
+              f"{VENV_DIRNAME}/ "
+              f"({'created' if created else 'existing'}, host {interpreter_tag()})")
+    else:
+        print(f"env cold: {detail}; installing from {lock_path.name} "
+              f"(host {interpreter_tag()})")
+
+    result = subprocess.run(_install_command(lock_path, target))
     if result.returncode != 0:
         print(f"env_probe: locked install failed (pip exit {result.returncode})")
         print(_hash_coverage_note(lock_path))
         return 2
-    if not _reprobe_subprocess():
+    if not _reprobe_subprocess(target):
         print("env_probe: install ran but the re-probe still fails; stop and say so")
         return 2
-    print("env warm after locked install")
+    if target is not None:
+        # The caller's shell does not inherit this; say so rather than letting a
+        # session install successfully and then run the gate on the wrong python.
+        print(f"env warm after locked install into {VENV_DIRNAME}. "
+              f"Every command this session runs must use {target}, or put "
+              f"{target.parent} first on PATH.")
+    else:
+        print("env warm after locked install")
     return 0
 
 

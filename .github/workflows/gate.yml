@@ -52,14 +52,18 @@ jobs:
           cache-dependency-path: requirements.lock
 
       - name: Install the locked runtime
-        # The same hashed install the probe runs, spelled out here so a CI
-        # failure names pip's own error rather than the probe's summary of it.
+        # Through the probe, into `.venv`, which is the ONE install path -- the
+        # same command `.claude/hooks/session_start_deps.py` runs on a cloud
+        # container. A second spelling here is a second thing to drift, and the
+        # first cut of this workflow had one: it installed into the runner's
+        # interpreter and passed no `--venv`, which is how it and the lock
+        # disagreed about whether `packaging` had to be pinned.
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -r requirements.lock --require-hashes -q
+          python tools/env_probe.py --install --venv
 
       - name: Probe
-        run: python tools/env_probe.py
+        run: .venv/bin/python tools/env_probe.py
 
       - name: Gate
         env:
@@ -68,7 +72,7 @@ jobs:
           PYTHONHASHSEED: '0'
         run: |
           set -o pipefail
-          python tools/audit.py --run-tests --terse 2>&1 | tee gate.out
+          .venv/bin/python tools/audit.py --run-tests --terse 2>&1 | tee gate.out
           # The audit's own exit code is the verdict. The grep is a second,
           # independent read of the same run: a zero exit with no PASS line has
           # happened before (a suite that collected nothing still exits clean),

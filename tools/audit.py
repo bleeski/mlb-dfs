@@ -747,7 +747,12 @@ EXPECTED_SUITE_COUNTS = {
     # were written because the two had drifted apart on CHANGELOG.md, so a pin
     # that restated either list here would have drifted the same way; both tests
     # read the two files instead.
-    "tests.test_core": 1294,
+    # R353 round two, 2026-09-17: 1294 -> 1295, the one that pins every
+    # transitive requirement of a pinned distribution as itself pinned. CI
+    # rejected the first cut for exactly that (`packaging>=20` unpinned under
+    # --require-hashes) and the local gate could not see it, because Debian had
+    # already put packaging on this host. The test reads installed metadata.
+    "tests.test_core": 1295,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps

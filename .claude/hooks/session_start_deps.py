@@ -33,36 +33,51 @@ PROBE = ROOT / "tools" / "env_probe.py"
 INSTALL_TIMEOUT_S = 600
 
 
+def venv_python() -> Path:
+    """`<repo>/.venv`'s interpreter. Mirrors `env_probe.venv_python`.
+
+    Duplicated rather than imported because this hook runs before anything has
+    put the repo on `sys.path`, and a hook that fails to import is a session
+    that starts with no dependencies and no explanation.
+    """
+    if sys.platform == "win32":
+        return ROOT / ".venv" / "Scripts" / "python.exe"
+    return ROOT / ".venv" / "bin" / "python"
+
+
 def remote() -> bool:
     return os.environ.get("CLAUDE_CODE_REMOTE", "").lower() == "true"
 
 
-def pin_hashseed() -> str:
-    """Put PYTHONHASHSEED=0 in the session's environment. R353.
+def export_env(lines: list) -> str:
+    """Append `export` lines to the session's environment file. R353.
 
-    CLAUDE.md's determinism rule says entry points pin it, and they do -- but a
-    session runs plenty that is not an entry point (`python -c`, a scratch
-    script, `pytest` directly), and on those the seed is whatever the container
-    felt like. Setting it for the whole session costs nothing and removes a
-    class of difference nobody would think to look for.
+    `PYTHONHASHSEED=0`: CLAUDE.md's determinism rule says entry points pin it,
+    and they do -- but a session runs plenty that is not an entry point
+    (`python -c`, a scratch script, `pytest` directly).
+
+    The PATH entry is load-bearing, not a convenience. The deps live in
+    `<repo>/.venv` and the container's `python3` is the system one, so without
+    this every command the session runs would miss them and the gate would fail
+    for a reason that looks like a code defect.
     """
     env_file = os.environ.get("CLAUDE_ENV_FILE")
     if not env_file:
-        return "PYTHONHASHSEED not pinned (no CLAUDE_ENV_FILE)"
+        return "environment not pinned (no CLAUDE_ENV_FILE)"
     try:
         with open(env_file, "a", encoding="utf-8") as fh:
-            fh.write("export PYTHONHASHSEED=0\n")
+            for line in lines:
+                fh.write(line + "\n")
     except OSError as exc:
-        return f"PYTHONHASHSEED not pinned ({exc})"
-    return "PYTHONHASHSEED=0 pinned for this session"
+        return f"environment not pinned ({exc})"
+    return "pinned: " + ", ".join(l.replace("export ", "") for l in lines)
 
 
-def run_probe(install: bool) -> tuple[int, str]:
-    cmd = [sys.executable, str(PROBE)] + (["--install"] if install else [])
+def run_probe(argv: list, python: Path) -> tuple:
     try:
-        out = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True,
-                             encoding="utf-8", errors="replace",
-                             timeout=INSTALL_TIMEOUT_S)
+        out = subprocess.run([str(python), str(PROBE), *argv], cwd=ROOT,
+                             capture_output=True, text=True, encoding="utf-8",
+                             errors="replace", timeout=INSTALL_TIMEOUT_S)
     except (OSError, subprocess.TimeoutExpired) as exc:
         return 2, f"env_probe did not complete: {exc}"
     return out.returncode, (out.stdout or out.stderr).strip()
@@ -75,12 +90,27 @@ def main() -> int:
         sys.stdout.write(f"deps: {PROBE} missing; the gate will not run.\n")
         return 0
 
-    code, text = run_probe(install=False)
-    if code != 0:
-        code, text = run_probe(install=True)
+    venv = venv_python()
+    if venv.exists():
+        # Probe THROUGH the venv. Probing with the system interpreter would
+        # report cold every time, because the deps are deliberately not there.
+        code, text = run_probe([], venv)
+        if code != 0:
+            code, text = run_probe(["--install", "--venv"], Path(sys.executable))
+    else:
+        code, text = run_probe(["--install", "--venv"], Path(sys.executable))
 
     lines = ["== deps (cloud container, R353) =="]
     lines.extend(text.splitlines()[-4:])
+
+    exports = ["export PYTHONHASHSEED=0"]
+    if venv.exists():
+        exports.append(f'export VIRTUAL_ENV="{venv.parent.parent}"')
+        exports.append(f'export PATH="{venv.parent}:$PATH"')
+    else:
+        lines.append(f"deps: {venv} absent after the install step; commands will "
+                     f"run against the system interpreter.")
+
     if code != 0:
         # Never fail the session start over this. A blocked gate that SAYS it is
         # blocked is recoverable; a session that will not start is not.
@@ -88,7 +118,7 @@ def main() -> int:
             "deps: NOT READY. `python tools/audit.py --run-tests` cannot pass "
             "here yet. Say so rather than working around it, and do not lower "
             "a suite pin to get green.")
-    lines.append(pin_hashseed())
+    lines.append(export_env(exports))
     sys.stdout.write("\n".join(lines) + "\n")
     return 0
 

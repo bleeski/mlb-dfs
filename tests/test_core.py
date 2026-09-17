@@ -12451,6 +12451,62 @@ class EnvLockTests(unittest.TestCase):
             self.assertGreaterEqual(got, floor,
                                     f"{name} pin below requirements.txt floor")
 
+    def test_every_transitive_requirement_is_pinned(self):
+        """R353: `--require-hashes` refuses the install unless EVERY requirement
+        of every pinned distribution is itself pinned with `==`.
+
+        This test exists because the first cut of R353 violated exactly that and
+        the local gate could not see it. `packaging` was left out deliberately --
+        Debian owns a copy in the system interpreter that pip cannot uninstall --
+        and the install succeeded HERE for that same reason: Debian had already
+        put it there. On a clean CI runner with no `packaging` at all, pip
+        refused the whole file in 20 seconds. The property is read from each
+        distribution's own installed metadata, so it holds without a network
+        call and fails on the host that omitted the pin rather than one push
+        later.
+        """
+        import sys
+        from importlib import metadata
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
+        try:
+            import env_probe
+        finally:
+            sys.path.pop(0)
+        pins = env_probe.parse_lock(self._lock_path().read_text(encoding="utf-8"))
+
+        def canonical(name):
+            return re.sub(r"[-_.]+", "-", name).lower()
+
+        pinned = {canonical(n) for n in pins}
+        unpinned, unchecked = [], []
+        for name in sorted(pins):
+            try:
+                dist = metadata.distribution(name)
+            except metadata.PackageNotFoundError:
+                unchecked.append(name)  # not installed here; nothing to read
+                continue
+            for req in (dist.requires or []):
+                # `; extra == "..."` requirements are optional and pip does not
+                # resolve them unless the extra is requested. Environment
+                # markers on a non-extra requirement (python_version,
+                # sys_platform) still have to be pinned, because pip evaluates
+                # them per host and this lock serves several.
+                if "extra ==" in req:
+                    continue
+                dep = canonical(re.split(r"[\s\[<>=!;(]", req.strip(), 1)[0])
+                if dep and dep not in pinned:
+                    unpinned.append(f"{name} requires {dep}, which the lock does "
+                                    f"not pin")
+        self.assertEqual(
+            unpinned, [],
+            "every transitive requirement must be pinned or --require-hashes "
+            "refuses the entire install: " + "; ".join(unpinned))
+        # Guard the guard: if nothing was installed, this test proved nothing,
+        # and a silent pass is what let the original defect through.
+        self.assertLess(len(unchecked), len(pins),
+                        f"no pinned distribution was importable here "
+                        f"({unchecked}), so this test checked nothing")
+
     def test_probe_decision_table(self):
         import sys
         sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))

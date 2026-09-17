@@ -47,7 +47,7 @@ Net, and this is the part worth keeping: **`PASS` was unreachable from the docum
 
 **What shipped.** `requirements.lock` now carries cp310 + cp311 + cp313 manylinux x86_64 hashes for every binary pin (pip accepts several `--hash` lines and takes the wheel matching any one), and pins the test dependencies the gate imports — pytest with iniconfig/pluggy/pygments and its conditional `exceptiongroup`/`tomli`/`colorama`, plus pydantic, pydantic-core, annotated-types, typing-extensions, typing-inspection. Its header now says what each of the three dependency files is FOR, which is the drift that hid defects 2 and 3: two locks with overlapping names, and the one the probe installs was the one that could not run the tests.
 
-`packaging` is deliberately NOT pinned: Debian installs it into the system interpreter without a RECORD file, so pip cannot uninstall it and a pin fails the entire install. pytest needs `packaging>=20` and every host satisfies it. `ruff` stays in `requirements-production.lock`; it is a platform-specific binary wanted only by `tools/verify_engine.py`, which is not the gate.
+`ruff` stays in `requirements-production.lock`; it is a platform-specific binary wanted only by `tools/verify_engine.py`, which is not the gate. On `packaging`, the first cut of this entry said it was deliberately unpinned; that was wrong and section (h) below records what happened.
 
 **Verified by installing, not by reading.** From the cold state above, `python tools/env_probe.py --install` → `env warm after locked install`, then `numpy 2.2.6 / pandas 2.3.3 / scipy 1.15.3 / pytest 8.4.2 / pydantic 2.12.5`, `scipy.optimize.milp` resolves.
 
@@ -83,9 +83,9 @@ CLAUDE.md's git bullet splits: the commit rules stay as they were, and a new bul
 
 **Gate, on the real tree, after every change above:**
 
-    PASS  v2.26.0  40 modules  2145 tests  5 skipped  {test_core 1294/1294 (4 skipped) skipped_in_place; test_showdown 219/219 (1 skipped) skipped_in_place}
+    PASS  v2.26.0  40 modules  2146 tests  5 skipped  {test_core 1295/1295 (4 skipped) skipped_in_place; test_showdown 219/219 (1 skipped) skipped_in_place}
 
-The five skips are absent optional files and are identical on a fresh CI clone: no vendored `.pylibs/scipy`, no `.env`, two unstaged 2026-08-16 salary fixtures, no Classic salary file for the Showdown case. One pin moved, `tests.test_core` 1292 -> 1294, for the two tests in (g). Golden histogram unmoved.
+The five skips are absent optional files and are identical on a fresh CI clone: no vendored `.pylibs/scipy`, no `.env`, two unstaged 2026-08-16 salary fixtures, no Classic salary file for the Showdown case. One pin moved, `tests.test_core` 1292 -> 1295, for the two tests in (g) and the one in (h). Golden histogram unmoved.
 
 ### (g) Found while shipping this: the claim mutex was blind to the changelog
 
@@ -101,6 +101,34 @@ Both lists corrected (`.github/` added to CLAUDE.md's bullet as well as the tupl
     .claude/skills/land/SKILL.md:19:8. **Ship it.** ... R350 ... ended "the push is Ben's"; R353 ... made the PR and the merge the session's too.
 
 One hit, and it is this entry's own replacement text quoting what it replaced.
+
+### (h) CI rejected the first cut, and it was right
+
+The workflow this entry ships failed on its own first run, in 20 seconds, at the install step:
+
+    ERROR: In --require-hashes mode, all requirements must have their versions
+    pinned with ==. These do not:
+        packaging>=20 ... (from pytest==8.4.2->-r requirements.lock)
+
+**The reasoning that produced the defect, since it is the reusable part.** `packaging` was left out of the lock on purpose, with the reason written into both the lock header and this entry: Debian ships `packaging` into the system interpreter with no RECORD file, so pip cannot uninstall it and a pin fails the install. Measured again here, that is true:
+
+    Cannot uninstall packaging 24.0, RECORD file not found.
+    Hint: The package was installed by debian.
+
+What was wrong is the generalisation. `--require-hashes` refuses the entire file unless EVERY transitive requirement is pinned with `==`, with no exceptions, and a clean CI runner has no `packaging` at all. So one host needs the pin and the other cannot take it. The local install succeeded for a reason that does not generalise -- Debian had already put `packaging` there -- which is precisely why a clean runner was the host that could find this, and precisely the argument for the workflow landing in the same change it checks.
+
+**What shipped.** The two observations conflict only inside a SHARED interpreter, so the install moves into a virtualenv, `packaging==26.3` is pinned like everything else, and `--break-system-packages` is retired from the venv path (it was always a way of saying "write into a directory the OS owns"). `env_probe --venv` creates and installs into `<repo>/.venv`, and it stays the ONE install path: the SessionStart hook calls it, and so does CI. The first cut of the workflow had its own `pip install` line, and that second spelling is exactly how the workflow and the lock came to disagree.
+
+The hook now probes THROUGH the venv when one exists (probing with the system interpreter would report cold forever, since the deps are deliberately not there) and exports `VIRTUAL_ENV` and `PATH` through `CLAUDE_ENV_FILE`. That PATH line is load-bearing: without it every command a session runs would miss the deps and the gate would fail in a way that reads like a code defect.
+
+**The test that should have caught it.** `EnvLockTests.test_every_transitive_requirement_is_pinned` reads each pinned distribution's own installed metadata and asserts every non-extra requirement is itself in the lock. No network. It guards itself, too: if nothing was importable it fails rather than passing vacuously, because a silent pass is the shape the original defect took. Mutation-checked by removing the `packaging` pin again -- `Lists differ: ['pytest requires packaging, which the lock does not pin'] != []`, which is CI's finding reproduced locally.
+
+**End to end, from a genuinely cold state** (all five packages uninstalled from the system interpreter, `.venv` removed), the hook run exactly as Claude Code invokes it:
+
+    env cold: missing ['numpy', 'pandas', 'scipy']; milp unavailable; test deps
+    missing ['pytest', 'pydantic'] ...; installing from requirements.lock into .venv/ (created, host cp311)
+    env warm after locked install into .venv.
+    pinned: PYTHONHASHSEED=0, VIRTUAL_ENV=..., PATH=...
 
 **What is NOT in this change, and is filed rather than dropped.** The host model still names two hosts where there are now three, and `.claude/rules/engine.md` still calls `/tmp` and `rm` Cowork-only where both work in this container. `claims/` is gitignored and a cloud container is isolated, so a cloud session takes a claim no other session can see — a false exclusivity that is worse than none. `skills/generate-lineups/SKILL.md` has no path for a DK CSV attached in chat and no way to hand a finished file back before the container is reclaimed. All of it is on the board as CC-A1 through CC-A3.
 

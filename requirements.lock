@@ -27,18 +27,34 @@
 # now carries cp310, cp311 and cp313 manylinux x86_64. A host outside that set
 # needs its own hashes added here, never `--no-deps` or a fallback resolve.
 #
-# NOT PINNED HERE, deliberately:
-#   packaging — Debian installs it into the system interpreter without a RECORD
-#     file, so pip cannot uninstall it and a pin fails the whole install. pytest
-#     needs `packaging>=20`; every host the project runs on already satisfies it.
+# EVERY TRANSITIVE REQUIREMENT MUST BE PINNED HERE. `--require-hashes` refuses
+# the whole install if any requirement of any pinned distribution is not itself
+# pinned with `==`. The first cut of R353 left `packaging` out on purpose --
+# Debian ships it into the system interpreter WITHOUT a RECORD file, so pip
+# cannot uninstall it and a pin fails with "Cannot uninstall packaging 24.0" --
+# and CI rejected that in 20 seconds on a clean runner that has no packaging at
+# all:
+#
+#   ERROR: In --require-hashes mode, all requirements must have their versions
+#   pinned with ==. These do not:
+#       packaging>=20 ... (from pytest==8.4.2->-r requirements.lock)
+#
+# Both observations are real and they conflict only when installing into a
+# SHARED system interpreter. So the install goes into a virtualenv, which has no
+# Debian-owned packaging to uninstall, and `packaging` is pinned like everything
+# else. `EnvLockTests.test_every_transitive_requirement_is_pinned` now checks
+# this property from each installed distribution's own metadata, so the next
+# omission fails locally rather than in CI.
+#
+# NOT PINNED HERE:
 #   ruff — a platform-specific Rust binary needed only by tools/verify_engine.py,
 #     which is an offline verifier and not the gate. It lives in
 #     requirements-production.lock.
 #
-# Install (cold host):
-#   pip install -r requirements.lock --require-hashes --break-system-packages -q
-# Probe first; install only on failure:
-#   python tools/env_probe.py --install
+# Install (cold host), into a virtualenv, never the system interpreter:
+#   python tools/env_probe.py --install --venv
+# Probe first; install only on failure. The probe is the ONE install path; CI and
+# the SessionStart hook both go through it.
 #
 # Regenerate (after a deliberate version move only; this file changing means
 # engine behavior may move under MILP and CSV handling). Hashes come from PyPI's
@@ -86,6 +102,8 @@ pluggy==1.6.0 \
     --hash=sha256:e920276dd6813095e9377c0bc5566d94c932c33b27a3e3945d8389c374dd4746
 pygments==2.21.0 \
     --hash=sha256:2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9
+packaging==26.3 \
+    --hash=sha256:d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c
 
 # pytest's conditional deps. The markers are pip's, so cp311+ skips the first two
 # and a non-Windows host skips colorama; they are pinned so a cp310 or Windows
