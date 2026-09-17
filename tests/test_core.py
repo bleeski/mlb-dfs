@@ -12281,7 +12281,20 @@ class RootContractBudgetTests(unittest.TestCase):
 
         for banned in ("git add -A", "git add --all", "git add . && git commit -m x",
                        "git checkout -- CLAUDE.md", "git -C repo reset --hard", "git stash",
-                       "git restore tools/audit.py", "git clean -fd", "git push origin main",
+                       "git restore tools/audit.py", "git clean -fd",
+                       # R350: the FORCE push is what destroys work, so it is what
+                       # stays denied. An ordinary push moved to the allow list below.
+                       "git push --force origin main",
+                       "git push --force-with-lease",
+                       "git push -f origin main",
+                       "git push origin main --force",
+                       # R350: a wrapper must not launder a banned command. The
+                       # over-match fix resolves the real command past env
+                       # assignments and wrappers, and this is the case that would
+                       # have regressed if it only tested argv[0].
+                       "timeout 130 git add -A",
+                       "PYTHONHASHSEED=0 git add -A",
+                       "env git add --all",
                        "pip install -r requirements.txt",
                        "python -m pip install -r requirements.txt",
                        "curl https://www.draftkings.com/lineup/upload",
@@ -12295,7 +12308,27 @@ class RootContractBudgetTests(unittest.TestCase):
                         "git commit --amend --no-edit",
                         "git status --short; git log --oneline -12",
                         "python tools/env_probe.py --install",
-                        "python tools/audit.py --run-tests --terse"):
+                        "python tools/audit.py --run-tests --terse",
+                        # R350, Ben 2026-09-16: sessions push. The convention this
+                        # used to enforce was never a capability limit, and on
+                        # 2026-09-16 it deadlocked against the harness stop-hook,
+                        # which asks for the push this denied.
+                        "git push origin main",
+                        "git push -u origin claude/generate-classic-lineups-sp7a7z",
+                        # --follow-tags starts with --f and is not --force.
+                        "git push --follow-tags origin main",
+                        # R350, the over-match. A READ-ONLY search for a banned
+                        # literal is not the banned act, and denying it blocks
+                        # reading about a rule rather than breaking it. Confirmed
+                        # live twice on 2026-09-16, once while diagnosing the hook.
+                        "grep -rn 'git push' docs/",
+                        "grep -rn 'git add -A' .claude/",
+                        "rg 'draftkings.com' docs/",
+                        "timeout 60 grep -rn 'git stash' docs/",
+                        # ...and the exemption is per SEGMENT, so a read-only first
+                        # segment cannot launder a second one: the deny case
+                        # "git add . && git commit -m x" above proves the converse.
+                        "grep -rn foo docs/ && git push origin main"):
             self.assertIsNone(verdict(allowed), allowed)
 
 

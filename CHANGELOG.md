@@ -25,6 +25,40 @@ performance claim.
 
 ---
 
+## 2026-09-16 — R350: sessions push, a force-push is refused, and the command guard stops denying the act of reading about a rule
+
+**Scope.** `.claude/hooks/guard_commands.py`, `.claude/settings.json`, `tests/test_core.py`, `CLAUDE.md`, `docs/cowork_sandbox.md`, `docs/cowork_sync_protocol.md`, this file. Ben's decision, 2026-09-16: sessions may push to any branch including `main`. The over-match half is a defect found the same evening, twice, in the course of using the hook.
+
+**What was wrong, part one: the push rule had stopped paying for itself.** R301 gave the rule two enforcement layers, `permissions.deny` for the client and `GIT_PUSH` in the hook, and CLAUDE.md stated it as "Sessions COMMIT, Ben PUSHES". `docs/cowork_sync_protocol.md` was always explicit that this is "a CONVENTION rather than a capability limit". On 2026-09-16 the convention cost a full stop: a BUILD session finished the 1910_7g slate, committed a backlog fragment, and then hit both layers on the push that the harness's own stop-hook was asking for. There was no resolution available to the session except to report the contradiction to Ben and stand down. An ordinary push is additive and revertible. A force-push is the operation that discards commits, and in a tree the multi-session contract assumes is shared, the commits it discards may not be yours. So the force-push is what stays denied, and it is denied in both layers.
+
+**What was wrong, part two: every rule searched the RAW command string.** So a read-only `grep` whose pattern contained a banned literal was denied — the hook blocking someone reading *about* a rule rather than breaking it. Confirmed live twice on 2026-09-16: once on an ordinary search, and once on a `grep` that was diagnosing this very file, which is the instance that makes it more than untidy. The file's own docstring claimed it "fails open, never closed", which is true of a command it does not recognise and false of one it over-matches.
+
+**What shipped.** `judge()` keeps its signature and its job moves inside: `segments()` splits the command on `&&`, `||`, `|`, `;` and newlines with quote awareness (via `shlex`'s `punctuation_chars`, because a naive `str.split` would reintroduce this same class from the other side — a separator inside a quoted argument is not a separator), `real_command()` resolves each segment's actual command past `VAR=value` prefixes and wrappers, and a segment whose command is in `READ_ONLY_TOOLS` is exempt from the content rules. `judge_segment()` then judges one segment.
+
+**Round two, forced by this change's own commit.** Scoping the regexes to a segment was not enough. The commit that shipped the paragraph above was DENIED BY THE GUARD: its message documents `git add -A` while explaining the rule, and a regex over the segment text reads a banned literal inside a quoted argument as the banned act. That is the same defect as the read-only `grep`, one level down, and rewording the message would have left it in place for the next person who documents a rule. So the git rules stopped reading text at all. `resolved_argv()` returns the segment's argv from its real command onward, `git_subcommand()` returns `(subcommand, its arguments)`, and push / banned-subcommand / add / commit are each answered from argv. `judge_commit()` carries the pathless-commit logic over unchanged in behaviour.
+
+Answering from argv is only safe BECAUSE `resolved_argv` walks past wrappers: an `argv[0] == "git"` test alone lets `timeout 130 git add -A` through, which is exactly why the first cut kept the regexes. `COMMAND_WRAPPERS` is therefore load-bearing rather than cosmetic, and the deny fixtures include the wrapped spellings to pin it. The trade is worth naming: an argv rule is exact about what it sees and blind to what it does not, where the regex was the reverse.
+
+Three things about that shape, each load-bearing:
+
+- **Wrapper resolution is required for the fix not to be a regression.** The design this replaced tested `argv[0] == "git"`, which would have let `timeout 130 git add -A` through, because `argv[0]` is `timeout`. Resolving past wrappers can only ever GRANT an exemption — the deny rules still run their own regexes over the whole segment — so a wrapper the list misses costs a false positive on a search, never a missed denial.
+- **The exemption is per segment, so a read-only first segment cannot launder a second.** `grep -rn foo docs/ && git push --force` is denied on the second segment; the long-standing `git add . && git commit -m x` case proves the converse still holds.
+- **`shlex.join`, never `" ".join`.** Caught by the pinned test rather than by review: the rules re-tokenize their own captures, so a segment rebuilt without quoting changes meaning. `git commit -m "R301: lean CLAUDE.md"` rejoined bare becomes `git commit -m R301: lean CLAUDE.md`, whose re-tokenization finds `CLAUDE.md` sitting loose and reads a commit MESSAGE as a pathspec — silently disabling the pathless-commit prompt that the same test exists to keep. Red with `" ".join`, green with `shlex.join`; that is the mutation check, run for real rather than simulated.
+
+The force deny is token-wise (`forced_push`) rather than a regex, so `--follow-tags` is not mistaken for `--force` and a combined short flag like `-fu` is still caught.
+
+**`permissions.deny` is a fast path, not the guarantee.** It carries four force-only prefixes (`Bash`/`PowerShell` x `--force`/`-f `), and a prefix rule structurally cannot catch a TRAILING flag: `git push origin main --force` does not match any of them. The hook does, and `test_the_command_guard_denies_the_contract_bans` pins that exact spelling. Anyone tightening this later should tighten the hook, not the prefix list.
+
+**R233 grep — the class this closes.** After round two, `grep -n "\.search(command)\|\.finditer(command)" .claude/hooks/guard_commands.py` returns exactly **two** hits, not six: `DRAFTKINGS` at line 237 and `PIP_UNPINNED` at line 259. Both still match text deliberately — DraftKings is a hard wall that should fail closed, and the pip rule reads both `pip install` and `python -m pip install` spellings. The four git rules are gone from that grep entirely, because `grep -n "sub == \|sub in \|git_subcommand("` shows them answered from argv at lines 240, 241, 245, 248, 255. `grep -n "GIT_ADD\|GIT_COMMIT\|GIT_PUSH"` returns ONE hit, line 280, and it is a docstring reference in `judge_commit` naming the loop it replaced — no live regex survives. `judge_segment` has exactly one caller, `judge()`'s segment loop at line 230, and `grep -n "judge(command)"` returns a single hit, `main()` at line 316. No path judges the raw command string.
+
+The DraftKings rule is deliberately NOT narrowed to known network clients. A broad match plus the read-only exemption is strictly safer than an allowlist of fetchers, and it is a hard wall, so it should fail closed. The measured consequence, worth knowing before someone files it as a bug: an ad-hoc bash harness that spells out a banned literal is still denied, because `python` is not a read-only tool and a heredoc naming a banned command is indistinguishable from one running it. Verifying this change by hand therefore required building every literal from fragments. The test suite is unaffected — pytest reads test files from disk and never invokes the hook.
+
+**One unrelated correction made in passing**, because leaving a known-wrong string next to a corrected one is the drift this repo keeps finding: the `PIP_UNPINNED` denial told the reader that `tools/env_probe.py --install` installs `requirements-production.lock`. It installs `requirements.lock` (`LOCK_NAME` in that file). Two locks with overlapping names, and the message named the other one.
+
+**Gate.** `PASS  v2.26.0  40 modules  2143 tests  4 skipped  {test_core 1292/1292 (4 skipped) skipped_in_place}`. **The pin does not move:** `test_the_command_guard_denies_the_contract_bans` grew its fixtures, not the method count, so `tests.test_core` stays at 1292. Golden replay unmoved; nothing here reaches the engine.
+
+---
+
 ## 2026-09-16 — R349: the call budget stops being a constant and becomes a resolved host fact, and the repo root resolves on a third host
 
 **Scope.** `mlb_engine/repo_env.py` (the new host authority), `tools/solver_probe.py`, `tools/autobuild.py`, `skills/generate-lineups/scripts/build_slate.py` (`_find_repo`, the `--max-seconds` default), `tests/test_core.py`, `tools/audit.py` (the `tests.test_core` pin), this file. Found by the 2026-09-16 1910_7g BUILD session, which delivered a certified 29-entry portfolio and spent roughly a third of a 35-minute lock window on problems that were not about baseball.
@@ -756,7 +790,7 @@ rosterable, Workstream 1, CC-3). Two findings deliberately got NO number: the
 `--max-opposing-hitters-per-sp` default (the archive supports the default and the
 R276 rider adds the panel that makes a relaxation visible), and a Showdown 5-1
 control would ratify a mix the engine already builds 95% of the time (R306 step 5
-rider). Next free number: R350 (R349 is the 2026-09-16 host-resolver entry above; R348 is the 2026-09-15 CC-0 entry; R340 landed the same date as CC-1).
+rider). Next free number: R351 (R350 and R349 are the 2026-09-16 entries above; R348 is the 2026-09-15 CC-0 entry; R340 landed the same date as CC-1).
 
 **Riders (twenty):** R10 (hierarchical fit, per-player popularity term, field-size
 transfer, two new control halves after the bar), R37(2)(c) (the secondary is

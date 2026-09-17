@@ -42,8 +42,10 @@
       "PowerShell(git fetch*)"
     ],
     "deny": [
-      "Bash(git push*)",
-      "PowerShell(git push*)",
+      "Bash(git push --force*)",
+      "Bash(git push -f *)",
+      "PowerShell(git push --force*)",
+      "PowerShell(git push -f *)",
       "Bash(pip install -r requirements.txt*)",
       "PowerShell(pip install -r requirements.txt*)",
       "Read(./.env)",

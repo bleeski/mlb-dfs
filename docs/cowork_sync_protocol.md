@@ -32,13 +32,19 @@ git different mtimes for identical bytes, so porcelain reports ` M` while
   and carries that call, and `sync_check.py` measured GitHub directly with the
   `GH_PAT`. Run `python tools/sync_check.py` and read what it says rather than
   reading this line.
-  **Pushing stays Ben's, and that is a CONVENTION rather than a capability
-  limit -- do not read the correction above as license to push.** The rule
-  ("sessions COMMIT and Ben PUSHES") is unchanged; what changed is that a
-  session can now answer "has GitHub moved ahead of me" instead of only "does
-  my disk carry commits GitHub does not". Where the fetch does fail, the
-  reading falls back to the stale ref and is LABELLED, and R147's classified
-  reason says which of the three stopped it.
+  **Sessions PUSH as of R350 (Ben, 2026-09-16).** This paragraph used to read
+  "Pushing stays Ben's, and that is a CONVENTION rather than a capability limit
+  -- do not read the correction above as license to push." It named itself a
+  convention correctly, and Ben retired it: an ordinary push is additive and
+  revertible, and the rule had started costing something, deadlocking against
+  the harness stop-hook that asks for the push the command guard denied. A
+  FORCE-push is still refused, by `.claude/hooks/guard_commands.py` and by the
+  `permissions.deny` prefixes, because that is the operation that discards
+  commits which may belong to another session. What this bullet originally
+  added is unchanged: a session can answer "has GitHub moved ahead of me"
+  instead of only "does my disk carry commits GitHub does not". Where the fetch
+  does fail, the reading falls back to the stale ref and is LABELLED, and
+  R147's classified reason says which of the three stopped it.
 - **The container reaches github.com.** `bleeski/mlb-dfs` is private, so a
   credential is required. Without one, the container cannot clone, and the
   disk-to-container path is the tarball bridge below. **With one it clones, and
