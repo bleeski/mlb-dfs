@@ -20471,7 +20471,13 @@ class SupervisorHardeningTests(unittest.TestCase):
         self.assertEqual(code, 5)
         self.assertEqual(len(logs), 1, "the decision log was not written")
         self.assertEqual([r["action"] for r in records], ["build_timed_out"])
-        self.assertEqual(records[0]["timeout_s"], 20 + 90)
+        # The contract is that the subprocess wall is the per-attempt SEARCH
+        # budget plus 90s, not that the budget is any particular number. This
+        # read `20 + 90` until R360 made --per-build-seconds host-derived, at
+        # which point it failed on a container resolving 105 -- the assertion
+        # was carrying the Cowork literal that R360 exists to remove.
+        self.assertEqual(records[0]["timeout_s"],
+                         self.ab.default_per_build_seconds() + 90)
 
     def test_the_decision_log_dates_from_the_salary_file_not_the_container(self):
         """R169(b). build_slate's `pool_blocked` and exit-10 payloads carried no
@@ -20772,6 +20778,216 @@ class SupervisorHardeningTests(unittest.TestCase):
                          f"main() returns at lines {unflushed} without flushing "
                          f"the decision log first; that exit files no "
                          f"post-mortem (R212, and R169(a) before it)")
+
+    def test_per_build_seconds_is_host_derived_not_a_cowork_literal(self):
+        """The per-attempt SEARCH budget follows the host's call budget.
+
+        R349 freed the CALL budget from the 130s Cowork ceiling and this one
+        stayed a literal 20, which kept that ceiling alive one level down:
+        20s of --max-seconds leaves build_slate roughly 14s to build a bank
+        (`deadline - now - 6.0`) on a host that affords 600.
+        """
+        fn = self.ab.default_per_build_seconds
+        # A container declaring 900s resolves 630; six attempts' worth each.
+        self.assertEqual(fn(630.0), 105)
+        # Cowork and any unrecognised host keep today's behaviour.
+        self.assertEqual(fn(130.0), 21)
+        self.assertEqual(fn(540.0), 90)
+        # The floor holds when a host declares something tiny, so the flag can
+        # never resolve to a budget too small to attempt anything.
+        self.assertEqual(fn(6.0), self.ab.PER_BUILD_FLOOR_S)
+        self.assertGreaterEqual(fn(630.0), fn(130.0),
+                                "a roomier host must not get a smaller "
+                                "per-attempt budget than Cowork")
+
+    def test_per_build_seconds_default_is_not_a_hardcoded_twenty(self):
+        """The argparse default must come from the resolver, not a literal.
+
+        Pinned because the literal is what regressed last time: the CALL
+        budget moved to a resolver and the flag next to it did not.
+        """
+        import ast
+        import inspect
+        tree = ast.parse(inspect.getsource(self.ab))
+        for node in ast.walk(tree):
+            if not (isinstance(node, ast.Call)
+                    and getattr(node.func, "attr", "") == "add_argument"):
+                continue
+            if not any(isinstance(a, ast.Constant)
+                       and a.value == "--per-build-seconds" for a in node.args):
+                continue
+            default = next((kw.value for kw in node.keywords
+                            if kw.arg == "default"), None)
+            self.assertIsInstance(
+                default, ast.Call,
+                "--per-build-seconds must default to a resolver call, not a "
+                "constant; a literal here re-pins every host to whichever "
+                "sandbox the number was tuned for")
+            self.assertEqual(getattr(default.func, "id", ""),
+                             "default_per_build_seconds")
+            return
+        self.fail("--per-build-seconds is gone; re-scope this test")
+
+
+class SessionStartDepsDiagnosticTests(unittest.TestCase):
+    """env_probe runs pip with INHERITED streams, so pip's diagnostic lands on
+    stderr while env_probe's narration lands on stdout. `out.stdout or
+    out.stderr` therefore discarded the diagnostic every time, because stdout
+    is never empty. On 2026-09-17 a transient install failure surfaced as
+    `pip exit 2` under a hash-mismatch hint that did not apply, and the
+    session wrote the wrong cause into a merged PR body."""
+
+    def _hook(self):
+        import importlib.util
+        src = REPO / ".claude" / "hooks" / "session_start_deps.py"
+        spec = importlib.util.spec_from_file_location("_sshook_deps", src)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def test_pip_stderr_survives_alongside_probe_stdout(self):
+        module = self._hook()
+
+        class Completed:
+            returncode = 2
+            stdout = "env cold: installing from requirements.lock into .venv/\n"
+            stderr = "ERROR: could not install packaging; RECORD file not found\n"
+
+        with unittest.mock.patch.object(module.subprocess, "run",
+                                        return_value=Completed()):
+            code, text = module.run_probe(["--install", "--venv"],
+                                          Path(sys.executable))
+        self.assertEqual(code, 2)
+        self.assertIn("RECORD file not found", text)
+        self.assertIn("env cold", text)
+
+    def test_the_install_is_retried_once_before_not_ready(self):
+        """The failing install reached only index metadata and died in ~19s;
+        the identical command run by hand 40s later succeeded against the same
+        lock. The one thing the hook did not do was the thing that fixed it."""
+        module = self._hook()
+        attempts = []
+
+        def flaky(argv, python):
+            attempts.append(argv)
+            return (0, "env warm") if len(attempts) == 2 else (2, "transient")
+
+        module.run_probe = flaky
+        code, text = module.install_with_retry()
+        self.assertEqual((code, len(attempts)), (0, 2))
+        self.assertIn("retry succeeded", text)
+
+    def test_both_failures_are_reported_not_just_the_second(self):
+        """Two different errors are a different diagnosis from one error
+        twice, and only the second survived a naive retry."""
+        module = self._hook()
+        seen = []
+
+        def always_fails(argv, python):
+            seen.append(argv)
+            return 2, f"failure {len(seen)}"
+
+        module.run_probe = always_fails
+        code, text = module.install_with_retry()
+        self.assertEqual((code, len(seen)), (2, 2))
+        self.assertIn("failure 1", text)
+        self.assertIn("failure 2", text)
+
+    def test_a_clean_install_is_not_retried(self):
+        module = self._hook()
+        seen = []
+
+        def succeeds(argv, python):
+            seen.append(argv)
+            return 0, "env warm"
+
+        module.run_probe = succeeds
+        code, _ = module.install_with_retry()
+        self.assertEqual((code, len(seen)), (0, 1))
+
+
+class SessionStartInboxTests(unittest.TestCase):
+    """The inbox is the documented route for every role that may not write the
+    board or the ledger, and nothing surfaced it: not this hook, not
+    /dev-session, and a COMMITTED fragment is invisible to `git status`. Three
+    backlog fragments were unmerged on 2026-09-18, the oldest from 2026-08-09,
+    and eighteen hand-written ledger fragments went back to 2026-08-13."""
+
+    def _hook(self, root):
+        """Load the hook against a private tree. ROOT is read at import, so
+        each case gets its own module object rather than a cached one."""
+        import importlib.util
+        src = REPO / ".claude" / "hooks" / "session_start.py"
+        with unittest.mock.patch.dict(os.environ,
+                                      {"CLAUDE_PROJECT_DIR": str(root)}):
+            spec = importlib.util.spec_from_file_location(
+                f"_sshook_{abs(hash(str(root)))}", src)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+        return module
+
+    def _tree(self, backlog=(), ledger=()):
+        box = tempfile.TemporaryDirectory()
+        self.addCleanup(box.cleanup)
+        root = Path(box.name)
+        for rel, files in (("docs/backlog_inbox", backlog),
+                           ("ledger/inbox", ledger)):
+            (root / rel).mkdir(parents=True, exist_ok=True)
+            for name, body in files:
+                (root / rel / name).write_text(body, encoding="utf-8")
+        return root
+
+    def test_waiting_fragments_are_named(self):
+        root = self._tree(backlog=[("2026-09-17_BUILD_a-finding.md", "# a\n")])
+        line = self._hook(root).pending_fragments()
+        self.assertIn("backlog 1", line)
+        self.assertIn("2026-09-17_BUILD_a-finding.md", line)
+
+    def test_retained_fragments_are_counted_apart_from_debt(self):
+        """Two fragments are KEPT by design and carry a banner saying so.
+        Counting them as waiting work would make the line cry wolf every
+        session, which is how a status line stops being read."""
+        root = self._tree(backlog=[
+            ("2026-09-17_BUILD_real.md", "# real finding\n"),
+            ("2026-08-09_DEV_kept.md",
+             "> **RETAINED - DO NOT DELETE ON AN INBOX SWEEP.**\n"),
+        ])
+        line = self._hook(root).pending_fragments()
+        self.assertIn("backlog 1", line)
+        self.assertIn("+1 retained", line)
+        self.assertNotIn("2026-08-09_DEV_kept.md", line)
+
+    def test_miner_emitted_ledger_blocks_are_not_news(self):
+        """ledger/inbox is ~343 machine-emitted decomposition blocks ARCHIVE
+        consumes in bulk. Listing them would bury the hand-written ones."""
+        root = self._tree(ledger=[
+            ("2026-09-01_miner_12345.md", "#### Full-field decomposition\n"),
+            ("2026-09-04_BUILD_run-record.md", "# a run record\n"),
+        ])
+        line = self._hook(root).pending_fragments()
+        self.assertIn("ledger 1", line)
+        self.assertIn("2026-09-04_BUILD_run-record.md", line)
+        self.assertNotIn("miner", line)
+
+    def test_an_empty_inbox_says_none_rather_than_nothing(self):
+        self.assertEqual(self._hook(self._tree()).pending_fragments(), "none")
+
+    def test_missing_inbox_directories_do_not_raise(self):
+        """A fresh clone or a partial checkout must not break session start."""
+        box = tempfile.TemporaryDirectory()
+        self.addCleanup(box.cleanup)
+        self.assertEqual(self._hook(Path(box.name)).pending_fragments(), "none")
+
+    def test_the_line_reaches_the_session_start_output(self):
+        """A resolver nothing prints is the defect this closes, not a fix
+        for it."""
+        root = self._tree(backlog=[("2026-09-17_BUILD_a-finding.md", "# a\n")])
+        module = self._hook(root)
+        module.git = lambda *a, **k: ""
+        module.held_claims = lambda: ["none held"]
+        module.dirt = lambda: ["clean"]
+        self.assertIn("inbox (fragments awaiting their owning role):",
+                      module.full())
 
 
 class ShapeBandRoutingTests(unittest.TestCase):

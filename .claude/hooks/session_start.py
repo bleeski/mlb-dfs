@@ -23,6 +23,7 @@ ROOT = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolve().par
 SUBJECT_WIDTH = 96
 LOG_LINES = 12
 DIRT_LINES = 14
+INBOX_NAMES = 6
 
 
 def git(*args: str) -> str:
@@ -89,6 +90,53 @@ def next_pointer() -> str:
     return "no `## Execution roadmap ... NEXT:` heading found in docs/backlog.md"
 
 
+def pending_fragments() -> str:
+    """Inbox fragments waiting for their owning role to merge them.
+
+    CLAUDE.md tells every non-owning role to drop a fragment in
+    `docs/backlog_inbox/` or `ledger/inbox/` rather than edit the board or the
+    ledger. Nothing surfaced them: not this hook, not `/dev-session`, and a
+    COMMITTED fragment is invisible to `git status`, so the write end of that
+    contract worked and the read end did not. Three backlog fragments were
+    sitting unmerged on 2026-09-18, the oldest filed 2026-08-09.
+
+    `ledger/inbox/` is ~355 machine-emitted `*_miner_*.md` decomposition blocks
+    that ARCHIVE consumes in bulk from its runbook; those are not news and are
+    excluded. A fragment whose first lines carry the RETAINED banner is kept BY
+    DESIGN and is counted separately, so the line does not read as debt every
+    session.
+    """
+    parts = []
+    for label, rel, pattern in (("backlog", "docs/backlog_inbox", "*.md"),
+                                ("ledger", "ledger/inbox", "*.md")):
+        directory = ROOT / rel
+        try:
+            names = sorted(p.name for p in directory.glob(pattern))
+        except OSError:
+            continue
+        if label == "ledger":
+            names = [n for n in names if "_miner_" not in n]
+        names = [n for n in names if not n.startswith("_")]
+        if not names:
+            continue
+        retained = []
+        fresh = []
+        for name in names:
+            try:
+                head = (directory / name).read_text(encoding="utf-8",
+                                                    errors="replace")[:400]
+            except OSError:
+                head = ""
+            (retained if "RETAINED" in head else fresh).append(name)
+        chunk = f"{label} {len(fresh)}"
+        if fresh:
+            chunk += " (" + ", ".join(fresh[:INBOX_NAMES]) + ")"
+        if retained:
+            chunk += f" +{len(retained)} retained"
+        parts.append(chunk)
+    return "; ".join(parts) if parts else "none"
+
+
 def locks() -> str:
     hits = []
     now = time.time()
@@ -122,6 +170,7 @@ def full() -> str:
         f"git log, subjects truncated at {SUBJECT_WIDTH}:",
         *["  " + l for l in git("log", f"--format=%h %<({SUBJECT_WIDTH},trunc)%s", f"-{LOG_LINES}").splitlines()],
         "backlog: " + next_pointer(),
+        "inbox (fragments awaiting their owning role): " + pending_fragments(),
         "git locks: " + lock_state,
         "next: take your role's claim (python tools/claim.py take engine --role DEV --scope \"...\"), "
         "then python tools/audit.py --run-tests --terse. DEV: /dev-session.",

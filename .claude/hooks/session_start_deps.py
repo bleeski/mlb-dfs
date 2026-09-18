@@ -31,6 +31,10 @@ from pathlib import Path
 ROOT = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path(__file__).resolve().parents[2])
 PROBE = ROOT / "tools" / "env_probe.py"
 INSTALL_TIMEOUT_S = 600
+# Enough that a pip traceback survives the tail. This was 4, which fit
+# env_probe's own narration and cut the pip error off above it even once the
+# stderr stopped being discarded.
+INSTALL_REPORT_LINES = 24
 
 
 def venv_python() -> Path:
@@ -80,7 +84,40 @@ def run_probe(argv: list, python: Path) -> tuple:
                              errors="replace", timeout=INSTALL_TIMEOUT_S)
     except (OSError, subprocess.TimeoutExpired) as exc:
         return 2, f"env_probe did not complete: {exc}"
-    return out.returncode, (out.stdout or out.stderr).strip()
+    # Both streams, never one or the other. env_probe runs pip with INHERITED
+    # streams, so pip's own diagnostic lands on stderr while env_probe's
+    # narration lands on stdout -- and `out.stdout or out.stderr` discarded the
+    # stderr whenever stdout was non-empty, which is always. On 2026-09-17 that
+    # left a real failure reading as `pip exit 2` under a hash-mismatch hint
+    # that did not apply, the actual pip error was unrecoverable, and the
+    # session wrote the wrong cause into a merged PR body.
+    parts = [s.strip() for s in (out.stdout, out.stderr) if s and s.strip()]
+    return out.returncode, "\n".join(parts)
+
+
+def install_with_retry() -> tuple:
+    """The locked install, retried once before the session is told it failed.
+
+    The install is the first thing that runs in a fresh container and it reaches
+    the network. On 2026-09-17 it died after ~19s having fetched only index
+    metadata, and the identical command run by hand 40 seconds later succeeded
+    unchanged against the same lock -- so the one thing the hook did not do was
+    the thing that fixed it. A second attempt costs a few seconds on the path
+    that was going to print `deps: NOT READY` anyway.
+
+    The first attempt's text is kept and labelled when the retry also fails,
+    because two different errors are a different diagnosis from the same error
+    twice.
+    """
+    code, text = run_probe(["--install", "--venv"], Path(sys.executable))
+    if code == 0:
+        return code, text
+    first = text
+    code, text = run_probe(["--install", "--venv"], Path(sys.executable))
+    if code == 0:
+        return code, text + "\nenv_probe: first attempt failed and the retry succeeded."
+    return code, (f"env_probe: attempt 1 failed --\n{first}\n"
+                  f"env_probe: attempt 2 failed --\n{text}")
 
 
 def main() -> int:
@@ -96,12 +133,12 @@ def main() -> int:
         # report cold every time, because the deps are deliberately not there.
         code, text = run_probe([], venv)
         if code != 0:
-            code, text = run_probe(["--install", "--venv"], Path(sys.executable))
+            code, text = install_with_retry()
     else:
-        code, text = run_probe(["--install", "--venv"], Path(sys.executable))
+        code, text = install_with_retry()
 
     lines = ["== deps (cloud container, R353) =="]
-    lines.extend(text.splitlines()[-4:])
+    lines.extend(text.splitlines()[-INSTALL_REPORT_LINES:])
 
     exports = ["export PYTHONHASHSEED=0"]
     if venv.exists():
