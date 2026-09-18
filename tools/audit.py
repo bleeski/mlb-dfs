@@ -758,7 +758,14 @@ EXPECTED_SUITE_COUNTS = {
     # role blocking per R70, a second run copying nothing, an empty root reported
     # rather than raising, a missing root skipped, and ATTACHMENT_ROOTS being a
     # ranked list rather than one hardcoded path.
-    "tests.test_core": 1302,
+    # R360+R361+R362, 2026-09-18: 1302 -> 1314, the post-run retro batch's
+    # twelve -- two that pin --per-build-seconds resolving from the host rather
+    # than the Cowork literal 20 (R360), four that pin the deps hook keeping
+    # pip's stderr and retrying the install once (R361), and six that pin the
+    # session-start inbox line: fragments named, RETAINED counted apart from
+    # debt, miner blocks excluded, an empty and a missing inbox both safe, and
+    # the line actually reaching full() (R362).
+    "tests.test_core": 1314,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps

@@ -157,8 +157,13 @@ Ben has delegated build decisions (CLAUDE.md, Autonomy). Start here:
 python <repo>/tools/autobuild.py \
   --salary <DKSalaries.csv> --entries <DKEntries.csv> \
   --lineups <feed.json> --postures '<id>=<posture>,...' \
-  --per-build-seconds 20 --stop-after-minutes 12
+  --stop-after-minutes 12
 ```
+
+`--per-build-seconds` is left off on purpose: it defaults to this host's call
+budget over six (105s on a 630s container, 21s on Cowork), and this recipe used
+to pin it at 20, which held every host to the Cowork ceiling one level down
+(R349 had already freed the CALL budget). Pass it only to override that.
 
 **Two clocks, and they are not the same number** (R296(f)).
 `--stop-after-minutes` is the SLATE's budget; `--call-budget-seconds` is THIS
@@ -213,9 +218,12 @@ portfolio to the last thing you looked at.
 ```bash
 python <repo>/skills/generate-lineups/scripts/build_slate.py \
   --salary <uploaded DKSalaries.csv> \
-  --entries <uploaded DKEntries.csv> \
-  --max-seconds 100
+  --entries <uploaded DKEntries.csv>
 ```
+
+`--max-seconds` is omitted deliberately; it already defaults to this host's
+call budget less 30s. The literal `100` this recipe used to carry was Cowork's
+130 minus 30, and it capped every other host at Cowork's ceiling.
 
 It detects Classic vs Showdown from the files, stages them into
 `data/slates/<date>/`, builds the pool, measures the solver, picks a strategy that
@@ -358,6 +366,25 @@ before lock, run them first and pass the results in:
   Two crosswalk facts that cost calls the same day: the MLB API says `AZ` where
   DK says `ARI`, and `bat_side` is not on the schedule payload at all, it is
   backfilled from `/people` in chunks of 100.
+
+  **When `statsapi.mlb.com` is proxy-gated, the `DFS_Architect_MCP` server is
+  the substitute.** `get_mlb_lineups` and `get_mlb_probables` return real
+  `source: "mlb-stats-api"` payloads carrying `handedness` on every hitter --
+  the field the schedule hydrate omits and `fetch_lineups_feed` backfills from
+  `/people`. Shape the result into the per-GAME structure above and pass it as
+  `--lineups`. Measured 2026-09-18 where every repo fetch died on a 403
+  CONNECT: 26 teams with handedness, `f4_platoon_applied: 162` on a 13-gamer.
+  Two sessions on 2026-09-17/18 called the feed unreachable with these tools
+  loadable throughout; one shipped Showdown at `hitters_with_side: 0`. Reach
+  for it before reporting the feed lost.
+
+  **`get_vegas_lines` on that same server is a STUB and must never reach
+  `--odds`.** Verified 2026-09-18: `source: "stub"`, `confidence: "stub"`, one
+  fabricated `game_id: "stub_game_1"` BOS @ NYY absent from that day's 15-game
+  slate, priced at a plausible -150/+130 with a 9.5 total. It is shaped like a
+  real payload, so nothing downstream rejects it: F1 would price every hitter
+  off a fiction and the brief would call the build enriched. Read `source` and
+  `confidence` on any odds payload; when either says `stub`, F1 is neutral.
 - **mlb-game-odds** for moneylines, run lines, and totals. Save it and pass
   `--odds <path>`. Odds now DO change the build: they are the input to F1, the
   game-environment factor. When `--odds` is omitted the script fetches totals
@@ -962,6 +989,14 @@ The sha256 you state must be the one in `outputs/<date>/upload_manifest.json`.
 If they differ, say so and stop: two files are in play and Ben is about to
 upload the wrong one.
 
+**Nothing goes between the preflight and the hand-over.** Not a commit, not a
+push, not the gate, not a PR. Repo housekeeping is real work and it belongs
+AFTER Ben has the file, because until then the slate can still be lost and
+none of it helps. On 2026-09-17 a Showdown file was gate-clean at 19:20:08 and
+reached Ben at 19:28 with commit, push, a 3m33s audit gate and a PR in
+between. Lock was 21:38, so it cost nothing; at T-12 it would have cost the
+slate. The ordering is the lesson, not the eight minutes.
+
 Nothing here touches DraftKings. Ben uploads by hand, always.
 
 ## Always run the preflight before presenting a file
@@ -1226,6 +1261,16 @@ Ben asked for leverage on the build, say plainly that the swapped entries are no
 carrying it rather than letting the parent's brief speak for the new file.
 
 Details in `references/late_swap.md`.
+
+## After the slate: the retro
+
+After delivery, never inside the T-window, spend a few minutes on the run
+itself. The brief self-reports the INPUTS; nothing self-reports the session, so
+a misfiring tool, an unreached fallback or a costly ordering is visible only
+here and only now. Findings route by layer: engine/tool and ergonomics to a
+`docs/backlog_inbox/` fragment, process to a skill edit, environment/host to
+Ben, who is the only one who can change it. **No findings means file nothing** —
+a clean run is one line in chat. `references/retro.md`.
 
 ## When something goes wrong
 

@@ -113,6 +113,33 @@ ASSERTED = REPO / "tools" / "build_asserted.py"
 DEFAULT_CALL_BUDGET_S = call_budget_s()
 DEFAULT_CALL_BUDGET_SOURCE = call_budget_source()
 
+# R349 moved the CALL budget off 130; the per-attempt SEARCH budget stayed at a
+# literal 20 and kept the Cowork ceiling alive one level down. 20 was chosen so
+# that "8 x 110s under a 12-minute wall" would fit the ~130s Cowork bash
+# ceiling (see --call-budget-seconds below). On a host resolving 630s that hands
+# each attempt 20s of --max-seconds, from which build_slate derives its bank
+# budget as `deadline - now - 6.0` -- about 14s to build a candidate bank, on a
+# host that can afford 600. The bank TARGET is unchanged by this
+# (resolve_candidate_bank_size is entry-derived, 2n capped at 150); what a
+# bigger budget buys is REACHING that target in one call instead of slicing it
+# across exit-10 resumes, and each extra slice costs a call on a live slate.
+#
+# The divisor keeps the old behaviour where the old constraint still applies:
+# 130/6 = 21 on Cowork and on an unrecognised host, 105 on a 630s container.
+PER_BUILD_FLOOR_S = 20
+PER_BUILD_BUDGET_DIVISOR = 6
+
+
+def default_per_build_seconds(budget: Optional[float] = None) -> int:
+    """Seconds of SEARCH one attempt gets, derived from this host's call budget.
+
+    Mirrors ``build_slate.default_max_seconds``: resolved from the host rather
+    than pinned, so a container with room to work uses it. ``budget`` is for
+    tests, which must not depend on the ambient environment.
+    """
+    resolved = DEFAULT_CALL_BUDGET_S if budget is None else float(budget)
+    return max(PER_BUILD_FLOOR_S, int(resolved / PER_BUILD_BUDGET_DIVISOR))
+
 # build_slate.py's documented exit vocabulary. Anything else is a crash wearing
 # a refusal's label; see the off-contract branch in main().
 BUILD_SLATE_CONTRACT_CODES = (0, 3, 4, 5, 10)
@@ -312,7 +339,20 @@ def main() -> int:
     ap.add_argument("--odds")
     ap.add_argument("--postures")
     ap.add_argument("--max-attempts", type=int, default=8)
-    ap.add_argument("--per-build-seconds", type=int, default=20)
+    ap.add_argument("--per-build-seconds", type=int,
+                    default=default_per_build_seconds(),
+                    help=f"seconds of SEARCH one attempt gets, forwarded to "
+                         f"build_slate as --max-seconds and therefore the input "
+                         f"to its bank budget (default "
+                         f"{default_per_build_seconds()}, this host's call "
+                         f"budget / {PER_BUILD_BUDGET_DIVISOR}, floored at "
+                         f"{PER_BUILD_FLOOR_S}). Raising it makes attempts "
+                         f"deeper and fewer: the subprocess wall is this + 90s, "
+                         f"so fewer fit one call, and --call-budget-seconds "
+                         f"stops cleanly at exit 5 before one that cannot "
+                         f"finish. --resume then restores the attempt count and "
+                         f"the derived floors, so a thin bank costs a call "
+                         f"rather than a truncated solve.")
     ap.add_argument("--stop-after-minutes", type=float, default=12.0,
                     help="wall clock for the whole supervised run")
     # R296(f). Two clocks, because they answer different questions.
