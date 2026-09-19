@@ -802,7 +802,25 @@ EXPECTED_SUITE_COUNTS = {
     # instructions are archived with banners, MANIFEST.md stays put and
     # points at its archive, MLB_Classic.md stops contradicting the bank
     # cap, and docs/hosts.md answers secrets, egress and the budget hatch.
-    "tests.test_core": 1341,
+    # R369, 2026-09-19: 1341 -> 1351, CC-A6's ten -- nine on the delivery
+    # record (one delivery recorded through the real choke point and all three
+    # archive-side readers answering from it with no `outputs/` tree in
+    # existence; a refusal keyed by timestamp with its exit code and its note;
+    # a planted key smuggled into a copied field refusing the write and naming
+    # the variable without echoing its value; both of `record_delivery`'s
+    # return paths mirroring, pinned by deleting the record between them; no
+    # ROI, win rate or cash rate in the artifact itself; the salary tier
+    # matching on CONTENT past a same-named decoy; that tier answering ahead of
+    # the in-date one, pinned by running `resolve_salary_tiered`; `build_slate`'s
+    # `__main__` recording the refusal its thirteen `return N, {}` sites cannot)
+    # and one that `data/deliveries/` reached BUILD and ARCHIVE in CLAUDE.md and
+    # tools/claim.py together. Then 1351 -> 1353, the two that pin the
+    # isolation the tracked record made visible: a bare `python -m unittest`
+    # got neither the gate's `MLB_DFS_ARTIFACT_ROOT` nor conftest's, so the
+    # front-door tests published into the real tree (harmless while `outputs/`
+    # was all they wrote, because it is gitignored), and the code sha survives
+    # an isolated artifact root because it is read from the code, not from it.
+    "tests.test_core": 1353,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps

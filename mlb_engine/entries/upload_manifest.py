@@ -209,6 +209,34 @@ def _write(path: Path, payload: Mapping[str, Any]) -> None:
     os.replace(tmp, path)
 
 
+def _mirror_to_delivery_record(date: str, record: Mapping[str, Any],
+                               controls: Optional[Mapping[str, Any]],
+                               relaxations: Optional[Mapping[str, Any]],
+                               egress: str) -> None:
+    """Project this delivery into the TRACKED record (R369).
+
+    Written from here rather than from the three delivery tools because this is
+    the one function all three already call -- `build_slate.py`, `late_swap.py`
+    and the re-promotion path in this module. Three writers would be three
+    places to forget.
+
+    The manifest under `outputs/` remains the authority for the session that
+    wrote it. This is its durable projection, and it exists because `outputs/`
+    is gitignored and a cloud container is reclaimed at session end, so without
+    it no build run there can ever be joined to its standings.
+
+    Never raises and never blocks: the record is bookkeeping, the delivery is
+    the deliverable.
+    """
+    try:
+        from mlb_engine.entries.delivery_record import write_delivery_record
+        write_delivery_record(date=date, manifest_row=record,
+                              run_id=record.get("run_id"), controls=controls,
+                              relaxations=relaxations, egress=egress)
+    except Exception as exc:  # noqa: BLE001
+        print(f"delivery_record: mirror skipped ({type(exc).__name__}: {exc})")
+
+
 def record_delivery(
     *,
     date: str,
@@ -226,6 +254,9 @@ def record_delivery(
     notes: str = "",
     hash_source: Optional[str | Path] = None,
     re_promoted_from: Optional[str] = None,
+    controls: Optional[Mapping[str, Any]] = None,
+    relaxations: Optional[Mapping[str, Any]] = None,
+    egress: str = "",
 ) -> Dict[str, Any]:
     """Append one delivery record and supersede any prior record for the same slate.
 
@@ -302,12 +333,14 @@ def record_delivery(
             # The same bytes recorded twice is one delivery, not two.
             prior.update(record)
             _write(manifest_path(date), manifest)
+            _mirror_to_delivery_record(date, prior, controls, relaxations, egress)
             return prior
         prior["status"] = "superseded"
         prior["superseded_by"] = record["delivered_file"]
         prior["superseded_utc"] = record["recorded_utc"]
     manifest["deliveries"].append(record)
     _write(manifest_path(date), manifest)
+    _mirror_to_delivery_record(date, record, controls, relaxations, egress)
     return record
 
 

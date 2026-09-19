@@ -999,6 +999,34 @@ slate. The ordering is the lesson, not the eight minutes.
 
 Nothing here touches DraftKings. Ben uploads by hand, always.
 
+### Commit the delivery record, AFTER the hand-over
+
+R369, 2026-09-19. Every delivery now writes a tracked JSON at
+`data/deliveries/<date>/<tag>_<run_id>.json` — the manifest row, the entry rows
+parsed out of the delivered file, the input fingerprints, the code identity, the
+effective controls, the host and the egress line. It is written for you by
+`upload_manifest.record_delivery`, so there is nothing to run; what a cloud
+session has to do is **commit and push it**, because `outputs/` and `runs/` are
+gitignored and the container is reclaimed. Without this commit the build is
+ungradeable: `awaiting_standings`, `field_miner.harvest_own_entry_ids` and the
+outcome review all read this file and nothing else survives.
+
+```bash
+git add data/deliveries/<date>
+git commit -m "record: <date> <tag> delivery (R369)"
+git push -u origin <branch>
+```
+
+This belongs in the same "repo housekeeping" block as the commit and the push,
+which means **after** Ben has the file. The ordering rule above is unchanged and
+outranks this: nothing goes between the preflight and the hand-over, this
+included. A record committed ten minutes late still grades; a slate lost at T-8
+does not come back.
+
+A refusal writes a record too, keyed `<date>_<tag>_<utc>` with `kind: refusal`
+and the exit code. Commit those the same way. A night that shipped nothing is
+the night the record is worth most.
+
 ## Always run the preflight before presenting a file
 
 Between "build finished" and "Ben uploads," run this on every deliverable,

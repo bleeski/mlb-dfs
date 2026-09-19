@@ -175,16 +175,58 @@ def scan_unrecorded_deliveries(outputs_dir: Path) -> dict[str, list[str]]:
     return out
 
 
-def scan_entered(outputs_dir: Path) -> tuple[dict[str, dict], dict[str, dict]]:
-    """Every Contest ID on a filled entry row in outputs/*/DKEntries*.csv.
+def _scan_delivery_records(deliveries_dir: "Path | None",
+                           entered: dict, invalid: dict) -> None:
+    """Contest IDs from the tracked delivery records (R369). Never raises."""
+    try:
+        from mlb_engine.entries.delivery_record import read_records, DELIVERIES_DIR
+        root = None
+        if deliveries_dir is not None:
+            # The caller names the deliveries directory; read_records wants the
+            # repo root that contains it.
+            root = Path(deliveries_dir)
+            for _ in Path(DELIVERIES_DIR).parts:
+                root = root.parent
+        for record in read_records(root=root):
+            if record.get("kind") != "delivery":
+                continue
+            row = record.get("manifest_row") or {}
+            if row.get("status") == "superseded":
+                continue
+            date = str(record.get("date") or "")
+            for entry in record.get("entries") or []:
+                if not entry.get("filled"):
+                    continue  # a reserved row was never entered anywhere
+                cid = str(entry.get("contest_id") or "").strip()
+                if not cid:
+                    continue
+                target = entered if CID_RE.match(cid) else invalid
+                target.setdefault(cid, {"date": date,
+                                        "name": entry.get("contest_name") or ""})
+    except Exception:  # noqa: BLE001 - the outputs/ scan below still runs
+        pass
+
+
+def scan_entered(outputs_dir: Path,
+                 deliveries_dir: "Path | None" = None
+                 ) -> tuple[dict[str, dict], dict[str, dict]]:
+    """Every Contest ID on a filled entry row, from the record and from outputs/.
 
     Returns (entered, invalid): entered maps a 9-digit contest ID to
     {"date", "name"}; invalid maps a non-empty, non-9-digit Contest ID value
     to the same, so the caller can report what it filtered out instead of
     silently dropping it.
+
+    R369, 2026-09-19: `data/deliveries/` is read FIRST and `outputs/` second.
+    `outputs/` is gitignored and a cloud container is reclaimed at session end,
+    so a build run there left no trace here at all -- the contest never reached
+    the pull list, and a contest that is never listed is never pulled, mined or
+    graded. Both sources are read because the two hosts that share a disk still
+    have the `outputs/` tree, and a contest found twice is the same key.
     """
     entered: dict[str, dict] = {}
     invalid: dict[str, dict] = {}
+    _scan_delivery_records(deliveries_dir, entered, invalid)
     if not outputs_dir.is_dir():
         return entered, invalid
     for date_dir in sorted(outputs_dir.iterdir()):
