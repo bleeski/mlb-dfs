@@ -150,7 +150,16 @@ WRITE_SETS["SOLO"] = tuple(sorted(set(WRITE_SETS["ARCHIVE"]) | set(WRITE_SETS["D
 
 # Create-only surfaces every role may write; pending files here are the
 # fragment protocol working, never a conflict.
-FRAGMENT_PREFIXES = ("ledger/inbox/", "docs/backlog_inbox/")
+#
+# R372 adds `data/agent_runs/`, where the SubagentStop hook records what a repo
+# agent run cost and found. It belongs here rather than in a role's write set
+# for the same reason the inbox directories do: every role runs those agents
+# (`dfs-premise` is a DEV tool, `dfs-qa` a BUILD one), and the hook writes
+# `<date>/<session_id>.jsonl`, one file per session, so two sessions can never
+# touch the same file. It is NOT in `data/deliveries/`, which R372 first named:
+# `dfs-qa` runs before the hand-over, a DEV session has no delivery at all, and
+# `data/deliveries/` is BUILD's and ARCHIVE's, never DEV's.
+FRAGMENT_PREFIXES = ("ledger/inbox/", "docs/backlog_inbox/", "data/agent_runs/")
 
 
 def _utc_now() -> str:

@@ -836,7 +836,24 @@ EXPECTED_SUITE_COUNTS = {
     # degraded-input extraction, a missing brief stated rather than silent, a
     # defaulted control kept apart from a hand-passed one, and every section
     # rendering when all are empty.
-    "tests.test_core": 1375,
+    # R372, 2026-09-19: 1375 -> 1392, the seventeen that pin the two repo agents
+    # and the four hook events as BEHAVIOUR -- the FINDINGS contract parsed from
+    # a real payload (absent line -> null, never 0; last line, not a quoted
+    # example; anchored so a prose mention is not the count), one jsonl per
+    # session with a sanitized id, the hand-over ask firing on an uncommitted
+    # R369 record and exempting the command that commits it, its refusal to
+    # claim a hand-over field that does not exist, `--untracked-files=all`
+    # without which the rule never fires on a fresh container, PreCompact
+    # injecting CLAUDE.md's own text and naming what it cannot recover,
+    # SessionEnd warning without ever blocking the exit, and all four events
+    # wired to files that exist. +1 on its first LIVE firing, which arrived with
+    # an empty agent_type on the PARENT transcript and recorded five hours of
+    # main session as an agent's wall time: the span is now refused unless the
+    # entries are the agent's.
+    # +1 again: the same live firing showed the event arrives with NO agent_type
+    # at all in an ordinary DEV session, so it now writes nothing rather than a
+    # contentless row into a tracked directory on every session.
+    "tests.test_core": 1394,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps

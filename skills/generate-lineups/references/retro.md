@@ -72,6 +72,14 @@ meaning, and every brief key `SKILL.md` names that this brief does not carry.
 Ben got the file, so the session supplies it or the gap is not computed. It is
 never guessed.
 
+Since R372 it also prints **repo agent runs**: every `dfs-qa` or `dfs-premise`
+run on the date, with its wall time, the model that served it and its findings
+count, read from `data/agent_runs/<date>/`. `findings: not stated` means the
+agent dropped the `FINDINGS: <n>` line its definition requires, and it is never
+read as zero. There is no token figure and there will not be one: the
+`SubagentStop` payload does not carry a token count, so cost here is wall time
+and findings per run.
+
 **It judges nothing, and that is deliberate.** An absent brief key may be a docs
 defect or a correct conditional; a degraded input may or may not have had a
 fallback; a gap may or may not be a finding. The tool reports the fact and

@@ -421,6 +421,51 @@ def absent_brief_keys(brief: Optional[Mapping[str, Any]], skill_text: str,
                      "judgment the skill step makes, not this tool")}
 
 
+AGENT_RUNS = "data/agent_runs"
+
+
+def agent_runs(root: Path, date: str) -> Dict[str, Any]:
+    """What the repo agents cost and found on this date (R372).
+
+    `.claude/hooks/subagent_record.py` appends one line per `dfs-qa` or
+    `dfs-premise` run to `data/agent_runs/<date>/<session_id>.jsonl`. Before it,
+    the only record a run left was scrollback, and R344's first agentic pass had
+    its cost reconstructed by hand afterwards.
+
+    COST HERE IS WALL TIME AND FINDINGS, NEVER TOKENS. The SubagentStop payload
+    carries no token count, so there is no honest token figure to print and this
+    prints none. `findings: null` means the agent omitted the `FINDINGS: <n>`
+    line its definition requires; it is never read as zero, because "found
+    nothing" and "did not say" are different facts and only one of them is good
+    news.
+
+    The directory is keyed by the UTC date the AGENT ran, which is not always the
+    slate date -- a late slate crosses UTC midnight. A date with no directory is
+    reported as such rather than as an empty list.
+    """
+    base = root / AGENT_RUNS / str(date)
+    if not base.is_dir():
+        return {"runs": [], "note": (f"no {AGENT_RUNS}/{date}/ -- either no repo "
+                                     f"agent ran on this UTC date, or the run "
+                                     f"crossed UTC midnight and sits under the "
+                                     f"adjacent date")}
+    runs: List[Dict[str, Any]] = []
+    for path in sorted(base.glob("*.jsonl")):
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+        except OSError:
+            continue
+        for line in lines:
+            try:
+                row = json.loads(line)
+            except ValueError:
+                continue
+            if isinstance(row, dict):
+                runs.append(row)
+    runs.sort(key=lambda r: str(r.get("recorded_utc") or ""))
+    return {"runs": runs, "note": ""}
+
+
 # ---------------------------------------------------------------------------
 # assembly
 # ---------------------------------------------------------------------------
@@ -463,6 +508,7 @@ def retro(record: Mapping[str, Any], root: Path, brief_path: Optional[Path] = No
         "contract_failures": contract_failures(record, brief, root),
         "absent_brief_keys": absent_brief_keys(brief, skill_text,
                                                str(row.get("contest_type") or "")),
+        "agent_runs": agent_runs(root, date),
         "labels": ("facts extracted from this build's artifacts; the judgment "
                    "and the filing stay a skill step (references/retro.md)"),
     }
@@ -529,6 +575,25 @@ def render(facts: Mapping[str, Any]) -> str:
     for key in block.get("absent") or []:
         out.append(f"  absent: {key}")
     out.append(f"  {block.get('note')}")
+    out.append("")
+
+    block = facts.get("agent_runs") or {}
+    out.append("## Repo agent runs (R372)")
+    rows = block.get("runs") or []
+    if not rows:
+        out.append(f"  {block.get('note') or 'none recorded'}")
+    for item in rows:
+        found = item.get("findings")
+        found = "not stated (the agent omitted its FINDINGS line)" if found is None else found
+        secs = item.get("duration_s")
+        out.append(f"  {item.get('agent_type') or 'unknown agent'}: "
+                   f"{secs if secs is not None else '?'} s, findings {found}")
+        out.append(f"    model {item.get('model') or 'unrecorded'}; "
+                   f"stop {item.get('stop_reason') or '?'}; "
+                   f"duration from {item.get('duration_source') or '?'}")
+    if rows:
+        out.append("  cost here is wall time and findings per run; the hook "
+                   "payload carries no token count")
     out.append("")
     out.append(facts.get("labels") or "")
     return "\n".join(out)

@@ -13125,8 +13125,18 @@ class RootContractBudgetTests(unittest.TestCase):
         guard = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(guard)
 
+        # R372: an EXPLICIT clean root. `pending_delivery_reason` asks git about
+        # `data/deliveries/`, and without this the answer came from whatever tree
+        # the test process was standing in -- so a BUILD session with an
+        # uncommitted delivery record in the working copy would flip
+        # `git push origin main` from allowed to asked and fail this test, which
+        # is about a different rule entirely. A temp dir has no git repo, the
+        # status call returns non-zero, and the rule is correctly inert.
+        import tempfile
+        clean_root = tempfile.mkdtemp()
+
         def verdict(command: str):
-            out = guard.judge(command)
+            out = guard.judge(command, root=clean_root)
             return None if out is None else out["hookSpecificOutput"]["permissionDecision"]
 
         for banned in ("git add -A", "git add --all", "git add . && git commit -m x",
@@ -13180,6 +13190,394 @@ class RootContractBudgetTests(unittest.TestCase):
                         # "git add . && git commit -m x" above proves the converse.
                         "grep -rn foo docs/ && git push origin main"):
             self.assertIsNone(verdict(allowed), allowed)
+
+
+class RepoAgentsAndHookEventsTests(unittest.TestCase):
+    """R372: two repo agents and four hook events, tested as BEHAVIOUR.
+
+    Every test here runs the real hook module against a real payload and reads
+    what it did. `.claude/rules/engine.md` and R300 both say why: this repo has a
+    history of `assertIn(..., source)` standing in for a behaviour claim, and a
+    hook is exactly the kind of file where a string pin passes while the thing is
+    wired to nothing.
+    """
+
+    ROOT = Path(__file__).resolve().parents[1]
+
+    def _hook(self, name):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            f"hook_{name}", self.ROOT / ".claude" / "hooks" / f"{name}.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    def _settings(self):
+        import json
+        return json.loads(
+            (self.ROOT / ".claude" / "settings.json").read_text(encoding="utf-8"))
+
+    # -- the agents ------------------------------------------------------
+
+    def test_both_agents_exist_and_require_the_findings_line_the_hook_parses(self):
+        """The hook's only findings source is a contract the agent files carry.
+
+        If an agent definition drops the `FINDINGS:` line, the hook records
+        `null` forever and nothing fails, which is the silent-loss shape this
+        pins against.
+        """
+        guard = self._hook("subagent_record")
+        for name in ("dfs-qa", "dfs-premise"):
+            path = self.ROOT / ".claude" / "agents" / f"{name}.md"
+            self.assertTrue(path.is_file(), f".claude/agents/{name}.md is absent")
+            text = path.read_text(encoding="utf-8")
+            self.assertTrue(text.startswith("---"),
+                            f"{name} has no YAML frontmatter, so it is not an agent")
+            self.assertIn(f"name: {name}", text)
+            # The agent file states the contract with a `<n>` placeholder, so
+            # the regex cannot match the file itself. What must hold is that the
+            # literal is there AND that the hook parses the line the agent is
+            # told to emit -- checked against a filled-in instance of it.
+            self.assertIn("FINDINGS:", text,
+                          f"{name} does not state the line the hook parses")
+            self.assertIn("SubagentStop", text,
+                          f"{name} does not say WHY the line matters")
+            self.assertEqual(guard.findings_count("FINDINGS: 5"), 5)
+
+    def test_the_qa_agent_points_at_the_standing_brief_which_exists(self):
+        brief = self.ROOT / "skills/generate-lineups/references/adversarial_qa_brief.md"
+        self.assertTrue(brief.is_file(), "R344's standing brief is absent")
+        text = (self.ROOT / ".claude/agents/dfs-qa.md").read_text(encoding="utf-8")
+        self.assertIn("adversarial_qa_brief.md", text)
+        body = brief.read_text(encoding="utf-8")
+        # The two requirements the first run failed, and the labels wall.
+        # Pinned as the INSTRUCTION, not as a word: "re-pull" also appears in
+        # the section heading, so a mutation that gutted the actual bullet and
+        # left the heading standing survived the looser assertion. Found by
+        # mutation-checking this test, 2026-09-19.
+        self.assertIn("Re-pull the lineups feed as the LAST act", body,
+                      "the brief no longer INSTRUCTS the re-pull; a heading that "
+                      "mentions it is not a requirement")
+        for needle in ("clock-stamp", "FINDINGS:", "NOT RUN"):
+            self.assertIn(needle, body, f"the brief lost {needle!r}")
+        for banned in ("win rate", "cash rate", "ROI"):
+            self.assertIn(banned, body,
+                          "the brief must NAME the forbidden labels to forbid them")
+
+    def test_skill_md_routes_the_poke_holes_step_to_the_brief(self):
+        text = (self.ROOT / "skills/generate-lineups/SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("## Then poke holes in it", text)
+        after = text.split("## Then poke holes in it", 1)[1].split("\n## ", 1)[0]
+        self.assertIn("adversarial_qa_brief.md", after,
+                      "the poke-holes step does not point at R344's brief")
+        self.assertIn("dfs-qa", after)
+
+    # -- SubagentStop ----------------------------------------------------
+
+    def test_subagent_stop_records_the_findings_count_from_the_agents_last_line(self):
+        import json, tempfile
+        mod = self._hook("subagent_record")
+        root = Path(tempfile.mkdtemp())
+        transcript = root / "t.jsonl"
+        transcript.write_text(
+            json.dumps({"timestamp": "2026-09-19T10:00:00.000Z", "type": "user"}) + "\n" +
+            json.dumps({"timestamp": "2026-09-19T10:02:30.000Z", "type": "assistant",
+                        "message": {"model": "claude-opus-5"}}) + "\n",
+            encoding="utf-8")
+        # the agent is NAMED, as a real SubagentStop event names it, so this
+        # transcript is that agent's own and its full span is the agent's
+        facts = mod.transcript_facts(str(transcript), "dfs-qa")
+        self.assertEqual(facts["model"], "claude-opus-5")
+        self.assertEqual(facts["duration_s"], 150.0)
+        self.assertEqual(mod.findings_count("body text\n\nFINDINGS: 4"), 4)
+        self.assertEqual(mod.findings_count("FINDINGS: 0"), 0)
+
+    def test_a_parent_transcript_span_is_refused_instead_of_recorded_as_an_agents(self):
+        """The bug this hook shipped with, caught live on its first real firing.
+
+        The event arrived with an EMPTY `agent_type` and a `transcript_path`
+        pointing at the parent session's transcript. The naive full-file span
+        recorded 18221.4 s -- five hours of main session -- into the record as
+        though it were an agent's wall time. A wrong number that looks right is
+        worse than no number, which is this whole file's premise.
+
+        Three cases, because the fix must not cost the real measurement:
+        sidechain entries are the agent's and are measured; a named agent's own
+        transcript is still trusted whole; an unnamed agent on a transcript with
+        no sidechain is refused with a reason.
+        """
+        import json, tempfile
+        mod = self._hook("subagent_record")
+        root = Path(tempfile.mkdtemp())
+
+        parent = root / "parent.jsonl"
+        parent.write_text("\n".join(json.dumps(e) for e in (
+            {"timestamp": "2026-09-19T10:00:00.000Z", "type": "user",
+             "isSidechain": False},
+            {"timestamp": "2026-09-19T15:00:00.000Z", "type": "assistant",
+             "isSidechain": False, "message": {"model": "claude-opus-5"}},
+        )), encoding="utf-8")
+
+        # the observed case: no agent named, nothing sidechain -> refuse
+        facts = mod.transcript_facts(str(parent), "")
+        self.assertIsNone(facts["duration_s"],
+                          "a parent-session span was recorded as an agent's")
+        self.assertIn("PARENT session", facts["duration_source"])
+
+        # a named agent's own transcript is still measured
+        facts = mod.transcript_facts(str(parent), "dfs-qa")
+        self.assertEqual(facts["duration_s"], 18000.0)
+
+        # sidechain entries win, and are measured ALONE rather than as a span
+        # across the parent entries that surround them
+        mixed = root / "mixed.jsonl"
+        mixed.write_text("\n".join(json.dumps(e) for e in (
+            {"timestamp": "2026-09-19T10:00:00.000Z", "isSidechain": False},
+            {"timestamp": "2026-09-19T12:00:00.000Z", "isSidechain": True},
+            {"timestamp": "2026-09-19T12:01:40.000Z", "isSidechain": True},
+            {"timestamp": "2026-09-19T15:00:00.000Z", "isSidechain": False},
+        )), encoding="utf-8")
+        facts = mod.transcript_facts(str(mixed), "")
+        self.assertEqual(facts["duration_s"], 100.0)
+        self.assertIn("sidechain", facts["duration_source"])
+
+    def test_a_missing_findings_line_records_null_and_is_never_read_as_zero(self):
+        """"Found nothing" and "did not say" are different facts.
+
+        Only one of them is good news, and collapsing them is how a broken agent
+        looks like a clean portfolio.
+        """
+        mod = self._hook("subagent_record")
+        self.assertIsNone(mod.findings_count("a report with no machine line"))
+        self.assertIsNone(mod.findings_count(""))
+        self.assertIsNone(mod.findings_count("FINDINGS: many"))
+        self.assertNotEqual(mod.findings_count("no line"), 0)
+        # The `^...$` anchors are load-bearing: without them a PROSE mention
+        # inside the report body becomes the count, and an agent explaining its
+        # own contract would report the sentence's number. Dropping the anchors
+        # survived this test until this case was added (mutation M20).
+        self.assertIsNone(mod.findings_count(
+            "I was told to print FINDINGS: 0 at the end but have not yet."))
+        self.assertIsNone(mod.findings_count("see FINDINGS: 12 in the table"))
+
+    def test_the_findings_line_is_read_from_the_END_not_a_quoted_example(self):
+        """An agent that echoes its own instructions quotes the example number."""
+        mod = self._hook("subagent_record")
+        self.assertEqual(
+            mod.findings_count("I must end with\nFINDINGS: 3\nas shown.\n"
+                               "Here is my report.\nFINDINGS: 7"), 7)
+
+    def test_subagent_stop_writes_one_jsonl_line_per_session_and_never_raises(self):
+        import io, json, tempfile
+        mod = self._hook("subagent_record")
+        root = Path(tempfile.mkdtemp())
+        payload = {"hook_event_name": "SubagentStop", "agent_type": "dfs-premise",
+                   "agent_id": "a9", "session_id": "sess/A", "stop_reason": "end_turn",
+                   "last_assistant_message": "FINDINGS: 2", "transcript_path": ""}
+        old_stdin, old_env = sys.stdin, os.environ.get("CLAUDE_PROJECT_DIR")
+        os.environ["CLAUDE_PROJECT_DIR"] = str(root)
+        try:
+            sys.stdin = io.StringIO(json.dumps(payload))
+            self.assertEqual(mod.main(), 0)
+            sys.stdin = io.StringIO(json.dumps(payload))
+            self.assertEqual(mod.main(), 0)      # appends, does not overwrite
+        finally:
+            sys.stdin = old_stdin
+            if old_env is None:
+                os.environ.pop("CLAUDE_PROJECT_DIR", None)
+            else:
+                os.environ["CLAUDE_PROJECT_DIR"] = old_env
+        written = sorted((root / "data" / "agent_runs").rglob("*.jsonl"))
+        self.assertEqual(len(written), 1, "one file per session, not per run")
+        # the session id is sanitized, so a '/' in it cannot become a directory
+        self.assertNotIn("/", written[0].name.replace(".jsonl", ""))
+        rows = [json.loads(ln) for ln in
+                written[0].read_text(encoding="utf-8").splitlines() if ln.strip()]
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(rows[0]["agent_type"], "dfs-premise")
+        self.assertEqual(rows[0]["findings"], 2)
+        self.assertIsNone(rows[0]["duration_s"])
+        self.assertIn("no transcript_path", rows[0]["duration_source"])
+        # the labels wall: no token figure is recorded, because none is carried
+        self.assertNotIn("token_count", rows[0])
+
+    def test_an_event_naming_no_agent_writes_nothing_at_all(self):
+        """Observed live twice in one DEV session, both rows contentless.
+
+        The event fires with an empty `agent_type`, an empty `stop_reason` and
+        the parent transcript. Recording it puts a row carrying no agent, no
+        duration and no findings into a TRACKED directory on every session. The
+        log's job is what a repo agent RUN cost and found; "none ran" is best
+        recorded by writing nothing.
+        """
+        import io, json, tempfile
+        mod = self._hook("subagent_record")
+        root = Path(tempfile.mkdtemp())
+        old_stdin, old_env = sys.stdin, os.environ.get("CLAUDE_PROJECT_DIR")
+        os.environ["CLAUDE_PROJECT_DIR"] = str(root)
+        try:
+            for agent in ("", "   ", None):
+                sys.stdin = io.StringIO(json.dumps(
+                    {"hook_event_name": "SubagentStop", "agent_type": agent,
+                     "session_id": "s", "last_assistant_message": "FINDINGS: 2"}))
+                self.assertEqual(mod.main(), 0)
+        finally:
+            sys.stdin = old_stdin
+            if old_env is None:
+                os.environ.pop("CLAUDE_PROJECT_DIR", None)
+            else:
+                os.environ["CLAUDE_PROJECT_DIR"] = old_env
+        self.assertEqual(list((root / "data" / "agent_runs").rglob("*.jsonl")), [],
+                         "an event naming no agent wrote a row anyway")
+
+    def test_the_agent_run_surface_is_a_no_conflict_write_for_every_role(self):
+        """`data/agent_runs/` is every role's, or a DEV session cannot run
+        `dfs-premise` without a write-set violation."""
+        import importlib, sys as _sys
+        _sys.path.insert(0, str(self.ROOT / "tools"))
+        try:
+            import claim
+            claim = importlib.reload(claim)
+        finally:
+            _sys.path.pop(0)
+        self.assertIn("data/agent_runs/", claim.FRAGMENT_PREFIXES)
+        # and it is NOT smuggled into a role write set, where it would make a
+        # DEV session BLOCK on a BUILD session's delivery record
+        self.assertNotIn("data/agent_runs/", claim.WRITE_SETS["DEV"])
+
+    # -- PreToolUse: the hand-over ask ------------------------------------
+
+    def test_the_handover_ask_fires_on_a_commit_while_a_record_is_uncommitted(self):
+        """The 2026-09-17 shape: housekeeping jumping the hand-over queue."""
+        mod = self._hook("guard_commands")
+        root = self._repo_with_pending_record()
+        out = mod.judge("git push -u origin somebranch", root=root)
+        self.assertIsNotNone(out, "the ask did not fire on a pending record")
+        block = out["hookSpecificOutput"]
+        self.assertEqual(block["permissionDecision"], "ask",
+                         "this must ASK, never deny: it is a proxy and it can be wrong")
+        self.assertIn("uncommitted delivery record", block["permissionDecisionReason"])
+
+    def test_the_handover_ask_says_it_reads_no_handover_field_because_none_exists(self):
+        """Nothing in this tree stamps the hand-over (`tools/retro.py`), so the
+        message must not claim it read one."""
+        mod = self._hook("guard_commands")
+        reason = mod.judge("git commit -m x -- tools/a.py",
+                           root=self._repo_with_pending_record()
+                           )["hookSpecificOutput"]["permissionDecisionReason"]
+        self.assertIn("nothing in this repo stamps the hand-over", reason)
+        self.assertIn("false positive", reason)
+
+    def test_the_command_that_commits_the_record_itself_is_not_asked_about(self):
+        mod = self._hook("guard_commands")
+        root = self._repo_with_pending_record()
+        self.assertIsNone(
+            mod.judge("git commit data/deliveries/2026-09-19 -m record", root=root),
+            "committing the record IS the post-hand-over act and must not be asked about")
+
+    def test_a_clean_tree_asks_nothing_so_the_rule_cannot_nag_forever(self):
+        import subprocess, tempfile
+        mod = self._hook("guard_commands")
+        root = tempfile.mkdtemp()
+        subprocess.run(["git", "init", "-q", root], check=False,
+                       capture_output=True, timeout=10)
+        self.assertIsNone(mod.judge("git push -u origin b", root=root))
+
+    def test_an_untracked_deliveries_directory_is_still_seen(self):
+        """Plain porcelain COLLAPSES an untracked directory to one line, and on a
+        fresh cloud container that directory is ALWAYS untracked -- so without
+        `--untracked-files=all` this rule silently never fires on the one host it
+        exists for. Measured 2026-09-19."""
+        mod = self._hook("guard_commands")
+        root = self._repo_with_pending_record()   # never `git add`ed
+        self.assertIsNotNone(mod.pending_delivery_reason("git push", root))
+
+    def _repo_with_pending_record(self) -> str:
+        import subprocess, tempfile
+        root = tempfile.mkdtemp()
+        subprocess.run(["git", "init", "-q", root], check=False,
+                       capture_output=True, timeout=10)
+        d = Path(root) / "data" / "deliveries" / "2026-09-19"
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "1900_9g_run1.json").write_text('{"kind": "delivery"}', encoding="utf-8")
+        return root
+
+    # -- PreCompact -------------------------------------------------------
+
+    def test_precompact_injects_the_contracts_own_compaction_text_not_a_copy(self):
+        """A paraphrase here would be a sixteenth entry in R301's contradiction
+        list the first time either file moved."""
+        mod = self._hook("precompact_context")
+        section = mod.compaction_section(self.ROOT)
+        self.assertTrue(section.startswith("## Compaction"))
+        contract = (self.ROOT / "CLAUDE.md").read_text(encoding="utf-8")
+        body = section.split("\n", 1)[1].strip()
+        self.assertIn(body, contract,
+                      "the injected text is not verbatim from CLAUDE.md")
+        self.assertNotIn("## ", body, "the section bled into the next heading")
+
+    def test_precompact_names_what_it_CANNOT_recover_instead_of_dropping_it(self):
+        import io, json
+        mod = self._hook("precompact_context")
+        old = sys.stdin
+        try:
+            sys.stdin = io.StringIO(json.dumps({"hook_event_name": "PreCompact"}))
+            buf = io.StringIO()
+            old_out, sys.stdout = sys.stdout, buf
+            try:
+                self.assertEqual(mod.main(), 0)
+            finally:
+                sys.stdout = old_out
+        finally:
+            sys.stdin = old
+        ctx = json.loads(buf.getvalue())["hookSpecificOutput"]["additionalContext"]
+        self.assertIn("R-numbers in flight", ctx)
+        self.assertIn("NOT readable from disk", ctx)
+        self.assertIn("claims held:", ctx)
+
+    # -- SessionEnd -------------------------------------------------------
+
+    def test_session_end_warns_on_unpushed_work_and_never_blocks_the_exit(self):
+        import io, json, subprocess, tempfile
+        mod = self._hook("session_end_push")
+        root = tempfile.mkdtemp()
+        subprocess.run(["git", "init", "-q", "-b", "work", root], check=False,
+                       capture_output=True, timeout=10)
+        (Path(root) / "a.txt").write_text("x", encoding="utf-8")
+        old_stdin, old_env = sys.stdin, os.environ.get("CLAUDE_PROJECT_DIR")
+        os.environ["CLAUDE_PROJECT_DIR"] = root
+        buf = io.StringIO()
+        try:
+            sys.stdin = io.StringIO(json.dumps({"hook_event_name": "SessionEnd"}))
+            old_out, sys.stdout = sys.stdout, buf
+            try:
+                rc = mod.main()
+            finally:
+                sys.stdout = old_out
+        finally:
+            sys.stdin = old_stdin
+            if old_env is None:
+                os.environ.pop("CLAUDE_PROJECT_DIR", None)
+            else:
+                os.environ["CLAUDE_PROJECT_DIR"] = old_env
+        self.assertEqual(rc, 0, "exit 2 would BLOCK the session from ending")
+        msg = json.loads(buf.getvalue())["hookSpecificOutput"]["systemMessage"]
+        self.assertIn("NO UPSTREAM", msg)
+        self.assertIn("uncommitted path", msg)
+
+    # -- the wiring -------------------------------------------------------
+
+    def test_all_four_hook_events_are_wired_to_files_that_exist(self):
+        """A hook that is written but not registered is a file, not a hook."""
+        settings = self._settings()
+        for event in ("PreToolUse", "PreCompact", "SubagentStop", "SessionEnd"):
+            self.assertIn(event, settings["hooks"], f"{event} is not registered")
+            for group in settings["hooks"][event]:
+                for hook in group["hooks"]:
+                    arg = hook["args"][0].replace("${CLAUDE_PROJECT_DIR}/", "")
+                    self.assertTrue((self.ROOT / arg).is_file(),
+                                    f"{event} points at {arg}, which is absent")
+                    self.assertGreater(hook.get("timeout", 0), 0)
 
 
 class EnvLockTests(unittest.TestCase):
