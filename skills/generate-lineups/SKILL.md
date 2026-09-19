@@ -213,6 +213,24 @@ decide, say which, and if you rebuild, do it once. Stop at two iterations even
 if the second one still shows findings, because a third is fitting the
 portfolio to the last thing you looked at.
 
+### The agentic half, when the clock allows (R344)
+
+The tool above measures what it was built to measure. The standing brief at
+`references/adversarial_qa_brief.md` is the pass that looks for what it does
+NOT measure: three axes (mispriced assets and whether a Pareto improvement
+exists; dual-objective adherence at contest and portfolio level as one
+frontier; leverage against the sourced ownership prior), report only, truthful
+labels, no DK fetch, gaps stated rather than filled, a hard wall-clock budget
+with partial-in-time beating complete-late.
+
+Run it as the `dfs-qa` repo agent (`.claude/agents/dfs-qa.md`, R372), handed
+the delivered CSV, the salary file, the brief JSON and the ownership prior as
+PATHS. It is never automatic and at T-10 or later skipping it is correct.
+
+Its first requirement is the one that cost something: re-pull the lineups feed
+as the LAST act before writing, and clock-stamp every liveness claim. A "zero
+dead slots" written at 12:57 was false at 12:58 on 2026-09-12.
+
 ## The single build, when you want it directly
 
 ```bash

@@ -16,6 +16,10 @@ Denied:
   anything naming draftkings.com    DK reads are manual, by any client
 Asked (a prompt, not a block):
   git commit with no pathspec       a pathless commit sweeps other sessions' staged files
+  git commit|push with an           SKILL.md: nothing goes between the preflight and the
+    UNCOMMITTED delivery record     hand-over, not a commit, not a push, not the gate, not
+                                    a PR (R372). See `pending_delivery_reason` for what this
+                                    actually reads, which is NOT a hand-over stamp.
 
 An ORDINARY `git push` is allowed (R350, Ben 2026-09-16). It was denied from
 R301 until then, on CLAUDE.md's "Sessions COMMIT, Ben PUSHES" -- a convention,
@@ -43,9 +47,12 @@ Test by hand:
 from __future__ import annotations
 
 import json
+import os
 import re
 import shlex
+import subprocess
 import sys
+from pathlib import Path
 
 # The git rules are answered from ARGV (`git_subcommand`), not from the segment
 # text. R350 round two: the regexes these replaced read a banned literal inside a
@@ -209,7 +216,7 @@ def forced_push(argv: list[str]) -> bool:
     return False
 
 
-def judge(command: str) -> dict | None:
+def judge(command: str, root: str | None = None) -> dict | None:
     """The verdict for a whole command, or None to allow it silently.
 
     Signature is unchanged (R350) so the pinned test's helper and this file's
@@ -227,13 +234,14 @@ def judge(command: str) -> dict | None:
         # `... -m R301: lean CLAUDE.md`, whose re-tokenization finds `CLAUDE.md`
         # sitting loose and reads a commit MESSAGE as a pathspec, so the pathless
         # commit stopped asking. Caught by the pinned test it was meant to keep.
-        verdict = judge_segment(shlex.join(argv), argv)
+        verdict = judge_segment(shlex.join(argv), argv, root)
         if verdict is not None:
             return verdict
     return None
 
 
-def judge_segment(command: str, argv: list[str]) -> dict | None:
+def judge_segment(command: str, argv: list[str],
+                  root: str | None = None) -> dict | None:
     if DRAFTKINGS.search(command):
         return decision("deny", "CLAUDE.md hard wall: DraftKings reads are MANUAL. Never fetch draftkings.com "
                                 "by any client; Ben downloads the file and drops it in the repo.")
@@ -252,16 +260,112 @@ def judge_segment(command: str, argv: list[str]) -> dict | None:
                                         "another session's dirt is in this tree.")
             if tok.startswith("-A") or tok.startswith("--all="):
                 return decision("deny", "CLAUDE.md: `git add` by explicit path only.")
-    if sub == "commit":
-        verdict = judge_commit(args)
-        if verdict is not None:
-            return verdict
+    if sub in ("commit", "push"):
+        # Both asks are composed into ONE prompt rather than racing, because a
+        # hook emits a single decision and the pathless-commit risk and the
+        # ordering risk are independent: suppressing either behind the other
+        # would lose a rule that has already cost something.
+        reasons = []
+        pathless = judge_commit(args) if sub == "commit" else None
+        delivery = pending_delivery_reason(command, root)
+        if delivery:
+            reasons.append(delivery)
+        if pathless is not None:
+            reasons.append(
+                pathless["hookSpecificOutput"]["permissionDecisionReason"])
+        if reasons:
+            return decision("ask", " ".join(reasons))
     if PIP_UNPINNED.search(command):
         return decision("deny", "The unpinned resolve is barred (R7, R42): use `python tools/env_probe.py --install`, "
                                 "which installs requirements.lock (`LOCK_NAME` in that file). This message named "
                                 "requirements-production.lock until R350 and that was simply wrong -- two locks "
                                 "with overlapping names, and the probe installs the OTHER one.")
     return None
+
+
+DELIVERIES = "data/deliveries"
+
+
+def guard_root(root: str | None = None) -> str | None:
+    """The repo this rule asks about.
+
+    Explicit argument first, then `CLAUDE_PROJECT_DIR` (which Claude Code sets
+    for every hook), then this file's own location. The explicit argument exists
+    because without it the rule reads whatever tree the process happens to be
+    standing in, which made the PINNED guard tests tree-state dependent: a BUILD
+    session with an uncommitted record in the working copy would have turned
+    `git push origin main` from allowed into asked and failed a test about a
+    completely different rule.
+    """
+    if root:
+        return root
+    env = os.environ.get("CLAUDE_PROJECT_DIR")
+    if env and os.path.isdir(env):
+        return env
+    return str(Path(__file__).resolve().parents[2])
+
+
+def pending_delivery_reason(command: str, root: str | None = None) -> str | None:
+    """The hand-over ask, scoped to what the tree ACTUALLY records (R372).
+
+    WHAT THIS DOES NOT READ. R372 specifies this as asking when "today's
+    certified file has no recorded hand-over". There is no such field. Nothing
+    in this repo stamps the moment Ben got the file -- `tools/retro.py:127` says
+    so in as many words, and that absence is exactly why `retro.py` takes
+    `--handover-utc` as an ARGUMENT. Inventing a field here to satisfy the
+    sentence would have made the hook read something no build writes, so this
+    reads the nearest real thing instead and says so in its own message.
+
+    WHAT IT READS. `data/deliveries/<date>/*.json` (R369) is written from inside
+    `record_delivery` at delivery time and is the first tracked artifact a build
+    produces. SKILL.md's ordering rule is "nothing goes between the preflight
+    and the hand-over. Not a commit, not a push, not the gate, not a PR", and
+    the record's own commit is named there as the FIRST legitimate act after the
+    hand-over. So an uncommitted delivery record is a build whose housekeeping
+    has not run, and a commit or push that does not name that record is
+    housekeeping jumping the queue -- the exact shape of 2026-09-17, where a
+    Showdown file was gate-clean at 19:20:08 and reached Ben at 19:28 with a
+    commit, a push, a 3m33s gate and a PR in between.
+
+    THE PROXY IS IMPERFECT AND THE MESSAGE SAYS SO. It cannot tell a session
+    that has already handed the file over from one that has not, because nothing
+    distinguishes them on disk. That is why it ASKS and never denies: a false
+    positive costs one keystroke, and the true positive costs a slate.
+
+    Never raises and never blocks on git being slow: any failure returns None,
+    so the guard fails open exactly as the rest of this file does.
+    """
+    if DELIVERIES.replace("/", os.sep) in command or DELIVERIES in command:
+        return None                       # this IS the record-committing command
+    try:
+        proc = subprocess.run(
+            # `--untracked-files=all` is load-bearing, not tidiness. Plain
+            # porcelain COLLAPSES an untracked directory to one `?? data/
+            # deliveries/` line, and on a fresh cloud container -- the host this
+            # rule exists for -- that directory is always untracked, so the
+            # per-file filter below matched nothing and the rule never fired.
+            # Measured 2026-09-19 while testing it.
+            ["git", "status", "--porcelain", "--untracked-files=all",
+             "--", DELIVERIES],
+            capture_output=True, text=True, timeout=5,
+            cwd=guard_root(root))
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if proc.returncode != 0:
+        return None
+    pending = [ln[3:].strip().strip('"') for ln in proc.stdout.splitlines()
+               if ln[3:].strip().endswith(".json")]
+    if not pending:
+        return None
+    shown = ", ".join(sorted(pending)[:3])
+    more = "" if len(pending) <= 3 else f" (+{len(pending) - 3} more)"
+    return ("An uncommitted delivery record is in the tree: " + shown + more +
+            ". SKILL.md: nothing goes between the preflight and the hand-over -- "
+            "not a commit, not a push, not the gate, not a PR. If Ben does not "
+            "have the file yet, hand it over FIRST and do this after. "
+            "NOTE: nothing in this repo stamps the hand-over, so this reads an "
+            "uncommitted R369 record, not a hand-over field; if he already has "
+            "the file, this is a false positive and you should proceed.")
 
 
 # Arguments whose VALUE is the next token and is never a pathspec. `-m` is the

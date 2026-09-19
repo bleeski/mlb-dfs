@@ -1,5 +1,5 @@
 {
-  "$comment": "Project-shared Claude Code settings for mlb-dfs (R301 2026-09-15, R353 2026-09-17). Personal overrides go in .claude/settings.local.json (gitignored). Deny rules are enforced by the client; CLAUDE.md is advisory. The command guard hook covers the regex cases a prefix rule cannot. Hosts: docs/hosts.md.",
+  "$comment": "Project-shared Claude Code settings for mlb-dfs (R301 2026-09-15, R353 2026-09-17, R372 2026-09-19). Personal overrides go in .claude/settings.local.json (gitignored). Deny rules are enforced by the client; CLAUDE.md is advisory. The command guard hook covers the regex cases a prefix rule cannot. Hosts: docs/hosts.md.",
   "env": {
     "BASH_DEFAULT_TIMEOUT_MS": "900000",
     "BASH_MAX_TIMEOUT_MS": "1800000"
@@ -117,6 +117,49 @@
             "command": "python",
             "args": [
               "${CLAUDE_PROJECT_DIR}/.claude/hooks/guard_commands.py"
+            ],
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "manual|auto",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/precompact_context.py"
+            ],
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/subagent_record.py"
+            ],
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/session_end_push.py"
             ],
             "timeout": 10
           }
