@@ -69,6 +69,53 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+# R359, 2026-09-19. The mutex below is REAL where several sessions share one
+# disk (Ben's Windows machine, the Cowork mount) and MEANINGLESS in a cloud
+# container: `claims/` is gitignored and every container is an isolated fresh
+# clone, so a claim taken there is visible to nobody and `check` reads "none
+# held" no matter what else is running. That is worse than having no mutex,
+# because the output looks like evidence. The mechanism stays -- two hosts
+# still need it -- and what changes is that it stops pretending on the third.
+#
+# The import is guarded because this tool is stdlib-only by contract and is run
+# from hosts and working directories where `mlb_engine` may not be importable;
+# a claim that cannot resolve the host still takes and releases correctly, it
+# just says nothing extra.
+# `python tools/claim.py` puts `tools/` on sys.path, not the repo root, so the
+# package is not importable without this -- the same line `tools/benchmark_engine.py`
+# and others already carry. Appended rather than inserted so it can never shadow a
+# caller's own `mlb_engine`.
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+
+try:
+    from mlb_engine.repo_env import detect_host, HOST_CLAUDE_CODE
+except Exception:  # pragma: no cover - the tool must work without the package
+    detect_host = None
+    HOST_CLAUDE_CODE = "claude_code"
+
+
+def _print_host_note() -> None:
+    """Print the caveat when there is one. No-op elsewhere."""
+    note = _host_note()
+    if note:
+        print(note)
+
+
+def _host_note() -> str:
+    """The cloud-container caveat, or '' on a host where the mutex is real."""
+    if detect_host is None:
+        return ""
+    try:
+        if detect_host() != HOST_CLAUDE_CODE:
+            return ""
+    except Exception:  # pragma: no cover - probing must never fail a claim
+        return ""
+    return ("note   this is a cloud container: `claims/` is gitignored and this "
+            "container is isolated, so this claim is CONTAINER-LOCAL and no "
+            "other session can see it. The pushed BRANCH is the real mutex "
+            "here -- one session, one branch, one PR (docs/hosts.md). `dirt` is "
+            "unaffected: it reads git, not claims.")
+
 REPO = Path(__file__).resolve().parents[1]
 
 ROLES = ("BUILD", "ARCHIVE", "DEV", "SOLO")
@@ -232,9 +279,11 @@ def cmd_take(args: argparse.Namespace) -> int:
             pass  # marker removal needs the delete grant; owner.json is authoritative
         print(f"re-took {name} as {args.role} (release-then-retake is "
               f"check-then-write, not atomic; the mkdir guards the first take)")
+        _print_host_note()
         return 0
     _write_owner(target, payload)
     print(f"took {name} as {args.role}")
+    _print_host_note()
     return 0
 
 
@@ -245,6 +294,7 @@ def cmd_check(args: argparse.Namespace) -> int:
         target = claims / name
         if not target.exists():
             print(f"free  {name} (no claim)")
+            _print_host_note()
             return 0
         if _is_held(target):
             owner = _read_owner(target)
@@ -252,15 +302,19 @@ def cmd_check(args: argparse.Namespace) -> int:
                   f"{owner.get('taken_utc', '?')}")
             if _release_incomplete(target):
                 print(_incomplete_note(name))
+            _print_host_note()
             return 2
         print(f"free  {name} (released)")
+        _print_host_note()
         return 0
     if not claims.is_dir():
         print("no claims")
+        _print_host_note()
         return 0
     rows = sorted(p for p in claims.glob("*") if p.is_dir())
     if not rows:
         print("no claims")
+        _print_host_note()
         return 0
     for claim in rows:
         owner = _read_owner(claim)

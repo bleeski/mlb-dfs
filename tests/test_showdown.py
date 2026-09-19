@@ -7,6 +7,7 @@ from the Classic solver, so test_golden_replay is unaffected.
 """
 from __future__ import annotations
 
+import ast
 import collections
 import contextlib
 import csv
@@ -15,6 +16,8 @@ import importlib.util
 import io
 import json
 import math
+import os
+import subprocess
 import sys
 import tempfile
 import types
@@ -1305,6 +1308,101 @@ class PoolBriefBlockTests(unittest.TestCase):
         self.assertEqual(block["opposing_probables_incomplete"], {})
         self.assertIsNone(block["dk_batting_order"])
         self.assertEqual(block["teams"], 0)
+
+
+class GateBudgetIsHostResolvedTests(unittest.TestCase):
+    """R358, 2026-09-19. The gate's two defaults were Cowork constants.
+
+    `GATE_DEFAULT_BUDGET_S = 28.0` and `GATE_CALL_CEILING_S = 39.0` were derived
+    from a 45s device ceiling that R271(b) RETIRED on 2026-08-29, and the
+    comment keeping them argued a default must be safe on a host that has told
+    us nothing. That argument is right and is now `repo_env`'s job: an unknown
+    host resolves to 130.0 there, CLAUDE.md's own Sandbox number. What changed
+    is that a host which DOES declare a ceiling is believed -- measured here on
+    a container declaring 900000ms, `--run-tests` lands in one call in ~230s,
+    so a 28s child budget was slicing a gate that needed no slicing.
+
+    Anything asserting on module-level values computed at import from the
+    environment runs in a SUBPROCESS (`.claude/rules/engine.md`), because the
+    suite has already imported the module by the time these run.
+    """
+
+    ROOT = Path(__file__).resolve().parents[1]
+
+    def _resolve(self, env):
+        """`(budget, ceiling)` as a fresh interpreter resolves them."""
+        code = (
+            "import importlib.util, json;"
+            "spec = importlib.util.spec_from_file_location('a', r'%s');"
+            "m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m);"
+            "print(json.dumps([m.GATE_DEFAULT_BUDGET_S, m.GATE_CALL_CEILING_S]))"
+            % (self.ROOT / "tools" / "audit.py")
+        )
+        full = {k: v for k, v in os.environ.items()
+                if k not in ("BASH_DEFAULT_TIMEOUT_MS", "BASH_MAX_TIMEOUT_MS",
+                             "MLB_DFS_HOST", "MLB_DFS_CALL_BUDGET_S")}
+        full.update(env)
+        out = subprocess.run([sys.executable, "-c", code], capture_output=True,
+                             text=True, env=full, cwd=str(self.ROOT))
+        self.assertEqual(out.returncode, 0, out.stderr)
+        return json.loads(out.stdout.strip())
+
+    def test_neither_default_is_a_literal_any_more(self):
+        """The R349 pin, applied here: a literal is the defect, so pin the
+        SHAPE. Re-introducing 28.0/39.0 as constants fails this without needing
+        a host to reproduce on."""
+        source = (self.ROOT / "tools" / "audit.py").read_text(encoding="utf-8")
+        tree = ast.parse(source)
+        found = {}
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign) and len(node.targets) == 1:
+                target = node.targets[0]
+                if isinstance(target, ast.Name) and target.id in (
+                        "GATE_DEFAULT_BUDGET_S", "GATE_CALL_CEILING_S"):
+                    found[target.id] = node.value
+        self.assertEqual(set(found), {"GATE_DEFAULT_BUDGET_S",
+                                      "GATE_CALL_CEILING_S"})
+        for name, value in found.items():
+            self.assertNotIsInstance(
+                value, ast.Constant,
+                f"{name} is a literal again; it must resolve per host")
+            self.assertIsInstance(value, ast.Call, name)
+
+    def test_a_host_that_declares_a_ceiling_is_believed(self):
+        budget, ceiling = self._resolve({"BASH_DEFAULT_TIMEOUT_MS": "900000"})
+        self.assertEqual(ceiling, 630.0)   # 0.7 of the declared 900s
+        self.assertEqual(budget, 619.0)    # less the parent's reserve
+
+    def test_a_host_that_states_nothing_gets_the_documented_floor(self):
+        """130.0 is `repo_env.UNKNOWN_HOST_BUDGET_S` and CLAUDE.md's Sandbox
+        number, so the conservative case is still conservative -- and is now
+        stated in ONE place rather than re-derived as 28/39 here."""
+        budget, ceiling = self._resolve({})
+        self.assertEqual(ceiling, 130.0)
+        self.assertEqual(budget, 119.0)
+
+    def test_the_explicit_environment_hatch_still_wins(self):
+        budget, ceiling = self._resolve({"MLB_DFS_CALL_BUDGET_S": "300",
+                                         "BASH_DEFAULT_TIMEOUT_MS": "900000"})
+        self.assertEqual(ceiling, 300.0)
+        self.assertEqual(budget, 289.0)
+
+    def test_a_stated_ceiling_is_not_raised_to_meet_an_unstated_budget(self):
+        """The defect this change would otherwise have introduced. With the
+        budget host-resolved to 619.0, the old floor turned an explicit
+        `--gate-ceiling 150` into 629.0 -- silently overriding an operator
+        instruction, which is the opposite of what R190(d)'s floor is for. The
+        floor now applies only when a budget was actually supplied, and both
+        in-tree callers supply one."""
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "audit_ceiling_under_test", self.ROOT / "tools" / "audit.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        self.assertEqual(mod.gate_call_ceiling(150.0), 150.0)
+        # ...while a STATED budget is still protected, which is R190(d) itself.
+        self.assertGreaterEqual(mod.gate_call_ceiling(20.0, budget=90.0),
+                                90.0 + mod.GATE_UNKNOWN_RESERVE_S)
 
 
 class GateCallCeilingTests(unittest.TestCase):

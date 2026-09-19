@@ -9755,6 +9755,128 @@ class ClaimWriteSetTests(unittest.TestCase):
                           f"{path} must be in DEV's write set for dirt to BLOCK")
 
 
+class ClaimHostHonestyTests(unittest.TestCase):
+    """R359, 2026-09-19. The claims mutex is FALSE in a cloud container.
+
+    `claims/` is gitignored and every cloud container is an isolated fresh
+    clone, so a session takes a claim nobody can see and `check` reads "none
+    held" no matter what else is running. That is worse than having no mutex,
+    because the output looks like evidence. The mechanism stays — Ben's Windows
+    machine and the Cowork mount share a disk and genuinely need it — and what
+    changes is that it stops pretending on the third host.
+
+    Every case runs the DOCUMENTED invocation (`python tools/claim.py`) in a
+    subprocess, because the failure mode being guarded is an import one: the
+    first cut resolved no host at all, since that invocation puts `tools/` on
+    `sys.path` and not the repo root. `tools/audit.py`'s own R147 comment
+    records the identical defect in `sync_check.py`, which "worked when
+    imported and no-opped in the invocation the docstring documents".
+    """
+
+    CLOUD = {"BASH_DEFAULT_TIMEOUT_MS": "900000"}
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = self._tmp.name
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _claim(self, *argv, host_env=None, cwd=None):
+        repo = Path(__file__).resolve().parents[1]
+        env = {k: v for k, v in os.environ.items()
+               if k not in ("BASH_DEFAULT_TIMEOUT_MS", "BASH_MAX_TIMEOUT_MS",
+                            "MLB_DFS_HOST", "MLB_DFS_CALL_BUDGET_S")}
+        env.update(host_env or {})
+        return subprocess.run(
+            [sys.executable, str(repo / "tools" / "claim.py"),
+             "--root", self.root, *argv],
+            capture_output=True, text=True, timeout=120, env=env,
+            cwd=str(cwd) if cwd else None)
+
+    def test_a_cloud_take_says_the_claim_is_container_local(self):
+        proc = self._claim("take", "engine", "--role", "DEV",
+                           host_env=self.CLOUD)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIn("CONTAINER-LOCAL", proc.stdout)
+        self.assertIn("BRANCH", proc.stdout)
+
+    def test_a_cloud_check_says_it_too_held_or_free(self):
+        free = self._claim("check", "engine", host_env=self.CLOUD)
+        self.assertIn("CONTAINER-LOCAL", free.stdout)
+        self._claim("take", "engine", "--role", "DEV", host_env=self.CLOUD)
+        held = self._claim("check", "engine", host_env=self.CLOUD)
+        self.assertEqual(held.returncode, 2)
+        self.assertIn("HELD", held.stdout)
+        self.assertIn("CONTAINER-LOCAL", held.stdout)
+
+    def test_the_two_hosts_where_the_mutex_is_REAL_say_nothing(self):
+        """The mechanism is not deleted and not hedged where it works."""
+        for host in ("cowork", "windows"):
+            with self.subTest(host=host):
+                proc = self._claim("take", "engine", "--role", "DEV",
+                                   "--date", f"2026-01-0{1 if host == 'cowork' else 2}",
+                                   host_env={"MLB_DFS_HOST": host})
+                self.assertEqual(proc.returncode, 0, proc.stderr)
+                self.assertNotIn("CONTAINER-LOCAL", proc.stdout)
+
+    def test_dirt_never_carries_the_note_because_it_reads_git(self):
+        """R359 is explicit that `dirt` is unaffected: it reads `git status`,
+        not `claims/`, so it is exactly as true in a container as anywhere."""
+        proc = self._claim("dirt", "--role", "DEV", "--porcelain", "",
+                           host_env=self.CLOUD)
+        self.assertNotIn("CONTAINER-LOCAL", proc.stdout)
+
+    def test_the_host_resolves_from_a_foreign_working_directory(self):
+        """The import regression guard, stated as the property that matters:
+        the answer must not depend on where the tool was invoked from."""
+        with tempfile.TemporaryDirectory() as elsewhere:
+            proc = self._claim("check", "engine", host_env=self.CLOUD,
+                               cwd=elsewhere)
+        self.assertIn("CONTAINER-LOCAL", proc.stdout)
+
+
+class HostProseIsCurrentTests(unittest.TestCase):
+    """R356, 2026-09-19. Two statements in the contract were measurably false.
+
+    `.claude/rules/engine.md` and `.claude/skills/dev-session/SKILL.md` both
+    called `/tmp`, `nohup` and `rm` "Cowork-only idioms"; measured in a cloud
+    container on 2026-09-17 and again on 2026-09-19, `/tmp` persists across
+    calls and `rm` works. These pin the corrections rather than the wording, so
+    a rewrite is free and a regression is not.
+    """
+
+    ROOT = Path(__file__).resolve().parents[1]
+
+    def test_claude_md_sends_every_budget_question_to_one_resolver(self):
+        text = (self.ROOT / "CLAUDE.md").read_text(encoding="utf-8")
+        head, _, sandbox = text.partition("## Sandbox")
+        self.assertTrue(sandbox, "CLAUDE.md lost its ## Sandbox section")
+        section = sandbox.split("\n##")[0]
+        self.assertIn("call_budget_s()", section)
+        # The pre-R349 form: one number asserted as universal.
+        self.assertNotIn("One number, this one", section)
+
+    def test_the_contract_names_three_hosts_and_defers_the_numbers(self):
+        text = (self.ROOT / "CLAUDE.md").read_text(encoding="utf-8")
+        hosts = text.partition("## Hosts")[2].split("\n##")[0]
+        self.assertIn("docs/hosts.md", hosts)
+        self.assertIn("host_profile()", hosts)
+        for host in ("cloud container", "Windows", "Cowork"):
+            self.assertIn(host, hosts, host)
+
+    def test_no_rule_still_calls_tmp_or_rm_cowork_only(self):
+        for rel in (".claude/rules/engine.md",
+                    ".claude/skills/dev-session/SKILL.md"):
+            text = (self.ROOT / rel).read_text(encoding="utf-8")
+            for line in text.splitlines():
+                if "Cowork-only" in line or "Cowork habits" in line:
+                    # Naming the claim to DENY it is the fix, not the defect.
+                    self.assertTrue(
+                        "NOT" in line or "not Cowork" in line,
+                        f"{rel} still asserts a Cowork-only idiom: {line[:120]}")
+
+
 class ClaimToolTests(unittest.TestCase):
     """R19: the multi-session claim protocol as one command.
 

@@ -25,6 +25,44 @@ performance claim.
 
 ---
 
+## 2026-09-19 — R359, R356, R358: the cloud host stops being described as a host it is not
+
+**Scope.** `tools/claim.py`, `tools/audit.py` (the two gate defaults, `gate_call_ceiling`, the flag help, `EXPECTED_SUITE_COUNTS`), `CLAUDE.md` (`## Hosts`, `## Sandbox`, session-start step 3, the claims bullet), `.claude/rules/engine.md`, `.claude/skills/dev-session/SKILL.md`, `tests/test_core.py` (`ClaimHostHonestyTests`, `HostProseIsCurrentTests` new), `tests/test_showdown.py` (`GateBudgetIsHostResolvedTests` new), `docs/backlog.md`, `docs/PROGRESS.md`, this file.
+
+**Why.** Roadmap rows CC-A2 and CC-A1, the board's own NEXT. The 2026-09-17 move to cloud containers left three statements in the contract that are false on the host that now runs most sessions, and each of them reads like evidence rather than like an assumption.
+
+### R359 — a claim nobody can see, reported as a claim
+
+`claims/` is gitignored and every cloud container is an isolated fresh clone, so a session takes a claim no other session can ever observe and `check` answers "none held" regardless of what else is running. That is worse than having no mutex: the output has the shape of a measurement. `claim.py` now prints, when `detect_host()` is `claude_code`, that the claim is CONTAINER-LOCAL and that the pushed BRANCH is the real mutex — one session, one branch, one PR. It stays silent on Cowork and on Ben's machine, where several sessions share one disk and the mutex is real; the mechanism is untouched there. `dirt` deliberately never carries the note, because it reads `git status` and not `claims/`, so it is exactly as true in a container as anywhere.
+
+**The first cut resolved no host at all, and the reason is worth keeping.** `python tools/claim.py` puts `tools/` on `sys.path`, not the repo root, so `from mlb_engine.repo_env import detect_host` failed, the guarded import set `detect_host = None`, and the note silently never printed — while every hand test that imported the module passed. That is the identical defect `tools/audit.py`'s own R147 comment records against `sync_check.py`: it "worked when imported and no-opped in the invocation the docstring documents". The fix is one `sys.path.append`, and the test that pins it runs the documented invocation from a foreign working directory rather than asserting on the import.
+
+### R358 — the gate's two defaults were retired numbers
+
+`GATE_DEFAULT_BUDGET_S = 28.0` and `GATE_CALL_CEILING_S = 39.0` were derived from a 45s device ceiling that R271(b) RETIRED on 2026-08-29. The comment that kept them made a real argument — a default has to be safe on a host that has told us nothing — and that argument is now `repo_env`'s job rather than this file's: a silent host resolves to 130.0 there, which is CLAUDE.md's own Sandbox number instead of a figure measured on one machine. What changed is that a host which DOES declare a ceiling is believed. Measured this date on a container declaring 900000ms, `--run-tests` completes in one call in about 230s and CI runs it as one step, so a 28s child budget was slicing a gate that needs no slicing. Both flags and the whole precedence are unchanged; only the defaults moved, and they moved the way `solver_probe.py:72` already did.
+
+**A defect this change would otherwise have introduced, found by the existing tests and fixed here.** With the budget resolved to 619.0, `gate_call_ceiling`'s R190(d) floor (`max(value, budget + reserve)`) turned an explicit `--gate-ceiling 150` into 629.0. That is a stated operator instruction being silently overridden, which is the opposite of what the floor is for: R190(d) exists so a raised `--gate-budget` cannot be capped underneath, and it protects a budget that was *stated*. So `budget` is now `None`-by-default and the floor applies only when one was actually supplied. Both in-tree callers (`:2528`, `:2561`) pass `budget=` explicitly, so the protected case is bit-for-bit unchanged; what changed is that asking for the ceiling alone now answers about the ceiling alone. Two existing tests caught it, which is the second time this batch that an old test earned its keep.
+
+### R356 — two statements in the contract were measurably false
+
+`.claude/rules/engine.md:21` and `.claude/skills/dev-session/SKILL.md:41` called `/tmp`, `nohup`, `setsid` and `rm` "Cowork-only idioms". Measured in a cloud container on 2026-09-17 and again this date: `/tmp` persists across calls and `rm` works. They are bash idioms, unavailable on Ben's PowerShell host and fine on the other two, and both files now say that. `CLAUDE.md`'s `## Hosts` names three hosts and defers every number to `docs/hosts.md` and `repo_env.host_profile()`; `## Sandbox` KEEPS its heading, because `tests/test_core.py:12333` pins the literal and `repo_env.call_budget_source()` quotes it in a verdict, with a body that resolves rather than asserts; session-start step 3 stopped naming 130s; the claims bullet carries R359's line. 95 lines and 14,806 bytes before, 97 and 15,574 after, against the `RootContractBudgetTests` limits of 200 and 18,000.
+
+**R233 grep for the class.** Every surviving mention of a Cowork-only idiom in the rules:
+
+    $ grep -rn "Cowork-only\|Cowork habits" .claude/ CLAUDE.md
+    .claude/skills/dev-session/SKILL.md:41:- `TZ=... date`, `nohup` and `setsid` are bash idioms, not Cowork habits: ...
+    .claude/rules/engine.md:21:- **Hosts.** ... they are NOT "Cowork-only": measured 2026-09-17 and again 2026-09-19 ...
+
+Two hits, both naming the claim in order to deny it, which is what the test allows and the defect did not.
+
+**Mutation-checked**, all thirteen new tests, each reverted against its fix and expected red, then restored. The five worth naming: dropping the `sys.path.append` (the import regression itself, red); printing the host note on every host (red); leaking the note into `dirt` (red); reverting `engine.md` to the false claim (red); and reverting `## Sandbox` to "One number, this one" (red). Thirteen reds, tree restored green.
+
+**Gate.**
+
+    PASS  v2.26.0  40 modules  2183 tests  5 skipped  {test_core 1327/1327 (4 skipped) skipped_in_place; test_showdown 224/224 (1 skipped) skipped_in_place}
+
+Pins moved `tests.test_core` 1319 -> 1327 and `tests.test_showdown` 219 -> 224. Golden histogram unmoved: no engine code was touched.
+
 ## 2026-09-19 — Decided, not yet shipped
 
 **Ben, 2026-09-19**, approving the cloud audit plan run against `3951675`. The work is carried by roadmap rows **CC-A5** through **CC-A9** in `docs/backlog.md` and by R367-R374 allocated in them. Recorded here because the reasoning is the part that gets lost, and because the plan file that produced it lived at `/root/.claude/plans/`, outside the repo, in a container that is reclaimed.
