@@ -81,7 +81,7 @@ def findings_count(message: str) -> int | None:
     return int(hits[-1]) if hits else None
 
 
-def transcript_facts(path: str) -> dict:
+def transcript_facts(path: str, agent_type: str = "") -> dict:
     """Model and duration, read from the subagent's transcript.
 
     Both are absent from the payload and present here, so this is the only way
@@ -98,6 +98,7 @@ def transcript_facts(path: str) -> dict:
         out["duration_source"] = f"transcript unreadable ({type(exc).__name__})"
         return out
     stamps: list[str] = []
+    side: list[str] = []
     model = None
     for line in lines:
         try:
@@ -109,17 +110,40 @@ def transcript_facts(path: str) -> dict:
         stamp = entry.get("timestamp")
         if isinstance(stamp, str):
             stamps.append(stamp)
+            if entry.get("isSidechain") is True:
+                side.append(stamp)
         if model is None and entry.get("type") == "assistant":
             got = (entry.get("message") or {}).get("model")
             if isinstance(got, str):
                 model = got
     out["model"] = model
+    # Which entries belong to the AGENT, which is not the same question as which
+    # entries are in the file. Measured live on 2026-09-19, the first time this
+    # hook fired for real: the event arrived with an empty `agent_type` and a
+    # `transcript_path` pointing at the PARENT session's transcript, and the
+    # naive full-file span recorded 18221.4 s -- five hours of main session,
+    # written into the record as though it were an agent's wall time. A wrong
+    # number that looks right is worse than no number, which is the whole
+    # premise of this file, so:
+    #   * sidechain entries present -> measure over those, they are the agent's;
+    #   * otherwise trust the full span only when the payload NAMED an agent,
+    #     which means the file is that agent's own transcript;
+    #   * otherwise refuse and say why.
+    if side:
+        stamps = side
+        out["duration_source"] = "sidechain entries in transcript"
+    elif not agent_type:
+        out["duration_source"] = ("no agent_type in payload and no sidechain "
+                                  "entries in transcript; a full-file span here "
+                                  "would measure the PARENT session, not an agent")
+        return out
     if len(stamps) >= 2:
         try:
             first = datetime.fromisoformat(stamps[0].replace("Z", "+00:00"))
             last = datetime.fromisoformat(stamps[-1].replace("Z", "+00:00"))
             out["duration_s"] = round((last - first).total_seconds(), 1)
-            out["duration_source"] = "transcript first-to-last timestamp span"
+            out["duration_source"] = (out["duration_source"]
+                                      or "transcript first-to-last timestamp span")
         except ValueError:
             out["duration_source"] = "transcript timestamps unparseable"
     else:
@@ -134,7 +158,9 @@ def main() -> int:
         return 0
     try:
         now = datetime.now(timezone.utc)
-        facts = transcript_facts(str(payload.get("transcript_path") or ""))
+        agent_type = str(payload.get("agent_type") or "")
+        facts = transcript_facts(str(payload.get("transcript_path") or ""),
+                                 agent_type)
         session = str(payload.get("session_id") or "nosession")
         session = "".join(c if (c.isalnum() or c in "-_") else "_" for c in session)
         record = {

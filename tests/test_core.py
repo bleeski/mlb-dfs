@@ -13284,11 +13284,62 @@ class RepoAgentsAndHookEventsTests(unittest.TestCase):
             json.dumps({"timestamp": "2026-09-19T10:02:30.000Z", "type": "assistant",
                         "message": {"model": "claude-opus-5"}}) + "\n",
             encoding="utf-8")
-        facts = mod.transcript_facts(str(transcript))
+        # the agent is NAMED, as a real SubagentStop event names it, so this
+        # transcript is that agent's own and its full span is the agent's
+        facts = mod.transcript_facts(str(transcript), "dfs-qa")
         self.assertEqual(facts["model"], "claude-opus-5")
         self.assertEqual(facts["duration_s"], 150.0)
         self.assertEqual(mod.findings_count("body text\n\nFINDINGS: 4"), 4)
         self.assertEqual(mod.findings_count("FINDINGS: 0"), 0)
+
+    def test_a_parent_transcript_span_is_refused_instead_of_recorded_as_an_agents(self):
+        """The bug this hook shipped with, caught live on its first real firing.
+
+        The event arrived with an EMPTY `agent_type` and a `transcript_path`
+        pointing at the parent session's transcript. The naive full-file span
+        recorded 18221.4 s -- five hours of main session -- into the record as
+        though it were an agent's wall time. A wrong number that looks right is
+        worse than no number, which is this whole file's premise.
+
+        Three cases, because the fix must not cost the real measurement:
+        sidechain entries are the agent's and are measured; a named agent's own
+        transcript is still trusted whole; an unnamed agent on a transcript with
+        no sidechain is refused with a reason.
+        """
+        import json, tempfile
+        mod = self._hook("subagent_record")
+        root = Path(tempfile.mkdtemp())
+
+        parent = root / "parent.jsonl"
+        parent.write_text("\n".join(json.dumps(e) for e in (
+            {"timestamp": "2026-09-19T10:00:00.000Z", "type": "user",
+             "isSidechain": False},
+            {"timestamp": "2026-09-19T15:00:00.000Z", "type": "assistant",
+             "isSidechain": False, "message": {"model": "claude-opus-5"}},
+        )), encoding="utf-8")
+
+        # the observed case: no agent named, nothing sidechain -> refuse
+        facts = mod.transcript_facts(str(parent), "")
+        self.assertIsNone(facts["duration_s"],
+                          "a parent-session span was recorded as an agent's")
+        self.assertIn("PARENT session", facts["duration_source"])
+
+        # a named agent's own transcript is still measured
+        facts = mod.transcript_facts(str(parent), "dfs-qa")
+        self.assertEqual(facts["duration_s"], 18000.0)
+
+        # sidechain entries win, and are measured ALONE rather than as a span
+        # across the parent entries that surround them
+        mixed = root / "mixed.jsonl"
+        mixed.write_text("\n".join(json.dumps(e) for e in (
+            {"timestamp": "2026-09-19T10:00:00.000Z", "isSidechain": False},
+            {"timestamp": "2026-09-19T12:00:00.000Z", "isSidechain": True},
+            {"timestamp": "2026-09-19T12:01:40.000Z", "isSidechain": True},
+            {"timestamp": "2026-09-19T15:00:00.000Z", "isSidechain": False},
+        )), encoding="utf-8")
+        facts = mod.transcript_facts(str(mixed), "")
+        self.assertEqual(facts["duration_s"], 100.0)
+        self.assertIn("sidechain", facts["duration_source"])
 
     def test_a_missing_findings_line_records_null_and_is_never_read_as_zero(self):
         """"Found nothing" and "did not say" are different facts.
