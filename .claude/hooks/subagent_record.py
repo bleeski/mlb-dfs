@@ -158,7 +158,16 @@ def main() -> int:
         return 0
     try:
         now = datetime.now(timezone.utc)
-        agent_type = str(payload.get("agent_type") or "")
+        agent_type = str(payload.get("agent_type") or "").strip()
+        # An event that names no agent is not an agent run, and this file's job
+        # is to record what a repo agent RUN cost and found. Measured live on
+        # 2026-09-19: the event fired twice in one DEV session with an empty
+        # `agent_type`, an empty `stop_reason` and the parent transcript, and
+        # both rows carried no agent, no duration and no findings -- pure churn
+        # in a TRACKED directory, on every session, forever. Recording nothing
+        # is the honest answer to "which agent ran?" when none did.
+        if not agent_type:
+            return 0
         facts = transcript_facts(str(payload.get("transcript_path") or ""),
                                  agent_type)
         session = str(payload.get("session_id") or "nosession")

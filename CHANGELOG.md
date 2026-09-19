@@ -160,6 +160,13 @@ NAMED an agent, meaning the file is that agent's own; otherwise it is refused
 with the reason recorded in `duration_source`. Caught because the record was
 read before merging rather than assumed.
 
+**A fourth, from the same live evidence.** The event fires in an ordinary DEV
+session with no `agent_type` and no `stop_reason` at all — twice in this one —
+so every session would have written a row carrying no agent, no duration and no
+findings into a TRACKED directory, forever. An event naming no agent is not an
+agent run, and "none ran" is best recorded by writing nothing. It now returns
+without writing; a named agent is unaffected.
+
 **The pinned guard test was made hermetic.** `pending_delivery_reason` asks git
 about `data/deliveries/`, so without an explicit root the answer came from
 whatever tree the test process stood in: a BUILD session with an uncommitted
@@ -168,8 +175,8 @@ allowed to asked and failed a test about a different rule entirely. `judge` and
 `judge_segment` take an optional `root`; the R350 signature is otherwise
 unchanged.
 
-**Mutations.** Twenty-three run by hand against the eighteen new tests;
-twenty-three caught, two only after the tests were strengthened. The two survivors were real
+**Mutations.** Twenty-five run by hand against the nineteen new tests;
+twenty-five caught, two only after the tests were strengthened. The two survivors were real
 test weaknesses: changing the brief's re-pull INSTRUCTION survived while the
 section heading still mentioned it (now pinned to the instruction), and dropping
 the `^...$` anchors from the FINDINGS regex survived until a prose-mention case
@@ -192,11 +199,11 @@ smuggled in behind a hook. The consequence is stated in the hook's own message:
 it cannot tell a session that has already handed the file over from one that has
 not.
 
-**Gate.** `PASS  v2.26.0  41 modules  2253 tests  5 skipped` (the five skips are
+**Gate.** `PASS  v2.26.0  41 modules  2254 tests  5 skipped` (the five skips are
 host facts on this container: no vendored `.pylibs/scipy`, no `.env`, and three
 needing salary files a fresh clone does not stage). Before: `PASS  v2.26.0  41
 modules  2235 tests  5 skipped`. `EXPECTED_SUITE_COUNTS["tests.test_core"]`
-1375 -> 1393. Golden histogram unmoved; nothing here touches the solver.
+1375 -> 1394. Golden histogram unmoved; nothing here touches the solver.
 
 ## 2026-09-19 — R370, R371: a delivery is graded against the standings, and the retro's facts are extracted rather than remembered
 

@@ -13401,6 +13401,35 @@ class RepoAgentsAndHookEventsTests(unittest.TestCase):
         # the labels wall: no token figure is recorded, because none is carried
         self.assertNotIn("token_count", rows[0])
 
+    def test_an_event_naming_no_agent_writes_nothing_at_all(self):
+        """Observed live twice in one DEV session, both rows contentless.
+
+        The event fires with an empty `agent_type`, an empty `stop_reason` and
+        the parent transcript. Recording it puts a row carrying no agent, no
+        duration and no findings into a TRACKED directory on every session. The
+        log's job is what a repo agent RUN cost and found; "none ran" is best
+        recorded by writing nothing.
+        """
+        import io, json, tempfile
+        mod = self._hook("subagent_record")
+        root = Path(tempfile.mkdtemp())
+        old_stdin, old_env = sys.stdin, os.environ.get("CLAUDE_PROJECT_DIR")
+        os.environ["CLAUDE_PROJECT_DIR"] = str(root)
+        try:
+            for agent in ("", "   ", None):
+                sys.stdin = io.StringIO(json.dumps(
+                    {"hook_event_name": "SubagentStop", "agent_type": agent,
+                     "session_id": "s", "last_assistant_message": "FINDINGS: 2"}))
+                self.assertEqual(mod.main(), 0)
+        finally:
+            sys.stdin = old_stdin
+            if old_env is None:
+                os.environ.pop("CLAUDE_PROJECT_DIR", None)
+            else:
+                os.environ["CLAUDE_PROJECT_DIR"] = old_env
+        self.assertEqual(list((root / "data" / "agent_runs").rglob("*.jsonl")), [],
+                         "an event naming no agent wrote a row anyway")
+
     def test_the_agent_run_surface_is_a_no_conflict_write_for_every_role(self):
         """`data/agent_runs/` is every role's, or a DEV session cannot run
         `dfs-premise` without a write-set violation."""

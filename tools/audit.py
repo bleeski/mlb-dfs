@@ -850,7 +850,10 @@ EXPECTED_SUITE_COUNTS = {
     # an empty agent_type on the PARENT transcript and recorded five hours of
     # main session as an agent's wall time: the span is now refused unless the
     # entries are the agent's.
-    "tests.test_core": 1393,
+    # +1 again: the same live firing showed the event arrives with NO agent_type
+    # at all in an ordinary DEV session, so it now writes nothing rather than a
+    # contentless row into a tracked directory on every session.
+    "tests.test_core": 1394,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps
