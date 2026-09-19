@@ -35,7 +35,11 @@ where it came from.
 Exit codes:
     0  projected build fits the budget
     3  projected build exceeds the budget (use time_budget_s or bank_cache slices)
-    4  inputs missing
+    4  inputs missing, unreadable, or the wrong geometry for this probe
+
+There is no exit 1: every refusal carries one of the codes above
+(R364). CLAUDE.md's session-start step 3 mandates this tool before any
+build, so a traceback here is a refusal a session cannot classify.
 
 Timings are measurements of this machine on this pool. They are deterministic
 review inputs, never an ROI, win-rate, or probability claim.
@@ -73,14 +77,40 @@ DEFAULT_BUDGET_S = call_budget_s()
 DEFAULT_BUDGET_SOURCE = call_budget_source()
 
 
+class ProbeInputError(Exception):
+    """An input this probe cannot use, carrying the contract's exit code.
+
+    R364, 2026-09-19. Every refusal here used to be a bare ``SystemExit`` or an
+    unhandled ``FileNotFoundError``, so the tool exited 1 -- with a traceback in
+    the missing-file case -- while its own docstring and CLAUDE.md's
+    session-start step 3 document 0/3/4. This repo's own phrase for that is "a
+    crash wearing a refusal's label", and it lands at the moment a BUILD session
+    is orienting under a slate clock.
+    """
+
+    def __init__(self, message: str, code: int = 4):
+        super().__init__(message)
+        self.code = code
+
+
 def _resolve_inputs(args) -> tuple[Path, Path]:
     if args.salary and args.lineups:
-        return Path(args.salary), Path(args.lineups)
-    if not args.date:
-        raise SystemExit("need --date, or both --salary and --lineups")
-    slate = REPO / "data" / "slates" / args.date
-    salary = Path(args.salary) if args.salary else slate / "DKSalaries.csv"
-    feed = Path(args.lineups) if args.lineups else slate / "lineups_feed.json"
+        salary, feed = Path(args.salary), Path(args.lineups)
+    else:
+        if not args.date:
+            raise ProbeInputError("need --date, or both --salary and --lineups")
+        slate = REPO / "data" / "slates" / args.date
+        salary = Path(args.salary) if args.salary else slate / "DKSalaries.csv"
+        feed = Path(args.lineups) if args.lineups else slate / "lineups_feed.json"
+
+    # EXISTENCE BEFORE GEOMETRY, and the order is the fix (R364). It ran the
+    # other way round: `detect_salary_contract` opens the path unguarded
+    # (`dk_entries_manager.py:280-289`), so a slate directory holding
+    # `DKSalaries_showdown.csv` but no canonical `DKSalaries.csv` -- an ordinary
+    # state -- raised FileNotFoundError out of a helper, exit 1, traceback.
+    if not salary.exists():
+        raise ProbeInputError(f"missing input: salary file {salary} does not exist")
+
     # The default name is date-keyed and shared, so it can hold a Showdown file
     # left by another build for the same date. This probe reports whether the
     # bank fits the execution budget; timing a six-slot pool as a ten-slot one
@@ -88,7 +118,7 @@ def _resolve_inputs(args) -> tuple[Path, Path]:
     from mlb_engine.entries.dk_entries_manager import detect_salary_contract
     contract = detect_salary_contract(salary)
     if contract != "CLASSIC":
-        raise SystemExit(
+        raise ProbeInputError(
             f"{salary} carries {contract} geometry; solver_probe times the Classic "
             f"solver. Pass --salary with the Classic file for this date."
         )
@@ -111,10 +141,11 @@ def main() -> int:
     ap.add_argument("--json", action="store_true", help="emit JSON only")
     args = ap.parse_args()
 
-    salary, feed_path = _resolve_inputs(args)
-    if not salary.exists():
-        print(f"missing input: salary file {salary} does not exist", file=sys.stderr)
-        return 4
+    try:
+        salary, feed_path = _resolve_inputs(args)
+    except ProbeInputError as exc:
+        print(str(exc), file=sys.stderr)
+        return exc.code
 
     # R296(g). This refused at exit 4 -- "missing inputs" -- whenever the feed
     # was absent, which since R143 is the NORMAL state of a fully DK-covered

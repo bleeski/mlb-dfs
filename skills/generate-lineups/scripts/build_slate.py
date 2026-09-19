@@ -4199,6 +4199,9 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
             "module_version": st.VERSION,
             "win_share_basis": ladder_meta.get("win_share_basis"),
             "favorite": (ladder_meta.get("shape") or {}).get("favorite"),
+            # R373: on the even-split path `favorite` is an alphabetical
+            # tiebreak over team names, not a reading. Say which, beside it.
+            "favorite_basis": ladder_meta.get("favorite_basis"),
             "win_share": (ladder_meta.get("shape") or {}).get("win_share"),
             "allocation": ladder_meta.get("allocation"),
             "bullpen_teams": (ladder_meta.get("shape") or {}).get("bullpen_teams"),

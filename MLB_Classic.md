@@ -248,7 +248,13 @@ Use a compact bank based on unique lineup demand, not raw reserved entries.
 - Two to three: about 12.
 - Four to nine: requested count plus roughly six.
 - Larger reserved grids: largest same-contest block, reuse-cap minimum, and a small shape buffer.
-- Default near-lock cap: 24 candidates; 40 only when justified.
+- Cap: `optimizer_v3.DEFAULT_CANDIDATE_BANK_CAP`, 150. **Corrected 2026-09-19
+  (R368).** This line read "Default near-lock cap: 24 candidates; 40 only when
+  justified", which the code has contradicted since before it was written and
+  which was filed as OH-7 on 2026-07-19. `resolve_candidate_bank_size`
+  (`optimize/optimizer_v3.py:3393-3422`) is entry-derived and reads no clock:
+  the four tiers above are exact, and the 10+ branch is `ceil(2n)` capped at
+  150. Whether a larger bank buys anything is UNMEASURED and is roadmap CC-A9.
 
 Scenario families should represent baseball outcomes—different SP pairs, offenses, and game environments—not repeated arbitrary exclusions. Game totals, park factors, and wind from §5 are the preferred seeds for scenario families.
 

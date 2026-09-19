@@ -302,6 +302,102 @@ def _hash_coverage_note(lock_path: Path) -> str:
     return "\n".join(lines)
 
 
+# ---------------------------------------------------------------------------
+# Egress (R367, 2026-09-19)
+# ---------------------------------------------------------------------------
+# Three documents in this repo state a different answer to "can this host reach
+# the odds API", and each was true where it was taken:
+# `intake/paste_odds.py` says proxy-gated (R236), `SKILL.md:393-398` records 200
+# (R316), the 2026-09-18 build fragment records 403. Egress is a property of the
+# host and the environment's network policy, not of the repository, so a document
+# is the wrong place to freeze one. Measure it once per session instead and let
+# every doc point here.
+#
+# Two things this deliberately does NOT do. It never touches DraftKings -- that
+# wall is absolute and reads are manual. And it never reports "blocked" for a
+# host it merely failed to parse: an unknown result says so.
+EGRESS_TIMEOUT_S = 6.0
+#: Whole-probe cap. Six hosts are probed concurrently, so a blackholed network
+#: costs this once rather than six times -- and a blackhole is exactly the case
+#: the probe exists to detect, so it must not be the slow path.
+EGRESS_TOTAL_CAP_S = 10.0
+
+#: ``(label, url, client)``. The client matters and is reported: FanGraphs
+#: answers 403 to urllib's fingerprint and 200 to curl (R317(a),
+#: `.claude/rules/engine.md`), so probing it with the wrong one would report a
+#: block that the fetcher does not actually hit.
+EGRESS_TARGETS = (
+    ("statsapi", "https://statsapi.mlb.com/api/v1/teams?sportId=1", "urllib"),
+    ("odds", "https://api.the-odds-api.com/v4/sports", "urllib"),
+    ("savant", "https://baseballsavant.mlb.com/leaderboard/expected_statistics", "urllib"),
+    ("mlb-lineups", "https://www.mlb.com/starting-lineups", "urllib"),
+    # The URL `tools/fetch_fangraphs_platoon.py:62` actually fetches. Probing
+    # some other FanGraphs path measured a different thing: `/roster-resource/
+    # depth-charts` answers 500 to curl while this one answers 200.
+    ("fangraphs", "https://www.fangraphs.com/roster-resource/platoon-lineups/angels", "curl"),
+    ("open-meteo", "https://api.open-meteo.com/v1/forecast?latitude=40&longitude=-74", "urllib"),
+)
+
+
+def _probe_one(label: str, url: str, client: str) -> str:
+    """``label=<status>`` for one host. Never raises."""
+    try:
+        if client == "curl":
+            out = subprocess.run(
+                # A plain GET, not `-I` and not `-L`: measured 2026-09-19,
+                # FanGraphs answers HEAD with 500 and GET with 200, and any
+                # 3xx already proves the host answered. A probe reporting a
+                # status the real fetcher never sees is worse than no probe.
+                ["curl", "-sS", "-o", "/dev/null", "-w", "%{http_code}",
+                 "--max-time", str(int(EGRESS_TIMEOUT_S)), url],
+                capture_output=True, text=True, timeout=EGRESS_TIMEOUT_S + 2)
+            code = (out.stdout or "").strip()
+            return f"{label} {code}" if code.isdigit() and code != "000" else f"{label} unreachable"
+        import urllib.error
+        import urllib.request
+        req = urllib.request.Request(url, method="GET",
+                                     headers={"User-Agent": "mlb-dfs-egress-probe"})
+        with urllib.request.urlopen(req, timeout=EGRESS_TIMEOUT_S) as resp:
+            return f"{label} {resp.status}"
+    except Exception as exc:  # noqa: BLE001 - every failure is a reading
+        import urllib.error
+        if isinstance(exc, urllib.error.HTTPError):
+            # A 401 means reachable-without-a-key, which is NOT a block and is
+            # the ordinary state of the odds API here; a 403 on CONNECT is.
+            return f"{label} {exc.code}"
+        if isinstance(exc, (TimeoutError, subprocess.TimeoutExpired)) or \
+                "timed out" in str(exc).lower():
+            # Slow and blocked are different facts. Saying so stops a session
+            # concluding "gated" from what was a busy host.
+            return f"{label} timeout"
+        return f"{label} unreachable"
+
+
+def egress_line() -> str:
+    """One line naming what this host could reach, just now.
+
+    Concurrent, capped, and it never fails the caller: a probe that cannot
+    answer says `unknown`, because "the probe broke" and "the host is blocked"
+    are different facts and only one of them is about the network.
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    results: Dict[str, str] = {}
+    try:
+        with ThreadPoolExecutor(max_workers=len(EGRESS_TARGETS)) as pool:
+            futures = {pool.submit(_probe_one, *target): target[0]
+                       for target in EGRESS_TARGETS}
+            for future in as_completed(futures, timeout=EGRESS_TOTAL_CAP_S):
+                label = futures[future]
+                results[label] = future.result()
+    except Exception:  # noqa: BLE001 - a cap hit is a reading, not a crash
+        pass
+    ordered = []
+    for label, _url, client in EGRESS_TARGETS:
+        text = results.get(label, f"{label} unknown")
+        ordered.append(f"{text} ({client})" if client != "urllib" else text)
+    return "egress: " + ", ".join(ordered)
+
+
 def main(argv: Optional[list] = None) -> int:
     parser = argparse.ArgumentParser(
         description="Probe the engine runtime against requirements.lock; "
@@ -315,7 +411,14 @@ def main(argv: Optional[list] = None) -> int:
                              "package manager, which is every Linux container.")
     parser.add_argument("--lock", default=None,
                         help="lock file path (default: repo requirements.lock)")
+    parser.add_argument("--egress", action="store_true",
+                        help="print one line naming what this host can reach "
+                             "right now, and exit. Never touches DraftKings.")
     args = parser.parse_args(argv)
+
+    if args.egress:
+        print(egress_line())
+        return 0
 
     root = repo_root()
     lock_path = Path(args.lock) if args.lock else root / LOCK_NAME

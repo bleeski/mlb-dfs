@@ -9755,6 +9755,196 @@ class ClaimWriteSetTests(unittest.TestCase):
                           f"{path} must be in DEV's write set for dirt to BLOCK")
 
 
+class SolverProbeExitContractTests(unittest.TestCase):
+    """R364, 2026-09-19. The probe crashed where its contract says it refuses.
+
+    `_resolve_inputs` called `detect_salary_contract` BEFORE the existence
+    check, and that helper opens the path unguarded
+    (`dk_entries_manager.py:280-289`), so a slate directory holding
+    `DKSalaries_showdown.csv` but no canonical `DKSalaries.csv` -- an ordinary
+    state -- exited 1 with a FileNotFoundError traceback. CLAUDE.md's
+    session-start step 3 mandates this tool before every build, so that landed
+    while a BUILD session was orienting under a slate clock, and this repo's own
+    phrase for it is "a crash wearing a refusal's label".
+    """
+
+    ROOT = Path(__file__).resolve().parents[1]
+
+    def _probe(self, *argv):
+        return subprocess.run(
+            [sys.executable, str(self.ROOT / "tools" / "solver_probe.py"), *argv],
+            capture_output=True, text=True, timeout=180, cwd=str(self.ROOT))
+
+    def test_a_missing_salary_file_is_exit_4_not_a_traceback(self):
+        proc = self._probe("--date", "1999-12-31")
+        self.assertEqual(proc.returncode, 4, proc.stderr)
+        self.assertIn("missing input", proc.stderr)
+        self.assertNotIn("Traceback", proc.stderr)
+
+    def test_no_date_and_no_paths_is_exit_4_not_exit_1(self):
+        proc = self._probe()
+        self.assertEqual(proc.returncode, 4, proc.stderr)
+        self.assertNotIn("Traceback", proc.stderr)
+
+    def test_the_wrong_geometry_returns_the_contract_code(self):
+        """A Showdown file under the shared date-keyed name is the case the
+        check exists for; it used to `raise SystemExit(str)`, which is exit 1."""
+        fixture = (self.ROOT / "tests" / "fixtures" / "showdown"
+                   / "DKSalaries_showdown_MIN_CHC.csv")
+        self.assertTrue(fixture.exists(), "showdown salary fixture moved")
+        with tempfile.TemporaryDirectory() as raw:
+            salary = Path(raw) / "DKSalaries.csv"
+            salary.write_bytes(fixture.read_bytes())
+            proc = self._probe("--salary", str(salary),
+                               "--lineups", str(Path(raw) / "feed.json"))
+        self.assertEqual(proc.returncode, 4, proc.stderr)
+        self.assertIn("SHOWDOWN", proc.stderr)
+        self.assertNotIn("Traceback", proc.stderr)
+
+    def test_the_docstring_promises_no_exit_1(self):
+        text = (self.ROOT / "tools" / "solver_probe.py").read_text(encoding="utf-8")
+        self.assertIn("There is no exit 1", text)
+
+
+class EgressProbeTests(unittest.TestCase):
+    """R367, 2026-09-19. Egress was asserted in three docs and measured in none.
+
+    `intake/paste_odds.py` says the odds API is proxy-gated (R236),
+    `skills/generate-lineups/SKILL.md` records it answering 200 (R316), and the
+    2026-09-18 build fragment records 403. Each was true where it was taken.
+    Egress belongs to the host and its network policy, so it is measured once a
+    session and the docs point at the measurement.
+
+    These pin SHAPE and failure behaviour, never a status code: a test that
+    asserted `statsapi 200` would fail on a correctly-configured restricted
+    environment, which is a policy this repo must not fight.
+    """
+
+    ROOT = Path(__file__).resolve().parents[1]
+
+    @staticmethod
+    def _mod():
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "env_probe_egress_under_test",
+            Path(__file__).resolve().parents[1] / "tools" / "env_probe.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    def test_every_target_appears_exactly_once_and_names_a_non_urllib_client(self):
+        mod = self._mod()
+        line = mod.egress_line()
+        self.assertTrue(line.startswith("egress: "))
+        for label, _url, client in mod.EGRESS_TARGETS:
+            self.assertEqual(line.count(label + " "), 1, label)
+            if client != "urllib":
+                self.assertIn(f"({client})", line)
+
+    def test_a_probe_that_raises_reads_as_a_status_not_a_crash(self):
+        mod = self._mod()
+        with unittest.mock.patch.object(
+                mod, "_probe_one", side_effect=RuntimeError("boom")):
+            # The executor surfaces the error through future.result(); the cap
+            # handler swallows it and every label still gets a reading.
+            line = mod.egress_line()
+        self.assertTrue(line.startswith("egress: "))
+        for label, _url, _client in mod.EGRESS_TARGETS:
+            self.assertIn(label, line)
+
+    def test_a_timeout_is_reported_as_a_timeout_and_not_as_a_block(self):
+        """Slow and blocked are different facts and only one is about policy.
+
+        A session that reads "unreachable" for a host that was merely busy
+        concludes the environment is gated and stops reaching for it, which is
+        how a wrong egress reading becomes a permanently degraded build.
+        """
+        mod = self._mod()
+        with unittest.mock.patch("urllib.request.urlopen",
+                                 side_effect=TimeoutError("timed out")):
+            slow = mod._probe_one("statsapi", "https://example.invalid", "urllib")
+        self.assertEqual(slow, "statsapi timeout")
+        with unittest.mock.patch("urllib.request.urlopen",
+                                 side_effect=OSError("no route to host")):
+            dead = mod._probe_one("statsapi", "https://example.invalid", "urllib")
+        self.assertEqual(dead, "statsapi unreachable")
+
+    def test_a_401_reads_as_reachable_rather_than_as_a_wall(self):
+        """The odds API answers 401 without a key here, which is its ORDINARY
+        state and not a block. Reporting it as unreachable would send a session
+        hunting a proxy problem that does not exist."""
+        import urllib.error
+        mod = self._mod()
+        err = urllib.error.HTTPError("u", 401, "Unauthorized", None, None)
+        with unittest.mock.patch("urllib.request.urlopen", side_effect=err):
+            self.assertEqual(
+                mod._probe_one("odds", "https://example.invalid", "urllib"),
+                "odds 401")
+
+    def test_nothing_in_the_probe_touches_draftkings(self):
+        """The money-and-entry wall is absolute, so it is pinned rather than
+        trusted: no target may name DK, by any spelling."""
+        mod = self._mod()
+        for label, url, _client in mod.EGRESS_TARGETS:
+            self.assertNotIn("draftkings", url.lower(), label)
+
+    def test_the_session_start_hook_prints_the_line(self):
+        hook = (self.ROOT / ".claude" / "hooks"
+                / "session_start.py").read_text(encoding="utf-8")
+        self.assertIn("egress()", hook)
+        self.assertIn("env_probe", hook)
+
+
+class RetiredInstructionsTests(unittest.TestCase):
+    """R368 and R365, 2026-09-19. Two documents instructed a dead workflow.
+
+    `docs/cowork_migration_handoff.md` opened with a read-order for the next
+    session and told it to run an unpinned pip install that
+    `.claude/settings.json` now DENIES; `MANIFEST.md` pinned a 119-test tree and
+    said to open the folder in Cowork. Both are archived with banners naming
+    what superseded them. `MANIFEST.md` keeps a pointer stub in place because it
+    is in the DEV write set in two files that a test compares.
+    """
+
+    ROOT = Path(__file__).resolve().parents[1]
+
+    def test_the_dead_read_order_is_archived_with_a_banner(self):
+        moved = self.ROOT / "docs" / "legacy" / "cowork_migration_handoff.md"
+        self.assertTrue(moved.exists(), "the handoff was not archived")
+        self.assertFalse((self.ROOT / "docs" / "cowork_migration_handoff.md").exists(),
+                         "the handoff is still live in docs/")
+        self.assertIn("RETIRED", moved.read_text(encoding="utf-8")[:600])
+
+    def test_manifest_stays_put_and_points_at_its_archive(self):
+        """It is named in CLAUDE.md's Roles bullet and claim.py's WRITE_SETS,
+        which `ClaimWriteSetTests` compares, so moving the path would break a
+        contract to fix a document."""
+        text = (self.ROOT / "MANIFEST.md").read_text(encoding="utf-8")
+        self.assertIn("docs/legacy/MANIFEST_cowork_seed_2026-07-16.md", text)
+        self.assertNotIn("119 tests", text)
+        self.assertTrue((self.ROOT / "docs" / "legacy"
+                         / "MANIFEST_cowork_seed_2026-07-16.md").exists())
+
+    def test_the_strategy_doc_no_longer_contradicts_the_bank_cap(self):
+        """Open as OH-7 since 2026-07-19: the doc said 24/40, the code says
+        `ceil(2n)` capped at 150, and the code is the authority."""
+        text = (self.ROOT / "MLB_Classic.md").read_text(encoding="utf-8")
+        self.assertIn("DEFAULT_CANDIDATE_BANK_CAP", text)
+        for line in text.splitlines():
+            if "near-lock cap" in line:
+                # Quoting the old figure to say it was WRONG is the fix, the
+                # same allowance `HostProseIsCurrentTests` makes for the
+                # "Cowork-only" line. Asserting it is the defect.
+                self.assertIn("This line read", line,
+                              f"MLB_Classic.md still asserts a cap: {line[:120]}")
+
+    def test_hosts_md_answers_the_three_questions_it_had_no_row_for(self):
+        text = (self.ROOT / "docs" / "hosts.md").read_text(encoding="utf-8")
+        for needle in ("## Secrets", "## Egress", "MLB_DFS_CALL_BUDGET_S",
+                       "THE_ODDS_API_KEY"):
+            self.assertIn(needle, text, needle)
+
+
 class ClaimHostHonestyTests(unittest.TestCase):
     """R359, 2026-09-19. The claims mutex is FALSE in a cloud container.
 

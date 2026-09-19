@@ -137,6 +137,28 @@ def pending_fragments() -> str:
     return "; ".join(parts) if parts else "none"
 
 
+def egress() -> str:
+    """What this host can reach right now, measured rather than asserted.
+
+    R367, 2026-09-19. Three documents in the tree gave three different answers
+    about the same two hosts, and each was true where it was taken:
+    `paste_odds.py` says the odds API is proxy-gated (R236), `SKILL.md` records
+    it answering 200 (R316), the 2026-09-18 build fragment records 403. Egress
+    belongs to the host and its network policy, not to the repo, so it is
+    measured once per session here and the docs point at this line.
+
+    Concurrent and capped at ~10s in `env_probe`. Never raises: a hook that
+    fails takes the whole session-start briefing with it, and a network reading
+    is not worth that.
+    """
+    try:
+        sys.path.insert(0, str(ROOT / "tools"))
+        import env_probe  # noqa: PLC0415 - deliberately lazy; the hook is stdlib
+        return env_probe.egress_line()
+    except Exception as exc:  # noqa: BLE001
+        return f"egress: not measured ({type(exc).__name__})"
+
+
 def locks() -> str:
     hits = []
     now = time.time()
@@ -172,6 +194,7 @@ def full() -> str:
         "backlog: " + next_pointer(),
         "inbox (fragments awaiting their owning role): " + pending_fragments(),
         "git locks: " + lock_state,
+        egress(),
         "next: take your role's claim (python tools/claim.py take engine --role DEV --scope \"...\"), "
         "then python tools/audit.py --run-tests --terse. DEV: /dev-session.",
     ]
