@@ -123,8 +123,14 @@ ROLES = ("BUILD", "ARCHIVE", "DEV", "SOLO")
 # Tracked write surfaces per role, for `dirt`. Prefix match on repo-relative
 # posix paths. BUILD's surfaces are gitignored, hence the empty tuple.
 WRITE_SETS = {
-    "BUILD": (),
-    "ARCHIVE": ("ledger/", "data/archive/", "data/standings/", "data/reference/"),
+    # R369: BUILD was empty because everything a build wrote was gitignored
+    # (`runs/`, `outputs/`, `data/slates/*/`), so `dirt` had nothing to classify
+    # and an empty tuple was honest. The delivery record is the first TRACKED
+    # thing a build writes, so BUILD now has exactly one path. ARCHIVE gets it
+    # too: the outcome review reads the record and writes its sidecar beside it.
+    "BUILD": ("data/deliveries/",),
+    "ARCHIVE": ("ledger/", "data/archive/", "data/standings/", "data/reference/",
+                "data/deliveries/"),
     # R353: `CHANGELOG.md`, `.github/` and the two locks were MISSING here while
     # CLAUDE.md's DEV bullet named them (it says `requirements*`, not
     # `requirements.txt`). The consequence was the opposite of harmless: the
@@ -415,8 +421,9 @@ def cmd_dirt(args: argparse.Namespace) -> int:
             print(f"note   (outside {args.role} write set, report and leave "
                   f"alone): {posix}")
     if args.role == "BUILD":
-        print("note   BUILD's write surfaces (runs/, outputs/, data/slates/) "
-              "are gitignored; the slate claim is the protection, not this gate")
+        print("note   BUILD's other write surfaces (runs/, outputs/, "
+              "data/slates/) are gitignored; the slate claim is the protection "
+              "there, not this gate. data/deliveries/ is tracked and DOES block")
     if blocks:
         print(f"BLOCKED  {len(blocks)} dirty path(s) inside the {args.role} "
               f"write set; name the owner before touching anything")

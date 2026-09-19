@@ -25,6 +25,77 @@ performance claim.
 
 ---
 
+## 2026-09-19 — R369: the delivery record, so a cloud build can be graded
+
+**Scope.** New `mlb_engine/entries/delivery_record.py`, `mlb_engine/entries/upload_manifest.py`, `mlb_engine/field/field_miner.py`, `tools/awaiting_standings.py`, `skills/generate-lineups/scripts/build_slate.py`, `skills/generate-lineups/SKILL.md`, `tools/claim.py`, `CLAUDE.md`, `tools/audit.py` (`EXPECTED_SUITE_COUNTS`), `tests/__init__.py`, `tests/test_core.py` (`DeliveryRecordTests` new; `ClaimWriteSetTests`, `MinerManifestFirstSalaryTests`, `MinerMoneyHonestyTests` extended), `docs/backlog.md`, `docs/PROGRESS.md`, this file.
+
+**Why.** Roadmap row CC-A6, and the migration defect itself: since the move to cloud sessions on 2026-09-17, no build run there could ever be graded.
+
+### What was wrong
+
+`runs/` and `outputs/` are gitignored (`.gitignore:1-2`) and a Claude Code cloud container is reclaimed when the session ends. Three archive-side links read only those trees:
+
+- entered contests, from `outputs/*/DKEntries*.csv` (`awaiting_standings.scan_entered`)
+- Ben's Entry IDs, from `outputs/<date>/upload_manifest.json` AND the delivered file it names (`field_miner.harvest_own_entry_ids`, which calls `parse_dk_entry_rows` on that file)
+- the salary file a build used, via `runs/<run_id>/inputs/` (`field_miner.manifest_salary_candidates`, R49's authoritative tier)
+
+So on the host that now runs most sessions, every build vanished. The 2026-09-17 and 2026-09-18 cloud builds left hand-written prose fragments and nothing machine-readable; their delivered sha256 exists in no file in this repo, and no standings export can ever be joined back to them. That is the whole archive-and-ledger loop going dark on the default host, not a reporting gap. No live run record carried a git sha either (`build_state_manager.runtime_environment` records the interpreter and the packages, which is the RUNTIME), so even a surviving portfolio could not be attributed to a version of the engine.
+
+A refusal was worse off still: twelve of the thirteen refusal returns inside `build_slate.py`'s run functions are `return N, {}`, and `main()` has nine more `return 4` exits above the brief writer, so a build that refused wrote nothing durable at all. "No delivery on this slate" and "no session ran" were the same absence.
+
+### What shipped
+
+A tracked JSON at `data/deliveries/<date>/<tag>_<run_id>.json`, written from inside `upload_manifest.record_delivery` — the one choke point `build_slate.py`, `late_swap.py` and this module's own re-promotion path already call, so there is one writer rather than three places to forget. It carries the manifest row (with the delivered sha256 and a posix path, because `repo_relative` returns backslashes on Windows), the entry rows parsed out of the delivered bytes, the input fingerprints copied from `runs/<run_id>/manifest.json`, code identity, the controls actually in force with the counted relaxations, the host profile and R367's egress line. Roughly 10-30 KB.
+
+**Code identity is the git sha plus a dirty flag**, and the flag matters more than the sha: a delivery built from an uncommitted tree is not reproducible from any commit, and saying so is the difference between evidence and a guess. `execution_pipeline.VERSION` and `contest_allocator.VERSION` ride along. `optimizer_v3` carries no VERSION constant and is deliberately not given one — the lineup source of truth is not the place for a bookkeeping field, and the sha identifies it exactly.
+
+**Both of `record_delivery`'s return paths mirror.** The same-bytes branch updates the prior manifest row in place, which is what preflight's promotion to `upload_ready` and the re-promotion path both do; mirroring only from the append path would leave the record reading `candidate` forever.
+
+**Refusals are recorded by a wrapper at `build_slate.py`'s `__main__`**, not at each refusal site, and keyed `<date>_<tag>_<utc>` because most refusals precede the `create_run` that mints a run_id. Each exit code is recorded with a note saying what it MEANT; a bare integer is not evidence a year later. One limit is stated rather than claimed away: a hard kill of the process still writes nothing.
+
+**The record never fails a delivery.** Both the writer and the mirror swallow everything and report; a delivery that can be broken by its own bookkeeping is a worse system than one with no bookkeeping. Same contract `stage_salary_for_delivery` already keeps.
+
+**Nothing from the environment reaches the record, and the writer checks its own output anyway.** Before writing, it scans the serialized text for the value of any environment variable whose name carries `KEY`, `TOKEN`, `SECRET`, `PAT` or `PASSWORD` and refuses the write if one appears, naming the VARIABLE and never the value. CLAUDE.md's wall is "never log, echo, or write API keys", and a tracked file is the worst possible place to break it.
+
+**The three readers were repointed.** `scan_entered` takes `deliveries_dir=` and reads the records FIRST, `outputs/` second (both, because the two hosts that share a disk still have that tree, and a contest found twice is the same key). `harvest_own_entry_ids` takes `root=` and tries the record before the manifest. A new `record_salary_candidates` tier sits ahead of the manifest tier and matches on CONTENT, by the record's own input sha256, because a bare `DKSalaries.csv` from one draftgroup silently answers for another.
+
+**`data/deliveries/` joined the BUILD and ARCHIVE write sets in `CLAUDE.md` and `tools/claim.py` together.** BUILD's write set was an empty tuple, which was honest while everything a build wrote was gitignored; this is the first tracked path a build writes, so `dirt` now blocks on another session's record. `claim.py`'s BUILD note was corrected in the same change: it said the write surfaces are gitignored, full stop.
+
+`SKILL.md` gained the commit step, placed explicitly in the repo-housekeeping block AFTER the hand-over. R354's ordering rule is unchanged and outranks it: a record committed ten minutes late still grades, a slate lost at T-8 does not come back.
+
+### What a TRACKED artifact made visible
+
+Three ways to run this suite, one of them unisolated. `tools/audit.py` sets `MLB_DFS_ARTIFACT_ROOT` on every `--run-tests` run (R338 repair 4) and `tests/conftest.py` sets it for pytest, but a bare `python -m unittest tests.test_core` got neither, so the front-door and golden-replay tests published real manifests into the operator's own `outputs/`. That was invisible for as long as `outputs/` was the only thing they wrote, because it is gitignored. `data/deliveries/` is tracked, so the same tests immediately left twenty delivery records in `git status`. The gate itself was never affected and is not what changed.
+
+Two fixes, both small. `tests/__init__.py` now sets the variable when nothing else has, which is the only place early enough: it has to be in force before `upload_manifest` is imported, and importing any `tests.*` module runs that file first. An existing value is respected. And this module read `upload_manifest.REPO_ROOT` through `from ... import REPO_ROOT`, which takes a COPY — so `conftest`'s in-process patch of that name never reached here at all. It reads the attribute now.
+
+One thing deliberately did NOT follow the artifact root. `code_identity` runs `git rev-parse HEAD`, and under an isolated root that is a temp directory with no git in it. The sha recorded is the sha of the ENGINE that built the portfolio, so it is read from this module's own location. Artifact root and code root are different questions and the module now has a named function for each.
+
+### The N+1th site (R233)
+
+The class is "an archive-side reader that answers a post-slate question out of a tree that does not survive the container". The grep that enumerates it:
+
+```
+grep -rn '"outputs"\|"runs"' --include=*.py mlb_engine/ tools/ skills/
+```
+
+37 hits across 19 files. Most are WRITERS running inside the live session, where the trees exist and the path is correct; `mlb_engine/production/` is off the build path. Four are the class, three of them named on the board and the fourth found by running the grep:
+
+| Site | Was |
+|---|---|
+| `tools/awaiting_standings.py` `scan_entered` | globbed `outputs/*/DKEntries*.csv` |
+| `mlb_engine/field/field_miner.py:1403` `harvest_own_entry_ids` | read `outputs/<date>/upload_manifest.json` and the file it names |
+| `mlb_engine/field/field_miner.py:661,681` `manifest_salary_candidates` | resolved through `runs/<run_id>/inputs/` |
+| `mlb_engine/field/field_miner.py:2185` the money-flag guard | **the N+1th.** Its error told the operator to "make `outputs/<date>/upload_manifest.json` resolvable", which is impossible advice on a cloud host. It now names the delivery record first. |
+
+### Verification
+
+Fourteen mutations run by hand, every one red, then restored: the mirror removed from the append path and from the same-bytes path; a refusal recorded as a delivery; the secret scan always answering clean; an ROI field added to the record; the mirror's `except Exception` narrowed so a failing record propagates; `data/deliveries/` dropped from `claim.py`'s BUILD set; the salary tier matching on name instead of content; the record tier appended after the in-date tier; `build_slate.py`'s `__main__` calling `main()` unwrapped; the money guard naming only the manifest again; `tests/__init__.py` no longer isolating; the artifact root bound at import instead of read at call time; and the git sha read from the artifact root again.
+
+**One of those mutations poisoned two later tests and is worth recording, because the harness was wrong rather than the code.** M8 replaced `if digest in wanted:` with `if digest or wanted:` — the same LENGTH. CPython validates a cached `.pyc` on the source's size and its second-granularity mtime, both of which the restore left unchanged, so the interpreter went on serving the MUTATED bytecode after the source was back. Two tests then failed in the full suite and passed alone, which reads exactly like in-process state dirtying and is not. The harness now purges every `__pycache__` on both sides of a mutation and runs the subprocess with `PYTHONDONTWRITEBYTECODE=1`. `.claude/rules/engine.md` already says anything asserting on import graphs or module caches runs in a subprocess; a subprocess is not enough when the mutation is length-preserving.
+
+Gate: `PASS  v2.26.0  41 modules  2213 tests  5 skipped`, exit 0, 207s. Pin moved `tests.test_core` 1341 -> 1353. A bare `python -m unittest tests.test_core` also verified to leave `git status` clean, which it did not before this change. Module count is measured off disk and needs no pin. Golden histogram unmoved: nothing on the solve path was touched.
+
 ## 2026-09-19 — R364, R365, R367, R368, R373: the probe refuses instead of crashing, egress is measured, and the dead instructions are retired
 
 **Scope.** `tools/solver_probe.py`, `tools/env_probe.py`, `.claude/hooks/session_start.py`, `mlb_engine/optimize/showdown_theses.py`, `skills/generate-lineups/scripts/build_slate.py`, `docs/hosts.md`, `docs/cowork_sandbox.md`, `docs/legacy/cowork_migration_handoff.md` (moved), `docs/legacy/MANIFEST_cowork_seed_2026-07-16.md` (new), `MANIFEST.md` (now a stub), `MLB_Classic.md`, `tools/audit.py` (`EXPECTED_SUITE_COUNTS`), `tests/test_core.py` (`SolverProbeExitContractTests`, `EgressProbeTests`, `RetiredInstructionsTests` new), `tests/test_showdown.py` (`FavoriteBasisTests` new), `docs/backlog.md`, `docs/PROGRESS.md`, this file.

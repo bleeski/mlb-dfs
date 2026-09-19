@@ -5473,5 +5473,54 @@ def main() -> int:
     return code
 
 
+def _main_recording_refusals() -> int:
+    """`main()`, with a REFUSAL recorded when it produced no delivery (R369).
+
+    Twelve of the thirteen refusal returns inside the run functions are
+    `return N, {}`, and `main()` has nine more `return 4` exits above the brief
+    writer, so the brief site at the bottom of `main()` cannot see them: a build
+    that refuses writes nothing durable at all. "No delivery on this slate" and
+    "no session ran" then look identical in the archive, and only one of them is
+    a thing to learn from.
+
+    A delivery writes its own record from inside `upload_manifest.record_delivery`,
+    so this only fires on a non-zero exit. It keys on the timestamp rather than a
+    run_id because most refusals happen before `create_run` mints one. It never
+    changes the exit code, and a hard kill of the process still writes nothing --
+    that limit is real and is not claimed away.
+    """
+    code = main()
+    if code == 0:
+        return code
+    try:
+        from mlb_engine.entries.delivery_record import write_refusal_record
+        from mlb_engine.repo_env import today_et
+        argv = sys.argv[1:]
+        date = ""
+        for i, arg in enumerate(argv):
+            if arg == "--date" and i + 1 < len(argv):
+                date = argv[i + 1]
+                break
+            if arg.startswith("--date="):
+                date = arg.split("=", 1)[1]
+                break
+        write_refusal_record(date=date or today_et(), slate_tag="",
+                             exit_code=int(code),
+                             refusal={"argv": argv,
+                                      "note": REFUSAL_EXIT_NOTES.get(int(code), "")})
+    except Exception as exc:  # noqa: BLE001 - never change the exit code
+        print(f"delivery_record: refusal not recorded ({type(exc).__name__}: {exc})")
+    return code
+
+
+#: What each documented exit means, so a record is readable without the source.
+REFUSAL_EXIT_NOTES = {
+    3: "inputs missing or unusable",
+    4: "refused: a wall, a units slip, or an unusable argument",
+    5: "supervisor stop: the wall clock or the call budget ran out",
+    10: "bank thin: resumable, run the same command again to add a slice",
+}
+
+
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(_main_recording_refusals())

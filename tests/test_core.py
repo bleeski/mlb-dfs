@@ -9754,6 +9754,465 @@ class ClaimWriteSetTests(unittest.TestCase):
             self.assertIn(path, write_set,
                           f"{path} must be in DEV's write set for dirt to BLOCK")
 
+    def test_the_delivery_record_is_in_build_and_archive_on_both_sides(self):
+        """R369. `data/deliveries/` is the first TRACKED path a build writes.
+
+        BUILD's write set was an empty tuple and that was honest while
+        everything a build wrote (`runs/`, `outputs/`, `data/slates/*/`) was
+        gitignored: `dirt` had nothing to classify. The delivery record changes
+        the fact, so it has to change both files at once, which is what the
+        test above already enforces for DEV and this enforces for the two roles
+        whose bullets the DEV parser does not reach.
+        """
+        claim = self._claim_module()
+        repo = Path(__file__).resolve().parents[1]
+        line = next(ln for ln in (repo / "CLAUDE.md").read_text(encoding="utf-8").splitlines()
+                    if ln.startswith("- Roles.") and "DEV:" in ln)
+        build_clause = line.split("BUILD,", 1)[1].split("ARCHIVE:", 1)[0]
+        archive_clause = line.split("ARCHIVE:", 1)[1].split("DEV:", 1)[0]
+        for role, clause in (("BUILD", build_clause), ("ARCHIVE", archive_clause)):
+            self.assertIn("`data/deliveries/`", clause,
+                          f"CLAUDE.md's {role} clause must name data/deliveries/")
+            self.assertIn("data/deliveries/", claim.WRITE_SETS[role],
+                          f"tools/claim.py's {role} write set must name it too, "
+                          f"or `dirt` will not BLOCK on another session's record")
+        # SOLO is derived from ARCHIVE|DEV, so it inherits it; pinned because a
+        # future edit could rebuild SOLO from a different pair.
+        self.assertIn("data/deliveries/", claim.WRITE_SETS["SOLO"])
+
+
+class DeliveryRecordTests(unittest.TestCase):
+    """R369, 2026-09-19. The tracked record that lets a cloud build be graded.
+
+    The defect: `runs/` and `outputs/` are gitignored and a cloud container is
+    reclaimed at session end, so the three archive-side readers that only look
+    there saw nothing at all for the 2026-09-17 and 2026-09-18 builds. Their
+    delivered sha256 exists in no file in this repo and no standings export can
+    ever be joined back to them.
+
+    The end-to-end test below is the one the plan asks for: one delivery
+    recorded through the real `record_delivery` choke point, then all three
+    readers asked the question they exist to answer, then a refusal.
+    """
+
+    FIXTURE = Path(__file__).resolve().parents[1] / "docs" / "greenfield" / \
+        "2026-09-09" / "fixture_baseline_DKEntries.csv"
+    # The vendored fixture's Contest ID is 80000, five digits, which
+    # `awaiting_standings.CID_RE` rejects by design. The temp copy carries a
+    # nine-digit ID so the scan has something legal to find; everything else
+    # about the file, including the rows the parser reads, is the fixture's.
+    REAL_CID = "123456789"
+
+    def _skeleton(self, tmp: Path, date: str = "2026-09-19") -> Path:
+        """A temp repo skeleton holding one delivered file under outputs/."""
+        out = tmp / "outputs" / date
+        out.mkdir(parents=True)
+        text = self.FIXTURE.read_text(encoding="utf-8-sig")
+        delivered = out / "DKEntries_test.csv"
+        delivered.write_text(text.replace(",80000,", f",{self.REAL_CID},"),
+                             encoding="utf-8")
+        return delivered
+
+    def _run_in_skeleton(self, script: str, tmp: Path) -> subprocess.CompletedProcess:
+        """Run `script` with the artifact root pointed at the skeleton.
+
+        A subprocess, not `patch`, because `upload_manifest.REPO_ROOT` is read
+        at import time and `delivery_record` imports the resolved value -- so
+        in-process patching would pin one module and miss the other, and the
+        suite's own import cache would make the result order-dependent. This is
+        the rule in `.claude/rules/engine.md`: anything asserting on import
+        graphs or env vars runs in a subprocess.
+        """
+        repo = Path(__file__).resolve().parents[1]
+        env = dict(os.environ)
+        env["MLB_DFS_ARTIFACT_ROOT"] = str(tmp)
+        env["PYTHONPATH"] = str(repo) + os.pathsep + env.get("PYTHONPATH", "")
+        env["PYTHONHASHSEED"] = "0"
+        return subprocess.run([sys.executable, "-c", script], cwd=str(repo),
+                              capture_output=True, text=True, timeout=120,
+                              env=env)
+
+    def test_a_delivery_writes_a_record_the_three_readers_can_answer_from(self):
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            delivered = self._skeleton(tmp)
+            script = f"""
+import json, sys
+from pathlib import Path
+tmp = Path({str(tmp)!r})
+from mlb_engine.entries.upload_manifest import record_delivery
+record_delivery(date="2026-09-19", delivered_file={str(delivered)!r},
+                contest_type="gpp", slate_tag="1905_5g",
+                contest_ids=[{self.REAL_CID!r}], entries=3,
+                status="candidate", certification="review_grade",
+                controls={{"max_shared_players": 4}}, egress="statsapi 200")
+records = sorted((tmp / "data" / "deliveries" / "2026-09-19").glob("*.json"))
+rec = json.loads(records[0].read_text(encoding="utf-8"))
+
+sys.path.insert(0, str(Path.cwd() / "tools"))
+import awaiting_standings
+entered, invalid = awaiting_standings.scan_entered(
+    tmp / "outputs" / "_absent", deliveries_dir=tmp / "data" / "deliveries")
+
+from mlb_engine.field.field_miner import harvest_own_entry_ids
+ids = harvest_own_entry_ids("2026-09-19", root=tmp)
+
+print(json.dumps({{
+    "n_records": len(records),
+    "name": records[0].name,
+    "sha256": rec["manifest_row"].get("sha256"),
+    "delivered_file": rec["manifest_row"].get("delivered_file"),
+    "n_entries": len(rec["entries"]),
+    "filled": [e["filled"] for e in rec["entries"]],
+    "controls": rec["controls"],
+    "egress": rec["egress"],
+    "entered": sorted(entered),
+    "invalid": sorted(invalid),
+    "entry_ids": ids,
+    "git_dirty_recorded": "git_dirty" in rec["code"],
+}}))
+"""
+            proc = self._run_in_skeleton(script, tmp)
+            self.assertEqual(proc.returncode, 0, proc.stderr[-3000:])
+            got = json.loads(proc.stdout.strip().splitlines()[-1])
+
+            self.assertEqual(got["n_records"], 1, "one delivery, one record")
+            self.assertTrue(got["name"].startswith("1905_5g_"), got["name"])
+            self.assertEqual(len(got["sha256"] or ""), 64,
+                             "the record must carry the delivered sha256, which "
+                             "is the only join a standings export has")
+            # Posix, so a record written on Windows reads in a container.
+            self.assertNotIn("\\", got["delivered_file"])
+            self.assertEqual(got["n_entries"], 3)
+            self.assertEqual(got["filled"], [True, True, True])
+            self.assertEqual(got["controls"], {"max_shared_players": 4})
+            self.assertEqual(got["egress"], "statsapi 200")
+            # Reader 1: the contest reaches the pull list from the record alone,
+            # with no outputs/ tree in existence.
+            self.assertEqual(got["entered"], [self.REAL_CID])
+            self.assertEqual(got["invalid"], [])
+            # Reader 2: Ben's Entry IDs, from the record alone.
+            self.assertEqual(got["entry_ids"], ["90000", "90001", "90002"])
+            self.assertTrue(got["git_dirty_recorded"],
+                            "a delivery built from an uncommitted tree is not "
+                            "reproducible and the record must say so")
+
+    def test_a_refusal_is_recorded_as_a_refusal_with_its_exit_code(self):
+        """A night that shipped nothing is the night the record is worth most.
+
+        Without this, "no delivery on this slate" and "no session ran" are the
+        same absence in the archive, and only one of them is a thing to learn
+        from.
+        """
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            script = f"""
+import json
+from pathlib import Path
+tmp = Path({str(tmp)!r})
+from mlb_engine.entries.delivery_record import write_refusal_record, read_records
+p = write_refusal_record(date="2026-09-19", slate_tag="1905_5g", exit_code=4,
+                         refusal={{"class": "pool_blocker"}}, root=tmp)
+records = read_records(root=tmp, date="2026-09-19")
+print(json.dumps({{"name": Path(p).name, "n": len(records),
+                  "kind": records[0]["kind"],
+                  "exit_code": records[0]["exit_code"],
+                  "refusal": records[0]["refusal"]}}))
+"""
+            proc = self._run_in_skeleton(script, tmp)
+            self.assertEqual(proc.returncode, 0, proc.stderr[-3000:])
+            got = json.loads(proc.stdout.strip().splitlines()[-1])
+            self.assertEqual(got["kind"], "refusal")
+            self.assertEqual(got["exit_code"], 4)
+            self.assertEqual(got["refusal"], {"class": "pool_blocker"})
+            # Timestamp-keyed, because most refusals precede `create_run`.
+            self.assertRegex(got["name"], r"^1905_5g_\d{8}T\d{6}Z\.json$")
+
+    def test_a_record_that_would_carry_a_secret_is_not_written(self):
+        """CLAUDE.md: never log, echo, or write API keys. A TRACKED file is the
+        worst possible place to break that, so the writer scans its own output.
+
+        The key is planted in the subprocess's environment and smuggled into
+        the record through a field the writer copies verbatim. What must come
+        back is no file and the NAME of the variable, never its value.
+        """
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            script = f"""
+import json, os
+from pathlib import Path
+os.environ["THE_ODDS_API_KEY_FAKE"] = "sk-notarealkey-0123456789abcdef"
+tmp = Path({str(tmp)!r})
+from mlb_engine.entries import delivery_record as dr
+p = dr.write_delivery_record(
+    date="2026-09-19",
+    manifest_row={{"slate_tag": "leaky", "run_id": "r1", "delivered_file": "x.csv",
+                  "notes": "pulled with sk-notarealkey-0123456789abcdef"}},
+    root=tmp)
+written = sorted((tmp / "data" / "deliveries").rglob("*.json"))
+print(json.dumps({{"path": p, "written": [str(x) for x in written]}}))
+"""
+            proc = self._run_in_skeleton(script, tmp)
+            self.assertEqual(proc.returncode, 0, proc.stderr[-3000:])
+            got = json.loads(proc.stdout.strip().splitlines()[-1])
+            self.assertIsNone(got["path"], "the write must be refused")
+            self.assertEqual(got["written"], [], "nothing may reach disk")
+            self.assertIn("THE_ODDS_API_KEY_FAKE", proc.stdout,
+                          "the refusal must name the variable")
+            self.assertNotIn("sk-notarealkey", proc.stdout,
+                             "and must never echo its value")
+
+    def test_the_same_bytes_recorded_twice_is_one_record_and_still_written(self):
+        """`record_delivery` has TWO return paths and both must mirror.
+
+        Recording the same bytes again takes the early branch that updates the
+        prior manifest row in place -- which is what preflight's promotion to
+        `upload_ready` and the re-promotion path both do. Mirroring from the
+        append path alone would leave that branch writing nothing, so the
+        record would carry `candidate` forever, or nothing at all if the first
+        write had failed. The record is deleted here between the two calls, so
+        only the second path can put it back.
+        """
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            delivered = self._skeleton(tmp)
+            script = f"""
+import json
+from pathlib import Path
+tmp = Path({str(tmp)!r})
+folder = tmp / "data" / "deliveries" / "2026-09-19"
+from mlb_engine.entries.upload_manifest import record_delivery
+kw = dict(date="2026-09-19", delivered_file={str(delivered)!r},
+          contest_type="gpp", slate_tag="1905_5g",
+          contest_ids=[{self.REAL_CID!r}], entries=3)
+record_delivery(status="candidate", **kw)
+first = sorted(folder.glob("*.json"))
+for p in first:
+    p.unlink()
+record_delivery(status="upload_ready", **kw)
+again = sorted(folder.glob("*.json"))
+from mlb_engine.field.field_miner import harvest_own_entry_ids
+print(json.dumps({{
+    "first": [p.name for p in first],
+    "again": [p.name for p in again],
+    "status": json.loads(again[0].read_text(encoding="utf-8"))["manifest_row"]["status"],
+    "ids": harvest_own_entry_ids("2026-09-19", root=tmp)}}))
+"""
+            proc = self._run_in_skeleton(script, tmp)
+            self.assertEqual(proc.returncode, 0, proc.stderr[-3000:])
+            got = json.loads(proc.stdout.strip().splitlines()[-1])
+            self.assertEqual(len(got["first"]), 1)
+            self.assertEqual(got["again"], got["first"],
+                             "the same-bytes branch must rewrite the same one "
+                             "record, not a second one and not none")
+            self.assertEqual(got["status"], "upload_ready")
+            self.assertEqual(got["ids"], ["90000", "90001", "90002"])
+
+    def test_nothing_in_a_record_claims_roi_or_a_probability(self):
+        """CLAUDE.md's truthful-labels wall, checked on the artifact rather than
+        on the source that writes it."""
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            delivered = self._skeleton(tmp)
+            script = f"""
+from pathlib import Path
+tmp = Path({str(tmp)!r})
+from mlb_engine.entries.upload_manifest import record_delivery
+record_delivery(date="2026-09-19", delivered_file={str(delivered)!r},
+                contest_type="gpp", slate_tag="1905_5g",
+                contest_ids=[{self.REAL_CID!r}], entries=3)
+for p in (tmp / "data" / "deliveries").rglob("*.json"):
+    print(p.read_text(encoding="utf-8"))
+"""
+            proc = self._run_in_skeleton(script, tmp)
+            self.assertEqual(proc.returncode, 0, proc.stderr[-3000:])
+            body = proc.stdout.lower()
+            self.assertIn("schema_version", body, "the record must have printed")
+            for banned in ("roi", "win rate", "cash rate", "profitab",
+                           "expected value"):
+                # "never ROI, win rate, cash rate, or probability" is the
+                # labels line itself; it states the wall rather than crossing
+                # it, so it is the one permitted occurrence.
+                hits = [ln for ln in body.splitlines()
+                        if banned in ln and '"labels"' not in ln]
+                self.assertEqual(hits, [], f"{banned!r} in a delivery record")
+
+    def test_the_salary_tier_matches_on_content_not_on_name(self):
+        """R49's authoritative tier resolves through `runs/<run_id>/inputs/`,
+        which dies with the container, so on the default host it answers nothing
+        and the resolver falls through to scoring -- the exact case R49 built
+        that tier to avoid. The record carries the input HASHES instead.
+
+        Content and not name, because a bare `DKSalaries.csv` from one
+        draftgroup silently answers for another; the decoy below is that file.
+        """
+        import hashlib
+        from mlb_engine.field.field_miner import record_salary_candidates
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            date = "2026-09-19"
+            archive = tmp / "data" / "archive" / date
+            archive.mkdir(parents=True)
+            real = archive / "DKSalaries_5g.csv"
+            real.write_text("Name,ID\nA,1\n", encoding="utf-8")
+            decoy = archive / "DKSalaries.csv"       # right name, wrong slate
+            decoy.write_text("Name,ID\nB,2\n", encoding="utf-8")
+            digest = hashlib.sha256(real.read_bytes()).hexdigest()
+
+            folder = tmp / "data" / "deliveries" / date
+            folder.mkdir(parents=True)
+            (folder / "1905_5g_r1.json").write_text(json.dumps({
+                "schema_version": 1, "kind": "delivery", "date": date,
+                "manifest_row": {"contest_ids": ["123456789"], "status": "candidate"},
+                "run": {"inputs": {"DKSalaries.csv": {"sha256": digest}}},
+            }), encoding="utf-8")
+
+            got = record_salary_candidates(tmp, date)
+            self.assertEqual([Path(p).name for p in got], ["DKSalaries_5g.csv"])
+            self.assertEqual(record_salary_candidates(tmp, date, "999999999"), [],
+                             "a contest the record does not cover gets nothing")
+            self.assertEqual(record_salary_candidates(tmp, "2026-01-01"), [],
+                             "no record for the date is an ordinary empty tier")
+
+    def test_the_record_tier_answers_before_the_in_date_tier(self):
+        """Order is the point, and it is pinned by RUNNING the tiering function.
+
+        The tiers are tried in sequence and the first that yields a file wins;
+        they are never pooled, because pooling is what lets a same-family
+        superset outrank the authoritative file (R49). Only the SCORER is
+        stubbed here -- the tier producers and the loop are the real ones.
+        """
+        import hashlib
+        from mlb_engine.field import field_miner
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            date = "2026-09-19"
+            archive = tmp / "data" / "archive" / date
+            archive.mkdir(parents=True)
+            real = archive / "DKSalaries_5g.csv"
+            real.write_text("Name,ID\nA,1\n", encoding="utf-8")
+            superset = archive / "DKSalaries.csv"
+            superset.write_text("Name,ID\nA,1\nB,2\n", encoding="utf-8")
+            folder = tmp / "data" / "deliveries" / date
+            folder.mkdir(parents=True)
+            (folder / "1905_5g_r1.json").write_text(json.dumps({
+                "schema_version": 1, "kind": "delivery", "date": date,
+                "manifest_row": {"contest_ids": ["123456789"], "status": "candidate"},
+                "run": {"inputs": {"DKSalaries.csv": {
+                    "sha256": hashlib.sha256(real.read_bytes()).hexdigest()}}},
+            }), encoding="utf-8")
+
+            def stub(standings, candidates):
+                # Whatever a tier offers, the first one is taken; the ORDER of
+                # the tiers is the thing under test.
+                return {"path": candidates[0], "reason": "stubbed", "scored": []}
+
+            with unittest.mock.patch.object(field_miner, "resolve_salary_file", stub):
+                got = field_miner.resolve_salary_tiered({}, tmp, date, "123456789")
+            self.assertEqual(got["tier"], "delivery_record")
+            self.assertEqual(Path(got["path"]).name, "DKSalaries_5g.csv")
+            self.assertEqual([a["tier"] for a in got["attempts"]], ["delivery_record"])
+
+    def test_a_refused_build_records_the_refusal_from_build_slate(self):
+        """Twelve of the thirteen refusal returns in `build_slate.py` are
+        `return N, {}` and the brief site cannot see them, so the record is
+        written by a wrapper at `__main__` rather than at each site."""
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            repo = Path(__file__).resolve().parents[1]
+            env = dict(os.environ)
+            env["MLB_DFS_ARTIFACT_ROOT"] = str(tmp)
+            env["PYTHONHASHSEED"] = "0"
+            proc = subprocess.run(
+                [sys.executable, str(repo / "skills" / "generate-lineups" /
+                                     "scripts" / "build_slate.py"),
+                 "--date", "1999-01-01",
+                 "--salary", str(tmp / "absent_DKSalaries.csv"),
+                 "--entries", str(tmp / "absent_DKEntries.csv")],
+                cwd=str(repo), capture_output=True, text=True, timeout=300, env=env)
+            self.assertNotEqual(proc.returncode, 0,
+                                "absent inputs must refuse")
+            records = sorted((tmp / "data" / "deliveries" / "1999-01-01").glob("*.json"))
+            self.assertEqual(len(records), 1,
+                             f"no refusal record written; stderr={proc.stderr[-1500:]}")
+            rec = json.loads(records[0].read_text(encoding="utf-8"))
+            self.assertEqual(rec["kind"], "refusal")
+            self.assertEqual(rec["exit_code"], proc.returncode)
+            self.assertTrue(rec["refusal"].get("note"),
+                            "the record must say what the exit code MEANT; a "
+                            "bare integer is not evidence a year later")
+
+    def test_a_test_run_never_publishes_a_record_into_the_real_tree(self):
+        """Three invocations, one isolation. The gate sets
+        `MLB_DFS_ARTIFACT_ROOT` (R338 repair 4) and `tests/conftest.py` sets it
+        for pytest; a bare `python -m unittest` had neither, so the front-door
+        and golden-replay tests published into the real `outputs/`. That was
+        invisible while `outputs/` was all they wrote, because it is gitignored.
+        `data/deliveries/` is TRACKED, so the same tests started leaving twenty
+        records in `git status`.
+
+        Two halves, because either alone passes for the wrong reason: the root
+        in force is not this repo, AND the writer actually resolves to it.
+        """
+        from mlb_engine.entries import delivery_record as dr
+        repo = Path(__file__).resolve().parents[1]
+        resolved = dr.deliveries_dir().resolve()
+        self.assertFalse(
+            resolved.is_relative_to(repo),
+            f"a test run resolves its deliveries directory to {resolved}, "
+            f"inside the repo; set MLB_DFS_ARTIFACT_ROOT before importing "
+            f"mlb_engine.entries.upload_manifest")
+        # `conftest` patches `upload_manifest.REPO_ROOT` in process, so the
+        # attribute has to be read at call time. Binding it at import took a
+        # COPY and that patch never reached this module.
+        with unittest.mock.patch.object(
+                dr._upload_manifest, "REPO_ROOT", Path("/nowhere/at/all")):
+            self.assertEqual(dr.deliveries_dir(),
+                             Path("/nowhere/at/all") / dr.DELIVERIES_DIR)
+
+    def test_the_git_sha_is_read_from_the_code_and_not_from_the_artifact_root(self):
+        """An isolated artifact root is a temp directory with no git in it. The
+        sha recorded is the sha of the ENGINE that built the portfolio, so it is
+        read from the module's own location; reading it from the artifact root
+        would silently record `git_sha: null` on every gate-isolated run and,
+        worse, on any host that pointed the artifact root elsewhere."""
+        from mlb_engine.entries import delivery_record as dr
+        with unittest.mock.patch.object(
+                dr._upload_manifest, "REPO_ROOT", Path(tempfile.gettempdir())):
+            identity = dr.code_identity()
+        self.assertIsNotNone(identity["git_sha"],
+                             "the code sha must survive an isolated artifact root")
+        self.assertEqual(len(identity["git_sha"]), 40)
+        self.assertIsNotNone(identity["git_dirty"])
+
+    def test_a_record_never_fails_a_delivery(self):
+        """The contract in the module docstring. A delivery that could be
+        broken by its own bookkeeping is a worse system than one with no
+        bookkeeping, so the mirror swallows everything."""
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            delivered = self._skeleton(tmp)
+            script = f"""
+import json
+from pathlib import Path
+from mlb_engine.entries import upload_manifest as um
+from mlb_engine.entries import delivery_record as dr
+def boom(**kw):
+    raise RuntimeError("disk gone")
+dr.write_delivery_record = boom
+row = um.record_delivery(date="2026-09-19", delivered_file={str(delivered)!r},
+                         contest_type="gpp", slate_tag="1905_5g",
+                         contest_ids=[{self.REAL_CID!r}], entries=3)
+print(json.dumps({{"sha256_len": len(row.get("sha256") or ""),
+                   "status": row.get("status")}}))
+"""
+            proc = self._run_in_skeleton(script, tmp)
+            self.assertEqual(proc.returncode, 0, proc.stderr[-3000:])
+            got = json.loads(proc.stdout.strip().splitlines()[-1])
+            self.assertEqual(got["sha256_len"], 64,
+                             "the manifest row must still be returned intact")
+            self.assertEqual(got["status"], "candidate")
+
 
 class SolverProbeExitContractTests(unittest.TestCase):
     """R364, 2026-09-19. The probe crashed where its contract says it refuses.
@@ -10639,6 +11098,14 @@ class MinerMoneyHonestyTests(unittest.TestCase):
                           "the error must name the missing manifest")
             self.assertIn("--my-entry-ids", done.stderr,
                           "and the way out of it")
+            # R369: "make <manifest> resolvable" is impossible advice on the
+            # host that runs most sessions, because `outputs/` is gitignored and
+            # its container is gone. The remedy that survives is named FIRST.
+            self.assertIn("data/deliveries", done.stderr,
+                          "and the remedy that works on a cloud host")
+            self.assertLess(done.stderr.index("data/deliveries"),
+                            done.stderr.index("upload_manifest.json"),
+                            "the durable remedy is named before the ephemeral one")
 
     def test_every_money_flag_is_covered_and_named(self):
         from mlb_engine.field import field_miner as fm
@@ -11367,8 +11834,12 @@ class MinerManifestFirstSalaryTests(unittest.TestCase):
             tiered = fm.resolve_salary_tiered(st, root, slate_date="2026-08-06",
                                               contest_id="777777777")
             self.assertEqual(tiered["tier"], "repo_wide")
+            # R369 put `delivery_record` in front: the manifest tier resolves
+            # through `runs/<run_id>/inputs/`, which is gitignored and dies with
+            # a cloud container, so on the host that runs most sessions the
+            # authoritative tier cannot answer at all.
             self.assertEqual([a["tier"] for a in tiered["attempts"]],
-                             ["manifest", "in_date", "repo_wide"],
+                             ["delivery_record", "manifest", "in_date", "repo_wide"],
                              "the tier order is the contract")
 
     def test_every_tier_failing_leaves_standings_only_with_all_three_reasons(self):

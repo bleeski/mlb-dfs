@@ -589,6 +589,53 @@ def default_salary_candidates(root: Path) -> List[str]:
     return [str(p) for p in sorted(set(seen), key=lambda p: -p.stat().st_mtime)]
 
 
+def record_salary_candidates(root: Path, slate_date: str,
+                             contest_id: str = "") -> List[str]:
+    """Salary files matching the sha256 the TRACKED delivery record names (R369).
+
+    The `manifest` tier below resolves through `runs/<run_id>/inputs/`, which is
+    gitignored and dies with a cloud container, so on that host the
+    authoritative tier answers nothing and the resolver falls back to scoring --
+    exactly the case R49 built this tier to avoid.
+
+    The record carries the input HASHES rather than the files, so this matches
+    by content across the two places a slate's salary export durably lives.
+    Content, not name: a bare `DKSalaries.csv` from one draftgroup silently
+    answers for another, which is the defect `stage_salary_for_delivery` names.
+    """
+    wanted: set = set()
+    try:
+        from mlb_engine.entries.delivery_record import read_records
+        for record in read_records(root=root, date=str(slate_date)):
+            if record.get("kind") != "delivery":
+                continue
+            row = record.get("manifest_row") or {}
+            if contest_id and str(contest_id) not in {
+                    str(c) for c in (row.get("contest_ids") or [])}:
+                continue
+            for name, meta in ((record.get("run") or {}).get("inputs") or {}).items():
+                if "salar" in str(name).lower() and (meta or {}).get("sha256"):
+                    wanted.add(str(meta["sha256"]))
+    except Exception:  # noqa: BLE001 - the tiers below still run
+        return []
+    if not wanted:
+        return []
+    out: List[str] = []
+    for folder in (root / "data" / "archive" / str(slate_date),
+                   root / "data" / "slates" / str(slate_date)):
+        if not folder.is_dir():
+            continue
+        for path in sorted(folder.glob("DKSalaries*.csv")):
+            try:
+                import hashlib
+                digest = hashlib.sha256(path.read_bytes()).hexdigest()
+            except OSError:
+                continue
+            if digest in wanted:
+                out.append(str(path))
+    return out
+
+
 def manifest_salary_candidates(root: Path, slate_date: str,
                                contest_id: str = "") -> List[str]:
     """The salary files the upload manifest says this contest was built from (R49).
@@ -672,6 +719,8 @@ def resolve_salary_tiered(standings: Dict[str, Any], root: Path,
     root = Path(root)
     tiers: List[Tuple[str, List[str]]] = []
     if slate_date:
+        tiers.append(("delivery_record",
+                      record_salary_candidates(root, slate_date, contest_id)))
         tiers.append(("manifest", manifest_salary_candidates(root, slate_date, contest_id)))
         tiers.append(("in_date", in_date_salary_candidates(root, slate_date)))
     tiers.append(("repo_wide", default_salary_candidates(root)))
@@ -1308,15 +1357,49 @@ def score_duplication_risk(
 # Opponent-recurrence registry (EntryName usernames across archived contests)
 # ---------------------------------------------------------------------------
 
-def harvest_own_entry_ids(slate_date: str, contest_id: str = "") -> List[str]:
-    """Ben's Entry IDs for a contest, read from that date's upload manifest.
+def harvest_own_entry_ids(slate_date: str, contest_id: str = "",
+                          root: Optional[Path] = None) -> List[str]:
+    """Ben's Entry IDs for a contest, from the tracked record or the manifest.
 
     The manifest records every delivered file and the contests it covered, so
     the delivered file itself is the record of which Entry IDs were entered
     where. Asking the operator to retype them at archival time is how this step
     gets skipped.
+
+    R369, 2026-09-19: the TRACKED delivery record is tried first, and on the
+    host that now runs most sessions it is the only thing that can answer.
+    `outputs/` is gitignored and a cloud container is reclaimed at session end,
+    so both the manifest and the delivered file it names are gone by the time a
+    standings export arrives -- and this function silently returned [] for
+    every cloud build, which reads as "he entered nothing" rather than as
+    "the evidence did not survive".
+
+    `root` exists so a test can point this at a temp tree; deriving it from
+    `__file__` alone is the pattern `.claude/rules/engine.md` warns about.
     """
-    root = Path(__file__).resolve().parents[2]
+    root = Path(root) if root is not None else Path(__file__).resolve().parents[2]
+    wanted_pre = str(contest_id or "").strip()
+    try:
+        from mlb_engine.entries.delivery_record import read_records
+        from_records: List[str] = []
+        for record in read_records(root=root, date=str(slate_date)):
+            if record.get("kind") != "delivery":
+                continue
+            row = record.get("manifest_row") or {}
+            if row.get("status") == "superseded":
+                continue
+            if wanted_pre and wanted_pre not in {
+                    str(c) for c in (row.get("contest_ids") or [])}:
+                continue
+            for entry in record.get("entries") or []:
+                if wanted_pre and str(entry.get("contest_id")) != wanted_pre:
+                    continue
+                if entry.get("entry_id"):
+                    from_records.append(str(entry["entry_id"]))
+        if from_records:
+            return sorted(set(from_records))
+    except Exception:  # noqa: BLE001 - fall through to the manifest
+        pass
     manifest_path = root / "outputs" / str(slate_date) / "upload_manifest.json"
     try:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -2099,12 +2182,20 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         ("--paid-places", args.paid_places),
         ("--paid-places-from", args.paid_places_from)) if value is not None]
     if money_flags and not own_ids:
-        manifest = (Path(__file__).resolve().parents[2] / "outputs"
-                    / str(args.slate_date or "<slate-date>") / "upload_manifest.json")
+        root = Path(__file__).resolve().parents[2]
+        date = str(args.slate_date or "<slate-date>")
+        manifest = root / "outputs" / date / "upload_manifest.json"
+        # R369: the N+1th site in this class. The remedy named here was
+        # "make <manifest> resolvable", which is impossible advice on the host
+        # that now runs most sessions -- `outputs/` is gitignored and its
+        # container is gone. The tracked record is named first because it is
+        # the one that survives.
+        record = root / "data" / "deliveries" / date
         print(f"ERROR  {', '.join(money_flags)} supplied but no own entry ids "
               f"resolved, so nothing would consume them and this mine would "
               f"record no fee, no winnings and no paid line while exiting 0.\n"
-              f"       Pass --my-entry-ids explicitly (source them from the entry "
+              f"       Commit the build's delivery record under {record} (R369), "
+              f"pass --my-entry-ids explicitly (source them from the entry "
               f"history's Entry_Key column), or make {manifest} resolvable.",
               file=sys.stderr)
         return EXIT_MONEY_WITHOUT_OWN_ENTRIES
