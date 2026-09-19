@@ -29,7 +29,57 @@ the things a program cannot probe.
 | **Where the repo lives** | fresh clone, reclaimed when the session ends | Ben's disk | a mounted device VM |
 | **DK files in** | attached in chat, under `/mnt/user-data` | Ben's Downloads folder | the container uploads path |
 | **Deliverable out** | handed back into the conversation | on disk | committed to the mount |
-| **Claims mutex** | container-local, means nothing | real | real |
+| **Claims mutex** | container-local, means nothing (`claim.py` says so, R359) | real | real |
+| **Secrets** | environment variables on the cloud environment ONLY | `REPO/.env` or the environment | `REPO/.env` |
+| **Egress** | measured per session, never assumed (R367) | open | measured per session |
+
+## Secrets
+
+`repo_env.resolve_secret` looks in exactly two places: the process environment,
+then `<repo>/.env`. `.env` is gitignored, so **on a cloud container it can never
+exist** -- the clone is fresh every session. A key must therefore be set as an
+environment variable on the cloud environment itself, and nothing in the repo
+can do that for you.
+
+The live consequence, unchanged until it is: `THE_ODDS_API_KEY` does not resolve
+in a cloud container, so F1 (the implied-team-total factor) is neutral
+slate-wide on every build run there. `enrichment.counts.f1_games_priced` reads 0
+and the brief says so; read it rather than assuming F1 was live.
+
+Two documents asserted the opposite from the Cowork era and were corrected or
+retired in R368: `docs/cowork_migration_handoff.md` ("`.env` exists at the repo
+root with a real key") is now in `docs/legacy/`, and `docs/cowork_sandbox.md`'s
+`GH_PAT` line is scoped to the host it is true on.
+
+## Egress
+
+**Measured, never asserted.** `python tools/env_probe.py --egress` prints one
+line naming what this host reached just now, and the SessionStart hook prints it
+at the top of every session. Six hosts, concurrent, capped at about ten seconds,
+with the CLIENT named per host because it matters: FanGraphs answers 403 to
+urllib's fingerprint and 200 to curl (R317(a)).
+
+Why it is measured rather than written down: three places in this repo recorded
+three different answers for the same two hosts, and each was true where it was
+taken -- `mlb_engine/intake/paste_odds.py` says the odds API is proxy-gated
+(R236), `skills/generate-lineups/SKILL.md` records it answering 200 (R316), and
+the 2026-09-18 build fragment records 403. Egress belongs to the host and the
+environment's network policy, not to the repository.
+
+A `401` from the odds API is REACHABLE-without-a-key, which is the ordinary
+state here; it is not a block. Nothing in this probe touches DraftKings, and
+nothing ever will: that wall is absolute and those reads are Ben's, by hand.
+
+## The call-budget escape hatch
+
+`MLB_DFS_CALL_BUDGET_S` is read FIRST by `repo_env.call_budget_s()` and is the
+supported way to plan a deliberately long call. It exists because the automatic
+version is unsafe: `declared_ceiling_s` reads `BASH_DEFAULT_TIMEOUT_MS`, which is
+what a call gets when the caller passes **no explicit timeout**, while
+`BASH_MAX_TIMEOUT_MS` is merely the largest a caller may request. Resolving the
+budget from the maximum would plan 1260s of work into a call that gets killed at
+900s, losing the whole call. So the hatch is explicit and deliberate, and it is
+the right mechanism rather than a limitation to engineer around.
 
 ## The cloud container is the default, and it is ephemeral
 

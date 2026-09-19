@@ -792,7 +792,17 @@ EXPECTED_SUITE_COUNTS = {
     # directory (the sync_check import defect, one tool over); three that
     # CLAUDE.md defers every budget question to `call_budget_s()`, names
     # three hosts, and that no rule still calls `/tmp` or `rm` Cowork-only.
-    "tests.test_core": 1327,
+    # R364+R367+R368+R365, 2026-09-19: 1327 -> 1341, CC-A5's fourteen --
+    # four that solver_probe refuses at the contract's exit 4 instead of
+    # crashing at 1 (missing salary, no arguments, wrong geometry, and the
+    # docstring promising no exit 1); six on the egress probe (every target
+    # once with its client named, a raising probe reading as a status, a
+    # timeout distinguished from unreachable, a 401 as reachable, no DK
+    # target, and the hook printing the line); four that the retired
+    # instructions are archived with banners, MANIFEST.md stays put and
+    # points at its archive, MLB_Classic.md stops contradicting the bank
+    # cap, and docs/hosts.md answers secrets, egress and the budget hatch.
+    "tests.test_core": 1341,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps
@@ -1009,7 +1019,11 @@ EXPECTED_SUITE_COUNTS = {
     # believed, a silent host still getting the documented 130.0 floor,
     # the MLB_DFS_CALL_BUDGET_S hatch winning, and a stated ceiling not
     # being raised to meet an unstated budget.
-    "tests.test_showdown": 224,
+    # R373, 2026-09-19: 224 -> 228, the four that pin `favorite_basis` --
+    # named as an alphabetical tiebreak with no market, mirroring a real
+    # basis when one exists, still a tiebreak when a market prices the
+    # game exactly even, and carried into the brief beside the label.
+    "tests.test_showdown": 228,
     # R96, 2026-08-11: 141 -> 162, the twenty-one tests that pin the delivery
     # path. A `grew` verdict is the one case where moving a pin is correct.
     # R46 round 2, 2026-08-12: 162 -> 168, the six that pin the PARTIAL side.

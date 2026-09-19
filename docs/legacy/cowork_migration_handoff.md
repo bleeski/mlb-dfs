@@ -1,3 +1,18 @@
+> **RETIRED 2026-09-19 under R368, and moved here from `docs/`.** This file
+> opened with a "Read order for the next session" and told it to run
+> `pip install -r requirements.txt --break-system-packages` -- a command `.claude/settings.json` now DENIES, because the
+> supported install is `python tools/env_probe.py --install --venv` against
+> `requirements.lock` (R353). Its `.env` paragraph is false on the host that now
+> runs most sessions: a cloud container is a fresh clone and `.env` is
+> gitignored, so the key can only come from an environment variable
+> (`docs/hosts.md`, Secrets). Its network section was measured on a Cowork
+> device VM in July, and egress is now measured per session
+> (`python tools/env_probe.py --egress`, R367).
+>
+> Kept unedited below as the record of the July 2026 migration. The current
+> authorities are `CLAUDE.md`, `docs/hosts.md` and
+> `skills/generate-lineups/SKILL.md`.
+
 # MLB DFS — Cowork Migration Handoff
 
 Last updated: 2026-07-17, later session. Supersedes the earlier 2026-07-17 end-of-session note on two points: network is now OPEN (was blocked), and a fresh sandbox needs `pip install` before the audit passes. Both are detailed below.

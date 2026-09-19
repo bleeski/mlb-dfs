@@ -1310,6 +1310,72 @@ class PoolBriefBlockTests(unittest.TestCase):
         self.assertEqual(block["teams"], 0)
 
 
+class FavoriteBasisTests(unittest.TestCase):
+    """R373, 2026-09-19. The even-split "favorite" is an alphabetical tiebreak.
+
+    `describe_slate` splits 0.5/0.5 when no market is reachable -- deliberately,
+    because reusing the DK price as a game-state prior would double-count a
+    projection input. Then `fav = max(teams, key=...)` over equal shares returns
+    the first element of a SORTED list, so the favorite is decided by team name,
+    and `favorite` reads like a finding.
+
+    Measured on the 2026-09-17 MIN@LAA build (`2138_1g_sd`, 16 entries):
+    favorite LAA drew 7 templates against underdog MIN's 6, and the delivered
+    team lean was LAA-heavy 8 / MIN-heavy 6 / balanced 2. One entry of sixteen
+    sat on a side the build had no market evidence for.
+
+    Only the REPORTING half is fixed: the label now says what it rests on. The
+    allocation half wants its own measurement and is not taken here.
+    """
+
+    @staticmethod
+    def _df():
+        return pd.DataFrame([
+            {"Team": "LAA", "Player_Key": "a", "Base": 10.0, "Batting_Order": 1.0},
+            {"Team": "LAA", "Player_Key": "sp1", "Base": 20.0,
+             "Batting_Order": float("nan")},
+            {"Team": "MIN", "Player_Key": "b", "Base": 11.0, "Batting_Order": 1.0},
+            {"Team": "MIN", "Player_Key": "sp2", "Base": 21.0,
+             "Batting_Order": float("nan")},
+        ])
+
+    def test_no_market_names_the_tiebreak_rather_than_implying_a_reading(self):
+        shape = st.describe_slate(self._df())
+        self.assertEqual(shape["win_share_basis"], "even_split_no_market_input")
+        self.assertEqual(shape["favorite_basis"],
+                         "alphabetical_tiebreak_no_market_input")
+        # The label is still produced, because downstream templates need a side;
+        # what changed is that it no longer passes for evidence.
+        self.assertEqual(shape["favorite"], "LAA")
+
+    def test_a_real_market_is_not_relabelled_as_a_tiebreak(self):
+        for kwargs, basis in (({"moneyline": {"LAA": -150, "MIN": 130}},
+                               "moneyline_no_vig"),
+                              ({"implied_totals": {"LAA": 5.0, "MIN": 4.0}},
+                               "implied_team_totals")):
+            with self.subTest(basis=basis):
+                shape = st.describe_slate(self._df(), **kwargs)
+                self.assertEqual(shape["win_share_basis"], basis)
+                self.assertEqual(shape["favorite_basis"], basis)
+
+    def test_a_market_that_happens_to_price_the_game_even_is_still_a_tiebreak(self):
+        """A pick'em priced at exactly even is the same epistemic state as no
+        market for the purpose of this label: the shares do not choose a side,
+        so the name does."""
+        shape = st.describe_slate(self._df(), moneyline={"LAA": 100, "MIN": 100})
+        self.assertEqual(shape["win_share_basis"], "moneyline_no_vig")
+        self.assertEqual(shape["favorite_basis"],
+                         "alphabetical_tiebreak_no_market_input")
+
+    def test_the_brief_carries_the_basis_beside_the_label(self):
+        """A reader of `construction.favorite` must be able to see, in the same
+        block, whether it rests on a price."""
+        text = (Path(__file__).resolve().parents[1] / "skills"
+                / "generate-lineups" / "scripts" / "build_slate.py").read_text(
+                    encoding="utf-8")
+        self.assertIn('"favorite_basis": ladder_meta.get("favorite_basis")', text)
+
+
 class GateBudgetIsHostResolvedTests(unittest.TestCase):
     """R358, 2026-09-19. The gate's two defaults were Cowork constants.
 

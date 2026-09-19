@@ -340,6 +340,27 @@ def describe_slate(df: pd.DataFrame,
 
     fav = max(teams, key=lambda t: share[t])
     dog = [t for t in teams if t != fav][0]
+    # R373, 2026-09-19. With equal shares `max` returns the FIRST element of
+    # `teams`, which is sorted, so on the even-split path the "favorite" is
+    # decided by alphabetical order. The comment above is explicit that this
+    # code declines to invent a favorite from salary; this line reinstated one
+    # from the team name, and `favorite` reads like a finding.
+    #
+    # It is not cosmetic: `_template_specs` tags one side `favorite` and the
+    # other `underdog`, and the favorite set draws one more `win_close` entry.
+    # Measured on the 2026-09-17 MIN@LAA build (`2138_1g_sd`, 16 entries):
+    # favorite LAA 7 templates against underdog MIN 6, delivered team lean
+    # LAA-heavy 8 / MIN-heavy 6 / balanced 2. One entry of sixteen moved onto a
+    # side the build had no market evidence for.
+    #
+    # The REPORTING half is fixed here: the label now says what it rests on, so
+    # a reader cannot mistake a tiebreak for a reading. The ALLOCATION half
+    # (splitting the odd entry to a neutral template, alternating it, or
+    # branching `_template_specs` on a null favorite) is deliberately not taken:
+    # it changes construction on every marketless Showdown slate and wants its
+    # own measurement.
+    tied = len({round(float(share[t]), 12) for t in teams}) == 1
+    favorite_basis = "alphabetical_tiebreak_no_market_input" if tied else basis
 
     starters, bands = {}, {}
     for team in teams:
@@ -354,6 +375,7 @@ def describe_slate(df: pd.DataFrame,
             "all": list(hitters.sort_values("Base", ascending=False)["Player_Key"]),
         }
     return {"teams": teams, "favorite": fav, "underdog": dog,
+            "favorite_basis": favorite_basis,
             "win_share": share, "win_share_basis": basis,
             "starters": starters, "bands": bands,
             # A team with no declared starter is a bullpen game or an
@@ -1019,7 +1041,10 @@ def build_thesis_ladder(df: pd.DataFrame, n_entries: int,
             if partition["available"] else {
                 "feasible": None,
                 "reason": "no contest partition; the precondition needs contest sizes"},
-            "win_share_basis": shape["win_share_basis"]}
+            "win_share_basis": shape["win_share_basis"],
+            # R373: carried beside the basis so the brief states whether
+            # `favorite` is a market reading or a tiebreak over team names.
+            "favorite_basis": shape.get("favorite_basis")}
 
 
 def _largest_remainder(weights: Mapping[int, float], n: int) -> Dict[int, int]:

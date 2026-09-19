@@ -92,7 +92,9 @@ never prunes.
 Files Ben attaches to a Cowork chat land in the container's uploads path and are
 invisible to `device_bash`; copy them to the outputs path and commit them to the
 mount with `device_commit_files`. A container clone of the repo is cheap
-(`GH_PAT` in `REPO/.env`) and is how a full audit runs when the mount is dead,
+(`GH_PAT`, read from the environment and then `REPO/.env` -- the file exists on
+THIS host; on a cloud container it never can, see `docs/hosts.md` Secrets, R365)
+and is how a full audit runs when the mount is dead,
 labelled as a container reproduction. Scheduled tasks: none exist as of
 2026-09-15; a scheduled run would be ARCHIVE, would take the ledger and inbox
 claims first, and a claim it cannot take turns the run into a report, never a
