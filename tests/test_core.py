@@ -26038,5 +26038,114 @@ class WashoutControlReportingTests(unittest.TestCase):
             self.assertIn(key, text, key)
 
 
+class PlanStatusTests(unittest.TestCase):
+    """R366. `docs/PROGRESS.md` is GENERATED from the board's roadmap rows.
+
+    The point of generating it is that it cannot drift, and the only thing that
+    makes that true is a test. This repo already carries what happens without
+    one: eighteen ledger fragments unmerged since 2026-08-13 and a Quick Card
+    gate pin about twelve moves stale, both surfaces somebody had to remember to
+    write twice.
+
+    These run the production functions rather than pinning strings on the
+    source (R300), and the synthetic-board cases use a temp root so nothing
+    depends on this checkout's own content (R155).
+    """
+
+    @staticmethod
+    def _mod():
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "plan_status_under_test", REPO / "tools" / "plan_status.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    @staticmethod
+    def _board(rows, pointer="CC-A2, then CC-A1"):
+        head = ("# board\n\n## Execution roadmap (synthetic) -- NEXT: "
+                + pointer + "\n\n### Phase A0 -- the host move\n\n"
+                "| Session ID | Execution Type | Item Name & Detailed Scope | "
+                "Source | Files | Impact | Complexity | Blockers |\n"
+                "| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n")
+        return head + "".join(rows) + "\n"
+
+    @staticmethod
+    def _row(sid, scope):
+        return (f"| **{sid}** | `Standalone` | {scope} | src | files | P1 | "
+                "Low | None |\n")
+
+    def _write(self, tmp, board_text):
+        (tmp / "docs").mkdir(parents=True, exist_ok=True)
+        (tmp / "docs" / "backlog.md").write_text(board_text, encoding="utf-8")
+
+    def test_the_committed_progress_file_matches_the_committed_board(self):
+        """The drift gate itself. A board edit that forgets to regenerate is a
+        RED gate, not a file that quietly describes a queue that moved on."""
+        mod = self._mod()
+        wanted = mod.build(REPO)
+        current = (REPO / "docs" / "PROGRESS.md").read_text(encoding="utf-8")
+        self.assertEqual(
+            current, wanted,
+            "docs/PROGRESS.md is out of date; run `python tools/plan_status.py`")
+        self.assertEqual(mod.main(["--check", "--root", str(REPO)]), 0)
+
+    def test_status_is_read_from_the_row_rather_than_stored(self):
+        mod = self._mod()
+        board = self._board([
+            self._row("CC-X1", "**R001 -- a done thing. DONE 2026-09-19.** tail"),
+            self._row("CC-X2", "**R002 -- an open thing.** tail"),
+        ])
+        with tempfile.TemporaryDirectory() as raw:
+            tmp = Path(raw)
+            self._write(tmp, board)
+            out = mod.build(tmp)
+        self.assertIn("| **CC-X1** | DONE 2026-09-19 |", out)
+        self.assertIn("| **CC-X2** | open |", out)
+        self.assertIn("1 of 2 sessions done.", out)
+
+    def test_a_batch_is_done_only_when_every_one_of_its_rows_is(self):
+        """A half-landed batch reading DONE is the failure mode that matters:
+        the roadmap would say a session is finished while one of its items is
+        still open, and partial landings are normal here."""
+        mod = self._mod()
+        board = self._board([
+            self._row("CC-Y1", "**R003 -- first half. DONE 2026-09-19.** tail"),
+            self._row("CC-Y1", "**R004 -- second half, still open.** tail"),
+        ])
+        with tempfile.TemporaryDirectory() as raw:
+            tmp = Path(raw)
+            self._write(tmp, board)
+            out = mod.build(tmp)
+        self.assertIn("| **CC-Y1** | part 1/2 |", out)
+        self.assertNotIn("DONE 2026-09-19 |", out)
+        self.assertIn("0 of 1 sessions done.", out)
+
+    def test_the_next_pointer_is_carried_and_a_missing_one_is_named(self):
+        mod = self._mod()
+        with tempfile.TemporaryDirectory() as raw:
+            tmp = Path(raw)
+            self._write(tmp, self._board([self._row("CC-Z1", "**R005 -- x.**")],
+                                         pointer="CC-A5, then CC-A6"))
+            self.assertIn("**NEXT:** CC-A5, then CC-A6", mod.build(tmp))
+            self._write(tmp, "# board\n\nno roadmap heading here\n")
+            self.assertIn("no `## Execution roadmap ... NEXT:` heading found",
+                          mod.build(tmp))
+
+    def test_check_exits_2_when_the_board_moved_and_the_file_did_not(self):
+        mod = self._mod()
+        with tempfile.TemporaryDirectory() as raw:
+            tmp = Path(raw)
+            self._write(tmp, self._board([self._row("CC-W1", "**R006 -- x.**")]))
+            self.assertEqual(mod.main(["--root", str(tmp)]), 0)
+            self.assertEqual(mod.main(["--check", "--root", str(tmp)]), 0)
+            self._write(tmp, self._board([
+                self._row("CC-W1", "**R006 -- x.**"),
+                self._row("CC-W2", "**R007 -- newly added row.**"),
+            ]))
+            self.assertEqual(mod.main(["--check", "--root", str(tmp)]), 2)
+
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

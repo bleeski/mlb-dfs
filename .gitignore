@@ -16,6 +16,12 @@ data/slates/*/
 # ad-hoc session scratch
 _scratch_*/
 
+# anchor-splice backups. `.claude/rules/board.md` requires a `.bak` beside the
+# target on every board or changelog splice, so every such session used to leave
+# an untracked file that reads as foreign dirt at the next session's start. The
+# backup is a within-session safety net; git history is the durable one.
+*.md.bak
+
 # generate-lineups iteration scratch (build scripts, review HTML)
 skills/generate-lineups-workspace/
 

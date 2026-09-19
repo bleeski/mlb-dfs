@@ -765,7 +765,13 @@ EXPECTED_SUITE_COUNTS = {
     # session-start inbox line: fragments named, RETAINED counted apart from
     # debt, miner blocks excluded, an empty and a missing inbox both safe, and
     # the line actually reaching full() (R362).
-    "tests.test_core": 1314,
+    # R366, 2026-09-19: 1314 -> 1319, the five that pin docs/PROGRESS.md as
+    # DERIVED from the board -- the drift gate itself (the committed file
+    # equals what the committed board generates), status read from a row
+    # rather than stored, a batch DONE only when every one of its rows is,
+    # the NEXT pointer carried and a missing one named, and --check exiting
+    # 2 when the board moved and the file did not.
+    "tests.test_core": 1319,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps

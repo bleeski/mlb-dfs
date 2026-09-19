@@ -25,6 +25,59 @@ performance claim.
 
 ---
 
+## 2026-09-19 — Decided, not yet shipped
+
+**Ben, 2026-09-19**, approving the cloud audit plan run against `3951675`. The work is carried by roadmap rows **CC-A5** through **CC-A9** in `docs/backlog.md` and by R367-R374 allocated in them. Recorded here because the reasoning is the part that gets lost, and because the plan file that produced it lived at `/root/.claude/plans/`, outside the repo, in a container that is reclaimed.
+
+**The ordering decision, and the one thing that would change it.** The board's `NEXT:` stands: CC-A2, then CC-A1, then CC-A5 onward. Ben's constraint is a usage allowance rather than a budget, so the rows are ordered to be stoppable. If only one working session is available after this one, it should be spent on **CC-A6 (R369)**, the delivery record: it is the only row that repairs a severe defect rather than tidying one, and until it exists no cloud build that ever runs can be graded afterwards.
+
+**What was decided against, each on its merits before any question of cost.** A scheduled Routine for the outcome review: standings still arrive by a manual DraftKings download, so a scheduled run would mostly idle, and CLAUDE.md requires Ben's sign-off before any scheduled task exists. A `Stop` hook to fire the retro: Ben's decision of 2026-09-18 (R362) stands, and "the assistant stopped speaking" is not "a build completed". A third subagent for diff review: `/code-review` already ships and does that job. A GitHub issue or Project board as the tracker: a second surface that a session must remember to write is exactly what produced the eighteen unmerged ledger fragments and the stale Quick Card pin, so the status view is generated instead (R366 below).
+
+**Two things that stay Ben's** and neither is a code change. `THE_ODDS_API_KEY` cannot resolve in a cloud container — `resolve_secret` reads the environment then `<repo>/.env`, and a gitignored `.env` can never be in a fresh clone — so the F1 implied-total factor stays 1.0 slate-wide until it is set as an environment variable on the cloud environment itself. And the same environment settings screen can hold `python tools/env_probe.py --install --venv` as its setup script, which is cached as a filesystem snapshot and would take the locked install off the front of every cold session; `.claude/hooks/session_start_deps.py` stays exactly as it is either way, because it is what makes an uncached container and the other two hosts work.
+
+---
+
+## 2026-09-19 — R366: the plan lands on the board, and the roadmap gets a status view that cannot drift
+
+**Scope.** `tools/plan_status.py` (new), `docs/PROGRESS.md` (new, generated), `docs/greenfield/2026-09-19/DFS_SYSTEM_GREENFIELD_SPEC_2026-09-19.md` (new), `docs/backlog.md` (five roadmap rows, the `NEXT:` pointer, one `### R373` entry), `tools/audit.py` (`EXPECTED_SUITE_COUNTS`), `tests/test_core.py` (`PlanStatusTests` new), `.gitignore`, this file.
+
+**Why.** A cloud audit produced eight findings and a six-row queue, and the artifact carrying them was a plan file outside the repository in a container that gets reclaimed. Nothing about that survives a session boundary, and the repo already had the right place for it: the roadmap tables the SessionStart hook prints and `/dev-session` reads. So the first act was to put the queue there.
+
+**The second half is the part worth arguing with.** `docs/backlog.md` is 1.1 MB, `.claude/rules/board.md` tells every session never to read it whole, and on github.com from a phone it does not open at all. So there was no cheap way to ask "what is open". `tools/plan_status.py` derives `docs/PROGRESS.md` from the roadmap rows: one line per Session ID, phase-grouped, status read from each row's own `DONE <date>` — the form `.claude/rules/board.md` already requires of a completed item — and a batch counted DONE only when every one of its rows is, because a half-landed batch reading DONE is the failure that matters here.
+
+It is GENERATED, and that is the whole design. This repository is carrying eighteen ledger fragments unmerged since 2026-08-13 and a Quick Card gate pin about twelve moves stale, both because a second surface needed a second write that somebody had to remember. A derived file cannot drift: `--check` exits 2 when the file disagrees with the board, `PlanStatusTests` runs that check against the committed tree, and the gate goes red rather than the file quietly describing a queue that moved on.
+
+**What it measured on its first run against the real board, unchanged:** 45 sessions, 6 done. After this commit's rows: 51 and 7.
+
+**The rows.** CC-A5 (R364, R365, R367, R368, R373: the two filed retro items, the egress probe, the obsolete instructions, and the Showdown fragment that had sat unmerged since 2026-09-17), CC-A6 (R369, the delivery record), CC-A7 (R370, R371, the two postmortems), CC-A8 (R344, R372, the QA brief with its agents and hooks), CC-A9 (R374, the bank measurement, conditional). CC-A4 is this commit and reads DONE.
+
+**On R-numbers without `### R` entries.** R367-R372 and R374 are carried by their roadmap rows alone, following the precedent R356, R358 and R359 already set in this same phase; the rows are self-contained and `/dev-session` step 5 reads the row first. R373 got a full `### R373.` entry in Workstream 1 instead, because it is a merged inbox fragment and the Showdown workstream is where a session will look for it.
+
+**R233 grep for the allocation**, so the next session's `grep -oh "R[0-9]\{3\}"` is not surprised:
+
+    $ grep -c "^| \*\*CC-A[4-9]\*\*" docs/backlog.md
+    10
+    $ grep -o "R3[67][0-9]" docs/backlog.md | sort -u | tr '\n' ' '
+    R360 R362 R363 R364 R365 R366 R367 R368 R369 R370 R371 R372 R373 R374
+
+Ten rows across six Session IDs. Five of those hits predate this change (R360
+and R362-R365, already on the board); the nine new ones run R366-R374 and the
+next free number is R375. The first cut of this entry quoted only the nine and
+was wrong about its own grep, which is the defect this convention exists to
+catch.
+
+**Mutation-checked**, all five, each reverted against its fix and expected red, then restored: hand-editing `docs/PROGRESS.md` (the drift gate itself), making the `DONE` pattern never match, counting a batch DONE when any one row is, dropping the `NEXT:` pointer, and making `--check` always pass. Five reds, tree restored green. The first attempt at the `DONE` mutation did not apply — the `sed` pattern missed and the test passed against unmutated code — which is exactly the false pass the rule exists to catch, so it was redone through a Python edit that asserts its anchor.
+
+**Gate.**
+
+    PASS  v2.26.0  40 modules  2170 tests  5 skipped  {test_core 1319/1319 (4 skipped) skipped_in_place; test_showdown 219/219 (1 skipped) skipped_in_place}
+
+2165 -> 2170. The five skips are the pre-existing host conditions this container has always reported (no vendored `.pylibs/scipy`, no `.env`, two unstaged 2026-08-16 salary files, no Classic salary on disk), unchanged by this work; the bracketed warnings describe the host and not the tree (R348).
+
+**One line of `.gitignore` rode with it.** `.claude/rules/board.md` requires a `.bak` beside the target on every anchor-splice, and nothing ignored it, so every session that edited the board or this file left an untracked artifact that reads as foreign dirt at the next session's start. `*.md.bak` now covers it; the backup stays a within-session safety net and git history remains the durable one.
+
+Pin moved `tests.test_core` 1314 -> 1319. Golden histogram unmoved: no engine code was touched.
+
 ## 2026-09-18 — R360, R361, R362: the per-attempt search budget follows the host, the deps hook stops hiding pip's error, and the inbox is visible at session start
 
 **Scope.** `tools/autobuild.py`, `.claude/hooks/session_start_deps.py`, `.claude/hooks/session_start.py`, `.claude/skills/dev-session/SKILL.md`, `skills/generate-lineups/SKILL.md`, `skills/generate-lineups/references/retro.md` (new), `tools/audit.py` (`EXPECTED_SUITE_COUNTS`), `tests/test_core.py` (`SessionStartDepsDiagnosticTests`, `SessionStartInboxTests` new; two added to `SupervisorHardeningTests`), `docs/backlog.md`, this file.
