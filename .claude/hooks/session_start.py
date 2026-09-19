@@ -137,6 +137,25 @@ def pending_fragments() -> str:
     return "; ".join(parts) if parts else "none"
 
 
+def outcome_reviews_due() -> str:
+    """Deliveries nobody has graded yet (R370).
+
+    A delivery record with no `.outcome.json` beside it is a portfolio whose
+    standings may already be sitting in `data/archive/` with nothing having
+    joined the two. That state is invisible unless something counts it, which is
+    how 584 mined contests ended up carrying no run_id and no portfolio: the
+    grading step was always somebody's memory. This is the reconciliation line.
+
+    Never raises: a hook that fails takes the whole briefing with it.
+    """
+    try:
+        sys.path.insert(0, str(ROOT / "tools"))
+        import outcome_review  # noqa: PLC0415 - deliberately lazy, like egress
+        return outcome_review.pending_line(ROOT)
+    except Exception as exc:  # noqa: BLE001
+        return f"outcome review due: not measured ({type(exc).__name__})"
+
+
 def egress() -> str:
     """What this host can reach right now, measured rather than asserted.
 
@@ -193,6 +212,7 @@ def full() -> str:
         *["  " + l for l in git("log", f"--format=%h %<({SUBJECT_WIDTH},trunc)%s", f"-{LOG_LINES}").splitlines()],
         "backlog: " + next_pointer(),
         "inbox (fragments awaiting their owning role): " + pending_fragments(),
+        outcome_reviews_due(),
         "git locks: " + lock_state,
         egress(),
         "next: take your role's claim (python tools/claim.py take engine --role DEV --scope \"...\"), "

@@ -5,9 +5,9 @@ hand-edit: `--check` runs in the gate and fails when this file and the board
 disagree.** The board is the source of truth; this is the one-screen view of it,
 because the board itself is 1.1 MB and cannot be read on a phone.
 
-**NEXT:** CC-A7, then CC-A8, then CC-3 (CC-0/CC-1/CC-2 DONE 2026-09-15; CC-A0 and CC-A3 DONE 2026-09-17; CC-A4/CC-A1/CC-A2/CC-A5/CC-A6 DONE 2026-09-19; CC-A9 conditional on CC-A5..CC-A8)
+**NEXT:** CC-A8, then CC-3 (CC-0/CC-1/CC-2 DONE 2026-09-15; CC-A0 and CC-A3 DONE 2026-09-17; CC-A4/CC-A1/CC-A2/CC-A5/CC-A6/CC-A7 DONE 2026-09-19; CC-A9 conditional on CC-A5..CC-A8)
 
-11 of 51 sessions done.
+12 of 51 sessions done.
 
 
 ### Phase A0 -- the host move: what a cloud session needs that the tree does not yet have (2026-09-17, Ben)
@@ -21,7 +21,7 @@ because the board itself is 1.1 MB and cannot be read on a phone.
 | **CC-A4** | DONE 2026-09-19 | R366 -- the plan for CC-A5..CC-A9 lands on the board, and the roadmap gets a one-screen status… |
 | **CC-A5** | DONE 2026-09-19 | R364 + R365 -- the two items the 2026-09-17 retro filed (+2 more) |
 | **CC-A6** | DONE 2026-09-19 | R369 -- the delivery record: a cloud build can be graded |
-| **CC-A7** | open | R370 -- the outcome postmortem: grade a delivery against the standings that already exist (+1 more) |
+| **CC-A7** | DONE 2026-09-19 | R370 -- the outcome postmortem: grade a delivery against the standings that already exist (+1 more) |
 | **CC-A8** | open | R344 -- the agentic adversarial QA pass, with its standing brief (+1 more) |
 | **CC-A9** | open | R374 -- measure the candidate bank before touching it, then retain or move the cap. CONDITIONAL… |
 
