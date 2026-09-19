@@ -5,9 +5,9 @@ hand-edit: `--check` runs in the gate and fails when this file and the board
 disagree.** The board is the source of truth; this is the one-screen view of it,
 because the board itself is 1.1 MB and cannot be read on a phone.
 
-**NEXT:** CC-A2, then CC-A1, then CC-A5 -> CC-A8, then CC-3 (CC-0/CC-1/CC-2 DONE 2026-09-15; CC-A0 and CC-A3 DONE 2026-09-17; CC-A4 DONE 2026-09-19; CC-A9 conditional on CC-A5..CC-A8)
+**NEXT:** CC-A5, then CC-A6 -> CC-A8, then CC-3 (CC-0/CC-1/CC-2 DONE 2026-09-15; CC-A0 and CC-A3 DONE 2026-09-17; CC-A4/CC-A1/CC-A2 DONE 2026-09-19; CC-A9 conditional on CC-A5..CC-A8)
 
-7 of 51 sessions done.
+9 of 51 sessions done.
 
 
 ### Phase A0 -- the host move: what a cloud session needs that the tree does not yet have (2026-09-17, Ben)
@@ -15,8 +15,8 @@ because the board itself is 1.1 MB and cannot be read on a phone.
 | Session | Status | Item |
 | :--- | :--- | :--- |
 | **CC-A0** | DONE 2026-09-17 | R353 -- a cloud session can install, gate, and ship |
-| **CC-A1** | open | R356 -- CLAUDE.md's `## Hosts` / `## Sandbox` still name two hosts, and two statements are meas… (+1 more) |
-| **CC-A2** | open | R359 -- the claims mutex is FALSE in a cloud container, which is worse than absent |
+| **CC-A1** | DONE 2026-09-19 | R356 -- CLAUDE.md's `## Hosts` / `## Sandbox` named two hosts and two statements were measurabl… (+1 more) |
+| **CC-A2** | DONE 2026-09-19 | R359 -- the claims mutex was FALSE in a cloud container, which is worse than absent |
 | **CC-A3** | DONE 2026-09-17 | R354 + R355 -- the DK files reach a cloud build and the finished file reaches Ben |
 | **CC-A4** | DONE 2026-09-19 | R366 -- the plan for CC-A5..CC-A9 lands on the board, and the roadmap gets a one-screen status… |
 | **CC-A5** | open | R364 + R365 -- the two items the 2026-09-17 retro filed and nobody has built (+2 more) |

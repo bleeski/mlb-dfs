@@ -27,6 +27,19 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+# R358, 2026-09-19. The two gate constants below were host-derived numbers
+# wearing the shape of universal defaults; they resolve per host now, the way
+# `tools/solver_probe.py:72` already does. `repo_env` is stdlib-only, so this
+# import cannot fail for want of a dependency, and it is deliberately NOT
+# guarded: a silent fallback here would reproduce the defect this file's own
+# R147 comment records against `sync_check.py`, where a guarded import without
+# the repo root on sys.path "worked when imported and no-opped in the
+# invocation the docstring documents". `python tools/audit.py` puts `tools/`
+# on sys.path, not the repo root, which is why the append is needed at all.
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+
+from mlb_engine.repo_env import call_budget_s, call_budget_source  # noqa: E402
+
 VERSION = "v3.4"
 PROJECT_VERSION = "v2.26.0"
 LAYOUT_VERSION = "v3.0.0-pre"
@@ -771,7 +784,15 @@ EXPECTED_SUITE_COUNTS = {
     # rather than stored, a batch DONE only when every one of its rows is,
     # the NEXT pointer carried and a missing one named, and --check exiting
     # 2 when the board moved and the file did not.
-    "tests.test_core": 1319,
+    # R359+R356, 2026-09-19: 1319 -> 1327, the eight that pin the host
+    # prose being true -- five that the claim tool says CONTAINER-LOCAL in
+    # a cloud container and stays silent on the two hosts where the mutex
+    # is real, that `dirt` never carries the note (it reads git, not
+    # claims), and that the host resolves from a foreign working
+    # directory (the sync_check import defect, one tool over); three that
+    # CLAUDE.md defers every budget question to `call_budget_s()`, names
+    # three hosts, and that no rule still calls `/tmp` or `rm` Cowork-only.
+    "tests.test_core": 1327,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps
@@ -982,7 +1003,13 @@ EXPECTED_SUITE_COUNTS = {
     # Base (the operator already replaced the prior it warns about) and the
     # FIELD is not, and that rule was correct and untested until the mutant
     # that deleted it lived. A fixture gap, not a weak mutant.
-    "tests.test_showdown": 219,
+    # R358, 2026-09-19: 219 -> 224, the five that pin the gate budget and
+    # ceiling as RESOLVED per host rather than the retired 28.0/39.0 --
+    # an AST pin that neither is a literal again, a declaring host being
+    # believed, a silent host still getting the documented 130.0 floor,
+    # the MLB_DFS_CALL_BUDGET_S hatch winning, and a stated ceiling not
+    # being raised to meet an unstated budget.
+    "tests.test_showdown": 224,
     # R96, 2026-08-11: 141 -> 162, the twenty-one tests that pin the delivery
     # path. A `grew` verdict is the one case where moving a pin is correct.
     # R46 round 2, 2026-08-12: 162 -> 168, the six that pin the PARTIAL side.
@@ -2049,7 +2076,35 @@ GATE_TIMINGS_FILE = "timings.json"
 # behaviour change for every silent caller, measured on one host. CLAUDE.md's
 # session-start command passes 130/165 explicitly and that is the supported way
 # up. What is NOT kept is any comment or --help string still asserting 45.
-GATE_DEFAULT_BUDGET_S = 28.0
+# What the parent keeps for itself out of the call: container start, the engine
+# import off a cold __pycache__, and printing the report. The child's budget is
+# the rest.
+GATE_BUDGET_RESERVE_S = 11.0
+#: Floor, so a host declaring an absurdly small ceiling still gets a budget a
+#: single test class can land inside rather than a negative number.
+GATE_MIN_BUDGET_S = 20.0
+
+
+def resolved_gate_budget() -> float:
+    """The child's default budget on THIS host, not a constant.
+
+    R358, 2026-09-19. This was 28.0 and the ceiling below 39.0, both derived
+    from a 45s device ceiling that R271(b) RETIRED on 2026-08-29. The comment
+    that kept them argued a default must be safe on a host that has told us
+    nothing -- which is right, and is now `repo_env`'s job: a host that states
+    nothing resolves to 130.0 there, which is CLAUDE.md's own Sandbox number
+    rather than a figure measured on one machine. What changed is that a host
+    which DOES say something is believed. Measured 2026-09-19 on a container
+    declaring 900000ms: `--run-tests` completes in one call in about 230s, so a
+    28s child budget was slicing a gate that did not need slicing.
+
+    Both flags and the whole precedence are unchanged; only the default moved.
+    """
+    return max(GATE_MIN_BUDGET_S, round(call_budget_s() - GATE_BUDGET_RESERVE_S, 1))
+
+
+GATE_DEFAULT_BUDGET_S = resolved_gate_budget()
+GATE_DEFAULT_BUDGET_SOURCE = call_budget_source()
 # The whole call, parent included: an overrun takes the parent's own report with
 # it, so the parent stops the child while it can still print what landed.
 #
@@ -2069,18 +2124,29 @@ GATE_DEFAULT_BUDGET_S = 28.0
 # a margin so a raised budget can never again be silently capped underneath.
 # Nothing about the conservative device default changes; a caller that says
 # nothing gets exactly the old behaviour.
-GATE_CALL_CEILING_S = 39.0
+GATE_CALL_CEILING_S = call_budget_s()
 GATE_CEILING_ENV = "MLB_GATE_CEILING_S"
 
 
 def gate_call_ceiling(explicit: "float | None" = None,
-                      budget: float = GATE_DEFAULT_BUDGET_S) -> float:
+                      budget: "float | None" = None) -> float:
     """The wall-clock ceiling this host allows one --gate-run child.
 
-    Precedence: an explicit flag, then ``MLB_GATE_CEILING_S``, then the 39s
-    device default. The result is floored at ``budget + GATE_UNKNOWN_RESERVE_S``
-    so a raised ``--gate-budget`` cannot be capped by a lower ceiling without
-    the caller having asked for that, which is the defect R190(d) fixed.
+    Precedence: an explicit flag, then ``MLB_GATE_CEILING_S``, then this host's
+    resolved ``GATE_CALL_CEILING_S``. When a budget IS stated the result is
+    floored at ``budget + GATE_UNKNOWN_RESERVE_S``, so a raised ``--gate-budget``
+    cannot be capped by a lower ceiling without the caller having asked for
+    that, which is the defect R190(d) fixed.
+
+    R358, 2026-09-19: ``budget`` became ``None``-by-default rather than bound to
+    ``GATE_DEFAULT_BUDGET_S``, and the floor now applies only when a budget was
+    actually supplied. With the default budget host-resolved (619.0 on a
+    container declaring 900000ms) the old form silently raised an explicit
+    ``--gate-ceiling 150`` to 629.0 -- overriding a stated operator instruction,
+    which is the opposite of what the floor is for. Both internal callers
+    (``:2528``, ``:2561``) pass ``budget=`` explicitly, so the protected case is
+    unchanged; what changed is that asking for the ceiling alone now answers
+    about the ceiling alone.
     """
     value = explicit
     if value is None:
@@ -2092,6 +2158,8 @@ def gate_call_ceiling(explicit: "float | None" = None,
                 value = None
     if value is None:
         value = GATE_CALL_CEILING_S
+    if budget is None:
+        return float(value)  # no budget stated, so there is nothing to protect
     return max(float(value), float(budget) + GATE_UNKNOWN_RESERVE_S)
 # The room an UNRECORDED class must have before it may start. A count-based
 # guess is useless here -- DeterminismTests is 4 tests and 24.5s while
@@ -3203,9 +3271,13 @@ def main() -> None:
                              "measurement; the stale-ref reading is used and "
                              "labelled as such")
     # R152: the same gate across several calls, for a caller whose per-call
-    # ceiling cannot hold --run-tests (a Cowork device_bash call ends around
-    # 180s with an explicit timeout, and the five gated suites together need
-    # more -- tests.test_core alone needs ~89s).
+    # ceiling cannot hold --run-tests. R358, 2026-09-19: that caller is now the
+    # exception rather than the assumption. Measured on a container declaring
+    # 900000ms, `--run-tests` completes in one call in about 230s and CI runs it
+    # in one step; the split path is for Cowork's ~130s inner budget and for any
+    # host that states a small ceiling. Both defaults below are resolved from
+    # `repo_env.call_budget_s()`, so the split happens where it is needed and
+    # not where it is not.
     parser.add_argument("--gate-run", action="store_true",
                         help="run as much of the gate as fits one call, "
                              "recording per-class results; repeat until it "
@@ -3218,16 +3290,16 @@ def main() -> None:
     parser.add_argument("--gate-budget", type=float,
                         default=GATE_DEFAULT_BUDGET_S,
                         help="seconds of testing one --gate-run may start "
-                             f"(default {GATE_DEFAULT_BUDGET_S:.0f}, a floor "
-                             "safe on any host; a Cowork device_bash call "
-                             "ends around 180s with an explicit timeout, so "
-                             "pass 130 there and assemble the gate in one "
-                             "warm call or five cold ones)")
+                             f"(default {GATE_DEFAULT_BUDGET_S:.0f} on this "
+                             f"host: {GATE_DEFAULT_BUDGET_SOURCE}, less a "
+                             f"{GATE_BUDGET_RESERVE_S:.0f}s parent reserve). "
+                             "Lower it to assemble the gate across more, "
+                             "smaller calls")
     parser.add_argument("--gate-ceiling", type=float, default=None,
                         help="seconds of wall clock one --gate-run child may "
-                             f"use (default {GATE_CALL_CEILING_S:.0f}, a floor "
-                             "safe on any host, NOT the Cowork figure; also "
-                             "read from "
+                             f"use (default {GATE_CALL_CEILING_S:.0f} on this "
+                             "host, resolved from its own declared ceiling; "
+                             "also read from "
                              f"{GATE_CEILING_ENV}). Raise it on a host with a "
                              "longer call cap: a unit slower than the ceiling "
                              "can never land, and the gate then cannot print "
