@@ -54,6 +54,35 @@ its owner: only ARCHIVE merges `ledger/inbox/`, only DEV merges
 and the container is ephemeral, so a retro written there does not survive the
 session — if it has findings, they go in a tracked fragment or they are gone.
 
+## Start with the facts, which a tool now extracts (R371)
+
+```bash
+python tools/retro.py --date <slate_date> --handover-utc "$(TZ=UTC date -Is)"
+```
+
+Five of the six things the next section asks for are already in the artifacts,
+and reconstructing them from scrollback is how they get lost when the context
+compacts. `retro.py` reads the tracked delivery record (R369) plus the build
+brief beside it and prints: the gate-clean stamp and the gap to hand-over, every
+degraded input the build reported, every number it ran on with the artifact that
+says whether a human chose it, every refusal exit code against its documented
+meaning, and every brief key `SKILL.md` names that this brief does not carry.
+
+`--handover-utc` is the one fact no artifact holds. Nothing stamps the moment
+Ben got the file, so the session supplies it or the gap is not computed. It is
+never guessed.
+
+**It judges nothing, and that is deliberate.** An absent brief key may be a docs
+defect or a correct conditional; a degraded input may or may not have had a
+fallback; a gap may or may not be a finding. The tool reports the fact and
+stops. Everything below is still yours, and the bar above still binds: no
+findings means file nothing.
+
+Run it in the session that built the slate. `outputs/` is gitignored and a cloud
+container is reclaimed at session end, so the brief is gone afterwards; the
+record survives and the sections that need the brief say so by name rather than
+coming back empty.
+
 ## What to actually look at
 
 Not a checklist to fill in. These are the places findings have actually come

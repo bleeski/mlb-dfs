@@ -26930,5 +26930,495 @@ class PlanStatusTests(unittest.TestCase):
 
 
 
+class OutcomeReviewTests(unittest.TestCase):
+    """R370, 2026-09-19. Grading a DELIVERY against the standings that exist.
+
+    The defect: nothing joined a run, or a delivered sha256, to a contest
+    result. `ledger/own_results.json` holds 584 mined contests and carries a
+    `run_id` on none of them, and `summarize_own_entries` -- the function that
+    does the grading -- had exactly one production caller, driven by entry ids a
+    human typed in. R369's tracked record supplies the join; this walks it.
+
+    The load-bearing assertion is the washout one. Washout is three-valued, and
+    a contest with no payout curve has to leave the portfolio answer UNKNOWN
+    rather than `false`, because `false` reads as "we cashed somewhere" and
+    would be a fail-open on an absence of evidence.
+    """
+
+    DATE = "2026-09-19"
+    CID = "912345678"
+
+    # Ten Classic players, so a lineup string parses to the 2P/1C/1B/2B/3B/SS/3OF
+    # multiset `parse_lineup_string` requires for `lineup_complete`.
+    NAMES = ("Ace One", "Ace Two", "Cee Three", "Onebee Four", "Twobee Five",
+             "Threebee Six", "Ess Seven", "Oh Eight", "Oh Nine", "Oh Ten")
+    SLOTS = ("P", "P", "C", "1B", "2B", "3B", "SS", "OF", "OF", "OF")
+
+    def _lineup(self, names):
+        return " ".join(f"{slot} {name}" for slot, name in zip(self.SLOTS, names))
+
+    def _standings(self, path: Path, mine, field=6, mine_rank=1, mine_names=None):
+        """A minimal DK standings export in the positional schema (ledger 3.1).
+
+        `mine` are the entry ids that are ours; `mine_rank` is where the first
+        of them finished. Everything else is filler so the field has a size.
+        """
+        header = ["Rank", "EntryId", "EntryName", "TimeRemaining", "Points",
+                  "Lineup", "", "Player", "Roster Position", "%Drafted", "FPTS"]
+        rows = [header]
+        ours = list(mine)
+        lineup_mine = self._lineup(mine_names or self.NAMES)
+        lineup_other = self._lineup(self.NAMES[:9] + ("Oh Eleven",))
+        rank = 1
+        placed = 0
+        for i in range(field):
+            if rank == mine_rank and placed < len(ours):
+                entry_id, lineup = ours[placed], lineup_mine
+                placed += 1
+            else:
+                entry_id, lineup = f"filler{i}", lineup_other
+            row = [str(rank), entry_id, f"user{i}", "0",
+                   str(round(200.0 - rank, 2)), lineup, ""]
+            names = list(self.NAMES) + ["Oh Eleven"]
+            if i < len(names):
+                row += [names[i], self.SLOTS[i] if i < len(self.SLOTS) else "OF",
+                        "10.0%", "12.5"]
+            else:
+                row += ["", "", "", ""]
+            rows.append(row)
+            rank += 1
+        import csv as _csv
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w", encoding="utf-8", newline="") as fh:
+            _csv.writer(fh).writerows(rows)
+
+    def _money(self, root: Path, contests):
+        target = root / "data" / "reference" / "dk_contest_money_2026-09-15.json"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(json.dumps({"_label": "observed history",
+                                      "contests": contests}), encoding="utf-8")
+
+    def _record(self, root: Path, entry_ids, cid=None, roster=None, inputs=None):
+        cid = cid or self.CID
+        record = {
+            "schema_version": 1, "kind": "delivery", "date": self.DATE,
+            "recorded_utc": "2026-09-19T22:00:00+00:00",
+            "manifest_row": {
+                "delivered_file": f"outputs/{self.DATE}/DKEntries_t.csv",
+                "sha256": "a" * 64, "contest_type": "classic",
+                "slate_tag": "1910_2g", "contest_ids": [cid],
+                "run_id": "run_t", "status": "candidate",
+                "certification": "certified",
+                "recorded_utc": "2026-09-19T22:00:00+00:00",
+            },
+            "entries": [{"entry_id": e, "contest_id": cid,
+                         "contest_name": "Test Cup", "entry_fee": 5.0,
+                         "roster_ids": list(roster or [str(n) for n in range(10)]),
+                         "filled": True} for e in entry_ids],
+            "run": {"inputs": dict(inputs or {})},
+            "code": {}, "host": {}, "controls": {}, "relaxations": {}, "egress": "",
+        }
+        folder = root / "data" / "deliveries" / self.DATE
+        folder.mkdir(parents=True, exist_ok=True)
+        path = folder / "1910_2g_run_t.json"
+        path.write_text(json.dumps(record, indent=1), encoding="utf-8")
+        return path
+
+    def _mod(self):
+        import importlib
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
+        import outcome_review
+        importlib.reload(outcome_review)
+        return outcome_review
+
+    def _review(self, root: Path, record_path: Path):
+        mod = self._mod()
+        record = json.loads(record_path.read_text(encoding="utf-8"))
+        record["_path"] = str(record_path.relative_to(root))
+        return mod, mod.review_record(record, root)
+
+    def test_a_cashed_contest_grades_the_portfolio_as_not_a_washout(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            self._standings(root / "data" / "archive" / self.DATE /
+                            f"contest-standings-{self.CID}.csv", ["E1"])
+            self._money(root, {self.CID: {"paid_places": 1, "entry_fee": 5.0,
+                                          "field_size": 6, "winnings_total": 25.0,
+                                          "name": "Test Cup"}})
+            path = self._record(root, ["E1"])
+            _, review = self._review(root, path)
+            block = review["contests"][0]
+            self.assertEqual(block["matched"], 1)
+            self.assertEqual(block["best_rank"], 1)
+            self.assertEqual(block["paid_places"], 1)
+            self.assertEqual(block["cashed_entries"], 1)
+            self.assertIs(block["in_the_money"], True)
+            self.assertIs(review["portfolio_washout"], False)
+
+    def test_no_entry_in_a_paid_position_is_a_washout_when_the_curve_is_known(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            self._standings(root / "data" / "archive" / self.DATE /
+                            f"contest-standings-{self.CID}.csv", ["E1"], mine_rank=5)
+            self._money(root, {self.CID: {"paid_places": 1, "entry_fee": 5.0}})
+            path = self._record(root, ["E1"])
+            _, review = self._review(root, path)
+            self.assertIs(review["contests"][0]["in_the_money"], False)
+            self.assertIs(review["portfolio_washout"], True)
+
+    def test_a_contest_with_no_payout_curve_leaves_washout_unknown_never_false(self):
+        """The load-bearing one. An absence must never read as a result."""
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            self._standings(root / "data" / "archive" / self.DATE /
+                            f"contest-standings-{self.CID}.csv", ["E1"], mine_rank=5)
+            self._money(root, {})   # this contest is in no payout file
+            path = self._record(root, ["E1"])
+            _, review = self._review(root, path)
+            self.assertEqual(review["contests"][0]["in_the_money"], "UNKNOWN")
+            self.assertEqual(review["portfolio_washout"], "UNKNOWN")
+            self.assertIsNot(review["portfolio_washout"], False)
+            self.assertIn(self.CID, review["portfolio_washout_reason"])
+
+    def test_one_cash_beats_an_unknown_contest_and_still_says_not_a_washout(self):
+        """A cash anywhere disproves a washout whatever the rest cannot say."""
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            other = "912345679"
+            for cid, rank in ((self.CID, 1), (other, 5)):
+                self._standings(root / "data" / "archive" / self.DATE /
+                                f"contest-standings-{cid}.csv", [f"E{cid}"],
+                                mine_rank=rank)
+            self._money(root, {self.CID: {"paid_places": 1, "entry_fee": 5.0}})
+            path = self._record(root, [f"E{self.CID}"])
+            record = json.loads(path.read_text(encoding="utf-8"))
+            record["entries"].append({"entry_id": f"E{other}", "contest_id": other,
+                                      "contest_name": "Other", "entry_fee": 5.0,
+                                      "roster_ids": [str(n) for n in range(10)],
+                                      "filled": True})
+            path.write_text(json.dumps(record), encoding="utf-8")
+            _, review = self._review(root, path)
+            states = {c["contest_id"]: c["in_the_money"] for c in review["contests"]}
+            self.assertIs(states[self.CID], True)
+            self.assertEqual(states[other], "UNKNOWN")
+            self.assertIs(review["portfolio_washout"], False)
+
+    def test_absent_standings_is_a_named_absence_rather_than_a_silent_skip(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            self._money(root, {self.CID: {"paid_places": 1}})
+            path = self._record(root, ["E1"])
+            _, review = self._review(root, path)
+            block = review["contests"][0]
+            self.assertEqual(block["status"], "standings_absent")
+            self.assertEqual(block["in_the_money"], "UNKNOWN")
+            self.assertIn(self.CID, block["note"])
+            self.assertIn("awaiting_standings", block["note"])
+            self.assertEqual(review["portfolio_washout"], "UNKNOWN")
+
+    def test_planned_and_realized_exposures_join_through_the_salary_file(self):
+        """The delivered roster is player IDS; the standings are NAMES.
+
+        The crosswalk is the slate's salary export, matched by the sha256 the
+        record itself names. Realized here differs from planned by one player,
+        which is what a late swap or a partial upload looks like from the
+        archive -- and nothing else in the tree records it.
+        """
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            realized = list(self.NAMES[:9]) + ["Oh Eleven"]
+            self._standings(root / "data" / "archive" / self.DATE /
+                            f"contest-standings-{self.CID}.csv", ["E1"],
+                            mine_names=realized)
+            self._money(root, {self.CID: {"paid_places": 1}})
+            salary = root / "data" / "archive" / self.DATE / "DKSalaries_1910_2g.csv"
+            lines = ["Position,Name + ID,Name,ID,Roster Position,Salary,"
+                     "Game Info,TeamAbbrev,AvgPointsPerGame"]
+            for i, name in enumerate(list(self.NAMES) + ["Oh Eleven"]):
+                lines.append(f"OF,{name} ({100 + i}),{name},{100 + i},OF,4000,"
+                             f"AAA@BBB,AAA,8.0")
+            salary.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            import hashlib
+            digest = hashlib.sha256(salary.read_bytes()).hexdigest()
+            path = self._record(root, ["E1"],
+                                roster=[str(100 + i) for i in range(10)],
+                                inputs={"salary_csv": {"sha256": digest,
+                                                       "size_bytes": 1,
+                                                       "source_path": "x"}})
+            _, review = self._review(root, path)
+            exposures = review["contests"][0]["exposures"]
+            self.assertTrue(exposures["joined"], exposures["join"])
+            moved = {m["player"]: m for m in exposures["moved"]}
+            # "Oh Ten" was delivered and is not in the standings lineup;
+            # "Oh Eleven" is in the standings lineup and was never delivered.
+            self.assertIn("oh ten", moved)
+            self.assertEqual(moved["oh ten"]["realized"], 0.0)
+            self.assertIn("oh eleven", moved)
+            self.assertEqual(moved["oh eleven"]["planned"], 0.0)
+
+    def test_an_unjoinable_crosswalk_still_emits_both_sides_with_its_reason(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            self._standings(root / "data" / "archive" / self.DATE /
+                            f"contest-standings-{self.CID}.csv", ["E1"])
+            self._money(root, {self.CID: {"paid_places": 1}})
+            path = self._record(root, ["E1"])
+            _, review = self._review(root, path)
+            exposures = review["contests"][0]["exposures"]
+            self.assertFalse(exposures["joined"])
+            self.assertIn("no salary export matches", exposures["join"])
+            self.assertTrue(exposures["planned_by_player_id"])
+            self.assertTrue(exposures["realized_by_player_name"])
+
+    def test_the_emitted_text_carries_no_outcome_claim_word(self):
+        """CLAUDE.md's truthful-labels wall, asserted on the text itself."""
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            self._standings(root / "data" / "archive" / self.DATE /
+                            f"contest-standings-{self.CID}.csv", ["E1"])
+            self._money(root, {self.CID: {"paid_places": 1, "entry_fee": 5.0,
+                                          "winnings_total": 25.0}})
+            path = self._record(root, ["E1"])
+            mod, review = self._review(root, path)
+            text = mod.render(review).lower()
+            for word in ("roi", "win rate", "cash rate", "edge", "profitab",
+                         "probability", "expected value", "return on"):
+                self.assertNotRegex(text, r"\b" + word,
+                                    f"the review text says {word!r}")
+
+    def test_pending_counts_records_with_no_review_beside_them(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            self._standings(root / "data" / "archive" / self.DATE /
+                            f"contest-standings-{self.CID}.csv", ["E1"])
+            self._money(root, {self.CID: {"paid_places": 1}})
+            path = self._record(root, ["E1"])
+            mod = self._mod()
+            self.assertEqual(len(mod.pending(root)), 1)
+            self.assertIn("outcome review due: 1", mod.pending_line(root))
+            self.assertEqual(mod.main(["--date", self.DATE, "--root", str(root)]), 0)
+            self.assertTrue(mod.sidecar_path(path).exists())
+            self.assertEqual(mod.pending(root), [])
+            self.assertIn("outcome review due: 0", mod.pending_line(root))
+
+    def test_a_rerun_replaces_its_own_ledger_fragment_rather_than_adding_one(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            self._standings(root / "data" / "archive" / self.DATE /
+                            f"contest-standings-{self.CID}.csv", ["E1"])
+            self._money(root, {self.CID: {"paid_places": 1}})
+            self._record(root, ["E1"])
+            mod = self._mod()
+            for _ in range(2):
+                self.assertEqual(mod.main(["--date", self.DATE, "--root", str(root)]), 0)
+            fragments = sorted((root / "ledger" / "inbox").glob("*.md"))
+            self.assertEqual([p.name for p in fragments],
+                             [f"{self.DATE}_outcome_1910_2g.md"])
+
+    def test_a_sidecar_is_never_mistaken_for_a_delivery_record(self):
+        """`read_records` globs `*.json`; every reader filters on `kind`."""
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            self._standings(root / "data" / "archive" / self.DATE /
+                            f"contest-standings-{self.CID}.csv", ["E1"])
+            self._money(root, {self.CID: {"paid_places": 1}})
+            self._record(root, ["E1"])
+            mod = self._mod()
+            self.assertEqual(mod.main(["--date", self.DATE, "--root", str(root)]), 0)
+            from mlb_engine.entries.delivery_record import read_records
+            kinds = [r.get("kind") for r in read_records(root=root, date=self.DATE)]
+            self.assertEqual(sorted(kinds), ["delivery", "outcome_review"])
+            self.assertEqual(len(mod.pending(root)), 0)
+
+
+class RetroFactsTests(unittest.TestCase):
+    """R371, 2026-09-19. The execution postmortem's deterministic half.
+
+    `references/retro.md` asks for five facts that are all in the artifacts and
+    none of which was extracted by anything: the only telemetry in the build is
+    one `elapsed_s`. The R363 detector is the one with a named sighting -- a
+    Showdown brief carries no `enrichment` block at all while SKILL.md states
+    that self-report with no contest-type condition.
+    """
+
+    DATE = "2026-09-19"
+
+    def _mod(self):
+        import importlib
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
+        import retro
+        importlib.reload(retro)
+        return retro
+
+    def _tree(self, root: Path, brief=None, contest_type="showdown",
+              refusal_exit=None):
+        (root / "skills" / "generate-lineups").mkdir(parents=True, exist_ok=True)
+        real = Path(__file__).resolve().parents[1] / "skills" / "generate-lineups" / "SKILL.md"
+        (root / "skills" / "generate-lineups" / "SKILL.md").write_text(
+            real.read_text(encoding="utf-8"), encoding="utf-8")
+        folder = root / "data" / "deliveries" / self.DATE
+        folder.mkdir(parents=True, exist_ok=True)
+        record = {
+            "schema_version": 1, "kind": "delivery", "date": self.DATE,
+            "recorded_utc": "2026-09-19T22:10:00+00:00",
+            "manifest_row": {"delivered_file": f"outputs/{self.DATE}/DKEntries.csv",
+                             "sha256": "b" * 64, "contest_type": contest_type,
+                             "slate_tag": "1910_1g", "run_id": None,
+                             "recorded_utc": "2026-09-19T22:05:00+00:00",
+                             "certification": "review_grade",
+                             "strategy_state": {"state": "relaxed",
+                                                "counts": {"overlap": 2}}},
+            "entries": [], "run": {}, "code": {}, "host": {},
+            "controls": {}, "relaxations": {}, "egress": "",
+        }
+        path = folder / "1910_1g_norun.json"
+        path.write_text(json.dumps(record, indent=1), encoding="utf-8")
+        if refusal_exit is not None:
+            (folder / "refusal_20260919T220000Z.json").write_text(json.dumps({
+                "schema_version": 1, "kind": "refusal", "date": self.DATE,
+                "slate_tag": "", "exit_code": refusal_exit,
+                "refusal": {"argv": [], "note": ""}}), encoding="utf-8")
+        if brief is not None:
+            out = root / "outputs" / self.DATE
+            out.mkdir(parents=True, exist_ok=True)
+            (out / "build_brief_sd_1910_1g.json").write_text(
+                json.dumps(brief), encoding="utf-8")
+        record["_path"] = str(path.relative_to(root))
+        return record
+
+    def test_the_clock_gap_is_computed_from_gate_clean_to_the_handover_given(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            record = self._tree(root, brief={"elapsed_s": 412.3,
+                                             "slate_clock": {"minutes_to_deadline": 38}})
+            mod = self._mod()
+            facts = mod.retro(record, root, handover_utc="2026-09-19T22:23:00Z")
+            self.assertEqual(facts["clock"]["gap_minutes"], 18.0)
+            self.assertEqual(facts["clock"]["build_elapsed_s"], 412.3)
+            self.assertEqual(facts["clock"]["minutes_to_deadline_at_build"], 38)
+
+    def test_without_a_handover_stamp_the_gap_is_not_invented(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            record = self._tree(root, brief={"elapsed_s": 1.0})
+            facts = self._mod().retro(record, root)
+            self.assertIsNone(facts["clock"]["gap_minutes"])
+            self.assertIn("--handover-utc", facts["clock"]["note"])
+
+    def test_a_showdown_brief_reports_every_enrichment_key_skill_md_names(self):
+        """R363's sighting, reproduced from the document rather than a list."""
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            record = self._tree(root, brief={"elapsed_s": 1.0,
+                                             "slate_clock": {"minutes_to_deadline": 9}},
+                                contest_type="showdown")
+            facts = self._mod().retro(record, root)
+            absent = set(facts["absent_brief_keys"]["absent"])
+            self.assertGreater(facts["absent_brief_keys"]["checked"], 8)
+            for key in ("enrichment.signal_applied", "enrichment.degraded",
+                        "enrichment.degraded_reason",
+                        "enrichment.requested_but_unapplied",
+                        "enrichment.counts.f1_games_priced"):
+                self.assertIn(key, absent)
+            # A key the brief DOES carry is not reported absent, so the detector
+            # is reading the brief rather than listing the document.
+            self.assertNotIn("slate_clock.minutes_to_deadline", absent)
+
+    def test_the_self_report_sentence_is_read_as_enrichment_keys(self):
+        """The bare-backtick construction, which the dotted scan cannot see."""
+        mod = self._mod()
+        keys = mod.skill_brief_keys(
+            "The brief carries an\nenrichment self-report: `signal_applied`, "
+            "`degraded_reason`, `f1_odds`. That is the record.")
+        self.assertEqual(keys, ["enrichment.degraded_reason", "enrichment.f1_odds",
+                                "enrichment.signal_applied"])
+
+    def test_a_backticked_filename_is_not_read_as_a_brief_key(self):
+        mod = self._mod()
+        self.assertEqual(mod.skill_brief_keys("see `lineups_feed.json` on disk"), [])
+        self.assertEqual(mod.skill_brief_keys("read `pool.basis` first"), ["pool.basis"])
+        # A dotted path whose ROOT is not a brief key. `optimizer_v3.x` was the
+        # first choice here and pinned nothing: the digit in `optimizer_v3`
+        # makes the regex reject it before the root filter ever runs, so the
+        # test passed with that filter deleted.
+        self.assertEqual(mod.skill_brief_keys("ask `repo_env.call_budget_s`"), [])
+
+    def test_an_undocumented_refusal_exit_is_named_as_a_contract_failure(self):
+        """R364's class: a tool exiting a code its contract does not define."""
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            record = self._tree(root, brief={"elapsed_s": 1.0}, refusal_exit=1)
+            facts = self._mod().retro(record, root)
+            rows = [r for r in facts["contract_failures"] if r.get("undocumented")]
+            self.assertEqual(len(rows), 1)
+            self.assertIn("exit 1", rows[0]["what"])
+
+    def test_a_documented_refusal_exit_is_recorded_and_not_flagged(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            record = self._tree(root, brief={"elapsed_s": 1.0}, refusal_exit=4)
+            facts = self._mod().retro(record, root)
+            rows = [r for r in facts["contract_failures"] if "exit 4" in r.get("what", "")]
+            self.assertEqual(len(rows), 1)
+            self.assertFalse(rows[0]["undocumented"])
+            self.assertIn("wall", rows[0]["contract"])
+
+    def test_degraded_inputs_come_off_the_brief_and_name_their_source(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            record = self._tree(root, brief={
+                "elapsed_s": 1.0,
+                "enrichment": {"signal_applied": False, "degraded": True,
+                               "degraded_reason": "no odds key on this host",
+                               "requested_but_unapplied": ["f1"],
+                               "counts": {"f1_games_priced": 0, "f4_platoon_applied": 7}},
+                "lineups_feed": {"status": "lineups_feed_unavailable",
+                                 "warning": "first fetch failed: 403"}})
+            facts = self._mod().retro(record, root)
+            sources = {r["source"]: r["what"] for r in facts["degraded_inputs"]}
+            self.assertIn("no odds key on this host",
+                          sources["brief.enrichment.degraded"])
+            self.assertIn("f1", sources["brief.enrichment.requested_but_unapplied"])
+            self.assertIn("f1_games_priced", sources["brief.enrichment.counts"])
+            self.assertNotIn("f4_platoon_applied", sources["brief.enrichment.counts"])
+            self.assertIn("403", sources["brief.lineups_feed.warning"])
+
+    def test_a_missing_brief_is_stated_rather_than_read_as_nothing_degraded(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            record = self._tree(root, brief=None)
+            facts = self._mod().retro(record, root)
+            self.assertIn("outputs/", facts["brief"])
+            whats = " ".join(r["what"] for r in facts["degraded_inputs"])
+            self.assertIn("the brief is not on disk", whats)
+            self.assertEqual(facts["absent_brief_keys"]["absent"], [])
+            self.assertIn("not on disk", facts["absent_brief_keys"]["note"])
+
+    def test_a_hand_passed_control_is_separated_from_an_engine_default(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            record = self._tree(root, brief={
+                "elapsed_s": 1.0, "controls_override_applied": "max_shared_players=5",
+                "anti_correlation": {"requested": None, "applied": 3}})
+            facts = self._mod().retro(record, root)
+            rows = {r["control"]: r for r in facts["hand_passed_numbers"]}
+            self.assertIn("passed by hand", rows["--controls-override"]["source"])
+            self.assertIn("the flag was not passed",
+                          rows["--max-opposing-hitters-per-sp"]["source"])
+            self.assertIn("strategy_state", rows)
+
+    def test_the_renderer_prints_every_section_even_when_all_are_empty(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            record = self._tree(root, brief={"elapsed_s": 1.0})
+            mod = self._mod()
+            text = mod.render(mod.retro(record, root))
+            for heading in ("## The clock", "## Degraded inputs",
+                            "## Numbers this build ran on",
+                            "## Tools against their contracts",
+                            "does not carry (R363)"):
+                self.assertIn(heading, text)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

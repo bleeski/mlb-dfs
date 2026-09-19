@@ -206,6 +206,44 @@ Per contest:
    arguing with). One contest never moves a prior; the record is what
    accumulates.
 
+### Grade the delivery, not just the contest (R370)
+
+Everything above grades a CONTEST. It says what the field did and where our
+entries landed inside it, and it never once names the portfolio those entries
+came from: `ledger/own_results.json` carries 584 contests and a `run_id` on none
+of them. The join exists now, because a build records itself in a tracked file
+(R369), and one command walks it:
+
+```bash
+python tools/outcome_review.py --date <slate_date>
+```
+
+It reads every delivery record for the date, finds each contest's standings
+under `data/archive/<slate_date>/` or `data/standings/inbox/`, and prints per
+contest the rank span, the points, whether any entry finished in a paid
+position, how many of our own lineups the field also had, and planned exposures
+against the ones the standings actually show. Then one portfolio line: washout,
+meaning no entry of ours in a paid position anywhere.
+
+Three things to know before reading the output.
+
+**Washout is three-valued.** `UNKNOWN` is not a failure of the tool. A contest
+whose payout curve is in neither `dk_contest_money_2026-09-15.json` nor
+`dk_contest_paid_places.json` cannot say whether rank 4 of 300 was paid, and the
+portfolio answer stays open until it can. `NO` is only printed when an entry is
+known to have cashed. There is no branch that prints `NO` from an absence.
+
+**Run it after the mine, not before.** The standings have to be on disk. What is
+still outstanding is what `python tools/awaiting_standings.py scan` lists.
+
+**It files for you.** A `.outcome.json` lands beside the delivery record, and the
+same review lands in `ledger/inbox/` as a fragment for ARCHIVE to merge. Only
+ARCHIVE edits the ledger (CLAUDE.md), and a re-run replaces its own fragment
+rather than appending, so a review run twice is one fragment.
+
+The session-start hook prints `outcome review due: <n>` — delivery records with
+no review beside them. A non-zero count is this step, unrun.
+
 After all contests on the slate: return the updated ledger, the updated
 registry, and the mined JSON files to the claude.ai project session.
 

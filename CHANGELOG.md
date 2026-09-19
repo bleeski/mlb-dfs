@@ -25,6 +25,193 @@ performance claim.
 
 ---
 
+## 2026-09-19 — R370, R371: a delivery is graded against the standings, and the retro's facts are extracted rather than remembered
+
+**Scope.** New `tools/outcome_review.py`, new `tools/retro.py`,
+`.claude/hooks/session_start.py`, `docs/cowork_archival_runbook.md`,
+`skills/generate-lineups/references/retro.md`, `tools/audit.py`
+(`EXPECTED_SUITE_COUNTS`), `tests/test_core.py` (`OutcomeReviewTests` and
+`RetroFactsTests`, both new), `docs/backlog.md`, `docs/PROGRESS.md`, this file.
+
+**Why.** Roadmap row CC-A7, both halves, unblocked by R369 landing on `main` at
+`a40f722`: the delivery record both of these read now exists.
+
+### (a) R370 — the archive knew what the field did and never what WE built
+
+`ledger/own_results.json` holds 584 mined contests. Not one of them carries a
+`run_id`, a delivered file, or a sha256 — checked, `0 of 584` — so the record of
+what happened and the record of what we built have never been the same record.
+`field_miner.summarize_own_entries` already does the grading and is already
+careful about it (R30a's `paid_places`, the duplication count, the labels), and
+it had exactly ONE production caller: `field_miner.py:2203`, inside the miner,
+driven by entry ids typed in by hand. Answering "how did that portfolio do"
+meant a human holding a delivered file in one hand and a standings export in the
+other.
+
+`tools/outcome_review.py` walks the join R369 made possible. It reads a tracked
+delivery record, groups its entry rows by contest, finds each contest's
+standings, mines it, and grades our entries through the existing
+`summarize_own_entries` rather than growing a second grader — two functions
+summing one contest is this project's named failure class (R128/R150).
+
+**Washout is three-valued and only one branch can say `false`.** The portfolio
+question CLAUDE.md's dual objective actually binds is "did every entry lose at
+once". A cash anywhere disproves it outright, so that branch is checked first
+and is the only one that returns `False`. Everything else routes to `UNKNOWN`
+with the contests named: a contest whose payout curve is in neither
+`dk_contest_money_2026-09-15.json` nor `dk_contest_paid_places.json` cannot say
+whether rank 4 of 300 was paid, and reporting `false` there would read as a
+result derived from an absence of evidence. That is the assertion the tests are
+built around, in both directions.
+
+**Planned exposures against realized ones, which no artifact records.** The
+delivered file holds player IDs; a standings export holds names. The crosswalk
+is the slate's salary export matched by the input sha256 the record itself
+names (R369's `record_salary_candidates`), never by filename. When it resolves,
+the per-player delta is printed — which is what a late swap, a partial upload,
+or a voided row looks like from the archive. When it does not, both tables are
+emitted unjoined WITH the reason, because a section that vanishes on a missing
+file teaches a reader that nothing diverged.
+
+**Everything degrades by name.** A missing standings export, an unreadable one,
+a contest the payout files do not cover: each is a named absence in the output
+and the rest of the portfolio still grades. The absent-standings note carries
+its own remedy (`tools/awaiting_standings.py scan`) rather than a status word.
+
+It files where the roles say: a `.outcome.json` beside the record, and the same
+review as a `ledger/inbox/` fragment, since only ARCHIVE edits the ledger. The
+fragment is REPLACED on a re-run rather than appended — `write_ledger_fragment`'s
+rule, and for the same reason: the ledger feeds the R10 gate and a block landed
+twice double-counts. The sidecar carries `kind: outcome_review`, and every
+reader of `read_records` already filters on `kind != "delivery"`, so it can
+never be read back as a delivery.
+
+**The reconciliation line.** `.claude/hooks/session_start.py` prints
+`outcome review due: <n>` — delivery records with no review beside them. A
+delivery nobody graded is invisible unless something counts it, which is how 584
+contests were mined with no portfolio attached to any of them.
+
+### (b) R371 — five facts sitting in the artifacts, reconstructed from scrollback every time
+
+`references/retro.md` asks the session for the clock gap between gate-clean and
+hand-over, every degraded input, every number passed by hand, every tool that
+failed its contract, and every brief key `SKILL.md` names that this brief does
+not carry. All five are IN the artifacts. The only telemetry the build writes is
+one `elapsed_s` at `build_slate.py:5456`. So every retro re-derived them from
+the session's own scrollback, which is the least durable record in the room and
+the first thing to go when the context compacts.
+
+`tools/retro.py <record>` prints exactly that factual half and nothing else.
+
+**It judges nothing, deliberately.** Whether an absent brief key is a docs defect
+or a correct conditional, whether a degraded input had a fallback somebody
+should have reached for, whether a gap is a finding: those stay a skill step.
+Ben's call, 2026-09-18 (R362) — the retro is not a hook, and "the assistant
+stopped speaking" is not "a build completed".
+
+**The R363 detector reads `SKILL.md`, not a list.** Two constructions, because
+the document uses two: a backticked dotted path whose root is a real brief key,
+and the `enrichment self-report:` sentence, which lists its keys as bare
+backticked names. The second one IS R363's sighting — that sentence states
+`signal_applied`, `requested_but_unapplied`, `degraded`, `degraded_reason`,
+`f1_league_mean_implied_total` and `f1_odds` with no contest-type condition, and
+a Showdown brief carries no `enrichment` block at all — so a scan that saw only
+dotted paths would have missed the one case this was built for. Two filters keep
+it honest: a dotted token ending in a file extension is a filename
+(`lineups_feed.json` is why), and a token whose root is not a brief key is not a
+brief key.
+
+**The one fact no artifact holds is an argument, not a guess.** Nothing stamps
+the moment Ben got the file. `--handover-utc` supplies it and the gap is
+computed from the delivery row's `recorded_utc`, which is when the gates were
+behind it. Without the argument the gap is not computed and the tool says how to
+supply it. `elapsed_s` is the build's wall time and is a different quantity: it
+ends where this one starts.
+
+**The exit-code table is read from the SOURCE, by `ast`, at the code root.** Two
+reasons, both borrowed from `delivery_record`'s own split between `_code_root`
+and `_artifact_root`: `REFUSAL_EXIT_NOTES` is code, so it is read from this
+file's repo and never from `--root`; and importing `build_slate` pulls the whole
+engine in to read one dict, in a tool whose job is to print facts quickly after
+a hand-over. A table that cannot be read returns empty PLUS a sentence saying
+so, because "this exit is undocumented" and "the documented list could not be
+found" are different claims and only one is about the build.
+
+**A missing brief is stated, never silent.** `outputs/` is gitignored and a
+container is reclaimed at session end, so the brief is there in the session that
+built the slate and gone afterwards. Every section that needs it says so by
+name; an empty section would read as "nothing was degraded".
+
+### The N+1th site (R233)
+
+The class is "a post-slate question whose answer is in the artifacts and is
+produced by no tool". The grep that enumerates the grading half:
+
+```
+grep -rn "summarize_own_entries\|harvest_own_entry_ids" --include=*.py mlb_engine/ tools/ skills/
+```
+
+Eight hits across four files. Two are the definitions, two are docstring
+citations in `delivery_record.py`, two are the miner's own CLI use
+(`field_miner.py:2170` and `:2203`), and the two new ones are this tool. Before
+this change the production hit list was ONE line: `field_miner.py:2203`, reached
+only when a human supplied `--my-entry-ids` or the manifest happened to survive.
+
+**And the N+1th, found by running the second grep rather than by being filed.**
+R369 added `controls=`, `relaxations=` and `egress=` to `record_delivery` and its
+entry describes the record as carrying "the controls actually in force with the
+counted relaxations". It does not, on any live path:
+
+```
+grep -rn "controls=\|relaxations=\|egress=" --include=*.py mlb_engine/ tools/ skills/
+```
+
+14 hits. Eleven are `portfolio_controls=` (a different parameter), the
+off-build-path `mlb_engine/production/`, or `autobuild`/`dfs` internals. Two are
+the internal mirror at `upload_manifest.py:234-235`, fed from `record_delivery`'s
+own parameters. None of the three production callers of `record_delivery` —
+`execution_pipeline._deliver_mirror`, `late_swap.py:919`, `build_slate.py:3786` —
+passes any of them, so `record["controls"]`, `record["relaxations"]` and
+`record["egress"]` are empty on every real delivery. The relaxations DO survive,
+under `manifest_row.strategy_state`, which `execution_pipeline` fills; the
+controls and the egress line do not survive at all.
+
+`retro.py` reads what exists and says the rest out loud rather than printing a
+blank section: it reads relaxations from `strategy_state`, controls from the
+brief, and prints the reason the record's own fields are empty. Wiring the three
+kwargs through the delivery path is a build-path change and is NOT in this diff;
+it is filed as **R377** on the board.
+
+**Gate.**
+
+    PASS  v2.26.0  41 modules  2235 tests  5 skipped  {test_core 1375/1375 (4 skipped) skipped_in_place; test_showdown 228/228 (1 skipped) skipped_in_place}
+
+2213 -> 2235. The five skips are the pre-existing host conditions this container
+has always reported (no vendored `.pylibs/scipy`, no `.env`, two unstaged
+2026-08-16 salary files, no Classic salary on disk), unchanged by this work; the
+bracketed warnings describe the HOST and not the tree (R348). Pin moved
+`tests.test_core` 1353 -> 1375. Golden histogram unmoved: no engine code was
+touched, and both new files are tools.
+
+**Mutation-checked**, all twenty-two, each reverted against its assertion and
+expected red, then restored. Twenty-four mutations were run because four of the
+first cut came back GREEN and had to be redone or repaired:
+
+- `standings_candidates` — blanking the first tier left the repo-wide archive
+  glob still finding the file. The mutation was wrong, not the test; redone
+  against the whole function.
+- the absent-standings note — dropping the trailing f-string left both asserted
+  substrings in place. Redone by blanking the note.
+- the missing-brief branch — prefixing the string left the asserted substring in
+  place. Redone by deleting the append.
+- the brief-root filter — this one was a WEAK TEST and was fixed. The case used
+  `` `optimizer_v3.excluded_flags` ``, which the key regex rejects on the digit
+  in `optimizer_v3` before the root filter ever runs, so the assertion passed
+  with `BRIEF_ROOTS` deleted. It now uses `` `repo_env.call_budget_s` ``, which
+  reaches the filter and goes red without it.
+
+---
+
 ## 2026-09-19 — R369: the delivery record, so a cloud build can be graded
 
 **Scope.** New `mlb_engine/entries/delivery_record.py`, `mlb_engine/entries/upload_manifest.py`, `mlb_engine/field/field_miner.py`, `tools/awaiting_standings.py`, `skills/generate-lineups/scripts/build_slate.py`, `skills/generate-lineups/SKILL.md`, `tools/claim.py`, `CLAUDE.md`, `tools/audit.py` (`EXPECTED_SUITE_COUNTS`), `tests/__init__.py`, `tests/test_core.py` (`DeliveryRecordTests` new; `ClaimWriteSetTests`, `MinerManifestFirstSalaryTests`, `MinerMoneyHonestyTests` extended), `docs/backlog.md`, `docs/PROGRESS.md`, this file.

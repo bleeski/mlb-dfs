@@ -820,7 +820,23 @@ EXPECTED_SUITE_COUNTS = {
     # front-door tests published into the real tree (harmless while `outputs/`
     # was all they wrote, because it is gitignored), and the code sha survives
     # an isolated artifact root because it is read from the code, not from it.
-    "tests.test_core": 1353,
+    # R370 + R371, 2026-09-19: 1353 -> 1375, CC-A7's twenty-two. Twelve on the
+    # outcome review: washout three-valued in both directions (an unknown curve
+    # never reading as `false`, one cash beating an unknown contest), a cashed
+    # contest graded end to end, a known-curve miss graded as a washout, an
+    # absent standings export named rather than skipped, the planned/realized
+    # exposure join through the salary sha and its unjoined fallback, the
+    # emitted text grepped for every outcome-claim word, `pending` counting
+    # only records with no review beside them, a re-run replacing its own
+    # ledger fragment, and a sidecar never readable as a delivery. Ten on the
+    # retro facts: the gate-clean-to-hand-over gap and its refusal to invent
+    # one, the R363 detector against a Showdown brief plus both SKILL.md
+    # constructions and the two filters that keep filenames and non-brief roots
+    # out, a refusal exit against its documented table in both directions, the
+    # degraded-input extraction, a missing brief stated rather than silent, a
+    # defaulted control kept apart from a hand-passed one, and every section
+    # rendering when all are empty.
+    "tests.test_core": 1375,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps
