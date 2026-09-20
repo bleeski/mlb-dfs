@@ -84,7 +84,7 @@ Ben's instruction, 2026-09-17: the workflow moves to Claude Code sessions in clo
 | **CC-3** (new + was Session 10 Batch 4, Session 11 Batch 1, Session 39 Batch 2 (a)) | `Batch (1 of 4)` **DONE 2026-09-20** | **R347 (NEW) -- a PO opener is unrosterable in Showdown while `showdown.py:319-322` says he is rosterable.** `_is_declared` returns False for `PO`, `_participation` (`:366`) falls to `confirmed_nonstarter` on a decided side, `starters_only` drops him (`:386`); `Is_Declared_Opener` is set (`:379`) and nothing reads it; `--declare-pitcher` cannot reach a Showdown pool by its own help text (`build_slate.py:4577-4581`). Measured 1940_1g_sd: Hagen Smith, the only CWS arm DK marked as taking the ball, absent from a 20-man pool, brief clean. An invisible pool reduction (CLAUDE.md hard guardrail). Fix: an opener branch in `_participation` that keeps him under `starters_only` on `Is_Declared_Opener` (a third participation value, never `confirmed_starter`), the brief naming him, and the comment and CLI help made true. | Inbox 2026-09-10 (`showdown-po-opener-unrosterable`) | `mlb_engine/optimize/showdown.py:146-152, 319-386`, `build_slate.py` `run_showdown` brief and `--declare-pitcher` help | P (one arm per side; the pool is the whole Showdown game) | Low | None |
 | **CC-3** | `Batch (2 of 4)` **WIRING DONE 2026-09-20; measurement deferred, inputs gone** | **R334(a) -- apply the existing F1 implied-team-total factor to the Showdown APPG prior** (pulled forward from Session 39 on the mine's evidence that the Showdown side split is the strongest effect in the archive and F1 reaches no Showdown hitter today, `build_slate.py:4697`, R249). Re-measure the 1.77x side split with it live. (b), the opposing-arm term, stays gated on (a)'s residual in Phase 4. | Backlog / Inbox | `build_slate.py` `run_showdown`, `showdown.py` melt, `projection_builder.build_f1_factors` | P | Low-Med | An odds packet for the measurement; the wiring needs none |
 | **CC-3** | `Batch (3 of 4)` **DONE 2026-09-20** | **R334(c)(d) -- the Showdown APPG Base is blind to the opposing arm; warning and sanity-pass halves.** A brief NOTE when the two declared arms' expected stats differ by more than a stated margin; a `--projections` sanity pass naming hitters whose Base rank contradicts their Savant rate-stat rank. Report, never a gate. | Inbox 2026-09-08 | `build_slate.py` `run_showdown` brief, `showdown.py` beside `small_sample_base_report`, `data/reference/expected_stats_*.csv` | P | Low | None |
-| **CC-3** | `Batch (4 of 4)` | **R328 -- Showdown ownership marginals exceed 100% and captain can exceed roster.** Project onto the capped simplex, enforce `0 <= captain_p <= roster_p <= 1`, reject NaN/inf before any `--leverage` or sleeve use. Arithmetic, not calibration; gates CC-5. | Spec | `mlb_engine/field/ownership_prior.py:676-727`, `tools/ownership_pred.py`, `tests/test_core.py` | P (R307 consumes these) | Low | None |
+| **CC-3** | `Batch (4 of 4)` **DONE 2026-09-20 -- and the row was STALE: two of its three sub-fixes shipped in R338 on 2026-09-11** | **R328 -- the ORDERING between the two Showdown ownership markets.** The capped-simplex projection and the NaN/inf rejection were already live (`_bounded_marginals` at `ownership_prior.py:491`, reached on the Showdown path at `:736` inside `_showdown_prediction`, which is at `:702-752` and not the `:676-727` this row cited). What remained was `captain_p <= roster_p`, enforced only in `mlb_engine/production/contracts.py`, which R302 keeps off the build path. `showdown_role_coherence` is that check where the build can reach it; it reports and never clamps, because a clamp breaks R306's 100% captain budget. The defect is UNREPRODUCED over 4,000 randomized pools plus a structured grid, so it unblocks CC-5 rather than repairing a number. | Spec | `mlb_engine/field/ownership_prior.py`, `tools/ownership_pred.py`, `tests/test_showdown.py` | P (R307 consumes these) | Low | None |
 | **CC-4** (was Session 8) | `Standalone` | **R295 (+F13, F14, F40 riders) -- Showdown ladder truth, remaining parts.** F13 shipped in R338; open: (a) the R250 hold collides with a thesis lock and the ladder drops the player cap (58% realized under 50%); (b) the degraded flag reads a thesis-weighted proxy; (c) rung 5 re-solves rung 1; (d) the melt merges same-name same-team persons; F14's second half (thesis preferences as a soft field, so R338 repair (3)'s operator-only scoping can be lifted); F40 captain reservations bounded by both caps and released once per slot. | Backlog / Spec | `mlb_engine/optimize/showdown_theses.py`, `showdown.py`, `build_slate.py` `run_showdown`, `tests/test_showdown.py` | P (single-game and small-field prizes ride on the three caps holding) | Med (ladder state machine) | CC-3 (same files; land after) |
 | **CC-5** (was Session 12) | `Standalone` | **R307 -- the captain leverage sleeve.** "These 4 entries take their captain from this list, the other 12 build honestly." Aimed at the CAPTAIN market only. **Mine rider, 2026-09-15:** captain popularity INVERTS between bands in the archive (top-1% lift 1.231 -> 0.856 from least- to most-captained quartile; top-20% runs the other way), while Showdown TOTAL ownership does not hurt at the top (every finishing band above median is more owned than the field). So the sleeve tilts the captain slot toward the low-captained quartile for top-band entries and leaves the five flex slots chalk-positive; it never imports Classic total-ownership fading into Showdown. The coldest-quartile CI [0.993, 1.547] is suggestive, so the sleeve ships counted and graded (R139's report), not as a default. | Backlog / Mine | `showdown_theses.py`, `build_slate.py` `run_showdown`, `ownership_pred emit` | P (Ben's stated design ruling, 2026-09-03) | Med | CC-3 (R328), CC-4 (R295(a), the cap collision the sleeve's reservations hit) |
 
@@ -4869,35 +4869,23 @@ where one game makes it matter most. Same fix, same session; the Showdown path
 is the second consumer the tool and the reference serve, and the acceptance test
 runs once on each format.
 
-### R328. The Showdown ownership prior's per-player marginals can exceed 100% and the captain marginal can exceed the roster marginal, because the 600% budget is enforced on the total and nowhere else (P1, XS; gates R307) | new 2026-09-08, from the greenfield twelfth edition (F27); VERIFIED-repro by the edition on the production function
+### R328. CLOSED 2026-09-20 -- SHIPPED across two commits, entries migrated to CHANGELOG.md
 
-**LANDED 2026-09-11 in R338's commit one; the record is that date's CHANGELOG entry.** The water-fill half shipped: `_bounded_marginals` projects softmax shares onto the capped simplex in percentage units for both `predict_ownership` and `_showdown_prediction`, and `attach_predicted_ownership` refuses non-finite or out-of-[0,100] values. **What is left is the captain bound**: `0 <= captain_p <= roster_p <= 1` is enforced only in the package's schemas, so Session 11 still owns it on the legacy path.
+The water-fill and the NaN/inf rejection landed 2026-09-11 with R338; the
+ordering between the two markets landed 2026-09-20 as `showdown_role_coherence`.
+Read both dates' CHANGELOG entries. The row above was written against the
+pre-R338 tree and is corrected there rather than here.
 
-- **What.** `ownership_prior._showdown_prediction` (`:676-727`) multiplies an
-  unconstrained softmax by the slot count. That enforces the sum (600% over six
-  seats, R306's correct accounting) and nothing per player: six players competing
-  for six seats came back `[8.01, 16.70, 34.84, 72.67, 151.59, 316.19]%`, where
-  every one must be 100%. The separate captain (100%) and roster (600%) markets
-  are not constrained to `captain_p <= roster_p`, and nonfinite or out-of-range
-  external values are not uniformly rejected before `attach_predicted_ownership`
-  (`:824-896`) hands them to `--leverage`. Classic normalization near `:491` has
-  the same shape at a scale where it rarely bites.
-- **Why P1.** R307's captain sleeve and every `--leverage` build read these
-  numbers, and a marginal above 1.0 on a chalk bat is exactly the input a
-  leverage tilt would act on hardest. This is arithmetic, not calibration:
-  fixing it makes the market coherent and says nothing about whether it is right
-  (R10 grades that).
-- **Fix.** Project the scores onto the capped simplex (bisection on the shift
-  until `sum(clip(v - t, 0, 1)) == slots`; all ones when players == slots; all
-  zeros when slots == 0); enforce `0 <= captain_p <= roster_p <= 1` between the
-  two markets; reject missing/NaN/inf/out-of-range values before any ownership
-  control reads them rather than treating a missing value as attractive low
-  ownership; keep unrounded values internally and round only presentation,
-  reporting the residual. The target field model derives marginals from sampled
-  legal lineups (R261); this is the immediate numerical repair. Acceptance:
-  six-for-six gives all ones; sums and bounds hold on thin and full pools;
-  captain/roster coherence is asserted; held-out calibration is measured
-  separately. Roadmap: Session 11, ahead of R307 at Session 12.
+**One residual, filed here rather than left in a commit message.**
+`optimizer_v3._ownership_pct_for_row` reads `Projected_Ownership_Pct` through
+`_safe_float(val, 0.0)` with no range check, so a direct
+`run_slate(projection_rows=...)` caller can hand in an out-of-range column and
+bypass `attach_predicted_ownership`'s refusal entirely. NOT reachable by any
+operator flag today: `--projections` is Showdown-only and `Player_ID,Base` only,
+`--leverage` is refused on Showdown outright, and both in-tree writers of that
+column (`attach_predicted_ownership` and `attach_projected_ownership`) are
+bounded. XS whenever somebody wants it; it becomes real the day a caller feeds
+the column from outside this repo.
 
 ### R315. A TRACKED reference manifest registers an UNTRACKED CSV that production code reads, so a clone stages every slate with one prior silently absent; plus two gitignore gaps that made ARCHIVE's completed work read as dirt for five days (P1 for (c), XS each) | new 2026-09-04, DEV, from Ben's question about the archive dirt at the boot scan
 

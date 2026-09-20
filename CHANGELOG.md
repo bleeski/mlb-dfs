@@ -25,6 +25,80 @@ performance claim.
 
 ---
 
+## 2026-09-20 — R328: the last half, the ordering between the two Showdown ownership markets; the other two halves shipped in R338 and the row was stale against its own entry
+
+**Scope.** `mlb_engine/field/ownership_prior.py`
+(`ROLE_COHERENCE_TOLERANCE_PCT`, `showdown_role_coherence`, both new),
+`tools/ownership_pred.py` (a `role_coherence` block per archetype on a Showdown
+emit), `tests/test_showdown.py` (`R328ShowdownRoleCoherenceTests`, new, 7),
+`tools/audit.py` (`EXPECTED_SUITE_COUNTS`), `docs/backlog.md`.
+
+**Two of the row's three sub-claims were FALSE at HEAD, and the entry already
+said so.** The roadmap row asked to "project onto the capped simplex, enforce
+`0 <= captain_p <= roster_p <= 1`, reject NaN/inf". `_bounded_marginals` has
+water-filled both markets onto the capped simplex since R338 (2026-09-11), at
+`predict_ownership` and at `_showdown_prediction` alike, and
+`attach_predicted_ownership` has refused non-finite, boolean and
+out-of-[0,100] values since the same commit. The `[8.01, 16.70, 34.84, 72.67,
+151.59, 316.19]%` the item was filed on was produced by `own = share *
+budget_pct` at `00ffc94:709-710`, and that arithmetic no longer exists. The
+row's file citation (`ownership_prior.py:676-727`) was exact when filed and has
+drifted 26 lines; at HEAD that window is `_single_pool_shares`' tail plus
+`_showdown_prediction`'s header, and the bounded call is at `:736`.
+
+**What was actually left.** `0 <= captain_p <= roster_p <= 1` was enforced only
+by `Projection.role_marginals` in `mlb_engine/production/contracts.py` -- a
+pydantic schema inside R302's strangler package, which the legacy path cannot
+import and which `test_no_legacy_module_imports_the_production_package_or_pydantic`
+pins out of it on every gate. `showdown_role_coherence` is that check on the
+path the build uses, called from `tools/ownership_pred.py`, which is the one
+place both markets are produced together.
+
+**It reports and never clamps, and the reason is arithmetic rather than
+caution.** Pulling a captain value down to its roster value breaks the 100%
+captain budget -- R306's own accounting, and the exact property the water-fill
+exists to preserve -- and redistributing the remainder re-runs an allocation
+whose inputs are already known to be wrong. A breach means the two temperatures
+produced a person more likely to be CAPTAINED than ROSTERED, which is impossible
+by construction rather than merely undesirable. That is a bug report with the
+numbers attached, not a number to round off at T-10. The comparison carries a
+0.01pp tolerance because `_bounded_marginals` rounds to 2dp, with an epsilon on
+top because `100.0 - 99.99` is `0.0100000000000051` in binary floating point and
+a bare `> 0.01` calls an equal pair a violation.
+
+**The defect is UNREPRODUCED and this entry says so rather than implying a fix.**
+4,000 randomized pools (6-45 people, random salaries, position mixes, probable
+sets, batting orders, implied totals and Base maps, all six archetypes) plus a
+structured grid over pool size, salary shape and arm count give a maximum
+captain-minus-roster excess of exactly 0.0. The reason is structural: the
+captain temperature runs below the roster temperature (0.1733 against 0.2267 on
+`large_field_gpp`), so a breach needs a captain share more than six times the
+roster share, and where the roster share would saturate the water-fill pins it
+at 100. Nothing on the legacy path consumes the captain market at all today --
+`--leverage` is refused outright on Showdown (`leverage_not_supported_on_showdown`)
+and R307's sleeve is not built. So this is a guard against drift in either
+temperature table, and it unblocks CC-5 rather than repairing an observed
+number.
+
+**One residual, named and not closed.** `optimizer_v3._ownership_pct_for_row`
+reads `Projected_Ownership_Pct` through `_safe_float(val, 0.0)` with no range
+check, so a direct `run_slate(projection_rows=...)` caller could hand in an
+out-of-range column and bypass `attach_predicted_ownership`. No operator flag
+reaches it -- `--projections` is Showdown-only and `Player_ID,Base` only -- and
+both in-tree writers of that column are bounded. Filed on the remaining entry
+rather than widened into here.
+
+**Mutation-checked, four reverts.** Flipping the comparison fails 3 of 7;
+dropping the out-of-range check fails 1; disabling the water-fill's capping
+fails 2 here and `test_ownership_is_a_bounded_inclusion_marginal` in the
+greenfield suite; dropping the emit block fails 1. A fifth mutation
+(`remaining = min(budget, 100 * len(shares))` to `remaining = budget`) was
+tried and caught NOTHING, because the `min` only bites when the budget exceeds
+100 per player -- a thinner pool than any test here builds, and worth knowing
+rather than mistaking for coverage.
+
+---
+
 ## 2026-09-20 — R334(c)(d): the Showdown brief says when the two declared arms are mismatched, and when a supplied Base contradicts the rate stats
 
 **Scope.** `mlb_engine/optimize/showdown.py` (`OPPOSING_ARM_XWOBA_MARGIN`,

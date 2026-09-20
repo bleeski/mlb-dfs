@@ -4779,5 +4779,113 @@ class R334dSuppliedBaseSanityTests(unittest.TestCase):
                       src)
 
 
+# ---------------------------------------------------------------------------
+# R328 remaining half. The ordering between the two Showdown ownership markets.
+# ---------------------------------------------------------------------------
+class R328ShowdownRoleCoherenceTests(unittest.TestCase):
+    """Two of this item's three sub-fixes shipped in R338 and are re-pinned here
+    so the row cannot be reopened against the wrong half.
+
+    `_bounded_marginals` water-fills BOTH markets onto the capped simplex, so
+    the `[8.01, ..., 316.19]%` the item was filed on cannot be produced;
+    `attach_predicted_ownership` refuses non-finite and out-of-[0,100] values
+    before any `--leverage` control reads one. What was left is the ORDERING
+    across the two markets, enforced only in `mlb_engine/production/contracts.py`
+    -- R302's strangler package, which the legacy path cannot import and a
+    greenfield test pins it out of.
+    """
+
+    def _players(self):
+        from mlb_engine.field import ownership_prior as op          # noqa: F401
+        rows = []
+        for i in range(9):
+            rows.append(types.SimpleNamespace(
+                player_id=f"H{i}", name=f"Bat {i}", team="AAA" if i < 5 else "BBB",
+                position="OF", salary=3000 + 400 * i, roster_position="UTIL",
+                avg_points_per_game=8.0 + i))
+        for i in range(2):
+            rows.append(types.SimpleNamespace(
+                player_id=f"P{i}", name=f"Arm {i}", team="AAA" if i else "BBB",
+                position="SP", salary=10000 + 500 * i, roster_position="UTIL",
+                avg_points_per_game=16.0 + i))
+        return rows
+
+    def test_the_production_markets_are_coherent_on_every_archetype(self):
+        """Not reproducible, and that is the finding. Over 4,000 randomized
+        pools plus a structured grid the maximum captain-minus-roster excess is
+        exactly 0.0, because the captain temperature runs BELOW the roster one
+        and the water-fill pins a saturating roster share at 100."""
+        from mlb_engine.field import ownership_prior as op
+        players = self._players()
+        for archetype in op.ARCHETYPE_PARAMS:
+            cap = op.predict_captain_ownership(
+                players, archetype=archetype, probable_sp_ids=["P0", "P1"])
+            ros = op.predict_showdown_roster_ownership(
+                players, archetype=archetype, probable_sp_ids=["P0", "P1"])
+            out = op.showdown_role_coherence(cap["own_pct_by_player_id"],
+                                             ros["own_pct_by_player_id"])
+            self.assertTrue(out["coherent"], f"{archetype}: {out['violations']}")
+            self.assertEqual(out["checked"], len(players))
+
+    def test_a_captain_marginal_above_its_roster_marginal_is_NAMED(self):
+        """The guard itself. A person cannot be captained more often than he is
+        rostered; both markets are percentages of entries, so the comparison is
+        direct."""
+        from mlb_engine.field import ownership_prior as op
+        out = op.showdown_role_coherence({"a": 40.0, "b": 5.0},
+                                         {"a": 12.0, "b": 90.0})
+        self.assertFalse(out["coherent"])
+        self.assertEqual([v["player_id"] for v in out["violations"]], ["a"])
+        self.assertEqual(out["violations"][0]["excess_pct"], 28.0)
+
+    def test_it_reports_and_never_clamps(self):
+        """A clamp breaks the 100% captain budget, which is R306's accounting
+        and the property the water-fill exists to preserve. The inputs come back
+        untouched and the caller still holds the numbers it passed."""
+        from mlb_engine.field import ownership_prior as op
+        captain = {"a": 40.0, "b": 5.0}
+        roster = {"a": 12.0, "b": 90.0}
+        before = dict(captain), dict(roster)
+        out = op.showdown_role_coherence(captain, roster)
+        self.assertEqual((captain, roster), before)
+        for key in ("own_pct_by_player_id", "clamped", "repaired"):
+            self.assertNotIn(key, out)
+
+    def test_rounding_at_the_last_place_is_not_a_violation(self):
+        """`_bounded_marginals` rounds to 2dp, so an equal pair can differ by
+        half a cent. A tolerance, not a clamp."""
+        from mlb_engine.field import ownership_prior as op
+        self.assertTrue(
+            op.showdown_role_coherence({"a": 100.0}, {"a": 99.99})["coherent"])
+        self.assertFalse(
+            op.showdown_role_coherence({"a": 100.0}, {"a": 99.0})["coherent"])
+
+    def test_out_of_range_and_missing_ids_are_reported_separately(self):
+        from mlb_engine.field import ownership_prior as op
+        out = op.showdown_role_coherence({"a": 101.0, "c": 5.0},
+                                         {"a": 100.0, "b": 50.0})
+        self.assertFalse(out["coherent"])
+        self.assertEqual(out["out_of_range"],
+                         [{"player_id": "a", "market": "captain", "value": 101.0}])
+        self.assertEqual(out["missing_from_roster_market"], ["c"])
+        self.assertEqual(out["missing_from_captain_market"], ["b"])
+        self.assertEqual(out["checked"], 1, "only the shared id is comparable")
+
+    def test_the_water_fill_half_already_shipped_and_stays_shipped(self):
+        """R338. The `[8.01, ..., 316.19]%` this item was filed on: six people
+        competing for six seats must every one be 100%."""
+        from mlb_engine.field import ownership_prior as op
+        out = op._bounded_marginals({str(i): 10 ** i for i in range(6)}, 600)
+        self.assertEqual(sorted(out.values()), [100.0] * 6)
+        for pid, value in op._bounded_marginals(
+                {str(i): float(i + 1) for i in range(20)}, 600).items():
+            self.assertTrue(0.0 <= value <= 100.0, f"{pid}={value}")
+
+    def test_the_emit_carries_the_block(self):
+        src = (REPO / "tools" / "ownership_pred.py").read_text(encoding="utf-8")
+        self.assertIn('block["role_coherence"] = '
+                      'ownership_prior.showdown_role_coherence(', src)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
