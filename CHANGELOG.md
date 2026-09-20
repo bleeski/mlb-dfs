@@ -25,6 +25,90 @@ performance claim.
 
 ---
 
+## 2026-09-20 — R334(c)(d): the Showdown brief says when the two declared arms are mismatched, and when a supplied Base contradicts the rate stats
+
+**Scope.** `mlb_engine/optimize/showdown.py` (`OPPOSING_ARM_XWOBA_MARGIN`,
+`SUPPLIED_BASE_RANK_GAP`, `_savant_name_index`, `_dk_name_key`,
+`opposing_arm_report`, `supplied_base_sanity_report`, all new),
+`skills/generate-lineups/scripts/build_slate.py` (`load_savant_table`, new;
+`run_showdown` resolves the reference data and computes both reports; two brief
+keys under `pool`), `tests/test_showdown.py`
+(`R334cOpposingArmReportTests` 5, `R334dSuppliedBaseSanityTests` 7),
+`tools/audit.py` (`EXPECTED_SUITE_COUNTS`), `docs/backlog.md`.
+
+**(c) names the condition under which the remaining blindness is largest.**
+R334(a) wired the market's implied team total, which carries the opposing arm at
+the TEAM level and only as far as `F1_HITTER_CLIP` allows. The arm's own quality
+is (b) and is not built. So the Showdown Base is still a season mean over every
+opponent a hitter faced, in a contest that is one game with one arm per side,
+and `opposing_arm_report` says so on the builds where it matters most -- before
+the first solve, which is the point. R310(b)'s shape exactly: present on every
+Showdown brief with `flagged: false`, never a gate, never a pool change.
+
+**The margin was chosen by measurement, not by taste, because R292 is what
+happens otherwise.** Over the 124 arms in `expected_stats_pitching.csv` with
+400+ PA, all 7,626 pairs, league mean xwOBA-against 0.3302:
+
+    margin 0.08  gap > 0.0264   fires on 50.8% of random SP pairs
+    margin 0.10  gap > 0.0330   fires on 40.3%
+    margin 0.12  gap > 0.0396   fires on 32.6%
+    margin 0.15  gap > 0.0495   fires on 21.9%
+    margin 0.20  gap > 0.0660   fires on 10.6%
+
+0.20 ships: about one slate in ten, which is a caution worth reading. The pair
+this item was measured from is 0.267 against 0.384, a gap of 0.117 and 35.4% of
+the mean, so it fires at every margin on that table and is not what calibrated
+it.
+
+**(d) is the SEMANTIC boundary beside R327's numeric one.** R327 refuses a
+supplied frame carrying a non-finite, negative or duplicated number.
+`supplied_base_sanity_report` refuses nothing: it ranks each side's supplied
+Bases against the same side's Savant `est_woba` and names a hitter whose two
+ranks contradict by more than the gap. A supplied number is the operator's, and
+R249's contract is that it IS the prior; the engine's job here is to say what it
+disagrees with.
+
+**WITHIN a side, and that is the whole design decision.** Ranking across the
+game would re-measure the thing a supplied Base is usually supplied to express
+-- that one side faces a much better arm, which is R334's own subject -- and
+would flag every prior that got the matchup right. Holding the opposing arm
+fixed makes a disagreement about the HITTER. The mutation that ranks across both
+sides fails two tests.
+
+**The rank gap carries its own noise floor, in the report.** Over 20,000 random
+permutations of a 9-hitter side, which is what this would name if the two
+orderings were independent: `> 2` names 4.67 of 9, `> 3` 3.31, `> 4` 2.22,
+`> 5` 1.34 with 20.7% of sides silent. 5 ships, the most conservative measured,
+and the report's `label` states the 1.34 so one or two names is not read as a
+finding. A real Base correlates with a rate stat, so that floor is an upper
+bound rather than an expectation.
+
+**Both joins are by NAME and a miss is NAMED.** DK ships no MLBAM id (R189(2)),
+so this is the same join `compute_f4_factors` makes, through the same
+`_savant_name_key`, and `_savant_name_index` keeps `_build_name_to_mlbam`'s rule
+that a colliding name establishes nothing and is dropped rather than resolved by
+a PA ranking. These functions REPORT; a report that names the wrong man is worse
+than one that stays quiet. An arm with no joinable row appears in
+`unmatched_arms` and the comparison is skipped rather than made against one
+side; a hitter with no row appears in `unmatched_hitters` and is not ranked.
+
+**The Showdown path read no Savant file at all before this.** `run_showdown` now
+calls `resolve_reference_data`, the same resolver `run_classic` has used since
+F4, through a `load_savant_table` helper that returns None rather than raising:
+a missing or unreadable reference file makes the block say which and the build
+carries on, which is `resolve_reference_data`'s own stated contract (degraded
+signal beats no lineups at T-10).
+
+**Mutation-checked, four reverts.** Margin to 0.0 fails the silent-pair test;
+dropping the unmatched-arm naming fails the R189(2) test; ranking across both
+sides instead of within one fails two (d) tests; the gap constant 5 to 1 fails
+the threshold test -- and that last one did NOT fail on the first version of
+that test, which used an adjacent swap whose delta of 1 is below both settings.
+The test was rewritten to a 3-place move and to exercise the report at two gap
+values, because a threshold nothing moves against is a constant no test pins.
+
+---
+
 ## 2026-09-20 — R334(a): the F1 implied-team-total factor reaches a Showdown hitter's prior, and the brief says whether it did
 
 **Scope.** `mlb_engine/optimize/showdown_theses.py` (`apply_f1_prior`, new;

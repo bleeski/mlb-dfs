@@ -4532,5 +4532,252 @@ class R334aShowdownF1PriorTests(unittest.TestCase):
         self.assertIn('"f1": {', src)
 
 
+# ---------------------------------------------------------------------------
+# R334(c)(d). Two Showdown reports, neither a gate.
+# ---------------------------------------------------------------------------
+def _savant_pitching(rows):
+    """A minimal Savant expected-stats pitching frame: (name, est_woba, pa)."""
+    return pd.DataFrame([
+        {"last_name, first_name": name, "player_id": str(1000 + i),
+         "year": 2026, "pa": pa, "woba": est, "est_woba": est, "xera": 4.00}
+        for i, (name, est, pa) in enumerate(rows)])
+
+
+def _savant_batting(rows):
+    return pd.DataFrame([
+        {"last_name, first_name": name, "player_id": str(2000 + i),
+         "year": 2026, "pa": 500, "woba": est, "est_woba": est}
+        for i, (name, est) in enumerate(rows)])
+
+
+class R334cOpposingArmReportTests(unittest.TestCase):
+    """The Showdown Base is APPG, a season mean over every opponent a hitter
+    faced; a Showdown contest is ONE game with ONE arm per side.
+
+    R334(a) wired the market's implied team total, which carries the arm at the
+    TEAM level and only as far as `F1_HITTER_CLIP` allows. The opposing-arm term
+    itself is (b) and is not built, so this names the condition under which the
+    remaining blindness is largest and is knowable BEFORE the first solve.
+    R310(b)'s shape: report, never a gate, present with `flagged: false`.
+    """
+
+    HEADER = ["Position", "Name + ID", "Name", "ID", "Roster Position",
+              "Salary", "Game Info", "TeamAbbrev", "AvgPointsPerGame",
+              "Status", "Starting"]
+    GAME = "AAA@BBB 09/30/2026 07:05PM ET"
+
+    def _melt(self, arm_names=("AAA Ace", "BBB Ace"), declare=True):
+        rows = [self.HEADER]
+        pid = 1000
+        for team, arm in zip(("AAA", "BBB"), arm_names):
+            for i in range(9):
+                name = f"{team} Bat{i + 1}"
+                for role, mult in (("UTIL", 1.0), ("CPT", 1.5)):
+                    rows.append(["OF", f"{name} ({pid})", name, str(pid), role,
+                                 str(int(4000 * mult)), self.GAME, team, "9.0",
+                                 "", str(i + 1)])
+                    pid += 1
+            for role, mult in (("UTIL", 1.0), ("CPT", 1.5)):
+                rows.append(["SP", f"{arm} ({pid})", arm, str(pid), role,
+                             str(int(9000 * mult)), self.GAME, team, "14.0", "",
+                             "SP" if declare else ""])
+                pid += 1
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "DKSalaries.csv"
+            with path.open("w", newline="", encoding="utf-8") as fh:
+                csv.writer(fh).writerows(rows)
+            return sd.melt_showdown_salary_csv(str(path))
+
+    # league mean over this table is 0.33, so the margin is a 0.066 gap
+    WIDE = _savant_pitching([("Ace, Aaa", 0.267, 600), ("Ace, Bbb", 0.384, 600),
+                             ("Filler, One", 0.330, 600),
+                             ("Filler, Two", 0.330, 600)])
+    NARROW = _savant_pitching([("Ace, Aaa", 0.325, 600), ("Ace, Bbb", 0.335, 600),
+                               ("Filler, One", 0.330, 600),
+                               ("Filler, Two", 0.330, 600)])
+
+    def test_it_fires_on_the_mismatched_pair(self):
+        """The 2210_1g_sd numbers: 0.267 against 0.384 is a 0.117 gap, 35.4% of
+        the league mean, against a 20% margin."""
+        out = sd.opposing_arm_report(self._melt(), self.WIDE)
+        self.assertTrue(out["flagged"])
+        self.assertAlmostEqual(out["gap_est_woba_against"], 0.117, places=3)
+        self.assertGreater(out["gap_as_fraction_of_league_mean"],
+                           sd.OPPOSING_ARM_XWOBA_MARGIN)
+        self.assertIn("AvgPointsPerGame", out["note"])
+        self.assertEqual(len(out["arms"]), 2)
+        self.assertEqual({a["team"] for a in out["arms"]}, {"AAA", "BBB"})
+
+    def test_it_stays_silent_on_a_pair_inside_the_margin(self):
+        """The half that keeps this from being the referee that warns on
+        everything (R292). A 0.010 gap is 3% of the mean."""
+        out = sd.opposing_arm_report(self._melt(), self.NARROW)
+        self.assertFalse(out["flagged"])
+        self.assertNotIn("note", out)
+        self.assertEqual(len(out["arms"]), 2)
+
+    def test_it_is_present_and_says_why_when_it_cannot_run(self):
+        """`flagged: false` with a reason, never an absent key: an absent key is
+        not an answer to 'were the two arms mismatched'."""
+        self.assertIn("Savant",
+                      sd.opposing_arm_report(self._melt(), None)["skipped"])
+        undeclared = sd.opposing_arm_report(self._melt(declare=False), self.WIDE)
+        self.assertFalse(undeclared["flagged"])
+        self.assertIn("declared arm", undeclared["skipped"])
+        empty = sd.opposing_arm_report(pd.DataFrame(), self.WIDE)
+        self.assertFalse(empty["flagged"])
+        self.assertIn("empty", empty["skipped"])
+
+    def test_an_arm_with_no_savant_row_is_named_not_scored_neutral(self):
+        """R189(2)'s rule. DK ships no MLBAM id, so the join is by NAME and a
+        miss must be visible rather than silently comparing one arm."""
+        out = sd.opposing_arm_report(
+            self._melt(arm_names=("AAA Ace", "Bbb Nobody")), self.WIDE)
+        self.assertFalse(out["flagged"])
+        self.assertEqual(out["unmatched_arms"], ["BBB Bbb Nobody"])
+        self.assertIn("1 of 2", out["skipped"])
+
+    def test_it_never_changes_the_pool(self):
+        df = self._melt()
+        before = list(df["Base"]), len(df)
+        sd.opposing_arm_report(df, self.WIDE)
+        self.assertEqual((list(df["Base"]), len(df)), before)
+
+
+class R334dSuppliedBaseSanityTests(unittest.TestCase):
+    """R327 gave the supplied frame a NUMERIC boundary and REFUSES an unusable
+    number. This is the semantic one beside it and it never refuses.
+
+    Within a side on purpose: comparing across sides would re-measure the thing
+    a supplied Base is usually supplied to express -- that one side faces a much
+    better arm, which is R334's whole subject -- and would flag every prior that
+    got the matchup right.
+    """
+
+    HEADER = R334cOpposingArmReportTests.HEADER
+    GAME = R334cOpposingArmReportTests.GAME
+
+    def _melt(self):
+        rows = [self.HEADER]
+        pid = 1000
+        self.ids = {}
+        for team in ("AAA", "BBB"):
+            for i in range(9):
+                name = f"{team} Bat{i + 1}"
+                for role, mult in (("UTIL", 1.0), ("CPT", 1.5)):
+                    if role == "UTIL":
+                        self.ids[name] = str(pid)
+                    rows.append(["OF", f"{name} ({pid})", name, str(pid), role,
+                                 str(int(4000 * mult)), self.GAME, team, "9.0",
+                                 "", str(i + 1)])
+                    pid += 1
+            arm = f"{team} Arm"
+            for role, mult in (("UTIL", 1.0), ("CPT", 1.5)):
+                rows.append(["SP", f"{arm} ({pid})", arm, str(pid), role,
+                             str(int(9000 * mult)), self.GAME, team, "14.0",
+                             "", "SP"])
+                pid += 1
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "DKSalaries.csv"
+            with path.open("w", newline="", encoding="utf-8") as fh:
+                csv.writer(fh).writerows(rows)
+            return sd.melt_showdown_salary_csv(str(path))
+
+    @staticmethod
+    def _table():
+        # AAA Bat1 is the best bat by xwOBA and AAA Bat9 the worst.
+        return _savant_batting(
+            [(f"Bat{i + 1}, Aaa", 0.400 - 0.02 * i) for i in range(9)]
+            + [(f"Bat{i + 1}, Bbb", 0.400 - 0.02 * i) for i in range(9)])
+
+    def _agreeing(self, df):
+        return {self.ids[n]: 12.0 - 0.5 * (int(n[-1]) - 1)
+                for n in self.ids if n[-1].isdigit()}
+
+    def test_a_prior_that_agrees_with_the_rate_stat_names_nobody(self):
+        df = self._melt()
+        out = sd.supplied_base_sanity_report(df, self._agreeing(df), self._table())
+        self.assertTrue(out["applied"])
+        self.assertEqual(out["flagged"], [])
+        self.assertEqual(out["hitters_ranked"], 18)
+        self.assertEqual(out["sides_ranked"], ["AAA", "BBB"])
+
+    def test_an_inverted_bat_is_named_with_both_ranks(self):
+        """The acceptance shape: a prior that buries the side's best bat."""
+        df = self._melt()
+        supplied = self._agreeing(df)
+        supplied[self.ids["AAA Bat1"]] = 1.0        # best xwOBA, worst Base
+        out = sd.supplied_base_sanity_report(df, supplied, self._table())
+        names = [(f["team"], f["name"]) for f in out["flagged"]]
+        self.assertIn(("AAA", "AAA Bat1"), names)
+        hit = next(f for f in out["flagged"] if f["name"] == "AAA Bat1")
+        self.assertEqual(hit["est_woba_rank_in_side"], 1)
+        self.assertEqual(hit["base_rank_in_side"], 9)
+        self.assertEqual(hit["rank_delta"], 8)
+        self.assertIn("BELOW", hit["direction"])
+        self.assertFalse([f for f in out["flagged"] if f["team"] == "BBB"],
+                         "the other side's prior was untouched")
+        self.assertIn("not error", out["note"])
+
+    def test_the_gap_threshold_is_what_decides(self):
+        """Three places out of nine is disagreement, not contradiction, and the
+        threshold is the whole of what separates them. Measured on the constant:
+        two INDEPENDENT orderings of a 9-hitter side would name 1.34 of 9 at
+        this gap and 4.67 of 9 at `> 2`, which is the wall of text this avoids.
+
+        Exercised at both settings, because a threshold nothing moves against is
+        a constant no test is pinning: at the shipped 5 this side is silent, and
+        the same side at `> 2` names both swapped bats."""
+        df = self._melt()
+        supplied = self._agreeing(df)
+        supplied[self.ids["AAA Bat1"]], supplied[self.ids["AAA Bat4"]] = (
+            supplied[self.ids["AAA Bat4"]], supplied[self.ids["AAA Bat1"]])
+        table = self._table()
+        self.assertEqual(sd.SUPPLIED_BASE_RANK_GAP, 5)
+        out = sd.supplied_base_sanity_report(df, supplied, table)
+        self.assertEqual(out["flagged"], [], "a 3-place move is not a finding")
+        self.assertIn("1.34 of 9", out["label"])
+        tight = sd.supplied_base_sanity_report(df, supplied, table, gap=2)
+        self.assertEqual(sorted(f["name"] for f in tight["flagged"]),
+                         ["AAA Bat1", "AAA Bat4"])
+        self.assertEqual(sorted(abs(f["rank_delta"]) for f in tight["flagged"]),
+                         [3, 3])
+
+    def test_it_is_a_no_op_with_no_projections_file(self):
+        df = self._melt()
+        out = sd.supplied_base_sanity_report(df, {}, self._table())
+        self.assertFalse(out["applied"])
+        self.assertIn("--projections", out["skipped"])
+        self.assertEqual(out["flagged"], [])
+
+    def test_a_hitter_with_no_savant_row_is_named_not_ranked(self):
+        df = self._melt()
+        table = _savant_batting(
+            [(f"Bat{i + 1}, Aaa", 0.400 - 0.02 * i) for i in range(9)])
+        out = sd.supplied_base_sanity_report(df, self._agreeing(df), table)
+        self.assertEqual(out["sides_ranked"], ["AAA"])
+        self.assertEqual(len(out["unmatched_hitters"]), 9)
+        self.assertTrue(all(n.startswith("BBB") for n in out["unmatched_hitters"]))
+
+    def test_it_never_changes_a_supplied_number(self):
+        df = self._melt()
+        supplied = self._agreeing(df)
+        before = dict(supplied)
+        base_before = list(df["Base"])
+        sd.supplied_base_sanity_report(df, supplied, self._table())
+        self.assertEqual(supplied, before)
+        self.assertEqual(list(df["Base"]), base_before)
+
+    def test_both_reports_reach_the_showdown_brief(self):
+        src = (REPO / "skills" / "generate-lineups" / "scripts"
+               / "build_slate.py").read_text(encoding="utf-8")
+        self.assertIn('"opposing_arm": sd_opposing_arm,', src)
+        self.assertIn('"supplied_base_sanity": sd_base_sanity,', src)
+        self.assertIn("sd_opposing_arm = sd.opposing_arm_report(df, "
+                      "sd_savant_pitching)", src)
+        self.assertIn("sd_base_sanity = sd.supplied_base_sanity_report(",
+                      src)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

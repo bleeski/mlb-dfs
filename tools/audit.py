@@ -1089,7 +1089,15 @@ EXPECTED_SUITE_COUNTS = {
     # executable rather than a source-layout property), the no-packet no-op, the
     # prior_note reading the frame instead of asserting a chain, and the wiring
     # itself read off the source.
-    "tests.test_showdown": 245,
+    # R334(c)+(d), 2026-09-20: 245 -> 257, the twelve that pin the two Showdown
+    # reports -- (c) firing on the measured 2210_1g_sd arm gap and staying
+    # silent inside the margin, present with a reason when it cannot run, an
+    # unjoinable arm NAMED rather than scored on one side (R189(2)), and the
+    # pool untouched; (d) silent on a prior that agrees, naming an inverted bat
+    # with both ranks, WITHIN a side rather than across the game, the rank gap
+    # exercised at two settings, the no-projections no-op, an unjoinable hitter
+    # named not ranked, no supplied number changed, and both blocks on the brief.
+    "tests.test_showdown": 257,
     # R96, 2026-08-11: 141 -> 162, the twenty-one tests that pin the delivery
     # path. A `grew` verdict is the one case where moving a pin is correct.
     # R46 round 2, 2026-08-12: 162 -> 168, the six that pin the PARTIAL side.

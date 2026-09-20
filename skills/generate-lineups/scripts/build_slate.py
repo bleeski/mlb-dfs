@@ -1887,6 +1887,26 @@ def build_f4_map(pool: dict, savant_pitching_csv) -> tuple[dict, dict]:
     return f4, report
 
 
+def load_savant_table(path):
+    """R334(c)(d). A Savant expected-stats CSV, or None, never a raised error.
+
+    `build_f4_map` swallows the same failure into its own report; both Showdown
+    reports want the table itself, and neither may kill a build over a reference
+    file. A missing path and an unreadable file both come back None and the
+    report that asked for it says which.
+    """
+    if not path:
+        return None
+    try:
+        from mlb_engine.projections.projection_builder import (
+            load_savant_expected_stats,
+        )
+        return load_savant_expected_stats(path)
+    except Exception as exc:                            # noqa: BLE001
+        print(f"savant table unreadable ({path}): {exc}", file=sys.stderr)
+        return None
+
+
 def pool_brief_block(report: dict, pool: dict) -> dict:
     """The brief's ``pool`` block, from the engine's own pool_report.
 
@@ -3600,6 +3620,15 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
     # rather than beside the brief so the caution exists even on a path that
     # refuses later.
     sd_small_sample = sd.small_sample_base_report(df)
+    # R334(c)+(d). The Showdown path read no Savant file at all; `run_classic`
+    # has resolved these three references since F4. Both reports are best-effort
+    # and neither gates: a missing or unreadable table makes the block say so
+    # and the build carries on, the same contract `resolve_reference_data`'s own
+    # docstring states (degraded signal beats no lineups at T-10).
+    sd_reference = resolve_reference_data(args)
+    sd_savant_pitching = load_savant_table(sd_reference.get("savant_pitching"))
+    sd_savant_batting = load_savant_table(sd_reference.get("savant_batting"))
+    sd_opposing_arm = sd.opposing_arm_report(df, sd_savant_pitching)
     clock = slate_clock(players=parse_dk_salary_csv(str(salary)))
     reserved = sd.read_showdown_reserved_rows(str(entries))
     # Only blank reserved rows are fillable; a complete row is immutable, and
@@ -3678,6 +3707,14 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                               "projections": str(args.projections),
                               "error": str(exc)}, indent=1))
             return 4, {}
+
+    # R334(d). The SEMANTIC boundary beside R327's numeric one, and it lands
+    # here because this is the first point where the supplied frame and the pool
+    # are both in scope -- `read_supplied_base` takes a path and never sees a
+    # player. Report only: R327 refuses an unusable number, this one names an
+    # ordering it disagrees with and changes nothing.
+    sd_base_sanity = sd.supplied_base_sanity_report(df, supplied_base,
+                                                    sd_savant_batting)
 
     # R290(c) step 2. The solve is a governed loop rather than a straight line.
     # Both refusals below are BADLY-SHAPED against Showdown's three portfolio
@@ -4145,6 +4182,17 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
             # Showdown brief with `applied: false` when nothing is flagged, the
             # same discipline `supplied_base` follows: absent is not an answer.
             "small_sample_base": sd_small_sample,
+            # R334(c). The condition under which APPG's blindness to the
+            # opposing arm is largest and knowable BEFORE the first solve, on
+            # R310(b)'s shape: present on every Showdown brief with
+            # `flagged: false`, because an absent key is not an answer to "were
+            # the two arms mismatched".
+            "opposing_arm": sd_opposing_arm,
+            # R334(d). R327 gave the supplied frame a numeric boundary and
+            # refuses an unusable number; this is the semantic one beside it and
+            # it never refuses. `applied: false` with a reason when no
+            # --projections file was supplied.
+            "supplied_base_sanity": sd_base_sanity,
         },
         "slate_clock": {
             "first_lock_utc": clock.get("first_lock_utc"),

@@ -600,6 +600,296 @@ def small_sample_base_report(df: pd.DataFrame) -> Dict[str, Any]:
     }
 
 
+#: R334(c). How far apart the two declared arms' expected stats have to be
+#: before the APPG Base's blindness to the opposing arm is worth a NOTE. A
+#: fraction of the league mean xwOBA-against, so a gap is stated against the
+#: population rather than in raw wOBA points, and so it moves in one place.
+#:
+#: CHOSEN BY MEASUREMENT, not by taste, because R292 is what happens otherwise:
+#: a caution that fires on every slate is the referee that warns on everything.
+#: Over the 124 arms in `expected_stats_pitching.csv` carrying 400+ PA, across
+#: all 7,626 pairs, league mean xwOBA-against 0.3302:
+#:
+#:     margin 0.08  gap > 0.0264   fires on 50.8% of random SP pairs
+#:     margin 0.10  gap > 0.0330   fires on 40.3%
+#:     margin 0.12  gap > 0.0396   fires on 32.6%
+#:     margin 0.15  gap > 0.0495   fires on 21.9%
+#:     margin 0.20  gap > 0.0660   fires on 10.6%
+#:
+#: 0.20 is about one slate in ten, which is a caution worth reading. The
+#: 2210_1g_sd pair this item was measured on is 0.267 against 0.384, a gap of
+#: 0.117 = 35.4% of the mean, so it fires at every margin on the table and is
+#: not what the threshold is calibrated against.
+OPPOSING_ARM_XWOBA_MARGIN = 0.20
+
+#: R334(d). How many places a supplied Base's within-side rank has to
+#: contradict the hitter's Savant rate-stat rank before he is NAMED.
+#:
+#: The noise floor, measured over 20,000 random permutations of a 9-hitter
+#: side, which is what this would flag if the two orderings were INDEPENDENT:
+#:
+#:     gap > 2   4.67 of 9 named on average,  0.3% of sides silent
+#:     gap > 3   3.31 of 9,                   1.9% silent
+#:     gap > 4   2.22 of 9,                   6.9% silent
+#:     gap > 5   1.34 of 9,                  20.7% silent
+#:
+#: 5, the most conservative measured. A real supplied Base correlates with a
+#: rate stat, so the floor above is an upper bound on the false-positive rate
+#: rather than an expectation -- but it is the number that stops one or two
+#: names being read as a finding, and the report's own label carries it.
+SUPPLIED_BASE_RANK_GAP = 5
+
+
+def _savant_name_index(table: "pd.DataFrame") -> Dict[str, str]:
+    """`{normalized name: Savant row index}` for the unambiguous names only.
+
+    DK ships no MLBAM id (R189(2)), so NAME is the only join to Savant on this
+    path and it is the same join `compute_f4_factors` already makes. A name
+    that appears twice establishes nothing about identity and is dropped rather
+    than resolved by a PA ranking, which is `_build_name_to_mlbam`'s rule and
+    is kept here deliberately: both of these functions REPORT, and a report
+    that names the wrong man is worse than one that stays quiet.
+    """
+    from mlb_engine.projections.xwoba_base_correction import _savant_name_key
+
+    seen: Dict[str, Any] = {}
+    collisions = set()
+    if table is None or not len(table) or "last_name, first_name" not in table:
+        return {}
+    for idx, raw in zip(table.index, table["last_name, first_name"]):
+        key = _savant_name_key(raw)
+        if not key:
+            continue
+        if key in seen:
+            collisions.add(key)
+            continue
+        seen[key] = idx
+    return {k: v for k, v in seen.items() if k not in collisions}
+
+
+def _dk_name_key(name: Any) -> str:
+    from mlb_engine.projections.xwoba_base_correction import _norm_name
+    return _norm_name(name)
+
+
+def opposing_arm_report(df: "pd.DataFrame",
+                        pitching_table: Optional["pd.DataFrame"] = None,
+                        margin: float = OPPOSING_ARM_XWOBA_MARGIN
+                        ) -> Dict[str, Any]:
+    """R334(c). NOTE when the two declared arms are far apart in expected stats.
+
+    The Showdown Base is AvgPointsPerGame, a season mean over every opponent a
+    hitter faced. A Showdown contest is ONE game with ONE arm per side, and
+    nothing on this path carries the declared arm's quality to a hitter's
+    number -- R334(a) wired the market's implied team total, which carries the
+    arm at the TEAM level and only as far as `F1_HITTER_CLIP` allows; the
+    opposing-arm term itself is (b) and is not built.
+
+    This is the condition under which that blindness is LARGEST and knowable
+    before the first solve. Measured on 2210_1g_sd (CIN@LAD, 2026-09-08):
+    Skubal (2.86 ERA) against Lodolo (5.08), and the side split against a
+    supplied external Base came out 1.77x wide and monotone by side.
+
+    R310(b)'s shape exactly: a report, never a gate, present on every Showdown
+    brief with ``flagged: false`` rather than absent, because "were the arms
+    mismatched" has to be answerable off the delivered brief and an absent key
+    is not an answer.
+
+    ``margin`` is a fraction of the league mean xwOBA-against, so a gap is
+    stated relative to the population rather than in raw wOBA points.
+    """
+    out: Dict[str, Any] = {
+        "flagged": False,
+        "margin": float(margin),
+        "arms": [],
+        "label": ("a deterministic comparison of two declared arms' Savant "
+                  "expected stats, never a projection, an edge or a "
+                  "probability claim. Report only; it changes no pool and no "
+                  "lineup."),
+    }
+    if df is None or not len(df):
+        out["skipped"] = "the pool is empty"
+        return out
+    arms = df[df["Batting_Order"].isna() & df["Is_Declared_Starter"].fillna(False)]
+    if len(arms) != 2 or len({str(t) for t in arms["Team"]}) != 2:
+        out["skipped"] = (f"{len(arms)} declared arm(s) across "
+                          f"{len({str(t) for t in arms['Team']})} side(s); this "
+                          f"compares exactly one per side")
+        return out
+    if pitching_table is None or not len(pitching_table):
+        out["skipped"] = "no Savant expected-stats pitching table was supplied"
+        return out
+
+    import pandas as _pd
+
+    est = _pd.to_numeric(pitching_table["est_woba"], errors="coerce")
+    valid = est.notna() & (est > 0)
+    if not bool(valid.any()):
+        out["skipped"] = "the supplied pitching table carries no usable est_woba"
+        return out
+    league_mean = float(est[valid].mean())
+    by_name = _savant_name_index(pitching_table)
+    rows, unmatched = [], []
+    for name, team in zip(arms["Name"], arms["Team"]):
+        idx = by_name.get(_dk_name_key(name))
+        if idx is None:
+            unmatched.append(f"{team} {name}")
+            continue
+        row = pitching_table.loc[idx]
+        value = est.loc[idx]
+        rows.append({
+            "team": str(team), "name": str(name),
+            "est_woba_against": (None if _pd.isna(value) else round(float(value), 4)),
+            "xera": (None if "xera" not in pitching_table
+                     else (lambda v: None if _pd.isna(v) else round(float(v), 2))(
+                         _pd.to_numeric(_pd.Series([row.get("xera")]),
+                                        errors="coerce").iloc[0])),
+            "pa": (None if _pd.isna(row.get("pa")) else int(float(row.get("pa")))),
+        })
+    out["arms"] = rows
+    out["league_mean_est_woba_against"] = round(league_mean, 4)
+    if unmatched:
+        # R189(2)'s rule, kept: an arm with a NAME but no joinable Savant row is
+        # NAMED, never scored neutral in silence.
+        out["unmatched_arms"] = sorted(unmatched)
+    if len(rows) != 2:
+        out["skipped"] = ("only "
+                          f"{len(rows)} of 2 declared arms joined the Savant "
+                          "table by name")
+        return out
+    gap = abs(float(rows[0]["est_woba_against"]) - float(rows[1]["est_woba_against"]))
+    out["gap_est_woba_against"] = round(gap, 4)
+    out["gap_as_fraction_of_league_mean"] = round(gap / league_mean, 4)
+    if gap / league_mean > margin:
+        tough, soft = sorted(rows, key=lambda r: float(r["est_woba_against"]))
+        out["flagged"] = True
+        out["note"] = (
+            f"the two declared arms differ by {gap:.3f} xwOBA-against "
+            f"({gap / league_mean:.1%} of the league mean), past the "
+            f"{margin:.0%} margin. Base on this build is AvgPointsPerGame, a "
+            f"season mean over every opponent, so {soft['team']}'s bats facing "
+            f"{tough['name']} and {tough['team']}'s bats facing {soft['name']} "
+            f"carry the same prior they would against an average arm. A "
+            f"supplied --projections Base is the way to price it; R334(b) is "
+            f"the factor and is not built."
+        )
+    return out
+
+
+def supplied_base_sanity_report(df: "pd.DataFrame",
+                                supplied_base: Optional[Mapping[str, Any]] = None,
+                                batting_table: Optional["pd.DataFrame"] = None,
+                                gap: int = SUPPLIED_BASE_RANK_GAP
+                                ) -> Dict[str, Any]:
+    """R334(d). Name hitters whose supplied Base rank contradicts their Savant
+    rate-stat rank, WITHIN their own side.
+
+    R327 gave the supplied frame a NUMERIC boundary -- finite, non-negative, no
+    duplicate ids, and a refusal rather than a skip. This is the SEMANTIC one
+    beside it, and like R309 it reports and never gates: a supplied number is
+    the operator's, and the engine's job is to say what it disagrees with, not
+    to overrule it.
+
+    WITHIN a side on purpose. Comparing across sides would re-measure the very
+    thing a supplied Base is usually supplied to express -- that one side faces
+    a much better arm (R334's whole subject) -- and would flag every prior that
+    got the matchup right. Within a side the opposing arm is held fixed, so a
+    disagreement is about the HITTER.
+
+    A hitter with no Savant row, or a side with fewer than two covered hitters,
+    is named and not ranked: a rank against one comparison is not a rank.
+    """
+    out: Dict[str, Any] = {
+        "applied": False,
+        "rank_gap": int(gap),
+        "flagged": [],
+        "label": ("a deterministic ORDERING cross-check between a supplied "
+                  "Base and on-disk Savant expected stats, within each side. "
+                  "Report only: no supplied number is changed, no player is "
+                  "removed, and this is never a projection or an edge claim. "
+                  "Two INDEPENDENT orderings of a 9-hitter side would name 1.34 "
+                  "of 9 at this gap (20,000 random permutations), so one or two "
+                  "names is not by itself a finding."),
+    }
+    supplied = {str(k).strip(): v for k, v in dict(supplied_base or {}).items()}
+    if not supplied:
+        out["skipped"] = "no --projections file was supplied"
+        return out
+    if df is None or not len(df):
+        out["skipped"] = "the pool is empty"
+        return out
+    if batting_table is None or not len(batting_table):
+        out["skipped"] = "no Savant expected-stats batting table was supplied"
+        return out
+
+    import pandas as _pd
+
+    est = _pd.to_numeric(batting_table["est_woba"], errors="coerce")
+    by_name = _savant_name_index(batting_table)
+    hitters = df[df["Batting_Order"].notna()]
+    per_side: Dict[str, list] = {}
+    unmatched: list = []
+    for name, team, cpt_id, util_id in zip(
+            hitters["Name"], hitters["Team"], hitters["CPT_ID"], hitters["UTIL_ID"]):
+        base = supplied.get(str(util_id), supplied.get(str(cpt_id)))
+        if base is None:
+            continue
+        idx = by_name.get(_dk_name_key(name))
+        value = None if idx is None else est.get(idx)
+        if idx is None or value is None or _pd.isna(value):
+            unmatched.append(f"{team} {name}")
+            continue
+        per_side.setdefault(str(team), []).append(
+            {"name": str(name), "team": str(team),
+             "supplied_base": float(base), "est_woba": float(value)})
+    if unmatched:
+        out["unmatched_hitters"] = sorted(unmatched)
+    thin = [t for t, rows in per_side.items() if len(rows) < 2]
+    if thin:
+        out["sides_too_thin_to_rank"] = sorted(thin)
+    flagged = []
+    covered = 0
+    for team, rows in sorted(per_side.items()):
+        if len(rows) < 2:
+            continue
+        covered += len(rows)
+        by_base = sorted(rows, key=lambda r: -r["supplied_base"])
+        by_est = sorted(rows, key=lambda r: -r["est_woba"])
+        base_rank = {r["name"]: i + 1 for i, r in enumerate(by_base)}
+        est_rank = {r["name"]: i + 1 for i, r in enumerate(by_est)}
+        for row in rows:
+            delta = base_rank[row["name"]] - est_rank[row["name"]]
+            if abs(delta) > gap:
+                flagged.append({
+                    "team": team, "name": row["name"],
+                    "supplied_base": round(row["supplied_base"], 2),
+                    "base_rank_in_side": base_rank[row["name"]],
+                    "est_woba": round(row["est_woba"], 4),
+                    "est_woba_rank_in_side": est_rank[row["name"]],
+                    "rank_delta": int(delta),
+                    "side_size": len(rows),
+                    "direction": ("supplied Base ranks him BELOW his rate-stat "
+                                  "rank" if delta > 0 else
+                                  "supplied Base ranks him ABOVE his rate-stat "
+                                  "rank"),
+                })
+    out.update({
+        "applied": True,
+        "hitters_ranked": covered,
+        "sides_ranked": sorted(t for t, rows in per_side.items() if len(rows) >= 2),
+        "flagged": sorted(flagged, key=lambda r: (r["team"], -abs(r["rank_delta"]))),
+    })
+    if flagged:
+        out["note"] = (
+            f"{len(flagged)} supplied Base(s) contradict the hitter's Savant "
+            f"expected-stats rank within his own side by more than {gap} "
+            f"place(s). A rate stat is not a DFS projection and disagreement is "
+            f"not error -- batting order, park and the opposing arm all belong "
+            f"in a Base and in none of these ranks. Read it as a place to look."
+        )
+    return out
+
+
 # --------------------------------------------------------------------------- #
 # MILP: 1 CPT + 5 UTIL, role exclusivity, both teams, salary cap
 # --------------------------------------------------------------------------- #
