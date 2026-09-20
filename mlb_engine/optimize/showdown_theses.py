@@ -398,6 +398,97 @@ def describe_slate(df: pd.DataFrame,
             "bullpen_teams": [t for t in teams if starters[t] is None]}
 
 
+def apply_f1_prior(df: pd.DataFrame,
+                   f1_by_player_key: Optional[Mapping[str, float]],
+                   f1_report: Optional[Mapping[str, Any]] = None) -> pd.DataFrame:
+    """Multiply the Showdown Base by the F1 implied-team-total factor (R334(a)).
+
+    Classic reaches the whole F1-F5 enrichment stack through
+    ``_assemble_projection_frame``; Showdown reaches AvgPointsPerGame and a
+    salary regression, so until now NOTHING on this path carried the market's
+    view of the run environment to a hitter's prior. `build_thesis_ladder` had
+    the moneyline and spent it on the SIDE MIX only -- which entries lean which
+    way -- while every hitter's number stayed a season mean over every opponent
+    he faced. Measured on 2210_1g_sd (CIN@LAD, 2026-09-08) against a supplied
+    external Base, the side split was 1.77x wide and monotone: every LAD bat
+    above APPG facing the 5.08 arm, every CIN bat below it facing the 2.86 arm,
+    with the two arms themselves near 1.0.
+
+    This runs OUTSIDE ``apply_base_prior`` on purpose, because
+    ``apply_base_prior`` runs on the ladder path alone. R249 learned that once
+    already: wiring only the ladder would make the factor a silent no-op on
+    exactly the `all_healthy` slates where the pool is thinnest. It is applied
+    through ``price_showdown_pool`` on both paths, and before
+    ``apply_supplied_base``, so R249's contract is unchanged -- a supplied
+    number is still the prior the solver ranks on, untouched by any factor.
+
+    ``build_f1_factors`` already pins a pitcher to ``F1_PITCHER_NEUTRAL`` when
+    his id is passed as a pitcher, so this function multiplies whatever it is
+    handed and does not re-derive who is an arm.
+
+    Two properties of a TWO-TEAM slate are worth stating where the code is,
+    because they bound what this can do:
+
+    * F1 is a team's de-parked implied total over the SLATE MEAN. Both sides of
+      a Showdown game play in the same park, so the de-parking cancels exactly
+      and F1 collapses to the moneyline devig, doubled and clipped. No park map
+      is supplied here and none would change a number.
+    * ``F1_HITTER_CLIP`` is (0.85, 1.15), so the widest side ratio this can
+      transmit is 1.15/0.85 = 1.353x, against the 1.77x measured on 2210_1g_sd.
+      The residual (b) is sized on is therefore large for a reason that is
+      arithmetic rather than evidence, and a re-measurement must say so.
+
+    A labeled deterministic prior, never a run projection, an edge, or a
+    probability claim.
+    """
+    # Lazy, for the reason every other import in this pair of modules is lazy:
+    # no load-time dependency from the Showdown path onto the Classic
+    # projection stack. Only the clip band is read.
+    from mlb_engine.projections.projection_builder import F1_HITTER_CLIP
+
+    out = df.copy()
+    factors = {str(k): float(v) for k, v in (f1_by_player_key or {}).items()}
+    report: Dict[str, Any] = {
+        "applied": False,
+        "source": None,
+        "covered_players": 0,
+        "non_neutral_f1": 0,
+        "factor_by_team": {},
+        "clip": list(F1_HITTER_CLIP),
+        "label": ("F1 is the team's implied team total over the slate mean of "
+                  "the two sides, clipped. On a one-game slate the park "
+                  "de-parking cancels, so this is the moneyline devig doubled "
+                  "and clipped. A labeled deterministic prior, never a run "
+                  "projection, ROI, win rate, or probability claim."),
+    }
+    if not len(out) or not factors:
+        report["skipped"] = ("no F1 factors were supplied; the build carried no "
+                             "moneyline for this game" if len(out) else
+                             "the pool is empty")
+        out.attrs = dict(df.attrs)
+        out.attrs["f1_prior_report"] = report
+        return out
+
+    applied = out["Player_Key"].astype(str).map(factors)
+    covered = applied.notna()
+    out.loc[covered, "Base"] = (out.loc[covered, "Base"].astype(float)
+                                * applied[covered].astype(float))
+    by_team: Dict[str, float] = {}
+    for team, factor in zip(out.loc[covered, "Team"], applied[covered]):
+        by_team.setdefault(str(team), round(float(factor), 4))
+    report.update({
+        "applied": True,
+        "source": (f1_report or {}).get("source") or "odds_packet",
+        "covered_players": int(covered.sum()),
+        "non_neutral_f1": int(sum(1 for v in applied[covered]
+                                  if abs(float(v) - 1.0) > 1e-9)),
+        "factor_by_team": dict(sorted(by_team.items())),
+    })
+    out.attrs = dict(df.attrs)
+    out.attrs["f1_prior_report"] = report
+    return out
+
+
 def _keys_in_band(hitters: pd.DataFrame, band: Sequence[int]) -> List[str]:
     sub = hitters[hitters["Batting_Order"].isin(band)]
     return list(sub.sort_values("Base", ascending=False)["Player_Key"])
@@ -1900,8 +1991,15 @@ def portfolio_report(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
         # captain one it mirrors. Realized off the SOLVED lineups, so it is what
         # the delivered file actually carries, not what was requested.
         "max_player_exposure_pct": round(max(exposure.values()) / n * 100, 1) if n and exposure else 0.0,
+        # R334(a). This string is a LITERAL and no test caught it drifting from
+        # the chain it describes -- the R122 `prior_note` class, which
+        # `apply_base_prior`'s own docstring already cites. It now reads the F1
+        # report off the frame rather than asserting a chain from memory.
         "prior_note": ("Base = 0.60*salary-regressed + 0.40*AvgPointsPerGame, "
-                       "x batting-order PA factor x platoon factor. A labeled "
-                       "deterministic prior, not a projection."),
+                       "x batting-order PA factor x platoon factor"
+                       + (" x F1 implied-team-total factor"
+                          if (df.attrs.get("f1_prior_report") or {}).get("applied")
+                          else " (no F1: this build carried no moneyline)")
+                       + ". A labeled deterministic prior, not a projection."),
         "label": "review_grade_build",
     }

@@ -4314,5 +4314,223 @@ class R347DeclaredOpenerStaysInThePoolTests(unittest.TestCase):
                          str(self._row(df, "AAA Arm")["Player_Key"]))
 
 
+# ---------------------------------------------------------------------------
+# R334(a). The F1 implied-team-total factor reaches a Showdown hitter's prior.
+# ---------------------------------------------------------------------------
+class R334aShowdownF1PriorTests(unittest.TestCase):
+    """Before this item nothing on the Showdown path carried the market's view
+    of the run environment to a hitter's number.
+
+    `build_f1_factors` has exactly one production caller, `build_f1_map`, which
+    is called once, inside `run_classic`. Showdown reached AvgPointsPerGame and
+    a salary regression. The moneyline it DID have was spent on the thesis
+    ladder's side mix -- which entries lean which way -- and never on a Base.
+
+    Measured on 2210_1g_sd (CIN@LAD, 2026-09-08) against a supplied external
+    Base, the side split was 1.77x wide and monotone by side, arms near 1.0.
+    Two bounds this wiring cannot pass, pinned below rather than rediscovered:
+    `F1_HITTER_CLIP` is (0.85, 1.15), so the widest transmissible side ratio is
+    1.353x; and a packet with a total but NO moneyline splits evenly on a
+    two-team slate, so every F1 clips to exactly 1.0.
+    """
+
+    @staticmethod
+    def _build_slate():
+        import importlib.util
+        path = (REPO / "skills" / "generate-lineups" / "scripts" / "build_slate.py")
+        spec = importlib.util.spec_from_file_location(
+            "build_slate_f1_under_test", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    @staticmethod
+    def _packet(total=8.5, away_ml=255, home_ml=-319):
+        entry = {"total": total, "source": "test"}
+        if away_ml is not None and home_ml is not None:
+            entry["moneyline"] = {"MIN": away_ml, "CHC": home_ml}
+        return {"MIN@CHC": entry}
+
+    def _pool(self):
+        return sd.melt_showdown_salary_csv(SAL)
+
+    def test_f1_reaches_every_hitter_and_leaves_the_arms_neutral(self):
+        mod = self._build_slate()
+        df = self._pool()
+        factors, report = mod.build_showdown_f1(self._packet(), df)
+        self.assertTrue(factors, "no hitter was scored")
+        self.assertGreater(report["non_neutral_f1"], 0)
+        arms = {str(k) for k, o in zip(df["Player_Key"], df["Batting_Order"])
+                if o is None or pd.isna(o)}
+        self.assertTrue(arms, "the fixture has no arms to check")
+        for key in arms:
+            self.assertEqual(factors[str(key)], 1.0,
+                             "a Showdown arm keeps raw APPG; F1 on him would "
+                             "double count the opposing total (v1)")
+
+    def test_the_favored_side_is_scored_above_the_underdog(self):
+        """On a two-team slate F1 is the moneyline devig, doubled and clipped:
+        the ratio between the sides is the whole of the signal."""
+        mod = self._build_slate()
+        df = self._pool()
+        factors, _ = mod.build_showdown_f1(self._packet(), df)
+        by_team = {}
+        for key, team, order in zip(df["Player_Key"], df["Team"],
+                                    df["Batting_Order"]):
+            if order is not None and not pd.isna(order):
+                by_team.setdefault(str(team), set()).add(factors[str(key)])
+        self.assertEqual({len(v) for v in by_team.values()}, {1},
+                         "F1 is a TEAM factor; every hitter on a side shares it")
+        self.assertGreater(by_team["CHC"].pop(), by_team["MIN"].pop(),
+                           "CHC is the -319 home favorite in this packet")
+
+    def test_a_total_with_no_moneyline_is_neutral_and_that_is_correct(self):
+        """The acceptance this corrects. A packet WAS present, so 'odds
+        available' is true and `non_neutral_f1` is still 0: two teams split an
+        even total onto the slate mean and every F1 clips to exactly 1.0. A
+        reader must be able to tell that from a wiring failure."""
+        mod = self._build_slate()
+        df = self._pool()
+        factors, report = mod.build_showdown_f1(
+            self._packet(away_ml=None, home_ml=None), df)
+        self.assertEqual(report["non_neutral_f1"], 0)
+        self.assertEqual(sorted({round(v, 9) for v in factors.values()}), [1.0])
+        self.assertEqual(report["games_priced"], 1,
+                         "the packet was read; only the split was even")
+
+    def test_the_clip_bounds_the_transmissible_side_ratio(self):
+        """`F1_HITTER_CLIP` caps this at 1.15/0.85 = 1.353x against a measured
+        1.77x, so (a) closes at most ~76% of that gap by construction and the
+        residual (b) is sized on is arithmetic before it is evidence."""
+        mod = self._build_slate()
+        df = self._pool()
+        factors, _ = mod.build_showdown_f1(
+            self._packet(total=12.0, away_ml=2000, home_ml=-5000), df)
+        values = [v for k, v in factors.items()
+                  if v != 1.0 or True]
+        hitters = [factors[str(k)] for k, o in zip(df["Player_Key"],
+                                                   df["Batting_Order"])
+                   if o is not None and not pd.isna(o)]
+        self.assertLessEqual(max(hitters) / min(hitters), 1.15 / 0.85 + 1e-9)
+        self.assertLessEqual(max(hitters), 1.15 + 1e-9)
+        self.assertGreaterEqual(min(hitters), 0.85 - 1e-9)
+        self.assertTrue(values)
+
+    def test_the_wiring_applies_f1_on_the_LADDER_path(self):
+        mod = self._build_slate()
+        raw = self._pool()
+        factors, report = mod.build_showdown_f1(self._packet(), raw)
+        hand = {"MIN": "R", "CHC": "R"}
+        plain = mod.price_showdown_pool(raw, use_ladder=True, bat_side={},
+                                        pitcher_hand=hand, supplied_base={},
+                                        supplied_read={})
+        wired = mod.price_showdown_pool(raw, use_ladder=True, bat_side={},
+                                        pitcher_hand=hand, supplied_base={},
+                                        supplied_read={},
+                                        f1_by_player_key=factors,
+                                        f1_report=report)
+        self.assertTrue(wired.attrs["f1_prior_report"]["applied"])
+        self.assertGreater(wired.attrs["f1_prior_report"]["non_neutral_f1"], 0)
+        moved = [a for a, b in zip(plain["Base"], wired["Base"])
+                 if abs(float(a) - float(b)) > 1e-9]
+        self.assertTrue(moved, "F1 changed no Base on the ladder path")
+
+    def test_the_wiring_reaches_the_FALLBACK_bank_path_too(self):
+        """R249's lesson, applied to this factor. `apply_base_prior` runs on the
+        ladder path alone, so wiring F1 inside it would make it a silent no-op
+        on exactly the `all_healthy` slates where the pool is thinnest."""
+        mod = self._build_slate()
+        raw = self._pool()
+        factors, report = mod.build_showdown_f1(self._packet(), raw)
+        out = mod.price_showdown_pool(raw, use_ladder=False, bat_side={},
+                                      pitcher_hand={}, supplied_base={},
+                                      supplied_read={},
+                                      f1_by_player_key=factors,
+                                      f1_report=report)
+        self.assertTrue(out.attrs["f1_prior_report"]["applied"])
+        self.assertNotIn("Salary_Fit", out.columns)      # still no prior here
+        hitter = raw[raw["Batting_Order"].notna()].iloc[0]
+        before = float(hitter["Base"])
+        after = float(out.loc[out["Name"] == hitter["Name"], "Base"].iloc[0])
+        self.assertAlmostEqual(after, before * factors[str(hitter["Player_Key"])],
+                               places=6)
+
+    def test_a_supplied_base_is_NOT_multiplied_by_f1(self):
+        """R249's contract, unchanged: a supplied number IS the prior and no
+        factor touches it. F1 goes in the same seam and before
+        `apply_supplied_base`, which is what makes the order executable rather
+        than a property of the source layout."""
+        mod = self._build_slate()
+        raw = self._pool()
+        factors, report = mod.build_showdown_f1(self._packet(), raw)
+        row = raw[raw["Batting_Order"].notna()].iloc[0]
+        asked = 37.5
+        for use_ladder in (True, False):
+            priced = mod.price_showdown_pool(
+                raw, use_ladder=use_ladder, bat_side={},
+                pitcher_hand={"MIN": "R", "CHC": "R"},
+                supplied_base={str(row["UTIL_ID"]): asked}, supplied_read={},
+                f1_by_player_key=factors, f1_report=report)
+            got = float(priced.loc[priced["Name"] == row["Name"], "Base"].iloc[0])
+            self.assertAlmostEqual(got, asked, places=6,
+                                   msg=f"F1 was applied AFTER the supplied "
+                                       f"number (use_ladder={use_ladder})")
+
+    def test_no_packet_leaves_every_base_alone_and_says_so(self):
+        mod = self._build_slate()
+        raw = self._pool()
+        factors, report = mod.build_showdown_f1({}, raw)
+        self.assertEqual(factors, {})
+        out = mod.price_showdown_pool(raw, use_ladder=False, bat_side={},
+                                      pitcher_hand={}, supplied_base={},
+                                      supplied_read={},
+                                      f1_by_player_key=factors,
+                                      f1_report=report)
+        block = out.attrs["f1_prior_report"]
+        self.assertFalse(block["applied"])
+        self.assertEqual(block["non_neutral_f1"], 0)
+        self.assertIn("moneyline", block["skipped"])
+        self.assertTrue(all(abs(float(a) - float(b)) < 1e-12
+                            for a, b in zip(raw["Base"], out["Base"])))
+
+    def test_the_prior_note_names_f1_only_when_it_was_applied(self):
+        """The R122 `prior_note` class: a hardcoded literal describing a factor
+        chain, which no test caught drifting. It now reads the frame."""
+        mod = self._build_slate()
+        raw = self._pool()
+        factors, report = mod.build_showdown_f1(self._packet(), raw)
+        hand = {"MIN": "R", "CHC": "R"}
+        with_f1 = mod.price_showdown_pool(raw, use_ladder=True, bat_side={},
+                                          pitcher_hand=hand, supplied_base={},
+                                          supplied_read={},
+                                          f1_by_player_key=factors,
+                                          f1_report=report)
+        without = mod.price_showdown_pool(raw, use_ladder=True, bat_side={},
+                                          pitcher_hand=hand, supplied_base={},
+                                          supplied_read={})
+        self.assertIn("F1 implied-team-total factor",
+                      st.portfolio_report(with_f1, [], [])["prior_note"])
+        note = st.portfolio_report(without, [], [])["prior_note"]
+        self.assertNotIn("x F1", note)
+        self.assertIn("no F1", note)
+
+    def test_showdown_moneyline_hands_back_the_packet_it_already_loaded(self):
+        """The seam. This function loaded the FULL packet -- the same loader
+        Classic uses, carrying each game's total beside its moneyline -- and
+        threw the total away three lines later, which is most of why no implied
+        total reached a Showdown hitter."""
+        src = (REPO / "skills" / "generate-lineups" / "scripts"
+               / "build_slate.py").read_text(encoding="utf-8")
+        self.assertIn("def showdown_moneyline(args, df, salary_csv=None) "
+                      "-> tuple[dict, dict, dict]:", src)
+        self.assertIn("moneyline, odds_note, odds_packet = showdown_moneyline(",
+                      src)
+        self.assertIn("f1_by_player_key, f1_report = build_showdown_f1("
+                      "odds_packet, df)", src)
+        # both build paths, same seam
+        self.assertEqual(src.count("f1_by_player_key=f1_by_player_key"), 2)
+        self.assertIn('"f1": {', src)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -25,6 +25,88 @@ performance claim.
 
 ---
 
+## 2026-09-20 — R334(a): the F1 implied-team-total factor reaches a Showdown hitter's prior, and the brief says whether it did
+
+**Scope.** `mlb_engine/optimize/showdown_theses.py` (`apply_f1_prior`, new;
+`portfolio_report`'s `prior_note`),
+`skills/generate-lineups/scripts/build_slate.py` (`build_showdown_f1`, new;
+`showdown_moneyline` now a 3-tuple; `price_showdown_pool`'s signature and seam;
+the `run_showdown` call site; the brief's `f1` block), `tests/test_showdown.py`
+(`R334aShowdownF1PriorTests`, new, 10), `tools/audit.py`
+(`EXPECTED_SUITE_COUNTS`), `docs/backlog.md`.
+
+**What was missing, stated by name rather than by line.** `build_f1_factors`
+has exactly one production caller, `build_f1_map`, and `build_f1_map` is called
+once, at `build_slate.py:2391`, inside `run_classic`. `_assemble_projection_frame`
+is Classic's door and has no Showdown reference. So Classic reached the whole
+F1-F5 enrichment stack and Showdown reached AvgPointsPerGame plus a salary
+regression, a batting-order PA factor and a platoon factor. Nothing on the
+Showdown path carried the market's view of the run environment to a hitter's
+number. The board's citation for this (`build_slate.py:4697-4700`) had rotted to
+`gate_failure_detail`; the R249 text it was pointing at is at `:5029-5033` and
+the mechanism it described is intact.
+
+**The seam turned out to be one return value wide.** `showdown_moneyline`
+already called `load_odds_packet` -- the same full-packet loader Classic uses,
+carrying each game's `total` beside its `moneyline` -- and discarded the total
+three lines later, keeping only `{team: american odds}` for the thesis ladder's
+side mix. It now returns the packet as well, and `build_showdown_f1` spends it
+on the other half. No second load, no new feed, no new flag.
+
+**Where it is applied, and why not where it looks like it belongs.**
+`apply_f1_prior` runs in `price_showdown_pool`, OUTSIDE `apply_base_prior`.
+`apply_base_prior` runs on the ladder path alone, and R249 already paid for that
+lesson once: wiring only the ladder made `--projections` a silent no-op on
+exactly the `all_healthy` slates where the pool is thinnest. F1 runs after the
+prior, before `apply_supplied_base`, on both paths. A supplied number is still
+the prior the solver ranks on, untouched -- pinned on both paths, and the
+mutation that supplies the number first fails only that test, which is the point
+of R249's one-function ordering.
+
+**Two bounds on the result, pinned in tests so no re-measurement reads them as
+signal.** On a two-team slate both sides play in the same park, so F1's
+de-parking divides both implied totals by the same number and cancels exactly;
+F1 collapses to the moneyline devig, doubled and clipped, and no park map would
+change a digit. And `F1_HITTER_CLIP` is (0.85, 1.15), so the widest side ratio
+this can transmit is 1.353x against the 1.77x measured on 2210_1g_sd. (a)
+therefore closes at most about three quarters of the measured gap by
+arithmetic, before any question of whether the external source was right, and
+the residual (b) is sized on inherits that.
+
+**The done-when in the entry was wrong and is corrected.** It asked for
+`non_neutral_f1 > 0` on "a build with an odds packet". A packet carrying a TOTAL
+but no MONEYLINE splits evenly on a two-team slate, so every F1 lands on the
+slate mean and clips to exactly 1.0: `non_neutral_f1` is 0 with the odds present
+and the read is correct. The brief carries two blocks for this reason --
+`f1.packet` is what the feed priced, `f1.prior` is what reached a Base -- and
+the acceptance needs a moneyline, not merely odds.
+
+**The `prior_note` was a hardcoded literal describing a factor chain, which is
+the R122 class `apply_base_prior`'s own docstring already cites.** It now reads
+the F1 report off the frame and names the factor only when it was applied,
+saying "no F1: this build carried no moneyline" when it was not.
+
+**Deferred, with its reason: the 1.77x re-measurement.** The entry asks for the
+side split re-measured against the same external source with F1 live. That needs
+an odds packet for 2026-09-08 and a Showdown salary file from that date. This
+session ran in a cloud container with no egress (every source read unreachable
+at session start), and the prototype artifacts the entry names
+(`data/slates/2026-09-08/projections_2210_1g_sd.csv`,
+`outputs/2026-09-08/make_base_2210_1g_sd.py`) are on gitignored paths, absent
+from disk and absent from git history -- a filesystem-wide `find` returns
+nothing and the archive stops at 2026-08-27. So the measurement is not deferred
+for convenience: its inputs no longer exist in this tree. No packet was
+fabricated. The wiring is what landed, and the frozen-fixture half of the
+done-when is rewritten onto the remaining entry.
+
+**Mutation-checked, four reverts.** Dropping `apply_f1_prior` from the seam
+fails 4 of 10; moving it AFTER `apply_supplied_base` fails exactly the
+supplied-Base order test; dropping `pitcher_ids` so the arms stop being pinned
+neutral fails the arms test; reverting `prior_note` to the literal fails the
+note test.
+
+---
+
 ## 2026-09-20 — R347: a DK-declared opener stays in the Showdown pool, where the module had been claiming he already was
 
 **Scope.** `mlb_engine/optimize/showdown.py` (`_is_declared`'s comment, the

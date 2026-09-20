@@ -1080,7 +1080,16 @@ EXPECTED_SUITE_COUNTS = {
     # participation report and empty when the man was shelved or absent, and the
     # thesis ladder refusing to promote him into `starters` (which `pitchers_duel`
     # hard-locks) on an opener-only side and on a side that also has a real SP.
-    "tests.test_showdown": 235,
+    # R334(a), 2026-09-20: 235 -> 245, the ten that pin the F1 implied-team-total
+    # factor reaching a Showdown hitter -- the team factor and the neutral arms,
+    # the favored side scored above the underdog, a total with NO moneyline
+    # reading neutral on a two-team slate (correct, not a wiring failure), the
+    # clip bounding the transmissible side ratio at 1.353x, the seam applying it
+    # on BOTH build paths, a supplied Base still untouched by it (R249's order,
+    # executable rather than a source-layout property), the no-packet no-op, the
+    # prior_note reading the frame instead of asserting a chain, and the wiring
+    # itself read off the source.
+    "tests.test_showdown": 245,
     # R96, 2026-08-11: 141 -> 162, the twenty-one tests that pin the delivery
     # path. A `grew` verdict is the one case where moving a pin is correct.
     # R46 round 2, 2026-08-12: 162 -> 168, the six that pin the PARTIAL side.
