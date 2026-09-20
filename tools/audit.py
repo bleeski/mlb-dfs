@@ -1109,7 +1109,18 @@ EXPECTED_SUITE_COUNTS = {
     # inputs untouched (reported, never clamped), the 2dp rounding tolerance,
     # out-of-range and missing ids reported separately, R338's water-fill half
     # re-pinned so the row cannot reopen against it, and the emit block.
-    "tests.test_showdown": 264,
+    # R379(c)(d), 2026-09-20: 264 -> 276, the twelve that pin the two Showdown
+    # ladder-truth defects. Six on the duplicate rung -- the lock-dropping rung
+    # skipped when there is no lock to drop, no slot ever issuing one argument
+    # set twice across 48 reachable configurations, the memo comparing an
+    # omitted control equal to an explicit None, the fail-open branch for an
+    # unrecognised control, every control the nine rungs pass being named, and
+    # the skipped rungs reported beside the compute facts rather than in a
+    # relaxation counter. Six on the melt refusal -- both roles colliding, one
+    # role alone, an identical repeated row still merging, the refusal firing
+    # ahead of R323's Position flag, every fixture on disk still melting, and
+    # the on-disk sweep that keeps (d) honestly PLAUSIBLE.
+    "tests.test_showdown": 276,
     # R96, 2026-08-11: 141 -> 162, the twenty-one tests that pin the delivery
     # path. A `grew` verdict is the one case where moving a pin is correct.
     # R46 round 2, 2026-08-12: 162 -> 168, the six that pin the PARTIAL side.

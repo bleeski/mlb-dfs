@@ -25,6 +25,159 @@ performance claim.
 
 ---
 
+## 2026-09-20 — R379(c)(d): a ladder rung that changes no control is paid for twice, and the Showdown melt merges two same-name same-team persons (CC-4 batch 1 of N)
+
+**Scope.** `mlb_engine/optimize/showdown_theses.py` (`_RUNG_MEMO_KEYS` new,
+`_rung` gains the memo, `_issue` extracted from it, the rung at the captain-lock
+relaxation gains `and cpt_lock`, `duplicate_rungs` and two diagnostics keys),
+`mlb_engine/optimize/showdown.py` (the melt refuses a second role row carrying a
+different draftable id), `tests/test_showdown.py`
+(`R379DuplicateRungTests` 6, `R379SameNameSameTeamMeltTests` 6, plus an
+`inspect` import), `tools/audit.py` (`EXPECTED_SUITE_COUNTS`), `docs/backlog.md`.
+
+**Every line number R295 cites is stale and the entry's structural assumption
+about the ladder is stale with it.** R223 and R239(b) grew `solve_ladder` from
+five rungs to nine, so "rung 5" is no longer the fifth of five; the nine call
+sites are at `showdown_theses.py:1493, 1497, 1504, 1512, 1519, 1533, 1563, 1585,
+1605` at the pre-change HEAD (6b2ef47). Re-derived from the ARGUMENTS rather
+than the ordinal, the rung the entry means is `:1519` — the first rung that
+drops `cpt_lock` — and it happens to still be the fifth call site, because
+R54(b)/R223/R239(b) all appended BELOW the entry's cited window. That is a
+coincidence and not a licence to trust an ordinal.
+
+**(c), and the entry's fix was right about the rung and wrong about the size of
+the class.** `:1518` read `if lu is None and not latch["stopped"]:` with no
+`cpt_lock` term, and `:1524` read a bare
+`cpt_relaxed += _record_lock_relaxation(thesis, lu)`. With `cpt_lock` None the
+rung's argument set is rung 1's, argument for argument: `build_showdown_lineup`
+defaults `cpt_lock` to None (`showdown.py:941`), and `work`, `cpt_excludes`,
+`with_cap`, `util_kw`, `kw` and `prior` are all slot-invariant — `prior` is
+appended to only after the whole rung chain. Reaching `:1518` means rung 1 was
+PROVEN infeasible, so the rung re-paid the full 8 s `time_limit` to reprove it,
+and `_record_lock_relaxation` could book a captain relaxation against a slot
+that never had a captain lock.
+
+One correction to the entry's own wording: it says "the three LATER rungs
+(`:1572`, `:1595`, `:1619`)" carry `if cpt_lock else 0`. There are FOUR later
+rungs. `:1533` is the fourth and is guarded differently — on its condition
+(`and cpt_lock` at `:1531`), with a bare record at `:1537`. `:1519` was the only
+rung carrying neither form of guard.
+
+**Reproducing (c) found a second instance, which is why the fix is a memo and
+not a tenth guard.** With `and cpt_lock` in place, a harness that walks the
+whole ladder with every solve proven infeasible still showed one redundant rung
+per descending slot: R223's floor rung at `:1563`, whose guard is a four-way
+disjunction that fires on `max_shared_players is not None` while the rung above
+it has already dropped the overlap bound. Measured across 48 reachable
+configurations (n in 1/2/4 × captain lock set or not × overlap bound on or off ×
+both exposure caps on or off), every configuration that descended that far
+issued a duplicate.
+
+The floor rung's CORRECT condition depends on which of four earlier rungs ran —
+it duplicates the player-cap rung when `cpt_lock` is None, and the overlap rung
+when `over` and `util_blocked` are both empty — and hand-deriving that across
+nine sites is the exercise that produced the defect. So `_rung` now memoizes: a
+per-slot set of the controls already issued, and a repeat returns None without
+paying for the solve. The solver is deterministic (CLAUDE.md), so a repeat
+cannot return anything the first issue did not. Scoped to the SLOT because
+`forbidden_sets` grows between slots, which is why the memo lives on `latch`.
+
+**Three things the memo deliberately does.** It compares a FIXED control list
+read with `.get`, not `call_kw`'s keys: the rungs disagree about how they say
+"no captain lock" — rung 1 passes `cpt_lock=cpt_lock` where the floor rung omits
+the argument — and a key-set comparison calls two identical solves different.
+That was this fix's first cut and it memoized nothing. It fails OPEN on any
+keyword absent from `_RUNG_MEMO_KEYS`, because a control added to a rung and not
+added to the list would make two different solves compare equal and the memo
+would skip a rung with new content: a lost lineup, which is worse than a
+repeated one. And a skipped repeat latches NOTHING — re-recording a stop or a
+timeout would double-count a fact the ladder already has.
+
+**The residue is counted, not asserted away.** `duplicate_rungs_skipped` and
+`duplicate_rung_detail` are emitted beside the compute facts, never summed into
+a relaxation counter, for the reason R158 keeps `solver_timeouts` apart: this is
+search effort, and a nonzero value says the ladder's shape has a redundant rung,
+which is a rung-guard change rather than a strategy change. It reads 1 per
+descending slot today, and that one is the floor rung. The test pins the NUMBER
+rather than asserting zero, and that is what keeps the `and cpt_lock` guard
+honest: with the memo in place, reverting the guard is invisible in the issued
+calls and shows up only here. The first cut of this entry's test asserted zero
+on the issued calls and the guard revert survived it.
+
+**(d), and it ships as a refusal because it is still unverified.** The melt keys
+a person on `(Name, Team)` (`showdown.py:265`, `Player_Key` at `:286`), so two
+DK persons sharing a name on one team collapse and the second one's draftable id
+overwrites the first's at `:306-309`, last writer wins. `certify_showdown`
+cannot catch it: it rebuilds `by_key` from the same merged frame (`:1502`) and
+checks the export's ids against the merge, so the merge validates itself. The
+export would carry one person's id for a lineup priced on the other's salary —
+an illegal file.
+
+R295 filed this PLAUSIBLE and never verified, and it is still PLAUSIBLE. Every
+salary CSV on disk was swept — 15 files with a `Name` and a `TeamAbbrev` column,
+every archived DK export plus every fixture — for a repeated
+`(Name, Team, Roster Position)` triple and for a person holding more distinct
+draftable ids than roles. Zero of each. A test carries that sweep so the day one
+appears, it says so by name rather than passing quietly.
+
+**Both of the entry's proposed fixes were checked and one of them does not
+work.** Keying on `(Name, Team, Position)` is a no-op for the case that
+survives: R323's `showdown_paired_role_disagreement` already flags a pair
+differing on Position or Starting (`showdown.py:348-352`,
+`SHOWDOWN_PAIRED_FIELDS` at `slate_intake_manager.py:444`), so the only silent
+collision is two persons sharing both — exactly where a Position-keyed melt
+changes nothing. Re-keying is also not local: `(Name, Team)` is the person
+identity at two further sites, `slate_intake_manager.showdown_person_key`
+(`:309-321`) and `preflight_upload.person_key` (`:220`, R234), and the first of
+those says in its own docstring that it is deliberately the same shape as the
+second. Splitting one of the three is how the role collapse and the standings
+join drift apart. So the melt refuses, naming the person, the team, the role and
+both ids, where `melt_showdown_salary_csv` already refuses an empty pool and a
+single-team pool — "where the cause is visible, rather than at the gate, where
+it is not".
+
+An identical repeated ROW is not this and still merges: DK re-emitting the same
+draftable id is a duplicate line, not a second person. The refusal fires on a
+differing id only.
+
+**One behaviour change beyond the defect, stated because it is not obvious.** A
+colliding pair that differs on Position or Starting previously reached R323's
+flag, made its side undecided, and shipped a frame whose ids had already merged.
+It now refuses instead. That is stricter, and the merged ids were wrong in that
+frame too.
+
+**R233, the class.** `(Name, Team)` as person identity.
+`grep -rn "showdown_person_key\|def person_key(\|key = (name, team)" --include=*.py .`
+(excluding `.venv/` and `tests/`) returns ten lines: THREE independent
+definitions of the identity —
+`mlb_engine/optimize/showdown.py:265` (the melt, this entry's site),
+`mlb_engine/intake/slate_intake_manager.py:309` (`showdown_person_key`),
+`tools/preflight_upload.py:220` (`person_key`, R234) — plus one comment
+reference added here (`showdown.py:322`) and six call sites, all of
+`showdown_person_key`: `slate_intake_manager.py:383`,
+`live_data_adapters.py:445` (import), `:452`, `:463`, `qa_portfolio.py:627`
+(import), `:632`.
+
+All three definitions are DELIBERATELY the same shape —
+`showdown_person_key`'s docstring says so of `preflight_upload`'s — and only
+the melt is touched here, because this entry refuses rather than re-keys. The
+other two are enumerated so the next session does not read the refusal as a
+re-key that stopped halfway: re-keying the melt alone would leave the role
+collapse and the standings join merging the same two persons.
+
+**Mutation-checked by hand, nine reverts, each expected red and restored.**
+(c): dropping `and cpt_lock` from the rung R295 named; removing the memo skip;
+keying the memo on `call_kw`'s keys (the first cut); removing the fail-open
+branch; dropping `cpt_lock` from the memo key list. (d): removing the refusal;
+refusing any repeated role row including an identical id; dropping the person's
+name from the message; checking only the CPT role. The scripts are
+`tools/_scratch_r379/mutate.py` and `mutate_d.py`, swept with the batch.
+
+**Gate.** `PASS  v2.26.0  41 modules  2304 tests  5 skipped` (from 2292; the
+twelve new tests are the whole move). Golden histogram unmoved.
+
+---
+
 ## 2026-09-20 — R378: the agent-run record stops writing `findings: null` on every run, and the consumed 2026-09-17 fragment is retired
 
 *(Filed as R378, not R374: R374 is CC-A9's candidate-bank measurement, and R375-R377 are allocated too. `grep -oE '\bR[0-9]{2,3}\b' docs/backlog.md CHANGELOG.md | sort -n | tail` is how the next free number is read, and the first cut of this entry took R374 without running it.)*

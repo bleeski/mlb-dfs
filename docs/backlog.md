@@ -39,7 +39,7 @@ lives under "Board history" near the bottom of this file.
 
 Ordered, with the reason:
 
-## Execution roadmap (2026-09-15, reprioritized for LARGE-PRIZE impact after the 2026-09-14/15 standings mine; rehosted 2026-09-17 to Claude Code in the cloud) -- NEXT: CC-4 (CC-0/CC-1/CC-2 DONE 2026-09-15; CC-A0 and CC-A3 DONE 2026-09-17; CC-A4/CC-A1/CC-A2/CC-A5/CC-A6/CC-A7/CC-A8 DONE 2026-09-19; **CC-3 DONE 2026-09-20, all four batches, with R334(a)'s 1.77x re-measurement the one named remainder -- its 2026-09-08 inputs are gone from disk and history, so it needs a NEW slate rather than a recovery**; R378 landed beside it as an R372 repair. CC-4 is next because it shares CC-3's files and the row says land after; CC-5 is now unblocked on the R328 side and still waits on CC-4's R295(a). CC-A9's condition is MET and it is runnable standalone whenever CC-4 is not the priority)
+## Execution roadmap (2026-09-15, reprioritized for LARGE-PRIZE impact after the 2026-09-14/15 standings mine; rehosted 2026-09-17 to Claude Code in the cloud) -- NEXT: CC-4 (CC-0/CC-1/CC-2 DONE 2026-09-15; CC-A0 and CC-A3 DONE 2026-09-17; CC-A4/CC-A1/CC-A2/CC-A5/CC-A6/CC-A7/CC-A8 DONE 2026-09-19; **CC-3 DONE 2026-09-20, all four batches, with R334(a)'s 1.77x re-measurement the one named remainder -- its 2026-09-08 inputs are gone from disk and history, so it needs a NEW slate rather than a recovery**; R378 landed beside it as an R372 repair. **CC-4 batch 1 of 4 DONE 2026-09-20** (R379(c)(d)); CC-4 batches 2-4 are (a), F40 and (b) in that order, and F14's soft-lock half was deferred out of the row on Ben's instruction to be repriced as its own row with the design question stated; CC-5 is now unblocked on the R328 side and still waits on CC-4's R295(a). CC-A9's condition is MET and it is runnable standalone whenever CC-4 is not the priority)
 
 **What changed in this rewrite and why.** Ben's instruction, 2026-09-15: reprioritize the board for items that change the chance of winning a LARGE prize, honour dependencies, and chunk it for single DEV sessions that run in **Claude Code on his machine** rather than Cowork. Two consequences. First, the ordering rule that ranked criteria (1)-(6) equally is replaced by a prize-first rule: **P (prize)** = changes the construction that reaches a top finish, or grades whether a construction does; **L (lost slate)** = a legal file on every slate, because a slate with no file is a zero; **G (guard)** = the referee and the record; **H** = hygiene. P and L lead; G and H follow. Second, the Cowork sandbox constraints that shaped the old Phase D ordering (the 130s inner budget, the six-call gate, the mount's refused `unlink`) do not apply to a Claude Code DEV session: `python tools/audit.py --run-tests --terse` runs in one call (~9 min on the pinned `.venv`), `rm` works, and an M item fits one session with its gate. BUILD and ARCHIVE sessions may still be Cowork, so the claims protocol, explicit-path `git add`, and the CHANGELOG-in-the-same-commit rule are unchanged, and any control that is only reachable from one door is still a defect.
 
@@ -85,7 +85,10 @@ Ben's instruction, 2026-09-17: the workflow moves to Claude Code sessions in clo
 | **CC-3** | `Batch (2 of 4)` | **R334(a) -- apply the existing F1 implied-team-total factor to the Showdown APPG prior. WIRING DONE 2026-09-20; the 1.77x re-measurement is the named remainder and its 2026-09-08 inputs are gone from disk and history, so it needs a NEW slate rather than a recovery.** (pulled forward from Session 39 on the mine's evidence that the Showdown side split is the strongest effect in the archive and F1 reaches no Showdown hitter today, `build_slate.py:4697`, R249). Re-measure the 1.77x side split with it live. (b), the opposing-arm term, stays gated on (a)'s residual in Phase 4. | Backlog / Inbox | `build_slate.py` `run_showdown`, `showdown.py` melt, `projection_builder.build_f1_factors` | P | Low-Med | An odds packet for the measurement; the wiring needs none |
 | **CC-3** | `Batch (3 of 4)` | **R334(c)(d) -- the Showdown APPG Base is blind to the opposing arm; warning and sanity-pass halves. DONE 2026-09-20.** A brief NOTE when the two declared arms' expected stats differ by more than a stated margin; a `--projections` sanity pass naming hitters whose Base rank contradicts their Savant rate-stat rank. Report, never a gate. | Inbox 2026-09-08 | `build_slate.py` `run_showdown` brief, `showdown.py` beside `small_sample_base_report`, `data/reference/expected_stats_*.csv` | P | Low | None |
 | **CC-3** | `Batch (4 of 4)` | **R328 -- the ORDERING between the two Showdown ownership markets. DONE 2026-09-20 -- and the row was STALE: two of its three sub-fixes shipped in R338 on 2026-09-11.** The capped-simplex projection and the NaN/inf rejection were already live (`_bounded_marginals` at `ownership_prior.py:491`, reached on the Showdown path at `:736` inside `_showdown_prediction`, which is at `:702-752` and not the `:676-727` this row cited). What remained was `captain_p <= roster_p`, enforced only in `mlb_engine/production/contracts.py`, which R302 keeps off the build path. `showdown_role_coherence` is that check where the build can reach it; it reports and never clamps, because a clamp breaks R306's 100% captain budget. The defect is UNREPRODUCED over 4,000 randomized pools plus a structured grid, so it unblocks CC-5 rather than repairing a number. **CC-3's landing gate, all four batches: `PASS  v2.26.0  41 modules  2292 tests` (2254 before; +7 R347, +10 R334(a), +12 R334(c)(d), +7 R328, +2 R378). The 5 skips are the same 5 the pre-work gate carried and are all host facts: no Classic salary file on disk, no vendored scipy, no `.env`, the 2026-08-16 salary file not staged.** | Spec | `mlb_engine/field/ownership_prior.py`, `tools/ownership_pred.py`, `tests/test_showdown.py` | P (R307 consumes these) | Low | None |
-| **CC-4** (was Session 8) | `Standalone` | **R295 (+F13, F14, F40 riders) -- Showdown ladder truth, remaining parts.** F13 shipped in R338; open: (a) the R250 hold collides with a thesis lock and the ladder drops the player cap (58% realized under 50%); (b) the degraded flag reads a thesis-weighted proxy; (c) rung 5 re-solves rung 1; (d) the melt merges same-name same-team persons; F14's second half (thesis preferences as a soft field, so R338 repair (3)'s operator-only scoping can be lifted); F40 captain reservations bounded by both caps and released once per slot. | Backlog / Spec | `mlb_engine/optimize/showdown_theses.py`, `showdown.py`, `build_slate.py` `run_showdown`, `tests/test_showdown.py` | P (single-game and small-field prizes ride on the three caps holding) | Med (ladder state machine) | CC-3 (same files; land after) |
+| **CC-4** (was Session 8) | `Batch (1 of 4)` | **R379(c)(d) -- a ladder rung that changes no control is paid for twice, and the Showdown melt merges two same-name same-team persons. DONE 2026-09-20.** (c) shipped as the entry prescribed (`and cpt_lock` on the condition and on the record at the rung that drops the captain lock) PLUS a per-slot argument memo in `_rung`, because reproducing (c) found a second instance of the same class: R223's floor rung fires on `max_shared_players is not None` after the rung above it has already dropped the overlap bound, and the correct guard depends on which of four earlier rungs ran. The residue is counted in a new `duplicate_rungs_skipped`, which reads 1 per descending slot and is the floor rung. (d) shipped as a REFUSAL naming the person, the team, the role and both draftable ids, not a re-key: 15 salary files on disk carry zero instances so it stays PLAUSIBLE, `(Name, Team, Position)` is a no-op for the only case R323's flag leaves silent, and `(Name, Team)` is the person identity at two further sites. Gate `PASS v2.26.0 41 modules 2304 tests`. | Backlog / Spec | `showdown_theses.py`, `showdown.py`, `tests/test_showdown.py`, `tools/audit.py` | P (single-game and small-field prizes ride on the three caps holding) | Med (ladder state machine) | CC-3 (same files; land after) |
+| **CC-4** | `Batch (2 of 4)` | **R295(a) -- the R250 hold collides with a thesis lock and the ladder answers by dropping the player cap (58.3% realized under a 50% cap).** The P1 of the row and the only part with a measured cap BREACH behind it. Includes closing `R250CaptainBudgetTests`' blind spot: every thesis it builds carries `"locks": []`, so the class cannot reach the collision. | Backlog / Spec | `showdown_theses.py`, `tests/test_showdown.py` | P1 | Med | CC-4 batch 1 (same rung chain; the anchors move) |
+| **CC-4** | `Batch (3 of 4)` | **R295 F40 -- captain reservations bounded by both caps and released once per slot.** Same reservation code as (a), so it lands immediately after it. | Backlog / Spec | `showdown_theses.py`, `tests/test_showdown.py` | P | S-M | CC-4 batch 2 (same code) |
+| **CC-4** | `Batch (4 of 4)` | **R295(b) -- the degraded flag reads a thesis-weighted proxy as one scale.** Largest of the four: a new unweighted `proj_points_base` has to be threaded from the solve through `portfolio_report` to `showdown_degraded_entries`, and the weighted number renamed `proxy_points_thesis_weighted`. | Backlog / Spec | `showdown.py`, `showdown_theses.py`, `build_slate.py`, `field_miner.py` | P | M | CC-4 batch 1 |
 | **CC-5** (was Session 12) | `Standalone` | **R307 -- the captain leverage sleeve.** "These 4 entries take their captain from this list, the other 12 build honestly." Aimed at the CAPTAIN market only. **Mine rider, 2026-09-15:** captain popularity INVERTS between bands in the archive (top-1% lift 1.231 -> 0.856 from least- to most-captained quartile; top-20% runs the other way), while Showdown TOTAL ownership does not hurt at the top (every finishing band above median is more owned than the field). So the sleeve tilts the captain slot toward the low-captained quartile for top-band entries and leaves the five flex slots chalk-positive; it never imports Classic total-ownership fading into Showdown. The coldest-quartile CI [0.993, 1.547] is suggestive, so the sleeve ships counted and graded (R139's report), not as a default. | Backlog / Mine | `showdown_theses.py`, `build_slate.py` `run_showdown`, `ownership_pred emit` | P (Ben's stated design ruling, 2026-09-03) | Med | CC-3 (R328), CC-4 (R295(a), the cap collision the sleeve's reservations hit) |
 
 ### Phase 2 -- the instrument and the ownership fit: grading what wins, from the archive already on disk (P, measurement)
@@ -3634,13 +3637,171 @@ point the wrong way, and the 2005_1g_sd session's own conclusion was that it may
 have bought the chalk and sold the leverage using a number that could not tell
 it either way. Slot 2 first, then this.
 
-### R295. Showdown ladder truth, third pass: the R250 hold collides with a thesis lock and the ladder answers by dropping the player cap; the degraded flag reads a thesis-weighted proxy as one scale; rung 5 re-solves rung 1 verbatim; the melt merges two same-name same-team persons (P1, S) | new 2026-09-02, from the greenfield tenth edition (GF10-D1, D3, D4, D5); (a) VERIFIED-repro and coordinator re-read at `showdown_theses.py:1268-1337`, (b)(c) VERIFIED-read, (d) PLAUSIBLE; R250 and R247(a) CLOSED incomplete
+### R295. Showdown ladder truth, third pass, REWRITTEN 2026-09-20 to its open remainder: (a) the R250 hold collides with a thesis lock and the ladder answers by dropping the player cap; (b) the degraded flag reads a thesis-weighted proxy as one scale; F40's reservation bounds and release (P1, S-M) | new 2026-09-02 from the greenfield tenth edition (GF10-D1, D3, D4, D5); F13 LANDED in R338; **(c) and (d) LANDED 2026-09-20 as R379(c)(d)**, see that CHANGELOG entry
 
-**LANDED 2026-09-11 in R338's commit one; the record is that date's CHANGELOG entry.** F13 shipped (`_rung` latches `stopped` on any None whose `proven_infeasible` is not literally True, and reports `solver_failures` beside `infeasible`), and F14 half-shipped: `build_showdown_lineup` refuses an absent `locks`/`cpt_lock` key as `invalid_hard_lock` before constraint assembly, scoped by R338 repair (3) to the OPERATOR door through an `operator_locks` flag, with `solve_ladder`'s `_rung` passing False once for all nine rung call sites. **What is left is F14's soft-lock field** -- thesis preferences travelling in their own argument, ignored-and-reported -- plus (a)-(d) and F40, all Session 8.
+**(c) and (d) are CLOSED and their text is in the 2026-09-20 R379(c)(d)
+CHANGELOG entry.** (c) shipped the prescribed `and cpt_lock` plus a per-slot
+argument memo in `_rung`, because reproducing it found a second instance of the
+same class at R223's floor rung; the residue is counted in a new
+`duplicate_rungs_skipped`. (d) shipped as a refusal in
+`melt_showdown_salary_csv` rather than a re-key, and stays PLAUSIBLE: 15 salary
+files on disk carry zero instances, and a test carries that sweep.
 
-**Rider 2026-09-08 (ed12, F13, F14, F40): three more ladder parts, same file, same session.** *F13 (fault injection):* `_rung` (`showdown_theses.py:1140-1164`, `solve_ladder` `:1440-1454`) latches TIMEOUTS and leaves every other empty result free to descend, so a status-4 solver response with no incumbent and `proven_infeasible=False` produced five calls and `infeasible=1`; `run_showdown` (`build_slate.py:3322-3371`) then classifies the incomplete ladder as a shape refusal that can reach the deadline governor. R294's Classic rule ("proven infeasible" only on status 2) was never propagated across this boundary. Raise a typed `SolverExecutionFailure` on a no-proof empty return and route it to an execution failure at the CLI, outside the strategic governor; a timeout reaches a compute-budget response, never a "constraints infeasible" label. *F14:* an unresolved hard `locks`/`cpt_lock` key is appended to `ignored_locks` (`showdown.py:502-521`) and a different lineup is solved; a hard inclusion cannot share an API with a soft thesis preference. Refuse unresolved hard keys before constraint assembly; soft preferences are a separate field with applied-change records. *F40:* captain reservations (`:1116-1124` init, UTIL blocking near `:1280`, release `:1474-1475`) are bounded by captain demand/cap but not the player cap, and are spent when the ACTUAL captain appears rather than when the requesting slot is processed, so a failed or substituted requested captain leaves a phantom hold and an incidental earlier captain consumes a later one. Bound by both caps; release the current request's hold exactly once at the end of its slot, success, substitution or failure alike; the joint role-aware allocator (Section 4) removes the order dependence entirely. Roadmap: Session 8, standalone, with (a)-(d).
+**READ THIS BEFORE ANCHORING ANYTHING BELOW.** Every line number in the
+original entry was stale for two compounding reasons, and both corrections were
+verified at 6b2ef47 before batch 1. R223 and R239(b) grew `solve_ladder` from
+FIVE rungs to NINE, so "rung 5" is not the fifth of five it was written against;
+CC-3 then added ~340 lines to `showdown.py` and ~130 to `showdown_theses.py`.
+**Re-derive which rung a claim is about from the ARGUMENTS, never from the
+ordinal.** The nine rung call sites were at `showdown_theses.py:1493, 1497,
+1504, 1512, 1519, 1533, 1563, 1585, 1605` at 6b2ef47; R379(c) then inserted the
+memo and `_issue` above them, so **they have moved again** and must be re-grepped
+(`grep -n "_rung(latch" mlb_engine/optimize/showdown_theses.py`).
 
-(a) `showdown_theses.py:1275-1334`: a held player `X` in this thesis's `locks` (shootout locks the side's top-4 at :397; both_explode three at :518; duel hard-locks both SPs at :505) with `cpt_lock = Y`: the lock says `cpt_X + util_X ≥ 1`, the hold says `util_X = 0`, the captain lock says the one CPT is `Y`; rungs 1-2 (:1310-1318) are infeasible ONLY because of the hold, and rung 3 (:1320-1326) drops the player cap together with the hold (`excludes=without_cap`, no `**util_kw`), readmitting every capped player and counting `player_relaxed`. Repro, MIN@CHC fixture, `{MIN:+150, CHC:-170}`, n=12: Busch 7/12 and Bell 7/12 against `player_cap_count=6` (58.3% under a 50% cap); at `{MIN:+300, CHC:-350}`, n=9: three players at 5/9 over a cap of 4 AND a `captain_budget_inversion` for Suzuki, the inversion R250 exists to prevent; 16 of 150 (moneyline × n) combinations fire. The R250 test class (`tests/test_showdown.py:2195-2202`) builds every thesis with `"locks": []`. Fix: at hold computation skip any `k` in this thesis's `locks` while `cpt_lock` is someone else and record `{"player": k, "yielded_to": "lock"}`; insert a hold-only rung between 2 and 3 counted under `captain_budget_hold_relaxed`, outside `clean`; test with locks on the held player and a `cpt_lock` elsewhere asserting `player_relaxed == 0` and realized max ≤ `player_cap_count`. (b) `showdown.py:550, :565, :584` + `showdown_theses.py:1187-1191` + `build_slate.py:3263-3264`: on the ladder path `proj_points` is computed on the thesis-MULTIPLIED frame (win_big 0.40 on the other side's bats, duel 0.78 on every bat), and R247(a)'s proxy-margin trigger (`field_miner.py:819-822`, ≥25% below the portfolio median) compares those across theses, so a duel or blowout roster is flagged degraded by construction; the filed 1905_1g_sd sighting ("38.19 against a median of 54.87") is consistent with a 0.40-suppressed thesis. Fix: recompute `proj_points_base = 1.5·Base[cpt] + Σ Base[util]` from the unweighted `df` after each solve; `showdown_degraded_entries` reads it; label the weighted number `proxy_points_thesis_weighted`. (c) `showdown_theses.py:1335-1341`: rung 5 has no `cpt_lock` guard, so when the captain was already reassigned it re-solves an argument-for-argument copy of rung 1 and re-pays `time_limit` (8 s); `_record_lock_relaxation` at :1341 would record a lock relaxation for a slot with no lock. Fix: `and cpt_lock` on both. (d) `showdown.py:224` keys a person on `(Name, Team)`; two DK persons with one name on one team merge, last writer wins on `CPT_ID`/`UTIL_ID`; `certify_showdown` cannot see it. Fix: key on `(Name, Team, Position)` or refuse a second row of the same role.
+**(a) HOLDS, VERIFIED at 6b2ef47, and it is the row's P1 — the only part with a
+measured cap BREACH behind it.** The hold is built at `showdown_theses.py:
+1453-1479` (`util_kw = {"util_excludes": util_blocked or None}` at `:1479`);
+`with_cap` and `without_cap` are at `:1451-1452`. The rung at `:1504` passes
+`excludes=without_cap` and DROPS `**util_kw`, so the player cap and the R250
+hold come off together and every capped player is readmitted while
+`player_relaxed` counts one relaxation. The three-constraint contradiction is
+real and reads in one screen at `showdown.py:1099` (`cpt_X + util_X >= 1`),
+`:1103` (`cpt_Y == 1`) and `:1120` (`util_X == 0`): with one CPT slot those are
+unsatisfiable, so rungs 1 and 2 are infeasible ONLY because of the hold.
+
+Two corrections to the original text. **Five of the nine rungs drop the hold,
+not one:** `grep -n "util_kw"` gives `:1479, 1495, 1499, 1522, 1535` at
+6b2ef47, so rungs 1, 2, 5 and 6 carry it and rungs 3, 4, 7, 8 and 9 all drop it.
+And **five templates set non-empty `locks`, not three:** `shootout` at `:566`
+(`_hitters(shape, s)[:4]`), `bottom_order` at `:578`, `duel`'s `hard_locks` at
+`:674`, `both_explode` at `:687`, `ace_loses` at `:708`. The entry named
+shootout, both_explode and duel and missed the other two. `hard_locks` matters
+here: `:1109-1111` strips the captain from `locks` but never from `hard_locks`,
+so a hard lock survives every rung.
+
+Reachability is structurally routine rather than exotic: `shootout`'s
+`cpt_ladder` (`:559`) and its `locks` (`:566`) are the SAME list, so a top-4
+hitter is a captain candidate for one rung and a lock for another.
+
+*Repro.* MIN@CHC fixture, moneyline `{MIN:+150, CHC:-170}`, n=12: Busch 7/12 and
+Bell 7/12 against `player_cap_count=6`, 58.3% under a 50% cap; at
+`{MIN:+300, CHC:-350}`, n=9, three players at 5/9 over a cap of 4 AND a
+`captain_budget_inversion` for Suzuki, the inversion R250 exists to prevent; 16
+of 150 (moneyline x n) combinations fire. **Reproduce at the
+`build_thesis_ladder` level and say which level you used.** Through
+`run_showdown` the filed numbers will NOT reproduce, and that is not a
+falsification: R334(a) now also routes the moneyline packet into
+`build_showdown_f1` -> `apply_f1_prior`, which moves Base.
+
+*Fix.* At hold computation skip any `k` in this thesis's `locks` while
+`cpt_lock` is someone else, and record `{"player": k, "yielded_to": "lock"}`;
+insert a hold-only rung between 2 and 3 counted under
+`captain_budget_hold_relaxed`, outside `clean`. Test with locks on the held
+player and a `cpt_lock` elsewhere, asserting `player_relaxed == 0` and realized
+max <= `player_cap_count`.
+
+*The blind spot, verified.* `R250CaptainBudgetTests` is at
+`tests/test_showdown.py:2363` (the original entry's `:2195-2202` is stale) and
+its `_theses()` at `:2380-2387` builds every thesis with `"locks": []` at
+`:2386`. It is the only thesis factory the class uses, so the class cannot reach
+the collision. Close it in the same commit.
+
+*Blast radius.* `util_block_slots` / `util_block_detail` (`:1298-1299`,
+`:1466-1478`), the diagnostics emit (`:1758-1760`), `build_slate.py:3980-3982`,
+`:4044-4045`, `:4341-4342`, and `tests/test_showdown.py:2472`, `:2491`,
+`:2498-2500`, `:2507`. `captain_budget_block_detail` has NO production reader --
+only the test at `:2472`. A new `captain_budget_hold_relaxed` counter needs a
+home in the diagnostics dict and a decision about `build_slate.py`'s `clean`
+verdict (the counter tuple is iterated at `tests/test_showdown.py:2792`).
+
+**F40 HOLDS, verbatim, and the trace is sharper than the filed text.**
+`reserve_ceiling = cpt_cap` at `showdown_theses.py:1294` is bounded by the
+captain cap only and never by `player_cap` (`:1249`). Release is at
+`:1659-1660`, `if reserved_remaining.get(got_cpt, 0) > 0:
+reserved_remaining[got_cpt] -= 1`, decremented against the ACTUAL captain
+(`got_cpt`, from `:1644`) rather than the requesting slot, so a failed or
+substituted requested captain leaves a phantom hold and an incidental earlier
+captain spends a later slot's reservation.
+
+Two facts the full lifecycle trace establishes that the filed text implies but
+does not state. **`reserved_remaining` has exactly ONE mutation after init**
+(`:1660`): the `lu is None` branch (`:1622-1639`) has no release at all, so a
+slot whose captain rung failed outright never releases its hold. And
+**`captain_budget_reserved` (`:1297`) is captured BEFORE the loop and never
+refreshed**, so the brief reports the hold as PLANNED and never as SPENT; the
+live residue after the loop is visible nowhere.
+
+Also reachable, through `--controls-override` only: if `reserve_ceiling >
+player_cap`, the bind test at `:1463` (`player_counts.get(k,0) >= player_cap -
+held`) compares against a negative bound and is true from slot 0, so the player
+is UTIL-blocked for the whole ladder. Defaults cannot reach it
+(cpt_cap = floor(.25n) < player_cap = floor(.50n)).
+
+*Fix.* Bound by both caps; release the current request's hold exactly once at
+the end of its slot -- success, substitution or failure alike. The joint
+role-aware allocator removes the order dependence entirely. Same reservation
+code as (a), so **land it immediately after (a), never before.**
+`tests/test_showdown.py:2485` pins `:1294`'s current semantics directly and
+`:2455` pins `:1659-1660`; read both first.
+
+**(b) HOLDS, and two of the entry's citations were wrong about the MODULE, not
+just the line.** `proj_points` is `round(sum(p["points"] for p in players), 3)`
+at `showdown.py:1235`, computed off the thesis-MULTIPLIED frame
+(`showdown_theses.py:1370-1374`). `grep -rn proj_points_base` returns zero hits,
+so the fix is unbuilt.
+
+`showdown_degraded_entries` is **not** in `field_miner.py`: it is
+`skills/generate-lineups/scripts/build_slate.py:4581`, a marshaller. The
+proxy-margin trigger is `mlb_engine/field/field_miner.degraded_entry_flags`
+(def `:766`, trigger body `:855-871`, NOT `:770-808`), with
+`DEGRADED_PROXY_MARGIN_PCT = 25.0` at `:136`. The two are joined by a lazy
+import at `build_slate.py:4600`.
+
+**Scope correction: the defect is LADDER-PATH ONLY.** `build_slate.py:3679`
+gates the ladder on `basis == "declared_starters" and posted >= 18`; the bank
+path applies no thesis multiplier, so its `proj_points` is one scale and the
+defect does not exist there. `showdown_degraded_entries` runs on BOTH paths, so
+**the fix must not change the bank path's number.**
+
+*Where the unweighted Base still lives.* Only one stack frame up, as
+`solve_ladder`'s own `df` parameter, alive for the whole slot loop
+(`showdown_theses.py:1370 work = df.copy()` overwrites `work["Base"]` at
+`:1373-1374`). Nothing inside `showdown.py` can see the pre-thesis Base, and
+neither `APPG_Raw` (`:99`) nor `Base_Prior` (`:120`) equals it -- `Base_Prior`
+is stale with respect to `apply_f1_prior` and `apply_supplied_base`, both of
+which write only `Base`. So `base_by_key = dict(zip(df["Player_Key"],
+df["Base"]))` built once beside `name_by_key` (`:1262`) and read after each
+successful solve is CHEAP and threads no frame into `showdown.py`. Computing it
+inside `_assemble_lineup` instead would need a new parameter on
+`build_showdown_lineup`, which has a signature pin at
+`tests/test_showdown.py:3824`.
+
+*The threading, exhaustively.* One writer (`showdown.py:1235`); two production
+readers (`showdown_theses.py:1976` `portfolio_report`, which relabels it
+`proxy_points`; `build_slate.py:4602`, which relabels it `proxy`). It leaves the
+process under THREE names -- `proxy_points` in `brief[...]["lineups"]`
+(`build_slate.py:4367`, ladder-only), `proxy` and `proxy_pct_below_median` in
+`degraded_entries` (`:4259`), and `median_proxy` on the stderr line (`:4068`,
+formatter `:4609+`, printed at `:4628`). `proxy_points` has NO reader anywhere
+in the repo -- a write-only brief field, the R122 `prior_note` shape. Tests that
+construct the key: `tests/test_core.py:17248-17250`, `:17271-17272`,
+`:17283-17285`.
+
+*Fix.* Recompute `proj_points_base = 1.5*Base[cpt] + sum(Base[util])` from the
+unweighted frame after each solve; `showdown_degraded_entries` reads it; label
+the weighted number `proxy_points_thesis_weighted`. Check nothing else reads the
+old key before renaming.
+
+**F14's soft-lock field is DEFERRED out of this row, on Ben's instruction
+(2026-09-20), and should be repriced as its own row with the design question
+stated.** The seam is named in the code at `showdown.py:1016`, which says in as
+many words that preferences travelling in their own argument is R295's;
+`operator_locks` (`showdown.py:948`, passed False by the thesis door at
+`showdown_theses.py:1334`) is R338 repair (3)'s scoping. It is the largest item
+on the row and the only one with no defect behind it: it is a design change that
+would let the scoping be lifted. "A hard inclusion cannot share an API with a
+soft thesis preference" is an API decision, and Ben wants the proposal before
+the diff.
 
 R104, R45, R105 and R54 landed 2026-08-10 as one session and their entries
 migrated to CHANGELOG.md. R41 stays the destination and stays decision-first;

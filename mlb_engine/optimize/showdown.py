@@ -303,6 +303,39 @@ def melt_showdown_salary_csv(path: str | Path, exclude_out: bool = True,
                 rec["Status"] = status
             if starting and not rec.get("Starting"):
                 rec["Starting"] = starting
+            # R379(d). Two DK persons sharing a name on one team collapse into
+            # `by_key` above and the second one's draftable id silently
+            # overwrites the first's here, last writer wins. `certify_showdown`
+            # cannot catch it: it rebuilds `by_key` from this same merged frame
+            # and checks the export's ids against the merge, so the merge
+            # validates itself. The export would then carry one person's id for
+            # a lineup the optimizer built on the other's salary -- an ILLEGAL
+            # file, which is the one thing CLAUDE.md says never to ship.
+            #
+            # Refuse, do not re-key. Keying on `(Name, Team, Position)` was the
+            # other candidate and it does not work: R323's
+            # `showdown_paired_role_disagreement` already flags the pair
+            # whenever they differ on Position or Starting (below, via
+            # `_role_rows`), so the ONLY case still silent is two persons
+            # sharing both -- exactly where a Position-keyed melt is a no-op.
+            # And `(Name, Team)` is the person identity at two further sites
+            # (`slate_intake_manager.showdown_person_key`,
+            # `preflight_upload.person_key`), so re-keying one of the three
+            # splits the identity the collapse and the standings join share.
+            #
+            # An identical repeated ROW is not this: DK re-emitting the same
+            # draftable id is a duplicate line, not a second person, and it
+            # merges as it always did.
+            seen_role_id = rec["CPT_ID"] if role == "CPT" else rec["UTIL_ID"]
+            if seen_role_id is not None and str(seen_role_id) != str(pid):
+                raise ValueError(
+                    f"{path} carries two different DraftKings persons named "
+                    f"{name!r} on {team} with a {role} row each (ids "
+                    f"{seen_role_id} and {pid}). The Showdown melt keys a "
+                    f"person on (Name, Team), so these two would merge into "
+                    f"one pool row and the export would carry one person's id "
+                    f"against the other's salary. Disambiguate the names in "
+                    f"the salary file and re-run.")
             if role == "CPT":
                 rec["CPT_ID"], rec["CPT_Salary"] = pid, salary
             else:

@@ -15,6 +15,7 @@ import hashlib
 import importlib.util
 import io
 import json
+import inspect
 import math
 import os
 import subprocess
@@ -4885,6 +4886,338 @@ class R328ShowdownRoleCoherenceTests(unittest.TestCase):
         src = (REPO / "tools" / "ownership_pred.py").read_text(encoding="utf-8")
         self.assertIn('block["role_coherence"] = '
                       'ownership_prior.showdown_role_coherence(', src)
+
+
+class R379DuplicateRungTests(unittest.TestCase):
+    """R379(c). A ladder rung that changes no control is paid for twice.
+
+    R295 filed one instance: the rung that exists to drop the captain lock had
+    no ``cpt_lock`` guard, so with no lock to drop its argument set was rung
+    1's, and it re-paid the full ``time_limit`` on a solve already proven
+    infeasible while ``_record_lock_relaxation`` booked a captain relaxation
+    against a slot that never had a captain lock. The three rungs below it
+    already read ``if cpt_lock else 0``; the guard was never backported.
+
+    Reproducing that instance found a second one in the same class -- R223's
+    floor rung fires on ``max_shared_players is not None`` while the rung above
+    it has already dropped the overlap bound -- so the fix is a per-slot memo
+    over the controls, not a tenth hand-derived disjunction.
+
+    Nothing here is a win rate, an ROI, or a probability claim. Rung counts and
+    argument sets are deterministic properties of the ladder.
+    """
+
+    @staticmethod
+    def _pool():
+        return pd.DataFrame([
+            _p(f"P{i}|{'AA' if i < 4 else 'BB'}", "AA" if i < 4 else "BB",
+               10 - i, 4000, 6000, f"1{i:03d}", f"2{i:03d}")
+            for i in range(8)])
+
+    @staticmethod
+    def _thesis(i, cpt=None, locks=()):
+        return {"template": f"t{i}", "name": f"t{i}", "why": "", "cpt": cpt,
+                "locks": list(locks), "excludes": [], "mult": {}}
+
+    def _walk(self, theses, **kw):
+        """Walk the whole ladder with every solve PROVEN infeasible, recording
+        each argument set the ladder issued.
+
+        Proven infeasible rather than a bare ``None`` because F13's stop latch
+        halts the descent on an unproven empty return, and the rungs below are
+        the subject here.
+        """
+        calls = []
+        real = st.build_showdown_lineup
+
+        def recorder(*args, status_out=None, **k):
+            bound = inspect.signature(real).bind_partial(*args, **k)
+            bound.apply_defaults()
+            seen = dict(bound.arguments)
+            for drop in ("df", "status_out", "contract"):
+                seen.pop(drop, None)
+            calls.append(tuple(sorted(
+                (name, tuple(sorted(str(x) for x in value))
+                 if isinstance(value, (list, tuple, set)) else value)
+                for name, value in seen.items())))
+            if status_out is not None:
+                status_out["proven_infeasible"] = True
+                status_out["status"] = 2
+            return None
+
+        diag = {}
+        with unittest.mock.patch.object(st, "build_showdown_lineup", recorder):
+            st.solve_ladder(self._pool(), theses, diagnostics=diag,
+                            time_limit=1, **kw)
+        return calls, diag
+
+    def test_a_slot_with_no_captain_lock_never_issues_the_lock_dropping_rung(self):
+        """The instance R295 named: cpt_lock None, so the rung that exists to
+        drop it has nothing to drop and rung 1's argument set is its own."""
+        calls, diag = self._walk([self._thesis(0, cpt=None)],
+                                 max_shared_players=4)
+        self.assertEqual(len(calls), len(set(calls)),
+                         "a rung re-issued an argument set in the same slot")
+        # EXACTLY ONE redundant rung is left, and it is R223's floor rung, not
+        # this one. Pinning the number rather than asserting zero is what keeps
+        # the `and cpt_lock` guard honest: the memo would otherwise cover for a
+        # guard that stopped guarding, and reverting the guard would still pass.
+        # Reverting it makes this 2.
+        #
+        # The floor rung's own guard is a four-way disjunction that fires on
+        # `max_shared_players is not None` after the rung above it has already
+        # dropped the overlap bound. It is left as it is deliberately: its
+        # correct condition depends on which of four earlier rungs ran, and
+        # hand-deriving that is the exercise the memo replaces. The memo makes
+        # the redundancy free -- no solve is paid for -- and this counter makes
+        # it visible.
+        self.assertEqual(diag["duplicate_rungs_skipped"], 1,
+                         f"expected R223's floor rung and nothing else: "
+                         f"{diag['duplicate_rung_detail']}")
+        # And the counter that rung would have incremented stays honest.
+        self.assertEqual(diag["captain_lock_relaxed"], 0)
+        self.assertEqual(diag["lock_relaxation_detail"], [])
+
+    def test_no_slot_ever_issues_one_argument_set_twice(self):
+        """The CLASS, over every reachable combination of the three controls.
+
+        Each configuration is walked on its own so that ``forbidden_sets``,
+        the one input that legitimately differs between slots, cannot make a
+        cross-slot repeat look like a defect.
+        """
+        checked = 0
+        for n in (1, 2, 4):
+            for cpt in (None, "P0|AA"):
+                for msp in (None, 4):
+                    for pcap in (None, 0.5):
+                        for ccap in (None, 0.25):
+                            theses = [self._thesis(i, cpt=cpt) for i in range(n)]
+                            calls, diag = self._walk(
+                                theses, max_shared_players=msp,
+                                max_player_exposure_pct=pcap,
+                                max_cpt_exposure_pct=ccap)
+                            # Every solve fails here, so `forbidden_sets` never
+                            # grows and every slot issues the same sequence: a
+                            # repeat WITHIN the run is a repeat within a slot.
+                            per_slot = len(calls) // n
+                            slot0 = calls[:per_slot]
+                            where = (f"n={n} cpt={cpt} msp={msp} "
+                                     f"pcap={pcap} ccap={ccap}")
+                            self.assertEqual(
+                                len(slot0), len(set(slot0)),
+                                f"duplicate rung at {where}")
+                            # At most ONE redundant rung per slot, which is
+                            # R223's floor rung (see the single-slot test).
+                            # Asserting only on the issued calls above would let
+                            # the memo cover for a guard that stopped guarding,
+                            # because a skipped rung issues nothing. Reverting
+                            # the `and cpt_lock` guard makes this 2 on every
+                            # configuration whose captain lock is None.
+                            self.assertLessEqual(
+                                diag["duplicate_rungs_skipped"], n,
+                                f"more than one redundant rung per slot at "
+                                f"{where}: {diag['duplicate_rung_detail']}")
+                            checked += 1
+        self.assertEqual(checked, 48)
+
+    def test_the_skipped_rungs_are_reported_rather_than_silent(self):
+        """A skipped repeat is search effort, so it is counted where the other
+        compute facts are -- never in a relaxation counter."""
+        _, diag = self._walk([self._thesis(0, cpt="P0|AA")],
+                             max_shared_players=4)
+        self.assertEqual(diag["duplicate_rungs_skipped"], 0)
+        self.assertEqual(diag["duplicate_rung_detail"], [])
+        for counter in ("overlap_relaxed", "player_relaxed",
+                        "captain_lock_relaxed", "both_relaxed"):
+            self.assertIsInstance(diag[counter], int)
+
+    def test_the_memo_compares_an_omitted_control_equal_to_an_explicit_none(self):
+        """Rung 1 passes ``cpt_lock=cpt_lock``; the floor rung omits it. Both
+        mean None, and a memo keyed on the KEY SET calls them different -- which
+        is this fix's first cut, and it memoized nothing."""
+        calls, _ = self._walk([self._thesis(0, cpt=None)], max_shared_players=4)
+        for call in calls:
+            self.assertIn("cpt_lock", dict(call),
+                          "the recorder applies defaults, so every control is "
+                          "present in every recorded call")
+
+    def test_an_unrecognised_control_disables_the_memo_rather_than_guessing(self):
+        """Fail OPEN. A control added to a rung and not added to the memo's key
+        list would make two different solves compare equal, and the memo would
+        skip a rung that had new content -- a lost lineup, which is worse than
+        a repeated one."""
+        self.assertNotIn("brand_new_control", st._RUNG_MEMO_KEYS)
+        src = inspect.getsource(st.solve_ladder)
+        self.assertIn("set(call_kw) - _RUNG_MEMO_KEYS", src)
+        # Every keyword the nine rung call sites pass is named, or the memo is
+        # disabled on every rung and this fix is inert.
+        self.assertTrue(
+            {"locks", "excludes", "cpt_lock", "cpt_excludes", "util_excludes",
+             "forbidden_sets", "max_shared_players", "time_limit"}
+            <= set(st._RUNG_MEMO_KEYS))
+
+    def test_every_control_the_rungs_pass_is_named_in_the_memo_key_list(self):
+        """Run the real ladder and assert the fail-open branch was never taken:
+        a memo disabled on every rung would pass every test above vacuously."""
+        real = st.build_showdown_lineup
+        unknown = []
+
+        def recorder(*args, status_out=None, **k):
+            extra = set(k) - set(st._RUNG_MEMO_KEYS) - {"df", "operator_locks"}
+            if extra:
+                unknown.append(sorted(extra))
+            if status_out is not None:
+                status_out["proven_infeasible"] = True
+                status_out["status"] = 2
+            return None
+
+        with unittest.mock.patch.object(st, "build_showdown_lineup", recorder):
+            st.solve_ladder(self._pool(),
+                            [self._thesis(0, cpt="P0|AA"),
+                             self._thesis(1, cpt=None)],
+                            diagnostics={}, time_limit=1, max_shared_players=4)
+        self.assertEqual(unknown, [])
+
+
+class R379SameNameSameTeamMeltTests(unittest.TestCase):
+    """R379(d). The Showdown melt keys a person on ``(Name, Team)``, so two DK
+    persons sharing a name on one team merge and the second one's draftable id
+    overwrites the first's, last writer wins.
+
+    ``certify_showdown`` cannot catch it, because it rebuilds ``by_key`` from
+    the same merged frame and checks the export's ids against the merge: the
+    merge validates itself. The export would carry one person's id for a lineup
+    priced on the other's salary.
+
+    R295 filed this PLAUSIBLE, never verified, and it is still unverified here:
+    15 salary files on disk (every archived DK export plus every fixture) carry
+    zero ``(Name, Team, Roster Position)`` repeats and zero persons holding more
+    ids than roles. So this refuses a file it cannot prove DK ships, rather than
+    silently re-keying a person identity that two other modules share.
+
+    Nothing here is a win rate, an ROI, or a probability claim.
+    """
+
+    @staticmethod
+    def _collide(tmp, name="collide.csv", clash_role=("CPT", "UTIL"),
+                 same_id=False, position=None):
+        """The MIN@CHC fixture with one person's rows renamed onto another's.
+
+        Both survivors keep their own draftable ids and salaries, which is what
+        makes them two persons rather than one duplicated row.
+        """
+        out = Path(tmp) / name
+        with open(SAL, newline="", encoding="utf-8-sig") as fh:
+            rows = list(csv.reader(fh))
+        head = rows[0]
+        c_name, c_team = head.index("Name"), head.index("TeamAbbrev")
+        c_role, c_id = head.index("Roster Position"), head.index("ID")
+        c_pos = head.index("Position")
+        c_nid = head.index("Name + ID")
+
+        # Two people on one team, so the rename produces a real collision.
+        by_person = {}
+        for row in rows[1:]:
+            by_person.setdefault((row[c_name], row[c_team]), []).append(row)
+        team = rows[1][c_team]
+        people = [k for k in by_person if k[1] == team]
+        keeper, victim = people[0], people[1]
+
+        for row in by_person[victim]:
+            role = row[c_role].strip().upper()
+            if role in clash_role:
+                row[c_name] = keeper[0]
+                row[c_nid] = f"{keeper[0]} ({row[c_id]})"
+                if same_id:
+                    # DK re-emitting an identical line: one person, not two.
+                    twin = [r for r in by_person[keeper]
+                            if r[c_role].strip().upper() == role][0]
+                    row[c_id] = twin[c_id]
+                if position is not None:
+                    row[c_pos] = position
+        with open(out, "w", newline="", encoding="utf-8") as fh:
+            csv.writer(fh).writerows(rows)
+        return out, keeper
+
+    def test_two_persons_one_name_one_team_are_refused_by_name(self):
+        """The defect: both roles collide, both ids differ, nothing upstream
+        can see it. The refusal names the person and both ids."""
+        with tempfile.TemporaryDirectory() as tmp:
+            path, keeper = self._collide(tmp)
+            with self.assertRaises(ValueError) as caught:
+                sd.melt_showdown_salary_csv(str(path))
+            message = str(caught.exception)
+            self.assertIn(keeper[0], message)
+            self.assertIn(keeper[1], message)
+            self.assertIn("two different DraftKings persons", message)
+
+    def test_a_collision_on_one_role_alone_is_refused_too(self):
+        """A person needs BOTH a CPT and a UTIL row to survive the melt, so a
+        one-role collision could look harmless. It is not: the surviving row
+        still carries an id that belongs to the other person."""
+        for role in ("CPT", "UTIL"):
+            with tempfile.TemporaryDirectory() as tmp:
+                path, _ = self._collide(tmp, clash_role=(role,))
+                with self.assertRaises(ValueError, msg=role):
+                    sd.melt_showdown_salary_csv(str(path))
+
+    def test_an_identical_repeated_row_is_not_two_persons(self):
+        """DK re-emitting the same draftable id is a duplicate LINE. It merged
+        before this fix and it still merges: refusing it would refuse a file
+        that has nothing wrong with it."""
+        with tempfile.TemporaryDirectory() as tmp:
+            path, keeper = self._collide(tmp, same_id=True)
+            df = sd.melt_showdown_salary_csv(str(path))
+            self.assertTrue(len(df))
+            self.assertIn(f"{keeper[0]}|{keeper[1]}", set(df["Player_Key"]))
+
+    def test_the_refusal_fires_even_when_the_pair_differs_on_position(self):
+        """R323's `showdown_paired_role_disagreement` already flags a pair that
+        disagrees on Position or Starting, but flagging makes the SIDE
+        undecided -- it does not stop the ids merging. The frame still shipped
+        one person's id over the other's, so the refusal is what closes it and
+        it does not defer to the flag."""
+        with tempfile.TemporaryDirectory() as tmp:
+            path, _ = self._collide(tmp, position="ZZ")
+            with self.assertRaises(ValueError):
+                sd.melt_showdown_salary_csv(str(path))
+
+    def test_the_unmodified_fixtures_still_melt(self):
+        """The refusal is a new way for a good file to fail, so every Showdown
+        fixture on disk is run through it."""
+        for fixture in sorted(FIX.glob("DKSalaries_showdown_*.csv")):
+            df = sd.melt_showdown_salary_csv(str(fixture))
+            self.assertTrue(len(df), fixture.name)
+
+    def test_no_salary_file_on_disk_carries_the_collision(self):
+        """R295 filed (d) PLAUSIBLE. This is why it is still PLAUSIBLE: the
+        refusal ships against a file shape nothing on disk demonstrates, which
+        is the reason it refuses instead of re-keying."""
+        checked = 0
+        for path in sorted(REPO.glob("data/**/*.csv")) + sorted(FIX.glob("*.csv")):
+            try:
+                with open(path, newline="", encoding="utf-8-sig") as fh:
+                    rows = list(csv.DictReader(fh))
+            except (OSError, UnicodeDecodeError, csv.Error):
+                continue
+            if not rows or "Name" not in rows[0] or "TeamAbbrev" not in rows[0]:
+                continue
+            checked += 1
+            seen = {}
+            for row in rows:
+                person = ((row.get("Name") or "").strip(),
+                          (row.get("TeamAbbrev") or "").strip(),
+                          (row.get("Roster Position") or "").strip().upper())
+                if not person[0] or not person[1]:
+                    continue
+                prior = seen.get(person)
+                got = (row.get("ID") or "").strip()
+                self.assertFalse(
+                    prior is not None and prior != got,
+                    f"{path.name}: {person} holds ids {prior} and {got} -- "
+                    f"(d) is reproducible on disk and is no longer PLAUSIBLE")
+                seen[person] = got
+        self.assertGreaterEqual(checked, 3, "no salary file was actually read")
 
 
 if __name__ == "__main__":

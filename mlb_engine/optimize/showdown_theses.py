@@ -47,6 +47,17 @@ from mlb_engine.optimize.showdown import (
 
 VERSION = "0.3"
 
+# R379(c). The controls `solve_ladder`'s rung memo compares, so that a rung
+# which changes nothing is not paid for twice. Every name here is a keyword
+# `build_showdown_lineup` accepts; `df` is excluded because it is one frame for
+# the whole slot, and `contract` and `operator_locks` because `_rung` fixes
+# both. A rung passing a keyword absent from this set disables the memo for
+# that call rather than risking a wrong match -- see `_rung`.
+_RUNG_MEMO_KEYS = frozenset({
+    "locks", "excludes", "cpt_lock", "cpt_excludes", "util_excludes",
+    "forbidden_sets", "max_shared_players", "time_limit",
+})
+
 # PA-share prior by batting-order slot. Deterministic, not fitted to any slate.
 ORDER_FACTOR = {1: 1.08, 2: 1.06, 3: 1.05, 4: 1.03, 5: 1.00,
                 6: 0.97, 7: 0.95, 8: 0.92, 9: 0.90}
@@ -1244,6 +1255,12 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
     solver_failures = []
     time_limited_accepted = 0
     timeout_detail: List[Dict[str, str]] = []
+    # R379(c). Rungs the memo below skipped because an earlier rung in the same
+    # slot had already issued that exact argument set. Not a relaxation and not
+    # a failure: it is search effort the ladder was about to spend twice. Kept
+    # visible rather than silent, because a ladder shape change that makes this
+    # non-empty again is the defect coming back.
+    duplicate_rungs: List[Dict[str, str]] = []
     player_counts: Dict[str, int] = {}
     cpt_counts: Dict[str, int] = {}
     player_cap = exposure_cap_count(max_player_exposure_pct, len(theses))
@@ -1323,14 +1340,72 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
         then be recorded as a control giving way. Latching the timeout is what
         lets the caller BREAK instead of descending.
         """
-        st_out: Dict[str, Any] = {}
+        # R379(c), the CLASS. `and cpt_lock` below fixes the rung R295 named;
+        # it does not fix the two-rung pattern that rung was an instance of. A
+        # rung is only worth paying for if it CHANGES a control, and nine call
+        # sites each guarded by its own hand-derived disjunction cannot make
+        # that true -- measured over 48 reachable configurations, every slot
+        # that descended to R223's floor rung re-issued an argument set an
+        # earlier rung had already proven infeasible, because that rung's guard
+        # fires on `max_shared_players is not None` while the rung above it has
+        # already dropped the overlap bound.
+        #
+        # The memo is the rule rather than a tenth guard: the solver is
+        # deterministic (CLAUDE.md), so re-issuing an argument set within one
+        # slot cannot return anything the first issue did not, and every repeat
+        # re-pays the full `time_limit` for a known answer. Scoped to the SLOT
+        # because `forbidden_sets` grows between slots -- `latch` is per-slot,
+        # which is why the memo lives on it.
+        #
+        # A skipped repeat latches NOTHING. The first issue already recorded
+        # whatever the solver said; re-recording a stop or a timeout here would
+        # double-count a fact the ladder has, and returning None is the same
+        # answer the solve would have given.
+        # The comparison is over a FIXED control list read with `.get`, not over
+        # `call_kw`'s keys, because the rungs disagree about how they say "no
+        # captain lock": rung 1 passes `cpt_lock=cpt_lock` where the floor rung
+        # OMITS the argument entirely. Both mean None -- `build_showdown_lineup`
+        # defaults it -- so a key-set comparison calls two identical solves
+        # different and memoizes nothing, which is the first cut of this fix.
+        def _norm(key: str, value: Any) -> Any:
+            if value is None:
+                return None
+            if key == "forbidden_sets":
+                # A list of prior ROSTERS. Order within a roster and order
+                # between rosters are both irrelevant to the constraint.
+                return tuple(sorted(tuple(sorted(str(x) for x in row))
+                                    for row in value))
+            if isinstance(value, (list, tuple, set)):
+                return tuple(sorted(str(x) for x in value))
+            return value
+
+        # Fail OPEN on anything this list does not name. A control added to a
+        # rung and not added here would make two different solves compare equal
+        # and the memo would skip a rung that had new content -- a lost lineup,
+        # which is far worse than a repeated one. An unknown key therefore
+        # disables the memo for that call rather than guessing.
+        if set(call_kw) - _RUNG_MEMO_KEYS - {"df"}:
+            st_out_unmemoized: Dict[str, Any] = {}
+            return _issue(latch, st_out_unmemoized, call_kw)
+        seen = latch.setdefault("issued", set())
+        signature = tuple((k, _norm(k, call_kw.get(k)))
+                          for k in sorted(_RUNG_MEMO_KEYS))
+        if signature in seen:
+            duplicate_rungs.append({"thesis": tname, "slot": str(slot)})
+            return None
+        seen.add(signature)
+        return _issue(latch, {}, call_kw)
+
+    def _issue(latch: Dict[str, Any], st_out: Dict[str, Any],
+               call_kw: Mapping[str, Any]) -> Optional[Dict[str, Any]]:
+        """Pay for one solve and latch what the SOLVER said."""
         # R338 repair (3). Every `locks`/`cpt_lock` this ladder passes is
-        # THESIS-sourced (`thesis["locks"]` at :1307, `thesis["cpt"]` at :1268),
-        # so F14's hard-lock refusal does not apply to it: a thesis naming a
-        # player absent from `work` is a preference that cannot be honoured, and
-        # it goes to `ignored_locks` as it always did rather than blanking the
-        # reserved row. Set here, once, because nine rung call sites below share
-        # this one door.
+        # THESIS-sourced (`thesis["locks"]`, `thesis["cpt"]`), so F14's
+        # hard-lock refusal does not apply to it: a thesis naming a player
+        # absent from `work` is a preference that cannot be honoured, and it
+        # goes to `ignored_locks` as it always did rather than blanking the
+        # reserved row. Set here, once, because nine rung call sites share this
+        # one door.
         got = build_showdown_lineup(status_out=st_out, operator_locks=False, **call_kw)
         if got is None:
             if st_out.get("proven_infeasible") is not True:
@@ -1515,13 +1590,22 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
             if lu is not None:
                 player_relaxed += 1
                 overlap_relaxed += 1
-        if lu is None and not latch["stopped"]:
+        # R379(c). `and cpt_lock` on BOTH halves. This rung exists to drop the
+        # captain lock, and it is the first rung that does; with no lock to drop
+        # its argument set is identical to rung 1 above -- same `with_cap`, same
+        # `util_kw`, same `max_shared_players`, same `kw` -- so it re-paid the
+        # full `time_limit` for a solve already proven to return nothing, and
+        # `_record_lock_relaxation` booked a captain relaxation against a slot
+        # that never had a captain lock. The three lower rungs already read
+        # `if cpt_lock else 0` on the record; the guard was added downstream and
+        # never backported to the rung that introduced it.
+        if lu is None and not latch["stopped"] and cpt_lock:
             lu = _rung(latch, df=work, cpt_excludes=cpt_excludes,
                        forbidden_sets=prior or None,
                        excludes=with_cap,
                        max_shared_players=max_shared_players, **util_kw, **kw)
             if lu is not None:
-                cpt_relaxed += _record_lock_relaxation(thesis, lu)
+                cpt_relaxed += _record_lock_relaxation(thesis, lu) if cpt_lock else 0
         # R54(b). The fourth rung, which the BANK ladder had and this one did
         # not: a thesis solvable only under both relaxations returned None and
         # left a blank reserved row -- write-blocked at T-5 -- on a pool the bank
@@ -1717,6 +1801,15 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
             "solver_timeouts": solver_timeouts,
             "time_limited_accepted": time_limited_accepted,
             "solver_timeout_detail": list(timeout_detail),
+            # R379(c). Search effort, not a relaxation and not a failure: rungs
+            # skipped because an earlier rung in the same slot had already
+            # issued that exact argument set to a deterministic solver. It is
+            # reported beside the compute facts above for the same reason they
+            # are kept apart from the relaxation counters -- a nonzero here says
+            # the ladder's shape has a redundant rung, which is a rung-guard
+            # change, not a strategy change.
+            "duplicate_rungs_skipped": len(duplicate_rungs),
+            "duplicate_rung_detail": list(duplicate_rungs),
             # R153. The player-exposure cap, reported on the same footing as the
             # other two controls so "clean" means all three held. The three
             # reassignment lists are NOT relaxations: nothing gave way, a capped
