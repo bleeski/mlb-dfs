@@ -25,6 +25,76 @@ performance claim.
 
 ---
 
+## 2026-09-20 — R378: the agent-run record stops writing `findings: null` on every run, and the consumed 2026-09-17 fragment is retired
+
+*(Filed as R378, not R374: R374 is CC-A9's candidate-bank measurement, and R375-R377 are allocated too. `grep -oE '\bR[0-9]{2,3}\b' docs/backlog.md CHANGELOG.md | sort -n | tail` is how the next free number is read, and the first cut of this entry took R374 without running it.)*
+
+**Scope.** `.claude/hooks/subagent_record.py` (`_message_text` new;
+`transcript_facts` returns `last_agent_message`; `main` gains the fallback and a
+`findings_source`), `tests/test_core.py` (two tests in
+`RepoAgentsAndHookEventsTests`), `tools/audit.py` (`EXPECTED_SUITE_COUNTS`),
+`docs/backlog.md` (an R373 rider), `docs/backlog_inbox/` (one fragment
+retired).
+
+**Found by using the thing, on the day after it shipped.** R372 records what a
+repo agent run cost and found, parsing `FINDINGS: n` out of the payload's
+`last_assistant_message`. This session ran three `dfs-premise` agents; all three
+ended with that line (2, 4 and 4), and all three rows read `findings: null`,
+beside a `stop_reason: null` from the same cause: this harness does not deliver
+that key. A record whose entire subject is what the agent found, answering null
+on every run, is the R369 shape -- a record that exists and answers nothing --
+and it was 3 for 3 on its first real outing.
+
+**The fix reuses R372's own sidechain test rather than adding a second answer to
+"whose entries are these".** `transcript_facts` already decides that question to
+get the duration right, after the parent-span bug R372 shipped with. The last
+SIDECHAIN assistant message is the agent's report; on a transcript with no
+sidechain entries the full file is trusted only when the payload NAMED an agent,
+which is the same rule, with the same refusal when it cannot be answered -- a
+parent transcript cannot donate its count to an unnamed agent, and a test pins
+that.
+
+**Three things the fallback deliberately does not do.** It does not override a
+payload that IS delivered, so the documented source stays first and this stays a
+fallback. It does not read a non-text content block, so a `tool_use` whose
+arguments contain the word cannot be mistaken for the agent's own count. And it
+does not guess: when neither source carries the line, `findings` is null and
+`findings_source` says "no FINDINGS line in the payload or the transcript",
+which is a different fact from "the key was missing" and is now distinguishable
+in the record.
+
+**The 2026-09-17 fragment is retired, not built.** `docs/backlog_inbox/
+2026-09-17_BUILD_showdown-even-split-favorite-tiebreak.md` had sat unmerged
+since it was filed and CC-3 is the Showdown row, so it was checked first. It was
+already CONSUMED: merged as R373 on 2026-09-19, with the reporting half shipped
+in the same commit (`favorite_basis: alphabetical_tiebreak_no_market_input`,
+`showdown_theses.py:362-363`, four tests at `test_showdown.py:1313-1376`). The
+merging session did not retire the file, which is how it read as open work.
+`git rm --cached` plus `mv` into `_to_delete/`, per `.claude/rules/board.md`.
+
+**Its premise check produced three corrections to R373's OPEN allocation half,
+filed as a rider so the session that takes it does not start from the wrong
+shape.** The function is `describe_slate`, not `build_game_shape` -- zero `.py`
+hits for that name anywhere. The asymmetry is n-DEPENDENT rather than standing:
+measured off `build_thesis_ladder` on a synthetic even split, n=6 gives 3/3/0,
+n=12 gives 5/5/2 and n=20 gives 8/8/4, while only n=16 (7/6/3) and n=18 (8/7/3)
+tilt -- so the filed 16-entry measurement is exact and the title's general claim
+is not, and the 2026-09-19 `2138_1g_sd` build at 6 entries carried no tilt at
+all. And the cause is one link below where the entry puts it: both sides get
+identical weights and on an even split the two `win_close` specs are pairwise
+identical at 0.098934, so the extra entry is decided by `_largest_remainder`'s
+INDEX tiebreak (`showdown_theses.py:1059`), which the alphabetical favorite wins
+only because `_template_specs` iterates `((fav, dog), (dog, fav))` and its specs
+therefore hold indices 0-4. A fix must touch that tiebreak or the spec ordering,
+never the weights.
+
+**Mutation-checked, four reverts.** Dropping the fallback, reading non-text
+blocks, letting a parent message answer for an unnamed agent, and letting the
+fallback override a delivered payload each fail exactly the test that names
+them.
+
+---
+
 ## 2026-09-20 — R328: the last half, the ordering between the two Showdown ownership markets; the other two halves shipped in R338 and the row was stale against its own entry
 
 **Scope.** `mlb_engine/field/ownership_prior.py`

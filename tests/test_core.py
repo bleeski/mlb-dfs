@@ -13360,6 +13360,101 @@ class RepoAgentsAndHookEventsTests(unittest.TestCase):
             "I was told to print FINDINGS: 0 at the end but have not yet."))
         self.assertIsNone(mod.findings_count("see FINDINGS: 12 in the table"))
 
+    def test_findings_falls_back_to_the_transcript_when_the_payload_omits_it(self):
+        """R378. Measured on the first three real `dfs-premise` runs,
+        2026-09-20: all three ended with a `FINDINGS: n` line (2, 4, 4) and all
+        three recorded `findings: null`, alongside `stop_reason: null` from the
+        same cause -- this harness does not deliver `last_assistant_message`. A
+        hook whose whole subject is what the agent found, recording null on
+        every run, is the R369 shape: a record that exists and answers nothing.
+
+        Four cases, because the fallback must not invent a number either: the
+        payload still WINS when present; the transcript's last SIDECHAIN
+        assistant message is the agent's; a list-of-blocks `content` is read
+        and a tool_use block carrying the word is not; and a transcript with no
+        FINDINGS line records None with a source that says so."""
+        import io, json, tempfile
+        mod = self._hook("subagent_record")
+        root = Path(tempfile.mkdtemp())
+        transcript = root / "t.jsonl"
+        transcript.write_text("\n".join(json.dumps(e) for e in (
+            {"timestamp": "2026-09-20T01:00:00.000Z", "type": "assistant",
+             "isSidechain": False,
+             "message": {"model": "claude-opus-5",
+                         "content": "parent turn, FINDINGS: 99"}},
+            {"timestamp": "2026-09-20T01:01:00.000Z", "type": "assistant",
+             "isSidechain": True,
+             "message": {"model": "claude-opus-5", "content": [
+                 {"type": "tool_use", "name": "Grep",
+                  "input": {"pattern": "FINDINGS: 77"}},
+                 {"type": "text", "text": "report body\n\nFINDINGS: 5"}]}},
+        )), encoding="utf-8")
+        facts = mod.transcript_facts(str(transcript), "dfs-premise")
+        self.assertIn("FINDINGS: 5", facts["last_agent_message"])
+        self.assertNotIn("77", facts["last_agent_message"],
+                         "a tool_use block is not the agent's own text")
+        self.assertEqual(mod.findings_count(facts["last_agent_message"]), 5)
+
+        def _run(payload):
+            old_stdin = sys.stdin
+            old_env = os.environ.get("CLAUDE_PROJECT_DIR")
+            os.environ["CLAUDE_PROJECT_DIR"] = str(root)
+            try:
+                sys.stdin = io.StringIO(json.dumps(payload))
+                self.assertEqual(mod.main(), 0)
+            finally:
+                sys.stdin = old_stdin
+                if old_env is None:
+                    os.environ.pop("CLAUDE_PROJECT_DIR", None)
+                else:
+                    os.environ["CLAUDE_PROJECT_DIR"] = old_env
+            written = sorted((root / "data" / "agent_runs").rglob("*.jsonl"))
+            rows = [json.loads(ln) for ln in
+                    written[-1].read_text(encoding="utf-8").splitlines() if ln.strip()]
+            return rows[-1]
+
+        base = {"hook_event_name": "SubagentStop", "agent_type": "dfs-premise",
+                "agent_id": "a1", "session_id": "sessR378",
+                "transcript_path": str(transcript)}
+        # no payload message: the transcript answers
+        row = _run(dict(base))
+        self.assertEqual(row["findings"], 5)
+        self.assertEqual(row["findings_source"], "transcript last agent message")
+        # the payload still WINS when it is delivered
+        row = _run(dict(base, last_assistant_message="FINDINGS: 1"))
+        self.assertEqual(row["findings"], 1)
+        self.assertEqual(row["findings_source"], "payload.last_assistant_message")
+        # neither source has one: None, with a reason, never a guess
+        silent = root / "quiet.jsonl"
+        silent.write_text(json.dumps(
+            {"timestamp": "2026-09-20T01:00:00.000Z", "type": "assistant",
+             "isSidechain": True,
+             "message": {"model": "claude-opus-5", "content": "no count here"}}),
+            encoding="utf-8")
+        row = _run(dict(base, transcript_path=str(silent)))
+        self.assertIsNone(row["findings"])
+        self.assertIn("no FINDINGS line", row["findings_source"])
+
+    def test_a_parent_transcript_cannot_donate_its_findings_to_an_unnamed_agent(self):
+        """R378's own guard, on R372's rule. The fallback reads the agent's
+        entries, so when the payload names no agent and the file carries no
+        sidechain, there is no agent message to read -- the same refusal the
+        duration makes, for the same reason."""
+        import json, tempfile
+        mod = self._hook("subagent_record")
+        root = Path(tempfile.mkdtemp())
+        parent = root / "p.jsonl"
+        parent.write_text(json.dumps(
+            {"timestamp": "2026-09-20T01:00:00.000Z", "type": "assistant",
+             "isSidechain": False,
+             "message": {"model": "claude-opus-5", "content": "FINDINGS: 42"}}),
+            encoding="utf-8")
+        self.assertIsNone(
+            mod.transcript_facts(str(parent), "")["last_agent_message"])
+        self.assertEqual(
+            mod.transcript_facts(str(parent), "dfs-qa")["last_agent_message"],
+            "FINDINGS: 42", "a NAMED agent's own transcript is still trusted")
+
     def test_the_findings_line_is_read_from_the_END_not_a_quoted_example(self):
         """An agent that echoes its own instructions quotes the example number."""
         mod = self._hook("subagent_record")

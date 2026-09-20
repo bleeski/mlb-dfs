@@ -853,7 +853,13 @@ EXPECTED_SUITE_COUNTS = {
     # +1 again: the same live firing showed the event arrives with NO agent_type
     # at all in an ordinary DEV session, so it now writes nothing rather than a
     # contentless row into a tracked directory on every session.
-    "tests.test_core": 1394,
+    # R378, 2026-09-20: 1394 -> 1396, the two that pin the findings
+    # fallback -- the transcript's last SIDECHAIN assistant message answers when
+    # the payload omits `last_assistant_message` (measured null on all three of
+    # this hook's first real runs), the payload still wins when delivered, a
+    # tool_use block is not the agent's text, neither source guesses, and a
+    # PARENT transcript cannot donate its count to an unnamed agent.
+    "tests.test_core": 1396,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps
