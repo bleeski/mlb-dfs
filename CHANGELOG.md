@@ -25,6 +25,82 @@ performance claim.
 
 ---
 
+## 2026-09-20 — R347: a DK-declared opener stays in the Showdown pool, where the module had been claiming he already was
+
+**Scope.** `mlb_engine/optimize/showdown.py` (`_is_declared`'s comment, the
+module docstring's participation bullet, `_participation`, the
+`participation_report`), `mlb_engine/optimize/showdown_theses.py`
+(`describe_slate`'s `starters` read, `bullpen_game`'s `why`),
+`skills/generate-lineups/scripts/build_slate.py` (the `--declare-pitcher` help,
+the `declared_pitchers` comment block, `pool.openers_kept` on the Showdown
+brief), `tests/test_showdown.py`
+(`R347DeclaredOpenerStaysInThePoolTests`, new, 7), `tools/audit.py`
+(`EXPECTED_SUITE_COUNTS`), `docs/backlog.md`.
+
+**The defect was three lines apart from its own denial.** R104 correctly stopped
+reading DK's `PO` token as a declared start: one or two innings by design is not
+a start, and on Classic an opener in a P slot priced on a starter's workload is
+a certified build with a hole in it. The comment R104 left above `_is_declared`
+said the Showdown case was different -- "He is still rosterable in Showdown,
+where every slot is a UTIL slot and no slot is priced on a starter's workload;
+he simply is not declared." Nothing made that true. `_is_declared` returned
+False, `_participation` fell through to `confirmed_nonstarter` on a decided
+side, `starters_only` dropped the row, and `Is_Declared_Opener` was written one
+line later and read by nothing. `grep -rn Is_Declared_Opener` returned the
+write, one docstring mention, and two test lines pinning the token set in sync
+with `live_data_adapters` -- no reader anywhere.
+
+**Measured, 1940_1g_sd (PIT@CWS, 2026-09-10).** Hagen Smith, `Starting=PO`,
+$4,000 UTIL / $6,000 CPT, named the White Sox starting pitcher on mlb.com,
+absent from a 20-man pool. The brief read `pool.players: 20`,
+`declared_starters: 2`, no blocker and no warning; only the delivery note said
+the arm was gone. CLAUDE.md forbids reducing the legal player set because the
+reduction is invisible in the certified output, and this one was invisible in
+the brief as well.
+
+**`declared_opener` is a third participation value, deliberately not
+`confirmed_starter`.** Promoting him would have put the R104 role back where
+R104 took it from. What the new value buys is the `starters_only` filter, which
+drops `confirmed_nonstarter` and nothing else. It is returned on BOTH bases: on
+an undecided side he used to read `unknown` with `Projected_Candidate=True`,
+which claimed the pool was projecting a man DK had named. `Is_Declared_Starter`
+is unchanged and still False for him, so the brief's `declared_starters` count
+stays honest, and `pool.openers_kept` beside it names him -- read from the final
+rows, so an opener who left on the health filter is not claimed as kept.
+
+**The thesis ladder is guarded in the same commit, because keeping him in the
+pool would otherwise have hard-locked him.** `describe_slate` reads a side's
+starter as its highest-Base row with no batting order, and once the melt stopped
+dropping openers that set grew by one. `starters` feeds `both_sp`, and R156 made
+`pitchers_duel` HARD-LOCK both arms through every rung of `solve_ladder`'s
+relaxation -- so a one-or-two-inning arm would have been forced onto a roster
+whose whole thesis is two men going deep, and on an opener-only side the
+`bullpen_game` template would have gone dark on a slate that is a bullpen game.
+`describe_slate` now excludes `Is_Declared_Opener` rows from `starters` only. He
+stays fully rosterable; he is simply not the starter, and a side whose only arm
+is an opener still reads as the bullpen game it is. Whether the ladder may
+CAPTAIN an opener is a strategy question and is not decided here.
+
+**The R233 class, and the half of it this does not close.** Two sites asserted
+the opposite of the behavior and are corrected with the fix rather than after
+it: the `_is_declared` comment, and `--declare-pitcher`'s help, which ended "so
+--declare-pitcher cannot put a PO arm in a Showdown pool" and left the operator
+with no move but the salary file's `Excluded` column -- the legal-pool reduction
+the hard guardrails forbid. That sentence is still true and now says why it no
+longer matters: a PO arm still cannot be DECLARED into a Showdown pool, because
+he is not a declared starter, and he no longer needs to be. R304's named
+remainder ("wiring it into the Showdown melt so a PO arm can be declared in") is
+closed from the other side and is not the same fix; the `declared_pitchers`
+comment block says so.
+
+**Mutation-checked, three reverts.** Dropping the `_participation` branch fails
+4 of 7; flattening `openers_kept` to `[]` fails 1; dropping the `describe_slate`
+guard fails 1. `bullpen_game`'s `why` also stopped claiming "its arms are
+unrosterable", which was true only on a decided side and is the sentence the
+opener now contradicts.
+
+---
+
 ## 2026-09-19 — R344, R372: the adversarial QA pass gets a standing brief, and four hook events stop the standing rules depending on a session remembering them
 
 **Scope.** New `skills/generate-lineups/references/adversarial_qa_brief.md`, new

@@ -1074,7 +1074,13 @@ EXPECTED_SUITE_COUNTS = {
     # named as an alphabetical tiebreak with no market, mirroring a real
     # basis when one exists, still a tiebreak when a market prices the
     # game exactly even, and carried into the brief beside the label.
-    "tests.test_showdown": 228,
+    # R347, 2026-09-20: 228 -> 235, the seven that pin the DK-declared opener
+    # staying in the Showdown pool -- `declared_opener` on a decided and on an
+    # undecided side, never counted as a declared starter, `openers_kept` on the
+    # participation report and empty when the man was shelved or absent, and the
+    # thesis ladder refusing to promote him into `starters` (which `pitchers_duel`
+    # hard-locks) on an opener-only side and on a side that also has a real SP.
+    "tests.test_showdown": 235,
     # R96, 2026-08-11: 141 -> 162, the twenty-one tests that pin the delivery
     # path. A `grew` verdict is the one case where moving a pin is correct.
     # R46 round 2, 2026-08-12: 162 -> 168, the six that pin the PARTIAL side.

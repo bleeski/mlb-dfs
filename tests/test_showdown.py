@@ -4168,5 +4168,151 @@ class ShowdownBriefCarriesTheSmallSampleCautionTests(unittest.TestCase):
                          "the caution changed a delivered byte")
 
 
+# ---------------------------------------------------------------------------
+# R347. A DK-declared opener (`Starting=PO`) is ROSTERABLE in Showdown.
+# ---------------------------------------------------------------------------
+class R347DeclaredOpenerStaysInThePoolTests(unittest.TestCase):
+    """At HEAD before this item the opener was an INVISIBLE pool reduction.
+
+    `_is_declared` is False for `PO` (R104, correctly: one or two innings by
+    design is not a start), `_participation` then fell through to
+    `confirmed_nonstarter` on a decided side, and `starters_only` dropped the
+    row. `Is_Declared_Opener` was written one line later and read by nothing,
+    and the comment above `_is_declared` said he "is still rosterable in
+    Showdown". Measured on 1940_1g_sd (PIT@CWS, 2026-09-10): Hagen Smith,
+    `Starting=PO`, the only CWS arm DK marked as taking the ball, absent from a
+    20-man pool with `declared_starters: 2`, no blocker and no warning.
+
+    `declared_opener` is a third participation value on purpose. It is not
+    `confirmed_starter`, because the R104 role must not be promoted, and it is
+    not `unknown`, because DK named the man.
+    """
+
+    HEADER = ["Position", "Name + ID", "Name", "ID", "Roster Position",
+              "Salary", "Game Info", "TeamAbbrev", "AvgPointsPerGame",
+              "Status", "Starting"]
+    GAME = "AAA@BBB 09/30/2026 07:05PM ET"
+
+    def _rows(self, post=(), arm=(), opener=(), opener_out=()):
+        rows = [self.HEADER]
+        pid = 1000
+        for team in ("AAA", "BBB"):
+            for i in range(9):
+                token = str(i + 1) if team in post else ""
+                name = f"{team} Bat{i + 1}"
+                for role, mult in (("UTIL", 1.0), ("CPT", 1.5)):
+                    rows.append(["OF", f"{name} ({pid})", name, str(pid), role,
+                                 str(int(4000 * mult)), self.GAME, team, "9.0",
+                                 "", token])
+                    pid += 1
+            for i in range(4):
+                name = f"{team} Bench{i + 1}"
+                for role, mult in (("UTIL", 1.0), ("CPT", 1.5)):
+                    rows.append(["OF", f"{name} ({pid})", name, str(pid), role,
+                                 str(int(3000 * mult)), self.GAME, team, "5.0",
+                                 "", ""])
+                    pid += 1
+            specs = [("Arm", "SP", 9000, "SP" if team in arm else ""),
+                     ("Reliever", "RP", 5000, "")]
+            if team in opener:
+                specs.append(("Opener", "RP", 4000, "PO"))
+            for label, pos, salary, token in specs:
+                name = f"{team} {label}"
+                status = "IL" if (label == "Opener" and team in opener_out) else ""
+                for role, mult in (("UTIL", 1.0), ("CPT", 1.5)):
+                    rows.append([pos, f"{name} ({pid})", name, str(pid), role,
+                                 str(int(salary * mult)), self.GAME, team,
+                                 "12.0", status, token])
+                    pid += 1
+        return rows
+
+    def _melt(self, **kw):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "DKSalaries.csv"
+            with path.open("w", newline="", encoding="utf-8") as fh:
+                csv.writer(fh).writerows(self._rows(**kw))
+            return sd.melt_showdown_salary_csv(str(path))
+
+    def _row(self, df, name):
+        sub = df.loc[df["Name"] == name]
+        self.assertEqual(len(sub), 1, f"{name} is not in the pool")
+        return sub.iloc[0]
+
+    def test_an_opener_on_a_DECIDED_side_stays_in_the_pool(self):
+        """The measured 1940_1g_sd shape: both nines posted, one side's only
+        arm marked PO. Before this item he was dropped by `starters_only`."""
+        df = self._melt(post=("AAA", "BBB"), arm=("BBB",), opener=("AAA",))
+        rec = self._row(df, "AAA Opener")
+        self.assertEqual(rec["Participation"], "declared_opener")
+        self.assertTrue(rec["Is_Declared_Opener"])
+        self.assertFalse(rec["Is_Declared_Starter"],
+                         "an opener is rosterable, never a declared starter")
+        self.assertFalse(rec["Projected_Candidate"],
+                         "DK named him; the pool is not guessing about him")
+        self.assertEqual(rec["Pool_Basis"], "declared_starters")
+        report = df.attrs["participation_report"]
+        self.assertEqual(report["openers_kept"], ["AAA AAA Opener"])
+        self.assertEqual(report["slate_basis"], "declared_starters")
+
+    def test_the_opener_is_not_counted_as_a_declared_starter(self):
+        """`declared_starters` on the brief is exactly what he is NOT, which is
+        why 1940_1g_sd read `declared_starters: 2` with a third arm missing."""
+        with_op = self._melt(post=("AAA", "BBB"), arm=("BBB",), opener=("AAA",))
+        without = self._melt(post=("AAA", "BBB"), arm=("BBB",))
+        self.assertEqual(int(with_op["Is_Declared_Starter"].sum()),
+                         int(without["Is_Declared_Starter"].sum()))
+        self.assertEqual(len(with_op), len(without) + 1,
+                         "the opener is one more person in the legal pool")
+
+    def test_an_opener_on_an_UNDECIDED_side_is_declared_not_unknown(self):
+        """He stayed in the pool here either way, but as `unknown` with
+        `Projected_Candidate=True`, which claimed the pool was projecting a man
+        DK had named."""
+        df = self._melt(post=("BBB",), arm=("BBB",), opener=("AAA",))
+        rec = self._row(df, "AAA Opener")
+        self.assertEqual(rec["Participation"], "declared_opener")
+        self.assertFalse(rec["Projected_Candidate"])
+        self.assertEqual(rec["Pool_Basis"], "all_healthy")
+        self.assertTrue(
+            self._row(df, "AAA Bench1")["Projected_Candidate"],
+            "his team-mates are still unknown; the opener branch is per person")
+
+    def test_a_shelved_opener_is_not_reported_as_kept(self):
+        """`openers_kept` reads the FINAL rows, so an IL opener who left on the
+        health filter is not claimed as a man the pool held."""
+        df = self._melt(post=("AAA", "BBB"), arm=("BBB",), opener=("AAA",),
+                        opener_out=("AAA",))
+        self.assertEqual(df.attrs["participation_report"]["openers_kept"], [])
+        self.assertEqual(len(df.loc[df["Name"] == "AAA Opener"]), 0)
+
+    def test_openers_kept_is_empty_and_present_when_there_is_no_opener(self):
+        df = self._melt(post=("AAA", "BBB"), arm=("AAA", "BBB"))
+        self.assertEqual(df.attrs["participation_report"]["openers_kept"], [])
+
+    def test_the_thesis_ladder_does_not_promote_an_opener_to_declared_starter(self):
+        """`starters` feeds `both_sp`, and `pitchers_duel` HARD-LOCKS both
+        entries through every rung of the relaxation ladder. Keeping the opener
+        in the pool must not force a one-inning arm onto that roster: a side
+        whose only arm is an opener is a bullpen game and reads as one."""
+        df = self._melt(post=("AAA", "BBB"), arm=("BBB",), opener=("AAA",))
+        shape = st.describe_slate(df)
+        opener_key = str(self._row(df, "AAA Opener")["Player_Key"])
+        self.assertIsNone(shape["starters"]["AAA"])
+        self.assertEqual(shape["bullpen_teams"], ["AAA"])
+        self.assertNotEqual(shape["starters"]["BBB"], opener_key)
+        self.assertEqual(shape["starters"]["BBB"],
+                         str(self._row(df, "BBB Arm")["Player_Key"]))
+
+    def test_an_opener_beside_a_real_starter_does_not_displace_him(self):
+        """The other shape: DK declares an SP and a PO on the same side. The SP
+        is the starter; the opener is neither the starter nor a bullpen game."""
+        df = self._melt(post=("AAA", "BBB"), arm=("AAA", "BBB"),
+                        opener=("AAA",))
+        shape = st.describe_slate(df)
+        self.assertEqual(shape["bullpen_teams"], [])
+        self.assertEqual(shape["starters"]["AAA"],
+                         str(self._row(df, "AAA Arm")["Player_Key"]))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

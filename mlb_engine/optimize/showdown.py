@@ -220,8 +220,10 @@ def melt_showdown_salary_csv(path: str | Path, exclude_out: bool = True,
       ``Projected_Candidate=True``. Block promotion, not generation;
     * a pitcher keeps his OWN role evidence either way: a DK-declared arm on an
       unposted side is a ``confirmed_starter`` while his team-mates are unknown,
-      and R104's opener is neither (``Is_Declared_Opener``, rosterable and not
-      declared);
+      and R104's opener is neither: he is ``declared_opener``
+      (``Is_Declared_Opener``), which R347 added because "rosterable and not
+      declared" had no value to be, fell through to ``confirmed_nonstarter`` and
+      left the pool;
     * the legal salary universe is unchanged. This decides POOL MEMBERSHIP on
       observed participation, and it never narrows on a compute or shape excuse.
 
@@ -319,9 +321,15 @@ def melt_showdown_salary_csv(path: str | Path, exclude_out: bool = True,
         # R104: PO is NOT one of them any more. An opener throws one or two
         # innings by design, and calling him a declared STARTER is the sharper
         # half of the defect Classic had -- on a `declared_starters` basis this
-        # line made a PO opener a declared starter outright. He is still
-        # rosterable in Showdown, where every slot is a UTIL slot and no slot is
-        # priced on a starter's workload; he simply is not declared. On an
+        # line made a PO opener a declared starter outright. He is not declared.
+        #
+        # R347: he IS rosterable, and saying so here was not enough to make it
+        # true. This predicate is False for him, `_participation` below fell
+        # through to `confirmed_nonstarter` on a decided side, and
+        # `starters_only` then dropped him -- an invisible pool reduction on the
+        # one geometry where every slot is a UTIL slot and no slot is priced on
+        # a starter's workload. `_participation` now has an opener branch and
+        # this comment no longer has to carry the claim on its own. On an
         # all_healthy basis nothing about him changes.
         return value in DK_STARTING_DECLARED_TOKENS or value.isdigit()
 
@@ -363,6 +371,18 @@ def melt_showdown_salary_csv(path: str | Path, exclude_out: bool = True,
         value = str(rec.get("Starting") or "").strip().upper()
         if value.isdigit() or _is_declared(rec):
             return "confirmed_starter"
+        # R347. A THIRD value, and deliberately not `confirmed_starter`: DK says
+        # this arm takes the ball, so his participation is OBSERVED rather than
+        # unknown, but one or two innings by design is not a start and the R104
+        # role stays `declared_opener`. What this value buys is the
+        # `starters_only` filter below, which drops `confirmed_nonstarter` and
+        # nothing else, so the opener stays in the pool on a decided side
+        # instead of vanishing from it. It is read on BOTH bases on purpose: on
+        # an undecided side he used to read `unknown` and carry
+        # `Projected_Candidate=True`, which claimed the pool was guessing about
+        # a man DK named.
+        if value in DK_STARTING_OPENER_TOKENS:
+            return "declared_opener"
         return "confirmed_nonstarter" if _side_key(rec) in decided else "unknown"
 
     for rec in rows:
@@ -410,13 +430,25 @@ def melt_showdown_salary_csv(path: str | Path, exclude_out: bool = True,
         "dropped_confirmed_nonstarter": universe - len(rows) - len(shelved_out),
         "dropped_status_out": len(shelved_out) if exclude_out else 0,
         "projected_candidates": sum(1 for r in rows if r.get("Projected_Candidate")),
+        # R347. The one reader `Is_Declared_Opener` did not have. An opener kept
+        # by the branch in `_participation` is NAMED here, because the pool
+        # change that item fixed was invisible in the brief as well as in the
+        # certified output: 1940_1g_sd shipped a 20-man pool with
+        # `declared_starters: 2`, no blocker and no warning, and only the
+        # delivery note said the CWS arm was gone. Read from the final `rows`,
+        # so a shelved opener is not claimed as kept.
+        "openers_kept": sorted(
+            f"{r.get('Team')} {r.get('Name')}"
+            for r in rows if r.get("Is_Declared_Opener")),
         "role_disagreements": sorted(
             f"{r['Player_Key']}: {r['Role_Disagreement']}"
             for r in rows if r.get("Role_Disagreement")),
         "note": "participation is per (event, team, person): only a side whose "
                 "1-9 is completely posted can establish a nonstarter, and an "
                 "incomplete declaration establishes nothing. A pitcher keeps his "
-                "own role evidence. The legal salary universe is unchanged.",
+                "own role evidence, and a DK-declared opener is "
+                "`declared_opener`: rosterable, never a declared starter. The "
+                "legal salary universe is unchanged.",
     }
 
     df = pd.DataFrame(rows)

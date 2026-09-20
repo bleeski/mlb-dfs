@@ -3997,8 +3997,16 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         # (`DK_STARTING_DECLARED_TOKENS`, which already admits PLR), and
         # `--declare-pitcher` reaches `build_slate_pool` on the Classic path
         # only. This is the operator's recorded answer, for the referees to read
-        # back; wiring it into the Showdown melt so a PO arm can be declared in
-        # is a pool change on the build path and is the named remainder.
+        # back.
+        #
+        # R347 closed the named remainder from the OTHER side, and the
+        # distinction is worth keeping straight. Nothing was wired into the
+        # melt: a PO arm still cannot be DECLARED into a Showdown pool, because
+        # he is not a declared starter. He no longer needs to be, because
+        # `_participation` gives him `declared_opener` and `starters_only` keeps
+        # him. The flag was never the fix for the PO case here; the pool
+        # dropping him was the defect, and `pool.openers_kept` on this brief is
+        # where a reader sees it did not.
         "declared_pitchers": parse_declared_pitchers(args.declare_pitcher),
         # R249. The whole point of the item is that the operator's previous
         # workaround -- editing the APPG column of the salary file -- moved
@@ -4022,6 +4030,13 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                                      if len(df) and "Projected_Candidate" in df
                                      else 0),
             "declared_starters": int(df["Is_Declared_Starter"].sum()) if len(df) else 0,
+            # R347. Beside `declared_starters` because that count is exactly
+            # what an opener is NOT, and because 1940_1g_sd shipped
+            # `declared_starters: 2` on a slate where a third arm had been
+            # dropped out of the pool with nothing on the brief saying so.
+            "openers_kept": list(
+                (df.attrs.get("participation_report") or {}).get(
+                    "openers_kept") or []),
             "posted_hitters": int(df["Batting_Order"].notna().sum()) if len(df) else 0,
             # R291(c). Classic's `pool_report.excluded_column`, on the path that
             # had no pool report. `players` above is the CARRIED pool; read
@@ -4910,7 +4925,10 @@ def main() -> int:
                          "Showdown melt derives declared starters from DK's own "
                          "Starting column, which already admits PLR but not PO, "
                          "so --declare-pitcher cannot put a PO arm in a Showdown "
-                         "pool.")
+                         "pool. R347: on Showdown a PO arm does not need it. He "
+                         "is kept as `declared_opener` -- rosterable, never a "
+                         "declared starter -- and the brief names him under "
+                         "pool.openers_kept.")
     ap.add_argument("--ignore-pool-blockers", action="store_true",
                     help="build despite a HARD pool blocker. The override is "
                          "printed and recorded in the brief. Reach for this only "

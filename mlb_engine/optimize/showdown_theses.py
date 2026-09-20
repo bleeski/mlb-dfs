@@ -365,7 +365,21 @@ def describe_slate(df: pd.DataFrame,
     starters, bands = {}, {}
     for team in teams:
         sub = df[df["Team"] == team]
-        sp = sub[sub["Batting_Order"].isna()].sort_values("Base", ascending=False)
+        arms = sub[sub["Batting_Order"].isna()]
+        # R347. An arm is a row with no batting order, and once the melt stopped
+        # dropping DK-declared openers that set grew by one on an opener slate.
+        # An opener is NOT this side's declared starter and must not be promoted
+        # into one here: `starters` feeds `both_sp`, and `pitchers_duel`
+        # HARD-LOCKS both entries through every rung of the relaxation ladder,
+        # so a one-or-two-inning arm would have been forced onto a roster that
+        # the template says is built on two men going deep. A side whose only
+        # arm is an opener is a bullpen game and reads as one, which is what it
+        # is. He stays fully rosterable; he is simply not the starter. Whether
+        # the ladder may CAPTAIN him is a strategy question and is not decided
+        # here.
+        if "Is_Declared_Opener" in arms.columns:
+            arms = arms[~arms["Is_Declared_Opener"].fillna(False).astype(bool)]
+        sp = arms.sort_values("Base", ascending=False)
         starters[team] = str(sp.iloc[0]["Player_Key"]) if len(sp) else None
         hitters = sub[sub["Batting_Order"].notna()]
         bands[team] = {
@@ -616,10 +630,10 @@ def _template_specs(shape: Mapping[str, Any]) -> List[Dict[str, Any]]:
         opp = [t for t in shape["teams"] if t != pen][0]
         return {
             "name": f"{pen} bullpen game - {opp} bats face a parade",
-            "why": (f"{pen} has no declared starter, so its arms are unrosterable "
-                    f"and {opp} sees a different pitcher every two innings. Bats "
-                    f"carry full weight; the third time through the order never "
-                    f"happens."),
+            "why": (f"{pen} has no declared starter, so no {pen} arm is locked "
+                    f"into this build and {opp} sees a different pitcher every "
+                    f"two innings. Bats carry full weight; the third time "
+                    f"through the order never happens."),
             "cpt_ladder": shape["bands"][opp]["all"] + shape["bands"][pen]["all"],
             "excludes": [sp[pen]] if sp[pen] else [],
             "mult": {},
