@@ -1,0 +1,191 @@
+{
+ "code": {
+  "contest_allocator": "v1.12",
+  "execution_pipeline": "v1.17",
+  "git_dirty": true,
+  "git_sha": "6b2ef472f79c024fad59c8a30559748c234da8bc"
+ },
+ "controls": {},
+ "date": "2026-09-20",
+ "egress": "",
+ "entries": [
+  {
+   "contest_id": "195830492",
+   "contest_name": "MLB $100 Dime Time [Just $0.10!] (Afternoon)",
+   "entry_fee": 0.1,
+   "entry_id": "5264101219",
+   "filled": true,
+   "roster_ids": [
+    "44216470",
+    "44216751",
+    "44216476",
+    "44216510",
+    "44216490",
+    "44216504",
+    "44216502",
+    "44216500",
+    "44216484",
+    "44216505"
+   ]
+  },
+  {
+   "contest_id": "195830492",
+   "contest_name": "MLB $100 Dime Time [Just $0.10!] (Afternoon)",
+   "entry_fee": 0.1,
+   "entry_id": "5264110236",
+   "filled": true,
+   "roster_ids": [
+    "44216471",
+    "44216470",
+    "44216476",
+    "44216507",
+    "44216490",
+    "44216539",
+    "44216479",
+    "44216481",
+    "44216542",
+    "44216514"
+   ]
+  },
+  {
+   "contest_id": "195900493",
+   "contest_name": "MLB $75 Solo Shot (Afternoon)",
+   "entry_fee": 1.0,
+   "entry_id": "5264114229",
+   "filled": true,
+   "roster_ids": [
+    "44216468",
+    "44216693",
+    "44216501",
+    "44216510",
+    "44216494",
+    "44216527",
+    "44216513",
+    "44216487",
+    "44216500",
+    "44216484"
+   ]
+  },
+  {
+   "contest_id": "195900631",
+   "contest_name": "MLB $20 Quarter Jukebox [Just $0.25!] (Afternoon)",
+   "entry_fee": 0.25,
+   "entry_id": "5264101320",
+   "filled": true,
+   "roster_ids": [
+    "44216473",
+    "44216693",
+    "44216501",
+    "44216476",
+    "44216494",
+    "44216522",
+    "44216486",
+    "44216542",
+    "44216487",
+    "44216491"
+   ]
+  },
+  {
+   "contest_id": "195900631",
+   "contest_name": "MLB $20 Quarter Jukebox [Just $0.25!] (Afternoon)",
+   "entry_fee": 0.25,
+   "entry_id": "5264110296",
+   "filled": true,
+   "roster_ids": [
+    "44216693",
+    "44216471",
+    "44216501",
+    "44216476",
+    "44216494",
+    "44216504",
+    "44216502",
+    "44216487",
+    "44216560",
+    "44216491"
+   ]
+  }
+ ],
+ "host": {
+  "call_budget_s": 630.0,
+  "declared_ceiling_s": 900.0,
+  "host": "claude_code"
+ },
+ "kind": "delivery",
+ "labels": "deterministic review proxies and labeled priors only; never ROI, win rate, cash rate, or probability",
+ "manifest_row": {
+  "certification": "certified",
+  "contest_ids": [
+   "195830492",
+   "195900493",
+   "195900631"
+  ],
+  "contest_names": [
+   "MLB $100 Dime Time [Just $0.10!] (Afternoon)",
+   "MLB $20 Quarter Jukebox [Just $0.25!] (Afternoon)",
+   "MLB $75 Solo Shot (Afternoon)"
+  ],
+  "contest_type": "classic",
+  "delivered_file": "outputs/2026-09-20/DKEntries_1607_4g.csv",
+  "entries": 5,
+  "notes": "",
+  "projection_tier": "enriched",
+  "recorded_utc": "2026-09-20T19:37:13.886914+00:00",
+  "run_id": "20260920T193713Z_1a1f5c58",
+  "sha256": "ca71d78698c363278136aae451d063a22528b1ff348e163898ddcb891cc22dab",
+  "slate_tag": "1607_4g",
+  "status": "candidate",
+  "strategy_state": {
+   "bank_warnings": [],
+   "counts": {
+    "built": 12,
+    "du_relaxation_high_water": 0,
+    "requested": 12
+   },
+   "evidence": "recorded",
+   "state": "relaxed",
+   "warnings": []
+  }
+ },
+ "recorded_utc": "2026-09-20T19:37:13.887450+00:00",
+ "relaxations": {},
+ "run": {
+  "certification": {
+   "allocation_certified": true,
+   "failed_post_export_gates": [],
+   "post_export_gates": {
+    "entry_reconciliation_passed": true,
+    "export_hash_binding_passed": true,
+    "locked_immutability_passed": true,
+    "portfolio_caps_passed": true,
+    "roster_legality_passed": true,
+    "template_preservation_passed": true
+   },
+   "pre_export_passed": true,
+   "selection_certified": true,
+   "workflow_valid": true
+  },
+  "environment": {
+   "lock_file": "requirements.lock",
+   "lock_sha256": "dd7723e54043e8c2644100beba5069959d835258f96e1cf6dc100ea1617ac0d6",
+   "packages": {
+    "numpy": "2.2.6",
+    "pandas": "2.3.3",
+    "scipy": "1.15.3"
+   },
+   "python": "3.11.15"
+  },
+  "inputs": {
+   "DKEntries.csv": {
+    "sha256": "447e705a90ff2bcf6ad026474d0f187abb59dbd8a9f100eb02137bb91f8f2f7e",
+    "size_bytes": 43864,
+    "source_path": "/home/user/mlb-dfs/data/slates/2026-09-20/DKEntries.csv"
+   },
+   "DKSalaries.csv": {
+    "sha256": "e054aa6def40532fbbc7720da9fd959ca7de3c48817ecc248c0347a6926d2aa3",
+    "size_bytes": 37864,
+    "source_path": "/home/user/mlb-dfs/data/slates/2026-09-20/DKSalaries.csv"
+   }
+  }
+ },
+ "schema_version": 1
+}
