@@ -843,6 +843,99 @@ def predict_captain_ownership(
         base_projection_by_player_id, archetype_params)
 
 
+#: R328. One place in the last digit of `_bounded_marginals`' 2dp rounding.
+#: A tolerance on the comparison, never a clamp on a value.
+ROLE_COHERENCE_TOLERANCE_PCT = 0.01
+
+
+def showdown_role_coherence(
+    captain_own_pct: Mapping[str, float],
+    roster_own_pct: Mapping[str, float],
+) -> Dict[str, Any]:
+    """R328, remaining half. Check `0 <= captain_p <= roster_p <= 1` ACROSS the
+    two Showdown markets, and NAME every breach rather than repairing one.
+
+    The other two halves of this item shipped in R338 and are not re-checked
+    here: `_bounded_marginals` water-fills both markets onto the capped simplex
+    (so no single marginal can exceed 100% and the budget is still exact), and
+    `attach_predicted_ownership` refuses non-finite, boolean and
+    out-of-[0,100] values before any `--leverage` control reads one. What was
+    left is the ORDERING between them, which was enforced only in
+    `mlb_engine/production/contracts.py`'s `Projection.role_marginals` -- a
+    schema in R302's strangler package, off the build path and pinned off it by
+    `test_no_legacy_module_imports_the_production_package_or_pydantic`.
+
+    WHY THIS REPORTS AND DOES NOT CLAMP. A clamp is arithmetically worse than
+    the breach it would hide: pulling a captain value down to its roster value
+    breaks the 100% budget, which is R306's own accounting and the exact
+    property the water-fill exists to preserve, and redistributing the
+    remainder re-runs an allocation whose inputs are already known to be wrong.
+    A breach here means the two temperatures produced a person more likely to
+    be CAPTAINED than to be ROSTERED, which is impossible by construction
+    rather than merely undesirable. That is a bug report, with the numbers
+    attached, not a number to round off at T-10.
+
+    WHAT IS KNOWN ABOUT WHETHER IT FIRES. It could not be reproduced: 4,000
+    randomized pools (6-45 people, random salaries, position mixes, probable
+    sets, batting orders, implied totals and Base maps, all six archetypes)
+    plus a structured grid over pool size, salary shape and arm count give
+    `max(captain_pct/100 - roster_pct/600 * 6)` of exactly 0.0. The reason is
+    structural: the captain temperature runs below the roster temperature (on
+    `large_field_gpp`, 0.1733 against 0.2267), so a breach needs a captain
+    share more than six times the roster share, and where the roster share
+    would saturate the water-fill pins it at 100. So this is a guard against
+    drift in either temperature table, not a repair of an observed defect, and
+    the entry should not be read as saying otherwise.
+
+    Both markets are compared in their OWN units: captain percentages against a
+    100% budget are probabilities of holding one slot, roster percentages
+    against 600% are probabilities of filling one of six. A person cannot be
+    captained more often than he is rostered, so the comparison is
+    `captain_pct <= roster_pct` directly, both already in percent of entries.
+    """
+    captain = {str(k): float(v) for k, v in dict(captain_own_pct or {}).items()}
+    roster = {str(k): float(v) for k, v in dict(roster_own_pct or {}).items()}
+    out: Dict[str, Any] = {
+        "checked": 0,
+        "violations": [],
+        "out_of_range": [],
+        "missing_from_roster_market": sorted(set(captain) - set(roster)),
+        "missing_from_captain_market": sorted(set(roster) - set(captain)),
+        "note": ("0 <= captain_pct <= roster_pct <= 100, checked across the two "
+                 "Showdown markets. Both are percentages OF ENTRIES, so a "
+                 "person cannot be captained more often than he is rostered. "
+                 "Reported, never clamped: a clamp breaks the 100% captain "
+                 "budget, which is R306's accounting. Labeled priors, never a "
+                 "win rate, ROI, edge or probability claim about an outcome."),
+    }
+    for pid in sorted(set(captain) | set(roster)):
+        values = [(name, val) for name, val in
+                  (("captain", captain.get(pid)), ("roster", roster.get(pid)))
+                  if val is not None]
+        for name, val in values:
+            if not math.isfinite(val) or not 0.0 <= val <= 100.0:
+                out["out_of_range"].append(
+                    {"player_id": pid, "market": name, "value": val})
+        if pid not in captain or pid not in roster:
+            continue
+        out["checked"] += 1
+        # Rounding is 2dp in `_bounded_marginals`, so an equal pair can differ
+        # by one place in the last digit. A tolerance on the COMPARISON, never a
+        # clamp on a value, and the epsilon on top of it because 100.0 - 99.99
+        # is 0.0100000000000051 in binary floating point and a bare `> 0.01`
+        # would call that a violation.
+        if captain[pid] - roster[pid] > ROLE_COHERENCE_TOLERANCE_PCT + 1e-9:
+            out["violations"].append({
+                "player_id": pid,
+                "captain_pct": round(captain[pid], 2),
+                "roster_pct": round(roster[pid], 2),
+                "excess_pct": round(captain[pid] - roster[pid], 2),
+            })
+    out["violations"].sort(key=lambda r: -r["excess_pct"])
+    out["coherent"] = not (out["violations"] or out["out_of_range"])
+    return out
+
+
 PROJECTED_OWNERSHIP_COLUMN = "Projected_Ownership_Pct"
 
 

@@ -4168,5 +4168,724 @@ class ShowdownBriefCarriesTheSmallSampleCautionTests(unittest.TestCase):
                          "the caution changed a delivered byte")
 
 
+# ---------------------------------------------------------------------------
+# R347. A DK-declared opener (`Starting=PO`) is ROSTERABLE in Showdown.
+# ---------------------------------------------------------------------------
+class R347DeclaredOpenerStaysInThePoolTests(unittest.TestCase):
+    """At HEAD before this item the opener was an INVISIBLE pool reduction.
+
+    `_is_declared` is False for `PO` (R104, correctly: one or two innings by
+    design is not a start), `_participation` then fell through to
+    `confirmed_nonstarter` on a decided side, and `starters_only` dropped the
+    row. `Is_Declared_Opener` was written one line later and read by nothing,
+    and the comment above `_is_declared` said he "is still rosterable in
+    Showdown". Measured on 1940_1g_sd (PIT@CWS, 2026-09-10): Hagen Smith,
+    `Starting=PO`, the only CWS arm DK marked as taking the ball, absent from a
+    20-man pool with `declared_starters: 2`, no blocker and no warning.
+
+    `declared_opener` is a third participation value on purpose. It is not
+    `confirmed_starter`, because the R104 role must not be promoted, and it is
+    not `unknown`, because DK named the man.
+    """
+
+    HEADER = ["Position", "Name + ID", "Name", "ID", "Roster Position",
+              "Salary", "Game Info", "TeamAbbrev", "AvgPointsPerGame",
+              "Status", "Starting"]
+    GAME = "AAA@BBB 09/30/2026 07:05PM ET"
+
+    def _rows(self, post=(), arm=(), opener=(), opener_out=()):
+        rows = [self.HEADER]
+        pid = 1000
+        for team in ("AAA", "BBB"):
+            for i in range(9):
+                token = str(i + 1) if team in post else ""
+                name = f"{team} Bat{i + 1}"
+                for role, mult in (("UTIL", 1.0), ("CPT", 1.5)):
+                    rows.append(["OF", f"{name} ({pid})", name, str(pid), role,
+                                 str(int(4000 * mult)), self.GAME, team, "9.0",
+                                 "", token])
+                    pid += 1
+            for i in range(4):
+                name = f"{team} Bench{i + 1}"
+                for role, mult in (("UTIL", 1.0), ("CPT", 1.5)):
+                    rows.append(["OF", f"{name} ({pid})", name, str(pid), role,
+                                 str(int(3000 * mult)), self.GAME, team, "5.0",
+                                 "", ""])
+                    pid += 1
+            specs = [("Arm", "SP", 9000, "SP" if team in arm else ""),
+                     ("Reliever", "RP", 5000, "")]
+            if team in opener:
+                specs.append(("Opener", "RP", 4000, "PO"))
+            for label, pos, salary, token in specs:
+                name = f"{team} {label}"
+                status = "IL" if (label == "Opener" and team in opener_out) else ""
+                for role, mult in (("UTIL", 1.0), ("CPT", 1.5)):
+                    rows.append([pos, f"{name} ({pid})", name, str(pid), role,
+                                 str(int(salary * mult)), self.GAME, team,
+                                 "12.0", status, token])
+                    pid += 1
+        return rows
+
+    def _melt(self, **kw):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "DKSalaries.csv"
+            with path.open("w", newline="", encoding="utf-8") as fh:
+                csv.writer(fh).writerows(self._rows(**kw))
+            return sd.melt_showdown_salary_csv(str(path))
+
+    def _row(self, df, name):
+        sub = df.loc[df["Name"] == name]
+        self.assertEqual(len(sub), 1, f"{name} is not in the pool")
+        return sub.iloc[0]
+
+    def test_an_opener_on_a_DECIDED_side_stays_in_the_pool(self):
+        """The measured 1940_1g_sd shape: both nines posted, one side's only
+        arm marked PO. Before this item he was dropped by `starters_only`."""
+        df = self._melt(post=("AAA", "BBB"), arm=("BBB",), opener=("AAA",))
+        rec = self._row(df, "AAA Opener")
+        self.assertEqual(rec["Participation"], "declared_opener")
+        self.assertTrue(rec["Is_Declared_Opener"])
+        self.assertFalse(rec["Is_Declared_Starter"],
+                         "an opener is rosterable, never a declared starter")
+        self.assertFalse(rec["Projected_Candidate"],
+                         "DK named him; the pool is not guessing about him")
+        self.assertEqual(rec["Pool_Basis"], "declared_starters")
+        report = df.attrs["participation_report"]
+        self.assertEqual(report["openers_kept"], ["AAA AAA Opener"])
+        self.assertEqual(report["slate_basis"], "declared_starters")
+
+    def test_the_opener_is_not_counted_as_a_declared_starter(self):
+        """`declared_starters` on the brief is exactly what he is NOT, which is
+        why 1940_1g_sd read `declared_starters: 2` with a third arm missing."""
+        with_op = self._melt(post=("AAA", "BBB"), arm=("BBB",), opener=("AAA",))
+        without = self._melt(post=("AAA", "BBB"), arm=("BBB",))
+        self.assertEqual(int(with_op["Is_Declared_Starter"].sum()),
+                         int(without["Is_Declared_Starter"].sum()))
+        self.assertEqual(len(with_op), len(without) + 1,
+                         "the opener is one more person in the legal pool")
+
+    def test_an_opener_on_an_UNDECIDED_side_is_declared_not_unknown(self):
+        """He stayed in the pool here either way, but as `unknown` with
+        `Projected_Candidate=True`, which claimed the pool was projecting a man
+        DK had named."""
+        df = self._melt(post=("BBB",), arm=("BBB",), opener=("AAA",))
+        rec = self._row(df, "AAA Opener")
+        self.assertEqual(rec["Participation"], "declared_opener")
+        self.assertFalse(rec["Projected_Candidate"])
+        self.assertEqual(rec["Pool_Basis"], "all_healthy")
+        self.assertTrue(
+            self._row(df, "AAA Bench1")["Projected_Candidate"],
+            "his team-mates are still unknown; the opener branch is per person")
+
+    def test_a_shelved_opener_is_not_reported_as_kept(self):
+        """`openers_kept` reads the FINAL rows, so an IL opener who left on the
+        health filter is not claimed as a man the pool held."""
+        df = self._melt(post=("AAA", "BBB"), arm=("BBB",), opener=("AAA",),
+                        opener_out=("AAA",))
+        self.assertEqual(df.attrs["participation_report"]["openers_kept"], [])
+        self.assertEqual(len(df.loc[df["Name"] == "AAA Opener"]), 0)
+
+    def test_openers_kept_is_empty_and_present_when_there_is_no_opener(self):
+        df = self._melt(post=("AAA", "BBB"), arm=("AAA", "BBB"))
+        self.assertEqual(df.attrs["participation_report"]["openers_kept"], [])
+
+    def test_the_thesis_ladder_does_not_promote_an_opener_to_declared_starter(self):
+        """`starters` feeds `both_sp`, and `pitchers_duel` HARD-LOCKS both
+        entries through every rung of the relaxation ladder. Keeping the opener
+        in the pool must not force a one-inning arm onto that roster: a side
+        whose only arm is an opener is a bullpen game and reads as one."""
+        df = self._melt(post=("AAA", "BBB"), arm=("BBB",), opener=("AAA",))
+        shape = st.describe_slate(df)
+        opener_key = str(self._row(df, "AAA Opener")["Player_Key"])
+        self.assertIsNone(shape["starters"]["AAA"])
+        self.assertEqual(shape["bullpen_teams"], ["AAA"])
+        self.assertNotEqual(shape["starters"]["BBB"], opener_key)
+        self.assertEqual(shape["starters"]["BBB"],
+                         str(self._row(df, "BBB Arm")["Player_Key"]))
+
+    def test_an_opener_beside_a_real_starter_does_not_displace_him(self):
+        """The other shape: DK declares an SP and a PO on the same side. The SP
+        is the starter; the opener is neither the starter nor a bullpen game."""
+        df = self._melt(post=("AAA", "BBB"), arm=("AAA", "BBB"),
+                        opener=("AAA",))
+        shape = st.describe_slate(df)
+        self.assertEqual(shape["bullpen_teams"], [])
+        self.assertEqual(shape["starters"]["AAA"],
+                         str(self._row(df, "AAA Arm")["Player_Key"]))
+
+
+# ---------------------------------------------------------------------------
+# R334(a). The F1 implied-team-total factor reaches a Showdown hitter's prior.
+# ---------------------------------------------------------------------------
+class R334aShowdownF1PriorTests(unittest.TestCase):
+    """Before this item nothing on the Showdown path carried the market's view
+    of the run environment to a hitter's number.
+
+    `build_f1_factors` has exactly one production caller, `build_f1_map`, which
+    is called once, inside `run_classic`. Showdown reached AvgPointsPerGame and
+    a salary regression. The moneyline it DID have was spent on the thesis
+    ladder's side mix -- which entries lean which way -- and never on a Base.
+
+    Measured on 2210_1g_sd (CIN@LAD, 2026-09-08) against a supplied external
+    Base, the side split was 1.77x wide and monotone by side, arms near 1.0.
+    Two bounds this wiring cannot pass, pinned below rather than rediscovered:
+    `F1_HITTER_CLIP` is (0.85, 1.15), so the widest transmissible side ratio is
+    1.353x; and a packet with a total but NO moneyline splits evenly on a
+    two-team slate, so every F1 clips to exactly 1.0.
+    """
+
+    @staticmethod
+    def _build_slate():
+        import importlib.util
+        path = (REPO / "skills" / "generate-lineups" / "scripts" / "build_slate.py")
+        spec = importlib.util.spec_from_file_location(
+            "build_slate_f1_under_test", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    @staticmethod
+    def _packet(total=8.5, away_ml=255, home_ml=-319):
+        entry = {"total": total, "source": "test"}
+        if away_ml is not None and home_ml is not None:
+            entry["moneyline"] = {"MIN": away_ml, "CHC": home_ml}
+        return {"MIN@CHC": entry}
+
+    def _pool(self):
+        return sd.melt_showdown_salary_csv(SAL)
+
+    def test_f1_reaches_every_hitter_and_leaves_the_arms_neutral(self):
+        mod = self._build_slate()
+        df = self._pool()
+        factors, report = mod.build_showdown_f1(self._packet(), df)
+        self.assertTrue(factors, "no hitter was scored")
+        self.assertGreater(report["non_neutral_f1"], 0)
+        arms = {str(k) for k, o in zip(df["Player_Key"], df["Batting_Order"])
+                if o is None or pd.isna(o)}
+        self.assertTrue(arms, "the fixture has no arms to check")
+        for key in arms:
+            self.assertEqual(factors[str(key)], 1.0,
+                             "a Showdown arm keeps raw APPG; F1 on him would "
+                             "double count the opposing total (v1)")
+
+    def test_the_favored_side_is_scored_above_the_underdog(self):
+        """On a two-team slate F1 is the moneyline devig, doubled and clipped:
+        the ratio between the sides is the whole of the signal."""
+        mod = self._build_slate()
+        df = self._pool()
+        factors, _ = mod.build_showdown_f1(self._packet(), df)
+        by_team = {}
+        for key, team, order in zip(df["Player_Key"], df["Team"],
+                                    df["Batting_Order"]):
+            if order is not None and not pd.isna(order):
+                by_team.setdefault(str(team), set()).add(factors[str(key)])
+        self.assertEqual({len(v) for v in by_team.values()}, {1},
+                         "F1 is a TEAM factor; every hitter on a side shares it")
+        self.assertGreater(by_team["CHC"].pop(), by_team["MIN"].pop(),
+                           "CHC is the -319 home favorite in this packet")
+
+    def test_a_total_with_no_moneyline_is_neutral_and_that_is_correct(self):
+        """The acceptance this corrects. A packet WAS present, so 'odds
+        available' is true and `non_neutral_f1` is still 0: two teams split an
+        even total onto the slate mean and every F1 clips to exactly 1.0. A
+        reader must be able to tell that from a wiring failure."""
+        mod = self._build_slate()
+        df = self._pool()
+        factors, report = mod.build_showdown_f1(
+            self._packet(away_ml=None, home_ml=None), df)
+        self.assertEqual(report["non_neutral_f1"], 0)
+        self.assertEqual(sorted({round(v, 9) for v in factors.values()}), [1.0])
+        self.assertEqual(report["games_priced"], 1,
+                         "the packet was read; only the split was even")
+
+    def test_the_clip_bounds_the_transmissible_side_ratio(self):
+        """`F1_HITTER_CLIP` caps this at 1.15/0.85 = 1.353x against a measured
+        1.77x, so (a) closes at most ~76% of that gap by construction and the
+        residual (b) is sized on is arithmetic before it is evidence."""
+        mod = self._build_slate()
+        df = self._pool()
+        factors, _ = mod.build_showdown_f1(
+            self._packet(total=12.0, away_ml=2000, home_ml=-5000), df)
+        values = [v for k, v in factors.items()
+                  if v != 1.0 or True]
+        hitters = [factors[str(k)] for k, o in zip(df["Player_Key"],
+                                                   df["Batting_Order"])
+                   if o is not None and not pd.isna(o)]
+        self.assertLessEqual(max(hitters) / min(hitters), 1.15 / 0.85 + 1e-9)
+        self.assertLessEqual(max(hitters), 1.15 + 1e-9)
+        self.assertGreaterEqual(min(hitters), 0.85 - 1e-9)
+        self.assertTrue(values)
+
+    def test_the_wiring_applies_f1_on_the_LADDER_path(self):
+        mod = self._build_slate()
+        raw = self._pool()
+        factors, report = mod.build_showdown_f1(self._packet(), raw)
+        hand = {"MIN": "R", "CHC": "R"}
+        plain = mod.price_showdown_pool(raw, use_ladder=True, bat_side={},
+                                        pitcher_hand=hand, supplied_base={},
+                                        supplied_read={})
+        wired = mod.price_showdown_pool(raw, use_ladder=True, bat_side={},
+                                        pitcher_hand=hand, supplied_base={},
+                                        supplied_read={},
+                                        f1_by_player_key=factors,
+                                        f1_report=report)
+        self.assertTrue(wired.attrs["f1_prior_report"]["applied"])
+        self.assertGreater(wired.attrs["f1_prior_report"]["non_neutral_f1"], 0)
+        moved = [a for a, b in zip(plain["Base"], wired["Base"])
+                 if abs(float(a) - float(b)) > 1e-9]
+        self.assertTrue(moved, "F1 changed no Base on the ladder path")
+
+    def test_the_wiring_reaches_the_FALLBACK_bank_path_too(self):
+        """R249's lesson, applied to this factor. `apply_base_prior` runs on the
+        ladder path alone, so wiring F1 inside it would make it a silent no-op
+        on exactly the `all_healthy` slates where the pool is thinnest."""
+        mod = self._build_slate()
+        raw = self._pool()
+        factors, report = mod.build_showdown_f1(self._packet(), raw)
+        out = mod.price_showdown_pool(raw, use_ladder=False, bat_side={},
+                                      pitcher_hand={}, supplied_base={},
+                                      supplied_read={},
+                                      f1_by_player_key=factors,
+                                      f1_report=report)
+        self.assertTrue(out.attrs["f1_prior_report"]["applied"])
+        self.assertNotIn("Salary_Fit", out.columns)      # still no prior here
+        hitter = raw[raw["Batting_Order"].notna()].iloc[0]
+        before = float(hitter["Base"])
+        after = float(out.loc[out["Name"] == hitter["Name"], "Base"].iloc[0])
+        self.assertAlmostEqual(after, before * factors[str(hitter["Player_Key"])],
+                               places=6)
+
+    def test_a_supplied_base_is_NOT_multiplied_by_f1(self):
+        """R249's contract, unchanged: a supplied number IS the prior and no
+        factor touches it. F1 goes in the same seam and before
+        `apply_supplied_base`, which is what makes the order executable rather
+        than a property of the source layout."""
+        mod = self._build_slate()
+        raw = self._pool()
+        factors, report = mod.build_showdown_f1(self._packet(), raw)
+        row = raw[raw["Batting_Order"].notna()].iloc[0]
+        asked = 37.5
+        for use_ladder in (True, False):
+            priced = mod.price_showdown_pool(
+                raw, use_ladder=use_ladder, bat_side={},
+                pitcher_hand={"MIN": "R", "CHC": "R"},
+                supplied_base={str(row["UTIL_ID"]): asked}, supplied_read={},
+                f1_by_player_key=factors, f1_report=report)
+            got = float(priced.loc[priced["Name"] == row["Name"], "Base"].iloc[0])
+            self.assertAlmostEqual(got, asked, places=6,
+                                   msg=f"F1 was applied AFTER the supplied "
+                                       f"number (use_ladder={use_ladder})")
+
+    def test_no_packet_leaves_every_base_alone_and_says_so(self):
+        mod = self._build_slate()
+        raw = self._pool()
+        factors, report = mod.build_showdown_f1({}, raw)
+        self.assertEqual(factors, {})
+        out = mod.price_showdown_pool(raw, use_ladder=False, bat_side={},
+                                      pitcher_hand={}, supplied_base={},
+                                      supplied_read={},
+                                      f1_by_player_key=factors,
+                                      f1_report=report)
+        block = out.attrs["f1_prior_report"]
+        self.assertFalse(block["applied"])
+        self.assertEqual(block["non_neutral_f1"], 0)
+        self.assertIn("moneyline", block["skipped"])
+        self.assertTrue(all(abs(float(a) - float(b)) < 1e-12
+                            for a, b in zip(raw["Base"], out["Base"])))
+
+    def test_the_prior_note_names_f1_only_when_it_was_applied(self):
+        """The R122 `prior_note` class: a hardcoded literal describing a factor
+        chain, which no test caught drifting. It now reads the frame."""
+        mod = self._build_slate()
+        raw = self._pool()
+        factors, report = mod.build_showdown_f1(self._packet(), raw)
+        hand = {"MIN": "R", "CHC": "R"}
+        with_f1 = mod.price_showdown_pool(raw, use_ladder=True, bat_side={},
+                                          pitcher_hand=hand, supplied_base={},
+                                          supplied_read={},
+                                          f1_by_player_key=factors,
+                                          f1_report=report)
+        without = mod.price_showdown_pool(raw, use_ladder=True, bat_side={},
+                                          pitcher_hand=hand, supplied_base={},
+                                          supplied_read={})
+        self.assertIn("F1 implied-team-total factor",
+                      st.portfolio_report(with_f1, [], [])["prior_note"])
+        note = st.portfolio_report(without, [], [])["prior_note"]
+        self.assertNotIn("x F1", note)
+        self.assertIn("no F1", note)
+
+    def test_showdown_moneyline_hands_back_the_packet_it_already_loaded(self):
+        """The seam. This function loaded the FULL packet -- the same loader
+        Classic uses, carrying each game's total beside its moneyline -- and
+        threw the total away three lines later, which is most of why no implied
+        total reached a Showdown hitter."""
+        src = (REPO / "skills" / "generate-lineups" / "scripts"
+               / "build_slate.py").read_text(encoding="utf-8")
+        self.assertIn("def showdown_moneyline(args, df, salary_csv=None) "
+                      "-> tuple[dict, dict, dict]:", src)
+        self.assertIn("moneyline, odds_note, odds_packet = showdown_moneyline(",
+                      src)
+        self.assertIn("f1_by_player_key, f1_report = build_showdown_f1("
+                      "odds_packet, df)", src)
+        # both build paths, same seam
+        self.assertEqual(src.count("f1_by_player_key=f1_by_player_key"), 2)
+        self.assertIn('"f1": {', src)
+
+
+# ---------------------------------------------------------------------------
+# R334(c)(d). Two Showdown reports, neither a gate.
+# ---------------------------------------------------------------------------
+def _savant_pitching(rows):
+    """A minimal Savant expected-stats pitching frame: (name, est_woba, pa)."""
+    return pd.DataFrame([
+        {"last_name, first_name": name, "player_id": str(1000 + i),
+         "year": 2026, "pa": pa, "woba": est, "est_woba": est, "xera": 4.00}
+        for i, (name, est, pa) in enumerate(rows)])
+
+
+def _savant_batting(rows):
+    return pd.DataFrame([
+        {"last_name, first_name": name, "player_id": str(2000 + i),
+         "year": 2026, "pa": 500, "woba": est, "est_woba": est}
+        for i, (name, est) in enumerate(rows)])
+
+
+class R334cOpposingArmReportTests(unittest.TestCase):
+    """The Showdown Base is APPG, a season mean over every opponent a hitter
+    faced; a Showdown contest is ONE game with ONE arm per side.
+
+    R334(a) wired the market's implied team total, which carries the arm at the
+    TEAM level and only as far as `F1_HITTER_CLIP` allows. The opposing-arm term
+    itself is (b) and is not built, so this names the condition under which the
+    remaining blindness is largest and is knowable BEFORE the first solve.
+    R310(b)'s shape: report, never a gate, present with `flagged: false`.
+    """
+
+    HEADER = ["Position", "Name + ID", "Name", "ID", "Roster Position",
+              "Salary", "Game Info", "TeamAbbrev", "AvgPointsPerGame",
+              "Status", "Starting"]
+    GAME = "AAA@BBB 09/30/2026 07:05PM ET"
+
+    def _melt(self, arm_names=("AAA Ace", "BBB Ace"), declare=True):
+        rows = [self.HEADER]
+        pid = 1000
+        for team, arm in zip(("AAA", "BBB"), arm_names):
+            for i in range(9):
+                name = f"{team} Bat{i + 1}"
+                for role, mult in (("UTIL", 1.0), ("CPT", 1.5)):
+                    rows.append(["OF", f"{name} ({pid})", name, str(pid), role,
+                                 str(int(4000 * mult)), self.GAME, team, "9.0",
+                                 "", str(i + 1)])
+                    pid += 1
+            for role, mult in (("UTIL", 1.0), ("CPT", 1.5)):
+                rows.append(["SP", f"{arm} ({pid})", arm, str(pid), role,
+                             str(int(9000 * mult)), self.GAME, team, "14.0", "",
+                             "SP" if declare else ""])
+                pid += 1
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "DKSalaries.csv"
+            with path.open("w", newline="", encoding="utf-8") as fh:
+                csv.writer(fh).writerows(rows)
+            return sd.melt_showdown_salary_csv(str(path))
+
+    # league mean over this table is 0.33, so the margin is a 0.066 gap
+    WIDE = _savant_pitching([("Ace, Aaa", 0.267, 600), ("Ace, Bbb", 0.384, 600),
+                             ("Filler, One", 0.330, 600),
+                             ("Filler, Two", 0.330, 600)])
+    NARROW = _savant_pitching([("Ace, Aaa", 0.325, 600), ("Ace, Bbb", 0.335, 600),
+                               ("Filler, One", 0.330, 600),
+                               ("Filler, Two", 0.330, 600)])
+
+    def test_it_fires_on_the_mismatched_pair(self):
+        """The 2210_1g_sd numbers: 0.267 against 0.384 is a 0.117 gap, 35.4% of
+        the league mean, against a 20% margin."""
+        out = sd.opposing_arm_report(self._melt(), self.WIDE)
+        self.assertTrue(out["flagged"])
+        self.assertAlmostEqual(out["gap_est_woba_against"], 0.117, places=3)
+        self.assertGreater(out["gap_as_fraction_of_league_mean"],
+                           sd.OPPOSING_ARM_XWOBA_MARGIN)
+        self.assertIn("AvgPointsPerGame", out["note"])
+        self.assertEqual(len(out["arms"]), 2)
+        self.assertEqual({a["team"] for a in out["arms"]}, {"AAA", "BBB"})
+
+    def test_it_stays_silent_on_a_pair_inside_the_margin(self):
+        """The half that keeps this from being the referee that warns on
+        everything (R292). A 0.010 gap is 3% of the mean."""
+        out = sd.opposing_arm_report(self._melt(), self.NARROW)
+        self.assertFalse(out["flagged"])
+        self.assertNotIn("note", out)
+        self.assertEqual(len(out["arms"]), 2)
+
+    def test_it_is_present_and_says_why_when_it_cannot_run(self):
+        """`flagged: false` with a reason, never an absent key: an absent key is
+        not an answer to 'were the two arms mismatched'."""
+        self.assertIn("Savant",
+                      sd.opposing_arm_report(self._melt(), None)["skipped"])
+        undeclared = sd.opposing_arm_report(self._melt(declare=False), self.WIDE)
+        self.assertFalse(undeclared["flagged"])
+        self.assertIn("declared arm", undeclared["skipped"])
+        empty = sd.opposing_arm_report(pd.DataFrame(), self.WIDE)
+        self.assertFalse(empty["flagged"])
+        self.assertIn("empty", empty["skipped"])
+
+    def test_an_arm_with_no_savant_row_is_named_not_scored_neutral(self):
+        """R189(2)'s rule. DK ships no MLBAM id, so the join is by NAME and a
+        miss must be visible rather than silently comparing one arm."""
+        out = sd.opposing_arm_report(
+            self._melt(arm_names=("AAA Ace", "Bbb Nobody")), self.WIDE)
+        self.assertFalse(out["flagged"])
+        self.assertEqual(out["unmatched_arms"], ["BBB Bbb Nobody"])
+        self.assertIn("1 of 2", out["skipped"])
+
+    def test_it_never_changes_the_pool(self):
+        df = self._melt()
+        before = list(df["Base"]), len(df)
+        sd.opposing_arm_report(df, self.WIDE)
+        self.assertEqual((list(df["Base"]), len(df)), before)
+
+
+class R334dSuppliedBaseSanityTests(unittest.TestCase):
+    """R327 gave the supplied frame a NUMERIC boundary and REFUSES an unusable
+    number. This is the semantic one beside it and it never refuses.
+
+    Within a side on purpose: comparing across sides would re-measure the thing
+    a supplied Base is usually supplied to express -- that one side faces a much
+    better arm, which is R334's whole subject -- and would flag every prior that
+    got the matchup right.
+    """
+
+    HEADER = R334cOpposingArmReportTests.HEADER
+    GAME = R334cOpposingArmReportTests.GAME
+
+    def _melt(self):
+        rows = [self.HEADER]
+        pid = 1000
+        self.ids = {}
+        for team in ("AAA", "BBB"):
+            for i in range(9):
+                name = f"{team} Bat{i + 1}"
+                for role, mult in (("UTIL", 1.0), ("CPT", 1.5)):
+                    if role == "UTIL":
+                        self.ids[name] = str(pid)
+                    rows.append(["OF", f"{name} ({pid})", name, str(pid), role,
+                                 str(int(4000 * mult)), self.GAME, team, "9.0",
+                                 "", str(i + 1)])
+                    pid += 1
+            arm = f"{team} Arm"
+            for role, mult in (("UTIL", 1.0), ("CPT", 1.5)):
+                rows.append(["SP", f"{arm} ({pid})", arm, str(pid), role,
+                             str(int(9000 * mult)), self.GAME, team, "14.0",
+                             "", "SP"])
+                pid += 1
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "DKSalaries.csv"
+            with path.open("w", newline="", encoding="utf-8") as fh:
+                csv.writer(fh).writerows(rows)
+            return sd.melt_showdown_salary_csv(str(path))
+
+    @staticmethod
+    def _table():
+        # AAA Bat1 is the best bat by xwOBA and AAA Bat9 the worst.
+        return _savant_batting(
+            [(f"Bat{i + 1}, Aaa", 0.400 - 0.02 * i) for i in range(9)]
+            + [(f"Bat{i + 1}, Bbb", 0.400 - 0.02 * i) for i in range(9)])
+
+    def _agreeing(self, df):
+        return {self.ids[n]: 12.0 - 0.5 * (int(n[-1]) - 1)
+                for n in self.ids if n[-1].isdigit()}
+
+    def test_a_prior_that_agrees_with_the_rate_stat_names_nobody(self):
+        df = self._melt()
+        out = sd.supplied_base_sanity_report(df, self._agreeing(df), self._table())
+        self.assertTrue(out["applied"])
+        self.assertEqual(out["flagged"], [])
+        self.assertEqual(out["hitters_ranked"], 18)
+        self.assertEqual(out["sides_ranked"], ["AAA", "BBB"])
+
+    def test_an_inverted_bat_is_named_with_both_ranks(self):
+        """The acceptance shape: a prior that buries the side's best bat."""
+        df = self._melt()
+        supplied = self._agreeing(df)
+        supplied[self.ids["AAA Bat1"]] = 1.0        # best xwOBA, worst Base
+        out = sd.supplied_base_sanity_report(df, supplied, self._table())
+        names = [(f["team"], f["name"]) for f in out["flagged"]]
+        self.assertIn(("AAA", "AAA Bat1"), names)
+        hit = next(f for f in out["flagged"] if f["name"] == "AAA Bat1")
+        self.assertEqual(hit["est_woba_rank_in_side"], 1)
+        self.assertEqual(hit["base_rank_in_side"], 9)
+        self.assertEqual(hit["rank_delta"], 8)
+        self.assertIn("BELOW", hit["direction"])
+        self.assertFalse([f for f in out["flagged"] if f["team"] == "BBB"],
+                         "the other side's prior was untouched")
+        self.assertIn("not error", out["note"])
+
+    def test_the_gap_threshold_is_what_decides(self):
+        """Three places out of nine is disagreement, not contradiction, and the
+        threshold is the whole of what separates them. Measured on the constant:
+        two INDEPENDENT orderings of a 9-hitter side would name 1.34 of 9 at
+        this gap and 4.67 of 9 at `> 2`, which is the wall of text this avoids.
+
+        Exercised at both settings, because a threshold nothing moves against is
+        a constant no test is pinning: at the shipped 5 this side is silent, and
+        the same side at `> 2` names both swapped bats."""
+        df = self._melt()
+        supplied = self._agreeing(df)
+        supplied[self.ids["AAA Bat1"]], supplied[self.ids["AAA Bat4"]] = (
+            supplied[self.ids["AAA Bat4"]], supplied[self.ids["AAA Bat1"]])
+        table = self._table()
+        self.assertEqual(sd.SUPPLIED_BASE_RANK_GAP, 5)
+        out = sd.supplied_base_sanity_report(df, supplied, table)
+        self.assertEqual(out["flagged"], [], "a 3-place move is not a finding")
+        self.assertIn("1.34 of 9", out["label"])
+        tight = sd.supplied_base_sanity_report(df, supplied, table, gap=2)
+        self.assertEqual(sorted(f["name"] for f in tight["flagged"]),
+                         ["AAA Bat1", "AAA Bat4"])
+        self.assertEqual(sorted(abs(f["rank_delta"]) for f in tight["flagged"]),
+                         [3, 3])
+
+    def test_it_is_a_no_op_with_no_projections_file(self):
+        df = self._melt()
+        out = sd.supplied_base_sanity_report(df, {}, self._table())
+        self.assertFalse(out["applied"])
+        self.assertIn("--projections", out["skipped"])
+        self.assertEqual(out["flagged"], [])
+
+    def test_a_hitter_with_no_savant_row_is_named_not_ranked(self):
+        df = self._melt()
+        table = _savant_batting(
+            [(f"Bat{i + 1}, Aaa", 0.400 - 0.02 * i) for i in range(9)])
+        out = sd.supplied_base_sanity_report(df, self._agreeing(df), table)
+        self.assertEqual(out["sides_ranked"], ["AAA"])
+        self.assertEqual(len(out["unmatched_hitters"]), 9)
+        self.assertTrue(all(n.startswith("BBB") for n in out["unmatched_hitters"]))
+
+    def test_it_never_changes_a_supplied_number(self):
+        df = self._melt()
+        supplied = self._agreeing(df)
+        before = dict(supplied)
+        base_before = list(df["Base"])
+        sd.supplied_base_sanity_report(df, supplied, self._table())
+        self.assertEqual(supplied, before)
+        self.assertEqual(list(df["Base"]), base_before)
+
+    def test_both_reports_reach_the_showdown_brief(self):
+        src = (REPO / "skills" / "generate-lineups" / "scripts"
+               / "build_slate.py").read_text(encoding="utf-8")
+        self.assertIn('"opposing_arm": sd_opposing_arm,', src)
+        self.assertIn('"supplied_base_sanity": sd_base_sanity,', src)
+        self.assertIn("sd_opposing_arm = sd.opposing_arm_report(df, "
+                      "sd_savant_pitching)", src)
+        self.assertIn("sd_base_sanity = sd.supplied_base_sanity_report(",
+                      src)
+
+
+# ---------------------------------------------------------------------------
+# R328 remaining half. The ordering between the two Showdown ownership markets.
+# ---------------------------------------------------------------------------
+class R328ShowdownRoleCoherenceTests(unittest.TestCase):
+    """Two of this item's three sub-fixes shipped in R338 and are re-pinned here
+    so the row cannot be reopened against the wrong half.
+
+    `_bounded_marginals` water-fills BOTH markets onto the capped simplex, so
+    the `[8.01, ..., 316.19]%` the item was filed on cannot be produced;
+    `attach_predicted_ownership` refuses non-finite and out-of-[0,100] values
+    before any `--leverage` control reads one. What was left is the ORDERING
+    across the two markets, enforced only in `mlb_engine/production/contracts.py`
+    -- R302's strangler package, which the legacy path cannot import and a
+    greenfield test pins it out of.
+    """
+
+    def _players(self):
+        from mlb_engine.field import ownership_prior as op          # noqa: F401
+        rows = []
+        for i in range(9):
+            rows.append(types.SimpleNamespace(
+                player_id=f"H{i}", name=f"Bat {i}", team="AAA" if i < 5 else "BBB",
+                position="OF", salary=3000 + 400 * i, roster_position="UTIL",
+                avg_points_per_game=8.0 + i))
+        for i in range(2):
+            rows.append(types.SimpleNamespace(
+                player_id=f"P{i}", name=f"Arm {i}", team="AAA" if i else "BBB",
+                position="SP", salary=10000 + 500 * i, roster_position="UTIL",
+                avg_points_per_game=16.0 + i))
+        return rows
+
+    def test_the_production_markets_are_coherent_on_every_archetype(self):
+        """Not reproducible, and that is the finding. Over 4,000 randomized
+        pools plus a structured grid the maximum captain-minus-roster excess is
+        exactly 0.0, because the captain temperature runs BELOW the roster one
+        and the water-fill pins a saturating roster share at 100."""
+        from mlb_engine.field import ownership_prior as op
+        players = self._players()
+        for archetype in op.ARCHETYPE_PARAMS:
+            cap = op.predict_captain_ownership(
+                players, archetype=archetype, probable_sp_ids=["P0", "P1"])
+            ros = op.predict_showdown_roster_ownership(
+                players, archetype=archetype, probable_sp_ids=["P0", "P1"])
+            out = op.showdown_role_coherence(cap["own_pct_by_player_id"],
+                                             ros["own_pct_by_player_id"])
+            self.assertTrue(out["coherent"], f"{archetype}: {out['violations']}")
+            self.assertEqual(out["checked"], len(players))
+
+    def test_a_captain_marginal_above_its_roster_marginal_is_NAMED(self):
+        """The guard itself. A person cannot be captained more often than he is
+        rostered; both markets are percentages of entries, so the comparison is
+        direct."""
+        from mlb_engine.field import ownership_prior as op
+        out = op.showdown_role_coherence({"a": 40.0, "b": 5.0},
+                                         {"a": 12.0, "b": 90.0})
+        self.assertFalse(out["coherent"])
+        self.assertEqual([v["player_id"] for v in out["violations"]], ["a"])
+        self.assertEqual(out["violations"][0]["excess_pct"], 28.0)
+
+    def test_it_reports_and_never_clamps(self):
+        """A clamp breaks the 100% captain budget, which is R306's accounting
+        and the property the water-fill exists to preserve. The inputs come back
+        untouched and the caller still holds the numbers it passed."""
+        from mlb_engine.field import ownership_prior as op
+        captain = {"a": 40.0, "b": 5.0}
+        roster = {"a": 12.0, "b": 90.0}
+        before = dict(captain), dict(roster)
+        out = op.showdown_role_coherence(captain, roster)
+        self.assertEqual((captain, roster), before)
+        for key in ("own_pct_by_player_id", "clamped", "repaired"):
+            self.assertNotIn(key, out)
+
+    def test_rounding_at_the_last_place_is_not_a_violation(self):
+        """`_bounded_marginals` rounds to 2dp, so an equal pair can differ by
+        half a cent. A tolerance, not a clamp."""
+        from mlb_engine.field import ownership_prior as op
+        self.assertTrue(
+            op.showdown_role_coherence({"a": 100.0}, {"a": 99.99})["coherent"])
+        self.assertFalse(
+            op.showdown_role_coherence({"a": 100.0}, {"a": 99.0})["coherent"])
+
+    def test_out_of_range_and_missing_ids_are_reported_separately(self):
+        from mlb_engine.field import ownership_prior as op
+        out = op.showdown_role_coherence({"a": 101.0, "c": 5.0},
+                                         {"a": 100.0, "b": 50.0})
+        self.assertFalse(out["coherent"])
+        self.assertEqual(out["out_of_range"],
+                         [{"player_id": "a", "market": "captain", "value": 101.0}])
+        self.assertEqual(out["missing_from_roster_market"], ["c"])
+        self.assertEqual(out["missing_from_captain_market"], ["b"])
+        self.assertEqual(out["checked"], 1, "only the shared id is comparable")
+
+    def test_the_water_fill_half_already_shipped_and_stays_shipped(self):
+        """R338. The `[8.01, ..., 316.19]%` this item was filed on: six people
+        competing for six seats must every one be 100%."""
+        from mlb_engine.field import ownership_prior as op
+        out = op._bounded_marginals({str(i): 10 ** i for i in range(6)}, 600)
+        self.assertEqual(sorted(out.values()), [100.0] * 6)
+        for pid, value in op._bounded_marginals(
+                {str(i): float(i + 1) for i in range(20)}, 600).items():
+            self.assertTrue(0.0 <= value <= 100.0, f"{pid}={value}")
+
+    def test_the_emit_carries_the_block(self):
+        src = (REPO / "tools" / "ownership_pred.py").read_text(encoding="utf-8")
+        self.assertIn('block["role_coherence"] = '
+                      'ownership_prior.showdown_role_coherence(', src)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

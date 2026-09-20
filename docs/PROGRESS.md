@@ -5,9 +5,9 @@ hand-edit: `--check` runs in the gate and fails when this file and the board
 disagree.** The board is the source of truth; this is the one-screen view of it,
 because the board itself is 1.1 MB and cannot be read on a phone.
 
-**NEXT:** CC-3 (CC-0/CC-1/CC-2 DONE 2026-09-15; CC-A0 and CC-A3 DONE 2026-09-17; CC-A4/CC-A1/CC-A2/CC-A5/CC-A6/CC-A7/CC-A8 DONE 2026-09-19; CC-A9's condition is now MET -- CC-A5..CC-A8 all green 2026-09-19 -- so it is runnable whenever CC-3 is not the priority)
+**NEXT:** CC-4 (CC-0/CC-1/CC-2 DONE 2026-09-15; CC-A0 and CC-A3 DONE 2026-09-17; CC-A4/CC-A1/CC-A2/CC-A5/CC-A6/CC-A7/CC-A8 DONE 2026-09-19; **CC-3 DONE 2026-09-20, all four batches, with R334(a)'s 1.77x re-measurement the one named remainder -- its 2026-09-08 inputs are gone from disk and history, so it needs a NEW slate rather than a recovery**; R378 landed beside it as an R372 repair. CC-4 is next because it shares CC-3's files and the row says land after; CC-5 is now unblocked on the R328 side and still waits on CC-4's R295(a). CC-A9's condition is MET and it is runnable standalone whenever CC-4 is not the priority)
 
-13 of 51 sessions done.
+14 of 51 sessions done.
 
 
 ### Phase A0 -- the host move: what a cloud session needs that the tree does not yet have (2026-09-17, Ben)
@@ -37,7 +37,7 @@ because the board itself is 1.1 MB and cannot be read on a phone.
 | :--- | :--- | :--- |
 | **CC-1** | DONE 2026-09-15 | R340 -- the five-stack controls were dead from both production doors |
 | **CC-2** | DONE 2026-09-15 | R343 + R333 -- the two washout-axis caps |
-| **CC-3** | open | R347 (NEW) -- a PO opener is unrosterable in Showdown while `showdown.py:319-322` says he is ro… (+3 more) |
+| **CC-3** | DONE 2026-09-20 | R347 (NEW) -- a PO opener is unrosterable in Showdown while `showdown.py:319-322` says he is ro… (+3 more) |
 | **CC-4** | open | R295 (+F13, F14, F40 riders) -- Showdown ladder truth, remaining parts |
 | **CC-5** | open | R307 -- the captain leverage sleeve |
 

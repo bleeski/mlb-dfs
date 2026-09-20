@@ -1887,6 +1887,26 @@ def build_f4_map(pool: dict, savant_pitching_csv) -> tuple[dict, dict]:
     return f4, report
 
 
+def load_savant_table(path):
+    """R334(c)(d). A Savant expected-stats CSV, or None, never a raised error.
+
+    `build_f4_map` swallows the same failure into its own report; both Showdown
+    reports want the table itself, and neither may kill a build over a reference
+    file. A missing path and an unreadable file both come back None and the
+    report that asked for it says which.
+    """
+    if not path:
+        return None
+    try:
+        from mlb_engine.projections.projection_builder import (
+            load_savant_expected_stats,
+        )
+        return load_savant_expected_stats(path)
+    except Exception as exc:                            # noqa: BLE001
+        print(f"savant table unreadable ({path}): {exc}", file=sys.stderr)
+        return None
+
+
 def pool_brief_block(report: dict, pool: dict) -> dict:
     """The brief's ``pool`` block, from the engine's own pool_report.
 
@@ -3319,7 +3339,9 @@ def resolve_leverage(args, salary: Path, slate_tag: str) -> tuple[dict, dict]:
 
 
 def price_showdown_pool(df, *, use_ladder: bool, bat_side: dict, pitcher_hand: dict,
-                        supplied_base: dict, supplied_read: dict):
+                        supplied_base: dict, supplied_read: dict,
+                        f1_by_player_key: dict | None = None,
+                        f1_report: dict | None = None):
     """The ONE place Base is finalised for a Showdown build, whichever path runs.
 
     R249. This exists as a function rather than as two call sites because the
@@ -3336,32 +3358,50 @@ def price_showdown_pool(df, *, use_ladder: bool, bat_side: dict, pitcher_hand: d
     and Base is raw AvgPointsPerGame. A supplied number replaces that directly;
     wiring only the ladder would make ``--projections`` a silent no-op on exactly
     the `all_healthy` slates where the pool is thinnest.
+
+    R334(a). F1 goes in the SAME seam for the same reason, and between the other
+    two for a third: after ``apply_base_prior`` because it is a factor on the
+    prior rather than part of the blend, on BOTH paths because
+    ``apply_base_prior`` runs on one of them, and before
+    ``apply_supplied_base`` because a supplied number is the prior and no
+    factor touches it. Absent F1 factors leave Base alone and say so in the
+    report, rather than being skipped and leaving "was the market read" a
+    question the brief cannot answer.
     """
     from mlb_engine.optimize import showdown_theses as theses
 
     priced = (theses.apply_base_prior(df, bat_side=bat_side,
                                       pitcher_hand=pitcher_hand)
               if use_ladder else df)
+    priced = theses.apply_f1_prior(priced, f1_by_player_key, f1_report)
     if supplied_base:
         priced = theses.apply_supplied_base(priced, supplied_base, supplied_read)
     return priced
 
 
-def showdown_moneyline(args, df, salary_csv=None) -> tuple[dict, dict]:
-    """Return ({team: american odds}, note) for the single Showdown game.
+def showdown_moneyline(args, df, salary_csv=None) -> tuple[dict, dict, dict]:
+    """Return ({team: american odds}, note, packet) for the single Showdown game.
 
     ``salary_csv`` matters on a doubleheader: both legs post under one
     AWAY@HOME key and a Showdown slate is one leg (F18).
+
+    R334(a). The third return value is the reason this is a 3-tuple. This
+    function already loaded the FULL packet through ``load_odds_packet`` -- the
+    same loader Classic uses, carrying each game's ``total`` beside its
+    ``moneyline`` -- and threw the total away three lines later, which is most
+    of why no implied team total reached a Showdown hitter. The packet is handed
+    back so ``build_f1_factors`` can be called on it without a second load.
     """
     try:
         odds, note = load_odds_packet(args, salary_csv=salary_csv)
     except Exception as exc:
-        return {}, {"warning": f"odds unavailable ({exc}); entries split evenly"}
+        return {}, {"warning": f"odds unavailable ({exc}); entries split evenly"}, {}
     teams = sorted(df["Team"].unique()) if len(df) else []
     for entry in (odds or {}).values():
         ml = (entry or {}).get("moneyline") or {}
         if all(t in ml for t in teams) and teams:
-            return {t: float(ml[t]) for t in teams}, dict(note, matched=True)
+            return ({t: float(ml[t]) for t in teams}, dict(note, matched=True),
+                    dict(odds or {}))
     # R29(5): say WHY there is no moneyline. This one sentence used to cover a
     # missing key, an unrecognised payload shape, a parsed-but-unmatched slate
     # and a market that genuinely is not posted, and only the last of those is
@@ -3374,9 +3414,52 @@ def showdown_moneyline(args, df, salary_csv=None) -> tuple[dict, dict]:
     else:
         reason = (f"{len(odds)} game(s) carried odds but none had a moneyline "
                   f"for both of {teams}; check the slate's team codes")
-    return {}, dict(note or {}, matched=False,
-                    warning=f"no moneyline for this game ({reason}); entries "
-                            f"split evenly between the two sides")
+    return ({}, dict(note or {}, matched=False,
+                     warning=f"no moneyline for this game ({reason}); entries "
+                             f"split evenly between the two sides"),
+            dict(odds or {}))
+
+
+def build_showdown_f1(odds: dict, df) -> tuple[dict, dict]:
+    """R334(a). ({Player_Key: F1}, report) for the one game on a Showdown slate.
+
+    Classic's equivalent is ``build_f1_map``, which is called once, inside
+    ``run_classic``. This is the Showdown sibling and it is deliberately
+    smaller, because a one-game slate removes two of the four things that make
+    the Classic one complicated:
+
+    * no park map. Both sides play in the same ballpark, so de-parking divides
+      the two implied totals by the same number and cancels out of the
+      slate-mean ratio exactly. F18's double-count cannot arise here.
+    * no venue resolution, for the same reason.
+
+    ``build_f1_factors`` normalizes against the teams actually in the pool, so
+    handing it the whole day's packet and a two-team ``team_by_player_id`` gives
+    a ratio taken over THIS game's two sides rather than the day's mean -- which
+    is the behavior a Showdown slate wants and the reason the packet is passed
+    whole rather than narrowed first.
+
+    The arms are passed as ``pitcher_ids`` so ``build_f1_factors`` pins them to
+    ``F1_PITCHER_NEUTRAL``: on Showdown a pitcher's Base is raw APPG and the
+    opposing side's total is not his matchup input here either, so the v1
+    double-count argument holds unchanged.
+
+    One property the caller should not have to rediscover: a packet carrying a
+    TOTAL but no MONEYLINE yields an even split on a two-team slate, so every
+    F1 lands on the mean and clips to exactly 1.0. ``non_neutral_f1`` is then 0
+    with the odds present, which is a correct reading and not a wiring failure.
+    """
+    from mlb_engine.projections.projection_builder import build_f1_factors
+
+    if not odds or df is None or not len(df):
+        return {}, {"applied": False, "non_neutral_f1": 0,
+                    "skipped": "no odds packet reached this build"}
+    team_by_key = {str(k): str(t) for k, t in zip(df["Player_Key"], df["Team"])}
+    # `.isna()` off the Series rather than `pd.isna`: this module holds no
+    # module-level pandas import and is not gaining one for a null test.
+    arm_keys = [str(k) for k in df.loc[df["Batting_Order"].isna(), "Player_Key"]]
+    factors, report = build_f1_factors(odds, team_by_key, pitcher_ids=arm_keys)
+    return factors, report
 
 
 def showdown_relaxation_caution(
@@ -3537,6 +3620,15 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
     # rather than beside the brief so the caution exists even on a path that
     # refuses later.
     sd_small_sample = sd.small_sample_base_report(df)
+    # R334(c)+(d). The Showdown path read no Savant file at all; `run_classic`
+    # has resolved these three references since F4. Both reports are best-effort
+    # and neither gates: a missing or unreadable table makes the block say so
+    # and the build carries on, the same contract `resolve_reference_data`'s own
+    # docstring states (degraded signal beats no lineups at T-10).
+    sd_reference = resolve_reference_data(args)
+    sd_savant_pitching = load_savant_table(sd_reference.get("savant_pitching"))
+    sd_savant_batting = load_savant_table(sd_reference.get("savant_batting"))
+    sd_opposing_arm = sd.opposing_arm_report(df, sd_savant_pitching)
     clock = slate_clock(players=parse_dk_salary_csv(str(salary)))
     reserved = sd.read_showdown_reserved_rows(str(entries))
     # Only blank reserved rows are fillable; a complete row is immutable, and
@@ -3564,7 +3656,12 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
     # best-effort: a Showdown build must not fail because an odds endpoint is
     # down, it must say the input was missing and build anyway.
     bat_side, pitcher_hand, feed_note = showdown_handedness(args, slate_dir, df)
-    moneyline, odds_note = showdown_moneyline(args, df, salary_csv=salary)
+    moneyline, odds_note, odds_packet = showdown_moneyline(args, df,
+                                                           salary_csv=salary)
+    # R334(a). The packet the moneyline read was matched against, spent a second
+    # time and on the other half of it. Best-effort like everything else in this
+    # block: a Showdown build must not fail because an odds endpoint is down.
+    f1_by_player_key, f1_report = build_showdown_f1(odds_packet, df)
 
     # R36 F8. `Pool_Basis` is per ROW and carries its own SIDE's basis now, so
     # `.iloc[0]` reports whichever side sorts first as though it spoke for both
@@ -3611,6 +3708,14 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                               "error": str(exc)}, indent=1))
             return 4, {}
 
+    # R334(d). The SEMANTIC boundary beside R327's numeric one, and it lands
+    # here because this is the first point where the supplied frame and the pool
+    # are both in scope -- `read_supplied_base` takes a path and never sees a
+    # player. Report only: R327 refuses an unusable number, this one names an
+    # ordering it disagrees with and changes nothing.
+    sd_base_sanity = sd.supplied_base_sanity_report(df, supplied_base,
+                                                    sd_savant_batting)
+
     # R290(c) step 2. The solve is a governed loop rather than a straight line.
     # Both refusals below are BADLY-SHAPED against Showdown's three portfolio
     # controls, all three of which are Ben's own, so inside the window rung 1
@@ -3628,7 +3733,9 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
             priced = price_showdown_pool(df, use_ladder=True, bat_side=bat_side,
                                          pitcher_hand=pitcher_hand,
                                          supplied_base=supplied_base,
-                                         supplied_read=supplied_read)
+                                         supplied_read=supplied_read,
+                                         f1_by_player_key=f1_by_player_key,
+                                         f1_report=f1_report)
             ladder_meta = st.build_thesis_ladder(priced, n_entries, moneyline=moneyline,
                                                  max_cpt_exposure_pct=cpt_cap,
                                                  contest_of_entry=contest_of_entry,
@@ -3656,7 +3763,9 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
             df = price_showdown_pool(df, use_ladder=False, bat_side=bat_side,
                                      pitcher_hand=pitcher_hand,
                                      supplied_base=supplied_base,
-                                     supplied_read=supplied_read)
+                                     supplied_read=supplied_read,
+                                     f1_by_player_key=f1_by_player_key,
+                                     f1_report=f1_report)
             bank = sd.build_showdown_bank(df, n=n_entries, max_cpt_exposure_pct=cpt_cap,
                                           max_shared_players=share_cap,
                                           max_player_exposure_pct=player_cap_pct,
@@ -3997,8 +4106,16 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         # (`DK_STARTING_DECLARED_TOKENS`, which already admits PLR), and
         # `--declare-pitcher` reaches `build_slate_pool` on the Classic path
         # only. This is the operator's recorded answer, for the referees to read
-        # back; wiring it into the Showdown melt so a PO arm can be declared in
-        # is a pool change on the build path and is the named remainder.
+        # back.
+        #
+        # R347 closed the named remainder from the OTHER side, and the
+        # distinction is worth keeping straight. Nothing was wired into the
+        # melt: a PO arm still cannot be DECLARED into a Showdown pool, because
+        # he is not a declared starter. He no longer needs to be, because
+        # `_participation` gives him `declared_opener` and `starters_only` keeps
+        # him. The flag was never the fix for the PO case here; the pool
+        # dropping him was the defect, and `pool.openers_kept` on this brief is
+        # where a reader sees it did not.
         "declared_pitchers": parse_declared_pitchers(args.declare_pitcher),
         # R249. The whole point of the item is that the operator's previous
         # workaround -- editing the APPG column of the salary file -- moved
@@ -4008,6 +4125,26 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         # absent and leaving "was a projection used" unanswerable.
         "supplied_base": ((priced if use_ladder else df).attrs.get(
             "supplied_base_report") or {"applied": False, "source": None}),
+        # R334(a). Beside `supplied_base` and on the same discipline: present on
+        # every Showdown brief, `applied: false` with a reason rather than
+        # absent, because "was the market read into the prior" has to be
+        # answerable off the delivered brief. The measured defect was that it
+        # was not -- 2210_1g_sd had a moneyline (LAD -319) and it moved only the
+        # ladder's side mix, while every hitter's Base stayed a season mean over
+        # every opponent.
+        #
+        # `packet` is `build_f1_factors`' own report; `prior` is what actually
+        # reached a Base on this build. They differ on purpose: a packet with a
+        # total and no moneyline splits evenly on a two-team slate, so every F1
+        # clips to exactly 1.0 and `non_neutral_f1` is 0 with the odds present.
+        # That is a correct reading, not a wiring failure, and the two blocks
+        # are what let a reader tell those apart.
+        "f1": {
+            "prior": ((priced if use_ladder else df).attrs.get("f1_prior_report")
+                      or {"applied": False, "non_neutral_f1": 0}),
+            "packet": {k: v for k, v in (f1_report or {}).items()
+                       if k != "games"},
+        },
         "pool": {
             "players": int(len(df)),
             # R36 F8. The frame-level basis, and the PER-SIDE participation it
@@ -4022,6 +4159,13 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                                      if len(df) and "Projected_Candidate" in df
                                      else 0),
             "declared_starters": int(df["Is_Declared_Starter"].sum()) if len(df) else 0,
+            # R347. Beside `declared_starters` because that count is exactly
+            # what an opener is NOT, and because 1940_1g_sd shipped
+            # `declared_starters: 2` on a slate where a third arm had been
+            # dropped out of the pool with nothing on the brief saying so.
+            "openers_kept": list(
+                (df.attrs.get("participation_report") or {}).get(
+                    "openers_kept") or []),
             "posted_hitters": int(df["Batting_Order"].notna().sum()) if len(df) else 0,
             # R291(c). Classic's `pool_report.excluded_column`, on the path that
             # had no pool report. `players` above is the CARRIED pool; read
@@ -4038,6 +4182,17 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
             # Showdown brief with `applied: false` when nothing is flagged, the
             # same discipline `supplied_base` follows: absent is not an answer.
             "small_sample_base": sd_small_sample,
+            # R334(c). The condition under which APPG's blindness to the
+            # opposing arm is largest and knowable BEFORE the first solve, on
+            # R310(b)'s shape: present on every Showdown brief with
+            # `flagged: false`, because an absent key is not an answer to "were
+            # the two arms mismatched".
+            "opposing_arm": sd_opposing_arm,
+            # R334(d). R327 gave the supplied frame a numeric boundary and
+            # refuses an unusable number; this is the semantic one beside it and
+            # it never refuses. `applied: false` with a reason when no
+            # --projections file was supplied.
+            "supplied_base_sanity": sd_base_sanity,
         },
         "slate_clock": {
             "first_lock_utc": clock.get("first_lock_utc"),
@@ -4910,7 +5065,10 @@ def main() -> int:
                          "Showdown melt derives declared starters from DK's own "
                          "Starting column, which already admits PLR but not PO, "
                          "so --declare-pitcher cannot put a PO arm in a Showdown "
-                         "pool.")
+                         "pool. R347: on Showdown a PO arm does not need it. He "
+                         "is kept as `declared_opener` -- rosterable, never a "
+                         "declared starter -- and the brief names him under "
+                         "pool.openers_kept.")
     ap.add_argument("--ignore-pool-blockers", action="store_true",
                     help="build despite a HARD pool blocker. The override is "
                          "printed and recorded in the brief. Reach for this only "

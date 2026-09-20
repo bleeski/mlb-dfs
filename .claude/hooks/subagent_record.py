@@ -81,6 +81,28 @@ def findings_count(message: str) -> int | None:
     return int(hits[-1]) if hits else None
 
 
+def _message_text(message: dict) -> str:
+    """The text of one assistant message, whichever shape it arrives in.
+
+    `content` is a plain string in some transcript writers and a list of typed
+    blocks in others. Anything that is not a text block is skipped rather than
+    stringified, so a tool-use block carrying the word FINDINGS in an argument
+    cannot be read as the agent's own count.
+    """
+    content = (message or {}).get("content")
+    if isinstance(content, str):
+        return content
+    if not isinstance(content, list):
+        return ""
+    parts = []
+    for block in content:
+        if isinstance(block, dict) and block.get("type") == "text":
+            text = block.get("text")
+            if isinstance(text, str):
+                parts.append(text)
+    return "\n".join(parts)
+
+
 def transcript_facts(path: str, agent_type: str = "") -> dict:
     """Model and duration, read from the subagent's transcript.
 
@@ -88,7 +110,8 @@ def transcript_facts(path: str, agent_type: str = "") -> dict:
     to get them. Every failure degrades to None with a stated reason rather than
     to a plausible number.
     """
-    out: dict = {"model": None, "duration_s": None, "duration_source": None}
+    out: dict = {"model": None, "duration_s": None, "duration_source": None,
+                 "last_agent_message": None}
     if not path:
         out["duration_source"] = "no transcript_path in payload"
         return out
@@ -100,6 +123,13 @@ def transcript_facts(path: str, agent_type: str = "") -> dict:
     stamps: list[str] = []
     side: list[str] = []
     model = None
+    # R378. The agent's final report, for the same reason the model and the
+    # duration are read here: it is not in the payload. Two buckets, on the
+    # SAME sidechain test the duration uses, so "which entries are the agent's"
+    # is answered once. `last_side_message` wins when the file carries the
+    # agent's own turns beside the parent's.
+    last_message = None
+    last_side_message = None
     for line in lines:
         try:
             entry = json.loads(line)
@@ -112,11 +142,19 @@ def transcript_facts(path: str, agent_type: str = "") -> dict:
             stamps.append(stamp)
             if entry.get("isSidechain") is True:
                 side.append(stamp)
-        if model is None and entry.get("type") == "assistant":
-            got = (entry.get("message") or {}).get("model")
-            if isinstance(got, str):
+        if entry.get("type") == "assistant":
+            message = entry.get("message") or {}
+            got = message.get("model")
+            if model is None and isinstance(got, str):
                 model = got
+            text = _message_text(message)
+            if text:
+                last_message = text
+                if entry.get("isSidechain") is True:
+                    last_side_message = text
     out["model"] = model
+    out["last_agent_message"] = (last_side_message if last_side_message
+                                 else (last_message if agent_type else None))
     # Which entries belong to the AGENT, which is not the same question as which
     # entries are in the file. Measured live on 2026-09-19, the first time this
     # hook fired for real: the event arrived with an empty `agent_type` and a
@@ -172,6 +210,12 @@ def main() -> int:
                                  agent_type)
         session = str(payload.get("session_id") or "nosession")
         session = "".join(c if (c.isalnum() or c in "-_") else "_" for c in session)
+        findings = findings_count(payload.get("last_assistant_message"))
+        findings_source = "payload.last_assistant_message"
+        if findings is None:
+            findings = findings_count(facts["last_agent_message"])
+            findings_source = ("transcript last agent message" if findings is not None
+                               else "no FINDINGS line in the payload or the transcript")
         record = {
             "schema_version": SCHEMA_VERSION,
             "recorded_utc": now.isoformat(),
@@ -179,7 +223,17 @@ def main() -> int:
             "agent_id": payload.get("agent_id"),
             "session_id": payload.get("session_id"),
             "stop_reason": payload.get("stop_reason"),
-            "findings": findings_count(payload.get("last_assistant_message")),
+            # R378. The payload's `last_assistant_message` is the documented
+            # source and is what this read FIRST; the transcript is the
+            # fallback, because on this harness the key is not delivered.
+            # Measured on the first three real `dfs-premise` runs, 2026-09-20:
+            # all three ended with a `FINDINGS: n` line (2, 4, 4) and all three
+            # recorded `findings: null`, alongside a `stop_reason: null` from
+            # the same absent-key cause. A hook whose whole subject is "what did
+            # the agent find" recording null on every run is the R369 shape --
+            # a record that exists and answers nothing.
+            "findings": findings,
+            "findings_source": findings_source,
             "model": facts["model"],
             "duration_s": facts["duration_s"],
             "duration_source": facts["duration_source"],

@@ -853,7 +853,13 @@ EXPECTED_SUITE_COUNTS = {
     # +1 again: the same live firing showed the event arrives with NO agent_type
     # at all in an ordinary DEV session, so it now writes nothing rather than a
     # contentless row into a tracked directory on every session.
-    "tests.test_core": 1394,
+    # R378, 2026-09-20: 1394 -> 1396, the two that pin the findings
+    # fallback -- the transcript's last SIDECHAIN assistant message answers when
+    # the payload omits `last_assistant_message` (measured null on all three of
+    # this hook's first real runs), the payload still wins when delivered, a
+    # tool_use block is not the agent's text, neither source guesses, and a
+    # PARENT transcript cannot donate its count to an unnamed agent.
+    "tests.test_core": 1396,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps
@@ -1074,7 +1080,36 @@ EXPECTED_SUITE_COUNTS = {
     # named as an alphabetical tiebreak with no market, mirroring a real
     # basis when one exists, still a tiebreak when a market prices the
     # game exactly even, and carried into the brief beside the label.
-    "tests.test_showdown": 228,
+    # R347, 2026-09-20: 228 -> 235, the seven that pin the DK-declared opener
+    # staying in the Showdown pool -- `declared_opener` on a decided and on an
+    # undecided side, never counted as a declared starter, `openers_kept` on the
+    # participation report and empty when the man was shelved or absent, and the
+    # thesis ladder refusing to promote him into `starters` (which `pitchers_duel`
+    # hard-locks) on an opener-only side and on a side that also has a real SP.
+    # R334(a), 2026-09-20: 235 -> 245, the ten that pin the F1 implied-team-total
+    # factor reaching a Showdown hitter -- the team factor and the neutral arms,
+    # the favored side scored above the underdog, a total with NO moneyline
+    # reading neutral on a two-team slate (correct, not a wiring failure), the
+    # clip bounding the transmissible side ratio at 1.353x, the seam applying it
+    # on BOTH build paths, a supplied Base still untouched by it (R249's order,
+    # executable rather than a source-layout property), the no-packet no-op, the
+    # prior_note reading the frame instead of asserting a chain, and the wiring
+    # itself read off the source.
+    # R334(c)+(d), 2026-09-20: 245 -> 257, the twelve that pin the two Showdown
+    # reports -- (c) firing on the measured 2210_1g_sd arm gap and staying
+    # silent inside the margin, present with a reason when it cannot run, an
+    # unjoinable arm NAMED rather than scored on one side (R189(2)), and the
+    # pool untouched; (d) silent on a prior that agrees, naming an inverted bat
+    # with both ranks, WITHIN a side rather than across the game, the rank gap
+    # exercised at two settings, the no-projections no-op, an unjoinable hitter
+    # named not ranked, no supplied number changed, and both blocks on the brief.
+    # R328, 2026-09-20: 257 -> 264, the seven that pin the ordering between the
+    # two Showdown ownership markets -- the production pair coherent on all six
+    # archetypes, a captain marginal above its roster marginal NAMED, the
+    # inputs untouched (reported, never clamped), the 2dp rounding tolerance,
+    # out-of-range and missing ids reported separately, R338's water-fill half
+    # re-pinned so the row cannot reopen against it, and the emit block.
+    "tests.test_showdown": 264,
     # R96, 2026-08-11: 141 -> 162, the twenty-one tests that pin the delivery
     # path. A `grew` verdict is the one case where moving a pin is correct.
     # R46 round 2, 2026-08-12: 162 -> 168, the six that pin the PARTIAL side.

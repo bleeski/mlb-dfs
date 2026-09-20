@@ -25,6 +25,392 @@ performance claim.
 
 ---
 
+## 2026-09-20 — R378: the agent-run record stops writing `findings: null` on every run, and the consumed 2026-09-17 fragment is retired
+
+*(Filed as R378, not R374: R374 is CC-A9's candidate-bank measurement, and R375-R377 are allocated too. `grep -oE '\bR[0-9]{2,3}\b' docs/backlog.md CHANGELOG.md | sort -n | tail` is how the next free number is read, and the first cut of this entry took R374 without running it.)*
+
+**Scope.** `.claude/hooks/subagent_record.py` (`_message_text` new;
+`transcript_facts` returns `last_agent_message`; `main` gains the fallback and a
+`findings_source`), `tests/test_core.py` (two tests in
+`RepoAgentsAndHookEventsTests`), `tools/audit.py` (`EXPECTED_SUITE_COUNTS`),
+`docs/backlog.md` (an R373 rider), `docs/backlog_inbox/` (one fragment
+retired).
+
+**Found by using the thing, on the day after it shipped.** R372 records what a
+repo agent run cost and found, parsing `FINDINGS: n` out of the payload's
+`last_assistant_message`. This session ran three `dfs-premise` agents; all three
+ended with that line (2, 4 and 4), and all three rows read `findings: null`,
+beside a `stop_reason: null` from the same cause: this harness does not deliver
+that key. A record whose entire subject is what the agent found, answering null
+on every run, is the R369 shape -- a record that exists and answers nothing --
+and it was 3 for 3 on its first real outing.
+
+**The fix reuses R372's own sidechain test rather than adding a second answer to
+"whose entries are these".** `transcript_facts` already decides that question to
+get the duration right, after the parent-span bug R372 shipped with. The last
+SIDECHAIN assistant message is the agent's report; on a transcript with no
+sidechain entries the full file is trusted only when the payload NAMED an agent,
+which is the same rule, with the same refusal when it cannot be answered -- a
+parent transcript cannot donate its count to an unnamed agent, and a test pins
+that.
+
+**Three things the fallback deliberately does not do.** It does not override a
+payload that IS delivered, so the documented source stays first and this stays a
+fallback. It does not read a non-text content block, so a `tool_use` whose
+arguments contain the word cannot be mistaken for the agent's own count. And it
+does not guess: when neither source carries the line, `findings` is null and
+`findings_source` says "no FINDINGS line in the payload or the transcript",
+which is a different fact from "the key was missing" and is now distinguishable
+in the record.
+
+**The 2026-09-17 fragment is retired, not built.** `docs/backlog_inbox/
+2026-09-17_BUILD_showdown-even-split-favorite-tiebreak.md` had sat unmerged
+since it was filed and CC-3 is the Showdown row, so it was checked first. It was
+already CONSUMED: merged as R373 on 2026-09-19, with the reporting half shipped
+in the same commit (`favorite_basis: alphabetical_tiebreak_no_market_input`,
+`showdown_theses.py:362-363`, four tests at `test_showdown.py:1313-1376`). The
+merging session did not retire the file, which is how it read as open work.
+`git rm --cached` plus `mv` into `_to_delete/`, per `.claude/rules/board.md`.
+
+**Its premise check produced three corrections to R373's OPEN allocation half,
+filed as a rider so the session that takes it does not start from the wrong
+shape.** The function is `describe_slate`, not `build_game_shape` -- zero `.py`
+hits for that name anywhere. The asymmetry is n-DEPENDENT rather than standing:
+measured off `build_thesis_ladder` on a synthetic even split, n=6 gives 3/3/0,
+n=12 gives 5/5/2 and n=20 gives 8/8/4, while only n=16 (7/6/3) and n=18 (8/7/3)
+tilt -- so the filed 16-entry measurement is exact and the title's general claim
+is not, and the 2026-09-19 `2138_1g_sd` build at 6 entries carried no tilt at
+all. And the cause is one link below where the entry puts it: both sides get
+identical weights and on an even split the two `win_close` specs are pairwise
+identical at 0.098934, so the extra entry is decided by `_largest_remainder`'s
+INDEX tiebreak (`showdown_theses.py:1059`), which the alphabetical favorite wins
+only because `_template_specs` iterates `((fav, dog), (dog, fav))` and its specs
+therefore hold indices 0-4. A fix must touch that tiebreak or the spec ordering,
+never the weights.
+
+**Mutation-checked, four reverts.** Dropping the fallback, reading non-text
+blocks, letting a parent message answer for an unnamed agent, and letting the
+fallback override a delivered payload each fail exactly the test that names
+them.
+
+---
+
+## 2026-09-20 — R328: the last half, the ordering between the two Showdown ownership markets; the other two halves shipped in R338 and the row was stale against its own entry
+
+**Scope.** `mlb_engine/field/ownership_prior.py`
+(`ROLE_COHERENCE_TOLERANCE_PCT`, `showdown_role_coherence`, both new),
+`tools/ownership_pred.py` (a `role_coherence` block per archetype on a Showdown
+emit), `tests/test_showdown.py` (`R328ShowdownRoleCoherenceTests`, new, 7),
+`tools/audit.py` (`EXPECTED_SUITE_COUNTS`), `docs/backlog.md`.
+
+**Two of the row's three sub-claims were FALSE at HEAD, and the entry already
+said so.** The roadmap row asked to "project onto the capped simplex, enforce
+`0 <= captain_p <= roster_p <= 1`, reject NaN/inf". `_bounded_marginals` has
+water-filled both markets onto the capped simplex since R338 (2026-09-11), at
+`predict_ownership` and at `_showdown_prediction` alike, and
+`attach_predicted_ownership` has refused non-finite, boolean and
+out-of-[0,100] values since the same commit. The `[8.01, 16.70, 34.84, 72.67,
+151.59, 316.19]%` the item was filed on was produced by `own = share *
+budget_pct` at `00ffc94:709-710`, and that arithmetic no longer exists. The
+row's file citation (`ownership_prior.py:676-727`) was exact when filed and has
+drifted 26 lines; at HEAD that window is `_single_pool_shares`' tail plus
+`_showdown_prediction`'s header, and the bounded call is at `:736`.
+
+**What was actually left.** `0 <= captain_p <= roster_p <= 1` was enforced only
+by `Projection.role_marginals` in `mlb_engine/production/contracts.py` -- a
+pydantic schema inside R302's strangler package, which the legacy path cannot
+import and which `test_no_legacy_module_imports_the_production_package_or_pydantic`
+pins out of it on every gate. `showdown_role_coherence` is that check on the
+path the build uses, called from `tools/ownership_pred.py`, which is the one
+place both markets are produced together.
+
+**It reports and never clamps, and the reason is arithmetic rather than
+caution.** Pulling a captain value down to its roster value breaks the 100%
+captain budget -- R306's own accounting, and the exact property the water-fill
+exists to preserve -- and redistributing the remainder re-runs an allocation
+whose inputs are already known to be wrong. A breach means the two temperatures
+produced a person more likely to be CAPTAINED than ROSTERED, which is impossible
+by construction rather than merely undesirable. That is a bug report with the
+numbers attached, not a number to round off at T-10. The comparison carries a
+0.01pp tolerance because `_bounded_marginals` rounds to 2dp, with an epsilon on
+top because `100.0 - 99.99` is `0.0100000000000051` in binary floating point and
+a bare `> 0.01` calls an equal pair a violation.
+
+**The defect is UNREPRODUCED and this entry says so rather than implying a fix.**
+4,000 randomized pools (6-45 people, random salaries, position mixes, probable
+sets, batting orders, implied totals and Base maps, all six archetypes) plus a
+structured grid over pool size, salary shape and arm count give a maximum
+captain-minus-roster excess of exactly 0.0. The reason is structural: the
+captain temperature runs below the roster temperature (0.1733 against 0.2267 on
+`large_field_gpp`), so a breach needs a captain share more than six times the
+roster share, and where the roster share would saturate the water-fill pins it
+at 100. Nothing on the legacy path consumes the captain market at all today --
+`--leverage` is refused outright on Showdown (`leverage_not_supported_on_showdown`)
+and R307's sleeve is not built. So this is a guard against drift in either
+temperature table, and it unblocks CC-5 rather than repairing an observed
+number.
+
+**One residual, named and not closed.** `optimizer_v3._ownership_pct_for_row`
+reads `Projected_Ownership_Pct` through `_safe_float(val, 0.0)` with no range
+check, so a direct `run_slate(projection_rows=...)` caller could hand in an
+out-of-range column and bypass `attach_predicted_ownership`. No operator flag
+reaches it -- `--projections` is Showdown-only and `Player_ID,Base` only -- and
+both in-tree writers of that column are bounded. Filed on the remaining entry
+rather than widened into here.
+
+**Mutation-checked, four reverts.** Flipping the comparison fails 3 of 7;
+dropping the out-of-range check fails 1; disabling the water-fill's capping
+fails 2 here and `test_ownership_is_a_bounded_inclusion_marginal` in the
+greenfield suite; dropping the emit block fails 1. A fifth mutation
+(`remaining = min(budget, 100 * len(shares))` to `remaining = budget`) was
+tried and caught NOTHING, because the `min` only bites when the budget exceeds
+100 per player -- a thinner pool than any test here builds, and worth knowing
+rather than mistaking for coverage.
+
+---
+
+## 2026-09-20 — R334(c)(d): the Showdown brief says when the two declared arms are mismatched, and when a supplied Base contradicts the rate stats
+
+**Scope.** `mlb_engine/optimize/showdown.py` (`OPPOSING_ARM_XWOBA_MARGIN`,
+`SUPPLIED_BASE_RANK_GAP`, `_savant_name_index`, `_dk_name_key`,
+`opposing_arm_report`, `supplied_base_sanity_report`, all new),
+`skills/generate-lineups/scripts/build_slate.py` (`load_savant_table`, new;
+`run_showdown` resolves the reference data and computes both reports; two brief
+keys under `pool`), `tests/test_showdown.py`
+(`R334cOpposingArmReportTests` 5, `R334dSuppliedBaseSanityTests` 7),
+`tools/audit.py` (`EXPECTED_SUITE_COUNTS`), `docs/backlog.md`.
+
+**(c) names the condition under which the remaining blindness is largest.**
+R334(a) wired the market's implied team total, which carries the opposing arm at
+the TEAM level and only as far as `F1_HITTER_CLIP` allows. The arm's own quality
+is (b) and is not built. So the Showdown Base is still a season mean over every
+opponent a hitter faced, in a contest that is one game with one arm per side,
+and `opposing_arm_report` says so on the builds where it matters most -- before
+the first solve, which is the point. R310(b)'s shape exactly: present on every
+Showdown brief with `flagged: false`, never a gate, never a pool change.
+
+**The margin was chosen by measurement, not by taste, because R292 is what
+happens otherwise.** Over the 124 arms in `expected_stats_pitching.csv` with
+400+ PA, all 7,626 pairs, league mean xwOBA-against 0.3302:
+
+    margin 0.08  gap > 0.0264   fires on 50.8% of random SP pairs
+    margin 0.10  gap > 0.0330   fires on 40.3%
+    margin 0.12  gap > 0.0396   fires on 32.6%
+    margin 0.15  gap > 0.0495   fires on 21.9%
+    margin 0.20  gap > 0.0660   fires on 10.6%
+
+0.20 ships: about one slate in ten, which is a caution worth reading. The pair
+this item was measured from is 0.267 against 0.384, a gap of 0.117 and 35.4% of
+the mean, so it fires at every margin on that table and is not what calibrated
+it.
+
+**(d) is the SEMANTIC boundary beside R327's numeric one.** R327 refuses a
+supplied frame carrying a non-finite, negative or duplicated number.
+`supplied_base_sanity_report` refuses nothing: it ranks each side's supplied
+Bases against the same side's Savant `est_woba` and names a hitter whose two
+ranks contradict by more than the gap. A supplied number is the operator's, and
+R249's contract is that it IS the prior; the engine's job here is to say what it
+disagrees with.
+
+**WITHIN a side, and that is the whole design decision.** Ranking across the
+game would re-measure the thing a supplied Base is usually supplied to express
+-- that one side faces a much better arm, which is R334's own subject -- and
+would flag every prior that got the matchup right. Holding the opposing arm
+fixed makes a disagreement about the HITTER. The mutation that ranks across both
+sides fails two tests.
+
+**The rank gap carries its own noise floor, in the report.** Over 20,000 random
+permutations of a 9-hitter side, which is what this would name if the two
+orderings were independent: `> 2` names 4.67 of 9, `> 3` 3.31, `> 4` 2.22,
+`> 5` 1.34 with 20.7% of sides silent. 5 ships, the most conservative measured,
+and the report's `label` states the 1.34 so one or two names is not read as a
+finding. A real Base correlates with a rate stat, so that floor is an upper
+bound rather than an expectation.
+
+**Both joins are by NAME and a miss is NAMED.** DK ships no MLBAM id (R189(2)),
+so this is the same join `compute_f4_factors` makes, through the same
+`_savant_name_key`, and `_savant_name_index` keeps `_build_name_to_mlbam`'s rule
+that a colliding name establishes nothing and is dropped rather than resolved by
+a PA ranking. These functions REPORT; a report that names the wrong man is worse
+than one that stays quiet. An arm with no joinable row appears in
+`unmatched_arms` and the comparison is skipped rather than made against one
+side; a hitter with no row appears in `unmatched_hitters` and is not ranked.
+
+**The Showdown path read no Savant file at all before this.** `run_showdown` now
+calls `resolve_reference_data`, the same resolver `run_classic` has used since
+F4, through a `load_savant_table` helper that returns None rather than raising:
+a missing or unreadable reference file makes the block say which and the build
+carries on, which is `resolve_reference_data`'s own stated contract (degraded
+signal beats no lineups at T-10).
+
+**Mutation-checked, four reverts.** Margin to 0.0 fails the silent-pair test;
+dropping the unmatched-arm naming fails the R189(2) test; ranking across both
+sides instead of within one fails two (d) tests; the gap constant 5 to 1 fails
+the threshold test -- and that last one did NOT fail on the first version of
+that test, which used an adjacent swap whose delta of 1 is below both settings.
+The test was rewritten to a 3-place move and to exercise the report at two gap
+values, because a threshold nothing moves against is a constant no test pins.
+
+---
+
+## 2026-09-20 — R334(a): the F1 implied-team-total factor reaches a Showdown hitter's prior, and the brief says whether it did
+
+**Scope.** `mlb_engine/optimize/showdown_theses.py` (`apply_f1_prior`, new;
+`portfolio_report`'s `prior_note`),
+`skills/generate-lineups/scripts/build_slate.py` (`build_showdown_f1`, new;
+`showdown_moneyline` now a 3-tuple; `price_showdown_pool`'s signature and seam;
+the `run_showdown` call site; the brief's `f1` block), `tests/test_showdown.py`
+(`R334aShowdownF1PriorTests`, new, 10), `tools/audit.py`
+(`EXPECTED_SUITE_COUNTS`), `docs/backlog.md`.
+
+**What was missing, stated by name rather than by line.** `build_f1_factors`
+has exactly one production caller, `build_f1_map`, and `build_f1_map` is called
+once, at `build_slate.py:2391`, inside `run_classic`. `_assemble_projection_frame`
+is Classic's door and has no Showdown reference. So Classic reached the whole
+F1-F5 enrichment stack and Showdown reached AvgPointsPerGame plus a salary
+regression, a batting-order PA factor and a platoon factor. Nothing on the
+Showdown path carried the market's view of the run environment to a hitter's
+number. The board's citation for this (`build_slate.py:4697-4700`) had rotted to
+`gate_failure_detail`; the R249 text it was pointing at is at `:5029-5033` and
+the mechanism it described is intact.
+
+**The seam turned out to be one return value wide.** `showdown_moneyline`
+already called `load_odds_packet` -- the same full-packet loader Classic uses,
+carrying each game's `total` beside its `moneyline` -- and discarded the total
+three lines later, keeping only `{team: american odds}` for the thesis ladder's
+side mix. It now returns the packet as well, and `build_showdown_f1` spends it
+on the other half. No second load, no new feed, no new flag.
+
+**Where it is applied, and why not where it looks like it belongs.**
+`apply_f1_prior` runs in `price_showdown_pool`, OUTSIDE `apply_base_prior`.
+`apply_base_prior` runs on the ladder path alone, and R249 already paid for that
+lesson once: wiring only the ladder made `--projections` a silent no-op on
+exactly the `all_healthy` slates where the pool is thinnest. F1 runs after the
+prior, before `apply_supplied_base`, on both paths. A supplied number is still
+the prior the solver ranks on, untouched -- pinned on both paths, and the
+mutation that supplies the number first fails only that test, which is the point
+of R249's one-function ordering.
+
+**Two bounds on the result, pinned in tests so no re-measurement reads them as
+signal.** On a two-team slate both sides play in the same park, so F1's
+de-parking divides both implied totals by the same number and cancels exactly;
+F1 collapses to the moneyline devig, doubled and clipped, and no park map would
+change a digit. And `F1_HITTER_CLIP` is (0.85, 1.15), so the widest side ratio
+this can transmit is 1.353x against the 1.77x measured on 2210_1g_sd. (a)
+therefore closes at most about three quarters of the measured gap by
+arithmetic, before any question of whether the external source was right, and
+the residual (b) is sized on inherits that.
+
+**The done-when in the entry was wrong and is corrected.** It asked for
+`non_neutral_f1 > 0` on "a build with an odds packet". A packet carrying a TOTAL
+but no MONEYLINE splits evenly on a two-team slate, so every F1 lands on the
+slate mean and clips to exactly 1.0: `non_neutral_f1` is 0 with the odds present
+and the read is correct. The brief carries two blocks for this reason --
+`f1.packet` is what the feed priced, `f1.prior` is what reached a Base -- and
+the acceptance needs a moneyline, not merely odds.
+
+**The `prior_note` was a hardcoded literal describing a factor chain, which is
+the R122 class `apply_base_prior`'s own docstring already cites.** It now reads
+the F1 report off the frame and names the factor only when it was applied,
+saying "no F1: this build carried no moneyline" when it was not.
+
+**Deferred, with its reason: the 1.77x re-measurement.** The entry asks for the
+side split re-measured against the same external source with F1 live. That needs
+an odds packet for 2026-09-08 and a Showdown salary file from that date. This
+session ran in a cloud container with no egress (every source read unreachable
+at session start), and the prototype artifacts the entry names
+(`data/slates/2026-09-08/projections_2210_1g_sd.csv`,
+`outputs/2026-09-08/make_base_2210_1g_sd.py`) are on gitignored paths, absent
+from disk and absent from git history -- a filesystem-wide `find` returns
+nothing and the archive stops at 2026-08-27. So the measurement is not deferred
+for convenience: its inputs no longer exist in this tree. No packet was
+fabricated. The wiring is what landed, and the frozen-fixture half of the
+done-when is rewritten onto the remaining entry.
+
+**Mutation-checked, four reverts.** Dropping `apply_f1_prior` from the seam
+fails 4 of 10; moving it AFTER `apply_supplied_base` fails exactly the
+supplied-Base order test; dropping `pitcher_ids` so the arms stop being pinned
+neutral fails the arms test; reverting `prior_note` to the literal fails the
+note test.
+
+---
+
+## 2026-09-20 — R347: a DK-declared opener stays in the Showdown pool, where the module had been claiming he already was
+
+**Scope.** `mlb_engine/optimize/showdown.py` (`_is_declared`'s comment, the
+module docstring's participation bullet, `_participation`, the
+`participation_report`), `mlb_engine/optimize/showdown_theses.py`
+(`describe_slate`'s `starters` read, `bullpen_game`'s `why`),
+`skills/generate-lineups/scripts/build_slate.py` (the `--declare-pitcher` help,
+the `declared_pitchers` comment block, `pool.openers_kept` on the Showdown
+brief), `tests/test_showdown.py`
+(`R347DeclaredOpenerStaysInThePoolTests`, new, 7), `tools/audit.py`
+(`EXPECTED_SUITE_COUNTS`), `docs/backlog.md`.
+
+**The defect was three lines apart from its own denial.** R104 correctly stopped
+reading DK's `PO` token as a declared start: one or two innings by design is not
+a start, and on Classic an opener in a P slot priced on a starter's workload is
+a certified build with a hole in it. The comment R104 left above `_is_declared`
+said the Showdown case was different -- "He is still rosterable in Showdown,
+where every slot is a UTIL slot and no slot is priced on a starter's workload;
+he simply is not declared." Nothing made that true. `_is_declared` returned
+False, `_participation` fell through to `confirmed_nonstarter` on a decided
+side, `starters_only` dropped the row, and `Is_Declared_Opener` was written one
+line later and read by nothing. `grep -rn Is_Declared_Opener` returned the
+write, one docstring mention, and two test lines pinning the token set in sync
+with `live_data_adapters` -- no reader anywhere.
+
+**Measured, 1940_1g_sd (PIT@CWS, 2026-09-10).** Hagen Smith, `Starting=PO`,
+$4,000 UTIL / $6,000 CPT, named the White Sox starting pitcher on mlb.com,
+absent from a 20-man pool. The brief read `pool.players: 20`,
+`declared_starters: 2`, no blocker and no warning; only the delivery note said
+the arm was gone. CLAUDE.md forbids reducing the legal player set because the
+reduction is invisible in the certified output, and this one was invisible in
+the brief as well.
+
+**`declared_opener` is a third participation value, deliberately not
+`confirmed_starter`.** Promoting him would have put the R104 role back where
+R104 took it from. What the new value buys is the `starters_only` filter, which
+drops `confirmed_nonstarter` and nothing else. It is returned on BOTH bases: on
+an undecided side he used to read `unknown` with `Projected_Candidate=True`,
+which claimed the pool was projecting a man DK had named. `Is_Declared_Starter`
+is unchanged and still False for him, so the brief's `declared_starters` count
+stays honest, and `pool.openers_kept` beside it names him -- read from the final
+rows, so an opener who left on the health filter is not claimed as kept.
+
+**The thesis ladder is guarded in the same commit, because keeping him in the
+pool would otherwise have hard-locked him.** `describe_slate` reads a side's
+starter as its highest-Base row with no batting order, and once the melt stopped
+dropping openers that set grew by one. `starters` feeds `both_sp`, and R156 made
+`pitchers_duel` HARD-LOCK both arms through every rung of `solve_ladder`'s
+relaxation -- so a one-or-two-inning arm would have been forced onto a roster
+whose whole thesis is two men going deep, and on an opener-only side the
+`bullpen_game` template would have gone dark on a slate that is a bullpen game.
+`describe_slate` now excludes `Is_Declared_Opener` rows from `starters` only. He
+stays fully rosterable; he is simply not the starter, and a side whose only arm
+is an opener still reads as the bullpen game it is. Whether the ladder may
+CAPTAIN an opener is a strategy question and is not decided here.
+
+**The R233 class, and the half of it this does not close.** Two sites asserted
+the opposite of the behavior and are corrected with the fix rather than after
+it: the `_is_declared` comment, and `--declare-pitcher`'s help, which ended "so
+--declare-pitcher cannot put a PO arm in a Showdown pool" and left the operator
+with no move but the salary file's `Excluded` column -- the legal-pool reduction
+the hard guardrails forbid. That sentence is still true and now says why it no
+longer matters: a PO arm still cannot be DECLARED into a Showdown pool, because
+he is not a declared starter, and he no longer needs to be. R304's named
+remainder ("wiring it into the Showdown melt so a PO arm can be declared in") is
+closed from the other side and is not the same fix; the `declared_pitchers`
+comment block says so.
+
+**Mutation-checked, three reverts.** Dropping the `_participation` branch fails
+4 of 7; flattening `openers_kept` to `[]` fails 1; dropping the `describe_slate`
+guard fails 1. `bullpen_game`'s `why` also stopped claiming "its arms are
+unrosterable", which was true only on a decided side and is the sentence the
+opener now contradicts.
+
+---
+
 ## 2026-09-19 — R344, R372: the adversarial QA pass gets a standing brief, and four hook events stop the standing rules depending on a session remembering them
 
 **Scope.** New `skills/generate-lineups/references/adversarial_qa_brief.md`, new

@@ -489,6 +489,16 @@ def build_prediction(
                     },
                     "note": sd["note"],
                 }
+            # R328, remaining half. The one place both Showdown markets are
+            # produced together, so the one place the ordering between them can
+            # be checked. `0 <= captain_pct <= roster_pct <= 100` is impossible
+            # to breach by construction and was enforced nowhere on this path --
+            # only in `mlb_engine/production/contracts.py`, which R302 keeps off
+            # the build path. Reported and never clamped: a clamp would break
+            # the 100% captain budget, which is R306's accounting.
+            block["role_coherence"] = ownership_prior.showdown_role_coherence(
+                block["captain"]["own_pct_by_player_id"],
+                block["showdown_roster"]["own_pct_by_player_id"])
         per_archetype[archetype] = block
 
     return {
