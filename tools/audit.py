@@ -1120,7 +1120,22 @@ EXPECTED_SUITE_COUNTS = {
     # inside R250's own class closing its `locks: []` blind spot, four on the
     # reservation bounded by BOTH caps and released against the requesting slot,
     # and five on the degraded proxy restated off the unweighted Base.
-    "tests.test_showdown": 287,
+    # R381, 2026-09-21: 287 -> 306, the nineteen that pin the captain leverage
+    # sleeve (CC-5, R307 batch 1) -- eight on resolution (either role's DK id, a
+    # Name|Team key and a bare name; the refusals for an unresolvable person, a
+    # name two teams carry, an unknown key and the four malformed values; the
+    # selector form refused AS A SELECTOR rather than as a missing ballplayer,
+    # which is the one a bare assertRaises passes for the wrong reason), four on
+    # apportionment (only the designated slots move, the sleeve rotates within
+    # itself although the cap permits stacking, a capped designation gives way
+    # to the cap and is counted, and the designation lands in `thesis["cpt"]` so
+    # it mints an R250 captain reservation), four on the delivered report
+    # (membership read off the DELIVERED captain, the three populations reported
+    # apart, an unsolved designated slot in neither, and no sleeve as a null
+    # block rather than a missing key), and three on the wiring (the JSON-object
+    # door, a refusal before anything is staged, and one delivered build whose
+    # brief splits the sleeve from the honest remainder).
+    "tests.test_showdown": 306,
     # R96, 2026-08-11: 141 -> 162, the twenty-one tests that pin the delivery
     # path. A `grew` verdict is the one case where moving a pin is correct.
     # R46 round 2, 2026-08-12: 162 -> 168, the six that pin the PARTIAL side.

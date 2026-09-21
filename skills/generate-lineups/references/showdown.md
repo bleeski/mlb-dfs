@@ -46,6 +46,38 @@ clean when the relaxation counts are zero.** Override all three through
 `--controls-override`, which reads them from one dict. CLAUDE.md's `## Showdown`
 section is the authority for all of this.
 
+## The captain leverage sleeve (R381)
+
+`--captain-sleeve '{"entries": 4, "from": ["12345", "Name|TEAM"]}'` designates
+the first 4 blank reserved rows to take their captain from that list. The
+remaining entries build with no tilt at all. Ben's ruling, 2026-09-03: "we dont
+need to artificially zero out players, but we should figure out how we can find
+leverage in the captain ranks and devote a few lineups to those picks."
+
+- **A person, not a row.** A Showdown person owns two DK ids, one per role, and
+  either resolves him. A `Name|Team` key works, and a bare name works when the
+  pool carries it once. An unresolvable or ambiguous name REFUSES (exit 4,
+  nothing staged): a sleeve is an operator instruction, so it does not shrink
+  from four designated entries to three in silence.
+- **The caps win.** All four captain-slot controls still bind, the per-contest
+  cap included. A designated captain at a cap is not taken; the slot falls back
+  to its own template and the miss is counted in `captain_sleeve.unfilled`.
+  Do NOT reach for `max_cpt_exposure_pct` as a leverage control: R307 measured
+  it and tightening it raised mean captain ownership. It is a diversity control.
+- **Read the brief's `captain_sleeve` block, not the portfolio captain table.**
+  It splits `honoured` / `lost` / `honest` on the DELIVERED captain, because the
+  relaxation ladder can substitute a designated captain. A mean quoted across
+  those three describes none of them.
+- **Ladder path only.** With no posted batting orders the build falls to the
+  points-max bank, which names no captain per entry; the brief then says
+  `applied: false` with the reason and the caution repeats it.
+- **No ownership anywhere in this.** The `{"from": ["prior_own_below", 25.0]}`
+  selector is refused by name: it needs a captain-ownership prior this build
+  path does not read. The sleeve is a DESIGNATION, counted and reported. Nothing
+  about it is a lift, an edge, an ROI or a win rate, and the archive evidence
+  behind it is suggestive: the coldest captain quartile's top-1% CI is
+  [0.993, 1.547] and crosses 1.
+
 ## Status, stated plainly
 
 `mlb_engine/optimize/showdown.py` is `VERSION = "0.3-review"`, and

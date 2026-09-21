@@ -3708,6 +3708,23 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                               "error": str(exc)}, indent=1))
             return 4, {}
 
+    # R381 (CC-5, R307 batch 1). Resolved here, against the MELT and before any
+    # solve, for the same reason R291(c)'s exclusion block is read where it is:
+    # a designation the pool cannot carry should refuse with the name it could
+    # not find, not surface as a portfolio that quietly designated three entries
+    # when four were asked for. A sleeve is an operator instruction, so it
+    # refuses (F14's class) rather than being ignored and reported the way a
+    # thesis preference is.
+    captain_sleeve = None
+    try:
+        captain_sleeve = st.resolve_captain_sleeve(
+            df, getattr(args, "captain_sleeve", None), n_entries)
+    except st.CaptainSleeveError as exc:
+        print(json.dumps({"status": "captain_sleeve_invalid", "date": args.date,
+                          "captain_sleeve": getattr(args, "captain_sleeve", None),
+                          "error": str(exc)}, indent=1))
+        return 4, {}
+
     # R334(d). The SEMANTIC boundary beside R327's numeric one, and it lands
     # here because this is the first point where the supplied frame and the pool
     # are both in scope -- `read_supplied_base` takes a path and never sees a
@@ -3739,7 +3756,8 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
             ladder_meta = st.build_thesis_ladder(priced, n_entries, moneyline=moneyline,
                                                  max_cpt_exposure_pct=cpt_cap,
                                                  contest_of_entry=contest_of_entry,
-                                                 max_cpt_per_contest=cpt_per_contest)
+                                                 max_cpt_per_contest=cpt_per_contest,
+                                                 captain_sleeve=captain_sleeve)
             theses = ladder_meta["theses"]
             solved = st.solve_ladder(priced, theses, max_shared_players=share_cap,
                                      max_player_exposure_pct=player_cap_pct,
@@ -3753,7 +3771,9 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                                             if lu is None]})
             else:
                 bank = list(solved)
-                report = st.portfolio_report(priced, theses, solved)
+                report = st.portfolio_report(priced, theses, solved,
+                                             captain_sleeve=ladder_meta.get(
+                                                 "captain_sleeve"))
                 certs = [sd.certify_showdown(lineup, priced) for lineup in bank]
         else:
             # R249. Same seam through the same function, with no prior to
@@ -3980,6 +4000,9 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         captain_budget_reserved = dict(
             solve_diag.get("captain_budget_reserved") or {})
         captain_budget_util_blocks = solve_diag.get("captain_budget_util_blocks") or 0
+        # R381. The sleeve as DELIVERED, computed in portfolio_report off the
+        # realized captains. None when no sleeve was designated.
+        captain_sleeve_block = report.get("captain_sleeve")
     else:
         cap_count = cpt_diagnostics.get("cap_count")
         captain_counts = cpt_diagnostics.get("captain_exposure") or {}
@@ -4043,6 +4066,24 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         captain_budget_inversions = []
         captain_budget_reserved = {}
         captain_budget_util_blocks = 0
+        # R381. The sleeve designates LADDER slots and this path has no ladder:
+        # `build_showdown_bank` rotates a captain-exclusion list over a points-max
+        # bank and no entry is a named thesis, so there is nothing to designate.
+        # Stated as `applied: false` with the reason rather than dropped, on
+        # R54(c)'s reasoning -- an operator instruction that did not arrive is
+        # louder than a relaxation the solver chose, because the solver chose
+        # nothing here. It is NOT a refusal: this path is reached when batting
+        # orders are not posted, which is T-20 territory, and a blank reserved
+        # row is the maximum washout.
+        captain_sleeve_block = ({
+            "applied": False,
+            "designated_entries": int(captain_sleeve.get("entries") or 0),
+            "from": list(captain_sleeve.get("captain_names") or []),
+            "reason": ("the thesis ladder was not used on this build, so no "
+                       "entry has a named captain to designate; "
+                       "build_showdown_bank rotates a captain-exclusion list "
+                       "over a points-max bank instead"),
+        } if captain_sleeve else None)
         player_structural_floor = cpt_diagnostics.get("player_cap_structural_floor")
     # R239(c). Computed on BOTH paths: the points-max bank builds no thesis
     # report, but it does build lineups, and the contest each one is entered into
@@ -4337,6 +4378,12 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         # captain was stopped from spending the last of his own exposure budget at
         # 1.0x before those rungs solved. Reported so the reader can see the
         # allocation the ladder made on purpose.
+        # R381. Reported SEPARATELY from every portfolio-wide captain number
+        # above, which is R307's fix line in one key: a mean quoted over a
+        # designated sleeve and an honest remainder together describes neither.
+        # None when the operator designated no sleeve, so the key has one shape
+        # across every Showdown brief.
+        "captain_sleeve": captain_sleeve_block,
         "captain_budget": {
             "reserved": captain_budget_reserved,
             "util_blocked_slots": captain_budget_util_blocks,
@@ -4443,7 +4490,32 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                           "denominator, so a recent callup can top the pool off "
                           "one or two games. Check the prior before uploading; "
                           "`--projections` is the lever (R310).")
-                       if sd_small_sample["applied"] and not supplied_base else "")),
+                       if sd_small_sample["applied"] and not supplied_base else "")
+                    # R381. The sleeve's own caution, and it is the LOUD case:
+                    # an operator designated entries and the file does not carry
+                    # the designation. Same treatment as `ignored_locks` above
+                    # and for the same reason -- this is an instruction that did
+                    # not arrive, not a control the solver chose to relax.
+                    + ((" NOTE: --captain-sleeve designated "
+                        f"{captain_sleeve_block['designated_entries']} entr"
+                        f"{'y' if captain_sleeve_block['designated_entries'] == 1 else 'ies'}"
+                        " and NOTHING was designated: "
+                        f"{captain_sleeve_block['reason']}. Read the delivered "
+                        "captains before uploading.")
+                       if captain_sleeve_block
+                       and captain_sleeve_block.get("applied") is False else "")
+                    + ((f" NOTE: --captain-sleeve designated "
+                        f"{captain_sleeve_block['designated_entries']} entries; "
+                        f"{captain_sleeve_block['honoured_count']} carry a "
+                        f"designated captain and "
+                        f"{captain_sleeve_block['lost_count']} do not (a cap "
+                        "reassigned or a relaxation rung substituted them). "
+                        "The brief's captain_sleeve block splits the three "
+                        "populations; no portfolio-wide captain number above "
+                        "describes either one.")
+                       if captain_sleeve_block
+                       and captain_sleeve_block.get("applied") is not False
+                       and captain_sleeve_block.get("lost_count") else "")),
     }
     # R290(c) step 2. Same shape as the Classic delivered brief: the LABEL is
     # what a rung changes, never the gates.
@@ -4922,7 +4994,11 @@ def parse_assume_gates_arg(value: str | None) -> list[str]:
 # (TypeError, exit 1, AFTER the pool build). `autobuild.lift_controls_override`
 # already refuses non-objects; this is that rule reaching the tool it guards.
 _JSON_OBJECT_FLAGS = (("controls_override", "--controls-override"),
-                      ("leverage", "--leverage"))
+                      ("leverage", "--leverage"),
+                      # R381. Same door, same reason: every reader of this flag
+                      # subscripts it, so a `[1,2]` or a bare `4` would crash
+                      # past every handler rather than refuse with a brief.
+                      ("captain_sleeve", "--captain-sleeve"))
 
 
 def validate_cli_values(args) -> dict | None:
@@ -5112,6 +5188,29 @@ def main() -> int:
                          "one player may fill in ANY role. Each cap count is a "
                          "floor() of pct x entries, so realized exposure never "
                          "exceeds the pct. Pass null to disable a cap.")
+    # R381 (CC-5, R307 batch 1). Ben's design ruling, 2026-09-03: "we dont need
+    # to artificially zero out players, but we should figure out how we can find
+    # leverage in the captain ranks and devote a few lineups to those picks."
+    ap.add_argument("--captain-sleeve", dest="captain_sleeve", type=json.loads,
+                    default=None,
+                    help="Showdown ladder only: JSON designating the first N "
+                         "reserved rows to take their captain from a named "
+                         "list, e.g. '{\"entries\": 4, \"from\": "
+                         "[\"12345\", \"Name|TEAM\"]}'. A person is a DK "
+                         "player id in either role, a \"Name|Team\" key, or a "
+                         "name the pool carries once; an unresolvable or "
+                         "ambiguous name REFUSES rather than shrinking the "
+                         "sleeve in silence. The remaining entries build with "
+                         "no tilt at all: this designates entries, it does not "
+                         "move any prior. All three portfolio caps and the "
+                         "per-contest captain cap still bind, and a designated "
+                         "captain at a cap gives way to them. The brief reports "
+                         "the sleeve on REALIZED captains, split from the rest "
+                         "of the portfolio. Counted and reported, never a "
+                         "leverage, lift, edge, ROI or win-rate claim. The "
+                         "'{\"from\": [\"prior_own_below\", 25.0]}' "
+                         "selector form is refused: it needs a captain-"
+                         "ownership prior this build path does not read.")
     ap.add_argument("--bundle",
                     help="slate_bundle.json from tools/fetch_slate_bundle.py. "
                          "Supplies the per-venue forecast for F5. Park factors "
@@ -5379,6 +5478,24 @@ def main() -> int:
                      "builds its projection through the F1-F5 enrichment stack, "
                      "so a supplied Base has no defined place in it. Nothing "
                      "was staged and no run directory was created."),
+        }, indent=1))
+        return 4
+
+    # R381. The mirror of the two refusals above, on the other side. The sleeve
+    # designates ladder slots, and there is no ladder on the Classic path -- its
+    # captain-equivalent question does not exist, since a Classic roster has no
+    # captain. Accepting it there would be R242's silent no-op with an operator
+    # reading the delivered lineups as having honoured a designation.
+    if getattr(args, "captain_sleeve", None) and contest != "showdown":
+        print(json.dumps({
+            "status": "captain_sleeve_not_supported_on_classic",
+            "date": args.date,
+            "captain_sleeve": args.captain_sleeve,
+            "contest": contest,
+            "note": ("--captain-sleeve designates Showdown ladder entries by "
+                     "captain. A Classic roster has no captain slot, so nothing "
+                     "would apply it. Nothing was staged and no run directory "
+                     "was created."),
         }, indent=1))
         return 4
 

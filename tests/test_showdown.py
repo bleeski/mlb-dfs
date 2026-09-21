@@ -5636,5 +5636,436 @@ class R328ShowdownRoleCoherenceTests(unittest.TestCase):
                       'ownership_prior.showdown_role_coherence(', src)
 
 
+# --------------------------------------------------------------------------- #
+# R381 (CC-5, R307 batch 1): the captain leverage sleeve
+# --------------------------------------------------------------------------- #
+#: The four coldest bats in the MIN@CHC fixture by Base. No template's
+#: `cpt_ladder` reaches them and the wide fallback ranks them last, so a
+#: designated slot carrying one of them can only have come from the sleeve.
+#: That is what makes "only the designated slots moved" observable rather than
+#: a claim about code that happens to agree with the default apportionment.
+_COLD = ["Miguel Amaya|CHC", "Ryan Kreidler|MIN",
+         "Pedro Ramirez|CHC", "Luke Keaschall|MIN"]
+
+
+def _sleeve_frame():
+    return st.apply_base_prior(sd.melt_showdown_salary_csv(str(SAL)),
+                               pitcher_hand={"MIN": "R", "CHC": "R"})
+
+
+def _two_teams_one_name():
+    """A pool carrying one NAME on two teams. R295(d) refuses two people under
+    one name on ONE team at the melt, which leaves exactly this case reachable
+    here -- and a bare name is the form an operator types fastest."""
+    rows = [_p("Chris Taylor|AA", "AA", 9.0, 5000, 7500, "1001", "2001"),
+            _p("Chris Taylor|BB", "BB", 8.0, 5000, 7500, "1002", "2002")]
+    for i in range(6):
+        rows.append(_p(f"AA_{i}|AA", "AA", 7.0 - i * 0.1, 4000, 6000,
+                       f"11{i:02d}", f"21{i:02d}"))
+        rows.append(_p(f"BB_{i}|BB", "BB", 6.9 - i * 0.1, 4000, 6000,
+                       f"12{i:02d}", f"22{i:02d}"))
+    df = pd.DataFrame(rows)
+    df["Name"] = [k.split("|")[0] for k in df["Player_Key"]]
+    return df
+
+
+class R381CaptainSleeveResolutionTests(unittest.TestCase):
+    """R307's fix line asks for "an explicit id list". What an id IS on a
+    Showdown file is the first decision: DK gives every person TWO ids, one per
+    role, and the sleeve is about the PERSON who captains. Both resolve.
+
+    Everything here is a designation. Nothing is a lift, an edge, an ROI or a
+    win rate, and the sleeve reads no ownership number of any kind.
+    """
+
+    def setUp(self):
+        self.df = _sleeve_frame()
+
+    def test_a_person_resolves_from_either_role_id_a_key_or_a_bare_name(self):
+        row = self.df[self.df["Player_Key"] == "Miguel Amaya|CHC"].iloc[0]
+        got = st.resolve_captain_sleeve(
+            self.df,
+            {"entries": 4, "from": [str(row["UTIL_ID"]), str(row["CPT_ID"]),
+                                    "Ryan Kreidler|MIN", "Pedro Ramirez"]},
+            16)
+        # The two ids are ONE person, so they collapse rather than filling two
+        # of the four designated slots with the same captain.
+        self.assertEqual(got["captain_keys"],
+                         ["Miguel Amaya|CHC", "Ryan Kreidler|MIN",
+                          "Pedro Ramirez|CHC"])
+        self.assertEqual(got["duplicates_collapsed"], [str(row["CPT_ID"])])
+        self.assertEqual([r["given"] for r in got["resolution"]],
+                         [str(row["UTIL_ID"]), "Ryan Kreidler|MIN",
+                          "Pedro Ramirez"])
+
+    def test_an_unresolvable_person_REFUSES_rather_than_shrinking_the_sleeve(self):
+        """F14's class. A thesis preference the pool cannot carry is ignored and
+        reported; an OPERATOR instruction the pool cannot carry refuses. A
+        sleeve that quietly designates three entries when four were asked for is
+        a portfolio Ben did not ask for and cannot see in the delivered file."""
+        with self.assertRaises(st.CaptainSleeveError) as caught:
+            st.resolve_captain_sleeve(
+                self.df, {"entries": 4, "from": ["Miguel Amaya", "Nobody Here"]},
+                16)
+        self.assertIn("Nobody Here", str(caught.exception))
+        self.assertIn("melted pool carries no", str(caught.exception))
+
+    def test_a_name_two_teams_carry_is_ambiguous_and_refuses_naming_both(self):
+        with self.assertRaises(st.CaptainSleeveError) as caught:
+            st.resolve_captain_sleeve(
+                _two_teams_one_name(), {"entries": 1, "from": ["Chris Taylor"]}, 6)
+        msg = str(caught.exception)
+        self.assertIn("ambiguous by name", msg)
+        self.assertIn("Chris Taylor|AA", msg)
+        self.assertIn("Chris Taylor|BB", msg)
+        # The disambiguated form is the remedy and it works.
+        got = st.resolve_captain_sleeve(
+            _two_teams_one_name(),
+            {"entries": 1, "from": ["Chris Taylor|BB"]}, 6)
+        self.assertEqual(got["captain_keys"], ["Chris Taylor|BB"])
+
+    def test_the_selector_form_refuses_AS_A_SELECTOR_not_as_a_missing_person(self):
+        """The distinguishing test, and it exists because the cheap version of
+        it passes for the wrong reason. Delete the selector branch entirely and
+        `"prior_own_below"` falls through to name resolution, finds no such
+        person, and raises the SAME exception type -- a test asserting only
+        `assertRaises` would stay green over a selector that is silently being
+        looked up as a ballplayer. So this pins what the branch KEEPS: the
+        message says the selector is not wired and what it is waiting on, and it
+        is NOT the missing-person message."""
+        with self.assertRaises(st.CaptainSleeveError) as caught:
+            st.resolve_captain_sleeve(
+                self.df, {"entries": 4, "from": ["prior_own_below", 25.0]}, 16)
+        msg = str(caught.exception)
+        self.assertIn("NOT WIRED", msg)
+        self.assertIn("captain-ownership prior", msg)
+        self.assertNotIn("melted pool carries no", msg)
+        self.assertIn("prior_own_below", st.CAPTAIN_SLEEVE_SELECTORS)
+
+    def test_entries_beyond_the_blank_rows_clamps_and_records_what_was_asked(self):
+        got = st.resolve_captain_sleeve(
+            self.df, {"entries": 20, "from": _COLD}, 6)
+        self.assertEqual(got["entries"], 6)
+        self.assertEqual(got["clamped_from"], 20)
+        self.assertEqual(got["slots"], [0, 1, 2, 3, 4, 5])
+
+    def test_an_unknown_key_refuses_because_a_typo_is_a_different_portfolio(self):
+        with self.assertRaises(st.CaptainSleeveError) as caught:
+            st.resolve_captain_sleeve(
+                self.df, {"entires": 4, "from": _COLD}, 16)
+        self.assertIn("entires", str(caught.exception))
+        for bad, why in (({"from": _COLD, "entries": 0}, "at least 1"),
+                         ({"from": _COLD, "entries": "4"}, "must be an integer"),
+                         ({"from": []}, "list is empty"),
+                         ({"from": "Miguel Amaya"}, "must be a list"),
+                         ({"entries": 4}, 'needs a "from" list')):
+            with self.subTest(spec=bad):
+                with self.assertRaises(st.CaptainSleeveError) as c:
+                    st.resolve_captain_sleeve(self.df, bad, 16)
+                self.assertIn(why, str(c.exception))
+
+    def test_no_spec_is_no_sleeve_rather_than_an_empty_one(self):
+        self.assertIsNone(st.resolve_captain_sleeve(self.df, None, 16))
+
+
+class R381CaptainSleeveApportionmentTests(unittest.TestCase):
+    """Where a designated captain wins over the template rotation, and what it
+    is not allowed to win over.
+
+    R307's three measured negative results are the shape of this: (a) the
+    captain cap is a DIVERSITY control and tightening it raised mean captain
+    ownership, (b) a CPT-row-only tilt scored worse than no tilt, and (c) the
+    hard tilt only reached its number by zeroing a leadoff man across all 16
+    entries. So the sleeve moves ENTRIES and never a prior, and the caps it
+    meets are Ben's -- they win.
+    """
+
+    ML = {"MIN": -150, "CHC": 130}
+    N = 16
+
+    def setUp(self):
+        self.df = _sleeve_frame()
+
+    def _ladder(self, spec, n=None, **kw):
+        n = self.N if n is None else n
+        sleeve = st.resolve_captain_sleeve(self.df, spec, n)
+        return st.build_thesis_ladder(self.df, n, moneyline=self.ML,
+                                      captain_sleeve=sleeve, **kw)
+
+    def test_only_the_designated_slots_take_a_sleeve_captain(self):
+        """Ben's ruling, 2026-09-03: "devote a few lineups to those picks" --
+        an honest core plus a designated sleeve, not a distorted portfolio."""
+        lad = self._ladder({"entries": 4, "from": _COLD})
+        theses = lad["theses"]
+        self.assertEqual([t["captain_sleeve"] for t in theses],
+                         [True] * 4 + [False] * 12)
+        self.assertEqual([t["cpt"] for t in theses[:4]], _COLD)
+        # And the remainder never reaches into the list. These four are the
+        # four coldest bats in the pool, so a non-designated slot holding one
+        # would mean the sleeve leaked past its own slots.
+        self.assertEqual([t["cpt"] for t in theses[4:] if t["cpt"] in set(_COLD)],
+                         [])
+        # The honest remainder is also what it was with no sleeve at all for
+        # the slots the freed captain budget cannot reach.
+        plain = st.build_thesis_ladder(self.df, self.N, moneyline=self.ML)
+        self.assertEqual([t["cpt"] for t in plain["theses"][:4]],
+                         ["Taj Bradley|MIN", "Ryan Jeffers|MIN",
+                          "Taj Bradley|MIN", "Ryan Jeffers|MIN"],
+                         "the pre-sleeve apportionment, so the diff above is "
+                         "the sleeve and not a moved default")
+        self.assertIsNone(plain["captain_sleeve"])
+
+    def test_the_sleeve_rotates_within_itself_although_the_cap_allows_stacking(self):
+        """Four designated entries and four names give one each. The cap cannot
+        be what produces that: `max_cpt_exposure_pct` 0.25 of 16 entries is a
+        count of 4, so stacking all four on the head of the list is permitted,
+        and a one-name sleeve does exactly that. The rotation is the sleeve's
+        own least-used-first ordering, which R307's first negative result says
+        cannot be delegated to the cap: the cap is a diversity control and every
+        captain it forced open was MORE owned, not less."""
+        lad = self._ladder({"entries": 4, "from": _COLD})
+        self.assertEqual(len({t["cpt"] for t in lad["theses"][:4]}), 4)
+        stacked = self._ladder({"entries": 4, "from": [_COLD[0]]})
+        self.assertEqual([t["cpt"] for t in stacked["theses"][:4]],
+                         [_COLD[0]] * 4,
+                         "a one-name sleeve stacking four deep is what proves "
+                         "the cap permits it, so the four-name spread above is "
+                         "the rotation and not the cap")
+        self.assertEqual(stacked["captain_sleeve"]["unfilled"], [])
+
+    def test_a_capped_designation_gives_way_to_the_cap_and_is_counted(self):
+        """The caps are Ben's and the sleeve is opt-in, so the sleeve yields.
+        Counted, never silent: a designation that did not land is the operator's
+        instruction not arriving, which R54(c) treats as the loudest class."""
+        lad = self._ladder({"entries": 4, "from": [_COLD[0]]},
+                           max_cpt_exposure_pct=0.07)   # floor(1.12) -> 1
+        self.assertEqual(lad["captain_cap_count"], 1)
+        theses = lad["theses"]
+        self.assertEqual(theses[0]["cpt"], _COLD[0])
+        self.assertEqual([t["cpt"] for t in theses[1:4] if t["cpt"] == _COLD[0]],
+                         [], "the cap held")
+        unfilled = lad["captain_sleeve"]["unfilled"]
+        self.assertEqual([u["slot"] for u in unfilled], ["1", "2", "3"])
+        self.assertIn("at a captain or player cap", unfilled[0]["reason"])
+        # Still DESIGNATED: the flag records what was asked, and the delivered
+        # report below is what decides membership.
+        self.assertEqual([t["captain_sleeve"] for t in theses[:4]], [True] * 4)
+        self.assertEqual(len(lad["captain_sleeve"]["assigned"]), 1)
+
+    def test_the_designation_lands_in_thesis_cpt_so_it_mints_a_reservation(self):
+        """The interaction CC-4 left live under this item. `solve_ladder` builds
+        `captain_demand` from `t.get("cpt")` and nothing else, bounds the
+        reservation by min(captain cap, player cap) per R295/F40, and releases
+        it against the REQUESTING slot. A sleeve that carried its designation in
+        a side channel instead would get none of that, and the coldest bats it
+        names are exactly the cheap players every earlier rung takes as UTIL
+        salary relief -- R250's measured inversion, with the sleeve supplying
+        the named captain."""
+        lad = self._ladder({"entries": 2, "from": _COLD[:2]}, n=6)
+        diag = {}
+        st.solve_ladder(self.df, lad["theses"], time_limit=5, diagnostics=diag)
+        reserved = diag["captain_budget_reserved"]
+        for key in _COLD[:2]:
+            self.assertEqual(reserved.get(key), 1,
+                             f"{key} was designated, so his captain budget is "
+                             f"held out of the UTIL seat until his slot solves")
+        # Bounded, not unbounded: one naming rung is one unit, never the whole
+        # cap. The F40 ceiling is min(cpt_cap, player_cap) and both exceed 1
+        # here, so a reservation above 1 would be the hold inflating itself.
+        self.assertTrue(all(v >= 1 for v in reserved.values()))
+        self.assertLessEqual(max(reserved.values()), 6)
+
+
+class R381CaptainSleeveDeliveredReportTests(unittest.TestCase):
+    """R307's fix line, verbatim: "the brief reports the sleeve separately so
+    mean captain ownership is never quoted over a mixed set as though it were
+    one population."
+
+    Two things follow. Membership is REALIZED, because `solve_ladder` can
+    substitute any named captain on its relaxation rungs and all three caps can
+    take one off a slot before the solve -- reporting the request would describe
+    a file that was not delivered, which is R153's founding defect one market
+    over. And the split is THREE-way: a designated slot that lost its captain is
+    neither sleeve nor honest, and folding it into either one re-creates the
+    mixed population the item exists to avoid.
+    """
+
+    def setUp(self):
+        self.df = _sleeve_frame()
+
+    @staticmethod
+    def _lu(cpt_key, *util_keys):
+        return {"captain": {"player_key": cpt_key},
+                "utils": [{"player_key": k} for k in util_keys],
+                "player_keys": [cpt_key, *util_keys]}
+
+    def _theses(self, designated, cpts):
+        return [{"template": f"t{i}", "name": f"t{i}", "why": "",
+                 "captain_sleeve": i < designated, "cpt": c,
+                 "locks": [], "excludes": [], "mult": {}}
+                for i, c in enumerate(cpts)]
+
+    def test_membership_is_the_DELIVERED_captain_not_the_requested_one(self):
+        sleeve = st.resolve_captain_sleeve(
+            self.df, {"entries": 2, "from": _COLD[:2]}, 4)
+        theses = self._theses(2, [_COLD[0], _COLD[1],
+                                  "Taj Bradley|MIN", "Matthew Boyd|CHC"])
+        # Slot 1's captain was substituted by a relaxation rung: the thesis
+        # still REQUESTS a designated captain and the file does not carry one.
+        lineups = [self._lu(_COLD[0]), self._lu("Seiya Suzuki|CHC"),
+                   self._lu("Taj Bradley|MIN"), self._lu("Matthew Boyd|CHC")]
+        rep = st.captain_sleeve_report(self.df, theses, lineups, sleeve)
+        self.assertEqual(rep["honoured_count"], 1)
+        self.assertEqual(rep["lost_count"], 1)
+        self.assertEqual([h["slot"] for h in rep["delivered_honoured"]], ["0"])
+        lost = rep["delivered_lost"][0]
+        self.assertEqual(lost["slot"], "1")
+        self.assertEqual(lost["designated"], "Ryan Kreidler")
+        self.assertEqual(lost["delivered"], "Seiya Suzuki")
+        # The requested captain is still on the thesis, so a report reading the
+        # REQUEST would call this slot honoured. It does not.
+        self.assertEqual(theses[1]["cpt"], _COLD[1])
+
+    def test_the_three_populations_are_reported_apart_and_never_summed(self):
+        sleeve = st.resolve_captain_sleeve(
+            self.df, {"entries": 2, "from": _COLD[:2]}, 4)
+        theses = self._theses(2, [_COLD[0], _COLD[1],
+                                  "Taj Bradley|MIN", "Taj Bradley|MIN"])
+        # Taj Bradley captains a LOST designated slot and two honest ones. One
+        # pooled number over those three describes neither population.
+        lineups = [self._lu(_COLD[0]), self._lu("Taj Bradley|MIN"),
+                   self._lu("Taj Bradley|MIN"), self._lu("Taj Bradley|MIN")]
+        pops = st.captain_sleeve_report(
+            self.df, theses, lineups, sleeve)["captain_exposure_by_population"]
+        self.assertEqual(sorted(pops), ["honest", "honoured", "lost"])
+        self.assertEqual(pops["honoured"], {"Miguel Amaya": 1})
+        self.assertEqual(pops["lost"], {"Taj Bradley": 1})
+        self.assertEqual(pops["honest"], {"Taj Bradley": 2})
+
+    def test_an_unsolved_designated_slot_is_neither_honoured_nor_lost(self):
+        sleeve = st.resolve_captain_sleeve(
+            self.df, {"entries": 2, "from": _COLD[:2]}, 3)
+        theses = self._theses(2, [_COLD[0], _COLD[1], "Taj Bradley|MIN"])
+        lineups = [self._lu(_COLD[0]), None, self._lu("Taj Bradley|MIN")]
+        rep = st.captain_sleeve_report(self.df, theses, lineups, sleeve)
+        self.assertEqual(rep["honoured_count"], 1)
+        self.assertEqual(rep["lost_count"], 0)
+        self.assertEqual(rep["unsolved"], [{"slot": "1", "thesis": "t1"}])
+        self.assertEqual(rep["captain_exposure_by_population"]["lost"], {})
+
+    def test_no_sleeve_is_a_None_block_rather_than_a_missing_key(self):
+        theses = self._theses(0, ["Taj Bradley|MIN"])
+        rep = st.portfolio_report(self.df, theses, [self._lu("Taj Bradley|MIN")])
+        self.assertIn("captain_sleeve", rep)
+        self.assertIsNone(rep["captain_sleeve"])
+        self.assertIsNone(st.captain_sleeve_report(self.df, theses, [None], None))
+
+
+class R381CaptainSleeveWiringTests(unittest.TestCase):
+    """The flag, the refusals, and one delivered build.
+
+    Written against the PRODUCTION `run_showdown` and not a hand-built frame,
+    on R300(a)'s reasoning: the R289 acceptance test asserted over a synthetic
+    frame and shipped green while five production sites still dropped the
+    column.
+    """
+
+    @staticmethod
+    def _module():
+        path = REPO / "skills" / "generate-lineups" / "scripts" / "build_slate.py"
+        spec = importlib.util.spec_from_file_location("build_slate_r381", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def test_the_flag_is_object_validated_at_the_same_door_as_the_other_two(self):
+        mod = self._module()
+        self.assertIn(("captain_sleeve", "--captain-sleeve"),
+                      mod._JSON_OBJECT_FLAGS)
+        args = types.SimpleNamespace(
+            date="2026-07-18", captain_sleeve=[1, 2], controls_override=None,
+            leverage=None, postures=None, assume_gates=None, declare_pitcher=None)
+        payload = mod.validate_cli_values(args)
+        self.assertEqual(payload["status"], "cli_value_invalid")
+        self.assertEqual(payload["flag"], "--captain-sleeve")
+        self.assertIn("JSON OBJECT", payload["error"])
+        args.captain_sleeve = {"entries": 4, "from": ["1"]}
+        self.assertIsNone(mod.validate_cli_values(args))
+
+    def _build(self, tmp, sleeve, entries=None):
+        import shutil
+        sal, ent = tmp / "DKSalaries.csv", tmp / "DKEntries.csv"
+        shutil.copy2(SAL, sal)
+        shutil.copy2(ENT, ent)
+        args = types.SimpleNamespace(
+            date="2026-07-18", entries=entries, controls_override=None,
+            projections=None, declare_pitcher=[], lineups=None,
+            odds=None, no_odds=True, brief=None, captain_sleeve=sleeve)
+        mod = self._module()
+        with unittest.mock.patch.object(mod, "REPO", tmp), \
+                contextlib.redirect_stdout(io.StringIO()) as out:
+            code, brief = mod.run_showdown(args, tmp, sal, ent)
+        return code, brief, out.getvalue()
+
+    def test_an_unresolvable_sleeve_refuses_before_anything_is_staged(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            code, brief, out = self._build(
+                tmp, {"entries": 2, "from": ["Miguel Amaya", "Nobody Here"]})
+        self.assertEqual(code, 4)
+        self.assertEqual(brief, {})
+        payload = json.loads(out)
+        self.assertEqual(payload["status"], "captain_sleeve_invalid")
+        self.assertIn("Nobody Here", payload["error"])
+        self.assertFalse((tmp / "outputs").exists(),
+                         "nothing is staged: the refusal is before the solve")
+
+    def test_a_delivered_build_splits_the_sleeve_from_the_rest_in_the_brief(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            code, brief, _ = self._build(
+                Path(tmp), {"entries": 2, "from": _COLD[:2]})
+        self.assertEqual(code, 0)
+        self.assertEqual(brief["status"], "review_grade_build",
+                         "Showdown ships review-grade, never upload-ready")
+        block = brief["captain_sleeve"]
+        self.assertTrue(block["applied"])
+        self.assertEqual(block["designated_entries"], 2)
+        self.assertEqual(block["from"], ["Miguel Amaya", "Ryan Kreidler"])
+        self.assertEqual(block["honoured_count"] + block["lost_count"]
+                         + len(block["unsolved"]), 2,
+                         "every designated slot lands in exactly one of the "
+                         "three outcomes")
+        pops = block["captain_exposure_by_population"]
+        self.assertEqual(sorted(pops), ["honest", "honoured", "lost"])
+        self.assertEqual(sum(pops["honest"].values()), brief["entries"] - 2,
+                         "every entry the sleeve did not designate built "
+                         "honestly and is counted in its own population")
+        self.assertEqual(sum(sum(p.values()) for p in pops.values()),
+                         brief["entries"],
+                         "the three populations partition the delivered set; "
+                         "no entry is counted twice and none is missing")
+        # Truthful labels, and this row is where they bite hardest. The
+        # coldest-quartile top-1% CI on the mine that motivated the sleeve is
+        # [0.993, 1.547] and it CROSSES 1, so the sleeve ships counted and
+        # graded, never as a claim. Everything outside the disclaimer is counts
+        # and names: no number in this block is a lift, an edge, an ROI, a win
+        # rate or a probability, and none of that vocabulary appears in it.
+        data = {k: v for k, v in block.items() if k != "label"}
+        text = json.dumps(data).lower()
+        for banned in ("roi", "win rate", "win_rate", "edge", "lift",
+                       "profit", "probab", "expected value"):
+            self.assertNotIn(banned, text)
+        self.assertIn("nothing here is a leverage, lift, edge, roi or "
+                      "win-rate claim", block["label"].lower(),
+                      "the disclaimer is the one place the words appear, and "
+                      "it appears to deny them")
+
+    def test_no_flag_leaves_the_brief_key_present_and_null(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            code, brief, _ = self._build(Path(tmp), None)
+        self.assertEqual(code, 0)
+        self.assertIn("captain_sleeve", brief)
+        self.assertIsNone(brief["captain_sleeve"])
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

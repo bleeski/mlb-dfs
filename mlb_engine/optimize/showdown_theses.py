@@ -23,6 +23,12 @@ VERSION history
                    past the `!= cpt` filter), cpt_ladder restricted to the two
                    starters, the top-band hitter locks removed after being
                    measured infeasible against real prices, weight 0.30 -> 0.45
+  0.4  2026-09-21  R381: the captain leverage sleeve. A per-entry captain
+                   DESIGNATION over the first k ladder slots, resolved from an
+                   explicit list of people, apportioned under all three caps and
+                   reported on realized membership. No prior is tilted and no
+                   ownership number is read; R307's three measured tilt shapes
+                   are why.
 """
 from __future__ import annotations
 
@@ -45,7 +51,7 @@ from mlb_engine.optimize.showdown import (
     player_cap_structural_floor,
 )
 
-VERSION = "0.3"
+VERSION = "0.4"
 
 # PA-share prior by batting-order slot. Deterministic, not fitted to any slate.
 ORDER_FACTOR = {1: 1.08, 2: 1.06, 3: 1.05, 4: 1.03, 5: 1.00,
@@ -809,6 +815,180 @@ def contest_partition(contest_of_entry: Optional[Sequence[str]],
     }
 
 
+
+
+# --------------------------------------------------------------------------- #
+# Captain sleeve (R381, CC-5 batch 1 of R307)
+# --------------------------------------------------------------------------- #
+#: Selector names the sleeve's ``from`` field may carry INSTEAD of an explicit
+#: list of people. None of them is wired: every one needs a captain-ownership
+#: prior inside the build, and the build path has none -- `predict_captain_
+#: ownership` has one production caller and it is `tools/ownership_pred.py`,
+#: which runs offline and writes a file nothing in `run_showdown` reads. Named
+#: here so the flag REFUSES the selector form by name rather than resolving
+#: `"prior_own_below"` as a person and failing with "no such player".
+CAPTAIN_SLEEVE_SELECTORS = ("prior_own_below",)
+
+#: The keys a sleeve spec may carry. Closed rather than open: a typo in an
+#: opt-in leverage flag is silently a different portfolio, and the whole point
+#: of the sleeve is that the operator knows which entries it moved.
+_CAPTAIN_SLEEVE_KEYS = ("entries", "from")
+
+
+class CaptainSleeveError(ValueError):
+    """A captain sleeve the build cannot honour exactly as written.
+
+    Raised rather than reported because the sleeve is an OPERATOR instruction
+    naming specific people, which is F14's class: a thesis preference the pool
+    cannot carry is ignored and reported, an operator's hard instruction that
+    the pool cannot carry refuses. A sleeve that silently shrinks from four
+    designated entries to three is a portfolio the operator did not ask for and
+    cannot see in the file.
+    """
+
+
+def resolve_captain_sleeve(df: pd.DataFrame, spec: Optional[Mapping[str, Any]],
+                           n_entries: int) -> Optional[Dict[str, Any]]:
+    """Resolve a ``--captain-sleeve`` spec against the melted Showdown pool.
+
+    Ben's design ruling, 2026-09-03: "we dont need to artificially zero out
+    players, but we should figure out how we can find leverage in the captain
+    ranks and devote a few lineups to those picks." So this designates ENTRIES,
+    it does not tilt a prior. R307 measured the three prior-tilt shapes and all
+    three failed; one of them (the CPT-row-only tilt) scored worse than no tilt
+    at all, because a global prior feeds the captain slot and the five UTIL
+    slots through one knob. The sleeve exists because of those results.
+
+    ``spec`` is ``{"entries": <int>, "from": [<person>, ...]}``. A person is a
+    DK player id (either role's -- a Showdown person has two and the sleeve is
+    about the person, not the row), a ``Player_Key`` (``"Name|Team"``), or a
+    bare ``Name`` when the pool carries exactly one. Returns the resolved sleeve
+    or ``None`` when ``spec`` is ``None``; raises ``CaptainSleeveError`` with
+    the reason otherwise.
+
+    The designated slots are the FIRST ``entries`` ladder slots, which R239
+    already makes meaningful: slot j and ``rows[j]`` are the same entry, so the
+    sleeve names actual reserved rows rather than a floating count. They are
+    also the first slots of ``_round_robin``, so they span up to ``entries``
+    distinct templates instead of concentrating the sleeve in one game state.
+
+    Nothing here is a lift, an edge, an ROI or a win rate. The sleeve is a
+    designation; what it produced is counted and reported, never graded.
+    """
+    if spec is None:
+        return None
+    if not isinstance(spec, Mapping):
+        raise CaptainSleeveError(
+            f"--captain-sleeve takes a JSON object, got {type(spec).__name__}")
+    unknown = sorted(k for k in spec if k not in _CAPTAIN_SLEEVE_KEYS)
+    if unknown:
+        raise CaptainSleeveError(
+            f"unknown key(s) {unknown} in --captain-sleeve; it takes "
+            f"{list(_CAPTAIN_SLEEVE_KEYS)}")
+    if "from" not in spec:
+        raise CaptainSleeveError('--captain-sleeve needs a "from" list of people')
+
+    want = spec.get("entries", 1)
+    if isinstance(want, bool) or not isinstance(want, int):
+        raise CaptainSleeveError(
+            f'--captain-sleeve "entries" must be an integer, got '
+            f"{type(want).__name__} ({want!r})")
+    if want < 1:
+        raise CaptainSleeveError(
+            f'--captain-sleeve "entries" must be at least 1, got {want}')
+    clamped_from = None
+    if want > int(n_entries):
+        clamped_from, want = want, int(n_entries)
+
+    raw = spec.get("from")
+    if isinstance(raw, (str, bytes)) or not isinstance(raw, Sequence):
+        raise CaptainSleeveError(
+            f'--captain-sleeve "from" must be a list, got {type(raw).__name__}')
+    given = list(raw)
+    if not given:
+        raise CaptainSleeveError('--captain-sleeve "from" list is empty')
+    # The selector form the entry also offers. It is refused HERE, by name, and
+    # the message says what it is waiting on: the sleeve's selector has no input
+    # in the build path, so accepting it would either resolve a selector name as
+    # a person or silently designate nothing.
+    head = str(given[0]) if given else ""
+    if head in CAPTAIN_SLEEVE_SELECTORS:
+        raise CaptainSleeveError(
+            f'--captain-sleeve selector {head!r} is NOT WIRED: it needs a '
+            f"captain-ownership prior inside the build and run_showdown reads "
+            f"none. Pass an explicit list of people instead. (CC-5 batch 2 is "
+            f"the wiring; batch 3 is this selector on top of it.)")
+
+    # Person lookup. A Showdown person owns two DK ids and the sleeve is about
+    # the person, so both resolve to the same key. Name is accepted only when it
+    # is unambiguous in THIS pool: R295(d) refuses two people under one name on
+    # one team at the melt, which leaves cross-team collisions reachable here.
+    by_key: Dict[str, str] = {}
+    by_id: Dict[str, str] = {}
+    by_name: Dict[str, List[str]] = {}
+    for key, name, cpt_id, util_id in zip(
+            df["Player_Key"], df["Name"], df["CPT_ID"], df["UTIL_ID"]):
+        k = str(key)
+        by_key[k] = k
+        for pid in (cpt_id, util_id):
+            if pid is not None and str(pid).strip():
+                by_id[str(pid).strip()] = k
+        by_name.setdefault(str(name).strip(), []).append(k)
+
+    resolved: List[str] = []
+    resolution: List[Dict[str, str]] = []
+    unresolved: List[str] = []
+    ambiguous: List[Dict[str, str]] = []
+    duplicates: List[str] = []
+    name_by_key = dict(zip(df["Player_Key"], df["Name"]))
+    for item in given:
+        token = str(item).strip()
+        key = by_key.get(token) or by_id.get(token)
+        if key is None:
+            hits = by_name.get(token) or []
+            if len(hits) > 1:
+                ambiguous.append({"given": token, "matches": ", ".join(sorted(hits))})
+                continue
+            key = hits[0] if hits else None
+        if key is None:
+            unresolved.append(token)
+            continue
+        if key in resolved:
+            duplicates.append(token)
+            continue
+        resolved.append(key)
+        resolution.append({"given": token, "player_key": key,
+                           "name": str(name_by_key.get(key, key))})
+
+    if unresolved or ambiguous:
+        parts = []
+        if unresolved:
+            parts.append(f"the melted pool carries no {unresolved}")
+        if ambiguous:
+            parts.append("ambiguous by name: " + "; ".join(
+                f"{a['given']} -> {a['matches']}" for a in ambiguous))
+        raise CaptainSleeveError(
+            "--captain-sleeve names people this build cannot captain: "
+            + " | ".join(parts)
+            + ". A sleeve is an operator instruction, so it refuses rather than "
+              "shrinking in silence; pass a DK player id, a \"Name|Team\" key, "
+              "or a name the pool carries once.")
+
+    return {
+        "entries": int(want),
+        "clamped_from": clamped_from,
+        "slots": list(range(int(want))),
+        "captain_keys": list(resolved),
+        "captain_names": [str(name_by_key.get(k, k)) for k in resolved],
+        "resolution": resolution,
+        "duplicates_collapsed": duplicates,
+        "label": ("a per-entry captain DESIGNATION over the first "
+                  f"{int(want)} reserved rows, counted and reported apart from "
+                  "the rest of the portfolio. Never a lift, an edge, an ROI or "
+                  "a win rate."),
+    }
+
+
 def per_contest_report(df: pd.DataFrame,
                        lineups: Sequence[Optional[Mapping[str, Any]]],
                        contest_of_entry: Optional[Sequence[str]],
@@ -959,6 +1139,7 @@ def build_thesis_ladder(df: pd.DataFrame, n_entries: int,
                         max_cpt_exposure_pct: Optional[float] = DEFAULT_MAX_CPT_EXPOSURE_PCT,
                         contest_of_entry: Optional[Sequence[str]] = None,
                         max_cpt_per_contest: int = DEFAULT_MAX_CPT_PER_CONTEST,
+                        captain_sleeve: Optional[Mapping[str, Any]] = None,
                         ) -> Dict[str, Any]:
     """Generate ``n_entries`` thesis specs, allocated across game states and with
     captains rotated so no captain exceeds the cap.
@@ -971,6 +1152,19 @@ def build_thesis_ladder(df: pd.DataFrame, n_entries: int,
     threaded first and alone deliberately: R239's own note says do that, and the
     partition has to exist here before the per-contest captain cap can bind at
     the moment a captain slot is filled rather than be evaluated after the fact.
+
+    R381 (CC-5, R307 batch 1). ``captain_sleeve`` is a resolved
+    ``resolve_captain_sleeve`` block, and it binds HERE rather than in
+    ``solve_ladder`` for two reasons. The apportionment step is where a captain
+    is chosen by name, so a designated captain wins over the template rotation
+    by replacing that template's shortlist for its own slot and nothing else.
+    And a thesis's ``cpt`` is what ``solve_ladder`` reads to build
+    ``captain_demand``, so a sleeve captain mints a captain-budget reservation
+    exactly as any other named captain does -- the sleeve rides R250's hold
+    instead of needing a second one. The three portfolio caps still bind on the
+    sleeve: a sleeve captain who is at a cap for his slot is NOT taken, the slot
+    falls back to the template's own ladder, and the miss is counted in
+    ``captain_sleeve.unfilled`` rather than relaxing a control Ben owns.
     """
     shape = dict(describe_slate(df, moneyline, implied_totals))
     shape["_base"] = dict(zip(df["Player_Key"], df["Base"]))
@@ -1040,6 +1234,22 @@ def build_thesis_ladder(df: pd.DataFrame, n_entries: int,
                 return False
         return True
 
+    # R381. The sleeve's own state. `sleeve_cpt_counts` is what rotates the
+    # designated captains WITHIN the sleeve: with four sleeve entries and four
+    # names, taking them least-used-first gives one each, where taking them
+    # list-order-first would put all four on the head of the list whenever the
+    # portfolio captain cap allows it (0.25 of 16 is 4, so it does). The cap is
+    # a diversity control, not a leverage one -- R307's first negative result --
+    # so it cannot be relied on to spread the sleeve.
+    sleeve_slots: set = set()
+    sleeve_keys: List[str] = []
+    if captain_sleeve:
+        sleeve_slots = {int(s) for s in (captain_sleeve.get("slots") or [])}
+        sleeve_keys = [str(k) for k in (captain_sleeve.get("captain_keys") or [])]
+    sleeve_cpt_counts: Dict[str, int] = {}
+    sleeve_assigned: List[Dict[str, str]] = []
+    sleeve_unfilled: List[Dict[str, str]] = []
+
     # Round-robin the templates so a truncated build still spans game states
     # rather than filling every entry from the first template in the list.
     order = _round_robin(counts)
@@ -1053,7 +1263,41 @@ def build_thesis_ladder(df: pd.DataFrame, n_entries: int,
                 cid = partition["contest_of_entry"][slot]
         cpt = None
         own_ladder = list(built.get("cpt_ladder") or [])
+        # R381. A designated slot takes its captain from the sleeve list and
+        # from nowhere else, least-used-within-the-sleeve first so the
+        # designation spreads, ties broken by the operator's own list order.
+        # Every other slot is untouched: this is the honest-core-plus-sleeve
+        # shape, not a portfolio-wide tilt.
+        sleeve_here = slot in sleeve_slots
+        if sleeve_here:
+            ranked = sorted(range(len(sleeve_keys)),
+                            key=lambda i: (sleeve_cpt_counts.get(sleeve_keys[i], 0), i))
+            for i in ranked:
+                cand = sleeve_keys[i]
+                if _under_caps(cand, cid):
+                    cpt = cand
+                    sleeve_cpt_counts[cand] = sleeve_cpt_counts.get(cand, 0) + 1
+                    sleeve_assigned.append({
+                        "slot": str(slot), "template": str(spec["id"]),
+                        "captain": str(df.loc[df["Player_Key"] == cand, "Name"].iloc[0])
+                        if (df["Player_Key"] == cand).any() else str(cand),
+                        "player_key": str(cand),
+                    })
+                    break
+            if cpt is None:
+                # Every sleeve captain is at a cap for this slot. The caps are
+                # Ben's and the sleeve is opt-in, so the sleeve gives way, not
+                # the cap: this slot falls through to its template's own ladder
+                # below and builds honestly. Counted, never silent.
+                sleeve_unfilled.append({
+                    "slot": str(slot), "template": str(spec["id"]),
+                    "contest_id": str(cid) if cid is not None else "",
+                    "reason": "every designated captain was at a captain or "
+                              "player cap for this slot",
+                })
         for cand in own_ladder:
+            if cpt is not None:
+                break
             if _under_caps(cand, cid):
                 cpt = cand
                 break
@@ -1113,6 +1357,12 @@ def build_thesis_ladder(df: pd.DataFrame, n_entries: int,
             "template": spec["id"],
             "name": name,
             "why": built["why"],
+            # R381. Whether this slot was DESIGNATED, which is not the same
+            # question as whether it ended up with a sleeve captain: the
+            # relaxation ladder in `solve_ladder` can substitute any named
+            # captain, so realized membership is computed off the solved
+            # lineups in `portfolio_report` and never off this flag.
+            "captain_sleeve": bool(sleeve_here),
             "cpt": cpt,
             "locks": locks,
             "excludes": [k for k in (built.get("excludes") or []) if k and k != cpt],
@@ -1146,6 +1396,17 @@ def build_thesis_ladder(df: pd.DataFrame, n_entries: int,
             if partition["available"] else {
                 "feasible": None,
                 "reason": "no contest partition; the precondition needs contest sizes"},
+            # R381. The sleeve as APPORTIONED. `assigned` is what this step
+            # designated, `unfilled` is where a cap took the designation away
+            # and the slot fell back to its template. Neither is the realized
+            # sleeve: a captain named here can still be substituted by
+            # `solve_ladder`'s relaxation rungs, so `portfolio_report` computes
+            # membership from the solved captains and the brief quotes that.
+            "captain_sleeve": ({
+                **{k: v for k, v in captain_sleeve.items()},
+                "assigned": sleeve_assigned,
+                "unfilled": sleeve_unfilled,
+            } if captain_sleeve else None),
             "win_share_basis": shape["win_share_basis"],
             # R373: carried beside the basis so the brief states whether
             # `favorite` is a market reading or a tiebreak over team names.
@@ -2052,8 +2313,102 @@ def construction_shadow(
     return out
 
 
+def captain_sleeve_report(df: pd.DataFrame,
+                          theses: Sequence[Mapping[str, Any]],
+                          lineups: Sequence[Optional[Mapping[str, Any]]],
+                          captain_sleeve: Optional[Mapping[str, Any]],
+                          ) -> Optional[Dict[str, Any]]:
+    """The sleeve as DELIVERED, split from the rest of the portfolio.
+
+    R381 (CC-5, R307 batch 1). R307's fix line asks for this by name: "the brief
+    reports the sleeve separately so mean captain ownership is never quoted over
+    a mixed set as though it were one population." Two things follow, and the
+    second is the one a session gets wrong.
+
+    First, membership is REALIZED, never requested. `solve_ladder` may drop a
+    thesis's captain lock on its relaxation rungs, and all three caps may take a
+    designated captain off a slot before the solve. A designated slot whose
+    delivered captain is not on the list built honestly, and counting it as
+    sleeve would report a designation the file does not carry -- R153's founding
+    defect, one market over.
+
+    Second, the split is three-way, not two. `honoured`, `lost` and `honest` are
+    three different populations and collapsing `lost` into either one is how a
+    mixed set gets quoted as one. There is no ownership number here: this build
+    path reads no captain-ownership prior at all (CC-5 batch 2 is that wiring),
+    so this block counts captains and says whose they were. It is not a lift, an
+    edge, an ROI or a win rate, and the three negative results on R307 are the
+    reason the sleeve is a designation rather than a tilt.
+    """
+    if not captain_sleeve:
+        return None
+    names = dict(zip(df["Player_Key"], df["Name"]))
+    sleeve_keys = {str(k) for k in (captain_sleeve.get("captain_keys") or [])}
+    honoured: List[Dict[str, str]] = []
+    lost: List[Dict[str, str]] = []
+    unsolved: List[Dict[str, str]] = []
+    pops: Dict[str, Dict[str, int]] = {"honoured": {}, "lost": {}, "honest": {}}
+    for slot, (thesis, lu) in enumerate(zip(theses, lineups)):
+        designated = bool(thesis.get("captain_sleeve"))
+        tname = str(thesis.get("name") or thesis.get("template") or "?")
+        if lu is None:
+            if designated:
+                unsolved.append({"slot": str(slot), "thesis": tname})
+            continue
+        cpt_key = str((lu.get("captain") or {}).get("player_key") or "")
+        cpt_name = str(names.get(cpt_key, cpt_key))
+        if not designated:
+            pops["honest"][cpt_name] = pops["honest"].get(cpt_name, 0) + 1
+            continue
+        want = thesis.get("cpt")
+        if cpt_key in sleeve_keys:
+            honoured.append({"slot": str(slot), "thesis": tname, "captain": cpt_name})
+            pops["honoured"][cpt_name] = pops["honoured"].get(cpt_name, 0) + 1
+        else:
+            lost.append({
+                "slot": str(slot), "thesis": tname,
+                "designated": str(names.get(want, want)) if want else "none",
+                "delivered": cpt_name,
+                "reason": ("the designated captain was reassigned by a cap or "
+                           "substituted by a relaxation rung; this entry is not "
+                           "in the delivered sleeve"),
+            })
+            pops["lost"][cpt_name] = pops["lost"].get(cpt_name, 0) + 1
+    return {
+        # True wherever this report exists at all: it is built only off a solved
+        # ladder. The bank path writes its own block with `applied: False`, so
+        # the key answers the same question on both paths.
+        "applied": True,
+        "designated_entries": int(captain_sleeve.get("entries") or 0),
+        "designated_slots": [str(s) for s in (captain_sleeve.get("slots") or [])],
+        "from": list(captain_sleeve.get("captain_names") or []),
+        "clamped_from": captain_sleeve.get("clamped_from"),
+        "duplicates_collapsed": list(captain_sleeve.get("duplicates_collapsed") or []),
+        "apportionment_unfilled": list(captain_sleeve.get("unfilled") or []),
+        "delivered_honoured": honoured,
+        "delivered_lost": lost,
+        "unsolved": unsolved,
+        "honoured_count": len(honoured),
+        "lost_count": len(lost),
+        # Three populations, never summed. `honest` is every entry the sleeve
+        # never designated -- R307's "the other 12 build honestly" -- and it is
+        # reported here only so the reader can see both sides of the split
+        # without crossing to another table and re-deriving which rows were
+        # which.
+        "captain_exposure_by_population": {
+            k: dict(sorted(v.items(), key=lambda kv: (-kv[1], kv[0])))
+            for k, v in pops.items()
+        },
+        "label": ("realized membership, counted off the DELIVERED captains. No "
+                  "ownership number exists on this path, so nothing here is a "
+                  "leverage, lift, edge, ROI or win-rate claim."),
+    }
+
+
 def portfolio_report(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
-                     lineups: Sequence[Optional[Mapping[str, Any]]]) -> Dict[str, Any]:
+                     lineups: Sequence[Optional[Mapping[str, Any]]],
+                     captain_sleeve: Optional[Mapping[str, Any]] = None,
+                     ) -> Dict[str, Any]:
     """Exposure, overlap, and per-lineup certification for a solved ladder."""
     names = dict(zip(df["Player_Key"], df["Name"]))
     teams = dict(zip(df["Player_Key"], df["Team"]))
@@ -2101,6 +2456,9 @@ def portfolio_report(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
         # the chain it describes -- the R122 `prior_note` class, which
         # `apply_base_prior`'s own docstring already cites. It now reads the F1
         # report off the frame rather than asserting a chain from memory.
+        # R381. None when no sleeve was designated, so the key has one shape
+        # across every Showdown brief rather than appearing only sometimes.
+        "captain_sleeve": captain_sleeve_report(df, theses, lineups, captain_sleeve),
         "prior_note": ("Base = 0.60*salary-regressed + 0.40*AvgPointsPerGame, "
                        "x batting-order PA factor x platoon factor"
                        + (" x F1 implied-team-total factor"

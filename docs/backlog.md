@@ -39,7 +39,7 @@ lives under "Board history" near the bottom of this file.
 
 Ordered, with the reason:
 
-## Execution roadmap (2026-09-15, reprioritized for LARGE-PRIZE impact after the 2026-09-14/15 standings mine; rehosted 2026-09-17 to Claude Code in the cloud) -- NEXT: CC-5 (CC-0/CC-1/CC-2 DONE 2026-09-15; CC-A0 and CC-A3 DONE 2026-09-17; CC-A4/CC-A1/CC-A2/CC-A5/CC-A6/CC-A7/CC-A8 DONE 2026-09-19; **CC-3 DONE 2026-09-20, all four batches, with R334(a)'s 1.77x re-measurement the one named remainder -- its 2026-09-08 inputs are gone from disk and history, so it needs a NEW slate rather than a recovery**; R378 landed beside it as an R372 repair. **CC-4 DONE 2026-09-21**, the four filed defects (a)(b)(c)(d) and the F40 rider, with F14's soft-lock field and the hold-ordering question declined and repriced as R295's open remainder, and R379 filed beside it from a second duplicate-solve sighting found while fixing (c). CC-5 is next: both its blockers are clear, R328 landed in CC-3 and CC-4's R295(a) landed here. CC-A9's condition is MET and it is runnable standalone whenever CC-5 is not the priority)
+## Execution roadmap (2026-09-15, reprioritized for LARGE-PRIZE impact after the 2026-09-14/15 standings mine; rehosted 2026-09-17 to Claude Code in the cloud) -- NEXT: CC-5 batch 2 (CC-0/CC-1/CC-2 DONE 2026-09-15; CC-A0 and CC-A3 DONE 2026-09-17; CC-A4/CC-A1/CC-A2/CC-A5/CC-A6/CC-A7/CC-A8 DONE 2026-09-19; **CC-3 DONE 2026-09-20, all four batches, with R334(a)'s 1.77x re-measurement the one named remainder -- its 2026-09-08 inputs are gone from disk and history, so it needs a NEW slate rather than a recovery**; R378 landed beside it as an R372 repair. **CC-4 DONE 2026-09-21**, the four filed defects (a)(b)(c)(d) and the F40 rider, with F14's soft-lock field and the hold-ordering question declined and repriced as R295's open remainder, and R379 filed beside it from a second duplicate-solve sighting found while fixing (c). CC-5's two blockers cleared on the way in (R328 in CC-3, R295(a) in CC-4). **CC-5 batch 1 DONE 2026-09-21** as R381: the explicit-id-list sleeve, end to end, with the `prior_own_below` selector and the captain-prior wiring split out as CC-5 batch 2 and refused by name until it exists. CC-A9's condition is MET and it is runnable standalone whenever CC-5 is not the priority)
 
 **What changed in this rewrite and why.** Ben's instruction, 2026-09-15: reprioritize the board for items that change the chance of winning a LARGE prize, honour dependencies, and chunk it for single DEV sessions that run in **Claude Code on his machine** rather than Cowork. Two consequences. First, the ordering rule that ranked criteria (1)-(6) equally is replaced by a prize-first rule: **P (prize)** = changes the construction that reaches a top finish, or grades whether a construction does; **L (lost slate)** = a legal file on every slate, because a slate with no file is a zero; **G (guard)** = the referee and the record; **H** = hygiene. P and L lead; G and H follow. Second, the Cowork sandbox constraints that shaped the old Phase D ordering (the 130s inner budget, the six-call gate, the mount's refused `unlink`) do not apply to a Claude Code DEV session: `python tools/audit.py --run-tests --terse` runs in one call (~9 min on the pinned `.venv`), `rm` works, and an M item fits one session with its gate. BUILD and ARCHIVE sessions may still be Cowork, so the claims protocol, explicit-path `git add`, and the CHANGELOG-in-the-same-commit rule are unchanged, and any control that is only reachable from one door is still a defect.
 
@@ -86,7 +86,8 @@ Ben's instruction, 2026-09-17: the workflow moves to Claude Code sessions in clo
 | **CC-3** | `Batch (3 of 4)` | **R334(c)(d) -- the Showdown APPG Base is blind to the opposing arm; warning and sanity-pass halves. DONE 2026-09-20.** A brief NOTE when the two declared arms' expected stats differ by more than a stated margin; a `--projections` sanity pass naming hitters whose Base rank contradicts their Savant rate-stat rank. Report, never a gate. | Inbox 2026-09-08 | `build_slate.py` `run_showdown` brief, `showdown.py` beside `small_sample_base_report`, `data/reference/expected_stats_*.csv` | P | Low | None |
 | **CC-3** | `Batch (4 of 4)` | **R328 -- the ORDERING between the two Showdown ownership markets. DONE 2026-09-20 -- and the row was STALE: two of its three sub-fixes shipped in R338 on 2026-09-11.** The capped-simplex projection and the NaN/inf rejection were already live (`_bounded_marginals` at `ownership_prior.py:491`, reached on the Showdown path at `:736` inside `_showdown_prediction`, which is at `:702-752` and not the `:676-727` this row cited). What remained was `captain_p <= roster_p`, enforced only in `mlb_engine/production/contracts.py`, which R302 keeps off the build path. `showdown_role_coherence` is that check where the build can reach it; it reports and never clamps, because a clamp breaks R306's 100% captain budget. The defect is UNREPRODUCED over 4,000 randomized pools plus a structured grid, so it unblocks CC-5 rather than repairing a number. **CC-3's landing gate, all four batches: `PASS  v2.26.0  41 modules  2292 tests` (2254 before; +7 R347, +10 R334(a), +12 R334(c)(d), +7 R328, +2 R378). The 5 skips are the same 5 the pre-work gate carried and are all host facts: no Classic salary file on disk, no vendored scipy, no `.env`, the 2026-08-16 salary file not staged.** | Spec | `mlb_engine/field/ownership_prior.py`, `tools/ownership_pred.py`, `tests/test_showdown.py` | P (R307 consumes these) | Low | None |
 | **CC-4** (was Session 8) | `Standalone` | **R295 (+F13, F14, F40 riders) -- Showdown ladder truth. DONE 2026-09-21** (`PASS v2.26.0 41 modules 2315 tests 5 skipped`, 2292 -> 2315). F13 shipped in R338. Landed here: (a) the R250 hold now yields to a thesis lock, so the ladder stops answering the collision by dropping the player cap -- the measured 58.3% under a 50% cap is gone and every counter reads clean; (b) the degraded proxy is restated on the unweighted Base and the weighted number is named `proxy_points_thesis_weighted`; (c) the captain-lock rung is guarded on `cpt_lock`, ending a duplicate solve of rung 1 and a substitution booked against a slot with no lock; (d) the melt REFUSES two DK persons under one name on one team, by name, rather than re-keying them -- a tree-wide scan found zero real instances, so there is nothing to validate a re-key against; F40 reservations bounded by both caps and released against the requesting slot. **Open remainder, repriced:** F14's soft-lock field (an API decision, wants a proposal before a diff) and the hold-ordering question the entry's own second half of (a) raised -- built as filed it breaks R250 on R250's own fixture. | Backlog / Spec | `mlb_engine/optimize/showdown_theses.py`, `showdown.py`, `build_slate.py` `run_showdown`, `tests/test_showdown.py` | P (single-game and small-field prizes ride on the three caps holding) | Med (ladder state machine) | CC-3 (same files; land after) |
-| **CC-5** (was Session 12) | `Standalone` | **R307 -- the captain leverage sleeve.** "These 4 entries take their captain from this list, the other 12 build honestly." Aimed at the CAPTAIN market only. **Mine rider, 2026-09-15:** captain popularity INVERTS between bands in the archive (top-1% lift 1.231 -> 0.856 from least- to most-captained quartile; top-20% runs the other way), while Showdown TOTAL ownership does not hurt at the top (every finishing band above median is more owned than the field). So the sleeve tilts the captain slot toward the low-captained quartile for top-band entries and leaves the five flex slots chalk-positive; it never imports Classic total-ownership fading into Showdown. The coldest-quartile CI [0.993, 1.547] is suggestive, so the sleeve ships counted and graded (R139's report), not as a default. | Backlog / Mine | `showdown_theses.py`, `build_slate.py` `run_showdown`, `ownership_pred emit` | P (Ben's stated design ruling, 2026-09-03) | Med | None remaining (CC-3's R328 landed 2026-09-20; CC-4's R295(a) landed 2026-09-21, and the F40 rider landed with it, so the reservations the sleeve rides are now bounded by both caps and released per slot) |
+| **CC-5** (was Session 12) | `Batch (1 of 2)` | **R381 -- the captain leverage sleeve, explicit-id-list form. DONE 2026-09-21** (`PASS v2.26.0 41 modules 2334 tests 5 skipped`, 2315 -> 2334; 17 mutations, 0 survivors). `--captain-sleeve '{"entries": 4, "from": [...]}'` designates the first N reserved rows and the rest build with no tilt at all, which is Ben's 2026-09-03 ruling as code. It binds in `build_thesis_ladder` because `thesis["cpt"]` is what `solve_ladder` reads to mint an R250 captain-budget reservation, so the sleeve rides the existing hold (bounded by both caps per F40) with no solver change. All four captain-slot controls still bind and the SLEEVE gives way to them, counted in `captain_sleeve.unfilled`; the per-contest cap is the one R307's own inventory predates. The brief splits `honoured` / `lost` / `honest` on the DELIVERED captain and never sums them. **Two declines, both in the CHANGELOG entry:** the `prior_own_below` selector (no captain-prior input in the build path; refused BY NAME) and "solves as its own sub-portfolio against the same bank" (false mechanism -- there is no bank on the ladder path and the three controls live in one `solve_ladder` call's locals, so a separate solve would stop them binding across the union). | Backlog / Mine | `showdown_theses.py`, `build_slate.py` `run_showdown`, `tests/test_showdown.py` | P (Ben's stated design ruling, 2026-09-03) | Med | None |
+| **CC-5** | `Batch (2 of 2)` | **R307 remainder -- the captain-ownership prior into `run_showdown`, and the `prior_own_below` selector on top of it.** The sleeve ships without either; this is what the selector is waiting on. The producer already EXISTS: `tools/ownership_pred.py` emits a `captain` block carrying `own_pct_by_player_id` for a Showdown file, so what is missing is a READER on the Showdown path, not a number. Model it on R334(a) -- one engine function, one return value -- and note the shape is already pinned: `tests/test_core.py::test_the_sliced_path_attaches_through_the_SAME_function_before_the_bank` forbids the literal `attach_predicted_ownership(` anywhere in `build_slate.py`, so the Showdown attach goes behind an engine function the way `apply_leverage_ownership` does for Classic. The selector is small once the reader exists: it filters the same resolved list `resolve_captain_sleeve` already builds. Truthful labels bind hardest here -- the coldest-quartile top-1% CI [0.993, 1.547] CROSSES 1, and R225 comes before any first-place equity read. | Backlog / Mine | `build_slate.py` `run_showdown`, `mlb_engine/pipeline/execution_pipeline.py`, `mlb_engine/field/ownership_prior.py`, `showdown_theses.py` | P (R307's own fix line) | Med | None (R381 landed the sleeve it sits on, 2026-09-21) |
 
 ### Phase 2 -- the instrument and the ownership fit: grading what wins, from the archive already on disk (P, measurement)
 
@@ -3626,23 +3627,59 @@ derives `Is_Declared_Starter` from DK's `Starting` column, which admits `PLR` an
 not `PO`, so a `PO` arm still cannot be declared into a Showdown pool. That is a
 pool change on the build path and was never in this item's Fix line.
 
-### R307. Nothing in the build path can designate a captain sleeve, and all three indirect proxies were measured and failed, one of them scoring WORSE than no tilt at all (P1, M; GATED on R306 step 2) | new 2026-09-03, from BUILD fragment `2026-09-03_BUILD_captain-leverage-and-qa-as-research-arm.md` part 1; four tilt shapes measured on 2005_1g_sd, same slate, same odds packet, same bank
+### R307, REWRITTEN 2026-09-21 to its surviving remainder. The captain leverage sleeve SHIPPED as R381 in its explicit-id-list form; what is left is the captain-ownership prior reaching `run_showdown` and the `prior_own_below` selector on top of it (P1, M) | new 2026-09-03, from BUILD fragment `2026-09-03_BUILD_captain-leverage-and-qa-as-research-arm.md` part 1; four tilt shapes measured on 2005_1g_sd, same slate, same odds packet, same bank
 
-**Rider 2026-09-15 (DEV, from the mine; roadmap CC-5).** First archive evidence on the captain market, from 117 Showdown contests and 43,960 entries: captain popularity INVERTS between finish bands. By within-contest quartile of captain ownership, least- to most-captained, top-1% lift runs 1.231 / 1.051 / 0.861 / 0.856 while top-20% lift runs 0.935 / 0.816 / 1.103 / 1.146 -- contrarian captain for the top band, chalk captain for the min-cash band; the coldest quartile's top-1% CI is [0.993, 1.547], suggestive not established. At the same time Showdown TOTAL ownership does not hurt at the top (top 1% 0.527, 1-5% 0.547, 5-20% 0.560, 20-50% 0.559, bottom half 0.442: every band above median is MORE owned than the field). So the sleeve tilts the CAPTAIN slot toward the low-captained quartile for top-band entries and leaves the five flex slots chalk-positive; it never imports Classic total-ownership fading into Showdown. Pitcher captain is positive but uncertain (+10.5 pp [-1.8, +21.6] date-balanced; +2.6 pp [-10.4, +13.8] on verified paid positions; much weaker in 1,000+-entry fields), so no unconditional pitcher-captain rule. Large-field Showdown is half duplicates (median duplicate share 0.40 at 1k-5k, 0.49 above 5k, max copies 240; winners averaged 1.83 copies), so any first-place equity read that ignores splitting is optimistic by a large factor; R225 first. Ships counted and graded (R139's report), never as a default.
+**LANDED 2026-09-21 (CC-5 batch 1) as R381: the sleeve itself, end to end. The
+record is that date's CHANGELOG entry**, which carries the seam, the four
+controls it yields to, the three-way delivered split, the two declines and the
+17-mutation list. Gate `PASS v2.26.0 41 modules 2334 tests 5 skipped`, 2315 ->
+2334. In one line: `--captain-sleeve '{"entries": 4, "from": [...]}'` designates
+the first N reserved rows, the rest build with no tilt, the designation lands in
+`thesis["cpt"]` so it mints an R250 captain-budget reservation with no solver
+change, all four captain-slot controls still bind and the SLEEVE is what gives
+way, and the brief splits `honoured` / `lost` / `honest` on the DELIVERED
+captain and never sums them.
+
+**The heading's old "GATED on R306 step 2" marker was FALSE and is gone.** R306
+steps 1-3 shipped 2026-09-03 and R306's own entry ends "Step 4 lives on R307
+(slot 9), whose gate this discharged"; `predict_captain_ownership`'s docstring
+says "R306 step 2" in as many words. The roadmap row's dependency cell was
+correct throughout. The old "Why gated" paragraph went with the marker: its
+argument (that person-level prior ownership correlates with realized captain
+ownership between 0.33 and 0.85 and can invert the read) is a caution on the
+REMAINDER below, not a gate, and it is restated there.
 
 **Ben's design ruling, 2026-09-03, verbatim, because it is the shape of the
 item and not just its motivation:** "we dont need to artificially zero out
 players, but we should figure out how we can find leverage in the captain ranks
 and devote a few lineups to those picks." An honest core plus a designated
-leverage sleeve, not a globally distorted portfolio.
+leverage sleeve, not a globally distorted portfolio. R381 is this as code.
 
-**What exists.** `--leverage` is Classic only. Showdown's only indirect levers
-are `--projections` (a `Player_ID,Base` CSV the solver ranks on) and
-`max_cpt_exposure_pct` through `--controls-override`. Four shapes measured on
-16 entries, ownership column from `ownership_pred.py wta_satellite`, an
-UNCALIBRATED structural prior, and "mean CPT own" is the entry-weighted prior
-ownership of the 16 captain slots, a deterministic review proxy over a labeled
-prior:
+**Rider 2026-09-15 (DEV, from the mine; roadmap CC-5), and it still governs the
+remainder.** First archive evidence on the captain market, from 117 Showdown
+contests and 43,960 entries: captain popularity INVERTS between finish bands. By
+within-contest quartile of captain ownership, least- to most-captained, top-1%
+lift runs 1.231 / 1.051 / 0.861 / 0.856 while top-20% lift runs 0.935 / 0.816 /
+1.103 / 1.146 -- contrarian captain for the top band, chalk captain for the
+min-cash band; the coldest quartile's top-1% CI is [0.993, 1.547], suggestive
+not established. At the same time Showdown TOTAL ownership does not hurt at the
+top (top 1% 0.527, 1-5% 0.547, 5-20% 0.560, 20-50% 0.559, bottom half 0.442:
+every band above median is MORE owned than the field). So the sleeve tilts the
+CAPTAIN slot toward the low-captained quartile for top-band entries and leaves
+the five flex slots chalk-positive; it never imports Classic total-ownership
+fading into Showdown. Pitcher captain is positive but uncertain (+10.5 pp [-1.8,
++21.6] date-balanced; +2.6 pp [-10.4, +13.8] on verified paid positions; much
+weaker in 1,000+-entry fields), so no unconditional pitcher-captain rule.
+Large-field Showdown is half duplicates (median duplicate share 0.40 at 1k-5k,
+0.49 above 5k, max copies 240; winners averaged 1.83 copies), so any first-place
+equity read that ignores splitting is optimistic by a large factor; R225 first.
+Ships counted and graded (R139's report), never as a default.
+
+**Three negative results, recorded so no session spends a lock window
+rediscovering them.** Four shapes measured on 16 entries, ownership column from
+`ownership_pred.py wta_satellite`, an UNCALIBRATED structural prior, and "mean
+CPT own" is the entry-weighted prior ownership of the 16 captain slots, a
+deterministic review proxy over a labeled prior:
 
 | shape | cap | distinct CPT | mean CPT own | sub-25% CPT | relaxations |
 |---|---|---|---|---|---|
@@ -3652,37 +3689,82 @@ prior:
 | hard tilt 1.55/1.40/1.10/0.78 | 0.19 | 8 | 24.7% | 8 of 16 | 1 player |
 | CPT-row-only tilt | 0.19 | 8 | 33.8% | 2 of 16 | 0 |
 
-**Three negative results, recorded so no session spends a lock window
-rediscovering them.** (a) **The captain cap is a diversity control and nothing
-else.** Tightening it 0.25 → 0.13 took distinct captains 6 → 10 and every new
-captain slot went to a MORE-owned player (46.2%, 39.1%, 35.6%, 33.6%), because
-the solver fills a forced-open slot with the next-best by projection and
-projection rank tracks the field's ownership rank, both reading salary and
-batting order. A session reaching for it as a leverage control gets the opposite
-of what it wanted and the brief reports `clean` while it happens. (b) **Tilting
-only the CPT rows is worse than not tilting**, 33.8% against a 33.6% baseline.
-CPT and UTIL are distinct `Player_ID`s so a per-row tilt looks surgical, but the
-captain is chosen by whole-lineup value, and a neutral UTIL pool drags the same
-chalk back into the captain slot through the five slots underneath it. (c) **The
-hard tilt reaches its number by breaking the portfolio**, zeroing TB's leadoff
-man across all 16 entries and taking a player-exposure relaxation. That is the
-move Ben ruled out; a global prior tilt cannot buy captain leverage without
-paying for it in UTIL construction, because it is one knob feeding both.
+(a) **The captain cap is a diversity control and nothing else.** Tightening it
+0.25 -> 0.13 took distinct captains 6 -> 10 and every new captain slot went to a
+MORE-owned player (46.2%, 39.1%, 35.6%, 33.6%), because the solver fills a
+forced-open slot with the next-best by projection and projection rank tracks the
+field's ownership rank, both reading salary and batting order. A session
+reaching for it as a leverage control gets the opposite of what it wanted and
+the brief reports `clean` while it happens. R381 does not delegate the sleeve's
+rotation to it for this reason. (b) **Tilting only the CPT rows is worse than
+not tilting**, 33.8% against a 33.6% baseline. CPT and UTIL are distinct
+`Player_ID`s so a per-row tilt looks surgical, but the captain is chosen by
+whole-lineup value, and a neutral UTIL pool drags the same chalk back into the
+captain slot through the five slots underneath it. (c) **The hard tilt reaches
+its number by breaking the portfolio**, zeroing TB's leadoff man across all 16
+entries and taking a player-exposure relaxation. That is the move Ben ruled out;
+a global prior tilt cannot buy captain leverage without paying for it in UTIL
+construction, because it is one knob feeding both.
 
-**Fix, additive and Showdown-first.** A per-entry captain designation, e.g.
-`--captain-sleeve '{"entries": 4, "from": ["prior_own_below", 25.0]}'` or an
-explicit id list. The sleeve solves as its own sub-portfolio against the same
-bank, the remaining entries build with no tilt at all, and the brief reports the
-sleeve separately so mean captain ownership is never quoted over a mixed set as
-though it were one population. The three Showdown controls still bind across the
-union, because exposure caps are properties of the whole entered set (R153).
+**What is OPEN, and it is one thing with a small thing on top.**
 
-**Why gated.** R306's measurement says person-level prior ownership correlates
-with realized captain ownership between 0.33 and 0.85 and can invert the read
-outright. Building the sleeve first gives it a sight the measurement says can
-point the wrong way, and the 2005_1g_sd session's own conclusion was that it may
-have bought the chalk and sold the leverage using a number that could not tell
-it either way. Slot 2 first, then this.
+**(1) The captain-ownership prior reaching `run_showdown`.** The selector half
+of R381's flag is refused BY NAME because THE SELECTOR HAS NO INPUT IN THE BUILD
+PATH: `predict_captain_ownership` has exactly one production caller,
+`tools/ownership_pred.py`, which runs offline, and `run_showdown` has zero
+references to ownership or `own_pct` anywhere in its body. This is R334(a)'s
+shape -- a factor that exists offline and never reaches the build.
+
+Sharper than the original entry knew, and it makes this cheaper than it reads:
+**the number is already produced.** `tools/ownership_pred.py` emits, for a
+Showdown file, a `captain` block carrying `own_pct_by_player_id`,
+`tier_by_player_id`, `params`, a `budget_check` against `CAPTAIN_BUDGET_PCT`,
+and R328's `role_coherence`. What is missing is a READER on the Showdown path,
+not a producer. Model it on R334(a), one engine function returning one value.
+The shape is already pinned and the pin is not optional:
+`tests/test_core.py::test_the_sliced_path_attaches_through_the_SAME_function_before_the_bank`
+forbids the literal `attach_predicted_ownership(` anywhere in `build_slate.py`
+and position-checks the call sites, so the Showdown attach goes behind an engine
+function the way `apply_leverage_ownership` (`execution_pipeline.py`, imported
+inside `run_classic`) does for Classic. `--leverage`'s own help says "Classic
+only" and `build_slate.py` enforces it with a named refusal; whatever lands here
+must not quietly make that sentence false.
+
+**The caution the old "Why gated" paragraph was carrying, restated as what it
+is.** R306's measurement says person-level prior ownership correlates with
+realized captain ownership between 0.33 and 0.85 and can invert the read
+outright, and the 2005_1g_sd session's own conclusion was that it may have
+bought the chalk and sold the leverage using a number that could not tell it
+either way. So a selector reading that prior needs its correlation stated beside
+its output in the brief. It is not a reason to defer the reader.
+
+**(2) The `prior_own_below` selector, on top.** Small once (1) exists: it
+filters the same resolved person list `resolve_captain_sleeve` already builds,
+and every refusal, clamp, rotation and delivered-split behaviour is already
+there and tested. Keep the refusal-by-name until the reader is real, because a
+selector that silently designates nobody is worse than one that says it is not
+wired.
+
+**What was DECLINED in R381 and should not be rebuilt.** "The sleeve solves as
+its own sub-portfolio against the same bank" is a FALSE MECHANISM on the ladder
+path and was not built. There is no bank there: `bank = list(solved)` comes
+straight out of one `solve_ladder` call, and "bank" is the fallback path's
+vocabulary. Worse for the sentence's own promise, the three controls it says
+will "still bind across the union" accumulate in `solve_ladder`'s LOCALS for a
+single call (`cpt_counts`, `player_counts`, `reserved_remaining`,
+`forbidden_sets`), so a genuinely separate sub-portfolio solve would not see
+them and the caps would silently stop binding across the union -- the exact R153
+failure the sentence was written to avoid. The sleeve is designated ENTRIES
+inside the one `solve_ladder` call. The design intent survives; the framing did
+not.
+
+**One stale inventory, corrected.** The entry's old "What exists" said
+Showdown's only indirect captain levers were `--projections` and
+`max_cpt_exposure_pct`. R239(b) added a fourth after the entry was written:
+`max_cpt_per_contest`, read from the same `--controls-override` dict and
+enforced in both `build_thesis_ladder` and `solve_ladder`. On a multi-contest
+file a 4-entry sleeve meets it before it meets `max_cpt_exposure_pct`.
+
 
 ### R295, REWRITTEN 2026-09-21 to its surviving remainder. Showdown ladder truth: the four filed defects and the F40 rider are DONE; what is left is F14's soft-lock field and one ordering question, both API/design calls with no defect behind them (S) | new 2026-09-02, from the greenfield tenth edition (GF10-D1, D3, D4, D5)
 
@@ -9393,6 +9475,28 @@ whichever share of runs are backgrounded. It is a record-keeping defect, not an
 engine one: nothing a build or a brief says depends on it. Price it accordingly,
 but do not let it sit unfiled, because the evidence for it only exists while
 someone is looking at their own agent rows.
+
+**Rider 2026-09-21 (DEV, CC-5). SECOND REPRODUCTION, same shape, and it
+narrows the hypothesis.** CC-5 ran one BACKGROUND `dfs-premise` agent whose
+report ended with the line `FINDINGS: 3`. Its row:
+
+```json
+{"agent_id": "a66db50d0e5ff113b", "agent_type": "dfs-premise", "duration_s": 285.2,
+ "duration_source": "transcript first-to-last timestamp span",
+ "findings": null, "findings_source": "no FINDINGS line in the payload or the transcript",
+ "model": "claude-opus-5", "stop_reason": null, ...}
+```
+
+Two differences from the first sighting are worth having, because both remove a
+confound rather than adding one. `model` came through as a real identifier here
+(`claude-opus-5`, not `<synthetic>`), so a degraded payload is not the
+explanation. And `duration_s` again resolved off the transcript while `findings`
+did not, against a DIFFERENT duration (285.2s vs 501.5s) -- so the hook is
+reading a transcript and failing to find the agent's message in it, twice, which
+is exactly what the background/sidechain hypothesis predicts. Both runs were
+backgrounded; neither this session nor the first ran a foreground agent, so the
+CONFIRMING comparison the hypothesis asks for is still not on the board. Run it
+before building.
 
 **Done when:** a background subagent's `FINDINGS: n` reaches its row, the
 `findings_source` string says which path answered, and the refusal case (no
