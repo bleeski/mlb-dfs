@@ -2377,14 +2377,42 @@ class R250CaptainBudgetTests(unittest.TestCase):
     N = 12
     CHEAP = "Cheap|AA"
 
-    def _theses(self, n, cheap_from):
+    def _theses(self, n, cheap_from, locks=None):
         out = []
         for i in range(n):
             cpt = (self.CHEAP if i >= cheap_from
                    else ("AA_Big|AA" if i % 2 else "BB_Big|BB"))
             out.append({"template": f"t{i}", "name": f"t{i}", "why": "",
-                        "cpt": cpt, "locks": [], "excludes": [], "mult": {}})
+                        "cpt": cpt, "locks": list(locks or []),
+                        "excludes": [], "mult": {}})
         return out
+
+    def test_the_hold_survives_a_thesis_that_carries_locks(self):
+        """R295(a) closes this class's blind spot: every thesis above is built
+        with `locks: []`, so nothing here ever exercised the hold against a
+        thesis that names players. R295(a) makes the hold stand down for a lock
+        it would contradict, and this pins that the stand-down is narrow --
+        R250's own guarantee still has to hold when locks are present.
+
+        The locks here name a player the hold never reserves, so no
+        contradiction arises and the hold must bind exactly as it does above.
+        """
+        diag = {}
+        theses = self._theses(self.N, self.N // 2, locks=["BB_0|BB"])
+        solved = st.solve_ladder(_apex_pool(), theses, max_shared_players=None,
+                                 time_limit=5, diagnostics=diag)
+        captains = [(lu.get("captain") or {}).get("player_key")
+                    for lu in solved if lu is not None]
+        self.assertGreaterEqual(
+            captains.count(self.CHEAP), 1,
+            "with locks present the hold stopped placing the named captain, so "
+            "R295(a)'s stand-down is wider than the contradiction it targets")
+        self.assertEqual(diag["captain_budget_inversions"], [])
+        self.assertEqual(diag["player_relaxed"], 0)
+        self.assertEqual(diag["captain_budget_hold_yielded"], [],
+                         "no lock here contradicts a hold, so none should yield")
+        for lu in solved:
+            self.assertIsNotNone(lu, "a blank reserved row blocks certification")
 
     def _run(self, n=None, cheap_from=None, hold=True):
         """Solve the ladder with the budget hold on, or with it stripped at the
@@ -5076,6 +5104,137 @@ class R295dDuplicateRoleRowsAreRefusedTests(unittest.TestCase):
         with self.assertRaises(ValueError) as caught:
             sd.melt_showdown_salary_csv(self._twin(self.POOLED, salary="3000"))
         self.assertIn("another's projection", str(caught.exception))
+
+
+class R295aTheHoldYieldsToAContradictingLockTests(unittest.TestCase):
+    """R295(a). The R250 captain-budget hold collided with a thesis lock and the
+    ladder answered by dropping the PLAYER CAP.
+
+    A player `X` this thesis locks must appear (`cpt_X + util_X >= 1`). The hold
+    says `util_X = 0`. The captain lock names someone else. The three are
+    infeasible for no strategic reason, and the rung that answers drops the cap
+    and the hold together (`excludes=without_cap`, no `**util_kw`), readmitting
+    every capped player to rescue a thesis whose only problem was a reservation.
+
+    Reproduced at the `build_thesis_ladder` level deliberately: through
+    `run_showdown`, R334(a) routes the same moneyline packet into
+    `build_showdown_f1` -> `apply_f1_prior`, which moves `Base`, so the filed
+    counts would not reproduce there and that would not be a falsification.
+
+    Every count here is a deterministic property of the delivered set. No win
+    rate, ROI or probability is claimed.
+    """
+
+    N = 12
+    MONEYLINE = {"MIN": 150.0, "CHC": -170.0}
+
+    @classmethod
+    def setUpClass(cls):
+        cls.df = sd.melt_showdown_salary_csv(SAL)
+
+    def _solve(self, n=None, moneyline=None):
+        built = st.build_thesis_ladder(self.df, n or self.N,
+                                       moneyline=moneyline or self.MONEYLINE)
+        diag = {}
+        solved = st.solve_ladder(self.df, built["theses"],
+                                 max_shared_players=None, time_limit=8,
+                                 diagnostics=diag)
+        counts = collections.Counter()
+        for lu in solved:
+            if lu is not None:
+                for key in lu["player_keys"]:
+                    counts[key] += 1
+        return built["theses"], solved, diag, counts
+
+    def test_no_player_finishes_over_the_player_cap(self):
+        """The filed breach, on the filed inputs: Josh Bell 7 of 12 against a
+        `player_cap_count` of 6."""
+        _, _, diag, counts = self._solve()
+        cap = diag["player_cap_count"]
+        self.assertIsNotNone(cap, "fixture precondition: the cap must bind")
+        over = {k: c for k, c in counts.items() if c > cap}
+        self.assertEqual(over, {},
+                         f"realized exposure above the player cap of {cap}: {over}")
+
+    def test_the_cap_is_not_relaxed_to_get_there(self):
+        """The distinction that makes this a defect rather than a trade: the cap
+        holding because nothing asked it to give way, not because the ladder
+        relaxed it and the counts happened to land under."""
+        _, _, diag, _ = self._solve()
+        self.assertEqual(diag["player_relaxed"], 0)
+        self.assertEqual(diag["captain_budget_inversions"], [])
+
+    def test_the_hold_that_stood_down_is_named(self):
+        """A hold that silently did not apply is the invisibility R250 was filed
+        against, one level down. The stand-down is reported per (slot, player)
+        with what it yielded to."""
+        theses, _, diag, _ = self._solve()
+        yielded = diag["captain_budget_hold_yielded"]
+        self.assertTrue(yielded, "the filed collision no longer arises at all; "
+                                 "re-derive the fixture before trusting this suite")
+        for row in yielded:
+            self.assertEqual(row["yielded_to"], "lock")
+            for field in ("thesis", "player", "held"):
+                self.assertIn(field, row)
+        names = {row["player"] for row in yielded}
+        by_name = {t["name"]: t for t in theses}
+        for row in yielded:
+            thesis = by_name[row["thesis"]]
+            locked = {str(k) for k in (thesis.get("locks") or [])}
+            key = next(k for k in self.df["Player_Key"]
+                       if str(k).split("|")[0] == row["player"])
+            self.assertIn(key, locked,
+                          "a hold yielded for a player the thesis never locked")
+            self.assertNotEqual(str(thesis.get("cpt")), key,
+                                "a hold yielded although the locked player IS "
+                                "the captain lock, where nothing contradicts")
+        self.assertTrue(names)
+
+    def test_the_hold_still_binds_where_nothing_contradicts_it(self):
+        """The stand-down must be narrow. R250's hold has to keep blocking UTIL
+        seats on every slot where no lock contradicts it, or this fix has
+        replaced one silent failure with another."""
+        _, _, diag, _ = self._solve()
+        self.assertGreater(
+            diag["captain_budget_util_blocks"], 0,
+            "the hold stopped binding anywhere, so R295(a) disabled R250 rather "
+            "than narrowing it")
+
+    def test_every_reserved_row_is_still_filled(self):
+        """A blank reserved row blocks certification, so a fix that buys cap
+        compliance with a missing lineup has bought nothing."""
+        _, solved, _, _ = self._solve()
+        self.assertEqual(len(solved), self.N)
+        for i, lu in enumerate(solved):
+            self.assertIsNotNone(lu, f"slot {i} came back blank")
+
+    def test_the_brief_carries_the_stand_down(self):
+        """The operator surface. R250's hold is reported in the brief's
+        `captain_budget` block; a hold that stood down belongs beside it, or the
+        reader has to infer it from a block that is not there."""
+        src = (REPO / "skills" / "generate-lineups" / "scripts"
+               / "build_slate.py").read_text(encoding="utf-8")
+        self.assertIn('"hold_yielded_to_lock": captain_budget_hold_yielded,', src)
+        self.assertIn('solve_diag.get("captain_budget_hold_yielded")', src)
+        self.assertIn("captain_budget_hold_yielded = []", src,
+                      "the bank path must define the key too, or the brief "
+                      "raises NameError on a non-ladder Showdown build")
+
+    def test_the_cap_holds_across_the_moneyline_grid(self):
+        """One fixture at one price is a sighting. The cap has to hold across
+        the side mix, because the moneyline is what moves which thesis carries
+        which locks."""
+        for chc, mn in ((-350.0, 300.0), (-170.0, 150.0), (110.0, -130.0),
+                        (300.0, -350.0)):
+            for n in (9, 12):
+                with self.subTest(chc=chc, n=n):
+                    _, solved, diag, counts = self._solve(
+                        n=n, moneyline={"CHC": chc, "MIN": mn})
+                    cap = diag["player_cap_count"]
+                    over = {k: c for k, c in counts.items() if cap and c > cap}
+                    self.assertEqual(over, {}, f"cap {cap} breached: {over}")
+                    self.assertEqual(diag["player_relaxed"], 0)
+                    self.assertTrue(all(lu is not None for lu in solved))
 
 
 if __name__ == "__main__":

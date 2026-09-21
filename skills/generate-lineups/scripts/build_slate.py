@@ -3980,6 +3980,10 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         captain_budget_reserved = dict(
             solve_diag.get("captain_budget_reserved") or {})
         captain_budget_util_blocks = solve_diag.get("captain_budget_util_blocks") or 0
+        # R295(a). Holds that stood down for a lock they would have
+        # contradicted. Reported, never counted: no control gave way.
+        captain_budget_hold_yielded = list(
+            solve_diag.get("captain_budget_hold_yielded") or [])
     else:
         cap_count = cpt_diagnostics.get("cap_count")
         captain_counts = cpt_diagnostics.get("captain_exposure") or {}
@@ -4043,6 +4047,7 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         captain_budget_inversions = []
         captain_budget_reserved = {}
         captain_budget_util_blocks = 0
+        captain_budget_hold_yielded = []
         player_structural_floor = cpt_diagnostics.get("player_cap_structural_floor")
     # R239(c). Computed on BOTH paths: the points-max bank builds no thesis
     # report, but it does build lineups, and the contest each one is entered into
@@ -4340,6 +4345,12 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         "captain_budget": {
             "reserved": captain_budget_reserved,
             "util_blocked_slots": captain_budget_util_blocks,
+            # R295(a). A hold that silently did not apply is the same
+            # invisibility R250 was filed against, one level down: the hold
+            # stands down for a thesis lock it would otherwise contradict, and
+            # the brief says so rather than leaving it to be inferred from a
+            # block that is not there.
+            "hold_yielded_to_lock": captain_budget_hold_yielded,
             "label": "an allocation of exposure between the 1.5x and 1.0x seats, "
                      "never a change to any cap value",
         },

@@ -1297,6 +1297,10 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
     captain_budget_reserved = {k: v for k, v in reserved_remaining.items() if v}
     util_block_slots = 0
     util_block_detail: List[Dict[str, str]] = []
+    # R295(a). Slots where the captain-budget hold stood down for a lock it
+    # would otherwise have contradicted. NOT a relaxation: nothing gave way
+    # and no cap moved, so it is reported outside `clean`.
+    hold_yielded_detail: List[Dict[str, str]] = []
     # R239(b)(i). The per-contest cap enforced HERE, where the roster spot is
     # actually spent. R153's second pass is the whole reason: `solve_ladder`
     # trusted `build_thesis_ladder`'s apportionment and then substituted captains
@@ -1455,12 +1459,34 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
         # ahead of him and (b) taking one more non-captain seat would eat into the
         # units those rungs need. Below that line he is spent freely: the hold is
         # the LAST few units of his budget, not his whole exposure.
+        #
+        # R295(a). The hold YIELDS to a lock it would contradict. A player this
+        # thesis locks must appear (`cpt_X + util_X >= 1`); the hold says
+        # `util_X = 0`; and when the captain lock names someone else, the only
+        # seat left for him is the one the hold closed. The three together are
+        # infeasible for no strategic reason, and the ladder's answer was to
+        # drop the PLAYER CAP -- readmitting every capped player to rescue a
+        # thesis whose only problem was a reservation.
+        #
+        # Yielding is the right direction because the lock is the thesis's own
+        # statement of what it IS and the hold is bookkeeping in service of a
+        # later slot. Recorded per (slot, player) so a hold that stood down is
+        # visible rather than inferred from a missing block.
+        locked_here = set(locks)
         util_blocked: List[str] = []
         if player_cap is not None:
             for k, held in reserved_remaining.items():
                 if held <= 0:
                     continue
                 if player_counts.get(k, 0) >= player_cap - held:
+                    if k in locked_here and cpt_lock and cpt_lock != k:
+                        hold_yielded_detail.append({
+                            "thesis": tname,
+                            "player": name_by_key.get(k, k),
+                            "held": str(held),
+                            "yielded_to": "lock",
+                        })
+                        continue
                     util_blocked.append(k)
         util_blocked = sorted(util_blocked)
         if util_blocked:
@@ -1767,6 +1793,13 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
             "captain_budget_reserved": dict(captain_budget_reserved),
             "captain_budget_util_blocks": util_block_slots,
             "captain_budget_block_detail": list(util_block_detail),
+            # R295(a). The hold standing down for a lock it would have
+            # contradicted. NOT a relaxation and deliberately outside `clean`:
+            # no control gave way and no cap moved. It is reported because a
+            # hold that silently did not apply is the same invisibility R250
+            # was filed against, one level down.
+            "captain_budget_hold_yielded": list(hold_yielded_detail),
+
             # The apex caution itself. Non-empty means the portfolio spent a named
             # captain's entire budget at 1.0x and none at 1.5x, which is the
             # condition R250 was filed for. Empty on a clean ladder.

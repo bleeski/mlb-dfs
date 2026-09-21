@@ -1118,7 +1118,16 @@ EXPECTED_SUITE_COUNTS = {
     # key: a pooled duplicate refused by name, the refusal naming both DK IDs,
     # a duplicate OUTSIDE the pool deliberately not refused, every committed
     # Showdown salary file still melting, and the mixed merge itself.
-    "tests.test_showdown": 273,
+    # R295(a), 2026-09-21: 273 -> 281, the eight that pin the hold standing down
+    # for a lock it would contradict. Six on the ladder: no player over the
+    # player cap on the filed inputs, the cap not RELAXED to get there, the
+    # stand-down named with what it yielded to, the hold still binding where
+    # nothing contradicts it (the narrowness guard), every reserved row still
+    # filled, and the cap holding across the moneyline grid. One on the brief's
+    # `captain_budget.hold_yielded_to_lock`, including the bank path defining
+    # the key. One inside `R250CaptainBudgetTests`, which built every thesis
+    # with `locks: []` and so could not see an over-broad stand-down at all.
+    "tests.test_showdown": 281,
     # R96, 2026-08-11: 141 -> 162, the twenty-one tests that pin the delivery
     # path. A `grew` verdict is the one case where moving a pin is correct.
     # R46 round 2, 2026-08-12: 162 -> 168, the six that pin the PARTIAL side.

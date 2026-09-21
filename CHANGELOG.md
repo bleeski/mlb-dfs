@@ -25,6 +25,92 @@ performance claim.
 
 ---
 
+## 2026-09-21 — R295(a): the captain-budget hold stands down for a thesis lock it would contradict, instead of the ladder dropping the player cap (CC-4 batch 2 of 4)
+
+**Scope.** `mlb_engine/optimize/showdown_theses.py` (`solve_ladder`: the hold
+computation and a `captain_budget_hold_yielded` diagnostic),
+`skills/generate-lineups/scripts/build_slate.py` (the brief's `captain_budget`
+block, both paths), `tests/test_showdown.py`
+(`R295aTheHoldYieldsToAContradictingLockTests`, new, 7;
+`R250CaptainBudgetTests.test_the_hold_survives_a_thesis_that_carries_locks`,
+new, 1), `tools/audit.py` (`EXPECTED_SUITE_COUNTS`), `docs/backlog.md`.
+
+**What was wrong, reproduced rather than read.** A player `X` a thesis LOCKS
+must appear (`cpt_X + util_X >= 1`). R250's hold says `util_X = 0`. The captain
+lock names someone else. The three are infeasible for no strategic reason, and
+the rung that answers drops the player cap and the hold TOGETHER
+(`excludes=without_cap`, no `**util_kw`), readmitting every capped player to
+rescue a thesis whose only problem was a reservation.
+
+Reproduced on the MIN@CHC fixture at `{MIN:+150, CHC:-170}`, n=12, through
+`build_thesis_ladder`: **Josh Bell 7 of 12 against `player_cap_count=6` — 58.3%
+under a 50% cap — with `player_relaxed=1`.** The colliding slot is named:
+`Both offenses explode - no starters` locks Pete Crow-Armstrong and captains
+Ryan Jeffers, while the hold reserved Crow-Armstrong's last unit. After the fix
+Bell is 6 of 12, `player_relaxed` is 0, all 12 reserved rows are filled, and the
+one stand-down is reported by name.
+
+**Reproduced at `build_thesis_ladder`, and that is load-bearing.** Through
+`run_showdown`, R334(a) now routes the same moneyline packet into
+`build_showdown_f1` → `apply_f1_prior`, which moves `Base` before the ladder
+sees it, so these counts do not reproduce at that level and their absence there
+is not a falsification.
+
+**Two things in the filed entry did not survive contact and should not be
+repeated.** Its second repro — `{MIN:+300, CHC:-350}`, n=9, three players at 5/9
+over a cap of 4 plus a `captain_budget_inversion` for Suzuki — does NOT
+reproduce at HEAD: that combination comes back with no breach, no relaxation and
+no inversion. And the incidence is far below the filed "16 of 150 combinations":
+a 30-cell sweep (6 moneylines × 5 entry counts) found **one** breached player
+before the fix and zero after, with no lineup lost in any cell. The mechanism is
+real and the headline number is real; the breadth claim is not, and CC-3's
+`describe_slate` opener guard (R347) changing which players land in `starters`
+is the likely reason, since `starters` is what decides which theses carry which
+locks.
+
+**The filed fix's second half is DECLINED, and the reason is that it reopens
+R250.** The entry asks for a hold-only rung between rungs 2 and 3, counted under
+`captain_budget_hold_relaxed`. It was built, and it reddened two R250 tests:
+`test_a_named_captain_at_the_player_cap_still_reaches_the_captain_slot` and
+`test_the_budget_moves_from_util_to_captain_it_does_not_grow` ("the hold
+recovered no captain slots, so it is doing nothing"). The reason is structural
+rather than incidental. Dropping the hold is always cheaper than dropping the
+player cap, so a rung offering that trade is taken every time the hold binds —
+and a hold that gives way whenever it binds is not a reservation. R250's design
+is that the hold binds HARD and the thesis solves around it; reordering two
+controls in the relaxation ladder is a STRATEGY change with no dead player
+behind it, which CLAUDE.md reserves to Ben. It is filed as a decision on the
+rewritten row rather than shipped. On the measured fixtures it would have
+bought nothing anyway: the rung fired zero times in all 30 sweep cells.
+
+**What shipped is the first half alone, and it is narrow by construction.** The
+hold skips a player only when all three of (i) this thesis locks him, (ii) a
+captain lock exists, and (iii) that captain lock is someone else. Where the
+locked player IS the captain lock there is no contradiction and the hold stands.
+Where no lock names him the hold stands. `captain_budget_util_blocks` is still
+nonzero on the fixture after the fix, which is the pinned proof that R250 was
+narrowed rather than disabled.
+
+**Reported, never counted.** `captain_budget_hold_yielded` is a per-(slot,
+player) record carrying `yielded_to: "lock"`, surfaced in the brief as
+`captain_budget.hold_yielded_to_lock`. It is deliberately OUTSIDE
+`counted_relaxations` and outside `clean`, on R250's own precedent: no control
+gave way, no cap moved, and the realized set breached nothing. A hold that
+silently did not apply is the same invisibility R250 was filed against, one
+level down, which is why it is reported at all.
+
+**The R250 blind spot is closed where it lives.** `R250CaptainBudgetTests` built
+every thesis with `"locks": []` at both of its two construction sites, so the
+class could not see a stand-down of any width. Its `_theses` helper now takes
+locks, and a new test pins that R250's own guarantee survives a locks-carrying
+thesis. That closure is load-bearing, not decorative: the mutation that
+over-broadens the yield to ignore the captain lock reddens four R250 tests
+including this one, where before it would have reddened none.
+
+**Gate.** `PASS  v2.26.0  41 modules  2309 tests  5 skipped` (2301 before; +8).
+Five host skips unchanged from the session baseline. Golden histogram unmoved;
+no Classic path is touched.
+
 ## 2026-09-21 — R295(c)(d): the captain-lock rung stops re-solving rung 1, and two DK persons sharing a name on one team are refused instead of merged (CC-4 batch 1 of 4)
 
 **Scope.** `mlb_engine/optimize/showdown_theses.py` (the fifth rung's condition;
