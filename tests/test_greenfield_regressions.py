@@ -414,3 +414,216 @@ def test_no_legacy_module_imports_the_production_package_or_pydantic():
 
     assert scanned, "the scan found no legacy modules, so it proved nothing"
     assert offenders == [], "\n".join(offenders)
+
+
+# ---------------------------------------------------------------------------
+# F6 / R374 (CC-A9). Two halves: the live path had no timing baseline at all,
+# and "the candidate bank cap" was believed to govern the bank every build
+# draws from. The first is closed by `benchmark_engine --live`; the second is
+# false, and these tests are what stop it being re-asserted.
+# ---------------------------------------------------------------------------
+
+
+def test_benchmark_engine_live_mode_does_not_wear_the_synthetic_label():
+    """F6 / R374. The honest-label question is the design question in --live.
+
+    `--live` drives the real MILP through `execution_pipeline.run_slate`, so
+    SYNTHETIC_LABEL's "offline synthetic workload; no live model" is false of
+    it. Copying that label onto the live path would be a truthful-labels
+    violation of exactly the kind CLAUDE.md makes non-negotiable, and it is the
+    cheapest mistake to make here because the label is one shared dict key.
+    """
+    import tools.benchmark_engine as be
+
+    assert be.LIVE_LABEL != be.SYNTHETIC_LABEL
+    assert "synthetic" not in be.LIVE_LABEL.lower()
+    # Each clause carries a fact a reader would otherwise assume wrongly.
+    for clause in ("run_slate", "no network intake", "n=1", "review prox"):
+        assert clause in be.LIVE_LABEL, f"LIVE_LABEL dropped its '{clause}' clause"
+    # Every economic word it uses must be inside its own disclaimer, never as a
+    # claim. Checked by requiring the disclaimer clause verbatim.
+    assert "never ROI, edge, a win rate, or a probability" in be.LIVE_LABEL
+
+
+def test_benchmark_engine_exposes_live_as_a_real_flag():
+    """The row named `benchmark_engine --live` as if it existed; it did not.
+
+    Asserted FUNCTIONALLY, not off `--help`. The first cut of this test grepped
+    the help text for "--live" and survived deletion of the flag, because the
+    module docstring names `--live` too and argparse prints the docstring as
+    its description. So this hands argparse the flag and asks whether it was
+    recognized: an existing `--output` makes the run die in `mkdir(exist_ok=False)`
+    AFTER parsing, while an unknown flag dies IN parsing with exit code 2.
+    """
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    out = subprocess.run(
+        [sys.executable, str(root / "tools" / "benchmark_engine.py"),
+         "--live", "--output", str(root)],
+        capture_output=True, text=True, timeout=180,
+    )
+    assert "unrecognized arguments" not in out.stderr, "--live is not a real flag"
+    assert out.returncode != 2, f"argparse rejected --live: {out.stderr}"
+    assert "FileExistsError" in out.stderr, (
+        "expected --live to parse and then fail on the existing --output dir; "
+        f"got rc={out.returncode} stderr={out.stderr[-400:]}"
+    )
+
+
+def test_benchmark_engine_live_replay_config_matches_the_golden_replay():
+    """The baseline must time the SAME shape the golden gate pins for correctness.
+
+    If these drift, `--live` reports a number for a build nothing else in the
+    tree verifies, and the two would drift silently because they are two
+    literals in two files.
+    """
+    import tools.benchmark_engine as be
+    from tests import test_golden_replay as gr
+
+    assert be.LIVE_SLATE_DATE == gr.SLATE_DATE
+    assert be.LIVE_REQUESTED_N == gr.REQUESTED_N
+    assert be.LIVE_TOP_SP_PER_TEAM == gr.TOP_SP_PER_TEAM
+    assert be.LIVE_LOOSE_CONTROLS == gr.LOOSE_CONTROLS
+    assert sorted(be.LIVE_ASSUMED_GATES) == sorted(
+        ["odds_gate_passed", "weather_gate_passed",
+         "pitcher_audit_gate_passed", "lineup_gate_passed"]
+    )
+
+
+def test_benchmark_engine_live_helpers_agree_with_the_golden_replay_helpers():
+    """Same inputs and same projection rows, measured on the vendored slate."""
+    import tools.benchmark_engine as be
+    from tests import test_golden_replay as gr
+
+    if not gr.ARCHIVE_DIR.exists():
+        import pytest
+        pytest.skip(f"data/archive/{gr.SLATE_DATE}/ is not vendored in this checkout")
+
+    be_salary, be_entries = be.live_inputs(gr.ARCHIVE_DIR)
+    gr_salary, gr_entries = gr._find_archive_inputs(gr.ARCHIVE_DIR)
+    assert (be_salary, be_entries) == (gr_salary, gr_entries)
+    assert be_salary is not None and be_entries is not None
+
+    be_rows = be.live_projection_rows(be_salary)
+    gr_rows = gr._projection_rows_from_salary_csv(gr_salary)
+    key = lambda rows: sorted((r["Player_ID"], r["Base"]) for r in rows)  # noqa: E731
+    assert key(be_rows) == key(gr_rows)
+    assert be_rows, "the live benchmark would have timed an empty projection set"
+
+
+def test_the_candidate_bank_cap_does_not_govern_the_bank_most_builds_deliver():
+    """R374's load-bearing measurement finding, pinned so it is not re-litigated.
+
+    `DEFAULT_CANDIDATE_BANK_CAP` clamps `resolve_candidate_bank_size`, and only
+    the AUTO bank path consults that resolver. The SLICED path -- the one
+    `build_slate.py` delivers from, and `execution_pipeline.py`'s own comment
+    calls "most of them" -- sizes its bank `max(n_entries * 12, 60)` and hands
+    it to `extend_bank`, which reads neither the resolver nor the cap. So
+    "raise the cap" is not a question about the bank most builds draw from.
+    """
+    import re
+    from pathlib import Path
+
+    from mlb_engine.optimize.optimizer_v3 import (
+        DEFAULT_CANDIDATE_BANK_CAP, resolve_candidate_bank_size,
+    )
+
+    root = Path(__file__).resolve().parents[1]
+    bank_cache = (root / "mlb_engine" / "optimize" / "bank_cache.py").read_text(encoding="utf-8")
+    assert "resolve_candidate_bank_size" not in bank_cache
+    assert "DEFAULT_CANDIDATE_BANK_CAP" not in bank_cache
+
+    build_slate = (root / "skills" / "generate-lineups" / "scripts" / "build_slate.py").read_text(
+        encoding="utf-8")
+    assert re.search(r"max\(\s*n_entries\s*\*\s*12\s*,\s*60\s*\)", build_slate), \
+        "the sliced path's bank size moved; re-measure before trusting this finding"
+
+    # The cap first binds at 75 reserved entries and not before.
+    assert resolve_candidate_bank_size(74) == 148
+    assert resolve_candidate_bank_size(74) < DEFAULT_CANDIDATE_BANK_CAP
+    assert resolve_candidate_bank_size(75) == DEFAULT_CANDIDATE_BANK_CAP
+    # At every realistic entry count the delivering path already asks for more
+    # than the capped auto path resolves to.
+    for n in (5, 10, 18, 20, 50):
+        assert max(n * 12, 60) > resolve_candidate_bank_size(n)
+
+
+def test_neither_golden_replay_can_move_when_the_cap_moves():
+    """So a cap move needs no golden re-freeze, which the row required.
+
+    Both goldens run well under 75 reserved entries, so `resolve_candidate_bank_size`
+    never reaches the cap on either, and the production golden builds its bank
+    through `extend_bank`, which never consults the resolver at all.
+    """
+    from mlb_engine.optimize.optimizer_v3 import (
+        DEFAULT_CANDIDATE_BANK_CAP, resolve_candidate_bank_size,
+    )
+    from tests import test_golden_replay as gr
+
+    for n in (gr.REQUESTED_N, 18):
+        assert resolve_candidate_bank_size(n) < DEFAULT_CANDIDATE_BANK_CAP, (
+            f"a golden replay at requested_n={n} now reaches the cap; a cap move "
+            "would move its frozen baseline and the re-freeze must be deliberate"
+        )
+
+
+def test_benchmark_engine_live_never_publishes_into_the_delivery_ledger():
+    """A benchmark must not leave certified deliveries behind.
+
+    `--live` runs a real certified build, and a certified build writes a
+    `kind: "delivery"` record into `data/deliveries/<date>/`. Unredirected, six
+    benchmark runs published six certified deliveries of an ARCHIVED slate into
+    the tracked ledger, where `awaiting_standings`, `field_miner` and
+    `outcome_review` all read them as real. Measured, not hypothetical: the
+    first cut of `--live` did exactly this.
+
+    Both redirections are asserted. The env var is what
+    `delivery_record._artifact_root` reads at call time, and `REPO_ROOT` is the
+    attribute it reads it THROUGH -- a module that took an import-time copy of
+    the name would not see the env var, which is the bug R338 repair 4 fixed on
+    the gate path.
+    """
+    import os
+    from pathlib import Path
+
+    import tools.benchmark_engine as be
+    import mlb_engine.entries.upload_manifest as upload_manifest
+
+    root = Path(__file__).resolve().parents[1]
+    seen = {}
+    real_inner = be._run_live_inner
+
+    def spy(output_dir):
+        seen["env"] = os.environ.get("MLB_DFS_ARTIFACT_ROOT")
+        seen["repo_root"] = upload_manifest.REPO_ROOT
+        return {"build_outcome": {"passed": True}}
+
+    before_env = os.environ.get("MLB_DFS_ARTIFACT_ROOT")
+    before_repo_root = upload_manifest.REPO_ROOT
+    be._run_live_inner = spy
+    try:
+        be.run_live(root / "unused")
+    finally:
+        be._run_live_inner = real_inner
+
+    # Compared against the values from BEFORE the call, not against the repo
+    # root. The first cut of this test asserted "not the repo root" and survived
+    # deletion of BOTH redirects, because tests/conftest.py has already pointed
+    # them somewhere else for the whole suite -- so it was measuring conftest.
+    assert seen["env"], "--live ran without redirecting MLB_DFS_ARTIFACT_ROOT"
+    assert seen["env"] != before_env, (
+        "--live did not set MLB_DFS_ARTIFACT_ROOT to its own directory")
+    assert Path(seen["repo_root"]) != Path(before_repo_root), (
+        "--live did not redirect upload_manifest.REPO_ROOT, so the delivery "
+        "writer would publish wherever the ambient root points")
+    assert Path(seen["env"]).resolve() == Path(seen["repo_root"]).resolve(), (
+        "the env var and REPO_ROOT point at different directories, so one of "
+        "the two writers is still escaping the redirect")
+    assert Path(seen["env"]).resolve() != root.resolve()
+    # And both are put back, or every later call in this process writes to a
+    # temp dir that no longer exists.
+    assert os.environ.get("MLB_DFS_ARTIFACT_ROOT") == before_env
+    assert upload_manifest.REPO_ROOT == before_repo_root
