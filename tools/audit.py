@@ -1135,7 +1135,30 @@ EXPECTED_SUITE_COUNTS = {
     # block rather than a missing key), and three on the wiring (the JSON-object
     # door, a refusal before anything is staged, and one delivered build whose
     # brief splits the sleeve from the honest remainder).
-    "tests.test_showdown": 306,
+    # R382, 2026-09-21: 306 -> 334, the twenty-eight that pin CC-5 batch 2 --
+    # the captain-ownership prior reaching the build and the `prior_own_below`
+    # selector on top of it. Eleven on the reader (the UTIL key space proven
+    # END TO END against the real `ownership_pred` emit rather than a hand-built
+    # payload, a CPT-keyed file joining and SAYING so, a prediction from another
+    # slate matching nobody and refusing by name, the Classic 800/200 market
+    # never used as the fallback, the archetype asked rather than picked, the
+    # empty cases, the four bad values, two ids on one person, a short budget
+    # reported and never rescaled, a person the prediction never scored named
+    # rather than zeroed, the ids read in SORTED order so a refusal and an
+    # `ids_not_in_pool` list are reproducible, and the label disclaiming each
+    # banned word by name),
+    # eight on the selector (coldest-first ordering, the menu not truncated to
+    # the entry count, an unscored person EXCLUDED rather than read as cold,
+    # the seven threshold and arity refusals, a threshold selecting nobody, an
+    # explicit list still ignoring the prior, and the selected sleeve reaching
+    # the ladder), and seven on the wiring (the resolve-before-the-sleeve
+    # order, the payload's shape staying out of the script, the Showdown gate
+    # against `is not None` because bare `--captain-prior` is not absent, the
+    # brief block, the corrected `--ownership-pred` help, the exit-4 prose
+    # count now counted from the AST, and TWO end-to-end runs of
+    # `resolve_captain_prior` itself over a real emitted file -- R300's rule,
+    # because every string pin above it would stay green on a dead branch).
+    "tests.test_showdown": 334,
     # R96, 2026-08-11: 141 -> 162, the twenty-one tests that pin the delivery
     # path. A `grew` verdict is the one case where moving a pin is correct.
     # R46 round 2, 2026-08-12: 162 -> 168, the six that pin the PARTIAL side.

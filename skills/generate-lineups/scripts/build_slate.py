@@ -510,8 +510,15 @@ VERIFY_CLASSIC_FAILURE_CLASS = {
 # be discovered, because "which exits does the governor not reach" is the
 # question the item makes the governor answer out loud.
 #
-# EXIT 4, fourteen sites (run_classic:1 through leverage_unresolved,
-# run_showdown:3, main:10). Every one refuses BEFORE anything is solved: a
+# EXIT 4, NINETEEN sites (run_classic:1 through leverage_unresolved,
+# run_showdown:5, main:13). R382 added two of them (`captain_prior_unresolved`,
+# `captain_prior_not_supported_on_classic`) and found the sentence already
+# stale by three before that: it read "fourteen (1/3/10)" against a tree
+# carrying seventeen (1/4/12). A hand-maintained count of a growing class
+# drifts silently, which is the one thing this comment exists not to do, so
+# `test_the_exit_4_site_count_in_the_prose_matches_the_TREE` now counts the
+# `return 4` sites by AST and fails on the next drift instead of the one after
+# it. Every one refuses BEFORE anything is solved: a
 # missing or unreadable salary file, a feed for another slate, a flag value this
 # build cannot use, a projections file that will not parse. R296(h) moved
 # `supplied_feed_rejected` here from exit 3 for exactly this reason and it is
@@ -3338,6 +3345,103 @@ def resolve_leverage(args, salary: Path, slate_tag: str) -> tuple[dict, dict]:
     }
 
 
+def resolve_captain_prior(args, slate_tag: str, df) -> tuple[dict, dict]:
+    """(resolved captain prior for the Showdown build, brief block). R382.
+
+    CC-5 batch 2 of R307. `tools/ownership_pred.py` has emitted a Showdown
+    CAPTAIN-slot distribution since R306 and nothing on the build path read
+    it, so `run_showdown` had no captain-ownership input and R381 refused the
+    sleeve's `prior_own_below` selector by name. This is the reader, and it is
+    `resolve_leverage`'s shape on purpose: the same `find_prior_file`, the same
+    refusal-with-the-path-named, the same archetype question asked rather than
+    answered by sort order, the same source/sha256/resolved_by provenance.
+
+    ONE LINE OF `resolve_leverage` IS DELIBERATELY NOT COPIED. It reads
+    `archetypes[a]["own_pct_by_player_id"]`, which is the CLASSIC 800/200
+    market and sums to ~1000% on a Showdown file. The captain slot is a 100%
+    budget over one slot and R306 built it as a separate distribution because
+    the archive says the two are different markets. So this reads the CAPTAIN
+    market instead, and it reads it through `captain_prior_by_person` rather
+    than reaching into the payload here -- that function also does the CPT/UTIL
+    key-space join without which the numbers land on nobody at all.
+
+    Which key names which block is therefore NOT written down in this script,
+    deliberately, comment included. A second statement of a payload's shape is
+    how a second reader of it starts, and it is exactly what the Classic
+    attach pin forbids one surface over.
+
+    THE ENGINE OWNS THE SEMANTICS. Everything about what the payload MEANS --
+    the archetype question, the captain block, the key-space join, the
+    budget check, the refusals -- is one engine function. What stays here is
+    what `resolve_leverage` keeps here: finding the file, hashing it, and
+    shaping the brief. `tests/test_core.py::test_the_sliced_path_attaches_
+    through_the_SAME_function_before_the_bank` forbids this script from
+    minting its own copy of the Classic attach, and the same discipline
+    applies to a market the script would otherwise learn the shape of.
+
+    THIS ALSO RETIRES A SILENT NO-OP NEITHER R307 NOR R381 NAMED.
+    `--ownership-pred` is not Classic-gated and never was, but its only reader
+    was inside `resolve_leverage`, which early-returns without `--leverage`,
+    whose only caller is `run_classic`. So on a Showdown build the flag parsed
+    and was discarded -- R242's shape, on the flag whose whole job is to
+    resolve ambiguity. It has a Showdown reader now.
+    """
+    if getattr(args, "captain_prior", None) is None:
+        return {}, {"applied": False, "reason": "no --captain-prior supplied"}
+    # LOCAL, for `resolve_leverage`'s reason: this script must still load with
+    # no engine on the path so the dependency check prints a one-line refusal
+    # instead of an ImportError traceback.
+    from mlb_engine.optimize import showdown_theses as _st
+    from tools.qa_portfolio import find_prior_file
+
+    path, how = find_prior_file(
+        {"date": args.date, "slate": {"tag": slate_tag}},
+        getattr(args, "ownership_pred", None), REPO)
+    if path is None or not Path(path).exists():
+        raise FileNotFoundError(
+            f"--captain-prior needs this slate's ownership prediction and none "
+            f"was found at {path or f'outputs/{args.date}/ownership_pred_{slate_tag}.json'} "
+            f"({how}). Emit it with `python tools/ownership_pred.py emit` "
+            f"against THIS slate's Showdown salary file, or drop "
+            f"--captain-prior; building without it would leave every selector "
+            f"over the prior reading as `nobody is owned`.")
+    payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    resolved = _st.captain_prior_by_person(
+        df, payload, str(getattr(args, "captain_prior", "") or ""),
+        source=str(path))
+    brief = {
+        "applied": True,
+        "source": str(path),
+        "sha256": hashlib.sha256(Path(path).read_bytes()).hexdigest(),
+        "resolved_by": how,
+        "archetype": resolved["archetype"],
+        "players_in_prediction": resolved["players_in_prediction"],
+        "persons_matched": resolved["persons_matched"],
+        "persons_in_pool": resolved["persons_in_pool"],
+        # The key-space fact, in the file rather than in a comment: this reads
+        # `util_id` on every well-formed Showdown prediction, because
+        # `ownership_pred` collapses the two roles and keeps the UTIL row.
+        "matched_through": resolved["matched_through"],
+        "ids_not_in_pool": len(resolved["ids_not_in_pool"]),
+        "persons_without_prior": resolved["persons_without_prior"],
+        "budget_check": resolved["budget_check"],
+        "label": resolved["label"],
+        "caution": ("R306 measured person-level prior ownership correlating "
+                    "with realized CAPTAIN ownership between 0.33 and 0.85, "
+                    "and a 60%-rostered player landing at 6% captain, so this "
+                    "number can invert the read it is used for. The 2026-09-15 "
+                    "mine's captain-quartile evidence is suggestive and says "
+                    "so: the coldest quartile's top-1% lift CI is [0.993, "
+                    "1.547] and it CROSSES 1. Large-field Showdown is about "
+                    "half duplicates (median duplicate share 0.40 at 1k-5k, "
+                    "0.49 above 5k; winners averaged 1.83 copies), so any "
+                    "first-place equity read that ignores splitting is "
+                    "optimistic by a large factor and R225 comes first. Read "
+                    "this as an ORDERING over a labeled prior and nothing more."),
+    }
+    return resolved, brief
+
+
 def price_showdown_pool(df, *, use_ladder: bool, bat_side: dict, pitcher_hand: dict,
                         supplied_base: dict, supplied_read: dict,
                         f1_by_player_key: dict | None = None,
@@ -3715,10 +3819,32 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
     # when four were asked for. A sleeve is an operator instruction, so it
     # refuses (F14's class) rather than being ignored and reported the way a
     # thesis preference is.
+    # R382 (CC-5, R307 batch 2). The captain-slot prior, read HERE for the
+    # same reason the sleeve is: against the melt, before any solve, so a
+    # prediction emitted from another slate's salary file costs the read and
+    # nothing else. It is the sleeve selector's only input, so it resolves
+    # first.
+    captain_prior: dict = {}
+    captain_prior_brief: dict = {"applied": False,
+                                 "reason": "no --captain-prior supplied"}
+    try:
+        captain_prior, captain_prior_brief = resolve_captain_prior(
+            args, slate_tag_suffix(salary).lstrip("_"), df)
+    except (OSError, ValueError) as exc:
+        # CaptainPriorError is a ValueError and JSONDecodeError is one too, so
+        # a malformed payload, a missing file and an unreadable market all
+        # refuse the same way: exit 4, nothing staged, the reason in the brief.
+        print(json.dumps({"status": "captain_prior_unresolved", "date": args.date,
+                          "captain_prior": getattr(args, "captain_prior", None),
+                          "ownership_pred": getattr(args, "ownership_pred", None),
+                          "error": str(exc)}, indent=1))
+        return 4, {}
+
     captain_sleeve = None
     try:
         captain_sleeve = st.resolve_captain_sleeve(
-            df, getattr(args, "captain_sleeve", None), n_entries)
+            df, getattr(args, "captain_sleeve", None), n_entries,
+            captain_prior=captain_prior or None)
     except st.CaptainSleeveError as exc:
         print(json.dumps({"status": "captain_sleeve_invalid", "date": args.date,
                           "captain_sleeve": getattr(args, "captain_sleeve", None),
@@ -4085,6 +4211,34 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                        "over a points-max bank instead"),
         } if captain_sleeve else None)
         player_structural_floor = cpt_diagnostics.get("player_cap_structural_floor")
+    # R382. What the prior said about the captains this build DELIVERED, on
+    # both paths, computed here because `bank` and the sleeve's realized split
+    # are both in scope only here. Per captain and never averaged: a mean prior
+    # share reads as a verdict on whether the sleeve worked, and R306 measured
+    # this prior's LEVEL unsized, so the entry-weighted mean R307's own table
+    # quoted by hand stays a labeled review proxy a session computes on purpose.
+    # A delivered captain the prediction never scored is `null`, not 0.0 --
+    # unknown is not cold, and the two must not average together.
+    delivered_captains: list = []
+    if captain_prior.get("own_pct_by_player_key"):
+        _own = captain_prior["own_pct_by_player_key"]
+        _names = dict(zip(df["Player_Key"], df["Name"]))
+        _pop_of_slot = {}
+        for _pop in ("delivered_honoured", "delivered_lost"):
+            for _row in ((captain_sleeve_block or {}).get(_pop) or []):
+                _pop_of_slot[str(_row.get("slot"))] = _pop.split("_", 1)[1]
+        for _slot, _lu in enumerate(bank):
+            if not _lu:
+                continue
+            _key = str((_lu.get("captain") or {}).get("player_key") or "")
+            delivered_captains.append({
+                "slot": str(_slot),
+                "captain": str(_names.get(_key, _key)),
+                "player_key": _key,
+                "prior_own_pct": _own.get(_key),
+                "sleeve_population": _pop_of_slot.get(str(_slot), "honest"),
+            })
+
     # R239(c). Computed on BOTH paths: the points-max bank builds no thesis
     # report, but it does build lineups, and the contest each one is entered into
     # is known either way. A slice that exists only on the ladder path would be
@@ -4384,6 +4538,18 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         # None when the operator designated no sleeve, so the key has one shape
         # across every Showdown brief.
         "captain_sleeve": captain_sleeve_block,
+        # R382 (CC-5, R307 batch 2). The captain-slot prior this build read, its
+        # provenance, the CPT/UTIL key space it joined on, and what it said
+        # about the captains actually delivered. `applied: false` with a reason
+        # when the operator did not ask for one, so the key has one shape across
+        # every Showdown brief. The caution travels IN the block, because a
+        # correlation of 0.33 to 0.85 against realized captain ownership is the
+        # first thing a reader of these numbers needs and the last thing a
+        # separate cautions list gets read for.
+        "captain_prior": ({**captain_prior_brief,
+                           "delivered_captains": delivered_captains}
+                          if captain_prior_brief.get("applied")
+                          else captain_prior_brief),
         "captain_budget": {
             "reserved": captain_budget_reserved,
             "util_blocked_slots": captain_budget_util_blocks,
@@ -4515,7 +4681,51 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                         "describes either one.")
                        if captain_sleeve_block
                        and captain_sleeve_block.get("applied") is not False
-                       and captain_sleeve_block.get("lost_count") else "")),
+                       and captain_sleeve_block.get("lost_count") else "")
+                    # R382. The prior's own caution, and it fires whenever a
+                    # build READ one -- not only when a selector used it. A
+                    # number in the brief with no correlation beside it is the
+                    # 2005_1g_sd failure: that session bought the chalk and
+                    # sold the leverage using a number that could not tell it
+                    # either way, and its own conclusion said so.
+                    + ((" NOTE: --captain-prior read "
+                        f"{captain_prior_brief['persons_matched']} of "
+                        f"{captain_prior_brief['persons_in_pool']} people from "
+                        f"{Path(captain_prior_brief['source']).name} "
+                        f"(archetype {captain_prior_brief['archetype']}), "
+                        "joined on "
+                        + "/".join(k for k, v in sorted(
+                            captain_prior_brief['matched_through'].items())
+                            if v)
+                        + ". It is an UNGRADED, UNCALIBRATED prior whose "
+                          "ORDERING was measured usable and whose LEVEL was "
+                          "not: R306 measured person-level prior ownership "
+                          "correlating with realized CAPTAIN ownership "
+                          "between 0.33 and 0.85. The coldest captain "
+                          "quartile's top-1% lift CI is [0.993, 1.547] and it "
+                          "CROSSES 1. Nothing above is a lift, an edge, an "
+                          "ROI, a win rate or a probability.")
+                       if captain_prior_brief.get("applied") else "")
+                    # The prior was read and a person in the pool was never
+                    # scored by it. Loud because of which people those are: a
+                    # late addition the prediction predates is exactly who a
+                    # contrarian-captain selector would reach for, and the
+                    # selector EXCLUDES them rather than reading unknown as
+                    # cold.
+                    + ((" NOTE: "
+                        f"{len(captain_prior_brief['persons_without_prior'])} "
+                        "people in this pool carry NO captain prior "
+                        f"({', '.join(captain_prior_brief['persons_without_prior'][:6])}"
+                        + (", ..." if len(
+                            captain_prior_brief['persons_without_prior']) > 6
+                           else "")
+                        + "); the prediction predates them or was emitted from "
+                          "another salary file. A selector over the prior "
+                          "cannot designate them, and their prior_own_pct is "
+                          "null rather than 0.")
+                       if captain_prior_brief.get("applied")
+                       and captain_prior_brief.get("persons_without_prior")
+                       else "")),
     }
     # R290(c) step 2. Same shape as the Classic delivered brief: the LABEL is
     # what a rung changes, never the gates.
@@ -5281,8 +5491,32 @@ def main() -> int:
                          "judgment, recording the value and the reason in the "
                          "brief (CLAUDE.md Autonomy).")
     ap.add_argument("--ownership-pred", dest="ownership_pred", default=None,
-                    help="name the ownership prediction file --leverage should "
-                         "read, when the default resolution is ambiguous.")
+                    help="name the ownership prediction file --leverage "
+                         "(Classic) or --captain-prior (Showdown) should read, "
+                         "when the default resolution is ambiguous. R382 gave "
+                         "it a Showdown reader; before that it parsed and was "
+                         "discarded on every Showdown build.")
+    # R382 (CC-5, R307 batch 2). The captain-slot prior reaching the build.
+    # An OPTIONAL VALUE rather than a JSON object: the only thing this flag
+    # ever needs to say beyond "on" is which archetype, and `--captain-prior`
+    # bare must stay distinguishable from absent, which `{}` is not.
+    ap.add_argument("--captain-prior", dest="captain_prior", nargs="?",
+                    const="", default=None,
+                    help="Showdown only: read this slate's CAPTAIN-slot "
+                         "ownership prior from outputs/<date>/"
+                         "ownership_pred_<tag>.json (emit it with `python "
+                         "tools/ownership_pred.py emit`). Bare resolves the "
+                         "archetype when the file carries exactly one; name "
+                         "one otherwise, e.g. `--captain-prior "
+                         "large_field_gpp`. Reads the `captain` block (a 100% "
+                         "budget over one slot), never the Classic 800/200 "
+                         "split beside it. It is the input the --captain-sleeve "
+                         "selector form needs. An UNGRADED, UNCALIBRATED prior: "
+                         "R306 measured person-level prior ownership "
+                         "correlating with realized CAPTAIN ownership between "
+                         "0.33 and 0.85, so it is an ORDERING and never a "
+                         "leverage, lift, edge, ROI, win-rate or probability "
+                         "claim.")
     # R249. Showdown's only projection input. Classic reaches the whole F1-F5
     # enrichment stack through `_assemble_projection_frame`; Showdown reaches
     # AvgPointsPerGame and a salary regression, on roughly a third of entered
@@ -5496,6 +5730,24 @@ def main() -> int:
                      "captain. A Classic roster has no captain slot, so nothing "
                      "would apply it. Nothing was staged and no run directory "
                      "was created."),
+        }, indent=1))
+        return 4
+
+    # R382. Same door, same class. The captain prior is a distribution over ONE
+    # Showdown slot with a 100% budget; a Classic roster has no captain, and
+    # Classic's own ownership seam is `--leverage`, which is gated the other
+    # way twelve lines up. Accepting it here would either silently read the
+    # 800/200 market under a captain name or apply nothing at all.
+    if getattr(args, "captain_prior", None) is not None and contest != "showdown":
+        print(json.dumps({
+            "status": "captain_prior_not_supported_on_classic",
+            "date": args.date,
+            "captain_prior": args.captain_prior,
+            "contest": contest,
+            "note": ("--captain-prior reads the Showdown CAPTAIN-slot market "
+                     "(a 100% budget over one slot). A Classic roster has no "
+                     "captain slot; the Classic ownership seam is --leverage. "
+                     "Nothing was staged and no run directory was created."),
         }, indent=1))
         return 4
 

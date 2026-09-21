@@ -71,12 +71,55 @@ leverage in the captain ranks and devote a few lineups to those picks."
 - **Ladder path only.** With no posted batting orders the build falls to the
   points-max bank, which names no captain per entry; the brief then says
   `applied: false` with the reason and the caution repeats it.
-- **No ownership anywhere in this.** The `{"from": ["prior_own_below", 25.0]}`
-  selector is refused by name: it needs a captain-ownership prior this build
-  path does not read. The sleeve is a DESIGNATION, counted and reported. Nothing
-  about it is a lift, an edge, an ROI or a win rate, and the archive evidence
-  behind it is suggestive: the coldest captain quartile's top-1% CI is
-  [0.993, 1.547] and crosses 1.
+- **A DESIGNATION, counted and reported.** Nothing about it is a lift, an edge,
+  an ROI or a win rate, and the archive evidence behind it is suggestive rather
+  than established: the coldest captain quartile's top-1% CI is [0.993, 1.547]
+  and crosses 1.
+
+## The captain-ownership prior, and selecting on it (R382)
+
+`--captain-prior` reads this slate's CAPTAIN-slot ownership prior from
+`outputs/<date>/ownership_pred_<tag>.json`. Emit that file first with
+`python tools/ownership_pred.py emit` against the SAME Showdown salary CSV this
+build melts. Bare resolves the archetype when the file carries exactly one;
+otherwise name it, `--captain-prior large_field_gpp`. Showdown only: a Classic
+roster has no captain slot, and Classic's ownership seam is `--leverage`.
+
+With a prior read, the sleeve's selector form works:
+
+    --captain-prior large_field_gpp \
+    --captain-sleeve '{"entries": 4, "from": ["prior_own_below", 25.0]}'
+
+- **It selects people, coldest first.** Everybody whose captain-slot prior is
+  under the threshold, ordered ascending, handed to the sleeve as its `from`
+  menu. Slot 0 takes the coldest the caps allow. Everything after that is the
+  sleeve's, unchanged: rotation, the four caps, `unfilled`, the three-way
+  delivered split.
+- **The menu is not truncated to the entry count.** A threshold admitting forty
+  people says so in `captain_sleeve.selector.matched`. That is the number to
+  read when deciding whether the threshold was set loosely.
+- **A person the prediction never scored is EXCLUDED, not read as cold.** An
+  unknown share is not a low one. They are named in
+  `selector.excluded_without_prior` and their `prior_own_pct` is `null`, never
+  `0`. This is who a late scratch's replacement is, and a selector must not
+  reach for him by accident.
+- **It is the CAPTAIN market, not the Classic one.** The file carries both. The
+  Classic `own_pct_by_player_id` is the 800/200 split and sums to ~1000% on a
+  Showdown file; the `captain` block is a 100% budget over one slot. The reader
+  refuses rather than falling back to the wrong one.
+- **Refusals, all exit 4 with nothing staged:** no prediction file (the path is
+  named), more than one archetype with none named, no `captain` block (what a
+  CLASSIC salary file emits), a prediction whose ids are strangers to this melt,
+  a threshold outside (0, 100], and a threshold that selects nobody.
+- **The number is an ORDERING and nothing more.** R306 measured person-level
+  prior ownership correlating with realized CAPTAIN ownership between 0.33 and
+  0.85, and a 60%-rostered player landing at 6% captain; R209 measured this
+  family's ordering usable (Spearman +0.581 over 112 graded players) and its
+  LEVEL not. One slate cannot size a coefficient. The brief's `captain_prior`
+  block carries that caution beside every number it reports, including what the
+  prior said about the captains actually delivered. Never quote it as a lift, an
+  edge, an ROI, a win rate or a probability, and R225 comes before any
+  first-place read: large-field Showdown is about half duplicates.
 
 ## Status, stated plainly
 

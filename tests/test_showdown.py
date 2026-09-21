@@ -5731,14 +5731,24 @@ class R381CaptainSleeveResolutionTests(unittest.TestCase):
         person, and raises the SAME exception type -- a test asserting only
         `assertRaises` would stay green over a selector that is silently being
         looked up as a ballplayer. So this pins what the branch KEEPS: the
-        message says the selector is not wired and what it is waiting on, and it
-        is NOT the missing-person message."""
+        message names the selector and what it is waiting on, and it is NOT the
+        missing-person message.
+
+        REWRITTEN BY R382, not retired, and the failure that sent it here was
+        the point of writing it this way: pinning the MESSAGE meant wiring the
+        selector reddened this test loudly instead of leaving it green over
+        changed behaviour. What R382 changed is only what the refusal waits on
+        -- no longer "the build reads no prior anywhere" (it does now) but
+        "this build was not asked to read one". That it refuses by NAME, and
+        never as a ballplayer, is R381's property and it survives.
+        """
         with self.assertRaises(st.CaptainSleeveError) as caught:
             st.resolve_captain_sleeve(
                 self.df, {"entries": 4, "from": ["prior_own_below", 25.0]}, 16)
         msg = str(caught.exception)
-        self.assertIn("NOT WIRED", msg)
+        self.assertIn("prior_own_below", msg)
         self.assertIn("captain-ownership prior", msg)
+        self.assertIn("--captain-prior", msg)
         self.assertNotIn("melted pool carries no", msg)
         self.assertIn("prior_own_below", st.CAPTAIN_SLEEVE_SELECTORS)
 
@@ -6069,3 +6079,539 @@ class R381CaptainSleeveWiringTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+# --------------------------------------------------------------------------- #
+# R382 (CC-5, R307 batch 2): the captain-ownership prior reaches the build
+# --------------------------------------------------------------------------- #
+def _captain_payload(df, own_by_util=None, archetype="large_field_gpp",
+                     key_column="UTIL_ID", scale=None):
+    """An emitted-payload shape carrying a `captain` block, keyed as asked.
+
+    `key_column` is the knob the key-space tests turn: the real producer keys
+    on UTIL_ID and a session's first instinct is CPT_ID, and those two agree
+    on nothing.
+    """
+    keys = [str(k) for k in df[key_column]]
+    own = dict(own_by_util) if own_by_util is not None else {
+        k: round(100.0 / len(keys), 4) for k in keys}
+    block = {
+        # The CLASSIC 800/200 market, present exactly as the real emit leaves
+        # it, so a test that passes cannot be passing by reading this one.
+        "own_pct_by_player_id": {k: 1000.0 / len(keys) for k in keys},
+        "captain": {"own_pct_by_player_id": own,
+                    "tier_by_player_id": {k: "mid" for k in own},
+                    "budget_check": {"pct_sum": round(sum(own.values()), 1),
+                                     "budget_pct": 100.0}},
+    }
+    if scale is not None:
+        block["captain"]["own_pct_by_player_id"] = {
+            k: v * scale for k, v in own.items()}
+    return {"archetypes": {archetype: block}}
+
+
+class R382CaptainPriorReaderTests(unittest.TestCase):
+    """The reader R381 refused the selector for want of. Every test here is
+    about a number ARRIVING on the right people or the read REFUSING; none of
+    them grades anything, and the prior is an ungraded, uncalibrated ordering
+    throughout."""
+
+    def setUp(self):
+        self.df = _sleeve_frame()
+
+    # -- the key space, pinned against the REAL producer --------------------- #
+    def test_the_real_emit_keys_the_captain_block_on_UTIL_ids_and_this_JOINS(self):
+        """THE trap, as an end-to-end pin rather than a comment. `ownership_pred`
+        runs `collapse_showdown_roles` before every block it emits and the
+        collapse KEEPS THE UTIL ROW, so the captain-slot probability is carried
+        on the person's UTIL id. A `by_cpt_id` lookup would match zero of these
+        and read downstream as "nobody is owned". Run against the producer, not
+        a hand-built payload, so it fails if either side ever moves."""
+        from tools.ownership_pred import build_prediction
+        payload = build_prediction(SAL, archetypes=["large_field_gpp"])
+        emitted = payload["archetypes"]["large_field_gpp"]["captain"][
+            "own_pct_by_player_id"]
+        util_ids = {str(k) for k in self.df["UTIL_ID"]}
+        cpt_ids = {str(k) for k in self.df["CPT_ID"]}
+        self.assertTrue(set(emitted) >= util_ids,
+                        "the emitted captain block must carry every UTIL id")
+        self.assertFalse(set(emitted) & cpt_ids,
+                         "and NOT ONE CPT id; if this ever fails the join below "
+                         "is reading a key space that no longer exists")
+        got = st.captain_prior_by_person(self.df, payload, "large_field_gpp",
+                                         source="t.json")
+        self.assertEqual(got["persons_matched"], len(self.df))
+        self.assertEqual(got["matched_through"],
+                         {"util_id": len(self.df), "cpt_id": 0})
+
+    def test_a_CPT_keyed_prior_JOINS_and_says_so_rather_than_refusing(self):
+        """Written first as "a CPT-keyed prior matches nobody and refuses", and
+        that was wrong about the right behaviour. A CPT id identifies the same
+        human as their UTIL id, so joining it lands the share on the correct
+        person and refusing would turn away a usable file. Both roles are
+        joined and `matched_through` is what makes the key space a FACT in the
+        brief: a well-formed prediction reads `util_id` for everybody, so a
+        `cpt_id` count is the file saying it did not come from `ownership_pred
+        emit`. The trap is not that a CPT-keyed file exists; it is that a
+        CPT-keyed LOOKUP against a UTIL-keyed file matches nothing."""
+        payload = _captain_payload(self.df, key_column="CPT_ID")
+        got = st.captain_prior_by_person(self.df, payload, "large_field_gpp",
+                                         source="cpt_keyed.json")
+        self.assertEqual(got["persons_matched"], len(self.df))
+        self.assertEqual(got["matched_through"],
+                         {"util_id": 0, "cpt_id": len(self.df)})
+
+    def test_a_prior_from_ANOTHER_slate_matches_nobody_and_names_the_trap(self):
+        """The real failure: every id a stranger to this melt. An empty mapping
+        downstream does not read as "no input", it reads as "every player
+        unowned" -- which passes every threshold a selector can set, so the
+        sleeve would designate the whole pool while the brief showed a source
+        and a sha256."""
+        payload = _captain_payload(self.df)
+        payload["archetypes"]["large_field_gpp"]["captain"][
+            "own_pct_by_player_id"] = {f"900000{i}": 1.0 for i in range(20)}
+        with self.assertRaises(st.CaptainPriorError) as caught:
+            st.captain_prior_by_person(self.df, payload, "large_field_gpp",
+                                       source="wrong.json")
+        msg = str(caught.exception)
+        self.assertIn("NOT ONE of their ids is in this melted pool", msg)
+        self.assertIn("UTIL", msg)
+        self.assertIn("wrong.json", msg)
+
+    def test_the_CLASSIC_800_200_market_is_never_the_fallback(self):
+        """`resolve_leverage`'s one line that must not be copied. On a Showdown
+        file the Classic block sums to ~1000% over the same people and R306
+        built the captain distribution because the archive says the two are
+        different markets. A payload with no `captain` block refuses; it does
+        NOT quietly read the 1000% one sitting beside it."""
+        payload = _captain_payload(self.df)
+        classic = payload["archetypes"]["large_field_gpp"]["own_pct_by_player_id"]
+        self.assertAlmostEqual(sum(classic.values()), 1000.0, places=6,
+                               msg="the fixture must carry the wrong market for "
+                                   "this test to mean anything")
+        del payload["archetypes"]["large_field_gpp"]["captain"]
+        with self.assertRaises(st.CaptainPriorError) as caught:
+            st.captain_prior_by_person(self.df, payload, "large_field_gpp",
+                                       source="classic.json")
+        msg = str(caught.exception)
+        self.assertIn("no `captain` block", msg)
+        self.assertIn("1000%", msg)
+
+    # -- the archetype question, asked rather than answered ------------------ #
+    def test_two_archetypes_and_none_named_is_a_QUESTION_not_a_sort_order(self):
+        payload = _captain_payload(self.df)
+        payload["archetypes"]["single_entry"] = payload["archetypes"][
+            "large_field_gpp"]
+        with self.assertRaises(st.CaptainPriorError) as caught:
+            st.captain_prior_by_person(self.df, payload, "", source="two.json")
+        msg = str(caught.exception)
+        self.assertIn("carries 2 archetypes", msg)
+        self.assertIn("single_entry", msg)
+        # Naming one is the remedy and it works.
+        got = st.captain_prior_by_person(self.df, payload, "single_entry",
+                                         source="two.json")
+        self.assertEqual(got["archetype"], "single_entry")
+
+    def test_one_archetype_resolves_itself_and_an_unknown_one_refuses(self):
+        payload = _captain_payload(self.df)
+        self.assertEqual(
+            st.captain_prior_by_person(self.df, payload, "")["archetype"],
+            "large_field_gpp")
+        with self.assertRaises(st.CaptainPriorError) as caught:
+            st.captain_prior_by_person(self.df, payload, "no_such_archetype")
+        self.assertIn("no_such_archetype", str(caught.exception))
+        self.assertIn("large_field_gpp", str(caught.exception))
+
+    def test_an_empty_payload_and_an_empty_captain_block_both_refuse(self):
+        with self.assertRaises(st.CaptainPriorError) as caught:
+            st.captain_prior_by_person(self.df, {"archetypes": {}}, "")
+        self.assertIn("no `archetypes`", str(caught.exception))
+        payload = _captain_payload(self.df)
+        payload["archetypes"]["large_field_gpp"]["captain"][
+            "own_pct_by_player_id"] = {}
+        with self.assertRaises(st.CaptainPriorError) as caught:
+            st.captain_prior_by_person(self.df, payload, "large_field_gpp")
+        self.assertIn("every person as unowned", str(caught.exception))
+
+    # -- values ------------------------------------------------------------- #
+    def test_a_value_outside_0_100_a_bool_and_a_string_all_refuse(self):
+        """R338 refuses the same class before a Classic leverage control reads
+        one. A share outside a 100% budget is a broken file, not a number to
+        clamp, and `True` is an `int` in Python -- which is why the bool test
+        is separate from the number test."""
+        first = str(self.df["UTIL_ID"].iloc[0])
+        for bad, needle in ((150.0, "outside [0, 100]"),
+                            (-1.0, "outside [0, 100]"),
+                            (float("nan"), "outside [0, 100]"),
+                            (True, "non-numeric"),
+                            ("12", "non-numeric")):
+            payload = _captain_payload(self.df)
+            payload["archetypes"]["large_field_gpp"]["captain"][
+                "own_pct_by_player_id"][first] = bad
+            with self.assertRaises(st.CaptainPriorError) as caught:
+                st.captain_prior_by_person(self.df, payload, "large_field_gpp")
+            self.assertIn(needle, str(caught.exception), f"for {bad!r}")
+
+    def test_two_ids_landing_on_one_person_refuses_rather_than_picking(self):
+        """Unreachable from a well-formed pair: the melt drops any person who is
+        not exactly one CPT row plus one UTIL row. Reachable from a prediction
+        emitted against a DIFFERENT salary file, which is the case worth
+        refusing, because picking a winner there is picking a stranger's
+        number."""
+        payload = _captain_payload(self.df)
+        own = payload["archetypes"]["large_field_gpp"]["captain"][
+            "own_pct_by_player_id"]
+        row = self.df.iloc[0]
+        own[str(row["CPT_ID"])] = 5.0
+        with self.assertRaises(st.CaptainPriorError) as caught:
+            st.captain_prior_by_person(self.df, payload, "large_field_gpp",
+                                       source="other.json")
+        msg = str(caught.exception)
+        self.assertIn("two captain-prior ids onto one person", msg)
+        self.assertIn(str(row["Player_Key"]), msg)
+
+    # -- what it reports ----------------------------------------------------- #
+    def test_a_short_budget_is_REPORTED_and_never_rescaled(self):
+        """People in the prediction that are absent from this melt are ordinary
+        (a scratch, a late change) and leave the matched sum under 100. R328's
+        discipline one market over: report the breach, never repair it, because
+        rescaling invents shares R306 did not allocate."""
+        payload = _captain_payload(self.df)
+        own = payload["archetypes"]["large_field_gpp"]["captain"][
+            "own_pct_by_player_id"]
+        dropped = sorted(own)[:3]
+        for k in dropped:
+            own[k] = 0.0
+        own["9999999"] = 40.0     # a person this melt does not carry
+        got = st.captain_prior_by_person(self.df, payload, "large_field_gpp")
+        self.assertEqual(got["ids_not_in_pool"], ["9999999"])
+        self.assertLess(got["budget_check"]["pct_sum"], 100.0)
+        self.assertEqual(got["budget_check"]["budget_pct"], 100.0)
+        self.assertAlmostEqual(
+            sum(got["own_pct_by_player_key"].values()),
+            got["budget_check"]["pct_sum"], places=1,
+            msg="the returned shares must be the ones the file carried")
+
+    def test_a_person_the_prediction_never_scored_is_NAMED_not_zeroed(self):
+        """An unknown share is not a low share. Zeroing here would make the
+        late scratch's replacement the coldest captain on the slate, which is
+        exactly who a contrarian selector reaches for first."""
+        payload = _captain_payload(self.df)
+        own = payload["archetypes"]["large_field_gpp"]["captain"][
+            "own_pct_by_player_id"]
+        missing_key = str(self.df["Player_Key"].iloc[3])
+        del own[str(self.df["UTIL_ID"].iloc[3])]
+        got = st.captain_prior_by_person(self.df, payload, "large_field_gpp")
+        self.assertIn(missing_key, got["persons_without_prior"])
+        self.assertNotIn(missing_key, got["own_pct_by_player_key"])
+        self.assertEqual(got["persons_matched"], len(self.df) - 1)
+
+    def test_the_ids_are_read_in_SORTED_order_so_a_refusal_is_reproducible(self):
+        """CLAUDE.md's determinism rule on a small surface: every set reaching a
+        decision is sorted first. Two payloads carrying the same ids in
+        different key order must name the same id in the same refusal and list
+        `ids_not_in_pool` the same way, or a brief stops being comparable
+        against the one from the re-run beside it."""
+        payload = _captain_payload(self.df)
+        own = payload["archetypes"]["large_field_gpp"]["captain"][
+            "own_pct_by_player_id"]
+        for stranger in ("9999999", "1111111"):
+            own[stranger] = 0.5
+        forward = st.captain_prior_by_person(self.df, payload, "large_field_gpp")
+        reversed_payload = _captain_payload(
+            self.df, own_by_util={k: own[k] for k in reversed(list(own))})
+        backward = st.captain_prior_by_person(self.df, reversed_payload,
+                                              "large_field_gpp")
+        self.assertEqual(forward["ids_not_in_pool"], ["1111111", "9999999"])
+        self.assertEqual(forward["ids_not_in_pool"], backward["ids_not_in_pool"])
+
+    def test_the_label_states_the_correlation_and_claims_nothing(self):
+        got = st.captain_prior_by_person(self.df, _captain_payload(self.df), "")
+        label = got["label"].lower()
+        self.assertIn("ungraded", label)
+        self.assertIn("0.33", label)
+        self.assertIn("0.85", label)
+        for banned in ("roi", "win rate", "edge", "lift", "probability"):
+            self.assertIn(banned, label,
+                          "the label must DISCLAIM each of these by name")
+        self.assertIn("never a lift", label)
+
+
+class R382CaptainSleeveSelectorTests(unittest.TestCase):
+    """`prior_own_below`, which R307 named and R381 refused for want of an
+    input. It resolves to a MENU and then falls through R381's own resolution,
+    so rotation, the three caps, the unfilled counter and the three-way
+    delivered split are unchanged and already tested."""
+
+    def setUp(self):
+        self.df = _sleeve_frame()
+        # A prior that makes the four `_COLD` bats the four coldest captains,
+        # so "the selector chose them" is observable rather than a coincidence
+        # with the ladder's own ranking.
+        util_by_key = dict(zip(self.df["Player_Key"], self.df["UTIL_ID"]))
+        own = {}
+        for key in self.df["Player_Key"]:
+            own[str(util_by_key[key])] = (
+                1.0 + _COLD.index(key) if key in _COLD else 40.0)
+        self.payload = _captain_payload(self.df, own_by_util=own)
+        self.prior = st.captain_prior_by_person(self.df, self.payload,
+                                                "large_field_gpp",
+                                                source="p.json")
+
+    def test_the_selector_designates_the_COLDEST_first_and_reports_what_chose(self):
+        got = st.resolve_captain_sleeve(
+            self.df, {"entries": 4, "from": ["prior_own_below", 25.0]}, 16,
+            captain_prior=self.prior)
+        self.assertEqual(got["captain_keys"], _COLD,
+                         "ascending prior share, so slot 0 takes the coldest")
+        sel = got["selector"]
+        self.assertEqual(sel["selector"], "prior_own_below")
+        self.assertEqual(sel["threshold_pct"], 25.0)
+        self.assertEqual(sel["matched"], 4)
+        self.assertEqual(sel["scored_by_prior"], len(self.df))
+        self.assertEqual(sel["source"], "p.json")
+        self.assertEqual(sel["archetype"], "large_field_gpp")
+
+    def test_the_menu_is_NOT_truncated_to_the_entry_count(self):
+        """A threshold admitting far more people than the sleeve has entries is
+        a threshold that was set loosely, and the brief should say so rather
+        than showing only the four that got used."""
+        got = st.resolve_captain_sleeve(
+            self.df, {"entries": 2, "from": ["prior_own_below", 100.0]}, 16,
+            captain_prior=self.prior)
+        self.assertEqual(got["entries"], 2)
+        self.assertEqual(len(got["captain_keys"]), len(self.df))
+        self.assertEqual(got["selector"]["matched"], len(self.df))
+        self.assertEqual(got["captain_keys"][:4], _COLD)
+
+    def test_a_person_with_NO_prior_is_excluded_not_read_as_cold(self):
+        """The selector's own version of the reader's rule, and the one that
+        would silently pick the wrong people. Unknown is not zero."""
+        own = dict(self.payload["archetypes"]["large_field_gpp"]["captain"][
+            "own_pct_by_player_id"])
+        orphan_key = str(self.df["Player_Key"].iloc[7])
+        del own[str(self.df["UTIL_ID"].iloc[7])]
+        prior = st.captain_prior_by_person(
+            self.df, _captain_payload(self.df, own_by_util=own),
+            "large_field_gpp", source="p.json")
+        got = st.resolve_captain_sleeve(
+            self.df, {"entries": 4, "from": ["prior_own_below", 100.0]}, 16,
+            captain_prior=prior)
+        self.assertNotIn(orphan_key, got["captain_keys"])
+        names = dict(zip(self.df["Player_Key"], self.df["Name"]))
+        self.assertIn(str(names[orphan_key]),
+                      got["selector"]["excluded_without_prior"])
+        self.assertEqual(got["selector"]["scored_by_prior"], len(self.df) - 1)
+
+    def test_a_threshold_selecting_NOBODY_refuses_naming_the_coldest(self):
+        """A sleeve that designates nobody builds the honest portfolio while
+        the brief reports a sleeve. R381's own note says that is worse than
+        saying the selector is not there."""
+        with self.assertRaises(st.CaptainSleeveError) as caught:
+            st.resolve_captain_sleeve(
+                self.df, {"entries": 4, "from": ["prior_own_below", 0.5]}, 16,
+                captain_prior=self.prior)
+        msg = str(caught.exception)
+        self.assertIn("selects NOBODY", msg)
+        self.assertIn("the coldest is 1.0%", msg)
+
+    def test_the_threshold_is_validated_and_the_arity_is_exactly_one(self):
+        for spec, needle in (
+                (["prior_own_below"], "exactly one threshold"),
+                (["prior_own_below", 25.0, 30.0], "exactly one threshold"),
+                (["prior_own_below", "25"], "numeric threshold"),
+                (["prior_own_below", True], "numeric threshold"),
+                (["prior_own_below", 0.0], "outside (0, 100]"),
+                (["prior_own_below", 100.1], "outside (0, 100]"),
+                (["prior_own_below", float("inf")], "outside (0, 100]")):
+            with self.assertRaises(st.CaptainSleeveError) as caught:
+                st.resolve_captain_sleeve(self.df, {"entries": 1, "from": spec},
+                                          16, captain_prior=self.prior)
+            self.assertIn(needle, str(caught.exception), f"for {spec!r}")
+
+    def test_an_explicit_list_still_ignores_the_prior_entirely(self):
+        """The honest-core-plus-sleeve shape is R381's and R382 does not change
+        it: a named list is a named list whether or not a prior was read."""
+        got = st.resolve_captain_sleeve(
+            self.df, {"entries": 2, "from": _COLD[:2]}, 16,
+            captain_prior=self.prior)
+        self.assertEqual(got["captain_keys"], _COLD[:2])
+        self.assertIsNone(got["selector"])
+
+    def test_the_selected_sleeve_reaches_the_LADDER_and_designates_those_slots(self):
+        """End to end through R381's machinery, because a menu that resolves
+        and never designates anything is the no-op this row exists to avoid."""
+        got = st.resolve_captain_sleeve(
+            self.df, {"entries": 3, "from": ["prior_own_below", 25.0]}, 12,
+            captain_prior=self.prior)
+        meta = st.build_thesis_ladder(self.df, 12, captain_sleeve=got)
+        designated = [t for t in meta["theses"] if t["captain_sleeve"]]
+        self.assertEqual(len(designated), 3)
+        self.assertTrue(all(t["cpt"] in _COLD for t in designated),
+                        [t["cpt"] for t in designated])
+        self.assertEqual(meta["captain_sleeve"]["selector"]["matched"], 4)
+
+
+class R382CaptainPriorWiringTests(unittest.TestCase):
+    """Source pins. The reader is only real if `run_showdown` calls it, and the
+    flag is only honest if the prose around it stays true."""
+
+    def setUp(self):
+        self.src = (REPO / "skills" / "generate-lineups" / "scripts"
+                    / "build_slate.py").read_text(encoding="utf-8")
+
+    def test_run_showdown_resolves_the_prior_and_hands_it_to_the_sleeve(self):
+        self.assertIn("captain_prior, captain_prior_brief = resolve_captain_prior(",
+                      self.src)
+        self.assertIn("captain_prior=captain_prior or None", self.src)
+        resolve = self.src.index("captain_prior, captain_prior_brief = "
+                                 "resolve_captain_prior(")
+        sleeve = self.src.index("captain_prior=captain_prior or None")
+        self.assertLess(resolve, sleeve,
+                        "the prior is the selector's only input, so it must "
+                        "resolve before the sleeve reads it")
+
+    def test_the_payload_semantics_live_in_the_ENGINE_not_in_this_script(self):
+        """The same discipline `test_the_sliced_path_attaches_through_the_SAME_
+        function_before_the_bank` puts on the Classic attach: the script finds
+        and hashes the file, the engine knows what is in it. A second copy of
+        "which block is the captain market" here is the defect that pin
+        exists for."""
+        self.assertIn("_st.captain_prior_by_person(", self.src)
+        self.assertNotIn('["captain"]["own_pct_by_player_id"]', self.src,
+                         "the script must not learn the block's shape")
+
+    def test_the_flag_is_Showdown_gated_and_distinguishable_from_absent(self):
+        self.assertIn('"status": "captain_prior_not_supported_on_classic"',
+                      self.src)
+        # `nargs="?"` with `const=""`: bare means "on, archetype unspecified",
+        # which a falsy test would read as absent. The gate and the resolver
+        # must both compare against None.
+        self.assertIn('getattr(args, "captain_prior", None) is not None '
+                      'and contest != "showdown"', self.src)
+        self.assertIn('if getattr(args, "captain_prior", None) is None:',
+                      self.src)
+
+    def test_the_brief_carries_the_prior_block_on_every_showdown_build(self):
+        self.assertIn('"captain_prior": ({**captain_prior_brief,', self.src)
+        self.assertIn('"reason": "no --captain-prior supplied"', self.src)
+
+    def test_the_ownership_pred_help_no_longer_says_leverage_alone(self):
+        """It was Classic-only in effect and not in gate: the flag parsed on a
+        Showdown build and its only reader was inside `resolve_leverage`, which
+        `run_classic` alone calls. R382 gave it a Showdown reader."""
+        self.assertIn("--captain-prior (Showdown) should read", self.src)
+
+    def test_the_exit_4_site_count_in_the_prose_matches_the_TREE(self):
+        """The comment was stale by three before R382 touched it (it read
+        fourteen against a tree carrying seventeen). A hand-maintained count of
+        a growing class drifts silently, which is the one thing that comment
+        exists not to do."""
+        import ast as _ast
+        tree = _ast.parse(self.src)
+        counts = {}
+        for fn in tree.body:
+            if (isinstance(fn, _ast.FunctionDef)
+                    and fn.name in ("run_classic", "run_showdown", "main")):
+                n = 0
+                for node in _ast.walk(fn):
+                    if not isinstance(node, _ast.Return) or node.value is None:
+                        continue
+                    value = node.value
+                    if isinstance(value, _ast.Tuple) and value.elts:
+                        value = value.elts[0]
+                    if isinstance(value, _ast.Constant) and value.value == 4:
+                        n += 1
+                counts[fn.name] = n
+        total = sum(counts.values())
+        self.assertIn(f"# EXIT 4, NINETEEN sites", self.src)
+        self.assertEqual(total, 19, counts)
+        self.assertIn(f"run_showdown:{counts['run_showdown']}, "
+                      f"main:{counts['main']})", self.src)
+
+    @staticmethod
+    def _module():
+        import importlib.util
+        path = (REPO / "skills" / "generate-lineups" / "scripts" / "build_slate.py")
+        spec = importlib.util.spec_from_file_location(
+            "build_slate_r382_under_test", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def test_resolve_captain_prior_END_TO_END_over_a_REAL_emitted_file(self):
+        """R300's rule: a test that runs the production function beats a string
+        pin. This emits a real prediction with `ownership_pred`, drops it where
+        `find_prior_file` looks, and runs the resolver the build runs -- so a
+        break anywhere along the file-resolution, payload, key-space and brief
+        chain reddens here rather than at the next live slate.
+
+        `find_prior_file` resolves against `REPO`, so the file goes under the
+        real `outputs/<date>/` with a date no slate will ever carry, and is
+        removed afterwards. `outputs/` is gitignored."""
+        import json as _json
+        from tools.ownership_pred import build_prediction
+        module = self._module()
+        date = "1900-01-02"
+        outdir = REPO / "outputs" / date
+        outdir.mkdir(parents=True, exist_ok=True)
+        pred = outdir / "ownership_pred_r382probe.json"
+        try:
+            pred.write_text(_json.dumps(
+                build_prediction(SAL, archetypes=["large_field_gpp"])),
+                encoding="utf-8")
+
+            class _Args:
+                date = "1900-01-02"
+                captain_prior = ""
+                ownership_pred = None
+
+            df = _sleeve_frame()
+            prior, brief = module.resolve_captain_prior(_Args(), "r382probe", df)
+            self.assertTrue(brief["applied"])
+            self.assertEqual(brief["archetype"], "large_field_gpp")
+            self.assertEqual(brief["resolved_by"],
+                             "brief date + slate tag (1900-01-02/r382probe)")
+            self.assertEqual(brief["sha256"], hashlib.sha256(
+                pred.read_bytes()).hexdigest())
+            # The key space, proven through the real file rather than asserted.
+            self.assertEqual(brief["matched_through"]["cpt_id"], 0)
+            self.assertEqual(brief["matched_through"]["util_id"], len(df))
+            self.assertEqual(brief["persons_without_prior"], [])
+            self.assertEqual(prior["archetype"], "large_field_gpp")
+            self.assertEqual(len(prior["own_pct_by_player_key"]), len(df))
+            # And the selector the whole row exists for resolves against it.
+            sleeve = st.resolve_captain_sleeve(
+                df, {"entries": 2, "from": ["prior_own_below", 100.0]}, 12,
+                captain_prior=prior)
+            self.assertEqual(len(sleeve["captain_keys"]), len(df))
+            shares = prior["own_pct_by_player_key"]
+            self.assertEqual(sleeve["captain_keys"],
+                             sorted(shares, key=lambda k: (shares[k], k)),
+                             "coldest first, so slot 0 takes the least-captained "
+                             "person the caps allow")
+        finally:
+            pred.unlink(missing_ok=True)
+            if outdir.exists() and not any(outdir.iterdir()):
+                outdir.rmdir()
+
+    def test_the_resolver_is_OFF_by_default_and_refuses_a_missing_file(self):
+        module = self._module()
+
+        class _Off:
+            date = "1900-01-02"
+            captain_prior = None
+            ownership_pred = None
+
+        prior, brief = module.resolve_captain_prior(_Off(), "nope", _sleeve_frame())
+        self.assertEqual(prior, {})
+        self.assertFalse(brief["applied"])
+
+        class _On(_Off):
+            captain_prior = ""
+
+        with self.assertRaises(FileNotFoundError) as caught:
+            module.resolve_captain_prior(_On(), "nope", _sleeve_frame())
+        msg = str(caught.exception)
+        self.assertIn("ownership_pred_nope.json", msg)
+        self.assertIn("--captain-prior", msg)
