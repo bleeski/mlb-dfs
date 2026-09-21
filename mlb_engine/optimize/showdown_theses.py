@@ -1260,6 +1260,17 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
     # count alone reads the same as a cap event, and `captain_exposure.by_player`
     # cannot show a lock substitution because it is not an exposure event.
     name_by_key = dict(zip(df["Player_Key"], df["Name"]))
+    # R295(b). The UNWEIGHTED prior, kept off the frame the solver ran on.
+    # Every slot solves on `work`, a copy of `df` with this thesis's
+    # multipliers applied, so the `proj_points` the lineup carries is on that
+    # thesis's own scale -- win_big suppresses the other side's bats to 0.40 and
+    # duel every bat to 0.78. R247(a)'s degraded trigger then compares those
+    # numbers ACROSS theses against the portfolio median and flags the
+    # suppressed constructions degraded by construction, which is a property of
+    # the thesis rather than of the lineup.
+    base_by_key = {k: float(b) for k, b in zip(df["Player_Key"], df["Base"])}
+    from mlb_engine.optimize.roster_contracts import SHOWDOWN as _SHOWDOWN
+    cpt_multiplier = _SHOWDOWN.multiplier_for(_SHOWDOWN.captain_slot or "CPT")
     lock_relaxation_detail: List[Dict[str, str]] = []
     # R250. Captain budget, reserved before UTIL can spend it.
     #
@@ -1291,12 +1302,26 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
         want = t.get("cpt")
         if want:
             captain_demand[str(want)] = captain_demand.get(str(want), 0) + 1
+    # R295/F40. Bounded by BOTH caps, not the captain cap alone. The hold blocks
+    # a UTIL seat while `player_counts >= player_cap - held`, so a `held` larger
+    # than `player_cap` makes that test true from the first slot and the player
+    # is UTIL-blocked for the entire ladder -- stranded budget, which is the
+    # exact failure `test_the_hold_shrinks_as_it_is_spent` exists to catch, one
+    # level up from where it looks. The reservation can never be worth more than
+    # the player's whole exposure allowance, because it is carved OUT of that
+    # allowance rather than added to it.
     reserve_ceiling = cpt_cap if cpt_cap is not None else len(theses)
+    if player_cap is not None:
+        reserve_ceiling = min(reserve_ceiling, player_cap)
     reserved_remaining: Dict[str, int] = {
         k: min(v, reserve_ceiling) for k, v in captain_demand.items()}
     captain_budget_reserved = {k: v for k, v in reserved_remaining.items() if v}
     util_block_slots = 0
     util_block_detail: List[Dict[str, str]] = []
+    # R295(a). The hold standing down for a thesis LOCK on the same player.
+    # Nothing is relaxed when it does, so this is a record and not a counter --
+    # the same footing as the three `*_reassigned` lists.
+    hold_yielded_detail: List[Dict[str, str]] = []
     # R239(b)(i). The per-contest cap enforced HERE, where the roster spot is
     # actually spent. R153's second pass is the whole reason: `solve_ladder`
     # trusted `build_thesis_ladder`'s apportionment and then substituted captains
@@ -1456,13 +1481,52 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
         # units those rungs need. Below that line he is spent freely: the hold is
         # the LAST few units of his budget, not his whole exposure.
         util_blocked: List[str] = []
+        yielded_here: List[str] = []
         if player_cap is not None:
+            lock_set = set(locks)
             for k, held in reserved_remaining.items():
                 if held <= 0:
                     continue
                 if player_counts.get(k, 0) >= player_cap - held:
+                    # R295(a). The hold yields to a thesis LOCK on the same
+                    # player. With `k` locked, the captain locked to someone
+                    # else, and `k` held out of the UTIL seat, the three
+                    # constraints are jointly unsatisfiable: the lock says
+                    # `cpt_k + util_k >= 1`, the hold says `util_k = 0`, and the
+                    # captain lock says the one CPT slot is not his. Rungs 1-2
+                    # are then infeasible for a reason no relaxation below them
+                    # names, and the rung that answers drops the player CAP --
+                    # readmitting every capped player and booking
+                    # `player_relaxed` against a cap that was never the binding
+                    # control. Measured on MIN@CHC {MIN:+150, CHC:-170} n=12:
+                    # the both_explode thesis locked Crow-Armstrong while
+                    # captaining Jeffers, and Busch and Bell finished 7 of 12
+                    # against `player_cap_count=6` -- 58.3% under a 50% cap,
+                    # with `player_relaxed: 1` and every other counter clean.
+                    #
+                    # A lock is a hard inclusion and the hold is an allocation
+                    # preference, so the hold is the one that gives way. It
+                    # costs nothing it was owed: the reservation exists to push
+                    # him toward a captain seat, and a thesis that has already
+                    # named him a lock is spending him on purpose. Recorded,
+                    # never counted as a relaxation -- nothing was relaxed.
+                    #
+                    # Only when the captain is locked ELSEWHERE. With
+                    # `cpt_lock` None the solver may still captain him and the
+                    # lock is satisfiable with the hold standing; with
+                    # `cpt_lock == k` the lock is satisfied by the captain seat
+                    # itself, which is exactly what the hold is for.
+                    if k in lock_set and cpt_lock and cpt_lock != k:
+                        yielded_here.append(k)
+                        continue
                     util_blocked.append(k)
         util_blocked = sorted(util_blocked)
+        for k in sorted(yielded_here):
+            hold_yielded_detail.append({
+                "thesis": tname,
+                "player": name_by_key.get(k, k),
+                "yielded_to": "lock",
+            })
         if util_blocked:
             util_block_slots += 1
             # One row per (slot, player) rather than a joined string, so the
@@ -1515,13 +1579,22 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
             if lu is not None:
                 player_relaxed += 1
                 overlap_relaxed += 1
-        if lu is None and not latch["stopped"]:
+        # R295(c). `and cpt_lock`, the guard the three rungs BELOW this one
+        # carry and this one never got. Dropping `cpt_lock=` from the call is
+        # the whole content of this rung, so with no lock to drop its arguments
+        # are identical to rung 1 above -- same `with_cap`, same `util_kw`, same
+        # `max_shared_players`, same `prior` -- and it re-pays the full
+        # `time_limit` on a solve whose answer is already known to be None.
+        # Worse, `_record_lock_relaxation` returns 1 when `thesis["cpt"]` is
+        # falsy, so a slot that never had a captain lock booked a captain
+        # substitution reading `requested: none`.
+        if lu is None and not latch["stopped"] and cpt_lock:
             lu = _rung(latch, df=work, cpt_excludes=cpt_excludes,
                        forbidden_sets=prior or None,
                        excludes=with_cap,
                        max_shared_players=max_shared_players, **util_kw, **kw)
             if lu is not None:
-                cpt_relaxed += _record_lock_relaxation(thesis, lu)
+                cpt_relaxed += _record_lock_relaxation(thesis, lu) if cpt_lock else 0
         # R54(b). The fourth rung, which the BANK ladder had and this one did
         # not: a thesis solvable only under both relaxations returned None and
         # left a blank reserved row -- write-blocked at T-5 -- on a pool the bank
@@ -1638,6 +1711,23 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
             else:
                 infeasible += 1
         else:
+            # R295(b). Restate the proxy on the unweighted Base before anything
+            # downstream reads it, and keep the number the solver actually
+            # ranked on under a name that says what it is. `proj_points` is what
+            # `showdown_degraded_entries` reads (`build_slate.py`, into
+            # `field_miner.degraded_entry_flags`), and it must be comparable
+            # across theses or the margin test is measuring the multiplier.
+            #
+            # Written for every slot, not only the multiplied ones, so the two
+            # keys have one shape across the portfolio. On a thesis with no
+            # multipliers they are equal, which is the honest answer rather than
+            # a missing key.
+            cpt_key = (lu.get("captain") or {}).get("player_key")
+            lu["proxy_points_thesis_weighted"] = lu.get("proj_points")
+            lu["proj_points"] = round(
+                cpt_multiplier * base_by_key.get(cpt_key, 0.0)
+                + sum(base_by_key.get(u.get("player_key"), 0.0)
+                      for u in (lu.get("utils") or [])), 3)
             prior.append(list(lu["player_keys"]))
             for key in lu["player_keys"]:
                 player_counts[key] = player_counts.get(key, 0) + 1
@@ -1653,11 +1743,6 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
                 cap_reassignments_withdrawn += 1
             if got_cpt:
                 cpt_counts[got_cpt] = cpt_counts.get(got_cpt, 0) + 1
-                # R250. The hold is spent when the seat it was held for is
-                # filled. Never below zero: a player can be captained by a rung
-                # that never named him, and that costs him nothing he was owed.
-                if reserved_remaining.get(got_cpt, 0) > 0:
-                    reserved_remaining[got_cpt] -= 1
                 # R239(b). Against the REALIZED captain, not the requested one.
                 # R153's finding was that the ladder's apportionment is not what
                 # the solver spends, so the per-contest counter reads what came
@@ -1671,6 +1756,21 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
             for key in (lu.get("ignored_locks") or []):
                 if key not in ignored_locks:
                     ignored_locks.append(key)
+        # R295/F40. The reservation is released against the REQUESTING SLOT,
+        # once, at the end of that slot -- success, substitution or failure
+        # alike. It used to be decremented against the REALIZED captain inside
+        # the success branch, which is two defects in one line.
+        #
+        # A slot whose requested captain was reassigned by a cap, substituted by
+        # a relaxation rung, or never solved at all left its hold standing
+        # forever: a phantom hold, blocking UTIL seats for a captaincy that has
+        # already been decided against. And a player captained INCIDENTALLY by a
+        # rung that never named him spent a unit belonging to a later slot that
+        # did, so that slot arrived with less budget than it was allocated --
+        # the order dependence F40 was filed for. A hold is a promise to ONE
+        # request; the request is what discharges it.
+        if want_cpt and reserved_remaining.get(want_cpt, 0) > 0:
+            reserved_remaining[want_cpt] -= 1
         out.append(lu)
 
     # R250. The apex caution, stated as its own condition rather than left for a
@@ -1758,6 +1858,12 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
             "captain_budget_reserved": dict(captain_budget_reserved),
             "captain_budget_util_blocks": util_block_slots,
             "captain_budget_block_detail": list(util_block_detail),
+            # R295(a). The hold standing down for a thesis lock on the same
+            # player. NOT a relaxation and deliberately not counted as one:
+            # nothing gave way, a hard inclusion and an allocation preference
+            # named the same player and the preference deferred. Same footing as
+            # the three `*_reassigned` lists above.
+            "captain_budget_hold_yielded": list(hold_yielded_detail),
             # The apex caution itself. Non-empty means the portfolio spent a named
             # captain's entire budget at 1.0x and none at 1.5x, which is the
             # condition R250 was filed for. Empty on a clean ladder.
