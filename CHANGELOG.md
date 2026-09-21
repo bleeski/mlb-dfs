@@ -2,6 +2,157 @@
 
 What changed in the engine, the tools and the contracts, when, and why.
 
+## 2026-09-21 — R381: the captain leverage sleeve, explicit-id-list form (CC-5, batch 1 of R307). The wiring and the `prior_own_below` selector are deferred with reasons
+
+**Scope.** `mlb_engine/optimize/showdown_theses.py` (new
+`resolve_captain_sleeve` and `captain_sleeve_report`; `build_thesis_ladder`
+takes and apportions a sleeve; `portfolio_report` takes it and reports realized
+membership; VERSION 0.3 -> 0.4),
+`skills/generate-lineups/scripts/build_slate.py` (`--captain-sleeve`, its
+object-shape validation, its Classic refusal, the resolve in `run_showdown`,
+the brief block on both Showdown paths and two caution clauses),
+`tests/test_showdown.py` (four new classes, 19 tests), `tools/audit.py`
+(`EXPECTED_SUITE_COUNTS`), `skills/generate-lineups/references/showdown.md` (the
+flag, where a session reads Showdown mechanics), `docs/backlog.md`,
+`docs/PROGRESS.md`. Two riders travel with it and neither is a shipped change:
+this session's R372 agent-run record, and a dated rider on R380 recording its
+SECOND reproduction -- the background `dfs-premise` run here ended its report
+with `FINDINGS: 3` and its row still reads `findings: null`, this time with a
+real `model` identifier rather than `<synthetic>`, which removes a confound the
+first sighting carried. Gate `PASS v2.26.0 41 modules
+2334 tests 5 skipped`, 2315 -> 2334. The 5 skips are the same 5 the pre-work
+gate carried and are all host facts.
+
+**Ben's design ruling, 2026-09-03, is the shape of the item.** "we dont need to
+artificially zero out players, but we should figure out how we can find leverage
+in the captain ranks and devote a few lineups to those picks." An honest core
+plus a designated sleeve. `--captain-sleeve '{"entries": 4, "from": [...]}'`
+designates the first 4 reserved rows; the other 12 build with no tilt at all.
+
+**R307's three measured negative results are why the sleeve is a designation
+and not a tilt**, and none was re-derived this session. (a) The captain cap is a
+DIVERSITY control: tightening 0.25 -> 0.13 took distinct captains 6 -> 10 and
+every new captain was MORE owned. (b) Tilting only the CPT rows is worse than
+not tilting, 33.8% against a 33.6% baseline. (c) The hard tilt reaches its
+number by zeroing a leadoff man across all 16 entries and taking an exposure
+relaxation, which Ben ruled out. One prior knob feeds two markets, so a global
+tilt cannot buy captain leverage without paying for it in UTIL construction.
+
+**The seam is `thesis["cpt"]`, and that is the whole reason the sleeve binds in
+`build_thesis_ladder` rather than in `solve_ladder`.** `solve_ladder` builds
+`captain_demand` from `t.get("cpt")` and nothing else (`showdown_theses.py`,
+the `for t in theses` loop above `reserve_ceiling`), so a designation written
+there mints an R250 captain-budget reservation, bounded by min(captain cap,
+player cap) per R295/F40 and released against the requesting slot, with no
+change to `solve_ladder` at all. A sleeve carried in a side channel would get
+none of that — and the cold bats a sleeve names are exactly the cheap players
+every earlier rung takes as UTIL salary relief, which is R250's measured
+inversion with the sleeve supplying the named captain. `M8` in this session's
+mutation list is that fact as a test.
+
+**All four captain-slot controls still bind on the sleeve, and the sleeve is
+what gives way.** The caps are Ben's and the flag is opt-in, so a designated
+captain who is at the portfolio captain cap, the player-exposure cap or R239(b)'s
+per-contest captain cap is NOT taken: the slot falls back to its own template's
+ladder and the miss is counted in `captain_sleeve.unfilled`. The per-contest cap
+is the one R307's own "what exists" inventory does not know about — it landed in
+R239(b) after the entry was written, and on a multi-contest file a 4-entry sleeve
+meets it before it meets `max_cpt_exposure_pct`.
+
+**Membership is REALIZED, never requested, and the split is three-way.** R307
+asks for the sleeve to be reported separately "so mean captain ownership is
+never quoted over a mixed set as though it were one population".
+`solve_ladder`'s relaxation rungs can substitute any named captain and all three
+caps can take one off a slot before the solve, so a designated slot whose
+delivered captain is not on the list built honestly and is reported `lost`.
+`honoured`, `lost` and `honest` are three populations in
+`captain_exposure_by_population` and are never summed; folding `lost` into
+either neighbour re-creates the mixed set the item exists to avoid. Reporting
+the REQUEST instead would be R153's founding defect one market over.
+
+**Rotation is the sleeve's own, because the cap cannot do it.** Four designated
+entries and four names give one captain each, ordered least-used-first with the
+operator's list order as the tiebreak. The cap cannot produce that: 0.25 of 16
+is a count of 4, so stacking all four on the head of the list is permitted, and
+a one-name sleeve does exactly that. R307(a) is the reason this is not delegated.
+
+**A sleeve is an operator instruction, so it refuses rather than shrinking.**
+F14's class: a thesis preference the pool cannot carry is ignored and reported,
+an operator instruction the pool cannot carry refuses. An unresolvable person, a
+name two teams carry, an unknown spec key and four malformed values all exit 4
+with the reason and nothing staged. A person resolves from either role's DK id
+(a Showdown person owns two and the sleeve is about the person), a `Name|Team`
+key, or a bare name the pool carries once.
+
+**Two things declined, with reasons.**
+
+**(1) The `prior_own_below` selector, and the wiring under it.** R307's fix line
+offers `{"from": ["prior_own_below", 25.0]}`, and THE SELECTOR HAS NO INPUT IN
+THE BUILD PATH. `predict_captain_ownership` has exactly one production caller,
+`tools/ownership_pred.py`, which runs offline; `run_showdown` has zero
+references to ownership or `own_pct` anywhere in its body. This is R334(a)'s
+shape again: a factor that exists offline and never reaches the build. The
+selector form is therefore REFUSED BY NAME rather than resolved as a
+ballplayer, and the refusal says what it is waiting on. Sharper than the entry
+knew: the number itself is already produced —
+`tools/ownership_pred.py` emits a `captain` block carrying
+`own_pct_by_player_id` for a Showdown file — so what is missing is a reader on
+the Showdown path, not a producer. That is the remaining work, and
+`tests/test_core.py::test_the_sliced_path_attaches_through_the_SAME_function_before_the_bank`
+already fixes its shape: `build_slate.py` may not contain the literal
+`attach_predicted_ownership(`, so the Showdown attach must go behind an engine
+function the way `apply_leverage_ownership` does for Classic.
+
+**(2) "Solves as its own sub-portfolio against the same bank" is a false
+mechanism on the ladder path and was not built.** There is no bank on that
+path: `bank = list(solved)` comes straight out of one `solve_ladder` call, and
+"bank" is the fallback path's vocabulary. Worse for the entry's own promise, the
+three controls it says will "still bind across the union" accumulate in
+`solve_ladder`'s locals for a single call, so a genuinely separate sub-portfolio
+solve would not see them and the caps would silently stop binding across the
+union — the exact R153 failure the sentence was written to avoid. The sleeve is
+therefore designated ENTRIES inside the one `solve_ladder` call. The design
+intent survives intact; the framing did not.
+
+**Not applicable on the points-max bank path, and said so rather than dropped.**
+That path builds no named thesis, so there is nothing to designate. The brief
+carries `captain_sleeve.applied: false` with the reason and the caution names
+it, on R54(c)'s reasoning that an operator instruction which did not arrive is
+louder than a control the solver chose to relax. Not a refusal: that path is
+reached when batting orders are not posted, which is T-20 territory, and a blank
+reserved row is the maximum washout.
+
+**Truthful labels.** Nothing in this diff claims lift, edge, ROI, a win rate or
+a probability. The mine evidence behind the item is suggestive and says so: the
+coldest captain quartile's top-1% CI is [0.993, 1.547] and it CROSSES 1. Large-
+field Showdown is about half duplicates (median duplicate share 0.40 at 1k-5k,
+0.49 above 5k; winners averaged 1.83 copies), so any first-place equity read
+that ignores splitting is optimistic by a large factor, and R225 comes first.
+The sleeve ships counted and graded, never as a default: there is no default
+value for the flag and no posture sets one. One test asserts the delivered block
+carries no such vocabulary outside its own disclaimer.
+
+**Every new test was mutation-checked by hand; all 17 mutations were caught and
+none survived.** Deleting the sleeve branch, rotating by list order alone,
+letting the sleeve ignore the caps, deleting the selector refusal, skipping
+unresolved people instead of refusing, removing the entries clamp, reading the
+REQUESTED captain instead of the delivered one, storing the designation in a
+side channel instead of `thesis["cpt"]`, pooling the three populations, applying
+the sleeve to every slot, not counting an unfilled designation, silently taking
+the first match for an ambiguous name, letting a duplicate person take a second
+slot, dropping the block from the brief, removing the flag from the JSON-object
+validation door, never calling the resolver in `run_showdown`, and never passing
+the sleeve to `portfolio_report`. The selector mutation is the one that would
+have passed a lazier test: with the branch gone, `"prior_own_below"` falls
+through to name resolution and raises the SAME exception type, so the test pins
+the MESSAGE the branch keeps rather than the fact that something raised.
+
+**The entry's GATE marker was stale and is corrected.** R307's heading read
+"GATED on R306 step 2"; R306 steps 1-3 shipped 2026-09-03 and R306's own entry
+ends "Step 4 lives on R307 (slot 9), whose gate this discharged". The roadmap
+row's dependency cell was already correct. No session should spend a window
+re-deriving that gate.
+
 ## 2026-09-21 — R295(a)(b)(c)(d) + F40: Showdown ladder truth, the four filed defects and the captain-reservation rider; F14 and one half of (a) declined with reasons
 
 **Scope.** `mlb_engine/optimize/showdown_theses.py` (`solve_ladder`: the
