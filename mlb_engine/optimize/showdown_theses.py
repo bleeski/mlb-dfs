@@ -23,6 +23,11 @@ VERSION history
                    past the `!= cpt` filter), cpt_ladder restricted to the two
                    starters, the top-band hitter locks removed after being
                    measured infeasible against real prices, weight 0.30 -> 0.45
+  0.5  2026-09-21  R382: the captain-ownership prior reaches this module
+                   (`captain_prior_by_person`, a person-keyed reader over the
+                   emitted `captain` block, joined through the UTIL id) and the
+                   sleeve's `prior_own_below` selector resolves against it
+                   instead of refusing by name
   0.4  2026-09-21  R381: the captain leverage sleeve. A per-entry captain
                    DESIGNATION over the first k ladder slots, resolved from an
                    explicit list of people, apportioned under all three caps and
@@ -39,6 +44,7 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence
 import numpy as np
 import pandas as pd
 
+from mlb_engine.field.ownership_prior import CAPTAIN_BUDGET_PCT
 from mlb_engine.optimize.showdown import (
     DEFAULT_MAX_CPT_EXPOSURE_PCT,
     DEFAULT_MAX_CPT_PER_CONTEST,
@@ -51,7 +57,7 @@ from mlb_engine.optimize.showdown import (
     player_cap_structural_floor,
 )
 
-VERSION = "0.4"
+VERSION = "0.5"
 
 # PA-share prior by batting-order slot. Deterministic, not fitted to any slate.
 ORDER_FACTOR = {1: 1.08, 2: 1.06, 3: 1.05, 4: 1.03, 5: 1.00,
@@ -818,15 +824,219 @@ def contest_partition(contest_of_entry: Optional[Sequence[str]],
 
 
 # --------------------------------------------------------------------------- #
+# Captain-ownership prior reader (R382, CC-5 batch 2 of R307)
+# --------------------------------------------------------------------------- #
+class CaptainPriorError(ValueError):
+    """A captain-ownership prior this build cannot read exactly as written.
+
+    Refusing is not defensive tidiness here. A prior that resolves to nothing
+    does not read downstream as an ABSENT input, it reads as a WRONG one --
+    every player unowned, so every threshold a selector can set passes and the
+    sleeve designates the whole pool while the brief reports a source and a
+    sha256. That is R242's silent-fallback shape on the one surface R381's own
+    refusal was written to protect. So every way of resolving to nothing exits
+    with what it looked for and where.
+    """
+
+
+def captain_prior_by_person(df: pd.DataFrame,
+                            payload: Mapping[str, Any],
+                            archetype: str = "",
+                            source: str = "") -> Dict[str, Any]:
+    """The emitted CAPTAIN-SLOT prior, re-keyed onto this melt's people.
+
+    R382 (CC-5, R307 batch 2). ``tools/ownership_pred.py emit`` has produced
+    this number since R306 and nothing on the build path read it: R381 refused
+    the sleeve's ``prior_own_below`` selector BY NAME because ``run_showdown``
+    had no captain-ownership input at all. This is that reader. It is the whole
+    of the wiring, and it returns A DICT KEYED BY PERSON.
+
+    **A dict and not a frame column, decided explicitly.** The obvious wiring
+    is to attach ``Projected_Ownership_Pct`` to the priced Showdown frame the
+    way Classic does. That would be a no-op: the column has exactly one reader
+    in this engine and it is the CLASSIC solver's ``_ownership_pct_for_row``.
+    Neither ``showdown.py`` nor ``showdown_theses.py`` reads any ownership
+    column, and the consumer this exists for -- a selector over people -- wants
+    a person-keyed mapping, not a row. A column nothing reads would be the
+    silent no-op on the surface R381 refused rather than build.
+
+    **THE JOIN IS THROUGH THE UTIL ID, and getting it wrong is silent.**
+    ``ownership_pred`` runs ``collapse_showdown_roles`` before every block it
+    emits, and that collapse KEEPS THE UTIL ROW and drops the CPT row: "the
+    UTIL row survives, because it is the person's base price". So the captain
+    block's ``own_pct_by_player_id`` is a CAPTAIN-SLOT probability carried on
+    the person's UTIL id -- measured 94 of 94 keys on a real Showdown file --
+    and the obvious ``by_cpt_id`` lookup matches NOTHING while reading
+    downstream as "nobody is owned". Both role ids are joined here anyway, and
+    ``matched_through`` reports which one answered, so the key space is a fact
+    in the brief rather than an assumption in a comment. ``qa_portfolio.
+    showdown_cpt_to_util`` is the same rejoin one surface over, from DK's
+    salary file for an entry row; this one is from the melt for a pool row, and
+    neither is a copy of the other.
+
+    Every prior id maps to at most one person and every person to at most one
+    id, because ``melt_showdown_salary_csv`` drops any person who is not
+    exactly one CPT row plus one UTIL row. A collision is therefore reachable
+    only from a prediction emitted against a DIFFERENT salary file, which is
+    why it refuses rather than picking a winner.
+
+    Refuses on: no archetypes, a named archetype the file lacks, more than one
+    with none named, no ``captain`` block (what a CLASSIC salary file emits --
+    ``showdown_markets.applied`` is false without a CPT token in Roster
+    Position), an empty block, a value that is not a finite number in [0, 100],
+    a colliding id, and a block whose every id is a stranger to this melt. The
+    Classic ``own_pct_by_player_id`` sitting beside the captain block is NEVER
+    the fallback: it is the 800/200 split, it sums to 1000% on this geometry
+    (measured 1000.1 against the captain block's 99.9 on the same file), and
+    R306 built the captain distribution because the archive says the two are
+    different markets.
+
+    **An UNGRADED, UNCALIBRATED prior, and the caution travels with it.** R306
+    measured person-level prior ownership correlating with realized CAPTAIN
+    ownership between 0.33 and 0.85, with a 60%-rostered player landing at 6%
+    captain. R209 measured this family's ORDERING usable (Spearman +0.581 over
+    112 graded players) and its LEVEL explicitly not; one slate cannot size a
+    coefficient. Nothing here is a lift, an edge, an ROI, a win rate or a
+    probability, and no caller may turn it into one.
+    """
+    where = str(source) or "the ownership prediction"
+    archetypes = (payload or {}).get("archetypes") or {}
+    if not archetypes:
+        raise CaptainPriorError(
+            f"{where} carries no `archetypes`; refusing rather than reading a "
+            "captain prior that is not in the file")
+    name = str(archetype or "").strip()
+    if name and name not in archetypes:
+        raise CaptainPriorError(
+            f"archetype {name!r} is not in {where}; it carries {sorted(archetypes)}")
+    if not name:
+        # R70's rule, the same one `resolve_leverage` and `find_prior_file`
+        # keep: more than one candidate and no choice from the operator is a
+        # question, not a race won by sort order.
+        if len(archetypes) != 1:
+            raise CaptainPriorError(
+                f"{where} carries {len(archetypes)} archetypes "
+                f"{sorted(archetypes)}; name one with "
+                "`--captain-prior <archetype>` rather than letting sort order pick")
+        name = next(iter(archetypes))
+    block = (archetypes.get(name) or {}).get("captain") or {}
+    if not block:
+        raise CaptainPriorError(
+            f"{where} archetype {name!r} carries no `captain` block, which is "
+            "what a CLASSIC salary file emits: `showdown_markets.applied` is "
+            "false unless the Roster Position column carries a CPT token. "
+            "Refusing rather than reading the Classic `own_pct_by_player_id` "
+            "beside it, which is the 800/200 split, sums to 1000% on Showdown "
+            "geometry, and is a different market from the captain slot")
+    own = block.get("own_pct_by_player_id") or {}
+    if not own:
+        raise CaptainPriorError(
+            f"{where} archetype {name!r} carries an empty captain "
+            "`own_pct_by_player_id`; refusing rather than reading every person "
+            "as unowned, which passes every threshold a selector can set")
+
+    by_id: Dict[str, str] = {}
+    role_of_id: Dict[str, str] = {}
+    # A DK draftable id is unique per row and per role, so this map is
+    # one-to-one however it is built and the order below is for reading, not a
+    # tie-break. Two prior ids reaching one person is handled where it can
+    # actually happen, in the loop under this one.
+    for key, cpt_id, util_id in zip(df["Player_Key"], df["CPT_ID"], df["UTIL_ID"]):
+        for role, pid in (("util_id", util_id), ("cpt_id", cpt_id)):
+            token = str(pid).strip() if pid is not None else ""
+            if token:
+                by_id[token] = str(key)
+                role_of_id[token] = role
+
+    own_by_key: Dict[str, float] = {}
+    matched_through: Dict[str, int] = {"util_id": 0, "cpt_id": 0}
+    ids_not_in_pool: List[str] = []
+    # Sorted, because every set reaching a decision in this repo is sorted
+    # first: the refusal a collision raises must name the same id on every run.
+    for pid, raw in sorted(own.items(), key=lambda kv: str(kv[0])):
+        token = str(pid).strip()
+        key = by_id.get(token)
+        if key is None:
+            ids_not_in_pool.append(token)
+            continue
+        if isinstance(raw, bool) or not isinstance(raw, (int, float)):
+            raise CaptainPriorError(
+                f"{where} archetype {name!r} carries a non-numeric captain "
+                f"ownership for id {token}: {raw!r}")
+        value = float(raw)
+        if not math.isfinite(value) or value < 0.0 or value > 100.0:
+            raise CaptainPriorError(
+                f"{where} archetype {name!r} carries captain ownership "
+                f"{value!r} for id {token}, which is outside [0, 100]. R338 "
+                "refuses the same class before a Classic leverage control "
+                "reads one; a share outside the budget is a broken file, not a "
+                "number to clamp")
+        if key in own_by_key:
+            raise CaptainPriorError(
+                f"{where} maps two captain-prior ids onto one person ({key}), "
+                f"most recently {token}. The melt drops any person who is not "
+                "exactly one CPT row plus one UTIL row, so this means the "
+                "prediction was emitted against a DIFFERENT salary file than "
+                "this build melted; refusing rather than picking one share")
+        matched_through[role_of_id[token]] += 1
+        own_by_key[key] = value
+
+    if not own_by_key:
+        raise CaptainPriorError(
+            f"{where} archetype {name!r} carries {len(own)} captain ownership "
+            "values and NOT ONE of their ids is in this melted pool, so the "
+            "prior would read as `nobody is owned` for every person. That is "
+            "the CPT/UTIL key-space trap: `ownership_pred` collapses roles "
+            "before it predicts and keeps the UTIL row, so the captain prior "
+            "is carried on UTIL ids. Check this prediction was emitted from "
+            "THIS slate's salary file")
+
+    pool_keys = [str(k) for k in df["Player_Key"]]
+    return {
+        "own_pct_by_player_key": dict(sorted(own_by_key.items())),
+        "archetype": name,
+        "source": str(source),
+        "players_in_prediction": len(own),
+        "persons_matched": len(own_by_key),
+        "persons_in_pool": len(pool_keys),
+        # Named, not counted away. A person the prediction never scored has an
+        # UNKNOWN captain share, not a zero, and every consumer here has to
+        # treat the two differently or it will read a scratched-in replacement
+        # as the coldest captain on the slate.
+        "persons_without_prior": sorted(k for k in pool_keys if k not in own_by_key),
+        "matched_through": dict(matched_through),
+        "ids_not_in_pool": ids_not_in_pool,
+        "budget_check": {
+            "pct_sum": round(sum(own_by_key.values()), 1),
+            "budget_pct": CAPTAIN_BUDGET_PCT,
+            "note": ("the softmax allocates exactly this budget over the people "
+                     "the PREDICTION saw. A sum below it here means people in "
+                     "the prediction are absent from this melt, which is "
+                     "ordinary (a scratch, a late change); reported and never "
+                     "rescaled, because rescaling would invent shares R306 did "
+                     "not allocate"),
+        },
+        "label": ("an UNGRADED, UNCALIBRATED structural prior over the CAPTAIN "
+                  "slot, forwarded unchanged. R306 measured person-level prior "
+                  "ownership correlating with realized CAPTAIN ownership "
+                  "between 0.33 and 0.85, and a 60%-rostered player landing at "
+                  "6% captain; R209 measured this family's ORDERING usable "
+                  "(Spearman +0.581 over 112 graded players) and its LEVEL not. "
+                  "Never a lift, an edge, an ROI, a win rate or a probability."),
+    }
+
+
+# --------------------------------------------------------------------------- #
 # Captain sleeve (R381, CC-5 batch 1 of R307)
 # --------------------------------------------------------------------------- #
 #: Selector names the sleeve's ``from`` field may carry INSTEAD of an explicit
-#: list of people. None of them is wired: every one needs a captain-ownership
-#: prior inside the build, and the build path has none -- `predict_captain_
-#: ownership` has one production caller and it is `tools/ownership_pred.py`,
-#: which runs offline and writes a file nothing in `run_showdown` reads. Named
-#: here so the flag REFUSES the selector form by name rather than resolving
-#: `"prior_own_below"` as a person and failing with "no such player".
+#: list of people. Membership here is still what makes the flag refuse a
+#: selector BY NAME rather than resolve `"prior_own_below"` as a person and
+#: fail with "no such player" -- R381's reason, and it outlived R381's refusal.
+#: ``prior_own_below`` is WIRED as of R382: it reads the captain-slot prior
+#: `captain_prior_by_person` resolves and refuses when the operator did not ask
+#: for one. A name added here without a resolver in `_sleeve_from_selector`
+#: would refuse as "unknown selector", never designate silently.
 CAPTAIN_SLEEVE_SELECTORS = ("prior_own_below",)
 
 #: The keys a sleeve spec may carry. Closed rather than open: a typo in an
@@ -847,8 +1057,113 @@ class CaptainSleeveError(ValueError):
     """
 
 
+def _sleeve_from_selector(df: pd.DataFrame, given: Sequence[Any],
+                         captain_prior: Optional[Mapping[str, Any]],
+                         ) -> tuple[List[str], Dict[str, Any]]:
+    """(``Player_Key`` menu, selector report) for a ``from`` list that names a
+    selector instead of people. R382 (CC-5, R307 batch 2).
+
+    ``["prior_own_below", 25.0]`` is R307's own wire format and R381 pinned it
+    by refusing it. It selects every person whose CAPTAIN-slot prior share is
+    strictly below the threshold, COLDEST FIRST, and hands that list back as
+    the sleeve's ``from`` menu -- so the rotation, the caps, the unfilled
+    counter and the three-way delivered split all stay exactly what R381 built
+    and tested. Ordering it coldest-first is the whole of the selector's
+    opinion: ``build_thesis_ladder`` breaks its least-used-first rotation on
+    list order, so slot 0 takes the coldest person the caps allow.
+
+    The menu is NOT truncated to the sleeve's entry count. A threshold that
+    admits forty people is a threshold that was set loosely, and the brief
+    should say forty rather than quietly show the four that got used.
+
+    **A person the prediction never scored is EXCLUDED, not treated as cold.**
+    An unknown share is not a low share, and reading it as one would designate
+    exactly the late scratch replacement whose prior was never emitted --
+    which is the person a contrarian-captain selector is most likely to reach
+    for and least entitled to. Those people are counted and named in the
+    report rather than dropped in silence.
+
+    **The correlation caution is not a gate and is not resolved here.** R306
+    measured person-level prior ownership correlating with realized CAPTAIN
+    ownership between 0.33 and 0.85; the 2005_1g_sd session's own conclusion
+    was that it may have bought the chalk and sold the leverage using a number
+    that could not tell it either way. This selects on an ORDERING R209
+    measured usable and a LEVEL nobody has sized. The threshold is the
+    operator's and travels into the brief beside the correlation.
+    """
+    selector = str(given[0])
+    if len(given) != 2:
+        raise CaptainSleeveError(
+            f'--captain-sleeve selector {selector!r} takes exactly one '
+            f'threshold: ["{selector}", <pct>]. Got {len(given)} element(s) '
+            f"in \"from\"")
+    threshold = given[1]
+    if isinstance(threshold, bool) or not isinstance(threshold, (int, float)):
+        raise CaptainSleeveError(
+            f"--captain-sleeve selector {selector!r} needs a numeric threshold "
+            f"in percent, got {type(threshold).__name__} ({threshold!r})")
+    threshold = float(threshold)
+    if not math.isfinite(threshold) or threshold <= 0.0 or threshold > 100.0:
+        raise CaptainSleeveError(
+            f"--captain-sleeve selector {selector!r} threshold {threshold} is "
+            "outside (0, 100]; the captain market is a 100% budget over one "
+            "slot, so a threshold outside it selects everybody or nobody")
+    if not (captain_prior or {}).get("own_pct_by_player_key"):
+        # R381's refusal, kept as a refusal and re-aimed. It used to say the
+        # selector was NOT WIRED because nothing on this path read a prior; the
+        # reader exists now, so what is missing is the operator asking for it.
+        # A selector with no prior would designate nobody, and R381's own note
+        # says that is worse than saying it is not there.
+        raise CaptainSleeveError(
+            f"--captain-sleeve selector {selector!r} needs this slate's "
+            "captain-ownership prior and none was read: pass `--captain-prior` "
+            "so the build resolves `outputs/<date>/ownership_pred_<tag>.json`, "
+            "or pass an explicit list of people instead. Selecting against no "
+            "prior would designate nobody while the brief reported a sleeve")
+
+    own = {str(k): float(v) for k, v
+           in (captain_prior or {}).get("own_pct_by_player_key", {}).items()}
+    scored: List[str] = []
+    unscored: List[str] = []
+    for key in df["Player_Key"]:
+        k = str(key)
+        (scored if k in own else unscored).append(k)
+    picked = sorted((k for k in scored if own[k] < threshold),
+                    key=lambda k: (own[k], k))
+    if not picked:
+        coldest = min((own[k] for k in scored), default=None)
+        raise CaptainSleeveError(
+            f"--captain-sleeve selector {selector!r} at {threshold}% selects "
+            f"NOBODY out of {len(scored)} people this prior scored"
+            + (f" (the coldest is {coldest}%)" if coldest is not None else "")
+            + ". Refusing rather than designating an empty sleeve, which would "
+              "build the honest portfolio while the brief reported a sleeve; "
+              "raise the threshold or pass people by name")
+    name_by_key = dict(zip(df["Player_Key"], df["Name"]))
+    return picked, {
+        "selector": selector,
+        "threshold_pct": threshold,
+        "matched": len(picked),
+        "scored_by_prior": len(scored),
+        # Never folded into `matched`: an unknown share is not a low one.
+        "excluded_without_prior": sorted(
+            str(name_by_key.get(k, k)) for k in unscored),
+        "source": str((captain_prior or {}).get("source") or ""),
+        "archetype": str((captain_prior or {}).get("archetype") or ""),
+        "own_pct_selected": {str(name_by_key.get(k, k)): own[k] for k in picked},
+        "label": ("a menu selected on an UNGRADED captain prior, coldest "
+                  "first. R306 measured person-level prior ownership "
+                  "correlating with realized CAPTAIN ownership between 0.33 "
+                  "and 0.85, so this ORDERS on a number that can invert the "
+                  "read; the threshold is the operator's. Never a lift, an "
+                  "edge, an ROI, a win rate or a probability."),
+    }
+
+
 def resolve_captain_sleeve(df: pd.DataFrame, spec: Optional[Mapping[str, Any]],
-                           n_entries: int) -> Optional[Dict[str, Any]]:
+                           n_entries: int,
+                           captain_prior: Optional[Mapping[str, Any]] = None,
+                           ) -> Optional[Dict[str, Any]]:
     """Resolve a ``--captain-sleeve`` spec against the melted Showdown pool.
 
     Ben's design ruling, 2026-09-03: "we dont need to artificially zero out
@@ -865,6 +1180,13 @@ def resolve_captain_sleeve(df: pd.DataFrame, spec: Optional[Mapping[str, Any]],
     bare ``Name`` when the pool carries exactly one. Returns the resolved sleeve
     or ``None`` when ``spec`` is ``None``; raises ``CaptainSleeveError`` with
     the reason otherwise.
+
+    R382: ``from`` may instead name a selector, ``["prior_own_below", <pct>]``,
+    which ``_sleeve_from_selector`` turns into a menu of people before the
+    resolution below ever runs. ``captain_prior`` is the resolved
+    ``captain_prior_by_person`` block a selector reads and is unused by the
+    explicit-list form; a selector with no prior REFUSES rather than
+    designating nobody.
 
     The designated slots are the FIRST ``entries`` ladder slots, which R239
     already makes meaningful: slot j and ``rows[j]`` are the same entry, so the
@@ -911,13 +1233,15 @@ def resolve_captain_sleeve(df: pd.DataFrame, spec: Optional[Mapping[str, Any]],
     # the message says what it is waiting on: the sleeve's selector has no input
     # in the build path, so accepting it would either resolve a selector name as
     # a person or silently designate nothing.
+    # R382. The selector form R307 asked for and R381 refused by name. It
+    # resolves to a MENU of `Player_Key`s and then falls through the same
+    # resolution loop below, so nothing downstream of here knows the difference
+    # -- rotation, the three caps, the unfilled counter and the three-way
+    # delivered split are R381's, unchanged and already tested.
     head = str(given[0]) if given else ""
+    selector_report: Optional[Dict[str, Any]] = None
     if head in CAPTAIN_SLEEVE_SELECTORS:
-        raise CaptainSleeveError(
-            f'--captain-sleeve selector {head!r} is NOT WIRED: it needs a '
-            f"captain-ownership prior inside the build and run_showdown reads "
-            f"none. Pass an explicit list of people instead. (CC-5 batch 2 is "
-            f"the wiring; batch 3 is this selector on top of it.)")
+        given, selector_report = _sleeve_from_selector(df, given, captain_prior)
 
     # Person lookup. A Showdown person owns two DK ids and the sleeve is about
     # the person, so both resolve to the same key. Name is accepted only when it
@@ -982,6 +1306,10 @@ def resolve_captain_sleeve(df: pd.DataFrame, spec: Optional[Mapping[str, Any]],
         "captain_names": [str(name_by_key.get(k, k)) for k in resolved],
         "resolution": resolution,
         "duplicates_collapsed": duplicates,
+        # R382. None when the operator listed people. Present, with the
+        # threshold and the prior it read, when a selector built the list --
+        # so the brief can never show a sleeve without showing what chose it.
+        "selector": selector_report,
         "label": ("a per-entry captain DESIGNATION over the first "
                   f"{int(want)} reserved rows, counted and reported apart from "
                   "the rest of the portfolio. Never a lift, an edge, an ROI or "
@@ -2334,11 +2662,16 @@ def captain_sleeve_report(df: pd.DataFrame,
 
     Second, the split is three-way, not two. `honoured`, `lost` and `honest` are
     three different populations and collapsing `lost` into either one is how a
-    mixed set gets quoted as one. There is no ownership number here: this build
-    path reads no captain-ownership prior at all (CC-5 batch 2 is that wiring),
-    so this block counts captains and says whose they were. It is not a lift, an
-    edge, an ROI or a win rate, and the three negative results on R307 are the
-    reason the sleeve is a designation rather than a tilt.
+    mixed set gets quoted as one. This block counts captains and says whose they
+    were, and that stayed true when R382 wired the prior in: the number the
+    build now reads lives in the brief's `captain_prior` block beside its own
+    correlation caution, and it is deliberately NOT averaged over these three
+    populations here. A mean prior share per population reads as a verdict on
+    whether the sleeve worked, and R306 measured this prior's LEVEL unsized --
+    R307's own table quoted one by hand, as a labeled review proxy, which is
+    where that number belongs. Nothing here is a lift, an edge, an ROI or a win
+    rate, and the three negative results on R307 are the reason the sleeve is a
+    designation rather than a tilt.
     """
     if not captain_sleeve:
         return None

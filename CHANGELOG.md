@@ -2,6 +2,231 @@
 
 What changed in the engine, the tools and the contracts, when, and why.
 
+## 2026-09-21 — R382: the captain-ownership prior reaches `run_showdown`, and `prior_own_below` resolves against it (CC-5, batch 2 of R307). R307 is now closed
+
+**Scope.** `mlb_engine/optimize/showdown_theses.py` (new
+`captain_prior_by_person` and `CaptainPriorError`; new `_sleeve_from_selector`;
+`resolve_captain_sleeve` takes a `captain_prior` and returns a `selector`
+block; three docstrings that R381 made true and this makes false again;
+VERSION 0.4 -> 0.5), `skills/generate-lineups/scripts/build_slate.py` (new
+`resolve_captain_prior`, the `--captain-prior` flag, its Classic refusal, the
+resolve in `run_showdown` ahead of the sleeve, the brief's `captain_prior`
+block with the delivered captains' prior shares, two caution clauses, the
+`--ownership-pred` help, the exit-4 site count), `tests/test_showdown.py`
+(three new classes, 28 tests; one R381 test REWRITTEN in place), `tools/audit.py`
+(`EXPECTED_SUITE_COUNTS`), `skills/generate-lineups/references/showdown.md`,
+`docs/backlog.md`, `docs/PROGRESS.md`. Gate `PASS v2.26.0 41 modules 2362 tests
+5 skipped`, 2334 -> 2362. The 5 skips are the same 5 the pre-work gate carried
+and are all host facts.
+
+**This row was a READER, not a producer, and that is why it is small.**
+`tools/ownership_pred.py` has emitted a Showdown `captain` block since R306 --
+`own_pct_by_player_id`, `tier_by_player_id`, `params`, a `budget_check` against
+`CAPTAIN_BUDGET_PCT` and R328's `role_coherence`. What did not exist was
+anything on the build path that read it, so `run_showdown` had no
+captain-ownership input at all and R381 refused the sleeve's selector form BY
+NAME. `predict_captain_ownership` is untouched here.
+
+**THE PRIOR IS KEYED BY UTIL ID, AND THE OBVIOUS LOOKUP MATCHES NOTHING.**
+`ownership_pred` runs `collapse_showdown_roles` before every block it emits,
+and that collapse keeps the UTIL row and drops the CPT row ("the UTIL row
+survives, because it is the person's base price"). So the CAPTAIN-SLOT
+probability is carried on the person's UTIL id. A `by_cpt_id` lookup -- the one
+a session writes first, because the block is called `captain` -- matches ZERO
+ids on a real file and reads downstream as "nobody is owned", which is not an
+absent input but a wrong one: every threshold a selector can set then passes
+and the sleeve designates the whole pool while the brief shows a source and a
+sha256. Measured 94 of 94 keys UTIL on the MIN@CHC fixture, and
+`test_the_real_emit_keys_the_captain_block_on_UTIL_ids_and_this_JOINS` runs the
+real producer rather than a hand-built payload, so the pin fails if either side
+ever moves. `qa_portfolio.showdown_cpt_to_util` is the same rejoin one surface
+over, from DK's salary file for an entry row; neither is a copy of the other.
+
+**A DICT KEYED BY PERSON, and the alternative was a silent no-op.** The
+obvious wiring is to attach `Projected_Ownership_Pct` to the priced Showdown
+frame the way Classic does. That column has exactly ONE reader in this engine
+and it is the Classic solver's `_ownership_pct_for_row`; grepping both Showdown
+modules for it returns nothing, and neither reads any ownership column at all.
+Attaching it would have been R242's shape on the surface R381's own refusal
+exists to protect. So the reader returns a mapping from `Player_Key` to a
+captain share, which is what a selector over people wants.
+
+**One line of `resolve_leverage` is deliberately not copied.** It reads
+`archetypes[a]["own_pct_by_player_id"]`, the CLASSIC 800/200 market, which sums
+to 1000% on a Showdown file -- measured 1000.1 against the captain block's 99.9
+on the same fixture. R306 built the captain distribution because the archive
+says the two are different markets. A payload with no `captain` block therefore
+REFUSES and names why (a Classic salary file emits none:
+`showdown_markets.applied` is false without a CPT token in Roster Position)
+rather than falling through to the market sitting beside it. Everything else
+about `resolve_leverage`'s shape IS copied: `find_prior_file` as the one
+resolver, refusal with the path named, the archetype asked rather than won by
+sort order, source/sha256/resolved_by provenance, an UNGRADED-prior label.
+
+**The payload's shape stays out of `build_slate.py`, comment included.**
+`test_the_sliced_path_attaches_through_the_SAME_function_before_the_bank`
+forbids the literal `attach_predicted_ownership(` anywhere in that file -- a raw
+text scan, so a docstring counts -- and permits calling an engine function that
+imports it, which is what `apply_leverage_ownership` does for Classic. The same
+discipline applies to a market the script would otherwise learn the shape of,
+so `captain_prior_by_person` owns the archetype question, the block choice, the
+key-space join, the value checks and every refusal, and the script finds the
+file, hashes it and shapes the brief. The first cut of the docstring explained
+the design by spelling the subscript chain; a test now forbids that too, on the
+reasoning that a comment saying "we read it like X" is how a second reader of
+it starts.
+
+**A SILENT NO-OP NEITHER R307 NOR R381 NAMED, retired here.**
+`--ownership-pred` is not Classic-gated and never was, but its only reader was
+inside `resolve_leverage`, which early-returns without `--leverage`, whose only
+caller is `run_classic`. On every Showdown build the flag parsed and was
+discarded -- R242's shape, on the flag whose entire job is to resolve ambiguity
+when a date carries more than one prediction. It has a Showdown reader now and
+its help says so.
+
+**The exit-4 prose count was stale by three BEFORE this diff.** The comment
+above `REFUSAL_SITES` read "fourteen sites (run_classic:1, run_showdown:3,
+main:10)" against a tree carrying seventeen (1/4/12). R382 adds two and makes
+it nineteen, and `test_the_exit_4_site_count_in_the_prose_matches_the_TREE`
+now counts `return 4` by AST so the next drift reddens instead of the one
+after it. A hand-maintained count of a growing class is the one thing that
+comment exists not to do.
+
+**What the selector is, and what it refuses.** `["prior_own_below", 25.0]` is
+R307's own wire format, the one R381 pinned by refusing it. It resolves to a
+MENU of people ordered COLDEST FIRST and then falls through R381's existing
+resolution, so rotation, all four captain-slot controls, `unfilled` and the
+three-way delivered split are unchanged and already tested. Three decisions in
+it are load-bearing. The menu is NOT truncated to the entry count, because a
+threshold admitting forty people is a threshold set loosely and the brief
+should say forty. A person the prediction never scored is EXCLUDED rather than
+read as cold, because an unknown share is not a low one and the person it would
+otherwise designate is exactly the late scratch's replacement a contrarian
+selector reaches for first. And a threshold selecting NOBODY refuses, naming
+the coldest share in the pool, because a sleeve that designates nobody builds
+the honest portfolio while the brief reports a sleeve.
+
+**R381's selector refusal was REWRITTEN in place, not deleted, and it did its
+job.** `test_the_selector_form_refuses_AS_A_SELECTOR_not_as_a_missing_person`
+pins the MESSAGE rather than the exception type, precisely because deleting the
+branch lets `"prior_own_below"` fall through to name resolution and raise the
+SAME type. Wiring the selector turned it red immediately instead of leaving it
+green over changed behaviour. What changed is only what the refusal waits on:
+no longer "the build reads no prior anywhere" but "this build was not asked to
+read one". That it refuses by NAME, never as a ballplayer, is R381's property
+and survives.
+
+**Truthful labels, and this row had a number where batch 1 had none.** Nothing
+in this diff, its brief, this entry or the PR claims lift, edge, ROI, a win
+rate or a probability. The prior is UNGRADED and UNCALIBRATED and every surface
+that carries a number carries that beside it: R306 measured person-level prior
+ownership correlating with realized CAPTAIN ownership between 0.33 and 0.85,
+with a 60%-rostered player landing at 6% captain; R209 measured this family's
+ORDERING usable (Spearman +0.581 over 112 graded players) and its LEVEL
+explicitly not, and one slate cannot size a coefficient. The mine's
+captain-quartile evidence is suggestive and says so: the coldest quartile's
+top-1% lift CI is [0.993, 1.547] and it CROSSES 1. Large-field Showdown is
+about half duplicates (median duplicate share 0.40 at 1k-5k, 0.49 above 5k;
+winners averaged 1.83 copies), so any first-place equity read that ignores
+splitting is optimistic by a large factor and R225 comes first. The 2005_1g_sd
+session's own conclusion was that it may have bought the chalk and sold the
+leverage using a number that could not tell it either way, which is why the
+correlation travels IN the brief block rather than in a cautions list read
+separately. One test asserts the label disclaims each banned word by name.
+
+**Three things declined, with reasons.**
+
+**(1) A mean prior share per delivered population was not shipped.** The brief
+reports each delivered captain's prior share individually, with `null` (never
+`0`) for a captain the prediction did not score, and does not average them.
+R307's own measurement table quoted an entry-weighted "mean CPT own" and
+labeled it a deterministic review proxy; that is the right handling and the
+wrong default. Shipped as a per-captain number, a mean reads as a verdict on
+whether the sleeve worked, over a prior whose LEVEL R306 measured unsized. A
+session that wants the mean can take it, deliberately, the way R307 did.
+
+**(2) `qa_portfolio`'s captain own-tier histogram was not reconciled, and is
+filed instead.** `tools/qa_portfolio.py:921` tiers a delivered Showdown CAPTAIN
+off the CLASSIC block's `tier_by_player_id` and never off `["captain"]`; it is
+the only production reader of that key, so there is no N+1th site. With the
+build path now reading the captain market, the brief quotes captain-market
+PERCENTAGES and the QA report a Classic-market TIER for the same slot:
+different market and different unit. Pre-existing rather than created here, it
+has its own tests and its own "ABSENT for Showdown" prose, and widening this
+diff to reach it was declined on R379's precedent. Filed as **R383**, with the
+measurement and NOT with this entry's first draft of the reason. That draft
+said the Classic block is wrong because it is the 800/200 split summing to
+~1000%, and a premise check refuted it: tiers are RANK cutpoints (0.15/0.60 of
+the ordering) taken over the pre-budget softmax shares, so the budget scales
+out entirely -- the captain and roster markets differ six-fold in budget and
+disagree on 0 of 94 tiers. What is actually wrong is the POOLING. Classic ranks
+hitters against hitters and pitchers against pitchers, two orderings over two
+pools; a captain is chosen across one pool, which is what
+`predict_captain_ownership` ranks, with its own pitcher tilt. Measured on the
+vendored fixtures that is 21 of 94 and 23 of 95 people in a different bucket,
+concentrated in the arms, and 5 to 6 of the top 20 by captain-market ownership
+-- the twenty who carry about 90% of the captain budget and whom a median 52.2%
+of archived entries captain. The entry is filed on that, because a number the
+report prints for the wrong reason is worth less than the same number filed
+with the right one.
+
+**(3) R307's three measured tilt shapes, the false sub-portfolio mechanism and
+`max_cpt_exposure_pct`-as-leverage were not re-derived.** All three are
+recorded declines on R307 and R381 and none was revisited.
+
+**Every new test was mutation-checked by hand; all 28 mutations were caught and
+none survived.** Joining on CPT ids only (the trap), reporting `util_id`
+unconditionally, falling back to the Classic market when the captain block is
+absent, picking an archetype by sort order, dropping the empty-block refusal,
+dropping the [0, 100] range check, letting a bool through as a number, taking
+last-wins on a colliding id, rescaling the matched shares to the budget,
+reading an unscored person as 0.0, dropping the zero-match refusal, reading the
+prior's ids unsorted, ordering the selector menu by pool order instead of
+coldest, truncating the menu to the entry count, treating an unscored person as
+cold, dropping the selector's no-prior refusal, dropping the selects-nobody
+refusal, dropping the threshold range check, dropping the arity check, dropping
+the `selector` block from the resolved sleeve, never handing the prior to the
+sleeve, breaking the Classic gate, gating on falsy so a bare `--captain-prior`
+reads as absent, dropping the brief block, dropping the sha256, letting the
+script learn the payload's shape, deleting the missing-file refusal, and
+letting the exit-4 prose count drift.
+
+**Two mutations were written wrong the first time and both corrections are the
+point.** The CPT-keyed-payload test was written as "matches nobody and
+refuses"; it failed, and the CODE was right. A CPT id identifies the same human
+as their UTIL id, so joining it lands the share on the correct person and
+refusing would turn away a usable file. The trap is not that a CPT-keyed file
+exists, it is that a CPT-keyed LOOKUP against a UTIL-keyed file matches
+nothing, and `matched_through` is what makes the difference visible: a
+well-formed prediction reads `util_id` for everybody, so a `cpt_id` count is
+the file saying it did not come from `ownership_pred emit`. Separately, the
+missing-file mutation first only edited the refusal's message text, which left
+the branch intact and "survived" for a harness reason rather than a real one;
+re-run as a branch deletion it was caught. A mutation that does not remove the
+behaviour proves nothing.
+
+**Rider on R380: a THIRD and FOURTH reproduction, the confirming comparison
+still cannot be produced here, and `duration_s` is wrong too.** This session ran
+two `dfs-premise` agents whose reports ended `FINDINGS: 3` and `FINDINGS: 2`.
+Both rows read `findings: null`, both with a real `model` and a `duration_s`
+resolved off the transcript. Four sightings now, four background runs. The
+second was requested as a FOREGROUND run explicitly and the harness launched it
+asynchronously anyway, so the foreground row R380's hypothesis needs may not be
+producible in a cloud container at all -- which would explain why four runs
+across three sessions have produced only background rows. That is a constraint
+on R380's "done when", not a fix, and a session that CAN produce a foreground
+row should still file the comparison.
+
+A second defect in the same record, not previously filed: **`duration_s` is not
+just imprecise, it is unusable.** The two rows read 538.8s and 1841.3s against
+harness-reported run times of 486.1s and 351.1s -- the second a 5.2x
+overstatement, because "transcript first-to-last timestamp span" on a
+backgrounded agent spans wall-clock the agent was not running in. R380's own
+entry cites `duration_s` arriving as evidence that the hook "found A
+transcript"; it found one and misread it, which makes the field weaker
+evidence for the hypothesis and a worse number for costing a run. Recorded on
+R380 rather than filed separately: same record, same hook, same read.
+
 ## 2026-09-21 — R381: the captain leverage sleeve, explicit-id-list form (CC-5, batch 1 of R307). The wiring and the `prior_own_below` selector are deferred with reasons
 
 **Scope.** `mlb_engine/optimize/showdown_theses.py` (new
