@@ -1109,7 +1109,18 @@ EXPECTED_SUITE_COUNTS = {
     # inputs untouched (reported, never clamped), the 2dp rounding tolerance,
     # out-of-range and missing ids reported separately, R338's water-fill half
     # re-pinned so the row cannot reopen against it, and the emit block.
-    "tests.test_showdown": 264,
+    # R295(a)(b)(c)(d)+F40, 2026-09-21: 264 -> 287, the twenty-three that pin
+    # the ladder-truth batch -- three on the unguarded captain-lock rung (the
+    # duplicate solve of rung 1, the substitution booked against a slot with no
+    # lock, and the rung still firing when there IS a lock), five on the melt
+    # refusing two DK persons under one name on one team (both roles, the
+    # same-ID duplicate that is NOT a collision, the clean fixture, and the
+    # tree-wide scan that is the evidence the fix refuses rather than re-keys),
+    # five on the captain-budget hold yielding to a thesis lock plus one more
+    # inside R250's own class closing its `locks: []` blind spot, four on the
+    # reservation bounded by BOTH caps and released against the requesting slot,
+    # and five on the degraded proxy restated off the unweighted Base.
+    "tests.test_showdown": 287,
     # R96, 2026-08-11: 141 -> 162, the twenty-one tests that pin the delivery
     # path. A `grew` verdict is the one case where moving a pin is correct.
     # R46 round 2, 2026-08-12: 162 -> 168, the six that pin the PARTIAL side.

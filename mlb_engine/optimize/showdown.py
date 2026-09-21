@@ -247,6 +247,10 @@ def melt_showdown_salary_csv(path: str | Path, exclude_out: bool = True,
     # brief can say the same thing truthfully.
     excluded_column_present = False
     unrecognized_cells: List[str] = []
+    # R295(d). Two DK persons under one (Name, TeamAbbrev) on the same role.
+    # Collected across the whole file rather than raised on the first, so an
+    # operator fixing the file sees every collision in one pass.
+    role_collisions: List[str] = []
     with Path(path).open(newline="", encoding="utf-8-sig") as fh:
         for r in csv.DictReader(fh):
             name = str(r.get("Name") or "").strip()
@@ -303,12 +307,42 @@ def melt_showdown_salary_csv(path: str | Path, exclude_out: bool = True,
                 rec["Status"] = status
             if starting and not rec.get("Starting"):
                 rec["Starting"] = starting
+            # R295(d). A person is keyed on (Name, TeamAbbrev), so two DK
+            # persons sharing a name on one team land in one record and the
+            # second row of each role overwrites the first. Last writer wins on
+            # the ID and the salary, one of the two people vanishes, and
+            # `certify_showdown` cannot see it: the surviving row is internally
+            # consistent and the melt has already forgotten there was another.
+            #
+            # REFUSED rather than re-keyed, and the reason is evidence. Keying
+            # on (Name, Team, Position) would silently change WHICH persons the
+            # melt merges on every file, and no file in this repo has ever
+            # carried the pair: a scan of every CSV under data/, outputs/ and
+            # runs/ found zero duplicate (Name, TeamAbbrev, Roster Position)
+            # rows, so there is no observed instance to validate a re-key
+            # against. A refusal that names the collision is honest about that
+            # and costs nothing on a file that does not have it; a re-key is a
+            # silent change to the pool on every file that does not.
+            prior_id = rec.get(f"{role}_ID")
+            if prior_id and prior_id != pid:
+                role_collisions.append(
+                    f"{name} ({team}) has two {role} rows, DK IDs {prior_id} "
+                    f"and {pid}")
             if role == "CPT":
                 rec["CPT_ID"], rec["CPT_Salary"] = pid, salary
             else:
                 rec["UTIL_ID"], rec["UTIL_Salary"] = pid, salary
             if base and not rec.get("Base"):
                 rec["Base"] = base
+    if role_collisions:
+        raise ValueError(
+            f"{path} carries two DraftKings persons under one name on one team: "
+            + "; ".join(sorted(role_collisions))
+            + ". The Showdown melt keys a person on (Name, TeamAbbrev), so the "
+            "second row of a role overwrites the first and one of the two "
+            "people would leave the pool unseen. Disambiguate the names in the "
+            "file, or pick the intended person's rows, and re-run."
+        )
     rows = [r for r in by_key.values()
             if r["CPT_ID"] and r["UTIL_ID"] and r["CPT_Salary"] and r["UTIL_Salary"]]
 

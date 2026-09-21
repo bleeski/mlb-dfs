@@ -2,6 +2,188 @@
 
 What changed in the engine, the tools and the contracts, when, and why.
 
+## 2026-09-21 — R295(a)(b)(c)(d) + F40: Showdown ladder truth, the four filed defects and the captain-reservation rider; F14 and one half of (a) declined with reasons
+
+**Scope.** `mlb_engine/optimize/showdown_theses.py` (`solve_ladder`: the
+captain-lock rung's guard, the hold's yield to a thesis lock, the reservation
+ceiling, the reservation release, the unweighted proxy restatement, two new
+diagnostics), `mlb_engine/optimize/showdown.py`
+(`melt_showdown_salary_csv`: the same-name same-team refusal),
+`tests/test_showdown.py` (four new classes, 22 tests, plus one test and a
+`lock_slots` parameter inside `R250CaptainBudgetTests`, 23 in total),
+`tools/audit.py` (`EXPECTED_SUITE_COUNTS`), `docs/backlog.md`.
+
+**Every line citation in R295 was stale and none of its mechanisms were.**
+R223 and R239(b) grew `solve_ladder` from five rungs to nine, and CC-3 moved
+everything below its insertion points again, so the entry's "rung 5" is not the
+fifth-of-five it was written against. Each claim was re-derived from the
+ARGUMENTS at the call site rather than from the ordinal. The nine rungs at HEAD
+are `showdown_theses.py:1493, 1497, 1504, 1512, 1519, 1533, 1563, 1585, 1605`;
+the entry's rung is the first one that drops `cpt_lock` while still carrying
+`with_cap`, `util_excludes` and `max_shared_players`.
+
+**(c) The captain-lock rung re-solved rung 1 and booked a substitution against a
+slot that had no lock.** Its condition carried no `cpt_lock` guard, and the
+three rungs below it all read `_record_lock_relaxation(thesis, lu) if cpt_lock
+else 0` — the guard was added downstream and never backported. Dropping
+`cpt_lock=` from the call is the rung's entire content, and
+`build_showdown_lineup` declares `cpt_lock: Optional[str] = None`, so with no
+lock its arguments are identical to rung 1's: same `with_cap`, same
+`util_excludes`, same `max_shared_players`, same `forbidden_sets`, same `locks`
+and `time_limit`. It re-paid the default 8s time limit on an answer already in
+hand. Worse, `_record_lock_relaxation` returns 1 when `thesis["cpt"]` is falsy,
+because its equality short-circuit needs a requested captain to compare, so a
+duplicate that happened to succeed appended a detail row reading
+`"requested": "none"` — a relaxation of a control the slot never set, in a
+counter the brief's `clean` verdict rests on. Fixed with `and cpt_lock` on the
+condition and the same `if cpt_lock else 0` the lower rungs use.
+
+**A SECOND duplicate of the same class was found and is NOT fixed here.** With
+nothing at the player cap and no captain budget held, `with_cap`, `without_cap`
+and `util_excludes` all collapse to the same values, and the floor rung at
+`:1563` then re-solves the overlap-relaxed rung at `:1497` argument for
+argument. It is a different rung pair from the one filed, fixing it means a
+per-slot memo rather than a guard, and widening this diff to reach it was
+declined. Filed as **R379** on the board with the reproduction.
+
+**(d) The melt merged two DraftKings persons under one name on one team.**
+`key = (name, team)` at `showdown.py:265` with `Player_Key = f"{name}|{team}"`
+at `:286`; the second row of each role overwrote the first, last writer winning
+on `CPT_ID`/`UTIL_ID`, and `certify_showdown` could not see it because the
+surviving row is internally consistent and the melt has already forgotten there
+was another. The entry filed this PLAUSIBLE and never VERIFIED, and it offered
+two fixes: re-key on `Position`, or refuse. **REFUSED, on evidence.** A scan of
+every CSV under `data/`, `outputs/`, `runs/` and `tests/fixtures/` produced zero
+instances of two rows sharing Name, TeamAbbrev and Roster Position — in a
+Showdown-shaped evidence base of two files, both of which carry exactly two rows
+per person. A re-key silently changes WHICH persons merge on every file, and
+there is no observed instance to validate that change against; a refusal naming
+the two DK IDs costs nothing on a file that does not have the pair. A repeated
+row for the SAME person is explicitly not a collision, because the second write
+sets the same ID and refusing it would turn a harmless duplicate into a build
+stop at the front door of every Showdown build. The tree-wide scan ships as a
+test, so the day a real pair appears the refuse-versus-re-key call is re-made
+against it rather than assumed.
+
+**(a) The R250 hold collided with a thesis lock and the ladder answered by
+dropping the player cap. This was the P1 and it is fixed.** Reproduced at the
+`build_thesis_ladder` level on the MIN@CHC fixture at `{MIN:+150, CHC:-170}`,
+n=12 — deliberately not through `run_showdown`, because R334(a) now routes that
+same moneyline packet into `build_showdown_f1` → `apply_f1_prior`, which moves
+`Base`, so the filed numbers do not reproduce through the CLI door and that is
+not a falsification. The filed numbers came back exactly:
+
+```
+player_cap_count: 6  n: 12
+OVER CAP: [('Michael Busch|CHC', 7, '58.3%'), ('Josh Bell|MIN', 7, '58.3%')]
+  player_relaxed: 1     overlap_relaxed: 0     captain_lock_relaxed: 0
+```
+
+The slot was `Both offenses explode - no starters`, captaining Ryan Jeffers and
+locking Pete Crow-Armstrong, with Crow-Armstrong holding reserved captain budget:
+
+```
+rung1: cpt_lock=Ryan Jeffers|MIN  util_excludes=['Pete Crow-Armstrong|CHC']  n_excludes=3  solved=False
+rung2: cpt_lock=Ryan Jeffers|MIN  util_excludes=None                        n_excludes=2  solved=True
+```
+
+The lock says `cpt_k + util_k >= 1`, the hold says `util_k = 0`, the captain
+lock says the one CPT slot is not his; the three cannot all hold, and the rung
+that answered dropped `with_cap` for `without_cap`, readmitting every capped
+player and booking `player_relaxed` against a cap that was never binding. The
+hold now yields to the lock — recorded in a new `captain_budget_hold_yielded`,
+never counted as a relaxation, because nothing was relaxed — and only when the
+captain is locked ELSEWHERE: with `cpt_lock` None the solver may still captain
+him, and with `cpt_lock == k` the lock is satisfied by the captain seat, which
+is what the hold exists to produce. After the fix, on the same slate:
+
+```
+OVER CAP: []
+  player_relaxed: 0   overlap_relaxed: 0   captain_lock_relaxed: 0
+  cpt_cap_relaxed: 0  contest_cap_relaxed: 0
+```
+
+**The entry's second half of (a) is DECLINED, and the reason is that it breaks
+R250 on R250's own fixture.** The entry specified a hold-only rung inserted
+between rungs 2 and 3, counted under `captain_budget_hold_relaxed`. Built
+exactly there, it drops the hold the moment a slot is infeasible with it — and
+that is the pre-R250 behaviour R250 exists to stop. Three R250 tests went red,
+including its payload: the named captain finished at the player cap with zero
+captain slots, which is verbatim the inversion the item was filed for. The
+ladder already has a correct answer to a hold-bound slot and it is the rung
+BELOW, which drops the captain lock and keeps the hold, letting the held player
+reach his own captain seat later. R250's own comment states that the hold riding
+with the player cap is deliberate. Re-ordering that is a design change with no
+measured defect behind it, so it goes back to the board as its own question
+rather than riding this commit.
+
+**R250's `locks: []` blind spot is closed inside R250's own class.** Its
+`_theses` builder gave every thesis `"locks": []`, which is why a class built
+around this hold could pass while the hold collided with a lock. `_theses` now
+takes `lock_slots`, and a new test in that class fails on the pre-fix tree.
+
+**(F40) Captain reservations were bounded by one cap and released against the
+wrong slot.** `reserve_ceiling = cpt_cap` never saw the player cap, and the UTIL
+block test reads `player_counts >= player_cap - held`, so a `held` larger than
+`player_cap` is true from the first slot and blocks the player out of every UTIL
+seat for the whole ladder — stranded budget, which is the failure
+`test_the_hold_shrinks_as_it_is_spent` exists to catch, one level up from where
+it was looking. The ceiling is now bounded by both caps. And the release
+decremented against the REALIZED captain inside the success branch, which is two
+defects in one line: a requested captain who was reassigned, substituted or
+never solved left his hold standing forever, and a player captained INCIDENTALLY
+by a rung that never named him spent a unit belonging to a later slot that did.
+The release is now against the REQUESTING slot, once, at the end of that slot,
+success, substitution and failure alike.
+
+**(b) The degraded flag compared thesis-weighted proxies as one scale.** Every
+slot solves on `work`, a copy of the pool with that thesis's multipliers
+applied, and `_assemble_lineup` sums `points` off the frame it was handed
+(`showdown.py:1235`), so a ladder lineup's `proj_points` was on its own thesis's
+scale — `SUPPRESS_BLOWOUT` 0.40 on the losing side's bats, `SUPPRESS_DUEL` 0.78
+on every bat. `showdown_degraded_entries` (`build_slate.py:4581`, into
+`field_miner.degraded_entry_flags`) then compares those across theses against
+the portfolio median, so a duel or blowout construction was flagged degraded by
+construction. `proj_points` is now restated on the unweighted `Base` before
+anything reads it, and the number the solver ranked on is kept as
+`proxy_points_thesis_weighted`. Measured on the MIN@CHC ladder, the distortion
+is real and on that slate does not cross the 25% bar either way — the pitchers
+duel moves from 16.8% to 20.8% below the median and the MIN offence-led blowout
+from 12.7% to 8.1% — so **no flag flips on an available fixture and none is
+claimed**. The flip is demonstrated on a constructed ladder where one thesis
+suppresses a whole side to 0.40: flagged on the weighted number, clean on the
+restated one, driven through the real consumer.
+
+**Naming: `proj_points_base` was NOT added.** The entry asked for a new key
+beside the weighted one. `proj_points` now IS the unweighted number on both
+paths — the bank path never had multipliers, so it was already the base there —
+and two keys holding one value is a drift waiting to happen. The weighted number
+gets the explicit name the entry specified.
+
+**R233, the class.** Every rung that can drop the captain lock now guards its
+`_record_lock_relaxation` on `cpt_lock`, in one spelling:
+`grep -n "_record_lock_relaxation" mlb_engine/optimize/showdown_theses.py`
+→ `1349` (def), `1524`, `1537`, `1572`, `1595`, `1619`. `:1537` sits inside a
+rung whose own condition at `:1531` carries `and cpt_lock`; the other four read
+`... if cpt_lock else 0`. Zero unguarded call sites remain.
+`grep -rn "proj_points_base" .` → zero hits in code, before and after.
+
+**F14's soft-lock field is DECLINED and repriced.** The seam is named in the
+code at `showdown.py:1016` and `operator_locks` (`:948`, passed False by the
+thesis door at `showdown_theses.py:1334`) is R338 repair (3)'s scoping. It is
+the only item on this row with no defect behind it: it is a design change that
+would let the scoping be lifted, and "a hard inclusion cannot share an API with
+a soft thesis preference" is an API decision that wants a proposal before a
+diff. It stays on the board as R295's open remainder.
+
+**Gate.** `PASS  v2.26.0  41 modules  2315 tests  5 skipped  {test_core
+1396/1396 (4 skipped) skipped_in_place; test_showdown 287/287 (1 skipped)
+skipped_in_place}  [tests.test_core ran its pinned 1396 but 4 were SKIPPED, so
+the count proves nothing about coverage.; tests.test_showdown ran its pinned 287
+but 1 were SKIPPED, so the count proves nothing about coverage.]` — 2292 → 2315,
+the twenty-three new tests, pin moved in the same commit. The bracketed warnings
+describe the HOST, not the tree (R348). Golden histogram unmoved.
+
 **Scope.** Code and contract changes only, the DEV write set: `mlb_engine/`,
 `tools/`, `tests/`, `docs/`, `skills/`, `CLAUDE.md`. Slate outcomes and
 calibration belong in `ledger/MLB_Classic_Calibration_Ledger.md`; per-build

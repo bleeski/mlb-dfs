@@ -2377,16 +2377,23 @@ class R250CaptainBudgetTests(unittest.TestCase):
     N = 12
     CHEAP = "Cheap|AA"
 
-    def _theses(self, n, cheap_from):
+    def _theses(self, n, cheap_from, lock_slots=()):
+        """R295(a). `lock_slots` exists because every thesis this class built
+        carried `locks: []`, and that blind spot is why the class could pass
+        while the hold collided with a thesis lock and the ladder answered by
+        dropping the player cap. A hold that only ever meets lockless theses is
+        a hold that has never met the case that breaks it."""
         out = []
         for i in range(n):
             cpt = (self.CHEAP if i >= cheap_from
                    else ("AA_Big|AA" if i % 2 else "BB_Big|BB"))
             out.append({"template": f"t{i}", "name": f"t{i}", "why": "",
-                        "cpt": cpt, "locks": [], "excludes": [], "mult": {}})
+                        "cpt": cpt,
+                        "locks": [self.CHEAP] if i in lock_slots else [],
+                        "excludes": [], "mult": {}})
         return out
 
-    def _run(self, n=None, cheap_from=None, hold=True):
+    def _run(self, n=None, cheap_from=None, hold=True, lock_slots=()):
         """Solve the ladder with the budget hold on, or with it stripped at the
         solver boundary, which is exactly the pre-R250 behaviour."""
         n = n or self.N
@@ -2400,7 +2407,8 @@ class R250CaptainBudgetTests(unittest.TestCase):
         ctx = (unittest.mock.patch.object(st, "build_showdown_lineup", without_hold)
                if not hold else contextlib.nullcontext())
         with ctx:
-            solved = st.solve_ladder(_apex_pool(), self._theses(n, cheap_from),
+            solved = st.solve_ladder(_apex_pool(),
+                                     self._theses(n, cheap_from, lock_slots),
                                      max_shared_players=None, time_limit=5,
                                      diagnostics=diag)
         captains = [(lu.get("captain") or {}).get("player_key")
@@ -2504,6 +2512,48 @@ class R250CaptainBudgetTests(unittest.TestCase):
             self.assertEqual(diag[counter], 0,
                              f"{counter} moved: the hold relaxed a control")
 
+    def test_a_thesis_that_locks_the_held_player_does_not_cost_the_player_cap(self):
+        """R295(a), closed inside the class that could not see it.
+
+        Every thesis this class built carried `locks: []`, so the one shape
+        that makes the hold unsatisfiable never arose here: player `k` locked by
+        the thesis, the captain locked to someone else, and `k` held out of the
+        UTIL seat. Those three cannot all hold, and the rung that answered
+        dropped `with_cap` for `without_cap` -- every capped player readmitted,
+        `player_relaxed` booked against a cap that was never binding. Measured
+        on MIN@CHC at {MIN:+150, CHC:-170}, n=12: two players at 7 of 12 against
+        a `player_cap_count` of 6.
+        """
+        captains, uses, diag = self._run(lock_slots={3})
+        cap = diag["player_cap_count"]
+        counts = collections.Counter()
+        for lu in st.solve_ladder(_apex_pool(),
+                                  self._theses(self.N, self.N // 2, {3}),
+                                  max_shared_players=None, time_limit=5,
+                                  diagnostics={}):
+            if lu is not None:
+                for key in lu["player_keys"]:
+                    counts[key] += 1
+        over = {k: c for k, c in counts.items() if c > cap}
+        self.assertEqual(
+            over, {},
+            f"a thesis lock on the held player cost the player cap of {cap}: "
+            f"{over}")
+        self.assertEqual(
+            diag["player_relaxed"], 0,
+            "the player cap was relaxed to answer the captain-budget hold")
+        self.assertEqual(
+            diag["captain_budget_hold_yielded"],
+            [{"thesis": "t3", "player": self.CHEAP, "yielded_to": "lock"}],
+            "the hold did not stand down for the lock, or did so without "
+            "saying so")
+        self.assertGreaterEqual(
+            captains.count(self.CHEAP), 1,
+            "R250's own payload broke under a lock: the held player still has "
+            "to reach a captain seat")
+        self.assertEqual(uses, cap,
+                         "fixture precondition: he must still reach the cap")
+
     def test_util_excludes_blocks_the_util_seat_and_leaves_the_captain_seat(self):
         """The constraint R250 needed and the module did not have. `excludes`
         drops a player from the pool entirely, so it cannot say 'keep him
@@ -2534,6 +2584,705 @@ class R250CaptainBudgetTests(unittest.TestCase):
                              "the UTIL block also removed him from the pool")
         self.assertEqual(captained["captain"]["player_key"], self.CHEAP)
 
+
+class R295dMeltNameCollisionTests(unittest.TestCase):
+    """R295(d). The Showdown melt keys a person on `(Name, TeamAbbrev)`.
+
+    Two DraftKings persons sharing a name on one team land in one record, and
+    the second row of each role overwrites the first: last writer wins on the
+    ID and the salary, one of the two people leaves the pool, and nothing
+    downstream can see it. `certify_showdown` cannot catch it either -- the
+    surviving row is internally consistent and the melt has already forgotten
+    there was another person.
+
+    REFUSED rather than re-keyed. The entry filed this PLAUSIBLE and never
+    VERIFIED, and a scan of every CSV under `data/`, `outputs/` and `runs/`
+    found zero real instances, so there is no observed file to validate a
+    re-key against. `test_the_repo_has_no_real_instance_of_the_collision` below
+    is that scan, kept as a test so the day one appears the evidence base is
+    re-read rather than assumed.
+
+    Nothing here is a win rate, an ROI, or a probability claim.
+    """
+
+    @staticmethod
+    def _rows(path):
+        with open(path, newline="", encoding="utf-8-sig") as fh:
+            return list(csv.DictReader(fh))
+
+    def _file_with_second_person(self, tmp, role="UTIL", same_id=False):
+        """A copy of the real MIN@CHC file with one extra row: a DIFFERENT DK
+        person carrying an existing person's Name and TeamAbbrev."""
+        rows = self._rows(SAL)
+        header = list(rows[0].keys())
+        victim = next(r for r in rows
+                      if str(r["Roster Position"]).upper() == role)
+        twin = dict(victim)
+        twin["ID"] = "99999999" if not same_id else victim["ID"]
+        twin["Name + ID"] = f"{victim['Name']} ({twin['ID']})"
+        twin["Salary"] = str(int(float(victim["Salary"])) + 700)
+        dest = Path(tmp) / "DKSalaries_collision.csv"
+        with dest.open("w", newline="", encoding="utf-8") as fh:
+            w = csv.DictWriter(fh, fieldnames=header)
+            w.writeheader()
+            for r in rows:
+                w.writerow(r)
+            w.writerow(twin)
+        return dest, victim, twin
+
+    def test_a_second_person_under_one_name_and_team_is_refused_by_name(self):
+        """The payload. Before this the melt took the last row silently."""
+        with tempfile.TemporaryDirectory() as tmp:
+            dest, victim, twin = self._file_with_second_person(tmp)
+            with self.assertRaises(ValueError) as ctx:
+                sd.melt_showdown_salary_csv(dest)
+            msg = str(ctx.exception)
+        self.assertIn(victim["Name"], msg,
+                      "the refusal does not name the colliding person")
+        self.assertIn(victim["TeamAbbrev"], msg)
+        self.assertIn(victim["ID"], msg,
+                      "the refusal does not name both DK IDs, so an operator "
+                      "cannot tell which two people collided")
+        self.assertIn(twin["ID"], msg)
+        self.assertIn("UTIL", msg, "the refusal does not name the role")
+
+    def test_the_captain_role_collides_the_same_way(self):
+        """Both roles overwrite, so both must refuse. Fixing only the role the
+        first sighting happened to use is how this defect survives a fix."""
+        with tempfile.TemporaryDirectory() as tmp:
+            dest, victim, _ = self._file_with_second_person(tmp, role="CPT")
+            with self.assertRaises(ValueError) as ctx:
+                sd.melt_showdown_salary_csv(dest)
+        self.assertIn("CPT", str(ctx.exception))
+        self.assertIn(victim["Name"], str(ctx.exception))
+
+    def test_a_repeated_row_for_the_SAME_person_is_not_a_collision(self):
+        """The bound on the refusal. A file that lists one person's row twice
+        is redundant, not ambiguous: the second write sets the same ID. Refusing
+        it would turn a harmless duplicate into a build stop, and this melt is
+        the front door of every Showdown build."""
+        with tempfile.TemporaryDirectory() as tmp:
+            dest, _, _ = self._file_with_second_person(tmp, same_id=True)
+            df = sd.melt_showdown_salary_csv(dest)
+        self.assertFalse(df.empty,
+                         "a repeated row for one person emptied the pool")
+
+    def test_the_clean_fixture_still_melts(self):
+        """The other bound. The refusal must not fire on a real DK file."""
+        df = sd.melt_showdown_salary_csv(SAL)
+        self.assertFalse(df.empty)
+        self.assertGreaterEqual(len(df), 2)
+
+    def test_the_repo_has_no_real_instance_of_the_collision(self):
+        """The evidence the refusal was chosen over a re-key on. Every DK-shaped
+        salary CSV in the tree, scanned for two rows sharing Name, TeamAbbrev
+        and Roster Position. Zero hits is why the fix names the file rather than
+        re-keying the person: a re-key changes which persons merge on EVERY
+        file, and there is no instance here to validate that change against.
+        If this test ever fails, a real pair exists and the fix is repriced.
+        """
+        offenders = []
+        for path in sorted(REPO.glob("data/**/*.csv")) + sorted(REPO.glob("tests/fixtures/**/*.csv")):
+            try:
+                with path.open(newline="", encoding="utf-8-sig") as fh:
+                    rows = list(csv.DictReader(fh))
+            except (OSError, UnicodeDecodeError, csv.Error):
+                continue
+            if not rows or "Roster Position" not in (rows[0] or {}):
+                continue
+            seen = collections.defaultdict(set)
+            for r in rows:
+                role = str(r.get("Roster Position") or "").strip().upper()
+                if role not in ("CPT", "UTIL"):
+                    continue
+                key = (str(r.get("Name") or "").strip(),
+                       str(r.get("TeamAbbrev") or "").strip(), role)
+                seen[key].add(str(r.get("ID") or "").strip())
+            offenders += [f"{path.name}: {k}" for k, ids in seen.items()
+                          if len(ids) > 1]
+        self.assertEqual(
+            offenders, [],
+            "a real same-name same-team pair exists in the tree, so (d) is no "
+            "longer PLAUSIBLE-only and the refusal-vs-re-key call must be "
+            "re-made against it: " + repr(offenders))
+
+class R295aHoldYieldsToThesisLockTests(unittest.TestCase):
+    """R295(a). The R250 captain-budget hold collided with a thesis lock and the
+    ladder answered by dropping the PLAYER CAP.
+
+    With player `k` in a thesis's `locks`, the captain locked to someone else,
+    and `k` holding reserved captain budget, three constraints are jointly
+    unsatisfiable: the lock says `cpt_k + util_k >= 1`, the hold says
+    `util_k = 0`, and the captain lock says the one CPT slot is not his. The
+    rungs that carry the hold are infeasible for a reason none of the counters
+    names, and the rung that answers drops `with_cap` for `without_cap` --
+    readmitting every capped player and booking `player_relaxed` against a cap
+    that was never the binding control.
+
+    MEASURED, and reproduced at the `build_thesis_ladder` level rather than
+    through `run_showdown`: R334(a) now routes the same moneyline packet into
+    `build_showdown_f1` -> `apply_f1_prior`, which moves `Base`, so the filed
+    numbers do not reproduce through the CLI door and that is not a
+    falsification.
+
+    Every number here is a deterministic review proxy. Exposure counts and cap
+    counts are properties of the delivered set, never a win rate or an ROI.
+    """
+
+    ML = {"MIN": 150.0, "CHC": -170.0}
+    N = 12
+    CHEAP = "Cheap|AA"
+
+    @staticmethod
+    def _exposure(solved):
+        counts = collections.Counter()
+        for lu in solved:
+            if lu is not None:
+                for key in lu["player_keys"]:
+                    counts[key] += 1
+        return counts
+
+    def test_the_measured_slate_keeps_every_player_under_the_player_cap(self):
+        """The payload, on the filed fixture and the filed moneyline. Before
+        this, Michael Busch and Josh Bell finished 7 of 12 against a
+        `player_cap_count` of 6 -- 58.3% under a 50% cap -- with
+        `player_relaxed: 1` and every other relaxation counter reading clean."""
+        df = sd.melt_showdown_salary_csv(SAL)
+        ladder = st.build_thesis_ladder(df, self.N, moneyline=self.ML)
+        theses = ladder["theses"]
+        collisions = [
+            t for t in theses
+            if t.get("cpt") and any(k != t.get("cpt")
+                                    for k in (t.get("locks") or []))]
+        self.assertTrue(
+            collisions,
+            "fixture precondition: no thesis on this slate locks a player while "
+            "captaining someone else, so the collision cannot arise and this "
+            "test constrains nothing")
+        diag = {}
+        solved = st.solve_ladder(df, theses, max_shared_players=None,
+                                 time_limit=8, diagnostics=diag)
+        cap = diag["player_cap_count"]
+        counts = self._exposure(solved)
+        over = {k: c for k, c in counts.items() if c > cap}
+        self.assertEqual(
+            over, {},
+            f"a player exceeded the player cap of {cap} in {self.N} entries: "
+            f"{over}. The ladder dropped the cap to answer the captain-budget "
+            f"hold, which is the control that was actually binding")
+        self.assertEqual(
+            diag["player_relaxed"], 0,
+            "the player cap was relaxed on a slate where nothing about the cap "
+            "was infeasible")
+        for counter in ("overlap_relaxed", "captain_lock_relaxed",
+                        "cpt_cap_relaxed", "contest_cap_relaxed"):
+            self.assertEqual(diag[counter], 0,
+                             f"{counter} moved on the measured slate")
+
+    def _theses(self, lock_slot=3):
+        """R250's own shape, with ONE thesis locking the held player while
+        captaining someone else. R250's `_theses` builds every thesis with
+        `locks: []`, which is why its class could not see this."""
+        out = []
+        for i in range(12):
+            cpt = (self.CHEAP if i >= 6
+                   else ("AA_Big|AA" if i % 2 else "BB_Big|BB"))
+            out.append({"template": f"t{i}", "name": f"t{i}", "why": "",
+                        "cpt": cpt,
+                        "locks": [self.CHEAP] if i == lock_slot else [],
+                        "excludes": [], "mult": {}})
+        return out
+
+    def _run(self, theses):
+        diag = {}
+        solved = st.solve_ladder(_apex_pool(), theses, max_shared_players=None,
+                                 time_limit=5, diagnostics=diag)
+        return solved, diag
+
+    def test_the_locked_player_is_actually_in_the_lineup_that_locked_him(self):
+        """The mechanism, on a controlled fixture. A lock is a hard inclusion;
+        the hold is an allocation preference. The preference is what gives
+        way."""
+        solved, diag = self._run(self._theses(lock_slot=3))
+        lu = solved[3]
+        self.assertIsNotNone(lu, "the slot that locked the held player did not "
+                                 "solve at all")
+        self.assertIn(
+            self.CHEAP, lu["player_keys"],
+            "the thesis locked him and he is not in the lineup: the hold "
+            "silently defeated a hard inclusion")
+        self.assertEqual(diag["ignored_locks"], [],
+                         "the lock was swallowed rather than honoured")
+        self.assertEqual(diag["player_relaxed"], 0)
+        # Scoped to the locked slot on purpose. This pool relaxes three captain
+        # locks at BASELINE -- that is R250 working as designed: with the hold
+        # standing and no lock in play, the captain lock is what gives way so
+        # the held player can take a captain seat. Asserting zero portfolio-wide
+        # would be asserting R250 does not happen. What must be true is that the
+        # slot which locked him kept BOTH its lock and its own captain, which
+        # before this fix it could not: the hold made that combination
+        # infeasible and the ladder gave up one of the two.
+        self.assertEqual(
+            (lu.get("captain") or {}).get("player_key"), "AA_Big|AA",
+            "the locked slot lost its requested captain: the ladder answered "
+            "the hold collision by dropping the captain lock instead")
+        self.assertEqual(
+            [d for d in diag["lock_relaxation_detail"] if d["thesis"] == "t3"],
+            [],
+            "a captain substitution was booked against the slot whose hold "
+            "should simply have yielded to its own lock")
+
+    def test_the_yield_is_recorded_and_is_not_counted_as_a_relaxation(self):
+        """Nothing gave way, so it must not read as a relaxation -- the same
+        distinction R153 drew for the reassignment lists. But it must be on the
+        record, because a hold that stood down is a fact about the build."""
+        _, diag = self._run(self._theses(lock_slot=3))
+        yielded = diag["captain_budget_hold_yielded"]
+        self.assertEqual(len(yielded), 1, yielded)
+        self.assertEqual(yielded[0]["player"], self.CHEAP)
+        self.assertEqual(yielded[0]["yielded_to"], "lock")
+        self.assertEqual(yielded[0]["thesis"], "t3")
+
+    def test_the_hold_stands_when_the_lock_and_the_captain_are_the_same_player(self):
+        """The first bound. With `cpt_lock == k` the lock is satisfied by the
+        captain seat, which is precisely what the hold exists to produce, so
+        yielding there would give the budget away for nothing."""
+        # Slot 3 on purpose: this is a slot where the hold is MEASURED to bind
+        # on this pool. Putting the lock on a slot the hold never reaches would
+        # pass whatever the condition said, because the yield branch is only
+        # reached once the block threshold is crossed.
+        theses = self._theses(lock_slot=None)
+        theses[3]["cpt"] = self.CHEAP
+        theses[3]["locks"] = [self.CHEAP]
+        _, diag = self._run(theses)
+        self.assertGreater(diag["captain_budget_util_blocks"], 0,
+                           "fixture precondition: the hold must still bind")
+        self.assertEqual(
+            diag["captain_budget_hold_yielded"], [],
+            "the hold yielded to a lock on the very player it was holding the "
+            "captain seat for, giving the budget away for nothing")
+
+    def test_the_hold_stands_when_no_captain_is_locked(self):
+        """The second bound. With `cpt_lock` None the solver may still captain
+        him, so the lock is satisfiable with the hold standing and there is
+        nothing to yield to."""
+        theses = self._theses(lock_slot=None)
+        theses[3]["cpt"] = None
+        theses[3]["locks"] = [self.CHEAP]
+        _, diag = self._run(theses)
+        self.assertEqual(
+            diag["captain_budget_hold_yielded"], [],
+            "the hold yielded although no captain was locked, so the lock could "
+            "have been satisfied at the captain seat with the hold intact")
+
+class R295F40CaptainReservationTests(unittest.TestCase):
+    """R295/F40. The R250 captain reservation was bounded by one cap and
+    released against the wrong slot.
+
+    Two defects a few lines apart. The ceiling was `min(captain demand, captain
+    cap)` and never saw the PLAYER cap, so a reservation could be worth more
+    than a player's entire exposure allowance -- and the UTIL block test reads
+    `player_counts >= player_cap - held`, which with `held > player_cap` is true
+    from the very first slot and blocks him out of every UTIL seat for the whole
+    ladder. And the release decremented against the REALIZED captain, inside the
+    success branch, so a requested captain who was reassigned, substituted or
+    never solved left his hold standing forever, while a player captained
+    INCIDENTALLY by a rung that never named him spent a unit belonging to a
+    later slot that did.
+
+    The solver is mocked so the ladder's bookkeeping is what is under test
+    rather than the pool's arithmetic. A mocked rung that returns None without
+    setting `proven_infeasible` latches `stopped`, which is what makes every
+    slot here cost exactly one call and lets the fake identify the slot by call
+    order.
+
+    Nothing here is a win rate, an ROI, or a probability claim: holds, caps and
+    exposure counts are deterministic properties of the ladder.
+    """
+
+    CHEAP = "Cheap|AA"
+    OTHER = "AA_Big|AA"
+    FILL = ["AA_0|AA", "BB_0|BB", "AA_1|AA", "BB_1|BB", "AA_2|AA"]
+
+    def _theses(self, cpts):
+        return [{"template": f"t{i}", "name": f"t{i}", "why": "", "cpt": c,
+                 "locks": [], "excludes": [], "mult": {}}
+                for i, c in enumerate(cpts)]
+
+    def _run(self, cpts, captain_for=None, fail_slots=(),
+             player_pct=0.5, cpt_pct=0.9):
+        """`captain_for` maps a slot index to the captain the solve comes back
+        with: that is how a SUBSTITUTION and an INCIDENTAL captaincy are
+        expressed without needing the pool to produce one."""
+        captain_for = captain_for or {}
+        state = {"slot": 0}
+
+        def fake(df=None, status_out=None, cpt_lock=None, **kw):
+            i = state["slot"]
+            state["slot"] += 1
+            if i in fail_slots:
+                # No `proven_infeasible`: the latch stops the descent, so this
+                # slot ends unsolved after exactly one call.
+                return None
+            cap = captain_for.get(i, cpt_lock or self.OTHER)
+            return {"player_keys": [cap] + self.FILL,
+                    "captain": {"player_key": cap},
+                    "utils": [], "ignored_locks": []}
+
+        diag = {}
+        with unittest.mock.patch.object(st, "build_showdown_lineup", fake):
+            solved = st.solve_ladder(
+                _apex_pool(), self._theses(cpts), max_shared_players=None,
+                time_limit=5, diagnostics=diag,
+                max_player_exposure_pct=player_pct, max_cpt_exposure_pct=cpt_pct)
+        self.assertEqual(state["slot"], len(cpts),
+                         "fixture invariant: one solver call per slot, so the "
+                         "fake's slot index is meaningful")
+        return solved, diag
+
+    def _blocks(self, diag, player=None):
+        player = player or self.CHEAP
+        return [(r["thesis"], int(r["held"]))
+                for r in diag["captain_budget_block_detail"]
+                if r["player"] == player]
+
+    def test_the_reservation_is_bounded_by_the_player_cap_too(self):
+        """The first defect. A reservation worth more than the player's whole
+        exposure allowance makes `player_cap - held` negative, so the block test
+        is true before he has been rostered even once and he is stranded out of
+        UTIL for the entire ladder."""
+        _, diag = self._run([self.CHEAP] * 6)
+        cap = diag["player_cap_count"]
+        self.assertIsNotNone(cap, "fixture precondition: a player cap must exist")
+        self.assertGreater(
+            diag["cpt_cap_count"], cap,
+            "fixture precondition: the captain cap must exceed the player cap, "
+            "or the player-cap bound is not the one that bites")
+        for player, held in diag["captain_budget_reserved"].items():
+            self.assertLessEqual(
+                held, cap,
+                f"{player} holds {held} units against a player cap of {cap}: "
+                f"the reservation is larger than his entire exposure allowance")
+
+    def test_an_incidental_captain_does_not_spend_a_later_slots_reservation(self):
+        """The order dependence. Slots 0-2 ask for someone else and come back
+        captained by the held player. His budget was reserved for slots 3-5,
+        which named him, and it must be intact when the first of them arrives."""
+        cpts = [self.OTHER] * 3 + [self.CHEAP] * 3
+        _, diag = self._run(cpts, captain_for={0: self.CHEAP, 1: self.CHEAP,
+                                               2: self.CHEAP})
+        reserved = diag["captain_budget_reserved"][self.CHEAP]
+        blocks = dict(self._blocks(diag))
+        self.assertIn("t3", blocks,
+                      "fixture precondition: the hold must still bind at the "
+                      "first slot that actually requested him")
+        self.assertEqual(
+            blocks["t3"], reserved,
+            "the held player was captained three times by rungs that never "
+            "named him and it cost him reserved units, so the slots that DID "
+            "name him arrived with less budget than they were allocated")
+
+    def test_a_substituted_captain_still_releases_its_own_slots_hold(self):
+        """The phantom hold. Every slot that asked for him came back with
+        someone else. The request is spent either way -- no later rung will
+        captain him for a slot already decided -- so the hold must not outlive
+        it."""
+        cpts = [self.CHEAP] * 3 + [self.OTHER] * 3
+        _, diag = self._run(cpts, captain_for={0: self.OTHER, 1: self.OTHER,
+                                               2: self.OTHER})
+        blocks = dict(self._blocks(diag))
+        self.assertIn("t0", blocks,
+                      "fixture precondition: the hold must bind at the start")
+        self.assertNotIn(
+            "t5", blocks,
+            "his hold was still blocking UTIL seats at the last slot, after "
+            "every slot that requested him had been decided against: stranded "
+            "budget nobody can spend")
+
+    def test_a_slot_that_never_solved_still_releases_its_hold(self):
+        """Same rule, the third outcome. A slot that produced no lineup has
+        still spent its request."""
+        cpts = [self.CHEAP] * 3 + [self.OTHER] * 3
+        _, diag = self._run(cpts, fail_slots={0, 1, 2})
+        blocks = dict(self._blocks(diag))
+        self.assertIn("t0", blocks,
+                      "fixture precondition: the hold must bind at the start")
+        self.assertNotIn(
+            "t5", blocks,
+            "three unsolved slots left their holds standing, so the budget "
+            "they were holding can never be spent by anyone")
+
+class R295bDegradedFlagReadsTheUnweightedProxyTests(unittest.TestCase):
+    """R295(b). The degraded flag compared thesis-weighted proxies as one scale.
+
+    Every ladder slot solves on `work`, a copy of the pool with that thesis's
+    multipliers applied, and `_assemble_lineup` sums `points` off the frame it
+    was handed. So the `proj_points` a ladder lineup carried was on its own
+    thesis's scale -- win_big suppresses the other side's bats to 0.40, duel
+    every bat to 0.78 -- while R247(a)'s proxy-margin trigger
+    (`field_miner.degraded_entry_flags`, via `showdown_degraded_entries`)
+    compares those numbers ACROSS theses against the portfolio median. A duel or
+    blowout construction was flagged degraded by construction: the number being
+    measured was a property of the thesis, not of the lineup.
+
+    `proj_points` is now restated on the unweighted Base before anything reads
+    it, and the number the solver ranked on is kept as
+    `proxy_points_thesis_weighted`.
+
+    Every number here is a deterministic review proxy. A proxy margin is not an
+    ROI, a win rate or a probability.
+    """
+
+    @staticmethod
+    def _thesis(name, mult=None):
+        return {"template": name, "name": name, "why": "", "cpt": None,
+                "locks": [], "excludes": [], "mult": dict(mult or {})}
+
+    def _suppressed_ladder(self):
+        """Five plain theses and one that suppresses an entire side to 0.40 --
+        `SUPPRESS_BLOWOUT`'s own factor, which is what win_big applies to the
+        losing side's bats."""
+        df = _apex_pool()
+        away = [k for k in df["Player_Key"] if k.startswith("BB")]
+        theses = [self._thesis(f"t{i}") for i in range(5)]
+        theses.append(self._thesis("suppressed", {k: 0.40 for k in away}))
+        solved = st.solve_ladder(df, theses, max_shared_players=None,
+                                 time_limit=5, diagnostics={})
+        self.assertTrue(all(lu is not None for lu in solved),
+                        "fixture precondition: every slot must solve")
+        return theses, solved
+
+    def test_the_proxy_is_restated_on_the_unweighted_base(self):
+        """The arithmetic, against the pool's own Base column rather than
+        against another call of the thing under test."""
+        df = _apex_pool()
+        base = dict(zip(df["Player_Key"], df["Base"]))
+        away = [k for k in df["Player_Key"] if k.startswith("BB")]
+        theses = [self._thesis("suppressed", {k: 0.40 for k in away})]
+        solved = st.solve_ladder(df, theses, max_shared_players=None,
+                                 time_limit=5, diagnostics={})
+        lu = solved[0]
+        self.assertIsNotNone(lu)
+        expected = round(
+            1.5 * float(base[lu["captain"]["player_key"]])
+            + sum(float(base[u["player_key"]]) for u in lu["utils"]), 3)
+        self.assertAlmostEqual(
+            lu["proj_points"], expected, places=2,
+            msg="the proxy is not the unweighted Base sum, so it still carries "
+                "this thesis's multipliers")
+
+    def test_the_weighted_number_is_kept_and_named_for_what_it_is(self):
+        """It is what the solver ranked on, so it is not thrown away -- it is
+        simply not the number a cross-thesis comparison may use."""
+        theses, solved = self._suppressed_ladder()
+        lu = solved[-1]
+        self.assertIn("proxy_points_thesis_weighted", lu)
+        self.assertLess(
+            lu["proxy_points_thesis_weighted"], lu["proj_points"],
+            "a thesis that suppressed a whole side to 0.40 produced a weighted "
+            "proxy no lower than its unweighted one, so the fixture is not "
+            "exercising the distortion")
+
+    def test_an_unmultiplied_thesis_gives_the_same_number_twice(self):
+        """The bound. Where there is no thesis weighting there is nothing to
+        restate, and the two keys must agree rather than drift."""
+        _, solved = self._suppressed_ladder()
+        for lu in solved[:5]:
+            self.assertEqual(
+                lu["proj_points"], lu["proxy_points_thesis_weighted"],
+                "an unmultiplied slot's two proxies disagree, so the restated "
+                "number is not the same quantity as the one it replaced")
+
+    def test_the_suppressed_thesis_is_no_longer_flagged_degraded(self):
+        """The payload, driven through the real consumer. The suppressed
+        construction crosses R247(a)'s margin on the weighted number and does
+        not on the unweighted one: the flag was reading the multiplier."""
+        from mlb_engine.field.field_miner import (degraded_entry_flags,
+                                                  DEGRADED_PROXY_MARGIN_PCT)
+        theses, solved = self._suppressed_ladder()
+
+        def flags(key):
+            return degraded_entry_flags(
+                [{"entry_id": t["name"], "proxy": lu[key], "salary_used": None}
+                 for t, lu in zip(theses, solved)])
+
+        before = flags("proxy_points_thesis_weighted")
+        after = flags("proj_points")
+        self.assertIn(
+            "suppressed", [f["entry_id"] for f in before["flagged"]],
+            f"fixture precondition: on the weighted number the suppressed "
+            f"thesis must cross the {DEGRADED_PROXY_MARGIN_PCT}% margin, or "
+            f"this test proves nothing about the flag")
+        self.assertEqual(
+            [f["entry_id"] for f in after["flagged"]], [],
+            "the suppressed thesis is still flagged degraded on the restated "
+            "proxy, so the trigger is still reading the thesis multiplier "
+            "rather than the lineup")
+
+    def test_the_consumer_reads_the_restated_key(self):
+        """`showdown_degraded_entries` marshals `proj_points` into the trigger.
+        Pinned by name: a rename that left the consumer on the weighted key
+        would pass every test above and ship the defect."""
+        spec = importlib.util.spec_from_file_location(
+            "_bs_probe", REPO / "skills" / "generate-lineups" / "scripts" / "build_slate.py")
+        src = (REPO / "skills" / "generate-lineups" / "scripts" / "build_slate.py").read_text(encoding="utf-8")
+        tree = ast.parse(src)
+        fn = next(n for n in ast.walk(tree)
+                  if isinstance(n, ast.FunctionDef)
+                  and n.name == "showdown_degraded_entries")
+        keys = {n.args[0].value for n in ast.walk(fn)
+                if isinstance(n, ast.Call)
+                and isinstance(n.func, ast.Attribute) and n.func.attr == "get"
+                and n.args and isinstance(n.args[0], ast.Constant)}
+        del spec
+        self.assertIn("proj_points", keys,
+                      f"the degraded consumer no longer reads `proj_points`: {keys}")
+        self.assertNotIn(
+            "proxy_points_thesis_weighted", keys,
+            "the degraded consumer reads the thesis-weighted proxy, which is "
+            "the defect this item exists to remove")
+
+class R295cUnlockedRungGuardTests(unittest.TestCase):
+    """R295(c). The fifth ladder rung had no `cpt_lock` guard.
+
+    `solve_ladder` grew from five rungs to nine across R223 and R239(b), and the
+    guard the three LOWEST rungs carry (`_record_lock_relaxation(...) if cpt_lock
+    else 0`) was added downstream and never backported to this one. The rung's
+    entire content is dropping `cpt_lock=` from the call, so on a thesis that
+    never had a captain lock its arguments are identical to rung 1's -- the same
+    `with_cap` excludes, the same `util_excludes`, the same `max_shared_players`,
+    the same `forbidden_sets`, the same `locks` and `time_limit`. It re-pays the
+    full time limit on a solve whose answer rung 1 already returned, and if that
+    duplicate happens to succeed it books a captain substitution against a slot
+    that requested no captain.
+
+    Nothing here is a win rate, an ROI, or a probability claim. Rung counts and
+    relaxation counters are deterministic properties of the ladder.
+    """
+
+    @staticmethod
+    def _signature(kw):
+        """The solver-relevant arguments, with absent keys normalized to the
+        defaults `build_showdown_lineup` would apply. Rung 5 differs from rung 1
+        only by OMITTING `cpt_lock`, so a signature that read the raw kwargs
+        would call the two calls different when the solver cannot."""
+        def freeze(v):
+            if isinstance(v, (list, tuple)):
+                return tuple(freeze(x) for x in v)
+            return v
+        return tuple(
+            (k, freeze(kw.get(k)))
+            for k in ("locks", "excludes", "cpt_lock", "cpt_excludes",
+                      "util_excludes", "forbidden_sets", "max_shared_players",
+                      "time_limit"))
+
+    def _thesis(self, cpt=None):
+        return [{"template": "t0", "name": "t0", "why": "", "cpt": cpt,
+                 "locks": [], "excludes": [], "mult": {}}]
+
+    def _recorder(self, lineup_on_call=None, captain=None):
+        """Records every rung's arguments. Returns None -- proven infeasible, so
+        the latch does not stop the descent -- until `lineup_on_call`, then a
+        minimal solved lineup. ONE thesis, so every call belongs to one slot and
+        a repeated signature is a duplicate solve rather than the next slot."""
+        calls = []
+
+        def fake(df=None, status_out=None, **kw):
+            calls.append(self._signature(kw))
+            if status_out is not None:
+                status_out["proven_infeasible"] = True
+            if lineup_on_call is not None and len(calls) == lineup_on_call:
+                if status_out is not None:
+                    status_out.clear()
+                keys = ["AA_Big|AA", "BB_Big|BB", "AA_0|AA", "BB_0|BB",
+                        "AA_1|AA", "BB_1|BB"]
+                return {"player_keys": keys,
+                        "captain": {"player_key": captain or "AA_Big|AA"},
+                        "utils": [], "ignored_locks": []}
+            return None
+
+        return calls, fake
+
+    def _run(self, theses, lineup_on_call=None, captain=None):
+        calls, fake = self._recorder(lineup_on_call, captain)
+        diag = {}
+        with unittest.mock.patch.object(st, "build_showdown_lineup", fake):
+            st.solve_ladder(_apex_pool(), theses, max_shared_players=4,
+                            time_limit=5, diagnostics=diag)
+        return calls, diag
+
+    def test_the_unlocked_rung_does_not_re_solve_rung_one(self):
+        """The payload. With no captain lock, the fifth rung asked the solver a
+        question rung 1 had already answered.
+
+        Asserted against rung 1's OWN signature rather than as "no two calls
+        alike", deliberately. On a single-thesis fixture nothing is at the
+        player cap and nothing holds captain budget, so `with_cap`,
+        `without_cap` and `util_excludes` all collapse to None and the
+        no-overlap-bound rungs become indistinguishable from each other. That
+        collision is real and is the same defect class, but it is a DIFFERENT
+        rung pair from the one filed here; it is recorded on the board rather
+        than fixed in this commit. Pinning rung 1's signature keeps this test
+        measuring the rung it names.
+        """
+        calls, _ = self._run(self._thesis(cpt=None))
+        self.assertTrue(calls, "the ladder made no solver call at all")
+        rung_one = calls[0]
+        self.assertEqual(
+            calls.count(rung_one), 1,
+            "rung 1's exact arguments were sent to the solver more than once: "
+            "a rung re-solved an argument-for-argument copy of it and re-paid "
+            "the full time limit on an answer already in hand")
+        with_bound = [c for c in calls if dict(c)["max_shared_players"] == 4]
+        self.assertEqual(
+            len(with_bound), 1,
+            "more than one rung solved under the overlap bound with the player "
+            "cap and the captain-budget hold both still on, which is rung 1's "
+            "question and no other rung's")
+
+    def test_no_captain_substitution_is_booked_for_a_slot_with_no_lock(self):
+        """`_record_lock_relaxation` returns 1 when `thesis['cpt']` is falsy,
+        because its equality short-circuit needs a requested captain to compare.
+        So the unguarded rung recorded a substitution reading `requested: none`
+        -- a relaxation of a control the slot never set, in the counter a brief's
+        `clean` verdict rests on."""
+        _, diag = self._run(self._thesis(cpt=None), lineup_on_call=3)
+        self.assertEqual(
+            diag["captain_lock_relaxed"], 0,
+            "a captain lock was relaxed on a thesis that requested no captain")
+        self.assertEqual(
+            [r for r in diag["lock_relaxation_detail"]
+             if r.get("requested") == "none"], [],
+            "the relaxation detail names a substitution with no requested "
+            "captain, which is a row no reader can act on")
+
+    def test_a_real_captain_lock_still_reaches_the_rung(self):
+        """The guard must not delete the rung. With a lock to drop, dropping it
+        is real work and the substitution it books is a true one."""
+        _, diag = self._run(self._thesis(cpt="Cheap|AA"), lineup_on_call=3,
+                            captain="AA_Big|AA")
+        self.assertEqual(
+            diag["captain_lock_relaxed"], 1,
+            "the guard suppressed a rung that had a real captain lock to drop")
+        detail = diag["lock_relaxation_detail"]
+        self.assertEqual(len(detail), 1, detail)
+        self.assertEqual(detail[0]["requested"], "Cheap|AA")
+        self.assertEqual(detail[0]["actual"], "AA_Big|AA")
+        # The discriminator. Deleting this rung outright does not fail the three
+        # assertions above, because the rung BELOW it also drops the captain
+        # lock and books the same substitution -- it just drops the overlap
+        # bound in the same breath. This rung exists to give up the lock and
+        # nothing else, so the proof that it is the one that fired is that both
+        # bounds it keeps are still standing.
+        self.assertEqual(
+            diag["overlap_relaxed"], 0,
+            "the overlap bound gave way, so the lineup came from a LOWER rung "
+            "than the captain-lock rung: this test is no longer measuring the "
+            "rung it names")
+        self.assertEqual(
+            diag["both_relaxed"], 0,
+            "the both-relaxed rung answered instead of the captain-lock rung")
+        self.assertEqual(diag["player_relaxed"], 0)
 
 class R223CaptainCapCounterTests(unittest.TestCase):
     """R223. The floor rung dropped the PORTFOLIO captain cap and nothing counted
