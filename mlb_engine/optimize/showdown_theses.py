@@ -1325,7 +1325,7 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
         """
         st_out: Dict[str, Any] = {}
         # R338 repair (3). Every `locks`/`cpt_lock` this ladder passes is
-        # THESIS-sourced (`thesis["locks"]` at :1307, `thesis["cpt"]` at :1268),
+        # THESIS-sourced (`thesis["locks"]` at :1444, `thesis["cpt"]` at :1405),
         # so F14's hard-lock refusal does not apply to it: a thesis naming a
         # player absent from `work` is a preference that cannot be honoured, and
         # it goes to `ignored_locks` as it always did rather than blanking the
@@ -1515,7 +1515,16 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
             if lu is not None:
                 player_relaxed += 1
                 overlap_relaxed += 1
-        if lu is None and not latch["stopped"]:
+        # R295(c). `and cpt_lock`, the guard the three rungs below already carry
+        # and this one never got. This rung exists to drop the captain lock; with
+        # no lock to drop its arguments are rung 1's exactly -- same `with_cap`,
+        # same `util_kw`, same `max_shared_players` -- and rung 1 reached here
+        # only by being PROVEN infeasible (`_rung` latches every other empty
+        # return), so the re-solve re-proves the same infeasibility and costs a
+        # second proof for nothing. It also put `_record_lock_relaxation` behind
+        # a condition that cannot promise a lock, which is how a slot with no
+        # captain would have booked a substitution against one.
+        if lu is None and not latch["stopped"] and cpt_lock:
             lu = _rung(latch, df=work, cpt_excludes=cpt_excludes,
                        forbidden_sets=prior or None,
                        excludes=with_cap,

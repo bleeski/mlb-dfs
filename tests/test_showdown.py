@@ -4887,5 +4887,196 @@ class R328ShowdownRoleCoherenceTests(unittest.TestCase):
                       'ownership_prior.showdown_role_coherence(', src)
 
 
+class R295cCaptainLockRungIsGuardedTests(unittest.TestCase):
+    """R295(c). The fifth rung of `solve_ladder` exists to drop the captain
+    lock, and its condition never checked that there was one.
+
+    With `cpt_lock` None its argument list is rung 1's exactly -- same
+    `with_cap`, same `util_excludes`, same `max_shared_players` -- and a rung
+    only descends past rung 1 when rung 1 came back PROVEN infeasible (`_rung`
+    latches every other empty return, R338/F13). So the re-solve re-proved the
+    same infeasibility and bought nothing, and `_record_lock_relaxation` sat
+    behind a condition that could not promise a lock.
+
+    Deterministic solver accounting only; no probability is claimed.
+    """
+
+    def _thesis(self, cpt, excludes):
+        return {"template": "t0", "name": "t0", "why": "", "cpt": cpt,
+                "locks": [], "excludes": excludes, "mult": {}}
+
+    def _calls(self, cpt):
+        """Solve one proven-infeasible slot, returning every solver call's
+        argument signature. The thesis excludes all but three players, so no
+        legal six-man roster exists and every rung is proven infeasible."""
+        pool = _apex_pool()
+        excludes = [str(k) for k in pool["Player_Key"]][:-3]
+        seen = []
+        real = st.build_showdown_lineup
+
+        def spy(**kw):
+            seen.append((kw.get("cpt_lock"),
+                         tuple(kw.get("cpt_excludes") or ()),
+                         tuple(kw.get("excludes") or ()),
+                         kw.get("max_shared_players"),
+                         tuple(kw.get("util_excludes") or ())))
+            return real(**kw)
+
+        with unittest.mock.patch.object(st, "build_showdown_lineup", spy):
+            st.solve_ladder(pool, [self._thesis(cpt, excludes)],
+                            max_shared_players=None, time_limit=5,
+                            diagnostics={})
+        return seen
+
+    def test_no_captain_lock_means_no_duplicate_resolve(self):
+        """The defect: two identical solver calls for one slot."""
+        calls = self._calls(cpt=None)
+        self.assertEqual(len(calls), len(set(calls)),
+                         f"a rung re-solved an identical model: {calls}")
+        self.assertEqual(len(calls), 1,
+                         "with no lock to relax and no cap over, one proven "
+                         f"infeasible rung is the whole ladder, got {len(calls)}")
+
+    def test_a_reassigned_captain_also_stops_the_duplicate(self):
+        """`cpt_lock` is cleared when the captain is reassigned off a cap, which
+        reaches the same rung by a different door."""
+        for cpt in (None, ""):
+            with self.subTest(cpt=cpt):
+                calls = self._calls(cpt=cpt)
+                self.assertEqual(len(calls), len(set(calls)))
+
+    def test_a_real_captain_lock_still_reaches_the_rung(self):
+        """The guard must not disarm the relaxation it guards: with a lock
+        present the ladder still descends onto the captain-lock rung.
+
+        Identified by SIGNATURE, not by ordinal or by `cpt_lock is None` alone:
+        the floor rungs below also drop the lock, so "some call had no lock" is
+        satisfied by the wrong branch. The captain-lock rung is the only one
+        that drops `cpt_lock` while still carrying `util_excludes` -- the floor
+        rungs drop the R250 hold along with the player cap.
+        """
+        calls = self._calls(cpt="AA_Big|AA")
+        self.assertTrue(any(c[0] == "AA_Big|AA" for c in calls),
+                        "no rung carried the thesis's captain lock")
+        lock_rung = [c for c in calls if c[0] is None and c[4]]
+        self.assertEqual(
+            len(lock_rung), 1,
+            "expected exactly one rung dropping the captain lock while keeping "
+            f"the R250 hold; got {len(lock_rung)} of {len(calls)} calls: {calls}")
+
+    def test_no_lock_relaxation_is_reachable_without_a_lock(self):
+        """R233, the class rather than the instance. Every rung that books a
+        captain-lock relaxation must be unreachable without a lock, either
+        through its own condition or through an `if cpt_lock else 0` on the
+        call. Four rungs book one; this walks all four so the next rung added
+        cannot reopen the hole."""
+        src = (REPO / "mlb_engine" / "optimize" / "showdown_theses.py").read_text(
+            encoding="utf-8").splitlines()
+        booking = [i for i, line in enumerate(src)
+                   if "_record_lock_relaxation(thesis, lu)" in line]
+        self.assertGreaterEqual(len(booking), 4,
+                                "expected at least four lock-relaxation rungs")
+        unguarded = []
+        for i in booking:
+            if "if cpt_lock else 0" in src[i]:
+                continue                       # guarded at the call site
+            condition = next(
+                (src[j] for j in range(i, max(i - 12, -1), -1)
+                 if src[j].lstrip().startswith(("if lu is None", "if (lu is None"))),
+                None)
+            window = "".join(src[max(i - 12, 0):i + 1])
+            if condition is None or "cpt_lock" not in window:
+                unguarded.append(f"line {i + 1}: {src[i].strip()}")
+        self.assertEqual(unguarded, [],
+                         "a captain-lock relaxation can be booked with no lock: "
+                         + "; ".join(unguarded))
+
+
+class R295dDuplicateRoleRowsAreRefusedTests(unittest.TestCase):
+    """R295(d). `melt_showdown_salary_csv` keys a person on (Name, TeamAbbrev),
+    so two DK persons sharing a name on one team melt into ONE record.
+
+    The collapse is silent and mixed: CPT_ID/UTIL_ID and both salaries are last
+    writer wins while `Base` is first writer wins, so the surviving row carries
+    one person's DK IDs and salaries on the other's projection. The only
+    upstream detector, `showdown_paired_role_disagreement`, compares Team,
+    Position and Starting -- never the IDs -- so two people who agree on
+    Position and Starting are invisible, and `certify_showdown` cannot see it.
+
+    Filed PLAUSIBLE, and it stays unwitnessed: a sweep of every DK-schema CSV
+    in the tree (15 files, 5 Showdown) found zero duplicate
+    (Name, TeamAbbrev, Roster Position) rows. So this refuses rather than
+    re-keys, and refuses only for a person who reaches the build.
+    """
+
+    POOLED = "Michael Busch"   # CHC, posted, survives every pool filter
+    BENCH = "Joe Ryan"         # blank Starting, dropped by starters_only
+
+    def _twin(self, name, salary="3000", avg="0.1"):
+        rows = list(csv.DictReader(SAL.open(encoding="utf-8")))
+        twins = []
+        for r in (r for r in rows if r["Name"] == name):
+            t = dict(r)
+            t["ID"] = "9" + str(t["ID"])[1:]
+            t["Salary"] = salary
+            t["AvgPointsPerGame"] = avg
+            twins.append(t)
+        self.assertEqual(len(twins), 2, f"{name} should have a CPT and a UTIL row")
+        out = Path(tempfile.mkdtemp()) / "DKSalaries_twin.csv"
+        with out.open("w", newline="", encoding="utf-8") as fh:
+            w = csv.DictWriter(fh, fieldnames=list(rows[0].keys()))
+            w.writeheader()
+            w.writerows(rows + twins)
+        return out
+
+    def test_a_pooled_duplicate_is_refused_by_name(self):
+        with self.assertRaises(ValueError) as caught:
+            sd.melt_showdown_salary_csv(self._twin(self.POOLED))
+        message = str(caught.exception)
+        self.assertIn(self.POOLED, message)
+        self.assertIn("duplicate Showdown role row", message)
+        self.assertIn("CPT", message)
+        self.assertIn("UTIL", message)
+
+    def test_the_refusal_names_both_competing_dk_ids(self):
+        """A refusal the operator cannot act on is a blocked build. Name the
+        rows, so the salary file can be fixed."""
+        with self.assertRaises(ValueError) as caught:
+            sd.melt_showdown_salary_csv(self._twin(self.POOLED))
+        message = str(caught.exception)
+        original = [r for r in csv.DictReader(SAL.open(encoding="utf-8"))
+                    if r["Name"] == self.POOLED]
+        for row in original:
+            self.assertIn(str(row["ID"]), message)
+            self.assertIn("9" + str(row["ID"])[1:], message)
+
+    def test_a_duplicate_outside_the_pool_does_not_refuse(self):
+        """Scope. A duplicate among players the participation and health
+        filters drop can never reach a lineup, and refusing a build over one is
+        the washout CLAUDE.md's T-schedule spends its whole ladder avoiding."""
+        df = sd.melt_showdown_salary_csv(self._twin(self.BENCH))
+        self.assertFalse(df.empty)
+        self.assertNotIn(self.BENCH, set(df["Name"]),
+                         "fixture assumption: this player is filtered out")
+
+    def test_every_committed_showdown_salary_file_still_melts(self):
+        """No false positive on a legal file: one person is exactly two rows."""
+        for path in sorted(FIX.glob("DKSalaries*.csv")):
+            with self.subTest(path=path.name):
+                self.assertFalse(sd.melt_showdown_salary_csv(path).empty)
+
+    def test_the_merge_this_refuses_was_real(self):
+        """The defect, reproduced against the melt's own accumulator rather
+        than asserted: the two people share one key, and the record that key
+        would have shipped mixes them."""
+        rows = list(csv.DictReader(SAL.open(encoding="utf-8")))
+        names = [(r["Name"], r["TeamAbbrev"]) for r in rows]
+        self.assertEqual(len(names), len(set(names)) * 2,
+                         "the fixture has exactly two rows per person today")
+        with self.assertRaises(ValueError) as caught:
+            sd.melt_showdown_salary_csv(self._twin(self.POOLED, salary="3000"))
+        self.assertIn("another's projection", str(caught.exception))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

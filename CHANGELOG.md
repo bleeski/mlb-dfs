@@ -25,6 +25,97 @@ performance claim.
 
 ---
 
+## 2026-09-21 — R295(c)(d): the captain-lock rung stops re-solving rung 1, and two DK persons sharing a name on one team are refused instead of merged (CC-4 batch 1 of 4)
+
+**Scope.** `mlb_engine/optimize/showdown_theses.py` (the fifth rung's condition;
+R338 repair (3)'s two stale in-source anchors), `mlb_engine/optimize/showdown.py`
+(`melt_showdown_salary_csv`: a duplicate-role accumulator and a refusal scoped to
+the final pool), `tests/test_showdown.py`
+(`R295cCaptainLockRungIsGuardedTests`, new, 4;
+`R295dDuplicateRoleRowsAreRefusedTests`, new, 5), `tools/audit.py`
+(`EXPECTED_SUITE_COUNTS`), `docs/backlog.md`.
+
+**Every line number in the filed entry was stale, and the ordinal was worse than
+stale.** R223 and R239(b) grew `solve_ladder` from five rungs to nine, so the
+entry's "rung 5" is no longer the fifth of five it was written against, and CC-3
+moved everything below its insertion points again. The nine rung call sites are
+at `:1493, 1497, 1504, 1512, 1519, 1533, 1563, 1585, 1605`, and each was
+re-identified by its ARGUMENTS rather than its position: `excludes` (`with_cap`
+vs `without_cap`), whether it carries `**util_kw`, whether it passes `cpt_lock`,
+and whether it passes `max_shared_players`. That table is what made (c)
+checkable; the filed `showdown.py:224` for (d) is now `:265`, and
+`tests/test_showdown.py:2195-2202` for the R250 class is now `:2363`.
+
+**(c) What was wrong, and it is narrower than filed.** The rung at `:1518`
+carried no `cpt_lock` guard while the three below it (`:1572`, `:1595`, `:1619`)
+all read `_record_lock_relaxation(thesis, lu) if cpt_lock else 0`: the guard was
+added downstream and never backported. With `cpt_lock` None its argument list is
+rung 1's exactly, the only difference being the `cpt_lock=` keyword itself, whose
+receiving default is None (`showdown.py:941`). Reproduced on the R250 apex pool:
+**one slot, two solver calls, identical argument signatures, both proven
+infeasible.** The guard takes it to one.
+
+The filed entry says the duplicate "re-pays the `time_limit` (8 s)" and that
+`_record_lock_relaxation` "would record a lock relaxation for a slot with no
+lock." Both are overstated and the entry should not be repeated as written.
+`time_limit` is a CEILING: the measured duplicate cost 0.001s, because a
+trivially infeasible model dies in presolve. And the false relaxation is not
+reachable today — `_rung` latches on any empty return whose `proven_infeasible`
+is not literally True (R338/F13), so this rung is entered ONLY after a proven
+infeasibility, and an argument-for-argument re-solve re-proves it rather than
+succeeding. What shipped is therefore a guaranteed-futile solve removed, plus a
+latent trap closed: the booking becomes reachable the moment anyone makes this
+rung's arguments differ from rung 1's, which is exactly the edit a future rung
+insertion looks like.
+
+**(d) What was wrong.** `melt_showdown_salary_csv` keys a person on
+`(Name, TeamAbbrev)` (`:265`), so two DK persons sharing a name on one team melt
+into one record — silently, and mixed: `CPT_ID`/`UTIL_ID` and both salaries are
+LAST writer wins (`:306-309`) while `Base` is FIRST writer wins (`:310`).
+Measured on the MIN@CHC fixture with a synthesized twin: one delivered row for
+two people, carrying the twin's DK IDs (`93628679`/`93628585`) and $3,000 salary
+on the original's 7.4 projection. The one upstream detector,
+`showdown_paired_role_disagreement`, compares Team, Position and Starting and
+never the IDs, so it read `Role_Disagreement=None`; `certify_showdown` cannot see
+it either, and the file uploads clean.
+
+**Refusal rather than a re-key, because the case is still unwitnessed.** The item
+was filed PLAUSIBLE and stays that way: a sweep of every DK-schema CSV in the
+tree (15 files, 5 of them Showdown, plus `data/archive/`) found **zero** duplicate
+`(Name, TeamAbbrev, Roster Position)` rows, and `data/slates/` is empty on this
+host. Re-keying on Position would be a silent behaviour change fitted to a case
+nobody has produced, so the key is left alone and what is provable is refused
+instead: a SECOND row of the same role for one key, since a person melts from
+exactly two rows and never three.
+
+**Scoped to the pool, not to the parse loop, and that is a correction to the
+first cut of this fix.** The refusal reads `rows` AFTER the participation and
+health filters (`:446`, `:449`), so a duplicate among players the pool drops does
+not block a build. The first cut refused at parse time and would have failed a
+build at T-10 over two benched bats nobody can roster — the washout CLAUDE.md's
+T-schedule spends its whole ladder avoiding. Mutation 3 below is that scoping,
+pinned.
+
+**R233, the class.** FIVE rungs book a captain-lock relaxation, not the four the
+entry implies. `grep -n "_record_lock_relaxation(thesis, lu)"
+mlb_engine/optimize/showdown_theses.py` → `1533` (this fix, now guarded by its
+condition at `:1527`), `1546` (rung 6, unguarded at the call and already safe
+because its own condition at `:1540` carries `and cpt_lock`), `1581`, `1604`,
+`1628` (all three already `if cpt_lock else 0`). Rung 6 is the idiom this fix
+follows —
+the filed "`and cpt_lock` on both" would have added a guard that the condition
+already guarantees, and a redundant guard reads as a claim that the condition
+cannot be trusted. The new test walks all four rather than pinning this one, so a
+tenth rung cannot reopen the hole. Two stale in-source anchors inside `_rung`'s
+own comment (`thesis["locks"]` at `:1307`, `thesis["cpt"]` at `:1268`) are
+corrected to `:1444` and `:1405` with the fix rather than after it.
+
+**Gate.** `PASS  v2.26.0  41 modules  2301 tests  5 skipped` (2292 before; +9).
+The five skips are the host's, unchanged from the session's baseline: no vendored
+`.pylibs/scipy`, no `.env`, the 2026-08-16 salary file unstaged (×2), and no
+Classic salary file on disk. Golden histogram unmoved; this touches no Classic
+path.
+
 ## 2026-09-20 — R378: the agent-run record stops writing `findings: null` on every run, and the consumed 2026-09-17 fragment is retired
 
 *(Filed as R378, not R374: R374 is CC-A9's candidate-bank measurement, and R375-R377 are allocated too. `grep -oE '\bR[0-9]{2,3}\b' docs/backlog.md CHANGELOG.md | sort -n | tail` is how the next free number is read, and the first cut of this entry took R374 without running it.)*

@@ -1109,7 +1109,16 @@ EXPECTED_SUITE_COUNTS = {
     # inputs untouched (reported, never clamped), the 2dp rounding tolerance,
     # out-of-range and missing ids reported separately, R338's water-fill half
     # re-pinned so the row cannot reopen against it, and the emit block.
-    "tests.test_showdown": 264,
+    # R295(c)(d), 2026-09-21: 264 -> 273, the nine that pin the two ladder-truth
+    # defects. Four on the captain-lock rung: no duplicate re-solve when the
+    # slot carries no lock, the same through the reassigned-captain door, the
+    # relaxation still reached when a lock IS present (identified by signature,
+    # since the floor rungs also drop the lock), and the R233 class walk over
+    # every rung that books a lock relaxation. Five on the melt's (Name, Team)
+    # key: a pooled duplicate refused by name, the refusal naming both DK IDs,
+    # a duplicate OUTSIDE the pool deliberately not refused, every committed
+    # Showdown salary file still melting, and the mixed merge itself.
+    "tests.test_showdown": 273,
     # R96, 2026-08-11: 141 -> 162, the twenty-one tests that pin the delivery
     # path. A `grew` verdict is the one case where moving a pin is correct.
     # R46 round 2, 2026-08-12: 162 -> 168, the six that pin the PARTIAL side.

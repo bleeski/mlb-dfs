@@ -247,6 +247,9 @@ def melt_showdown_salary_csv(path: str | Path, exclude_out: bool = True,
     # brief can say the same thing truthfully.
     excluded_column_present = False
     unrecognized_cells: List[str] = []
+    # R295(d). A person melts from exactly two rows: one CPT and one UTIL. A
+    # THIRD row for the same (Name, TeamAbbrev) means the key is not a person.
+    duplicate_role_rows: List[Dict[str, str]] = []
     with Path(path).open(newline="", encoding="utf-8-sig") as fh:
         for r in csv.DictReader(fh):
             name = str(r.get("Name") or "").strip()
@@ -304,8 +307,16 @@ def melt_showdown_salary_csv(path: str | Path, exclude_out: bool = True,
             if starting and not rec.get("Starting"):
                 rec["Starting"] = starting
             if role == "CPT":
+                if rec["CPT_ID"] is not None:
+                    duplicate_role_rows.append({
+                        "name": name, "team": team, "role": "CPT",
+                        "kept": str(rec["CPT_ID"]), "dropped": str(pid)})
                 rec["CPT_ID"], rec["CPT_Salary"] = pid, salary
             else:
+                if rec["UTIL_ID"] is not None:
+                    duplicate_role_rows.append({
+                        "name": name, "team": team, "role": "UTIL",
+                        "kept": str(rec["UTIL_ID"]), "dropped": str(pid)})
                 rec["UTIL_ID"], rec["UTIL_Salary"] = pid, salary
             if base and not rec.get("Base"):
                 rec["Base"] = base
@@ -451,6 +462,45 @@ def melt_showdown_salary_csv(path: str | Path, exclude_out: bool = True,
                 "legal salary universe is unchanged.",
     }
 
+    # R295(d). Refuse, rather than re-key, and only for a person who reaches the
+    # BUILD. The melt keys a person on (Name, TeamAbbrev), so two DK persons
+    # sharing a name on one team collapse into one record -- silently and
+    # mixed: CPT_ID/UTIL_ID and both salaries are LAST writer wins while `Base`
+    # is FIRST writer wins, so the surviving row carries one person's DK IDs and
+    # salaries on the other person's projection, and a delivered lineup names
+    # the wrong ID. `showdown_paired_role_disagreement` (:389) sees it only when
+    # the two differ in Position or Starting and never compares the IDs at all;
+    # `certify_showdown` cannot see it either, so the file uploads clean.
+    #
+    # Scoped to `rows` AFTER the participation and health filters, not to the
+    # parse loop: a duplicate among bench bats never reaches a lineup, and
+    # refusing a build at T-10 over a person nobody can roster is the shape
+    # CLAUDE.md's T-schedule spends its whole ladder avoiding.
+    #
+    # A refusal rather than a re-key on (Name, Team, Position), because there is
+    # no instance to build a key against: a sweep of every DK-schema CSV in the
+    # tree (15 files, 5 of them Showdown) found zero duplicate
+    # (Name, TeamAbbrev, Roster Position) rows, so a new key would be a silent
+    # behaviour change fitted to a case nobody has seen. A second row of the
+    # SAME role is unambiguous -- one person melts from exactly two rows, never
+    # three -- so this refuses what it can prove and leaves the key alone until
+    # DK produces one.
+    pooled_keys = {r["Player_Key"] for r in rows}
+    pooled_dupes = [d for d in duplicate_role_rows
+                    if f"{d['name']}|{d['team']}" in pooled_keys]
+    if pooled_dupes:
+        detail = "; ".join(
+            f"{d['name']} ({d['team']}) has two {d['role']} rows, "
+            f"IDs {d['dropped']} and {d['kept']}"
+            for d in pooled_dupes)
+        raise ValueError(
+            f"{path} carries {len(pooled_dupes)} duplicate Showdown role row(s) "
+            f"on players in the pool: {detail}. The melt keys a person on "
+            f"(Name, TeamAbbrev), so these rows merge into one player carrying "
+            f"one person's DK IDs and salaries on another's projection, and "
+            f"nothing downstream can see it. Resolve the duplicate names in the "
+            f"salary file (or confirm they are one person) before building."
+        )
     df = pd.DataFrame(rows)
     if not df.empty:
         df = df.sort_values("Player_Key").reset_index(drop=True)
