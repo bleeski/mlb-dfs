@@ -2,6 +2,151 @@
 
 What changed in the engine, the tools and the contracts, when, and why.
 
+## 2026-09-21 — R374: the candidate bank, measured; the cap is RETAINED, and `benchmark_engine --live` gives the live path its first timing baseline (CC-A9, closes F6)
+
+**Scope.** `tools/benchmark_engine.py` (new `--live` mode: `SYNTHETIC_LABEL` /
+`LIVE_LABEL` as named constants, `live_inputs`, `live_projection_rows`,
+`run_live`, and `measure(warmup=)` so one expensive live build is not run seven
+times), `tests/test_greenfield_regressions.py` (seven new tests, 30 -> 37),
+`tools/audit.py` (`EXPECTED_SUITE_COUNTS`), `docs/backlog.md` (CC-A9 migrated,
+NEXT pointer CC-A9 -> CC-6), `docs/PROGRESS.md` (regenerated from the board by
+`tools/plan_status.py`; its drift gate caught the board edit). Gate `PASS v2.26.0 41 modules 2369 tests 5 skipped`, 2362 ->
+2369. The 5 skips are the same 5 the pre-work gate carried and are host facts.
+No engine file changed: this row is a measurement and its verdict is RETAIN.
+
+**Verdict: RETAIN `DEFAULT_CANDIDATE_BANK_CAP = 150`.** The row's rule is that
+the cap moves only if neither objective proxy degrades AND coverage improves.
+Coverage cannot improve on this fixture -- `gap_pct` is already `0.0` at the
+smallest bank measured -- so the condition is unsatisfiable, and both proxies
+are not merely undegraded but byte-identical across every cell. Nothing in the
+engine moved, and no golden was re-frozen.
+
+**The measurement.** Ten cells, five targets x two per-attempt budgets, driven
+through `execution_pipeline.run_slate` on the vendored 2026-06-03 archive slate
+at `requested_n=18` (its real reserved-entry count, so `{2n,3n,4n} = {36,54,72}`).
+`bank_stack_min_size` and `bank_secondary_size` held at R34's defaults
+throughout. Realized bank length is reported beside the requested target
+because the two are never equal.
+
+| budget | target | realized | base | appended | budget exhausted | distinct SP pairs | bank build s | peak MB | gap_pct | ceiling_best | ceiling_mean | retained % | intact |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 105s | 36 | **50** | 36 | 14 | no | **18** | 75.0 | 19.4 | 0.0 | 145.82 | 144.31 | 71.6 | 0 |
+| 105s | 54 | **49** | 49 | 0 | YES | **8** | 113.0 | 19.4 | 0.0 | 145.82 | 144.31 | 71.6 | 0 |
+| 105s | 72 | **49** | 49 | 0 | YES | **8** | 112.9 | 19.4 | 0.0 | 145.82 | 144.31 | 71.6 | 0 |
+| 105s | 150 | **48** | 48 | 0 | YES | **7** | 109.1 | 19.4 | 0.0 | 145.82 | 144.31 | 71.6 | 0 |
+| 105s | 300 | **48** | 48 | 0 | YES | **7** | 110.0 | 19.4 | 0.0 | 145.82 | 144.31 | 71.6 | 0 |
+| 300s | 36 | **50** | 36 | 14 | no | **18** | 71.6 | 19.4 | 0.0 | 145.82 | 144.31 | 71.6 | 0 |
+| 300s | 54 | **66** | 54 | 12 | no | **21** | 129.6 | 19.8 | 0.0 | 145.82 | 144.31 | 71.6 | 0 |
+| 300s | 72 | **82** | 72 | 10 | no | **21** | 224.5 | 20.1 | 0.0 | 145.82 | 144.31 | 71.6 | 0 |
+| 300s | 150 | **88** | 88 | 0 | YES | **15** | 309.6 | 20.3 | 0.0 | 145.82 | 144.31 | 71.6 | 0 |
+| 300s | 300 | **89** | 89 | 0 | YES | **15** | 311.0 | 20.3 | 0.0 | 145.82 | 144.31 | 71.6 | 0 |
+
+Read the last five columns first: `gap_pct`, both apex ends, the washout end
+and the intact count are IDENTICAL in all ten cells, across realized banks from
+48 to 89 candidates, while bank build time rises 4.3x (71.6s -> 311.0s). A
+bigger bank bought nothing measurable and cost linearly.
+
+**A bigger ask made the bank LESS diverse, and that is the mechanism.** Distinct
+SP pairs is not monotone in the target: 21 pairs at target 72 (82 candidates)
+against 15 pairs at target 150 (88 candidates). The `appended` column is why. The
+forced-augmentation pass in `build_diverse_candidate_bank` is what GUARANTEES
+SP-pair coverage, and it runs on whatever budget the base bank leaves. Ask for a
+big base bank and it consumes the budget alone (`appended=0`, `budget_exhausted`
+YES) and the coverage pass never runs at all. So past the point where the base
+bank can finish inside the budget, raising the target trades the guarantee for
+raw count. That is an argument against raising the cap, not a neutral result.
+
+**The cap never bound in any cell.** At targets 150 and 300 the realized bank
+topped out at 88 and 89 with the budget exhausted, against a cap of 150. On this
+host and this slate the per-attempt time budget binds long before the cap does,
+which is the same residue R360 fixed one layer down.
+
+**Three corrections to the row itself, each verified at the call site.**
+
+(a) A direct `build_diverse_candidate_bank(candidate_bank_size=300)` call does
+NOT escape the clamp. It forwards `candidate_bank_size` into
+`build_candidate_lineup_bank`, which calls
+`resolve_candidate_bank_size(requested_n, candidate_bank_size)` positionally
+with no `cap` passthrough, so the explicit branch returns `min(300, 150) = 150`.
+Routed that way the 150 and 300 cells are the same experiment. This sweep pins
+the resolver per cell instead -- the exact counterfactual a cap move would
+create -- and records what the unpinned resolver would have returned in every
+cell's `resolver_calls`.
+
+(b) A cap move could not have moved either golden, so the "histogram before and
+after" the row required is vacuous. `resolve_candidate_bank_size` first reaches
+150 at **75 reserved entries**; the loose golden runs `requested_n=8` (-> 14)
+and the production golden 18 (-> 36), and the production golden builds through
+`bank_cache.extend_bank`, which never calls the resolver at all. Pinned by
+`test_neither_golden_replay_can_move_when_the_cap_moves`.
+
+(c) **The cap does not govern the bank most builds deliver from.** It clamps
+`resolve_candidate_bank_size`, which only the AUTO bank path consults. The
+SLICED path -- the one `build_slate.py` ships from, and which
+`execution_pipeline.py:5288` and `bank_cache.py:933` both call "most of them" --
+sizes its bank `max(n_entries * 12, 60)` (`build_slate.py:2622`) and hands it to
+`extend_bank`, which contains no reference to `resolve_candidate_bank_size` or
+`DEFAULT_CANDIDATE_BANK_CAP`. At 18 entries that path already asks for 216
+candidates while the "cap" reads 150. Pinned by
+`test_the_candidate_bank_cap_does_not_govern_the_bank_most_builds_deliver`.
+So "raise the cap" was never a question about the bank most deliveries draw
+from, and the board should not re-raise it as one.
+
+**Re-confirmed, so it is not re-litigated.** `resolve_candidate_bank_size`
+(`optimizer_v3.py:3393`) takes `(requested_n, explicit=None,
+cap=DEFAULT_CANDIDATE_BANK_CAP)` and its body reads no clock, no host and no
+budget. The Cowork-cap hypothesis is FALSE from the signature alone.
+
+**`benchmark_engine --live`.** The row named the flag as if it existed; the tool
+had exactly one argument. `--live` drives the real MILP through `run_slate`
+against the vendored slate and emits `LIVE_LABEL`, never `SYNTHETIC_LABEL`,
+because "offline synthetic workload; no live model" is false of it. Recorded
+baseline on a cloud container this date: projection frame assembly 0.014s, plan
+pass (`approve=False`) 2.2s, certified build (`approve=True`) 13.9s, bank
+`build_diverse_candidate_bank` 28 candidates at `requested_n=8`, all three gates
+passing, `gap_pct` 0.0. `--live` reaches no network: the replay synthesizes
+projections from the salary CSV's own `AvgPointsPerGame` in `emergency_proxy`
+mode, so `live_data_adapters.build_slate_pool` is never called. "Live" means the
+real optimizer and the real front door, not a live feed, and `LIVE_LABEL` says
+so in those words. The tracemalloc peak is Python-only and excludes the native
+solver, which is why the memory column is flat at ~20MB and must not be read as
+the solver's footprint.
+
+**One defect found in `--live` and fixed before it landed.** A certified build
+writes a `kind: "delivery"` record, so the first cut of `--live` published six
+certified deliveries of an ARCHIVED slate into `data/deliveries/2026-06-03/`,
+where `awaiting_standings`, `field_miner` and `outcome_review` would each have
+read them as real. `run_live` now runs under a redirected
+`MLB_DFS_ARTIFACT_ROOT` AND a redirected `upload_manifest.REPO_ROOT` -- the same
+pair the gate and `tests/conftest.py` redirect, and both are needed because
+`delivery_record._artifact_root` reads the env var THROUGH that attribute. The
+six records were removed. Pinned by
+`test_benchmark_engine_live_never_publishes_into_the_delivery_ledger`.
+
+**Truthful labels.** Every number above is a deterministic review proxy over a
+labeled prior, measured on ONE vendored slate: **n=1**. Solve time, peak memory,
+distinct SP pairs, `gap_pct` and both frontier ends are review proxies and none
+is ROI, an edge, a win rate, a cash rate or a probability. `ceiling_best` being
+equal across cells means the bank contained the same best candidate, not that
+any bank would win the same money. One slate cannot size an effect (R209's
+lesson on a different number), and a sweep table is exactly the artifact that
+invites being read as if it could. A second slate would be needed before any of
+this generalizes.
+
+**The 105s column is a host measurement, not an engine measurement.** Every cell
+in it at target >= 54 is budget-exhausted, and a budget-bound bank build is
+wall-clock dependent by construction (`_time.monotonic()` deadlines in
+`build_diverse_candidate_bank`, plus `resolve_solver_time_limit` shrinking the
+per-solve limit as the budget depletes). Repeats confirm it, with a nuance worth
+recording: the budget-CLEAR cell (target 36, 300s) realized 50 on all three
+runs of it, while the budget-BOUND cell (target 150, 105s) realized 48 during
+the sweep and 51 on each of two later repeats -- so two back-to-back repeats
+AGREED with each other and still disagreed with the sweep. A budget-bound cell
+is not visibly flaky run-to-run; it drifts with whatever else the host was
+doing, which is the harder failure to notice.
+Read that column as "what this container finished in 105s", never as what the
+engine does at that bank size.
+
 ## 2026-09-21 — R382: the captain-ownership prior reaches `run_showdown`, and `prior_own_below` resolves against it (CC-5, batch 2 of R307). R307 is now closed
 
 **Scope.** `mlb_engine/optimize/showdown_theses.py` (new

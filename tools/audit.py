@@ -1397,7 +1397,14 @@ EXPECTED_SUITE_COUNTS = {
     # step 5 grep pin (no legacy module imports `mlb_engine.production` or
     # `pydantic`), which belongs in a suite rather than only in a changelog --
     # a boundary nothing executes is a boundary that rots on the next import.
-    "tests.test_greenfield_regressions": 30,
+    # R374 (CC-A9), 2026-09-21: 30 -> 36. Six that pin F6's two halves --
+    # four on `benchmark_engine --live` (its label may not be the synthetic
+    # one, the flag exists, its replay config and its helpers agree with the
+    # golden replay's) and two on the measurement finding itself: the cap does
+    # not govern the bank most builds deliver from, and neither golden can move
+    # when it moves. The seventh pins that --live never publishes a certified
+    # delivery record into the tracked ledger, which its first cut did.
+    "tests.test_greenfield_regressions": 37,
     "tests.test_production": 101,
 }
 # The sum, not a second number to keep in step: R70 left this comment reading
