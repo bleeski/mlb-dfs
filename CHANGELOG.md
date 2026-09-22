@@ -2,6 +2,154 @@
 
 What changed in the engine, the tools and the contracts, when, and why.
 
+## 2026-09-22 — R384/R118: `tools/replay_slate.py`, the replay instrument — Classic settles exactly, Showdown refuses, and three of the entry's premises were wrong (CC-6)
+
+**Scope.** New `tools/replay_slate.py` (the copied exact-Fraction tie oracle,
+`fpts_cents_by_norm`, `ambiguous_norms`, `payout_curve_cents`,
+`ticket_face_value`, `replay`, `self_validate`, CLI), `tests/test_core.py`
+(`ReplaySlateTests`, ten tests), `tools/audit.py` (`EXPECTED_SUITE_COUNTS`),
+`docs/backlog.md` (CC-6 migrated, NEXT pointer), `docs/PROGRESS.md`
+(regenerated). Gate `PASS v2.26.0 41 modules 2379 tests 5 skipped`, 2369 ->
+2379. The 5 skips are the same 5 the pre-work gate carried and are host facts.
+No engine module changed: this is a read-only tool over the archive.
+
+**What shipped.** A replay scores a supplied lineup set against an archived
+contest's OBSERVED field and settles it at that contest's own payout curve. Each
+supplied lineup ENTERS the field as an additional entry, takes its own rank, and
+a duplicate of an archived lineup ties with it and splits the tied ranks — DK's
+own rule, and F-48's. Per lineup: realized points, rank, percentile, exact
+duplicate count against the real field, seat cleared or not, gross award and net
+of fee. Demonstrated end to end on contest 191488366, which pays ONE $25 seat:
+entering a copy of its own rank-1 lineup makes two entries tie for first,
+spanning ranks 1-2, so the group takes `(2500 + 0) / 2` = **$12.50** each. The
+naive alternatives — award the top slot to every tied entry, or average the
+whole block — are both wrong in the direction that flatters a concentrated
+portfolio, which is the portfolio shape this instrument exists to grade.
+
+**The acceptance gate, and it is stated per contest because pooling hides the
+answer.** Re-scoring every archived Classic entry from the table, against DK's
+own recorded points and ranks:
+
+| | |
+|---|---|
+| Classic contests | 361 |
+| field entries | 442,001 |
+| **contests reproducing every point total exactly** | **353 of 361 (97.78%)** |
+| **contests reproducing every rank exactly** | **353 of 361 (97.78%)** |
+| entries scored WRONG | **0** |
+| entries refused (colliding name) | 16,816 |
+| entries unresolvable (player off the table) | **0** |
+
+Zero wrong answers is the property that matters: the tool scores exactly or
+refuses, and never guesses. The entry-pooled figures beside these (96.2% points,
+67.0% rank) are reported but are NOT per-contest accuracy — every irreproducible
+Classic entry in the archive sits in 8 contests and 5 of those are among the
+largest fields in it, so pooling reads 67% while 353 of 361 contests are
+perfect. CLAUDE.md conditions outcome counts on contest and field size and never
+pools them; this is a worked example of why.
+
+**Three corrections to the entry, each verified at the call site.**
+
+(a) **"Lift `settle_scores` rather than re-derive it" (2026-09-10 rider) is
+impossible as written.** `tests/test_greenfield_regressions.py`'s
+`test_no_legacy_module_imports_the_production_package_or_pydantic` forbids any
+`tools/*.py` outside a four-name exemption list from importing
+`mlb_engine.production.*`, and its pattern allows no deferred-import escape. So
+"lift" means COPY. The copy names `mlb_engine/production/simulation.py:95` as
+its origin and is pinned against that function's own hand example from
+`tests/test_production.py`.
+
+(b) **Caveat (i)'s mechanism is wrong, and the right one changes the remedy.**
+The entry attributes the irreproducible entries to "DK multi-position
+row-splitting". It is not that. All 1,827 irreproducible Classic entries sit in
+8 contests, and in every one the cause is a NAME COLLISION: two different major
+leaguers normalizing to one name — two Max Muncys, both listed `3B`, with
+different realized scores; one contest also carries two Jose Fermins, one of
+them a pitcher. The distinction decides the fix. Row-splitting is collapsible,
+because a player split across roster positions holds the SAME score on each row,
+so first-wins is right for it. A collision is not collapsible at all:
+`player_norm -> fpts` is not a function when two people share a name, and any
+collapse rule silently attributes one player's score to the other. A lineup
+naming a colliding player is therefore reported non-replayable, the same rule
+this repo already applies to a player DK's table omits. That is what took the
+wrong-answer count from 1,827 to 0.
+
+First-wins itself is CONFIRMED, against a real alternative: over all 442,001
+archived Classic entries it reproduces DK's points on 99.587% against 96.610%
+for last-wins. (Last-wins fixes 1,826 of the mismatches and breaks 14,982 — an
+inversion visible only by measuring both on the whole set rather than on the
+failures.)
+
+(c) **"Every satellite in the archive settles exactly today; a GPP settles
+UNKNOWN" (2026-09-15 rider) is wrong in both halves.** 336 of 613 archived
+contests join the payout reference (the rider's "123 matches" is stale low — the
+archive grew from 379 records to 614). The other 277 settle UNKNOWN, and they
+are not GPPs: all 336 joined contests are satellite-named and there is no GPP in
+the intersection at all. The unknown set is "contests Ben's entry-history export
+does not cover", which is a different and larger gap than the one filed.
+
+**Seat value: observed on 21, inferred and validated on the rest.** The rider
+says the curve is "`paid_places` tickets of the recorded value". The value is
+RECORDED on only 21 of the 611 reference contests — the ones where a ticket was
+actually won. On the rest it is parsed from the contest title, which is a
+labeled inference and is carried as `seat_value_provenance: contest_name`,
+never as an observation. It is corroborated rather than assumed: on all 21
+contests where both exist the title's single dollar figure equals the recorded
+ticket value exactly, 21 of 21 with no disagreement. The only titles carrying
+more than one dollar figure are 11 Best Ball GPPs, and those are exactly the 11
+contests that pay no places, so they never reach the parse. A ticket is carried
+as face value and labeled `award_kind: tournament_ticket`, never as cash and
+never counted twice against a later redemption.
+
+**Showdown is REFUSED by name, with its reason.** It is not exactly replayable
+from the archive: DK's captain takes 1.5x, 89 of 249 archived Showdown records
+carry no `CPT` row at all, and `captain_norm` is absent on 31.2% of Showdown
+entries, so for those the captain is not recoverable. Where a `CPT` row does
+exist its `fpts` is the 1.5x ALREADY APPLIED and rounded to 2dp while DK's own
+`points` carries the unrounded value, so reading it is wrong twice over. The
+tool's `fpts_cents_by_norm` excludes `CPT` rows BEFORE the collapse rather than
+after, because `player_table` is ordered by pct_drafted descending and the CPT
+row precedes the UTIL row for 85 of the 2,648 archived players holding both — a
+naive first-wins records the inflated number as that player's realized score.
+This answers the 2026-08-24 rider's standing condition to verify the CPT
+convention against one archived Showdown contest before grading any.
+
+**Scores are summed in integer hundredths, never floats.** The tie group decides
+the payout and float addition is not associative: 1,408 of 4,409 real archived
+lineups (31.9%) sum to a different float depending on term order, so two
+IDENTICAL lineups would sometimes fail to tie and split the wrong prize. The
+oracle's precondition enforces integer scores rather than trusting the caller.
+
+**Declined, with reasons.**
+- **The policy A/B half is not runnable and was not attempted.** The entry's
+  acceptance clause asks for "one worked policy A/B — the 2207_2g reuse-cap
+  pair" over `runs/`, leaning on "302 runs". `runs/` is gitignored and does not
+  exist in a cloud container, which is ephemeral and clones fresh, so this half
+  is unsatisfiable on this host rather than skipped. It needs a host that holds
+  `runs/`, and the tool it needs now exists.
+- **The FPTS-agreement key (2026-09-15 rider (2)) is NOT built, and should not be
+  built as filed.** Union-find assumes transitivity and FPTS agreement is not
+  transitive: `0.0` is overloaded in DK's table — a player listed 0.00 because
+  his game is not in this draftgroup is indistinguishable from one who played
+  and scored nothing — so an all-day slate agrees with an early-only slate on
+  the early players and with a late-only slate on the late players and union-find
+  welds all three. Filed rather than built. The smallest deliverable does not
+  need it: settlement is per contest, so no cross-contest realized-FPTS table is
+  on its path.
+- **Original body Fix (1) is dead text.** "Stop stripping `fpts_by_norm`, sidecar,
+  idempotent re-mine backfill" was superseded by the 2026-08-24 re-price and is
+  now confirmed unnecessary at scale: all 614 archived records carry
+  `player_table`, 46,850 rows, 100% with a non-null `fpts`. No miner change, no
+  re-mine, no sidecar.
+
+**Truthful labels.** A replay is an observed-outcome counterfactual conditioned
+on ONE archived field. It is exact accounting over archived outcomes and it is
+never ROI, a win rate, a cash rate, or a probability. A construction that wins a
+replay is "supported in the shapes replayed", never proven — the field it beat
+is that slate's field and no other. Dollar figures are ticket FACE VALUE where
+the award is a ticket, labeled as such. `LABEL` carries this on every result the
+tool emits.
+
 ## 2026-09-21 — R374: the candidate bank, measured; the cap is RETAINED, and `benchmark_engine --live` gives the live path its first timing baseline (CC-A9, closes F6)
 
 **Scope.** `tools/benchmark_engine.py` (new `--live` mode: `SYNTHETIC_LABEL` /
