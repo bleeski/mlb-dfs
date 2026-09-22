@@ -16,7 +16,7 @@ Every step prints evidence. Show the output, not a summary of it.
 ## 0. Before you start
 
 `/land` must have passed: gate green on the real tree, CHANGELOG entry in the
-same commit, backlog row migrated, commit made by explicit path. If it has not,
+same commit, roadmap row and register entry migrated, commit made by explicit path. If it has not,
 stop and run `/land`. Shipping an unlanded commit is how the changelog and the
 tree drift apart.
 

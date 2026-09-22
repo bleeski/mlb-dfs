@@ -13097,6 +13097,7 @@ class RootContractBudgetTests(unittest.TestCase):
             "docs/cowork_sandbox.md",
             "docs/cowork_sync_protocol.md",
             "docs/cowork_archival_runbook.md",
+            "docs/ROADMAP.md",
             "skills/generate-lineups/SKILL.md",
             "tools/claim.py",
             "tools/audit.py",
@@ -27315,18 +27316,21 @@ class WashoutControlReportingTests(unittest.TestCase):
 
 
 class PlanStatusTests(unittest.TestCase):
-    """R366. `docs/PROGRESS.md` is GENERATED from the board's roadmap rows.
+    """R385 (replaces R366's generator tests). `tools/plan_status.py --check`
+    lints `docs/ROADMAP.md`, the only surface that orders work, against the
+    R-entry register `docs/backlog.md`.
 
-    The point of generating it is that it cannot drift, and the only thing that
-    makes that true is a test. This repo already carries what happens without
-    one: eighteen ledger fragments unmerged since 2026-08-13 and a Quick Card
-    gate pin about twelve moves stale, both surfaces somebody had to remember to
-    write twice.
-
-    These run the production functions rather than pinning strings on the
-    source (R300), and the synthetic-board cases use a temp root so nothing
-    depends on this checkout's own content (R155).
+    The rule that matters is coverage: an open register entry named nowhere in
+    the roadmap is a second backlog, and this repo carried one for months
+    (eighteen ledger fragments unmerged since 2026-08-13, twenty open entries
+    with no roadmap slot on 2026-09-22). These run the production functions
+    rather than pinning strings on the source (R300), and every synthetic case
+    uses a temp root so nothing depends on this checkout's content (R155).
     """
+
+    HEAD = ("| Session ID | Packaging Type | Work Unit & Scope | Source Origin | "
+            "Gate Classification | Target Files | Verification Command / Breakpoint "
+            "| Status |\n|---|---|---|---|---|---|---|---|\n")
 
     @staticmethod
     def _mod():
@@ -27338,89 +27342,89 @@ class PlanStatusTests(unittest.TestCase):
         return mod
 
     @staticmethod
-    def _board(rows, pointer="CC-A2, then CC-A1"):
-        head = ("# board\n\n## Execution roadmap (synthetic) -- NEXT: "
-                + pointer + "\n\n### Phase A0 -- the host move\n\n"
-                "| Session ID | Execution Type | Item Name & Detailed Scope | "
-                "Source | Files | Impact | Complexity | Blockers |\n"
-                "| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |\n")
-        return head + "".join(rows) + "\n"
+    def _row(sid, scope, status="Pending"):
+        return (f"| **Session {sid}** | Standalone | {scope} | src | Validity (V) "
+                f"| files | cmd | {status} |\n")
+
+    def _roadmap(self, rows, next_sid="01", ledger=("00",)):
+        ledger_rows = "".join(f"| 2026-09-22 | Session {s} | abc | x | y |\n" for s in ledger)
+        return ("# ROADMAP\n\n**NEXT:** Session " + next_sid + "\n\n## Master\n\n"
+                + self.HEAD + "".join(rows)
+                + "\n## Living Changelog and Progress Ledger\n\n"
+                "| Date | Session ID | Commit SHA | Completed Scope | Remaining Items |\n"
+                "|---|---|---|---|---|\n" + ledger_rows)
 
     @staticmethod
-    def _row(sid, scope):
-        return (f"| **{sid}** | `Standalone` | {scope} | src | files | P1 | "
-                "Low | None |\n")
+    def _register(*headings):
+        body = "".join(f"### {h}\n\n- **What.** x\n\n" for h in headings)
+        return ("# R-entry register\n\n## Workstream 1\n\n" + body
+                + "## Closed number stubs\n\n### R104, R45. LANDED 2026-08-10\n\n"
+                "# Board history\n\n### R999. an old heading kept verbatim\n")
 
-    def _write(self, tmp, board_text):
-        (tmp / "docs").mkdir(parents=True, exist_ok=True)
-        (tmp / "docs" / "backlog.md").write_text(board_text, encoding="utf-8")
-
-    def test_the_committed_progress_file_matches_the_committed_board(self):
-        """The drift gate itself. A board edit that forgets to regenerate is a
-        RED gate, not a file that quietly describes a queue that moved on."""
-        mod = self._mod()
-        wanted = mod.build(REPO)
-        current = (REPO / "docs" / "PROGRESS.md").read_text(encoding="utf-8")
-        self.assertEqual(
-            current, wanted,
-            "docs/PROGRESS.md is out of date; run `python tools/plan_status.py`")
-        self.assertEqual(mod.main(["--check", "--root", str(REPO)]), 0)
-
-    def test_status_is_read_from_the_row_rather_than_stored(self):
-        mod = self._mod()
-        board = self._board([
-            self._row("CC-X1", "**R001 -- a done thing. DONE 2026-09-19.** tail"),
-            self._row("CC-X2", "**R002 -- an open thing.** tail"),
-        ])
-        with tempfile.TemporaryDirectory() as raw:
-            tmp = Path(raw)
-            self._write(tmp, board)
-            out = mod.build(tmp)
-        self.assertIn("| **CC-X1** | DONE 2026-09-19 |", out)
-        self.assertIn("| **CC-X2** | open |", out)
-        self.assertIn("1 of 2 sessions done.", out)
-
-    def test_a_batch_is_done_only_when_every_one_of_its_rows_is(self):
-        """A half-landed batch reading DONE is the failure mode that matters:
-        the roadmap would say a session is finished while one of its items is
-        still open, and partial landings are normal here."""
-        mod = self._mod()
-        board = self._board([
-            self._row("CC-Y1", "**R003 -- first half. DONE 2026-09-19.** tail"),
-            self._row("CC-Y1", "**R004 -- second half, still open.** tail"),
-        ])
-        with tempfile.TemporaryDirectory() as raw:
-            tmp = Path(raw)
-            self._write(tmp, board)
-            out = mod.build(tmp)
-        self.assertIn("| **CC-Y1** | part 1/2 |", out)
-        self.assertNotIn("DONE 2026-09-19 |", out)
-        self.assertIn("0 of 1 sessions done.", out)
-
-    def test_the_next_pointer_is_carried_and_a_missing_one_is_named(self):
+    def _run(self, roadmap, register):
         mod = self._mod()
         with tempfile.TemporaryDirectory() as raw:
             tmp = Path(raw)
-            self._write(tmp, self._board([self._row("CC-Z1", "**R005 -- x.**")],
-                                         pointer="CC-A5, then CC-A6"))
-            self.assertIn("**NEXT:** CC-A5, then CC-A6", mod.build(tmp))
-            self._write(tmp, "# board\n\nno roadmap heading here\n")
-            self.assertIn("no `## Execution roadmap ... NEXT:` heading found",
-                          mod.build(tmp))
+            (tmp / "docs").mkdir()
+            (tmp / "docs" / "ROADMAP.md").write_text(roadmap, encoding="utf-8")
+            (tmp / "docs" / "backlog.md").write_text(register, encoding="utf-8")
+            err = io.StringIO()
+            with contextlib.redirect_stderr(err), contextlib.redirect_stdout(io.StringIO()):
+                code = mod.main(["--check", "--root", str(tmp)])
+        return code, err.getvalue()
 
-    def test_check_exits_2_when_the_board_moved_and_the_file_did_not(self):
+    def _good_rows(self):
+        return [self._row("00", "R385: the move.", "Complete 2026-09-22"),
+                self._row("01", "R386 and R10."),
+                self._row("90", "decisions owed", "Deferred")]
+
+    def test_the_committed_roadmap_passes_against_the_committed_register(self):
+        """The gate itself: the real tree must lint clean."""
         mod = self._mod()
-        with tempfile.TemporaryDirectory() as raw:
-            tmp = Path(raw)
-            self._write(tmp, self._board([self._row("CC-W1", "**R006 -- x.**")]))
-            self.assertEqual(mod.main(["--root", str(tmp)]), 0)
-            self.assertEqual(mod.main(["--check", "--root", str(tmp)]), 0)
-            self._write(tmp, self._board([
-                self._row("CC-W1", "**R006 -- x.**"),
-                self._row("CC-W2", "**R007 -- newly added row.**"),
-            ]))
-            self.assertEqual(mod.main(["--check", "--root", str(tmp)]), 2)
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err), contextlib.redirect_stdout(io.StringIO()):
+            code = mod.main(["--check", "--root", str(REPO)])
+        self.assertEqual(code, 0, err.getvalue())
 
+    def test_a_consistent_synthetic_pair_passes(self):
+        code, err = self._run(self._roadmap(self._good_rows()),
+                              self._register("R10. open", "R386. open", "R12. CLOSED 2026-09-01"))
+        self.assertEqual(code, 0, err)
+
+    def test_an_open_register_entry_named_nowhere_is_a_second_backlog(self):
+        """Coverage. Closed stubs and Board-history headings are not open."""
+        code, err = self._run(self._roadmap(self._good_rows()),
+                              self._register("R10. open", "R386. open", "R77. nobody scheduled me"))
+        self.assertEqual(code, 2)
+        self.assertIn("R77 is open", err)
+        self.assertNotIn("R104", err)
+        self.assertNotIn("R999", err)
+
+    def test_status_outside_the_vocabulary_fails(self):
+        rows = self._good_rows()
+        rows[1] = self._row("01", "R386 and R10.", "DONE 2026-09-23")
+        code, err = self._run(self._roadmap(rows), self._register("R10. open"))
+        self.assertEqual(code, 2)
+        self.assertIn("outside the vocabulary", err)
+
+    def test_next_must_name_a_pending_or_in_progress_row(self):
+        code, err = self._run(self._roadmap(self._good_rows(), next_sid="00"),
+                              self._register("R10. open"))
+        self.assertEqual(code, 2)
+        self.assertIn("NEXT names Session 00", err)
+        code, err = self._run(self._roadmap(self._good_rows(), next_sid="42"),
+                              self._register("R10. open"))
+        self.assertEqual(code, 2)
+        self.assertIn("not in the master table", err)
+
+    def test_a_non_deferred_row_must_name_an_r_number_and_the_ledger_must_resolve(self):
+        rows = self._good_rows() + [self._row("02", "no number here")]
+        code, err = self._run(self._roadmap(rows, ledger=("00", "07")),
+                              self._register("R10. open"))
+        self.assertEqual(code, 2)
+        self.assertIn("Session 02: a non-Deferred row names no R-number", err)
+        self.assertIn("Progress Ledger names Session 07", err)
+        self.assertNotIn("Session 90: a non-Deferred", err)
 
 
 class OutcomeReviewTests(unittest.TestCase):

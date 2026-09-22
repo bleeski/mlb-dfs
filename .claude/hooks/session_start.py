@@ -4,7 +4,7 @@
 Prints, as plain text that Claude Code adds to context, the facts CLAUDE.md's
 session-start step 1 asks every session to gather: HEAD and its distance from
 origin, held claims, dirt classified by write set, a truncated git log, the
-backlog's NEXT pointer, and any git lock files. About 300 tokens, replacing the
+roadmap's NEXT pointer, and any git lock files. About 300 tokens, replacing the
 two shell calls and the read of a 63KB status note that used to do this job
 (R301, 2026-09-15).
 
@@ -79,15 +79,17 @@ def dirt() -> list[str]:
 
 
 def next_pointer() -> str:
-    backlog = ROOT / "docs" / "backlog.md"
+    """The `**NEXT:**` line of docs/ROADMAP.md, the only surface that orders
+    work (R385; before 2026-09-22 this read the backlog's roadmap heading)."""
+    roadmap = ROOT / "docs" / "ROADMAP.md"
     try:
-        with backlog.open(encoding="utf-8", errors="replace") as fh:
+        with roadmap.open(encoding="utf-8", errors="replace") as fh:
             for line in fh:
-                if line.startswith("## Execution roadmap") and "NEXT:" in line:
+                if line.startswith("**NEXT:**"):
                     return line.strip()[:320]
     except OSError:
-        return "docs/backlog.md unreadable"
-    return "no `## Execution roadmap ... NEXT:` heading found in docs/backlog.md"
+        return "docs/ROADMAP.md unreadable"
+    return "no `**NEXT:**` line found in docs/ROADMAP.md"
 
 
 def pending_fragments() -> str:
@@ -210,7 +212,7 @@ def full() -> str:
         *["  " + l for l in dirt()],
         f"git log, subjects truncated at {SUBJECT_WIDTH}:",
         *["  " + l for l in git("log", f"--format=%h %<({SUBJECT_WIDTH},trunc)%s", f"-{LOG_LINES}").splitlines()],
-        "backlog: " + next_pointer(),
+        "roadmap: " + next_pointer(),
         "inbox (fragments awaiting their owning role): " + pending_fragments(),
         outcome_reviews_due(),
         "git locks: " + lock_state,
@@ -225,7 +227,7 @@ def compact() -> str:
     return "\n".join([
         "== mlb-dfs, after compaction ==",
         "claims: " + "; ".join(held_claims()),
-        "backlog: " + next_pointer(),
+        "roadmap: " + next_pointer(),
         "Re-read CLAUDE.md's Hard walls and Roles, claims, and git before the next write. "
         "Explicit-path git add and commit; CHANGELOG entry in the same commit; "
         "then /ship (branch, push, PR, merge on green). Force-push is refused.",

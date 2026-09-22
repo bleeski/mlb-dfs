@@ -2,6 +2,120 @@
 
 What changed in the engine, the tools and the contracts, when, and why.
 
+## 2026-09-22 — R385: one roadmap. `docs/ROADMAP.md` becomes the only queue, `docs/backlog.md` becomes the R-entry register, and the 2026-09-22 deadline-delivery audit is triaged into it (R386-R404 filed)
+
+**Scope.**
+- New: `docs/ROADMAP.md`; `docs/2026-09-22_deadline_delivery_qa.md` (Ben's audit, committed verbatim).
+- `docs/backlog.md`: header rewritten as the register; the pre-ROADMAP queue relocated verbatim under `# Board history`; R225-R227 moved to Workstream 7; the Open tails section retired to a pointer; R118, R364 and R365 collapsed to CLOSED stubs; R386-R404 filed in Workstream 5; riders on R98, R125, R204, R285 and R290.
+- `docs/PROGRESS.md` (deleted).
+- `tools/plan_status.py` (generator → linter); `tests/test_core.py` (`PlanStatusTests` rewritten; `docs/ROADMAP.md` added to the RootContract pointer tuple); `tools/audit.py` (`EXPECTED_SUITE_COUNTS`).
+- `.claude/hooks/session_start.py`; `.claude/skills/dev-session/SKILL.md`; `.claude/skills/land/SKILL.md`; `.claude/skills/ship/SKILL.md`; `.claude/rules/board.md`; `.claude/agents/dfs-premise.md`.
+- `CLAUDE.md`; `MANIFEST.md`; `docs/cowork_archival_runbook.md`; `.audit/NEXT_IMPLEMENTATION_RUN.md`.
+- SUPERSEDED banners: `docs/2026-07-24_session_handoff.md`, `docs/2026-07-25_session_note.md`, `docs/2026-07-25_red_team_final.md`, `docs/legacy/MLB_Classic_Backlog.md`.
+- `skills/generate-lineups/scripts/build_slate.py` (one comment: a line citation became an anchor).
+- Six `docs/backlog_inbox/` fragments consumed.
+
+**What was wrong.** Open work had seven homes:
+- the 2026-09-15 prize-first execution roadmap (CC-7..CC-40 open);
+- Tier 1-6, the older ordering, never marked superseded;
+- the Phase 6 filler paragraph;
+- a generated `docs/PROGRESS.md`;
+- six unmerged inbox fragments;
+- stale July handoffs that still carried "open" lists;
+- the greenfield 2026-09-19 spec's "filed rather than fixed" notes.
+
+An agent inventory counted 186 open `### R` entries, 20 of them named in no roadmap slot. R118, R364 and R365 still read open though they had shipped. Ben's 2026-09-22 audit reorders everything: a legal, accessible file before the deadline outranks prize work. It existed only as a chat upload.
+
+**What shipped.**
+- **One queue.** `docs/ROADMAP.md` holds 91 session blocks: Phase 0; D (delivery, audit packages A-F, Sessions 01-26); V (27-33); C (capture transport, 34-37); T; P; G; H; one ARCHIVE block (88); three Deferred pools (90-92). Each row has packaging, scope, source (with the old CC-N / Session N), a V/S/P class, target files, a verification command and a status.
+- **Priority.** D > V > C > T > P > G > H, replacing prize-first.
+- **The linter.** `tools/plan_status.py --check` runs in the gate. It fails when an open register entry (a `### R` heading above Board history, outside the closed stubs, without CLOSED) is named nowhere in ROADMAP.md, when a status is outside {Pending, In Progress, Complete YYYY-MM-DD, Deferred}, when NEXT points at a finished row, when a non-Deferred row names no R-number, or when a ledger id does not resolve. R366's derived PROGRESS.md was a second surface once the queue lived in a file this small, so it is deleted; `--print` gives the one-screen view.
+- **The hook** reads `**NEXT:**` from ROADMAP.md. The skills, the board rule (now also loading on ROADMAP.md, and allocating R-numbers from all three files), CLAUDE.md and MANIFEST.md are repointed.
+
+**Audit triage** (the full table is in ROADMAP.md).
+- All ten findings were re-verified at `bdf03e3`. No `.py` changed since the audited `5b83165`; four line hints were corrected. DD-10 is worse than reported: 4 of 8 delivery records carried `entries: []`.
+- Accepted, split into sessions: packages A-F.
+- Rejected: a non-scipy fallback solver (CLAUDE.md: `scipy.optimize.milp` only), and relaxing R133's crosswalk wall.
+- Modified: a labelled default posture ships review-grade only, because contest identity stays a no-override gate.
+- Three defects the audit missed were filed:
+  - NF-1: `autobuild.py:696` reads `solve.bank`; refusals write `bank_exploration`. Now an R285 rider. PR #27's fragment confirms the sliced path misses too.
+  - NF-2: `REFUSAL_EXIT_NOTES` swaps exits 3 and 4.
+  - NF-3: exit 5 has no handler, and `--max-attempts` exhaustion writes no stop record.
+
+  NF-2 and NF-3 are R396.
+- A red-team pass on the first draft of the order changed twenty things. Among them: the manifest mislabel (DD-09) is live today and moved to Session 03; the baseline needs the last-usable-artifact contract, not the deadline object; the gate taxonomy seeds from the existing `CLASSIC_GATE_CLASS` rather than a parallel table; R285 was scheduled twice; R268 must precede review-grade files; four sessions were split to fit one context window.
+
+**Ben's answers, 2026-09-22,** recorded in ROADMAP.md:
+- F-1: upload allowance 5 minutes.
+- F-2: DK accepts a partial DKEntries file when unresolved rows are REMOVED.
+- F-3: DK allows a repeated lineup within a contest; Ben's rule is never, so distinct lineups become an operator never-relax control.
+- F-4: deadline-aware delivery runs on every build. This ends R290's "no delivered byte changes without the flag" promise.
+- Ben's plan-review addition: retire `THE_ODDS_API_KEY` and the in-build fetches in favour of session web-tool captures parsed offline. That is R402, Phase C.
+- Ben's instruction is recorded as the decision halves of R125(b)(c).
+
+**New numbers.**
+
+| R | Scope |
+|---|---|
+| R385 | This change |
+| R386 | Delivery-first contract |
+| R387 | Delivery record binds its bytes (DD-10 + fragment) |
+| R388 | Package A (a)-(e) |
+| R389 | Baseline-first (a)-(c) |
+| R390 | Thin bank (DD-03) |
+| R391 | Relaxation policy (DD-07) |
+| R392 | Optional-input degradation |
+| R393 | Publication and the last usable artifact |
+| R394 | Telemetry and receipt |
+| R395 | Acceptance suite |
+| R396 | Exit contract |
+| R397 | Odds paste on a postponed game |
+| R398 | F4 against the bulk arm |
+| R399 | Showdown 1915 defects |
+| R400 | Greenfield orphans |
+| R401 | Partial salvage, absorbing CLOSED R290's Classic rung-2 remainder, since numbers are never reused |
+| R402 | Capture transport |
+| R403 | Refusal and run-less records name their slate (PR #27 fragment) |
+| R404 | Late swap and repair read DK `Starting` without a feed file (PR #27 fragment) |
+
+**Consumed fragments** (moved to the gitignored `docs/backlog_inbox/_to_delete/`):
+
+| Fragment | Consumed into |
+|---|---|
+| `delivery-record-reads-dest-before-promote` | R387 |
+| `odds-paste-blocks-on-postponed-game` | R397 |
+| `f4-grades-against-opener-not-bulk-arm` | R398 |
+| `showdown-1915-small-defects` | R399 |
+| `1905-autobuild-sliced-read-and-untagged-refusals` | R285 rider, R403(a), R204 and R98 riders |
+| `1905-late-swap-needs-feed-dk-starting-ignored` | R404, R403(b) |
+
+The two RETAINED fragments stay, and their sessions are named (36, 88).
+
+**R233 grep for "the queue lives in one place":**
+
+    $ grep -rn "Execution roadmap\|PROGRESS\.md\|What do we tackle next\|\*\*CC-[0-9A]" tools .claude tests skills .audit CLAUDE.md MANIFEST.md docs --include=*.py --include=*.md | grep -v "^docs/backlog.md:\|^docs/2026-09-22_deadline_delivery_qa.md:\|^docs/ROADMAP.md:"
+    tools/plan_status.py:6       (docstring: history of R366)
+    tools/audit.py:781, :869     (pin comments: history)
+    .audit/NEXT_IMPLEMENTATION_RUN.md:6   (banner: "retired to its Board history")
+    docs/greenfield/2026-09-19/...:87, docs/2026-09-02_critique_greenfield_spec_ed10.md:375, :475, :598   (dated critiques)
+
+Every hit is historical; nothing reads a queue from anywhere but ROADMAP.md.
+
+**Mutation-checked**, five mutations of `plan_status.py`, each restored:
+- coverage off;
+- status vocabulary off;
+- NEXT-target check off;
+- R-number-per-row check off;
+- closed-stub exclusion off.
+
+Each one reddened `PlanStatusTests` (the last three tests at once).
+
+**Gate.**
+- Before: `PASS  v2.26.0  41 modules  2379 tests  5 skipped`.
+- After: `PASS  v2.26.0  41 modules  2380 tests  5 skipped`.
+- Pin: `tests.test_core` 1406 -> 1407.
+- Golden histogram unmoved; no engine logic touched. The five skips are the standing host conditions.
+
 ## 2026-09-22 — R384/R118: `tools/replay_slate.py`, the replay instrument — Classic settles exactly, Showdown refuses, and three of the entry's premises were wrong (CC-6)
 
 **Scope.** New `tools/replay_slate.py` (the copied exact-Fraction tie oracle,

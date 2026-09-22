@@ -16,7 +16,7 @@ files.
    `field_opponent_registry.json`. (Until 2026-08-17 this line also named
    `MLB_Classic_Backlog.md` as an untracked companion; that file has been the
    superseded v1 board since 2026-07-27 and now lives in `docs/legacy/`. The
-   live board is `docs/backlog.md`, it is TRACKED, and only DEV writes it —
+   live queue is `docs/ROADMAP.md` with entry bodies in `docs/backlog.md`, both TRACKED, and only DEV writes them —
    every other role records by dropping a fragment in `docs/backlog_inbox/`.)
 3. Ledger edits are edit-in-place and append-only in the archive. Never drop an
    invariant section. Diff the structure before saving; if a section

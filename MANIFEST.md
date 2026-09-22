@@ -15,7 +15,7 @@ Where the current answers live:
 |---|---|
 | The contract, and what a session may write | `CLAUDE.md` |
 | Which host you are on, and what it can do | `docs/hosts.md` |
-| What to build next | `docs/PROGRESS.md`, then `docs/backlog.md` |
+| What to build next | `docs/ROADMAP.md` (the NEXT line), then the R-entry in `docs/backlog.md` |
 | What changed and why | `CHANGELOG.md`, by R-number |
 | Per-slate build procedure | `skills/generate-lineups/SKILL.md` |
 | Layout and module inventory | `python tools/audit.py --terse` |
