@@ -1,0 +1,172 @@
+{
+ "code": {
+  "contest_allocator": "v1.12",
+  "execution_pipeline": "v1.17",
+  "git_dirty": true,
+  "git_sha": "5b831655fdd2c12d0f4277cdbbfb1165b0c948c8"
+ },
+ "controls": {},
+ "date": "2026-09-22",
+ "egress": "",
+ "entries": [
+  {
+   "contest_id": "195925692",
+   "contest_name": "MLB $2K Solo Shot (Turbo)",
+   "entry_fee": 1.0,
+   "entry_id": "5266538813",
+   "filled": true,
+   "roster_ids": [
+    "44223660",
+    "44223661",
+    "44223711",
+    "44223733",
+    "44223717",
+    "44223784",
+    "44223724",
+    "44223749",
+    "44223792",
+    "44223680"
+   ]
+  },
+  {
+   "contest_id": "195953298",
+   "contest_name": "MLB $75 Quarter Jukebox [Just $0.25!] (Turbo)",
+   "entry_fee": 0.25,
+   "entry_id": "5266538321",
+   "filled": true,
+   "roster_ids": [
+    "44223660",
+    "44223663",
+    "44223765",
+    "44223764",
+    "44223723",
+    "44223784",
+    "44223705",
+    "44223715",
+    "44223690",
+    "44223671"
+   ]
+  },
+  {
+   "contest_id": "195953298",
+   "contest_name": "MLB $75 Quarter Jukebox [Just $0.25!] (Turbo)",
+   "entry_fee": 0.25,
+   "entry_id": "5266547809",
+   "filled": true,
+   "roster_ids": [
+    "44223663",
+    "44223661",
+    "44223765",
+    "44223672",
+    "44223723",
+    "44223806",
+    "44223724",
+    "44223680",
+    "44223690",
+    "44223749"
+   ]
+  },
+  {
+   "contest_id": "195954768",
+   "contest_name": "MLB $400 Solo Shot (Turbo)",
+   "entry_fee": 1.0,
+   "entry_id": "5266538654",
+   "filled": true,
+   "roster_ids": [
+    "44223665",
+    "44223667",
+    "44223698",
+    "44223692",
+    "44223682",
+    "44223685",
+    "44223767",
+    "44223671",
+    "44223721",
+    "44223715"
+   ]
+  }
+ ],
+ "host": {
+  "call_budget_s": 630.0,
+  "declared_ceiling_s": 900.0,
+  "host": "claude_code"
+ },
+ "kind": "delivery",
+ "labels": "deterministic review proxies and labeled priors only; never ROI, win rate, cash rate, or probability",
+ "manifest_row": {
+  "certification": "certified",
+  "contest_ids": [
+   "195925692",
+   "195953298",
+   "195954768"
+  ],
+  "contest_names": [
+   "MLB $2K Solo Shot (Turbo)",
+   "MLB $400 Solo Shot (Turbo)",
+   "MLB $75 Quarter Jukebox [Just $0.25!] (Turbo)"
+  ],
+  "contest_type": "classic",
+  "delivered_file": "outputs/2026-09-22/DKEntries_1840_5g.csv",
+  "entries": 4,
+  "notes": "",
+  "projection_tier": "enriched",
+  "recorded_utc": "2026-09-22T20:24:29.181939+00:00",
+  "run_id": "20260922T202428Z_a8965ab7",
+  "sha256": "10bcb12d5188bf562aeecdcfaf1c64c125a7de2b3c2f0949d6d5267e2acb8452",
+  "slate_tag": "1840_5g",
+  "status": "candidate",
+  "strategy_state": {
+   "bank_warnings": [],
+   "counts": {
+    "built": 12,
+    "du_relaxation_high_water": 0,
+    "requested": 12
+   },
+   "evidence": "recorded",
+   "state": "relaxed",
+   "warnings": []
+  }
+ },
+ "recorded_utc": "2026-09-22T20:24:29.182928+00:00",
+ "relaxations": {},
+ "run": {
+  "certification": {
+   "allocation_certified": true,
+   "failed_post_export_gates": [],
+   "post_export_gates": {
+    "entry_reconciliation_passed": true,
+    "export_hash_binding_passed": true,
+    "locked_immutability_passed": true,
+    "portfolio_caps_passed": true,
+    "roster_legality_passed": true,
+    "template_preservation_passed": true
+   },
+   "pre_export_passed": true,
+   "selection_certified": true,
+   "workflow_valid": true
+  },
+  "environment": {
+   "lock_file": "requirements.lock",
+   "lock_sha256": "dd7723e54043e8c2644100beba5069959d835258f96e1cf6dc100ea1617ac0d6",
+   "packages": {
+    "numpy": "2.2.6",
+    "pandas": "2.3.3",
+    "scipy": "1.15.3"
+   },
+   "python": "3.11.15"
+  },
+  "inputs": {
+   "DKEntries.csv": {
+    "sha256": "944aacbcc750dd21fb4fcd25d83cc3da8047cd13bb4ac84c24eec843d72175f0",
+    "size_bytes": 50644,
+    "source_path": "/home/user/mlb-dfs/data/slates/2026-09-22/DKEntries.csv"
+   },
+   "DKSalaries.csv": {
+    "sha256": "77b401b8170d6e98206d8ce53f4019222e6ff66e1d33329a30d5fc2b9187310d",
+    "size_bytes": 45604,
+    "source_path": "/home/user/mlb-dfs/data/slates/2026-09-22/DKSalaries.csv"
+   }
+  }
+ },
+ "schema_version": 1
+}
