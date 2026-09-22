@@ -1,5 +1,7 @@
 # Session note - 2026-07-25
 
+> **SUPERSEDED as a work list (R385, 2026-09-22).** Open work, its order and its status live only in `docs/ROADMAP.md`; entry bodies in `docs/backlog.md`. This file is a historical record.
+
 Tree clean at `686c931`. `python tools/audit.py --run-tests --terse` prints
 `PASS  v2.26.0  13 modules  157 tests`. Showdown and golden replays pass (13).
 

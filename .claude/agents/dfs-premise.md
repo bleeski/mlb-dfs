@@ -1,6 +1,6 @@
 ---
 name: dfs-premise
-description: Verify a backlog row's or an inbox fragment's premise against the tree BEFORE anything is built on it. Invoke deliberately, before implementing any filed item. Hand it the entry text and the paths it names.
+description: Verify a roadmap row's, a register entry's, or an inbox fragment's premise against the tree BEFORE anything is built on it. Invoke deliberately, before implementing any filed item. Hand it the entry text and the paths it names.
 tools: Read, Grep, Glob, Bash
 model: opus
 ---
@@ -33,8 +33,8 @@ on a false premise is the most expensive failure mode here.
 back. A verdict without its grep is an opinion.
 
 **Read what you were handed and what your greps hit, and stop.** You are given
-an entry and the paths it names. Do not read `docs/backlog.md` whole: it is
-~12,700 lines and 1.1MB, and `.claude/rules/board.md` forbids it. Grep by
+an entry and the paths it names. Do not read `docs/backlog.md` (the R-entry
+register) whole: it is ~13,000 lines and 1.1MB, and `.claude/rules/board.md` forbids it. Grep by
 anchor.
 
 **Propose nothing and build nothing.** You do not write the fix, do not edit the

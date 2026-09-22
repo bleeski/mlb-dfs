@@ -1,9 +1,9 @@
 # Next implementation run (paste this into a fresh Cowork session on the mlb-dfs folder)
 
 > **Stale as a queue since 2026-08-15, and kept only as the record of that run.**
-> The authority for what to take next is the "What do we tackle next" section of
-> `docs/backlog.md` (renamed from `docs/2026-07-27_backlog_v2.md` on 2026-08-17),
-> which is maintained every session; the "Queue after this run" list at the
+> The authority for what to take next is `docs/ROADMAP.md` (its **NEXT** line;
+> R385, 2026-09-22), with entry bodies in `docs/backlog.md`; the backlog's old
+> "What do we tackle next" section is retired to its Board history; the "Queue after this run" list at the
 > bottom of this file is not. Read the backlog first and treat anything here that
 > disagrees with it as superseded.
 

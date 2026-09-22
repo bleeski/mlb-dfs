@@ -1,5 +1,7 @@
 # MLB Classic Engineering Backlog
 
+> **SUPERSEDED as a work list (R385, 2026-09-22).** Open work, its order and its status live only in `docs/ROADMAP.md`; entry bodies in `docs/backlog.md`. This file is a historical record.
+
 > **SUPERSEDED 2026-07-27 by docs/2026-07-27_backlog_v2.md, which is the single
 > live backlog.** This file is kept for the history of what was considered and
 > when. Do not add items here and do not work from it. Its baseline line below

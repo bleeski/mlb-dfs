@@ -642,7 +642,7 @@ def distinct_sp_pairs(candidates: list):
     certified in 345.7s. R349's host budget is what fixed that slate.
 
     What survives is the arithmetic, which the board already evidences
-    independently (`docs/backlog.md:7732`, R115: "at 66 candidates against 13
+    independently (`docs/backlog.md`, `### R115`: "at 66 candidates against 13
     entries the documented resume path is unreachable however unexhausted the
     jobs"). The candidate-count gate opens at roughly `n_entries` pairs because
     of the R340 doubling, whatever the slate holds. Treat that as the claim; do

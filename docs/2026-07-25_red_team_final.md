@@ -1,5 +1,7 @@
 # Final Consolidated Critique | MLB DFS Engine | 2026-07-25
 
+> **SUPERSEDED as a work list (R385, 2026-09-22).** Open work, its order and its status live only in `docs/ROADMAP.md`; entry bodies in `docs/backlog.md`. This file is a historical record.
+
 **This document supersedes** `docs/2026-07-19_red_team_review.md`, `docs/2026-07-24_red_team_review.md`, `docs/2026-07-25_red_team_review.md`, and the independent critique of 2026-07-25. It is the single live backlog. When an item lands, mark it landed here; do not write a new review to say so.
 
 Basis: tree at `e58b3ac` plus untracked files. Synthesis of two independent adversarial reviews (referenced below as **RT** for this session's review, **IC** for the independent critique), reconciled item by item. Every IC claim that changed a priority or a fix was re-verified against code this session before acceptance; one was rejected on evidence (see disposition). Claims marked **[executed]** were reproduced by running code against real production files. Nothing in the repo was modified to produce this document.

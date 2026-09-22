@@ -1,5 +1,7 @@
 # Session handoff - 2026-07-24
 
+> **SUPERSEDED as a work list (R385, 2026-09-22).** Open work, its order and its status live only in `docs/ROADMAP.md`; entry bodies in `docs/backlog.md`. This file is a historical record.
+
 Written at the end of a long Cowork session so the next one can start cold. Read
 `CLAUDE.md` and the ledger Quick Card first as always; this file covers only what
 changed tonight and what is still open.

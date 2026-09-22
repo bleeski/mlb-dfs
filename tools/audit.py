@@ -865,7 +865,11 @@ EXPECTED_SUITE_COUNTS = {
     # refusal, the Showdown refusal WITH its measured reason, UNKNOWN never
     # zeroed, observed-vs-inferred seat value, the F-48 tie split on real
     # archived data, zero-mismatch self-validation, and the strangler wall.
-    "tests.test_core": 1406,
+    # R385, 2026-09-22: 1406 -> 1407, PlanStatusTests rewritten from R366's five
+    # PROGRESS.md drift tests to six ROADMAP lint tests (real tree clean, a clean
+    # synthetic pair, uncovered open entry, status vocabulary, NEXT target, rows
+    # without an R-number and unresolvable ledger ids).
+    "tests.test_core": 1407,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps
