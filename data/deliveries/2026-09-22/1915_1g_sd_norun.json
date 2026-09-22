@@ -1,0 +1,146 @@
+{
+ "code": {
+  "contest_allocator": "v1.12",
+  "execution_pipeline": "v1.17",
+  "git_dirty": true,
+  "git_sha": "5b831655fdd2c12d0f4277cdbbfb1165b0c948c8"
+ },
+ "controls": {},
+ "date": "2026-09-22",
+ "egress": "",
+ "entries": [
+  {
+   "contest_id": "195924683",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (CIN @ ATL)",
+   "entry_fee": 0.1,
+   "entry_id": "5266549168",
+   "filled": true,
+   "roster_ids": [
+    "44234397",
+    "44234296",
+    "44234298",
+    "44234299",
+    "44234304",
+    "44234311"
+   ]
+  },
+  {
+   "contest_id": "195924683",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (CIN @ ATL)",
+   "entry_fee": 0.1,
+   "entry_id": "5266549180",
+   "filled": true,
+   "roster_ids": [
+    "44234399",
+    "44234296",
+    "44234298",
+    "44234299",
+    "44234304",
+    "44234307"
+   ]
+  },
+  {
+   "contest_id": "195924692",
+   "contest_name": "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (CIN @ ATL)",
+   "entry_fee": 1.0,
+   "entry_id": "5266549322",
+   "filled": true,
+   "roster_ids": [
+    "44234384",
+    "44234299",
+    "44234304",
+    "44234306",
+    "44234308",
+    "44234311"
+   ]
+  },
+  {
+   "contest_id": "195925748",
+   "contest_name": "MLB Showdown $1K Solo Shot (CIN @ ATL)",
+   "entry_fee": 1.0,
+   "entry_id": "5266549256",
+   "filled": true,
+   "roster_ids": [
+    "44234387",
+    "44234298",
+    "44234300",
+    "44234306",
+    "44234308",
+    "44234311"
+   ]
+  },
+  {
+   "contest_id": "195925749",
+   "contest_name": "MLB Showdown $200 Quarter Jukebox [Just $0.25!] (CIN @ ATL)",
+   "entry_fee": 0.25,
+   "entry_id": "5266549187",
+   "filled": true,
+   "roster_ids": [
+    "44234385",
+    "44234295",
+    "44234302",
+    "44234305",
+    "44234307",
+    "44234320"
+   ]
+  },
+  {
+   "contest_id": "195925749",
+   "contest_name": "MLB Showdown $200 Quarter Jukebox [Just $0.25!] (CIN @ ATL)",
+   "entry_fee": 0.25,
+   "entry_id": "5266549214",
+   "filled": true,
+   "roster_ids": [
+    "44234386",
+    "44234293",
+    "44234294",
+    "44234313",
+    "44234316",
+    "44234320"
+   ]
+  }
+ ],
+ "extra": {
+  "entries_rewritten_by_session": "the build wrote this record before os.replace promoted the provisional CSV, so entries[] held the superseded v1 rosters; rewritten from the delivered file whose sha256 the manifest_row names (backlog_inbox 2026-09-22_BUILD_delivery-record-reads-dest-before-promote.md)"
+ },
+ "host": {
+  "call_budget_s": 630.0,
+  "declared_ceiling_s": 900.0,
+  "host": "claude_code"
+ },
+ "kind": "delivery",
+ "labels": "deterministic review proxies and labeled priors only; never ROI, win rate, cash rate, or probability",
+ "manifest_row": {
+  "certification": "review_grade",
+  "contest_ids": [
+   "195924683",
+   "195924692",
+   "195925748",
+   "195925749"
+  ],
+  "contest_names": [
+   "MLB Showdown $100 Dime Time [Just $0.10!] (CIN @ ATL)",
+   "MLB Showdown $1K Solo Shot (CIN @ ATL)",
+   "MLB Showdown $200 Quarter Jukebox [Just $0.25!] (CIN @ ATL)",
+   "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (CIN @ ATL)"
+  ],
+  "contest_type": "showdown",
+  "delivered_file": "outputs/2026-09-22/DKEntries_showdown_1915_1g_sd.csv",
+  "entries": 6,
+  "notes": "Showdown ships review-grade; it does not pass the three certification gates. See CLAUDE.md.",
+  "projection_tier": "unknown",
+  "recorded_utc": "2026-09-22T20:24:48.533561+00:00",
+  "run_id": null,
+  "sha256": "98c3f26b6ce194b9e82536073a7d968411292ffe877c60d2b744fc5ab9e70f8a",
+  "slate_tag": "1915_1g_sd",
+  "status": "candidate",
+  "strategy_state": {
+   "counts": {},
+   "state": "unknown"
+  }
+ },
+ "recorded_utc": "2026-09-22T20:26:41.964859+00:00",
+ "relaxations": {},
+ "run": {},
+ "schema_version": 1
+}
