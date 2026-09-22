@@ -27915,3 +27915,211 @@ class RetroFactsTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+class ReplaySlateTests(unittest.TestCase):
+    """R118 (CC-6). `tools/replay_slate.py`: settle an archived contest exactly.
+
+    The instrument grades construction in DOLLARS against an observed field, so
+    a silently wrong score is worse here than a refusal. Every test below pins
+    a place where the tool must refuse rather than approximate.
+    """
+
+    @staticmethod
+    def _mod():
+        import importlib
+        sys.path.insert(0, str(REPO))
+        return importlib.import_module("tools.replay_slate")
+
+    def test_settle_scores_matches_the_production_hand_example(self):
+        """The tie oracle, against the example `test_production.py` already pins.
+
+        This tool COPIES `settle_scores` rather than importing it, because
+        `test_no_legacy_module_imports_the_production_package_or_pydantic`
+        forbids a `tools/` module from importing `mlb_engine.production.*`. A
+        copy is only safe while it still answers the original's own example.
+        """
+        from fractions import Fraction
+        mod = self._mod()
+        self.assertEqual(
+            mod.settle_scores([100, 100, 90, 100], [1000, 500, 100, 0]),
+            [Fraction(1600, 3), Fraction(1600, 3), 0, Fraction(1600, 3)],
+        )
+
+    def test_settle_scores_requires_integer_hundredths_so_ties_are_exact(self):
+        """Float scores are refused, and the reason is measured, not stylistic.
+
+        The tie group decides the payout, and float addition is not
+        associative: 1,408 of 4,409 real archived lineups sum to a different
+        float depending on term order, so two IDENTICAL lineups would sometimes
+        fail to tie and split the wrong prize.
+        """
+        mod = self._mod()
+        with self.assertRaises(ValueError):
+            mod.settle_scores([100.0, 90.0], [1000, 0])
+        # and the hazard itself is real on plain floats
+        self.assertNotEqual(
+            sum([16.0, 2.0, 7.0, 4.0, 18.0, 16.0, 18.7, 28.0, 29.9, 16.0]),
+            sum([16.0, 29.9, 28.0, 18.7, 16.0, 18.0, 4.0, 7.0, 2.0, 16.0]),
+        )
+
+    def test_cpt_rows_are_excluded_before_the_collapse(self):
+        """A Showdown CPT row carries the 1.5x ALREADY APPLIED.
+
+        `player_table` is ordered by pct_drafted descending, so the CPT row
+        precedes the UTIL row for 85 of the 2,648 archived players holding
+        both. A naive first-wins then records the inflated number as that
+        player's realized score.
+        """
+        mod = self._mod()
+        table = [
+            {"player_norm": "a", "roster_position": "CPT", "fpts": 30.0},
+            {"player_norm": "a", "roster_position": "UTIL", "fpts": 20.0},
+        ]
+        self.assertEqual(mod.fpts_cents_by_norm(table), {"a": 2000})
+        # and a CPT row must not make a name look ambiguous
+        self.assertEqual(mod.ambiguous_norms(table), {})
+
+    def test_a_name_two_players_share_is_refused_not_collapsed(self):
+        """`player_norm -> fpts` is not a function when two players share a name.
+
+        Measured: all 1,827 irreproducible Classic entries in the archive sit
+        in 8 contests, and in every one the cause is two different major
+        leaguers normalizing to one name (two Max Muncys, both `3B`). That is
+        NOT the DK multi-position row-splitting the backlog attributes it to --
+        a split player holds the SAME score on each row, so it collapses
+        cleanly, while a collision cannot be collapsed at all.
+        """
+        mod = self._mod()
+        table = [
+            {"player_norm": "max muncy", "roster_position": "3B", "fpts": 21.0},
+            {"player_norm": "max muncy", "roster_position": "3B", "fpts": 0.0},
+            {"player_norm": "solo", "roster_position": "OF", "fpts": 5.0},
+        ]
+        self.assertEqual(sorted(mod.ambiguous_norms(table)), ["max muncy"])
+        fmap = mod.fpts_cents_by_norm(table)
+        cents, missing, collides = mod.score_lineup_cents(
+            ["max muncy", "solo"], fmap, mod.ambiguous_norms(table))
+        self.assertIsNone(cents, "a colliding name must not be scored")
+        self.assertEqual(collides, ["max muncy"])
+        self.assertEqual(missing, [])
+        # a split across roster positions with the SAME score still collapses
+        split = [
+            {"player_norm": "p", "roster_position": "2B", "fpts": 7.0},
+            {"player_norm": "p", "roster_position": "OF", "fpts": 7.0},
+        ]
+        self.assertEqual(mod.ambiguous_norms(split), {})
+        self.assertEqual(mod.fpts_cents_by_norm(split), {"p": 700})
+
+    def test_showdown_is_refused_by_name(self):
+        """Showdown is not exactly replayable from the archive, so it refuses.
+
+        89 of 249 archived Showdown records carry no CPT row at all and
+        `captain_norm` is absent on 31.2% of Showdown entries, so for those the
+        captain -- who takes 1.5x -- is not recoverable.
+        """
+        mod = self._mod()
+        showdown = [p for p in sorted((REPO / "data" / "archive").glob("*/mined_*.json"))
+                    if (json.loads(p.read_text(encoding="utf-8")).get("contest_type")
+                        or "").lower() == "showdown"]
+        if not showdown:
+            self.skipTest("no archived Showdown record in this checkout")
+        contest_id = showdown[0].name[len("mined_"):-len(".json")]
+        with self.assertRaises(mod.ShowdownRefused) as caught:
+            mod.load_contest(contest_id)
+        # The refusal must carry the MEASURED reason, not just refuse. A bare
+        # "unsupported contest type" would survive deleting the Showdown branch
+        # entirely, because the generic non-Classic guard below it also raises.
+        message = str(caught.exception).lower()
+        self.assertIn("captain", message)
+        self.assertIn("1.5", message)
+
+    def test_a_contest_with_no_curve_settles_unknown_and_is_never_zeroed(self):
+        mod = self._mod()
+        curve, why = mod.payout_curve_cents(None, 50)
+        self.assertIsNone(curve)
+        self.assertFalse(why["settled"])
+        curve, why = mod.payout_curve_cents({"paid_places": 0, "name": "x $5"}, 50)
+        self.assertIsNone(curve, "no paid places must not become an all-zero curve")
+        self.assertFalse(why["settled"])
+
+    def test_seat_value_provenance_separates_observed_from_inferred(self):
+        """A parsed contest title is a labeled inference, never an observation."""
+        mod = self._mod()
+        value, prov = mod.ticket_face_value(
+            {"name": "MLB Satellite to NFL $25 Millionaire", "winnings_ticket": 25.0,
+             "my_entries": 1})
+        self.assertEqual((value, prov), (25.0, "observed"))
+        value, prov = mod.ticket_face_value(
+            {"name": "MLB Satellite to NFL $25 Millionaire", "winnings_ticket": 0.0,
+             "my_entries": 1})
+        self.assertEqual((value, prov), (25.0, "contest_name"))
+        value, prov = mod.ticket_face_value({"name": "no figure here", "my_entries": 1})
+        self.assertIsNone(value)
+        self.assertEqual(prov, "unavailable")
+
+    def test_a_duplicate_of_the_archived_winner_splits_the_tied_seat(self):
+        """The F-48 rule, end to end on real archived data.
+
+        Contest 191488366 pays ONE $25 seat. Entering a copy of its own rank-1
+        lineup makes two entries tie for first, spanning ranks 1-2, so the tie
+        group takes (2500 + 0) / 2 = $12.50 each -- not $25 each, which is the
+        error that flatters a concentrated portfolio.
+        """
+        mod = self._mod()
+        record = mod.find_mined_record("191488366")
+        if record is None or not mod.MONEY_FILE.exists():
+            self.skipTest("contest 191488366 or the payout reference is not vendored")
+        archived = json.loads(record.read_text(encoding="utf-8"))
+        winner = max(archived["entries"], key=lambda e: float(e["points"]))
+        out = mod.replay("191488366", [{"lineup_id": "dup",
+                                        "players_norm": winner["players_norm"]}])
+        row = out["lineups"][0]
+        self.assertTrue(row["replayable"])
+        self.assertEqual(row["rank"], 1)
+        self.assertEqual(row["tied_with"], 1)
+        self.assertTrue(row["seat_cleared"])
+        self.assertEqual(row["gross_award_usd"], 12.5)
+        self.assertEqual(out["settlement"]["paid_places"], 1)
+
+    def test_self_validation_scores_exactly_or_refuses_but_never_guesses(self):
+        """The acceptance gate: zero mismatches on whatever it agrees to score."""
+        mod = self._mod()
+        classic = [p for p in sorted((REPO / "data" / "archive").glob("*/mined_*.json"))
+                   if (json.loads(p.read_text(encoding="utf-8")).get("contest_type")
+                       or "").lower() == "classic"]
+        if len(classic) < 3:
+            self.skipTest("fewer than three archived Classic records in this checkout")
+        ids = [p.name[len("mined_"):-len(".json")] for p in classic[:3]]
+        for contest_id in ids:
+            out = mod.self_validate([contest_id])
+            self.assertEqual(out["points_mismatch"], 0,
+                             f"{contest_id} produced a WRONG score rather than refusing")
+            self.assertGreater(out["entries"], 0)
+
+    def test_the_tool_never_imports_the_production_package(self):
+        """The strangler wall, asserted on this file specifically.
+
+        `test_no_legacy_module_imports_the_production_package_or_pydantic`
+        already scans `tools/*.py`, but this tool is the one with a standing
+        temptation to import `mlb_engine.production.simulation.settle_scores`,
+        and the backlog entry told it to "lift" that function.
+
+        Asserted over the parsed IMPORT GRAPH, not over the source text. The
+        first cut of this test scanned for the substring and failed on the
+        module's own comment explaining why the function is copied -- the code
+        was right and the test was measuring prose.
+        """
+        source = (REPO / "tools" / "replay_slate.py").read_text(encoding="utf-8")
+        imported = set()
+        for node in ast.walk(ast.parse(source)):
+            if isinstance(node, ast.Import):
+                imported.update(a.name for a in node.names)
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                imported.add(node.module)
+        offenders = sorted(m for m in imported
+                           if m == "pydantic" or m.startswith("mlb_engine.production"))
+        self.assertEqual(offenders, [], f"replay_slate imports {offenders}")
+        # and it still says where the copy came from
+        mod = self._mod()
+        self.assertIn("simulation.py", mod.SETTLE_ORACLE_ORIGIN)

@@ -859,7 +859,13 @@ EXPECTED_SUITE_COUNTS = {
     # this hook's first real runs), the payload still wins when delivered, a
     # tool_use block is not the agent's text, neither source guesses, and a
     # PARENT transcript cannot donate its count to an unnamed agent.
-    "tests.test_core": 1396,
+    # R118 (CC-6), 2026-09-22: 1396 -> 1406, the ten that pin tools/replay_slate.py --
+    # the copied tie oracle against production's own hand example, the
+    # integer-hundredths guard, the CPT-row exclusion, the name-collision
+    # refusal, the Showdown refusal WITH its measured reason, UNKNOWN never
+    # zeroed, observed-vs-inferred seat value, the F-48 tie split on real
+    # archived data, zero-mismatch self-validation, and the strangler wall.
+    "tests.test_core": 1406,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps
