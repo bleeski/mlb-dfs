@@ -1,0 +1,33 @@
+{
+ "code": {
+  "contest_allocator": "v1.12",
+  "execution_pipeline": "v1.17",
+  "git_dirty": false,
+  "git_sha": "bdf03e33b1629d12090a2a8b1bd2b5841a742b28"
+ },
+ "date": "2026-09-22",
+ "exit_code": 3,
+ "host": {
+  "call_budget_s": 630.0,
+  "declared_ceiling_s": 900.0,
+  "host": "claude_code"
+ },
+ "kind": "refusal",
+ "labels": "a refusal is an observed build outcome, never a claim about the slate",
+ "recorded_utc": "2026-09-22T21:08:14.921657+00:00",
+ "refusal": {
+  "argv": [
+   "--salary",
+   "data/slates/2026-09-22/265a9809-DKSalaries_-_main_slate.csv",
+   "--entries",
+   "data/slates/2026-09-22/4039bab3-DKEntries_-_main_slate.csv",
+   "--max-seconds",
+   "105",
+   "--postures",
+   "195924397=wta_satellite,195924417=wta_satellite,195924410=wta_satellite,195924440=wta_satellite,195924501=wta_satellite,195924493=wta_satellite,195924369=large_gpp,195925707=large_gpp,195957086=small_gpp,195957833=small_gpp,195925712=small_gpp,195925706=mme,195925719=single_entry"
+  ],
+  "note": "inputs missing or unusable"
+ },
+ "schema_version": 1,
+ "slate_tag": ""
+}
