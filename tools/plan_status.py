@@ -23,6 +23,11 @@ What `--check` enforces, each rule because its absence has cost this repo:
      subjects carry R-numbers (R301).
   5. Every Session ID in the Progress Ledger exists in the master table.
 
+A Session ID is two or three digits. Two-digit IDs run out at 99, and a
+three-digit row used to be invisible here: never parsed, so its status went
+unlinted and `--print` skipped it, while `**NEXT:** Session 100` failed the gate
+outright. Rows sort by number, not by text, so 100 follows 99.
+
     python tools/plan_status.py --check     # exit 2 on any lint failure
     python tools/plan_status.py --print     # one line per session, to stdout
 
@@ -39,12 +44,21 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 ROADMAP = Path("docs/ROADMAP.md")
 REGISTER = Path("docs/backlog.md")
 
-ROW = re.compile(r"^\|\s*\*\*Session (\d{2})\*\*\s*\|")
-NEXT = re.compile(r"^\*\*NEXT:\*\*\s*Session (\d{2})\b")
+#: A Session ID is two or three digits (see the docstring). One width, used by
+#: every reader below.
+SESSION_ID = r"\d{2,3}"
+ROW = re.compile(r"^\|\s*\*\*Session (" + SESSION_ID + r")\*\*\s*\|")
+NEXT = re.compile(r"^\*\*NEXT:\*\*\s*Session (" + SESSION_ID + r")\b")
+LEDGER_ID = re.compile(r"Session (" + SESSION_ID + r")$")
 STATUS = re.compile(r"^(Pending|In Progress|Complete \d{4}-\d{2}-\d{2}|Deferred)$")
 RNUM = re.compile(r"\bR\d{1,3}(?!\d)")
 OPEN_HEADING = re.compile(r"^### (R\d{1,3})(?!\d)")
 LEDGER_HEADING = "## Living Changelog and Progress Ledger"
+
+
+def _by_number(item: tuple) -> int:
+    """Sort key for ``(session_id, row)``: 100 after 99, never between 10 and 11."""
+    return int(item[0])
 
 
 def split_row(line: str) -> list[str]:
@@ -73,7 +87,7 @@ def parse_roadmap(text: str) -> dict:
         if in_ledger and line.startswith("|"):
             cells = split_row(line)
             if len(cells) > 1:
-                sid = re.match(r"Session (\d{2})$", cells[1])
+                sid = LEDGER_ID.match(cells[1])
                 if sid:
                     ledger_ids.append(sid.group(1))
             continue
@@ -121,7 +135,7 @@ def lint(roadmap_text: str, register_text: str) -> list[str]:
         elif rows[sid]["status"] not in ("Pending", "In Progress"):
             problems.append(f"NEXT names Session {sid}, whose status is {rows[sid]['status']!r}")
 
-    for sid, row in sorted(rows.items()):
+    for sid, row in sorted(rows.items(), key=_by_number):
         if not STATUS.match(row["status"]):
             problems.append(f"Session {sid}: status {row['status']!r} is outside the vocabulary")
         if row["status"] != "Deferred" and not RNUM.search(row["scope"]):
@@ -144,7 +158,7 @@ def summary(roadmap_text: str) -> str:
     done = sum(1 for r in rows.values() if r["status"].startswith("Complete"))
     lines = [f"NEXT: Session {parsed['nexts'][0] if parsed['nexts'] else '??'}",
              f"{done} of {len(rows)} sessions complete", ""]
-    for sid, row in sorted(rows.items()):
+    for sid, row in sorted(rows.items(), key=_by_number):
         lead = re.sub(r"<br>.*", "", row["scope"])
         lead = " ".join(lead.split())
         lead = lead if len(lead) <= 90 else lead[:89].rstrip() + "…"

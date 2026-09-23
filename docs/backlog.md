@@ -6102,6 +6102,16 @@ which is R196's. Filed there, not here.
 
 ## Workstream 6 — Infrastructure, tests, environment, coordination, and docs
 
+### R413. CLOSED 2026-09-23 -- SHIPPED, filed and landed in one commit (roadmap Session 100), entry in CHANGELOG.md
+
+`tools/plan_status.py` recognized a roadmap Session ID only as exactly two
+digits (the master-table row, the NEXT line and the Progress Ledger), with 87
+taken by R412 and 89 the last free two-digit ID. A three-digit row was never
+parsed, so its status went unlinted and `--print` skipped it, and
+`**NEXT:** Session 100` failed the gate. All three readers take two or three
+digits and rows sort by number; Session 100 is the first three-digit row.
+Gate and commit: the CHANGELOG entry.
+
 ### R411. Two fixture evals fail on main, and nothing runs the evals (P2, S) | new 2026-09-23, found by Session 03's eval run | Roadmap: Session 99
 
 - **What.** `python skills/generate-lineups/evals/run_evals.py` at 648f8cf: 6 of 8 pass. Eval 2 (`classic-under-deadline-refuses-rather-than-trims`) exits 0 with brief `status: certified` where it pins exit 3 and `not_certified`; it passed at 0c2ea3c and fails from afbaf68, the R405 merge, onward. Eval 5 (`adversarial-multi-ticket-satellite`) prints the forbidden `/large_wta/`; it already fails at fa8f343 (2026-09-22), so it is older. Both reproduce identically on a clean worktree of main with the session's `.venv`.

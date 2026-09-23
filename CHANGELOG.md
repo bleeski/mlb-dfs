@@ -2,6 +2,32 @@
 
 What changed in the engine, the tools and the contracts, when, and why.
 
+## 2026-09-23 — R413: `tools/plan_status.py` reads a two- or three-digit Session ID, so Session 100 is parsed, linted, printed and can be NEXT (roadmap Session 100, filed and landed in one commit)
+
+**Scope.** `tools/plan_status.py` (the three patterns through one `SESSION_ID`, numeric row order, the docstring), `tests/test_core.py` (`PlanStatusTests` +4), `tools/audit.py` (one pin), `docs/ROADMAP.md` (the Session 100 row in Phase G, its Progress Ledger row, the IDs line), `docs/backlog.md` (the R413 CLOSED stub), `CHANGELOG.md`.
+
+**What was wrong.** Ben measured it on a scratch copy of the roadmap (2026-09-23). The linter matched a Session ID as exactly two digits in three places: the master-table row (`ROW`, `Session (\d{2})`), the NEXT line (`NEXT`) and the Progress Ledger (`re.match(r"Session (\d{2})$", ...)`). 87 is R412's and 89 is the last free two-digit ID, so the next new block is three digits, and:
+- a `Session 100` row filed with a new register entry passed LINT, because the open-entry check scans the roadmap's raw text;
+- the same row with status "Maybe someday" still passed, because the row was never parsed: its status vocabulary, cell count and duplicates went unchecked, and `--print` did not list it;
+- `**NEXT:** Session 100` failed LINT at exit 2 ("expected exactly one `**NEXT:** Session NN` line, found 0"), so a three-digit session could never be NEXT and the landing before it would turn the gate red.
+
+Found while fixing it: `lint` and `--print` sorted Session IDs as TEXT, which would have listed 100 between 10 and 11. Both now sort by number.
+
+**What shipped.** `SESSION_ID = r"\d{2,3}"` feeds `ROW`, `NEXT` and a new `LEDGER_ID`; `_by_number` orders both loops. A four-digit ID still matches none of them. This row, Session 100, is the first three-digit ID, so the fix runs on the live file: `plan_status.py --print` lists it after Session 99 and reads `14 of 100 sessions complete`. 89 stays free.
+
+**R233, the class of readers of a Session ID.** `grep -rnE 'Session \(\\d|Session\\s|\\d\{2\}|NEXT:\*\*' --include=*.py .claude/hooks tools tests` and a read of the prose readers:
+- `tools/plan_status.py:42,43,76`: the three patterns, widened.
+- `tools/plan_status.py` `lint` and `summary`: the two `sorted(rows.items())`, now numeric.
+- `.claude/hooks/session_start.py:82-92` (`next_pointer`): prints the whole `**NEXT:**` line and parses no digits. Confirmed, unchanged.
+- `tests/test_core.py` `PlanStatusTests._roadmap`: builds IDs by string concatenation, no width. Confirmed.
+- The Progress Ledger header's backfill command, `--grep='^Session <NN>:'`: a placeholder with no width; `git log --grep='^Session 100:'` runs clean. Confirmed, unchanged.
+- `docs/ROADMAP.md`'s IDs line ("`Session NN` is the only live ID"): now says two or three digits.
+No other `tools/`, hook or test reads a Session ID with a pattern (the same grep over `mlb_engine` and `skills` finds none).
+
+**Tests.** `PlanStatusTests` +4, each through `main()` on a temp root: a three-digit row is parsed and a bad status fails (and a good one passes); `--print` lists it after Session 90; NEXT may name it (and names it as missing when there is no row); a ledger row naming it resolves (and an unknown one fails). Mutations, each red then restored byte-identical: `ROW` back to two digits (all four red), `NEXT` back (the NEXT test), `LEDGER_ID` back (the ledger test), text sort (the `--print` test).
+
+**Gate.** LINT exit 0 and `UT test_core.PlanStatusTests` 10 OK on this commit. This fold-in sits on the Session 07 branch (Session 06 was already merged, bleeski/mlb-dfs#41), so its full gate is Session 07's landing gate, recorded in that entry. The pin moves 1524 -> 1528 for these four; Session 07's own tests move it again there.
+
 ## 2026-09-23 — R388(b): control authority. Every resolved control carries its provenance, `--never-relax` holds a control at every relaxer that can move it, and F-3's distinct lineups per contest is `operator_never_relax` on every build (roadmap Session 06)
 
 **Scope.** `mlb_engine/entries/gate_classes.py` (the provenance vocabulary and `FACT_AUTHORITY`), `mlb_engine/pipeline/deadline_governor.py` (the never-relax sets and resolver, `take_rung`'s `moves` and `held`, `merge_open_controls`' second lock, two comments corrected), `mlb_engine/pipeline/execution_pipeline.py` (`_merged_controls_for_build`'s `never_relax` and `provenance_out`, `run_slate`'s `never_relax_controls` and `control_moves`, `_control_provenance_block`, `CONFIDENCE_DERIVED` imported), `mlb_engine/allocate/contest_allocator.py` and `mlb_engine/entries/dk_entries_manager.py` (one comment each), `skills/generate-lineups/scripts/build_slate.py` (`--never-relax`, both governed rungs, both briefs, the exit-4 count), `skills/generate-lineups/SKILL.md` (a two-line pointer), `skills/generate-lineups/references/never_relax.md` (new), `.claude/rules/skills.md` (the body's line count), `tools/autobuild.py` (`--never-relax`, the passthrough lift, the floor stop, the resume, the exit-4 stop), `tools/late_swap.py` (`--never-relax`), `MLB_Classic.md` (§2's S line), `tests/test_core.py`, `tests/test_showdown.py`, `tools/audit.py` (one pin), `docs/ROADMAP.md`, `docs/backlog.md`, `CHANGELOG.md`.

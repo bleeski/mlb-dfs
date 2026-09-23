@@ -29091,6 +29091,58 @@ class PlanStatusTests(unittest.TestCase):
         self.assertIn("Progress Ledger names Session 07", err)
         self.assertNotIn("Session 90: a non-Deferred", err)
 
+    # -- three-digit Session IDs (89 is the last free two-digit one) -------- #
+    def test_a_three_digit_row_is_parsed_and_its_status_is_linted(self):
+        """The row was never parsed, so a status outside the vocabulary passed
+        the gate. Measured on a scratch copy of the roadmap before the fix."""
+        rows = self._good_rows() + [self._row("100", "R10.", "Maybe someday")]
+        code, err = self._run(self._roadmap(rows), self._register("R10. open"))
+        self.assertEqual(code, 2)
+        self.assertIn("Session 100: status 'Maybe someday' is outside the vocabulary", err)
+        rows[-1] = self._row("100", "R10.", "Complete 2026-09-23")
+        code, err = self._run(self._roadmap(rows), self._register("R10. open"))
+        self.assertEqual(code, 0, err)
+
+    def test_print_lists_a_three_digit_session_in_numeric_order(self):
+        mod = self._mod()
+        rows = self._good_rows() + [self._row("100", "R10. the hundredth.")]
+        with tempfile.TemporaryDirectory() as raw:
+            tmp = Path(raw)
+            (tmp / "docs").mkdir()
+            (tmp / "docs" / "ROADMAP.md").write_text(self._roadmap(rows), encoding="utf-8")
+            (tmp / "docs" / "backlog.md").write_text(self._register("R10. open"),
+                                                     encoding="utf-8")
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                code = mod.main(["--print", "--root", str(tmp)])
+        self.assertEqual(code, 0)
+        text = out.getvalue()
+        self.assertIn("Session 100 | Pending", text)
+        self.assertLess(text.index("Session 90 |"), text.index("Session 100 |"),
+                        "rows sort by number: 100 follows 90, not 00")
+        self.assertIn("of 4 sessions", text)
+
+    def test_next_may_name_a_three_digit_session(self):
+        """`**NEXT:** Session 100` failed the gate with 'found 0'."""
+        rows = self._good_rows() + [self._row("100", "R10.")]
+        code, err = self._run(self._roadmap(rows, next_sid="100"),
+                              self._register("R10. open"))
+        self.assertEqual(code, 0, err)
+        code, err = self._run(self._roadmap(self._good_rows(), next_sid="100"),
+                              self._register("R10. open"))
+        self.assertEqual(code, 2)
+        self.assertIn("NEXT names Session 100, which is not in the master table", err)
+
+    def test_a_ledger_row_naming_a_three_digit_session_resolves(self):
+        rows = self._good_rows() + [self._row("100", "R10.", "Complete 2026-09-23")]
+        code, err = self._run(self._roadmap(rows, ledger=("00", "100")),
+                              self._register("R10. open"))
+        self.assertEqual(code, 0, err)
+        code, err = self._run(self._roadmap(rows, ledger=("00", "101")),
+                              self._register("R10. open"))
+        self.assertEqual(code, 2)
+        self.assertIn("Progress Ledger names Session 101", err)
+
 
 class OutcomeReviewTests(unittest.TestCase):
     """R370, 2026-09-19. Grading a DELIVERY against the standings that exist.
