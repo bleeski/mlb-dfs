@@ -491,8 +491,9 @@ VERIFY_CLASSIC_FAILURE_CLASS = {
 # be discovered, because "which exits does the governor not reach" is the
 # question the item makes the governor answer out loud.
 #
-# EXIT 4, NINETEEN sites (run_classic:1 through leverage_unresolved,
-# run_showdown:5, main:13). R382 added two of them (`captain_prior_unresolved`,
+# EXIT 4, TWENTY sites (run_classic:1 through leverage_unresolved,
+# run_showdown:5, main:14). R388(b) added `never_relax_not_holdable`. R382
+# added two (`captain_prior_unresolved`,
 # `captain_prior_not_supported_on_classic`) and found the sentence already
 # stale by three before that: it read "fourteen (1/3/10)" against a tree
 # carrying seventeen (1/4/12). A hand-maintained count of a growing class

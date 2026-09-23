@@ -1075,6 +1075,12 @@ def validate_dk_entries_file(
         by_contest_sig[entry.contest_id][entry.lineup_signature] += 1
         legal_rosters.append((entry, roster))
 
+    # R388(b), F-3 (Ben, 2026-09-22). Reclassified: not a DK rule, since DK
+    # accepts one lineup in two entries of one contest, but Ben's operator rule
+    # with never-relax authority (`gate_classes.FACT_AUTHORITY`). It stays
+    # inside `roster_legality_passed` deliberately, because that gate is ILLEGAL
+    # and so never governed: no deadline rung reaches it. The error text is
+    # unchanged, since the golden `pure_verdict` freezes it.
     duplicate_same_contest = []
     for contest_id, counter in by_contest_sig.items():
         for signature, count in counter.items():
