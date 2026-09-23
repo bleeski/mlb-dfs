@@ -75,7 +75,7 @@ from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
 # `REFUSAL_*` copy (it loads without the engine) and
 # `test_the_class_vocabularies_agree_with_build_slate` still holds all three
 # in step.
-from mlb_engine.entries.gate_classes import (  # noqa: E402
+from mlb_engine.entries.gate_classes import (
     REFUSAL_BADLY_SHAPED as CLASS_BADLY_SHAPED,
     REFUSAL_ILLEGAL as CLASS_ILLEGAL,
     REFUSAL_READ_IT as CLASS_READ_IT,

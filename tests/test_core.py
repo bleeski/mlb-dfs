@@ -24727,10 +24727,13 @@ class RefusalClassificationTests(unittest.TestCase):
                                  "classic_verify_failed"})
 
     def test_every_workflow_gate_is_classified(self):
-        """CLASSIC_GATE_CLASS_DEFAULT is a safety net that must never fire.
+        """No PRE or POST gate may reach CLASSIC_GATE_CLASS_DEFAULT.
         A gate added to the engine without a row here fails the suite, which is
         the point: an unclassified gate defaulting to READ-IT is correct but
-        silent, and silent is how this repo loses things."""
+        silent, and silent is how this repo loses things. (R388(a) found three
+        OTHER names that can reach the default -- `allocation_certified`,
+        `allocation_method`, `caller_assertion` -- and classified their V/S/P
+        half in gate_classes; the table itself stays exactly PRE and POST.)"""
         mod = self._module()
         from mlb_engine.entries.dk_entries_manager import (
             POST_EXPORT_GATES, PRE_EXPORT_GATES,
@@ -24867,8 +24870,11 @@ class RefusalClassificationTests(unittest.TestCase):
                          "an unclassifiable refusal must not be governable")
 
     def test_an_unclassified_gate_defaults_to_read_it(self):
-        """Reached alone, because the completeness test above means production
-        never gets here. R267's lesson: a guard two other fixes mask is a guard
+        """Reached alone. The completeness test above keeps every PRE and POST
+        gate off this default, but R388(a) measured three other names that can
+        reach it (`allocation_certified`, `allocation_method`,
+        `caller_assertion`), so it is live, and READ-IT is the conservative
+        answer for them. R267's lesson: a guard two other fixes mask is a guard
         nothing tested."""
         mod = self._module()
         self.assertEqual(mod.classic_gate_class("a_gate_that_does_not_exist"),

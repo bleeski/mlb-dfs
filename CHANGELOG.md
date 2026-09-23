@@ -4,7 +4,7 @@ What changed in the engine, the tools and the contracts, when, and why.
 
 ## 2026-09-23 — R388(a): one gate taxonomy. Every certification gate and refusal site carries its V/S/P class beside the governor's refusal class in `mlb_engine/entries/gate_classes.py`, and a name it has never classified raises (roadmap Session 05)
 
-**Scope.** `mlb_engine/entries/gate_classes.py` (new), `skills/generate-lineups/scripts/build_slate.py` (the gate table and three sibling constants moved out; lazy reads and a module `__getattr__`), `mlb_engine/pipeline/deadline_governor.py` (the four class strings imported, not copied), `mlb_engine/entries/dk_entries_manager.py` (one pointer comment), `MLB_Classic.md` (§2 names the module), `tests/test_upload_integrity.py` (`GateTaxonomyTests`, new, 10), `tests/test_core.py` (`RefusalClassificationTests` +2), `tools/audit.py` (two pins), `docs/backlog.md`, `docs/ROADMAP.md` (the row, NEXT, the ledger, Sessions 87 and 04 backfilled to `2864fb7`), `CHANGELOG.md`.
+**Scope.** `mlb_engine/entries/gate_classes.py` (new), `skills/generate-lineups/scripts/build_slate.py` (the gate table and three sibling constants moved out; lazy reads and a module `__getattr__`), `mlb_engine/pipeline/deadline_governor.py` (the four class strings imported, not copied), `mlb_engine/entries/dk_entries_manager.py` (one pointer comment), `MLB_Classic.md` (§2 names the module), `tests/test_upload_integrity.py` (`GateTaxonomyTests`, new, 12), `tests/test_core.py` (`RefusalClassificationTests` +2), `tools/audit.py` (two pins), `docs/backlog.md`, `docs/ROADMAP.md` (the row, NEXT, the ledger, Sessions 87 and 04 backfilled to `2864fb7`), `CHANGELOG.md`.
 
 **What was wrong.** The governor's refusal class (R290(c): illegal, badly_shaped, read_it, split) lived in `build_slate.py`'s `CLASSIC_GATE_CLASS`, and `deadline_governor.py` kept the four strings by value. The delivery-first class R386 defined (V, S, P, MIXED; `MLB_Classic.md` §2) had no code at all, and neither did an evidence state that keeps "not checked" apart from "passed" (audit §3).
 
@@ -13,6 +13,7 @@ What changed in the engine, the tools and the contracts, when, and why.
 - Audit §3 labels several checks outside the four values: "S/P", "V/P", "P with V revalidation", "Coverage", "Coverage/S/P", "V or actual I/O failure". Each was mapped by §2's rules: two classes become MIXED with named facts; "P with V revalidation" is P (the post-export gates do the V check on any fallback's output); "Coverage" is V by F-2 (DK takes a partial file only with the unresolved rows removed, so a blank row is not the partial form); an I/O failure that cannot be placed is V.
 - "An unclassified name raises" and "no behaviour change" conflict for the governor's lookup: `test_an_unclassified_gate_defaults_to_read_it` pins its READ-IT default, and it runs on a live refusal path where an exception is a lost file. So the V/S/P lookups raise and the governor's keeps its default.
 - `test_every_workflow_gate_is_classified` is a two-sided equality, so `CLASSIC_GATE_CLASS` keeps exactly the fifteen PRE and POST gates, and the new names go in the V/S/P table only.
+- One deliberate exception to "two classes become MIXED": the audit's "S/P" on the search-effort sites (`bank_thin_partial`, `showdown_ladder_infeasible`, `showdown_bank_short`) is plain S, because §2 lists bank targets and the Showdown controls as S and the P half is the refusal's own record, which every class carries. `showdown_bank_short_of_reserved_rows` ("Coverage/S/P") is S for the short bank and V for the blank row, the same F-2 reading.
 
 **Found: the default that "should never fire" can.** Measured through DKM's validator and the script's own parser: `validate_upload_ready_gates` fails `allocation_certified` and `allocation_method` by those names, and a forbidden caller assertion as `caller_assertion:<gate>`, which `_GATE_ERROR_RE` (`\w+`) reads as `caller_assertion`. All three take `(read_it, "unclassified")`, the conservative direction. On the `run_slate` path the two allocation names do not arrive in practice (every allocator record with `allocation_certified` False also has `passed` False, and `execute_portfolio` blocks first); `caller_assertion`'s reachability there was not traced. The comment now says so, and all three have V/S/P classes.
 
@@ -29,10 +30,12 @@ What changed in the engine, the tools and the contracts, when, and why.
 - `deadline_governor.py` imports the four strings under its `CLASS_*` names.
 - No payload, exit code or governor decision changed. The golden replay is unmoved and every existing refusal test passes unedited.
 
-**Classes that differ from the governor's today, deliberately.** Twelve disagree with the refusal class and stay that way until Sessions 06, 09 and 13 wire V/S/P into behaviour:
+**Classes that differ from the governor's today, deliberately.** Fourteen disagree with the refusal class and stay that way until Sessions 06, 09 and 13 wire V/S/P into behaviour:
 - nine gates: `lineup_gate_passed`, `pitcher_audit_gate_passed`, `weather_gate_passed`, `odds_gate_passed`, `projection_schema_gate_passed`, `optimizer_gate_passed`, `roster_legality_passed`, `export_hash_binding_passed` and `allocation_certified`;
 - `allocation_method`;
-- two refusal sites: `pool_blocked_hard` and `pool_blocked_crosswalk`.
+- four refusal sites: `pool_blocked_hard`, `pool_blocked_crosswalk`, `classic_verify_failed` and `showdown_bank_short_of_reserved_rows`.
+
+The last two matter most for Session 09. They are the only places where the governor today RELAXES something this table calls V: its rung 2 (`accept_blank_rows`) ships blank reserved rows, and `VERIFY_CLASSIC_FAILURE_CLASS` classes `blank_row` BADLY-SHAPED. That is R401's (Session 22) to reconcile.
 
 Two are pinned against misreading:
 - `roster_legality_passed`'s `distinct_lineups_per_contest` fact is S by F-3, with never-relax authority.
@@ -51,9 +54,17 @@ Two are pinned against misreading:
 - the governor's by-value strings restored (1);
 - a refusal site unclassified (1).
 
+**Review.** A review agent read the diff in place of `/land`'s `/code-review`, which the Skill hook cannot start on this host. It found no behaviour change on a live path and nothing blocking; every finding below was fixed before the merge, in a second commit:
+- `roster_legality_passed` classed its completeness fact P, but the validator's one completeness error is "reserved row is blank or incomplete", which this same table calls V elsewhere (`partial_row`, `blank_row`, F-2). It is now `reserved_row_blank_or_incomplete: V`, with only the reported count left P, and a test holds one fact name to one class across both tables.
+- `evidence_state` read only `passed`, while its docstring claimed `_gate_bool`'s rule. It now reads `_gate_bool`'s three keys in order and recursively, and a test compares the two over twelve values.
+- `describe()` now always shows the governor's class for a gate, including the READ-IT default the three off-table names really get; its docstring no longer claims both classes for a refusal site.
+- The disagreement list was two short (above), and the S/P exception is now stated (premise corrections).
+- Nits: `_base_name` matches `caller_assertion` and `caller_assertion:<gate>` exactly; `Validity` refuses a repeated fact name; `evidence_state(assumed="x")` reads one name, not its characters; build_slate's `__getattr__` answers AttributeError when the engine is unimportable, so `hasattr` holds; two test docstrings that said the default never fires; an unused import and an unneeded `noqa`; `GateTaxonomyTests` moved above the file's final `__main__` guard.
+- Mutations on those fixes, each red then restored byte-identical: the row fact back to P, `passed`-only evidence, the prefix match, duplicate facts allowed, the table-only `describe`, the ImportError branch disabled, and the bare-string `assumed` (it survived the first cut of its test, whose one-letter gate name is its own character set; the test now uses a real gate name).
+
 **Evals.** `run_evals.py`: 6 of 8, the two R411 names as on main; the seven `data/deliveries/` records the run wrote were removed by path.
 
-**Gate.** Before: `PASS  v2.26.0  42 modules  2480 tests  5 skipped` (this block's start, at `2864fb7`). After: `PASS  v2.26.0  43 modules  2492 tests  5 skipped  {test_core 1491/1491 (4 skipped) skipped_in_place; test_showdown 337/337 (1 skipped) skipped_in_place}  [tests.test_core ran its pinned 1491 but 4 were SKIPPED, so the count proves nothing about coverage.; tests.test_showdown ran its pinned 337 but 1 were SKIPPED, so the count proves nothing about coverage.]` (the same five absent-file skips; 43 modules is the new `gate_classes.py`). Pins: `tests.test_core` 1489 -> 1491, `tests.test_upload_integrity` 401 -> 411. GOLD: `tests.test_golden_replay` 9 OK, `tests/golden/` untouched, histogram unmoved. PROBE not required (no bank, allocator or optimizer change). Verification command: 28 tests OK. LINT exit 0.
+**Gate.** Before: `PASS  v2.26.0  42 modules  2480 tests  5 skipped` (this block's start, at `2864fb7`). After: `PASS  v2.26.0  43 modules  2494 tests  5 skipped  {test_core 1491/1491 (4 skipped) skipped_in_place; test_showdown 337/337 (1 skipped) skipped_in_place}  [tests.test_core ran its pinned 1491 but 4 were SKIPPED, so the count proves nothing about coverage.; tests.test_showdown ran its pinned 337 but 1 were SKIPPED, so the count proves nothing about coverage.]` (the same five absent-file skips; 43 modules is the new `gate_classes.py`). Pins: `tests.test_core` 1489 -> 1491, `tests.test_upload_integrity` 401 -> 413. GOLD: `tests.test_golden_replay` 9 OK, `tests/golden/` untouched, histogram unmoved. PROBE not required (no bank, allocator or optimizer change). Verification command: 30 tests OK (after the review fixes). LINT exit 0.
 
 ## 2026-09-23 — R399(a)(e): `build_slate.py --help` prints again, and the Showdown captain-sleeve surfaces stop describing the build before R382 (roadmap Session 04)
 

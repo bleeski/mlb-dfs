@@ -7679,10 +7679,6 @@ class R323ShowdownPreflightRunsTheCheckTests(unittest.TestCase):
         self.assertNotIn("AAA Bench1", text.split("WARN")[-1])
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class GateTaxonomyTests(unittest.TestCase):
     """R388(a). One taxonomy for every gate and refusal the build can stop on.
 
@@ -7749,6 +7745,9 @@ class GateTaxonomyTests(unittest.TestCase):
         self.assertIn("MLB_Classic.md", str(caught.exception))
         with self.assertRaises(self.gc.UnclassifiedGateError):
             self.gc.refusal_site_validity("a_refusal_added_without_a_class")
+        with self.assertRaises(self.gc.UnclassifiedGateError,
+                               msg="only caller_assertion and caller_assertion:<gate> map"):
+            self.gc.gate_validity("caller_assertions")
 
     def test_the_governors_lookup_still_defaults_and_does_not_raise(self):
         """The other half of that rule. The governor's lookup runs on a live
@@ -7758,6 +7757,14 @@ class GateTaxonomyTests(unittest.TestCase):
                          (self.gc.REFUSAL_READ_IT, "unclassified"))
         self.assertEqual(self.bs.classic_gate_class("caller_assertion"),
                          (self.gc.REFUSAL_READ_IT, "unclassified"))
+
+    def test_a_fact_named_in_two_checks_carries_one_class(self):
+        seen = {}
+        for table in (self.gc.GATE_VALIDITY, self.gc.REFUSAL_SITE_VALIDITY):
+            for name, validity in table.items():
+                for fact, klass in validity.facts:
+                    with self.subTest(fact=fact, check=name):
+                        self.assertEqual(seen.setdefault(fact, klass), klass)
 
     def test_a_mixed_check_names_facts_and_each_fact_is_one_class(self):
         for table in (self.gc.GATE_VALIDITY, self.gc.REFUSAL_SITE_VALIDITY):
@@ -7774,6 +7781,7 @@ class GateTaxonomyTests(unittest.TestCase):
                     lambda: Validity("MIXED", (("a", "V"), ("b", "V"))),
                     lambda: Validity("V", (("a", "V"),)),
                     lambda: Validity("MIXED", (("a", "V"), ("b", "coverage"))),
+                    lambda: Validity("MIXED", (("a", "V"), ("a", "S"))),
                     lambda: Validity("ILLEGAL")):
             with self.assertRaises(ValueError):
                 bad()
@@ -7810,6 +7818,14 @@ class GateTaxonomyTests(unittest.TestCase):
         self.assertIs(self.bs.CLASSIC_GATE_CLASS, self.gc.CLASSIC_GATE_CLASS)
         self.assertIs(self.bs.CLASSIC_CONTEST_IDENTITY_CLASS,
                       self.gc.CLASSIC_CONTEST_IDENTITY_CLASS)
+        self.assertFalse(hasattr(self.bs, "NOT_A_GATE_TABLE"))
+        # With the engine unimportable, the four names answer AttributeError, so
+        # `hasattr` is False rather than raising. The PACKAGE is blocked: an
+        # already-imported package serves the submodule from its attributes.
+        import unittest.mock
+        with unittest.mock.patch.dict(sys.modules, {"mlb_engine.entries": None}):
+            self.assertFalse(hasattr(self.bs, "CLASSIC_GATE_CLASS"))
+        self.assertTrue(hasattr(self.bs, "CLASSIC_GATE_CLASS"))
 
     def test_the_three_vocabularies_are_one(self):
         """build_slate keeps its four strings (it loads without the engine);
@@ -7842,6 +7858,9 @@ class GateTaxonomyTests(unittest.TestCase):
         self.assertEqual(dict(roster.facts)["distinct_lineups_per_contest"],
                          self.gc.S, "F-3: an S control, never relaxed")
         self.assertEqual(dict(roster.facts)["platform_roster_rules"], self.gc.V)
+        self.assertEqual(dict(roster.facts)["reserved_row_blank_or_incomplete"],
+                         self.gc.V, "the validator's completeness error is a "
+                         "row DK rejects or will not take (F-2), never P")
         crosswalk = self.gc.refusal_site_validity("pool_blocked_crosswalk")
         self.assertIn(self.gc.V, crosswalk.classes())
         self.assertEqual(self.bs.REFUSAL_BY_KEY["pool_blocked_crosswalk"]["authority"],
@@ -7860,6 +7879,24 @@ class GateTaxonomyTests(unittest.TestCase):
         self.assertEqual(es(values, "e"), self.gc.EVIDENCE_FAILED)
         self.assertEqual(es(values, "absent"), self.gc.EVIDENCE_NOT_CHECKED)
         self.assertEqual(es(values, "a", assumed=["a"]), self.gc.EVIDENCE_ASSUMED)
+        self.assertEqual(es({"odds_gate_passed": False}, "odds_gate_passed",
+                            assumed="odds_gate_passed"),
+                         self.gc.EVIDENCE_ASSUMED,
+                         "a bare string is one gate name, not its characters")
+
+    def test_evidence_state_reads_a_gate_exactly_as_dk_entries_manager_does(self):
+        """Two readers of one fact share one rule: `_gate_bool`'s three keys,
+        in order and recursively, and literal True for anything else."""
+        from mlb_engine.entries.dk_entries_manager import _gate_bool
+        for value in (True, False, 1, "true", None, {}, {"passed": True},
+                      {"passed": 1}, {"selection_certified": True},
+                      {"allocation_certified": True},
+                      {"passed": {"passed": True}},
+                      {"passed": False, "selection_certified": True}):
+            with self.subTest(value=value):
+                self.assertEqual(
+                    self.gc.evidence_state({"g": value}, "g")
+                    == self.gc.EVIDENCE_PASSED, _gate_bool(value))
         self.assertEqual(self.gc.EVIDENCE_STATES,
                          ("passed", "failed", "not_checked", "assumed"))
 
@@ -7868,6 +7905,13 @@ class GateTaxonomyTests(unittest.TestCase):
         self.assertEqual(row["validity"], "MIXED")
         self.assertEqual(row["refusal_class"], self.gc.REFUSAL_READ_IT)
         self.assertEqual(set(row["facts"].values()), {"V", "S", "P"})
+        off_table = self.gc.describe("allocation_method")
+        self.assertEqual((off_table["refusal_class"], off_table["authority"]),
+                         (self.gc.REFUSAL_READ_IT, "unclassified"),
+                         "describe shows the default the governor really applies")
         site = self.gc.describe("showdown_not_certified", kind="refusal_site")
         self.assertEqual(site["validity"], "V")
         self.assertNotIn("refusal_class", site)
+
+if __name__ == "__main__":
+    unittest.main()

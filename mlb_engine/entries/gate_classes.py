@@ -37,7 +37,7 @@ engine can import it at the top.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Collection, Dict, Mapping, Optional, Tuple
+from typing import Any, Collection, Dict, Mapping, Tuple
 
 # --------------------------------------------------------------------------- #
 # The governor's refusal class (R290(c)). Strings are the contract with
@@ -97,6 +97,9 @@ class Validity:
             if len({k for _, k in self.facts}) < 2:
                 raise ValueError("a MIXED check spans at least two classes; "
                                  "one class is that class")
+            names = [fact for fact, _ in self.facts]
+            if len(names) != len(set(names)):
+                raise ValueError(f"a fact is named once: {names}")
         elif self.facts:
             raise ValueError(f"a {self.klass} check has no facts to split")
 
@@ -245,10 +248,14 @@ GATE_VALIDITY: Dict[str, Validity] = {
     "roster_legality_passed": _m(
         ("platform_roster_rules", V),
         ("non_platform_anti_correlation", S),
+        ("reserved_row_blank_or_incomplete", V),
         ("completeness_accounting", P),
         ("distinct_lineups_per_contest", S),
-        note="distinct lineups per contest is F-3: an S control with operator "
-             "never-relax authority, kept under every deadline"),
+        note="the validator's one completeness error is a reserved row blank or "
+             "incomplete, which is V (a partial row DK rejects; a blank row is "
+             "not the partial form, F-2); only the count reported beside it is "
+             "P. Distinct lineups per contest is F-3: an S control with "
+             "operator never-relax authority, kept under every deadline"),
     "locked_immutability_passed": Validity(
         V, note="genuinely locked slots and unauthorized selections; no "
                 "deadline override"),
@@ -341,7 +348,9 @@ REFUSAL_SITE_VALIDITY: Dict[str, Validity] = {
 
 def _base_name(name: str) -> str:
     text = str(name)
-    return "caller_assertion" if text.startswith("caller_assertion") else text
+    if text == "caller_assertion" or text.startswith("caller_assertion:"):
+        return "caller_assertion"
+    return text
 
 
 def gate_validity(name: str) -> Validity:
@@ -379,25 +388,43 @@ def evidence_state(values: Mapping[str, Any], name: str,
     ``passed`` is, the same identity rule ``dk_entries_manager._gate_bool``
     applies, so "1 means yes" cannot come back through this door.
     """
+    if isinstance(assumed, str):
+        assumed = (assumed,)
     if name in set(assumed or ()):
         return EVIDENCE_ASSUMED
     if name not in values:
         return EVIDENCE_NOT_CHECKED
-    value = values[name]
+    return EVIDENCE_PASSED if _gate_true(values[name]) else EVIDENCE_FAILED
+
+
+def _gate_true(value: Any) -> bool:
+    """`dk_entries_manager._gate_bool`, restated here because this module is
+    stdlib only: a mapping answers through its first present key of
+    `passed`, `selection_certified`, `allocation_certified`, recursively;
+    anything else passes only when it is literally True.
+    `GateTaxonomyTests` holds the two in step."""
     if isinstance(value, Mapping):
-        value = value.get("passed")
-    return EVIDENCE_PASSED if value is True else EVIDENCE_FAILED
+        for key in ("passed", "selection_certified", "allocation_certified"):
+            if key in value:
+                return _gate_true(value[key])
+        return False
+    return value is True
 
 
 def describe(name: str, kind: str = "gate") -> Dict[str, Any]:
-    """A JSON-ready row for one gate or refusal site, both classes side by side."""
+    """A JSON-ready row for one gate or refusal site.
+
+    A gate carries both classes, the governor's included, and a name outside
+    its table shows the default it really gets. A refusal site carries its
+    V/S/P class only: its refusal class and authority are
+    `build_slate.REFUSAL_SITES`', which this engine module cannot import.
+    """
     validity = gate_validity(name) if kind == "gate" else refusal_site_validity(name)
     out: Dict[str, Any] = {"name": str(name), "validity": validity.klass}
     if validity.facts:
         out["facts"] = {fact: klass for fact, klass in validity.facts}
     if validity.note:
         out["note"] = validity.note
-    if kind == "gate" and _base_name(name) in CLASSIC_GATE_CLASS:
-        refusal, authority = CLASSIC_GATE_CLASS[_base_name(name)]
-        out["refusal_class"], out["authority"] = refusal, authority
+    if kind == "gate":
+        out["refusal_class"], out["authority"] = classic_gate_class(_base_name(name))
     return out

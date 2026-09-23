@@ -1383,8 +1383,8 @@ EXPECTED_SUITE_COUNTS = {
     # it, and the counterfactual where the row count puts it back on the
     # "no feed, no check" branch.
     # R387 + R377, 2026-09-23: 394 -> 401, the seven DeliveryRecordBytesTests that pin rosters read from the hashed bytes and the controls and egress passed.
-    # R388(a), 2026-09-23: 401 -> 411, the ten GateTaxonomyTests (every certification gate classified; every name DKM's validator can fail, raw and parsed, resolves; an unclassified name raises; the governor's lookup still defaults; MIXED checks name facts across two classes; the governor table moved value for value; one refusal vocabulary; the audit's anchor classes; four evidence states; both classes side by side).
-    "tests.test_upload_integrity": 411,
+    # R388(a), 2026-09-23: 401 -> 413, the twelve GateTaxonomyTests (every certification gate classified; every name DKM's validator can fail, raw and parsed, resolves; an unclassified name raises; the governor's lookup still defaults; one fact name, one class; MIXED checks name distinct facts across two classes; the governor table moved value for value and answers AttributeError without the engine; one refusal vocabulary; the audit's anchor classes; four evidence states; evidence read exactly as _gate_bool reads it; both classes side by side).
+    "tests.test_upload_integrity": 413,
     "tests.test_golden_replay": 9,
     # R117(a), 2026-08-18: 75 -> 82, the seven that pin BOTH renders of the
     # mlb.com hand line against the same paste -- the joined render derived from

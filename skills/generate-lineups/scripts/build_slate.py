@@ -392,7 +392,13 @@ _GATE_CLASS_NAMES = ("CLASSIC_GATE_CLASS", "CLASSIC_GATE_CLASS_DEFAULT",
 
 def __getattr__(name: str):
     if name in _GATE_CLASS_NAMES:
-        from mlb_engine.entries import gate_classes
+        try:
+            from mlb_engine.entries import gate_classes
+        except ImportError as exc:
+            # So `hasattr` and `getattr(mod, name, default)` still answer
+            # when the engine is absent, which is when this script prints
+            # the missing_dependencies refusal.
+            raise AttributeError(f"{name} needs mlb_engine ({exc})") from exc
         return getattr(gate_classes, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
