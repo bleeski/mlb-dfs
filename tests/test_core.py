@@ -24489,6 +24489,53 @@ class SupervisorLostWindowTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(records[-1]["action"], "delivered")
 
+    # ---- R207: typed remedies ------------------------------------------
+
+    def test_autobuild_takes_the_typed_structural_floor(self):
+        """The pipeline types the remedy where it writes the sentence; the
+        supervisor reads the type first, so a reworded sentence cannot move or
+        lose the floor."""
+        brief = {"status": "not_certified", "date": "2026-07-29",
+                 "solve": {"bank": {"job_list_exhausted": True}},
+                 "feasibility": {"checks": [
+                     {"name": "shared_players_floor", "passed": False,
+                      "remedy": "reworded: lift the overlap floor",
+                      "remedy_typed": {"control": "max_shared_players", "op": ">=",
+                                       "to": 7}}]}}
+
+        def side(n, cmd, kwargs):
+            return self._proc(3, brief) if n == 1 else self._certify(n, cmd, kwargs)
+        code, records, cmds, _logs = self._run(side)
+        self.assertEqual(code, 0)
+        self.assertEqual([r["action"] for r in records],
+                         ["apply_structural_floor", "delivered"])
+        joined = " ".join(cmds[1])
+        self.assertIn('"max_shared_players": 7', joined)
+
+    def test_the_interaction_stop_carries_the_builds_typed_remedy(self):
+        remedy = [{"kind": "raise_control", "source": "interaction_probe",
+                   "control": "max_player_exposure_pct", "from": 0.4, "to": 0.5}]
+        brief = {"status": "not_certified", "date": "2026-07-29",
+                 "solve": {"bank": {"job_list_exhausted": True}},
+                 "feasibility": {"checks": []}, "refusal_remedy": remedy}
+        code, records, _cmds, _logs = self._run(lambda *_a: self._proc(3, brief))
+        self.assertEqual(code, 3)
+        self.assertEqual(records[-1]["action"], "stop")
+        self.assertEqual(records[-1]["refusal_remedy"], remedy)
+
+    def test_a_strategy_stop_carries_the_checks_typed_remedy(self):
+        typed = {"control": "max_player_exposure_pct", "op": ">=", "to": 0.6, "count": 6}
+        brief = {"status": "not_certified", "date": "2026-07-29",
+                 "solve": {"bank": {"job_list_exhausted": True}},
+                 "feasibility": {"checks": [
+                     {"name": "player_exposure_floor", "passed": False,
+                      "remedy": "raise max_player_exposure_pct to >= 0.600 (cap 6)",
+                      "remedy_typed": typed}]}}
+        code, records, _cmds, _logs = self._run(lambda *_a: self._proc(3, brief))
+        self.assertEqual(code, 3)
+        self.assertIn("STRATEGY control", records[-1]["why"])
+        self.assertEqual(records[-1]["remedy_typed"], typed)
+
     # ---- R345: --declare-pitcher ----------------------------------------
 
     @staticmethod
@@ -24701,6 +24748,246 @@ class SwapAndProbeLostWindowTests(unittest.TestCase):
             capture_output=True, text=True, cwd=str(REPO))
         self.assertEqual(result.returncode, 4)
         self.assertIn("salary file", result.stderr)
+
+
+class TypedRefusalTests(unittest.TestCase):
+    """R207 (+R204's naming half). The refusal names the one control to move.
+
+    On 1240_6g the build refused three times with "no single control is
+    arithmetically binding against this bank, so the interaction of the active
+    controls is", and finding the cap that mattered (max_player_exposure_pct
+    0.4 -> 0.5, floor(pct * n) 2 -> 3) cost four full builds. The allocator's
+    interaction probe drops each active control ALONE on that refusal and says
+    which restore feasibility and at what step; the remedies travel as data
+    beside errors[], which stays byte-identical. The fixtures are two entries
+    and three candidates where each lineup pair is killed by one cap, so every
+    cap alone is satisfiable and the three together are not."""
+
+    ENTRIES = [{"entry_id": str(i), "contest_id": "c1", "contest_shape": "large_wta"}
+               for i in (1, 2)]
+    CONTROLS = {"max_primary_stack_exposure_pct": 0.5, "max_sp_pair_repetition": 1,
+                "max_shared_players": 5}
+
+    @staticmethod
+    def _cand(cid, roster, score, stack):
+        return {"candidate_id": cid, "lineup_ids": roster, "player_ids": roster,
+                "sp_ids": roster[:2], "primary_stack": stack, "objective": score,
+                "contest_fit_score": score}
+
+    def _every_cap_restores(self):
+        """{A,B} share a stack, {A,C} an SP pair, {B,C} six hitters."""
+        shared = [f"h{i}" for i in range(6)]
+        return [self._cand("A", ["x1", "x2", *[f"a{i}" for i in range(8)]], 100, "S1"),
+                self._cand("B", ["y1", "y2", *shared, "b0", "b1"], 99, "S1"),
+                self._cand("C", ["x1", "x2", *shared, "c0", "c1"], 98, "S2")]
+
+    def _one_cap_does_not(self):
+        """{A,B} is killed by the stack cap AND by overlap, so dropping the stack
+        cap alone leaves it dead: that control does not restore alone."""
+        A = self._cand("A", ["x1", "x2", "g0", "g1", "g2", "a0", "a1", "a2", "a3", "a4"], 100, "S1")
+        B = self._cand("B", ["y1", "y2", "g0", "g1", "g2", "h0", "h1", "h2", "b0", "b1"], 99, "S1")
+        C = self._cand("C", ["x1", "x2", "h0", "h1", "h2", "c0", "c1", "c2", "c3", "c4"], 98, "S2")
+        return [A, B, C], dict(self.CONTROLS, max_shared_players=2)
+
+    def test_the_probe_names_each_control_that_alone_restores_and_its_step(self):
+        out = ca.select_and_assign_entries(self._every_cap_restores(), self.ENTRIES,
+                                           dict(self.CONTROLS),
+                                           interaction_probe_budget_s=30)
+        self.assertFalse(out["passed"])
+        self.assertIn("the interaction of the active controls is", out["errors"][0])
+        probe = out["interaction_probe"]
+        self.assertTrue(probe["ran"])
+        self.assertEqual(probe["restoring"], ["max_primary_stack_exposure_pct",
+                                              "max_shared_players", "max_sp_pair_repetition"])
+        rows = {r["control"]: r for r in probe["controls"]}
+        self.assertEqual(rows["max_primary_stack_exposure_pct"]["step"],
+                         {"from": 0.5, "to": 1.0, "count_from": 1, "count_to": 2,
+                          "restores": True})
+        self.assertEqual((rows["max_sp_pair_repetition"]["step"]["to"],
+                          rows["max_shared_players"]["step"]["to"]), (2, 6))
+        self.assertEqual(probe["solves"], 6, "one drop and one step per control")
+
+    def test_a_control_that_does_not_restore_alone_says_so(self):
+        bank, controls = self._one_cap_does_not()
+        out = ca.select_and_assign_entries(bank, self.ENTRIES, controls,
+                                           interaction_probe_budget_s=30)
+        rows = {r["control"]: r for r in out["interaction_probe"]["controls"]}
+        self.assertIs(rows["max_primary_stack_exposure_pct"]["alone_restores"], False)
+        self.assertNotIn("step", rows["max_primary_stack_exposure_pct"])
+        self.assertEqual(out["interaction_probe"]["restoring"],
+                         ["max_shared_players", "max_sp_pair_repetition"])
+
+    def test_the_budget_bounds_the_probe_and_names_what_it_skipped(self):
+        out = ca.select_and_assign_entries(self._every_cap_restores(), self.ENTRIES,
+                                           dict(self.CONTROLS),
+                                           interaction_probe_budget_s=0.0)
+        probe = out["interaction_probe"]
+        self.assertEqual(probe["solves"], 0)
+        self.assertEqual({r["status"] for r in probe["controls"]}, {"not_probed"})
+        self.assertEqual(probe["restoring"], [])
+
+    def test_no_budget_runs_nothing_and_errors_stay_byte_identical(self):
+        plain = ca.select_and_assign_entries(self._every_cap_restores(), self.ENTRIES,
+                                             dict(self.CONTROLS))
+        probed = ca.select_and_assign_entries(self._every_cap_restores(), self.ENTRIES,
+                                              dict(self.CONTROLS),
+                                              interaction_probe_budget_s=30)
+        self.assertNotIn("interaction_probe", plain)
+        self.assertEqual(plain["errors"], probed["errors"])
+        self.assertEqual(sorted(set(probed) - set(plain)), ["interaction_probe"])
+
+    def test_the_probe_runs_only_on_the_interaction_refusal(self):
+        """A singleton-binding refusal already names its control, and a solve
+        that succeeds has nothing to probe."""
+        same = [self._cand("A", ["x1", "x2", *[f"a{i}" for i in range(8)]], 100, "S1"),
+                self._cand("B", ["y1", "y2", *[f"b{i}" for i in range(8)]], 99, "S1")]
+        singleton = ca.select_and_assign_entries(
+            same, self.ENTRIES, {"max_primary_stack_exposure_pct": 0.5},
+            interaction_probe_budget_s=30)
+        self.assertFalse(singleton["passed"])
+        self.assertNotIn("the interaction of the active controls", singleton["errors"][0])
+        self.assertNotIn("interaction_probe", singleton)
+        fine = ca.select_and_assign_entries(self._every_cap_restores(), self.ENTRIES,
+                                            {"max_sp_pair_repetition": 2},
+                                            interaction_probe_budget_s=30)
+        self.assertTrue(fine["passed"], fine.get("errors"))
+        self.assertNotIn("interaction_probe", fine)
+
+    def test_the_step_is_the_next_count_1240_6g_numbers(self):
+        """The filed case: 6 entries, 0.4 -> count 2; the step is 0.5 -> 3."""
+        self.assertEqual(ca.interaction_step("max_player_exposure_pct", 0.4, 6),
+                         {"from": 0.4, "to": 0.5, "count_from": 2, "count_to": 3})
+        self.assertEqual(ca.interaction_step("max_sp_pair_repetition", 1, 6)["to"], 2)
+        self.assertEqual(ca.interaction_step("max_team_exposure_pct", 0.9, 6)["to"], 1.0)
+        # The message and the probe name one set.
+        self.assertEqual(ca.INTERACTION_CONTROLS, tuple(sorted(ca.INTERACTION_CONTROLS)))
+        self.assertLessEqual(ca.INTERACTION_COUNT_CONTROLS, set(ca.INTERACTION_CONTROLS))
+
+    def test_remedy_typed_agrees_with_every_failing_remedy_sentence(self):
+        """Typed where the sentence is computed, so the two cannot disagree:
+        every failing check that names a control carries the same control, the
+        same value and (for a fraction cap) the same count as its sentence, and
+        a passing check carries nothing."""
+        feas = {"available": True, "entries": 10, "viable_sp_pairs": 2,
+                "max_stack_size": 5, "viable_sp_count": 2, "stackable_team_count": 2,
+                "game_count": 2, "legal_hitter_count": 30,
+                "floor_consensus_cluster_share_pct": 0.5,
+                "floor_player_exposure_count": 6}
+        controls = {"max_sp_pair_repetition": 1, "max_shared_players": 3,
+                    "max_pitcher_exposure_pct": 0.2, "max_primary_stack_exposure_pct": 0.2,
+                    "max_team_exposure_pct": 0.2, "max_game_exposure_pct": 0.2,
+                    "max_consensus_cluster_share_pct": 0.5,
+                    "max_player_exposure_pct": 0.2}
+        report = epi._feasibility_report(feas, controls)
+        failing = [c for c in report["checks"] if c.get("passed") is False]
+        self.assertEqual(len(failing), 8, [c["name"] for c in failing])
+        sentence = re.compile(r"raise (\w+) to >= ([0-9.]+)(?: \(cap (\d+)\))?")
+        for check in failing:
+            with self.subTest(check=check["name"]):
+                typed = check["remedy_typed"]
+                m = sentence.search(check["remedy"])
+                self.assertEqual(typed["control"], m.group(1))
+                self.assertAlmostEqual(float(typed["to"]), float(m.group(2)), places=6)
+                if m.group(3):
+                    self.assertEqual(typed["count"], int(m.group(3)))
+        self.assertEqual(
+            {c["name"]: c["remedy_typed"]["to"] for c in failing
+             if c["name"] in ("sp_pair_capacity", "shared_players_floor")},
+            {"sp_pair_capacity": 5, "shared_players_floor": 5})
+        for check in report["checks"]:
+            if check.get("passed") is not False:
+                self.assertNotIn("remedy_typed", check)
+
+    def test_typed_refusal_remedy_orders_sources_and_marks_held(self):
+        mod = RefusalClassificationTests._module()
+        feas = {"checks": [
+            {"name": "shared_players_floor", "passed": False, "remedy": "raise ...",
+             "remedy_typed": {"control": "max_shared_players", "op": ">=", "to": 7}},
+            {"name": "stack_exposure_capacity", "passed": True}]}
+        probe = {"ran": True, "controls": [
+            {"control": "max_player_exposure_pct", "value": 0.4, "alone_restores": True,
+             "status": "probed", "step": {"from": 0.4, "to": 0.5, "count_from": 2,
+                                          "count_to": 3, "restores": True}},
+            {"control": "max_team_exposure_pct", "value": 0.5, "alone_restores": False,
+             "status": "probed"}]}
+        prov = {"by_control": {"max_player_exposure_pct": {
+            "value": 0.4, "provenance": "posture_default"}}}
+        out = mod.typed_refusal_remedy(
+            feas, probe, {"job_list_exhausted": False, "jobs_attempted": 4,
+                          "jobs_total": 40},
+            control_provenance=prov, never_relax={"max_shared_players"})
+        self.assertEqual([r["kind"] for r in out],
+                         ["grow_bank", "raise_control", "raise_control"])
+        self.assertEqual((out[1]["control"], out[1]["arithmetic"], out[1]["held"]),
+                         ("max_shared_players", True, True))
+        self.assertEqual((out[2]["control"], out[2]["from"], out[2]["to"],
+                          out[2]["count_to"], out[2]["provenance"], out[2]["class"]),
+                         ("max_player_exposure_pct", 0.4, 0.5, 3, "posture_default", "S"))
+        self.assertIn("which alone restores feasibility", mod.format_typed_remedy(out[2]))
+        self.assertIn("HELD by --never-relax", mod.format_typed_remedy(out[1]))
+        none = mod.typed_refusal_remedy({}, {"ran": True, "controls": [
+            {"control": "max_team_exposure_pct", "status": "not_probed"}]}, None)
+        self.assertEqual(none[0]["kind"], "no_single_control")
+        self.assertIn("not probed inside the budget: max_team_exposure_pct", none[0]["note"])
+        self.assertEqual(mod.typed_refusal_remedy({}, None, {"job_list_exhausted": True}), [])
+
+    def test_run_slate_passes_the_budget_and_returns_the_probe(self):
+        """The wiring, through the real run_slate and execute_portfolio: only
+        the allocator is faked, so the budget and the result are the door's."""
+        seen = {}
+        fake_probe = {"ran": True, "controls": [], "restoring": []}
+
+        def fake(candidates, entries, controls, **kw):
+            seen.update(kw)
+            return {"passed": False, "assignments": [], "errors": ["refused"],
+                    "selection_certified": False, "allocation_certified": False,
+                    "interaction_probe": fake_probe}
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            salary = root / "salary.csv"; ids = write_salary(salary)
+            entries = root / "DKEntries.csv"; write_entries(entries)
+            r1, r2 = legal_rosters(ids)
+            with unittest.mock.patch.object(epi, "select_and_assign_entries", fake):
+                out = run_slate(
+                    runs_root=root / "runs", salary_csv=salary, entries_csv=entries,
+                    projections_override=projection_frame(ids),
+                    candidates_override=[candidate("A", r1, 100), candidate("B", r2, 99, "CCC")],
+                    portfolio_controls_override=RunSlateFrontDoorTests.LOOSE,
+                    assume_gates=RunSlateFrontDoorTests.UNEVIDENCED,
+                    approve=True, interaction_probe_budget_s=7.5)
+        self.assertEqual(seen.get("interaction_probe_budget_s"), 7.5)
+        self.assertFalse(out["passed"])
+        self.assertEqual(out["interaction_probe"], fake_probe)
+        self.assertEqual(out["errors"][:1], ["refused"])
+
+    def test_run_classic_puts_the_typed_remedy_on_the_refusal(self):
+        """Through run_classic (only run_slate faked): outside the governor's
+        window the solve gets a probe budget, and the refusal carries the typed
+        remedies; inside it, the budget is None."""
+        wiring = DeadlineGovernorWiringTests("test_an_illegal_refusal_is_never_governed")
+        wiring.setUp()
+        self.addCleanup(wiring.doCleanups)
+        probe = {"ran": True, "restoring": ["max_player_exposure_pct"], "controls": [
+            {"control": "max_player_exposure_pct", "value": 0.4, "alone_restores": True,
+             "status": "probed", "step": {"from": 0.4, "to": 0.5, "count_from": 2,
+                                          "count_to": 3, "restores": True}}]}
+        refusal = dict(DeadlineGovernorWiringTests._REFUSAL, interaction_probe=probe)
+        code, brief, _calls, err = wiring._run(30, refusal=refusal)
+        self.assertEqual(code, 3)
+        budget = wiring.solve_kwargs[0]["interaction_probe_budget_s"]
+        self.assertIsInstance(budget, float)
+        self.assertLessEqual(budget, 45.0)
+        remedy = [r for r in brief["refusal_remedy"] if r["source"] == "interaction_probe"]
+        self.assertEqual((remedy[0]["control"], remedy[0]["to"]),
+                         ("max_player_exposure_pct", 0.5))
+        self.assertEqual(brief["interaction_probe"], probe)
+        self.assertIn("REMEDY: max_player_exposure_pct 0.4 -> >= 0.5 (count 2 -> 3)", err)
+        from mlb_engine.entries import gate_classes as gc
+        self.assertEqual(brief["refusal_validity"],
+                         gc.refusal_site_validity("classic_not_certified").klass)
+        _code, _brief, _calls, _err = wiring._run(2, refusal=refusal)
+        self.assertIsNone(wiring.solve_kwargs[0]["interaction_probe_budget_s"],
+                          "inside the window rung 1 opens every control; no probe")
 
 
 class RefusalClassificationTests(unittest.TestCase):
@@ -25106,6 +25393,21 @@ class RefusalClassificationTests(unittest.TestCase):
                             self._refusal_return_sites() for code in codes),
                         "no exit-10 return site found, so the row is stale")
 
+
+
+    def test_every_refusal_stamp_carries_its_delivery_first_class(self):
+        """R207. The stamp carried the governor's class and not the V/S/P one
+        Session 05 gave every site, so a reader had to look it up by hand."""
+        mod = self._module()
+        from mlb_engine.entries import gate_classes as gc
+        for key in mod.REFUSAL_BY_KEY:
+            with self.subTest(key=key):
+                stamp = mod.refusal_stamp(key)
+                validity = gc.refusal_site_validity(key)
+                self.assertEqual(stamp["refusal_validity"], validity.klass)
+                if validity.facts:
+                    self.assertEqual(stamp["refusal_validity_facts"],
+                                     dict(validity.facts))
 
 class BlankRowVersusPartialRowTests(unittest.TestCase):
     """R290(c). `verify_classic` emitted ONE failure string, "blank slot", over
