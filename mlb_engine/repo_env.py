@@ -381,3 +381,45 @@ def call_budget_source(explicit: Optional[float] = None,
         return ("CLAUDE.md Sandbox: this host stated nothing, so the "
                 "conservative Cowork budget applies")
     return f"CLAUDE.md Hosts: the {resolved} profile"
+
+
+# ---------------------------------------------------------------------------
+# The session-start egress reading (R377, 2026-09-23)
+# ---------------------------------------------------------------------------
+# R369 gave the delivery record an `egress` field and no caller ever filled it,
+# because the only measurement is `env_probe.egress_line`, a ~10s network probe
+# the SessionStart hook runs once. A delivery must never make that call (T-5 is
+# the worst place for optional network work), so the hook keeps its reading
+# here and `delivery_record` reads the file. Gitignored: a network reading is a
+# fact about this container at one moment, never history. Relative to the
+# ARTIFACT root, so a test run under `MLB_DFS_ARTIFACT_ROOT` reads its own temp
+# tree and never the operator's reading.
+SESSION_EGRESS_PATH = Path(".session") / "egress.json"
+
+
+def write_session_egress(line: str, root: Path) -> Optional[Path]:
+    """Keep the hook's egress line with its UTC stamp. Never raises."""
+    import json
+    from datetime import datetime, timezone
+    try:
+        target = Path(root) / SESSION_EGRESS_PATH
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(json.dumps({
+            "line": str(line or ""),
+            "measured_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        }), encoding="utf-8")
+        return target
+    except Exception:  # noqa: BLE001 - a hook that fails loses the whole briefing
+        return None
+
+
+def read_session_egress(root: Path) -> Optional[Dict[str, str]]:
+    """``{"line", "measured_utc"}`` from the session-start hook, or None."""
+    import json
+    try:
+        payload = json.loads((Path(root) / SESSION_EGRESS_PATH).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(payload, dict) or not str(payload.get("line") or "").strip():
+        return None
+    return {"line": str(payload["line"]), "measured_utc": str(payload.get("measured_utc") or "")}

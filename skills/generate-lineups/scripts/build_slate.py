@@ -556,7 +556,16 @@ def refusal_stamp(key: str, **extra) -> dict:
     if rec.get("override"):
         out["refusal_override"] = rec["override"]
     out.update(extra)
+    # R403. Most refusals return an empty brief, so the stamp is the only place
+    # the wrapper can learn the class from.
+    _REFUSAL_CONTEXT["stamp"] = dict(out)
     return out
+
+
+#: R403. What `main()` knew when it refused, for `_main_recording_refusals`,
+#: which otherwise sees only argv and the exit code. Filled at three points
+#: (the slate tag, the brief, the last refusal stamp) and cleared per call.
+_REFUSAL_CONTEXT: dict = {}
 
 # R98(2). Which failing feasibility checks name a floor the ENGINE derived from
 # the slate, and which name a number that is merely the minimum clearing THIS
@@ -947,6 +956,25 @@ def manifest_sha256(path) -> str | None:
         return None
     from mlb_engine.entries.upload_manifest import sha256_file
     return sha256_file(path)
+
+
+def showdown_relaxation_counts(*holders: Mapping[str, Any]) -> dict:
+    """Every relaxation counter the Showdown solve left, as ``{name: n}``.
+
+    R377. The ladder writes its counters into ``solve_diag``, the bank path into
+    ``cpt_diagnostics``, and apportionment into ``ladder_meta``. Only integer
+    counters whose name says ``relax`` are taken, the name rule
+    ``execution_pipeline.manifest_strategy_state`` uses for Showdown-shaped
+    counters. Unlike it, a zero is kept: a clean solve reads as zeros, not as
+    an absence.
+    """
+    out: dict = {}
+    for holder in holders:
+        for key, value in (holder or {}).items():
+            if ("relax" in str(key).lower() and isinstance(value, int)
+                    and not isinstance(value, bool)):
+                out[str(key)] = max(out.get(str(key), 0), value)
+    return dict(sorted(out.items()))
 
 
 def slate_tag_suffix(salary_csv: Path) -> str:
@@ -4053,6 +4081,15 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
             certification="review_grade",
             notes="Showdown ships review-grade; it does not pass the three "
                   "certification gates. See CLAUDE.md.",
+            # R377. The four controls as solved (after any deadline opening),
+            # and the solver's relaxation counters. No strategy_state is passed
+            # on this path, so without these the record carried neither.
+            controls={"max_shared_players": share_cap,
+                      "max_cpt_exposure_pct": cpt_cap,
+                      "max_player_exposure_pct": player_cap_pct,
+                      "max_cpt_per_contest": cpt_per_contest},
+            relaxations=showdown_relaxation_counts(
+                solve_diag, cpt_diagnostics, ladder_meta),
         )
         # R96(4): a Showdown slate with no staged salary can only ever be mined
         # standings_only, which is how the 2026-08-06 SD contests were lost.
@@ -5662,6 +5699,7 @@ def main() -> int:
     args.date = args.date or slate_date_from_salary(salary)
     contest = detect_contest_type(salary, entries)
     signature = slate_signature(salary)
+    _REFUSAL_CONTEXT["slate_tag"] = str(signature.get("tag") or "")
 
     # R249. `--projections` is a Showdown seam. On Classic the enrichment stack
     # owns the projection and a supplied Base would have to be reconciled with
@@ -5980,6 +6018,7 @@ def main() -> int:
     if brief:
         if args.odds and Path(args.odds).exists():
             brief["odds_source"] = args.odds
+        _REFUSAL_CONTEXT["brief"] = brief
         brief["elapsed_s"] = round(time.monotonic() - started, 1)
         brief["labels"] = ("deterministic review proxies and labeled priors only; "
                            "never ROI, win rate, cash rate, or probability")
@@ -6016,6 +6055,7 @@ def _main_recording_refusals() -> int:
     changes the exit code, and a hard kill of the process still writes nothing --
     that limit is real and is not claimed away.
     """
+    _REFUSAL_CONTEXT.clear()
     code = main()
     if code == 0:
         return code
@@ -6031,13 +6071,42 @@ def _main_recording_refusals() -> int:
             if arg.startswith("--date="):
                 date = arg.split("=", 1)[1]
                 break
-        write_refusal_record(date=date or today_et(), slate_tag="",
+        slate_tag, refusal = refusal_record_facts(dict(_REFUSAL_CONTEXT))
+        write_refusal_record(date=date or today_et(), slate_tag=slate_tag,
                              exit_code=int(code),
                              refusal={"argv": argv,
-                                      "note": REFUSAL_EXIT_NOTES.get(int(code), "")})
+                                      "note": REFUSAL_EXIT_NOTES.get(int(code), ""),
+                                      **refusal})
     except Exception as exc:  # noqa: BLE001 - never change the exit code
         print(f"delivery_record: refusal not recorded ({type(exc).__name__}: {exc})")
     return code
+
+
+def refusal_record_facts(context: Mapping[str, Any]) -> tuple:
+    """``(slate_tag, facts)`` for a refusal record, from what `main()` left.
+
+    R403(a). On 1905_10g eleven refusal records came out `untagged_<utc>.json`
+    carrying only argv and an exit note, while every refusal brief printed beside
+    them carried `slate.tag` and the error text. The brief wins where there is
+    one; the last refusal stamp covers the `return N, {}` sites; a refusal before
+    the salary file was read has neither and stays untagged, truthfully.
+    """
+    brief = context.get("brief") or {}
+    stamp = context.get("stamp") or {}
+    tag = str((brief.get("slate") or {}).get("tag") or context.get("slate_tag") or "")
+    feasibility = brief.get("feasibility") or {}
+    failing = [{k: check.get(k) for k in ("name", "detail", "remedy")}
+               for check in (feasibility.get("checks") or [])
+               if isinstance(check, Mapping) and check.get("passed") is False]
+    facts = {
+        "status": brief.get("status") or "",
+        "refusal": brief.get("refusal") or stamp.get("refusal") or "",
+        "refusal_class": brief.get("refusal_class") or stamp.get("refusal_class") or "",
+        "errors": [str(e) for e in (brief.get("errors") or [])][:3],
+        "failing_checks": failing,
+        "run_id": brief.get("run_id"),
+    }
+    return tag, facts
 
 
 #: What each documented exit means, so a record is readable without the source.

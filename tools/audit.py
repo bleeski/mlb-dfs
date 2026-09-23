@@ -869,7 +869,8 @@ EXPECTED_SUITE_COUNTS = {
     # PROGRESS.md drift tests to six ROADMAP lint tests (real tree clean, a clean
     # synthetic pair, uncovered open entry, status vocabulary, NEXT target, rows
     # without an R-number and unresolvable ledger ids).
-    "tests.test_core": 1407,
+    # R403, 2026-09-23: 1407 -> 1412, the five RefusalRecordTagTests that pin a tagged refusal record and sha-keyed run-less records.
+    "tests.test_core": 1412,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps
@@ -1371,7 +1372,8 @@ EXPECTED_SUITE_COUNTS = {
     # and RUNNING the posted-lineup check, a benched Showdown starter failing
     # it, and the counterfactual where the row count puts it back on the
     # "no feed, no check" branch.
-    "tests.test_upload_integrity": 394,
+    # R387 + R377, 2026-09-23: 394 -> 401, the seven DeliveryRecordBytesTests that pin rosters read from the hashed bytes and the controls and egress passed.
+    "tests.test_upload_integrity": 401,
     "tests.test_golden_replay": 9,
     # R117(a), 2026-08-18: 75 -> 82, the seven that pin BOTH renders of the
     # mlb.com hand line against the same paste -- the joined render derived from

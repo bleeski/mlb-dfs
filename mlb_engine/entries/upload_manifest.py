@@ -212,7 +212,8 @@ def _write(path: Path, payload: Mapping[str, Any]) -> None:
 def _mirror_to_delivery_record(date: str, record: Mapping[str, Any],
                                controls: Optional[Mapping[str, Any]],
                                relaxations: Optional[Mapping[str, Any]],
-                               egress: str) -> None:
+                               egress: str,
+                               entries_source: Optional[Path] = None) -> None:
     """Project this delivery into the TRACKED record (R369).
 
     Written from here rather than from the three delivery tools because this is
@@ -227,12 +228,19 @@ def _mirror_to_delivery_record(date: str, record: Mapping[str, Any],
 
     Never raises and never blocks: the record is bookkeeping, the delivery is
     the deliverable.
+
+    R387. ``entries_source`` is the file the row's sha256 was taken from. Inside
+    ``deliver`` that is the provisional file, which is not promoted onto the
+    row's ``delivered_file`` until after this returns, so reading the rosters
+    from ``delivered_file`` read nothing on a first build and the previous
+    build's lineups on a rebuild.
     """
     try:
         from mlb_engine.entries.delivery_record import write_delivery_record
         write_delivery_record(date=date, manifest_row=record,
                               run_id=record.get("run_id"), controls=controls,
-                              relaxations=relaxations, egress=egress)
+                              relaxations=relaxations, egress=egress,
+                              entries_source=entries_source)
     except Exception as exc:  # noqa: BLE001
         print(f"delivery_record: mirror skipped ({type(exc).__name__}: {exc})")
 
@@ -333,14 +341,16 @@ def record_delivery(
             # The same bytes recorded twice is one delivery, not two.
             prior.update(record)
             _write(manifest_path(date), manifest)
-            _mirror_to_delivery_record(date, prior, controls, relaxations, egress)
+            _mirror_to_delivery_record(date, prior, controls, relaxations, egress,
+                                       entries_source=source)
             return prior
         prior["status"] = "superseded"
         prior["superseded_by"] = record["delivered_file"]
         prior["superseded_utc"] = record["recorded_utc"]
     manifest["deliveries"].append(record)
     _write(manifest_path(date), manifest)
-    _mirror_to_delivery_record(date, record, controls, relaxations, egress)
+    _mirror_to_delivery_record(date, record, controls, relaxations, egress,
+                               entries_source=source)
     return record
 
 

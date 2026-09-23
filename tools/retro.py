@@ -172,9 +172,10 @@ def degraded_inputs(record: Mapping[str, Any],
         out.append({"source": "record.egress", "what": egress})
     else:
         out.append({"source": "record.egress",
-                    "what": "not recorded by this delivery; no caller of "
-                            "record_delivery passes egress= today, so the "
-                            "session-start line is the only measurement"})
+                    "what": "not recorded by this delivery: no caller passed "
+                            "egress= and no session-start reading was on disk "
+                            "(.session/egress.json, written by the SessionStart "
+                            "hook; R377)"})
     if brief is None:
         out.append({"source": "brief", "what": "the brief is not on disk; every "
                                                "degraded-input fact below it is unavailable"})
@@ -237,8 +238,9 @@ def hand_passed_numbers(record: Mapping[str, Any],
             out.append({"control": key, "value": controls[key], "source": "record.controls"})
     else:
         out.append({"control": "(none)", "value": None,
-                    "source": "record.controls is empty; no caller of "
-                              "record_delivery passes controls= today, so the "
+                    "source": "record.controls is empty; the Classic path "
+                              "(execution_pipeline._deliver_mirror) passes no "
+                              "controls= until R377's remainder lands, so the "
                               "brief below is the only record of them"})
     strategy = (record.get("manifest_row") or {}).get("strategy_state") or {}
     if strategy:

@@ -5290,12 +5290,9 @@ supervisor takes this class; noted on its entry via this number.
 
 Principles only, no engine code. V, S and P are defined in `MLB_Classic.md` §2 ("Delivery first"). CLAUDE.md's Autonomy section and T-schedule give the session S relaxation and P recording under deadline (inside T-30), keep V a wall at every clock, skip the gate and the solver probe inside T-30, and make `--accept-downgrade` on an authorized repair the session's call; `--force` stays Ben's. F-1..F-4 and the R125(b)(c) decision are recorded in MLB_Classic.md §2. `skills/generate-lineups/SKILL.md` mirrors the principles. Gate: see the CHANGELOG entry.
 
-### R387. The tracked delivery record reads its rosters from the destination file before the provisional file is promoted to it (P1, S) | new 2026-09-22, from `docs/backlog_inbox/2026-09-22_BUILD_delivery-record-reads-dest-before-promote.md` (audit DD-10) | Roadmap: Session 02
+### R387. CLOSED 2026-09-23 -- SHIPPED as roadmap Session 02 (a), entry migrated to CHANGELOG.md
 
-- **What.** `upload_manifest.deliver` records at `upload_manifest.py:423` and runs `os.replace(provisional, dest)` at `:435`. `delivery_record.write_delivery_record` (`delivery_record.py:236`, reading `:248-256`) fills `entries` from `manifest_row["delivered_file"]`, which is `dest`: absent on a first build, the previous build's file on a rebuild. The same order sits in `run_showdown` (`build_slate.py:4041` then `:4061`) and in late swap (`tools/late_swap.py:919` then `:935`). The manifest row's sha256 comes from `hash_source` and is correct, so the two halves of one record disagree.
-- **Measured.** 1915_1g_sd: the v2 record carried v2's sha256 and v1's six rosters (hand-corrected, see `extra`). At bdf03e3, 4 of 8 delivery records carried `entries: []`; the populated 1607/1840 rebuild records are probably one build stale (unverifiable, because `outputs/` is gone).
-- **Fix.** Read `entries` from `hash_source` when supplied, threaded through `record_delivery` → `_mirror_delivery_record` → `write_delivery_record`, on all three writers. Assert that the sha256 of the entries source equals `manifest_row.sha256`.
-- **Acceptance.** A rebuild's record rosters equal the delivered file's; a first build's record is non-empty.
+`record_delivery` now hands its hash source (the provisional file inside `deliver`) through `_mirror_to_delivery_record` to `write_delivery_record(entries_source=...)` on both return paths, so a record's rosters are parsed from the bytes its sha256 names on all three writers. `bound_entries` re-hashes the parsed file and writes rosters only on a match; a mismatch records `entries: []` with both hashes in `entries_binding` and never withholds the delivery. Pinned by `test_upload_integrity.DeliveryRecordBytesTests`. Gate: see the CHANGELOG entry.
 
 ### R388. Usability, strategy and process are one certification: split them (Package A of the 2026-09-22 audit) (P0, M across five sessions) | new 2026-09-22, audit DD-04, DD-08, DD-09 and §3 | Roadmap: (a) Session 05, (b) 06, (c) 13, (d) 09, (e) 03
 
@@ -5381,58 +5378,19 @@ Principles only, no engine code. V, S and P are defined in `MLB_Classic.md` §2 
 - **Fix.** (a) Measure which sources the session's web tools can read, then define the capture contract (`data/slates/<date>/captures/` with a url/fetched_utc/sha256/tool sidecar, `tools/capture.py`) and add odds parsing (absorbs R236(b)'s raw-capture half). (b) Weather and statsapi slate JSON. (c) FanGraphs platoon grids and season tables; R317's transport. (d) Remove the key, the the-odds-api/odds-api.io callers, and the in-build Open-Meteo/statsapi fetches, after two BUILD slates have run on captures.
 - **Walls.** Never a DraftKings page, sportsbook included. A missing capture is `not_checked`, never a neutral recorded as checked.
 
-### R403. Refusal records carry no slate tag or reason, and run-less deliveries overwrite each other's record (P2, S) | new 2026-09-22, from `docs/backlog_inbox/2026-09-22_BUILD_1905-autobuild-sliced-read-and-untagged-refusals.md` §2 and `..._1905-late-swap-needs-feed-dk-starting-ignored.md` §3 | Roadmap: Session 02
+### R403. CLOSED 2026-09-23 -- SHIPPED as roadmap Session 02 (c), entry migrated to CHANGELOG.md
 
-- **(a)** `_main_recording_refusals` calls `write_refusal_record(..., slate_tag="", refusal={"argv": ..., "note": ...})`. On 1905_10g that produced eleven `untagged_<utc>.json` records while every refusal brief carried `slate.tag: "1905_10g"` and the error text. Pass the tag, `refusal`, `refusal_class`, `errors[:3]` and the failing `feasibility.checks`.
-- **(b)** `record_name(slate_tag, None)` yields `<tag>_norun.json`, so the 18:23 repair and the 19:05 hand late swap on 1905_10g wrote the same file. Key run-less records on UTC or a sha256 prefix.
+`main()` leaves the slate tag, its brief and the last refusal stamp in `build_slate._REFUSAL_CONTEXT`; `_main_recording_refusals` passes the tag and `refusal_record_facts` (status, refusal, `refusal_class`, `errors[:3]`, the failing `feasibility.checks`, run_id) to `write_refusal_record`. Run-less delivery records are `<tag>_norun_<sha12>.json`, keyed on the delivered sha256 so the same bytes recorded twice stay one record. A refusal before the salary file is read stays untagged, truthfully. Pinned by `test_core.RefusalRecordTagTests`. Gate: see the CHANGELOG entry.
 
 ### R404. Late swap and repair demand a feed file even when DK's `Starting` column covers every side (P1, S) | new 2026-09-22, from `docs/backlog_inbox/2026-09-22_BUILD_1905-late-swap-needs-feed-dk-starting-ignored.md` §1-2 | Roadmap: Session 28
 
 - **What.** At 19:04 ET on 1905_10g, with a complete DK `Starting` 1-9 for all 20 sides and every data host blocked, `tools/late_swap.py` exited 4 on a missing `lineups_feed.json`. `tools/repair_entry.py` counted every candidate `not_confirmed` and printed `lock: no feed supplied; no team treated as locked` one minute after TB@NYY started. The five benched slots were repaired by hand under R272.
 - **Fix.** Accept "no feed, DK covers every side" the way `build_slate.py` does (`dk_order_coverage`; R143 ranks DK above any feed). Take confirmation from the feed synthesized from the salary file, as `preflight_upload.py` does, and fall back to salary Game Info for locks, as `verify_export.py` does.
 
-### R377. `record_delivery`'s `controls`, `relaxations` and `egress` are passed by NO production caller, so three fields of the tracked record are empty on every real delivery (P2, S) | new 2026-09-19, found by running R370/R371's own R233 grep while landing CC-A7; premise VERIFIED in tree
+### R377. The Classic delivery record's `controls` is still empty: `execution_pipeline._deliver_mirror` passes none (P2, XS) | new 2026-09-19; Showdown, late swap and egress SHIPPED 2026-09-23 as roadmap Session 02 (b), that half migrated to CHANGELOG.md | Roadmap: Session 03
 
-R369 added the three kwargs and its entry describes the record as carrying
-"the controls actually in force with the counted relaxations, the host profile
-and R367's egress line". The host profile and the code identity are collected
-inside `delivery_record` itself and do arrive. The other three are parameters,
-and nothing fills them:
-
-```
-grep -rn "controls=\|relaxations=\|egress=" --include=*.py mlb_engine/ tools/ skills/
-```
-
-14 hits. Eleven are `portfolio_controls=` (a different parameter), the
-off-build-path `mlb_engine/production/`, or `autobuild`/`dfs` internals. Two are
-the internal mirror at `upload_manifest.py:234-235`, which passes through
-whatever `record_delivery` was given. All three production callers of
-`record_delivery` give it nothing: `execution_pipeline._deliver_mirror` (the
-Classic path, via `deliver`), `tools/late_swap.py:919`, and
-`skills/generate-lineups/scripts/build_slate.py:3786` (Showdown).
-
-So `record["controls"]`, `record["relaxations"]` and `record["egress"]` are `{}`,
-`{}` and `""` on every delivery this engine has ever written or will write until
-this is closed.
-
-Half of it is already covered elsewhere and that is worth knowing before
-building: the counted relaxations DO survive, under
-`manifest_row.strategy_state`, which `execution_pipeline.manifest_strategy_state`
-fills on the Classic path. `tools/retro.py` reads them from there. What is
-genuinely lost is the controls in force and the egress line.
-
-**The remedy is not symmetric across the three.** Controls and relaxations are
-in hand at each call site and cost nothing. Egress is a ~10s concurrent network
-probe (`env_probe.egress_line`, R367) and must NOT run inside a delivery: the
-T-schedule exists because optional work has cost slates, and T-5 is the worst
-possible place for a network call. Either the session-start measurement is
-threaded through, or the field is dropped from the record and from R369's
-description of it. Do not close this by making the delivery path measure egress.
-
-**Not urgent.** No current reader breaks: `retro.py` prints the reason the fields
-are empty rather than a blank section, and nothing else reads them. This is a
-record that claims more than it carries, which is the kind of thing that costs a
-session two years from now rather than today.
+- **What remains.** Session 02 was barred from `execution_pipeline`, and the Classic caller lives there. `run_slate` sets `result["merged_controls"] = controls_for_report(controls)` before it calls `mirror_to_outputs(result, salary_csv)`, and `_deliver_mirror` receives that `result`, so the fix is one keyword argument in `_deliver_mirror`'s `deliver(...)` call: `controls=result.get("merged_controls")`. Relaxations already ride on this path as `strategy_state`, and egress now comes from the session-start reading for every caller.
+- **Acceptance.** A Classic delivery record's `controls` equals the build's `merged_controls`; `DeliveryRecordBytesTests.test_showdown_and_late_swap_pass_the_controls_in_force` grows the Classic caller; `tools/retro.py`'s Classic "passes no controls=" message is retired.
 
 ### R324. CLOSED 2026-09-08 -- SHIPPED with R314, entry migrated to CHANGELOG.md
 

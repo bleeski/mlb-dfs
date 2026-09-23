@@ -58,6 +58,9 @@ line naming what this host reached just now, and the SessionStart hook prints it
 at the top of every session. Six hosts, concurrent, capped at about ten seconds,
 with the CLIENT named per host because it matters: FanGraphs answers 403 to
 urllib's fingerprint and 200 to curl (R317(a)).
+The hook also keeps its line in `.session/egress.json` (gitignored), and each
+delivery record copies it from there with its UTC stamp, so a delivery never
+probes the network itself (R377).
 
 Why it is measured rather than written down: three places in this repo recorded
 three different answers for the same two hosts, and each was true where it was

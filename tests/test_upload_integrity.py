@@ -3919,6 +3919,188 @@ class R96PerCallerTests(unittest.TestCase):
         self.assertIn("UNRECORDED DELIVERIES", text)
 
 
+class DeliveryRecordBytesTests(unittest.TestCase):
+    """R387 + R377: the tracked delivery record describes the bytes it hashes.
+
+    `deliver` records BEFORE it promotes the provisional file onto `dest`, and
+    the record's rosters were parsed from `dest`: nothing on a first build, the
+    previous build's lineups on a rebuild (1915_1g_sd carried v2's sha256 over
+    v1's six rosters). These run the real `deliver` door, so the order that
+    caused it is the order under test.
+    """
+
+    FIXTURE = REPO / "docs" / "greenfield" / "2026-09-09" / "fixture_baseline_DKEntries.csv"
+
+    def setUp(self):
+        from mlb_engine.entries import upload_manifest as um
+        self.um = um
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self._original_root = um.REPO_ROOT
+        um.REPO_ROOT = self.root
+        self.date = "2026-09-22"
+        self.outputs = self.root / "outputs" / self.date
+        self.outputs.mkdir(parents=True)
+        self.addCleanup(self._restore)
+
+    def _restore(self):
+        self.um.REPO_ROOT = self._original_root
+        self.tmp.cleanup()
+
+    def _bytes(self, version: int) -> bytes:
+        """The fixture, or the fixture with its first and last rosters swapped:
+        two builds' worth of distinct, parseable bytes for one template."""
+        lines = self.FIXTURE.read_text(encoding="utf-8-sig").splitlines()
+        pair = {2: (1, 3), 3: (1, 2)}.get(version)
+        if pair:
+            a, b = (lines[i].split(",") for i in pair)
+            # Roster columns sit after the four identity fields (the contest
+            # name is one quoted field containing a comma, so five here).
+            a[5:15], b[5:15] = b[5:15], a[5:15]
+            lines[pair[0]], lines[pair[1]] = ",".join(a), ",".join(b)
+        return ("\n".join(lines) + "\n").encode("utf-8")
+
+    def _deliver(self, version: int, run_id=None, **extra):
+        payload = self._bytes(version)
+        return self.um.deliver(
+            date=self.date, dest=self.outputs / "DKEntries_1905_10g.csv",
+            write=lambda p: Path(p).write_bytes(payload),
+            contest_type="classic", slate_tag="1905_10g", entries=3,
+            run_id=run_id, status="candidate", certification="review_grade",
+            **extra)
+
+    @staticmethod
+    def _call(rel: str, anchor: str) -> str:
+        """The text of the one call starting at ``anchor``, parens balanced."""
+        text = (REPO / rel).read_text(encoding="utf-8")
+        start = text.index(anchor)
+        depth, i = 0, text.index("(", start)
+        while True:
+            depth += {"(": 1, ")": -1}.get(text[i], 0)
+            if depth == 0:
+                return text[start:i + 1]
+            i += 1
+
+    def _record_for(self, sha256: str) -> dict:
+        from mlb_engine.entries.delivery_record import read_records
+        hits = [r for r in read_records(root=self.root, date=self.date)
+                if (r.get("manifest_row") or {}).get("sha256") == sha256]
+        self.assertEqual(len(hits), 1, f"one record per delivered sha256: {hits}")
+        return hits[0]
+
+    def _rosters(self, path: Path) -> list:
+        from mlb_engine.entries.dk_entries_manager import parse_dk_entry_rows
+        return [[str(p) for p in row.roster_ids] for row in parse_dk_entry_rows(str(path))]
+
+    def test_a_first_build_records_the_rosters_it_delivered(self):
+        out = self._deliver(1, run_id="r1")
+        self.assertTrue(out["recorded"], out["error"])
+        dest = Path(out["path"])
+        rec = self._record_for(out["record"]["sha256"])
+        self.assertEqual([e["roster_ids"] for e in rec["entries"]], self._rosters(dest),
+                         "a first build's record read the not-yet-promoted dest "
+                         "and came out empty")
+        self.assertEqual(rec["entries_binding"]["status"], "bound")
+        self.assertEqual(rec["entries_binding"]["source_sha256"], out["record"]["sha256"])
+
+    def test_a_rebuild_records_its_own_rosters_not_the_previous_files(self):
+        first = self._deliver(1, run_id="r1")
+        second = self._deliver(2, run_id="r2")
+        self.assertNotEqual(first["record"]["sha256"], second["record"]["sha256"])
+        dest = Path(second["path"])
+        rec = self._record_for(second["record"]["sha256"])
+        got = [e["roster_ids"] for e in rec["entries"]]
+        self.assertEqual(got, self._rosters(dest),
+                         "the rebuild's record must carry the delivered file's "
+                         "rosters, the bytes its sha256 names")
+        self.assertNotEqual(got, [e["roster_ids"] for e in
+                                  self._record_for(first["record"]["sha256"])["entries"]])
+
+    def test_a_sha256_mismatch_withholds_the_rosters_and_says_so(self):
+        from mlb_engine.entries.delivery_record import write_delivery_record
+        source = self.outputs / "held.csv"
+        source.write_bytes(self._bytes(1))
+        path = write_delivery_record(
+            date=self.date, root=self.root, entries_source=source,
+            manifest_row={"slate_tag": "1905_10g", "run_id": "rX",
+                          "delivered_file": "outputs/x.csv", "sha256": "0" * 64})
+        self.assertIsNotNone(path, "a mismatch is recorded, never a raise or a skip")
+        rec = json.loads(Path(path).read_text(encoding="utf-8"))
+        self.assertEqual(rec["entries"], [],
+                         "rosters that are not the recorded bytes are not written")
+        binding = rec["entries_binding"]
+        self.assertEqual(binding["status"], "sha256_mismatch")
+        self.assertEqual(binding["expected_sha256"], "0" * 64)
+        self.assertEqual(len(binding["source_sha256"]), 64)
+
+    def test_a_record_that_cannot_be_written_never_withholds_the_delivery(self):
+        """P, not V (R386): bookkeeping failing is never a reason to lose a file."""
+        from unittest import mock
+        from mlb_engine.entries import delivery_record as dr
+
+        def boom(**_kwargs):
+            raise RuntimeError("record writer down")
+
+        with mock.patch.object(dr, "write_delivery_record", boom):
+            out = self._deliver(1, run_id="r1")
+        self.assertTrue(out["recorded"], out["error"])
+        self.assertEqual(Path(out["path"]).name, "DKEntries_1905_10g.csv")
+        self.assertTrue(Path(out["path"]).is_file())
+
+    def test_every_writer_hands_the_provisional_bytes_to_the_record(self):
+        """The three delivery paths, one at a time (R96's lesson): each names
+        the provisional file as `hash_source`, which is now also where the
+        record's rosters are read from."""
+        for rel, anchor in (
+                ("mlb_engine/entries/upload_manifest.py", "out[\"record\"] = record_delivery("),
+                ("skills/generate-lineups/scripts/build_slate.py", "        record_delivery(\n"),
+                ("tools/late_swap.py", "record = record_delivery(")):
+            self.assertIn("hash_source=provisional", self._call(rel, anchor), rel)
+        um = (REPO / "mlb_engine/entries/upload_manifest.py").read_text(encoding="utf-8")
+        self.assertEqual(um.count("entries_source=source)"), 2,
+                         "both record_delivery return paths must thread the source")
+
+    def test_showdown_and_late_swap_pass_the_controls_in_force(self):
+        """R377. Two of three production callers pass controls and relaxations;
+        the Classic caller is `execution_pipeline._deliver_mirror`, which this
+        session did not touch (Session 03 carries it)."""
+        for rel, anchor, needles in (
+                ("skills/generate-lineups/scripts/build_slate.py", "        record_delivery(\n",
+                 ("controls={\"max_shared_players\": share_cap",
+                  "relaxations=showdown_relaxation_counts(")),
+                ("tools/late_swap.py", "record = record_delivery(",
+                 ("controls=controls_for_report(",
+                  "relaxations={\"downgrades_accepted\": len(downgraded)}"))):
+            call = self._call(rel, anchor)
+            for needle in needles:
+                self.assertIn(needle, call, rel)
+
+    def test_the_session_egress_reading_reaches_the_record_and_a_caller_wins(self):
+        """R377. The hook's reading is read from disk; a delivery never probes."""
+        from mlb_engine import repo_env
+        first = self._deliver(1, run_id="r1")
+        rec = self._record_for(first["record"]["sha256"])
+        self.assertEqual((rec["egress"], rec["egress_source"]), ("", "not_measured"))
+
+        repo_env.write_session_egress("egress: statsapi 200, odds 401", self.root)
+        second = self._deliver(2, run_id="r2")
+        rec = self._record_for(second["record"]["sha256"])
+        self.assertEqual(rec["egress"], "egress: statsapi 200, odds 401")
+        self.assertTrue(rec["egress_source"].startswith("session_start "), rec["egress_source"])
+
+        third = self._deliver(3, run_id="r3", egress="egress: from the caller")
+        rec = self._record_for(third["record"]["sha256"])
+        self.assertEqual((rec["egress"], rec["egress_source"]),
+                         ("egress: from the caller", "caller"))
+        # T-5 is the worst place for a network call: the record path reads a
+        # file and never reaches the ~10s probe.
+        for rel in ("mlb_engine/entries/delivery_record.py",
+                    "mlb_engine/entries/upload_manifest.py"):
+            text = (REPO / rel).read_text(encoding="utf-8")
+            self.assertNotIn("egress_line", text, rel)
+            self.assertNotIn("env_probe", text, rel)
+
+
 class CorruptManifestIsItsOwnStateTests(unittest.TestCase):
     """R36 F6m(1). CORRUPT and ABSENT were the same answer, and the write erased.
 
