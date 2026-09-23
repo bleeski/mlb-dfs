@@ -27309,9 +27309,14 @@ class LastUsableArtifactTests(unittest.TestCase):
 
     def test_a_crash_after_certification_delivers_its_export_with_exit_7(self):
         delivered = self._delivered_csv()
+        # `feasibility` because run_slate stamps it on every approved result,
+        # and it is what makes a governor read a failed result as the
+        # allocator's refusal: without it the class is READ-IT and the
+        # governor passes whatever this code does.
         crashed = {"passed": False, "crashed": True, "run_id": "r1",
                    "workflow_valid": False,
                    "errors": ["OperationalError: database is locked"],
+                   "feasibility": {"passed": True, "checks": []},
                    "last_usable_artifact": self._engine_artifact(delivered)}
         code, brief, _calls, err = self._run(2, refusal=crashed)
         self.assertEqual(code, 7, err[-400:])
@@ -27411,6 +27416,29 @@ class LastUsableArtifactTests(unittest.TestCase):
         with unittest.mock.patch.object(mod, "main", main), \
                 self.assertRaisesRegex(ValueError, "nothing written yet"):
             mod._main_recording_refusals()
+
+    def test_build_asserted_exits_through_the_same_door(self):
+        """R233's N+1: tools/build_asserted.py, which autobuild runs as its
+        child after a pool override, called build_slate's bare `main()`, so its
+        builds skipped the refusal record and the exit-7 guard. Driven against
+        a stand-in script whose two doors return different codes."""
+        import importlib
+        stub = self.root / "build_slate_stub.py"
+        stub.write_text("def main():\n    return 11\n"
+                        "def _main_recording_refusals():\n    return 22\n",
+                        encoding="utf-8")
+        ba = importlib.import_module("tools.build_asserted")
+        import mlb_engine.pipeline.execution_pipeline as ep_mod
+        original = ep_mod.run_slate
+        try:
+            with unittest.mock.patch.object(ba, "BUILD", stub), \
+                    unittest.mock.patch.object(
+                        sys, "argv", ["build_asserted.py", "--assert-gate",
+                                      "lineup_gate_passed"]):
+                code = ba.main()
+        finally:
+            ep_mod.run_slate = original
+        self.assertEqual(code, 22)
 
     def test_a_showdown_file_whose_record_failed_is_presented_and_exits_7(self):
         """run_showdown, end to end on the vendored fixture: a failed manifest

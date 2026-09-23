@@ -186,7 +186,7 @@ and classified structural, override a pool blocker whose shape is classified
 benign and assert `lineup_gate_passed` on that same evidence. It stops on
 anything it cannot classify, and every decision lands in
 `outputs/<date>/autobuild_decisions.json`. Exit 0 certified, 3 refused with
-reasons, 4 bad input, 5 out of time.
+reasons, 4 bad input, 5 out of time, 7 delivered after a later failure.
 
 A stop is a real question, not a formality: an exposure cap has no engine-named
 floor, and a team matching under 5 of 9 salary hitters is a crosswalk failure,
@@ -250,7 +250,8 @@ to `outputs/<date>/build_brief.json`.
 
 Exit codes: `0` certified, `10` partial progress saved (run the exact same command
 again, it resumes), `3` built but did not certify, `4` a precondition was never
-met (inputs missing, solver missing, or the slate's first lock already passed).
+met (inputs missing, solver missing, or the slate's first lock already passed), `7`
+the file passed its checks and a later stage failed: hand over the `FILE` line's file.
 
 An exit of `10` is normal on a big slate, not a failure. The bank persists between
 runs. Just run it again.
