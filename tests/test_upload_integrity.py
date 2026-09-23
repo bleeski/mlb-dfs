@@ -4061,16 +4061,25 @@ class DeliveryRecordBytesTests(unittest.TestCase):
                          "both record_delivery return paths must thread the source")
 
     def test_showdown_and_late_swap_pass_the_controls_in_force(self):
-        """R377. Two of three production callers pass controls and relaxations;
-        the Classic caller is `execution_pipeline._deliver_mirror`, which this
-        session did not touch (Session 03 carries it)."""
+        """R377. Every production caller passes the controls in force: Showdown
+        and late swap since Session 02, the Classic `_deliver_mirror` and the
+        re-promotion since Session 03 (their relaxations ride as
+        `strategy_state` and the earlier record's respectively).
+        `DeliveryLabelAgreementTests` checks the Classic value on the real
+        path; this pins the four call sites."""
         for rel, anchor, needles in (
                 ("skills/generate-lineups/scripts/build_slate.py", "        record_delivery(\n",
                  ("controls={\"max_shared_players\": share_cap",
                   "relaxations=showdown_relaxation_counts(")),
                 ("tools/late_swap.py", "record = record_delivery(",
                  ("controls=controls_for_report(",
-                  "relaxations={\"downgrades_accepted\": len(downgraded)}"))):
+                  "relaxations={\"downgrades_accepted\": len(downgraded)}")),
+                ("mlb_engine/pipeline/execution_pipeline.py", "    return deliver(\n",
+                 ("controls=result.get(\"merged_controls\")",
+                  "strategy_state=manifest_strategy_state(result)")),
+                ("tools/promote_run.py", "        result = deliver(\n",
+                 ("controls=prior_record.get(\"controls\")",
+                  "relaxations=prior_record.get(\"relaxations\")"))):
             call = self._call(rel, anchor)
             for needle in needles:
                 self.assertIn(needle, call, rel)

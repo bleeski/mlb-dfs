@@ -99,6 +99,22 @@ def find_prior_row(run_id: str, outputs_root: Path) -> Tuple[Optional[str], Opti
     return best
 
 
+def prior_delivery_record(run_id: str, date: str) -> Optional[Dict[str, Any]]:
+    """The latest delivery record for this run on this date, or None (R377)."""
+    from mlb_engine.entries.delivery_record import read_records
+
+    best: Optional[Dict[str, Any]] = None
+    for record in read_records(date=date):
+        if record.get("kind") != "delivery":
+            continue
+        if str((record.get("manifest_row") or {}).get("run_id") or "") != run_id:
+            continue
+        if best is None or str(record.get("recorded_utc") or "") > str(
+                best.get("recorded_utc") or ""):
+            best = record
+    return best
+
+
 def entries_facts(path: Path) -> Dict[str, Any]:
     """Contest ids, names and the entry count, counted off the delivered bytes.
 
@@ -209,6 +225,15 @@ def run(args: argparse.Namespace) -> int:
                        f"these entries belong to")
     tag = args.tag if args.tag is not None else str((prior_row or {}).get("slate_tag") or "")
     contest_type = str((prior_row or {}).get("contest_type") or "classic")
+    # R388(e), R377. A re-promotion restores bytes an earlier delivery already
+    # recorded, and that delivery knew two things runs/<id>/manifest.json does
+    # not: a review-grade label (a deadline rung, an accepted downgrade) and the
+    # controls the build solved under. Re-deriving `certified` from
+    # workflow_valid would upgrade the label; passing nothing empties the record.
+    prior_cert = str((prior_row or {}).get("certification") or "")
+    if workflow_valid and prior_cert.startswith("review_grade"):
+        certification = prior_cert
+    prior_record = prior_delivery_record(run_id, date) or {}
 
     facts = entries_facts(source)
     out_dir = outputs_root / date
@@ -276,6 +301,8 @@ def run(args: argparse.Namespace) -> int:
                             {"state": "unknown", "counts": {}}),
             re_promoted_from=run_id,
             notes=notes,
+            controls=prior_record.get("controls") or None,
+            relaxations=prior_record.get("relaxations") or None,
         )
     except CorruptManifestError as exc:
         return _refuse(str(exc))

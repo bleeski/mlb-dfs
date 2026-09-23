@@ -66,7 +66,7 @@ Never repair audit or test infrastructure during a live slate; if version or inv
 
 ## Hosts
 Three hosts run this repo and `docs/hosts.md` is the table: how each is reached, call budget, whether `rm` works, where DK files arrive, how the deliverable leaves. **Ask `repo_env.host_profile()` for any number a program needs** (R349); do not restate one here.
-- **A Claude Code cloud container is the default**, and runs DEV, BUILD or ARCHIVE. It is EPHEMERAL: everything uncommitted dies with the session and `outputs/`/`runs/` are gitignored, so push before you stop and hand the deliverable into the conversation (R354). `.claude/` carries the settings, hooks, path-scoped rules and the `/dev-session`, `/land` and `/ship` skills. The full gate runs in one call here (~230s measured 2026-09-19).
+- **A Claude Code cloud container is the default**, and runs DEV, BUILD or ARCHIVE. It is EPHEMERAL: everything uncommitted dies with the session and `outputs/`/`runs/` are gitignored, so push before you stop and hand the deliverable into the conversation (R354). `.claude/` carries the settings, hooks, path-scoped rules and the `/dev-session`, `/land` and `/ship` skills. The full gate runs in one call here; `docs/hosts.md` has the measured time.
 - **Claude Code on Ben's Windows machine runs DEV** (Ben, 2026-09-15). PowerShell, so prefer `python` entry points over bash idioms. Host facts go in `CLAUDE.local.md` (gitignored), never here.
 - **Cowork is legacy**, kept because the mount still exists: no `rm` (`mv` into `_to_delete/`), and a lock CLASS to sweep before every git write (R109). Read `docs/cowork_sandbox.md` before the first bash call there.
 

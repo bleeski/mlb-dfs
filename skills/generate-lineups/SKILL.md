@@ -1492,20 +1492,12 @@ Before a build, when there is time:
 
 ```bash
 cd <repo> && git status --short
-python tools/audit.py --gate-run --gate-budget 130 --gate-ceiling 165  # repeat to GATE COMPLETE
-python tools/audit.py --gate-report --terse  # expect PASS v2.26.0, 40 modules, 2129 tests
+python tools/audit.py --run-tests --terse
 ```
 
-**`--run-tests` in one call is not the supported path here and CLAUDE.md says
-so.** `tests.test_core` alone needs ~89s and one of its tests needs 35.8s by
-itself, so the single command overruns the call and takes its own report with
-it. The gate above is that same command assembled across calls: budget for five
-from a cold `__pycache__`, one warm. Do not background it — `nohup` and `setsid`
-both die with the call, the log comes back EMPTY (which reads exactly like a
-silent pass), and a killed `audit.py` strands the next commit on a zero-byte
-`.git/index.lock` this mount cannot unlink. Do not hand it to Ben either: his
-Windows Python has no scipy and `.pylibs/` is a Linux build, so `--run-tests`
-cannot pass on his host. The gate is the session's job.
+Whether that fits one call, and how long it takes, is a host fact:
+`docs/hosts.md` has the table, and `docs/cowork_sandbox.md` has the split gate
+for Cowork, the one host where it does not fit. The gate is the session's job.
 
 When the skill or its scripts change, run the fixture evals too (not part of
 the audit; they are the skill-development harness and each pins an exit code,
@@ -1519,10 +1511,10 @@ The audit checks dependencies first and names the install command if something i
 missing, because a missing solver is not a slow build, it is no build. It also
 pins the test count, PER SUITE since R62: `EXPECTED_SUITE_COUNTS` in
 `tools/audit.py` is the source of truth and `EXPECTED_TEST_COUNT` is only its
-sum, so adding tests means bumping the suite's own entry, not a single total,
-and then the three docs that quote the expected line (CLAUDE.md, the ledger
-Quick Card, and this file). A count mismatch is the pin working, not a broken
-suite, but read the state word the audit prints before touching a pin. Only
+sum, so adding tests means bumping the suite's own entry, not a single total.
+Only the ledger Quick Card quotes the counts, and it is ARCHIVE's to move. A
+count mismatch is the pin working, not a broken suite, but read the state word
+the audit prints before touching a pin. Only
 `grew` is a stale pin. `shortfall`, `skipped_in_place` and `absent` are lost
 coverage, they name the precondition to stage, and lowering a pin to meet them
 retires the tests for good.

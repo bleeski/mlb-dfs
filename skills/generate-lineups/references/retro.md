@@ -63,7 +63,8 @@ python tools/retro.py --date <slate_date> --handover-utc "$(TZ=UTC date -Is)"
 Five of the six things the next section asks for are already in the artifacts,
 and reconstructing them from scrollback is how they get lost when the context
 compacts. `retro.py` reads the tracked delivery record (R369) plus the build
-brief beside it and prints: the gate-clean stamp and the gap to hand-over, every
+brief beside it and prints: when the manifest row was recorded (before
+preflight, so not a gate-clean stamp; R298) and the gap to hand-over, every
 degraded input the build reported, every number it ran on with the artifact that
 says whether a human chose it, every refusal exit code against its documented
 meaning, and every brief key `SKILL.md` names that this brief does not carry.

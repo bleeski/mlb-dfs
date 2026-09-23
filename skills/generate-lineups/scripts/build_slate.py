@@ -15,7 +15,8 @@ Exit codes:
     0   certified file written
     10  partial progress saved, run the same command again
     3   build ran but did not certify (errors printed)
-    4   inputs missing or unreadable
+    4   refused before any solve: inputs missing or unreadable, or a flag
+        value this build cannot use
 
 Every number this prints is a deterministic review proxy or a labeled prior.
 Nothing here is ROI, win rate, cash rate, or a probability claim. Nothing here
@@ -3009,12 +3010,14 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
     confidence_relax = ("deadline_t30" if isinstance(_minutes, (int, float))
                         and _minutes < 30 else None)
 
-    def _solve(controls: dict):
+    def _solve(controls: dict, certification_label: str | None = None):
         # R290(c) step 2. Extracted so the deadline governor can re-solve with
         # the controls open WITHOUT a second copy of this call. A governor that
         # re-solves through a duplicated invocation is R267's dependency
         # problem and R153's "on every rung" problem at once: the copy drifts,
         # and the rung that matters is the one the copy forgot.
+        # R388(e): the governed re-solve passes the deadline label, so the
+        # manifest row records what the brief says rather than `certified`.
         return run_slate(
             runs_root=str(REPO / "runs"),
             salary_csv=str(salary), entries_csv=str(entries),
@@ -3030,6 +3033,7 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
             leverage=leverage or None,
             input_confidence_facts=confidence_facts,
             input_confidence_relax=confidence_relax,
+            certification_label=certification_label,
             **slate_kwargs,
         )
 
@@ -3100,7 +3104,7 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
               f"re-solving. Opened: {json.dumps(opened, sort_keys=True)}. This "
               f"file will be labelled {dg.DEADLINE_LABEL} and never certified.",
               file=sys.stderr)
-        result = _solve(attempt_controls)
+        result = _solve(attempt_controls, certification_label=dg.DEADLINE_LABEL)
 
     if not result.get("passed"):
         for blocker in result.get("contest_identity_blockers") or []:
@@ -3305,6 +3309,13 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         "delivered_sha256": manifest_sha256(delivered),
         "upload_manifest": manifest_repo_relative(
             REPO / "outputs" / args.date / "upload_manifest.json"),
+        # R298(b). The engine sets all three on the result and this brief
+        # dropped them, so a failed mirror read as a normal delivery of the
+        # runs/ path. On every brief, None when nothing failed, so absence is
+        # visible (R237). The Showdown brief carries `manifest_recorded` too.
+        "manifest_recorded": result.get("manifest_recorded"),
+        "mirror_error": result.get("mirror_error"),
+        "delivered_sha256_error": result.get("delivered_sha256_error"),
         "pool_blockers_overridden": hard if (hard and args.ignore_pool_blockers) else [],
         "pool_blockers_soft": soft,
         # R104. The operator's PLR/PO decision is an INPUT to this build, so it is
@@ -3387,6 +3398,15 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
             print(f"DEADLINE: delivered as {dg.DEADLINE_LABEL} after "
                   f"{len(governor.walked)} rung(s): "
                   f"{', '.join(governor.rungs_walked())}", file=sys.stderr)
+            # R388(e). The status said `certified` beside this label; the
+            # manifest row, the delivery record and preflight now read the
+            # label too, so the brief's own status does.
+            if brief["status"] == "certified":
+                brief["status"] = dg.DEADLINE_LABEL
+    # R298(b). A certified build whose mirror failed delivered nothing to
+    # outputs/; the status says so rather than reading as a delivery.
+    if result.get("mirror_error") and brief["status"] != "verify_failed":
+        brief["status"] = f"{brief['status']}_unmirrored"
 
     # R290(c). The conditional refusal stamps its own class, on the brief this
     # site already writes. Both halves matter to the governor: `delivery_blocked`
@@ -6369,9 +6389,14 @@ def refusal_record_facts(context: Mapping[str, Any]) -> tuple:
 
 
 #: What each documented exit means, so a record is readable without the source.
+#: R396(a): 3 carried exit 4's meaning, so every exit-3 record said "inputs
+#: missing" about a build that ran and refused. 3 and 4 now read as the module
+#: docstring and `REFUSAL_OUT_OF_SCOPE` do. 5 is autobuild's, not this script's
+#: (R396(b)).
 REFUSAL_EXIT_NOTES = {
-    3: "inputs missing or unusable",
-    4: "refused: a wall, a units slip, or an unusable argument",
+    3: "built and refused: the build ran but did not certify, or the pool blocked it",
+    4: ("refused before any solve: inputs missing or unreadable, a wall, a "
+        "units slip, or an unusable argument"),
     5: "supervisor stop: the wall clock or the call budget ran out",
     10: "bank thin: resumable, run the same command again to add a slice",
 }

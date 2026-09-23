@@ -2,6 +2,147 @@
 
 What changed in the engine, the tools and the contracts, when, and why.
 
+## 2026-09-23 — R388(e): one label. A deadline-governed Classic retry is recorded review-grade inside `run_slate`, so the brief, the manifest row, the delivery record and preflight's verdict agree; an accepted late-swap downgrade and a re-promotion follow (roadmap Session 03, part a)
+
+**Scope.** `mlb_engine/pipeline/execution_pipeline.py` (`run_slate`'s `certification_label` and its guard, `manifest_certification`, `_deliver_mirror`), `skills/generate-lineups/scripts/build_slate.py` (`_solve`, the governed re-solve, the brief's status), `tools/preflight_upload.py` (`REVIEW_GRADE_REASONS`, the verdict note), `tools/late_swap.py` (`DOWNGRADE_LABEL`, `swap_certification`), `tools/promote_run.py` (the earlier row's label), `tests/test_core.py` (`DeliveryLabelAgreementTests`, new; `DeadlineGovernorWiringTests` +1 and a label list in its harness), `tools/audit.py` (`EXPECTED_SUITE_COUNTS`, shared with the three entries below), `docs/ROADMAP.md` (Session 03 row Complete, NEXT to Session 04, Session 99 row, ledger row), `docs/backlog.md` (R388 rewritten to (a)-(d), R411 filed), this file.
+
+**What was wrong, verified at 648f8cf.** A `dfs-premise` agent checked the row and I re-ran its sharpest evidence. `_deliver_mirror` wrote `certification="certified" if result.get("workflow_valid")` (EP:6425), and nothing told `run_slate` a retry was governed: its signature had no such parameter, and `build_slate`'s `_solve` passed the opened controls only as `portfolio_controls_override`. Preflight turns any label other than `certified` into `review_ready` (PF:2937), so the manifest's `certified` was what made a governed file `upload_ready`. Three corrections to the row:
+- The label is `review_grade_deadline_build` (`deadline_governor.DEADLINE_LABEL`). The row's `review_grade_deadline` exists nowhere and would not have matched the brief.
+- The brief disagreed with itself too: `status: certified` beside `label: review_grade_deadline_build`.
+- `tools/promote_run.py:264` is a second Classic delivery caller. It re-derived `certified` from `workflow_valid`, so re-promoting a governed run would have upgraded its label.
+
+`late_swap.py --accept-downgrade` recorded `certified` whenever the gates passed (LS:986), although CLAUDE.md (R386) says that file ships review-grade.
+
+**What shipped.**
+- **`run_slate(certification_label=None)`.** Only a `review_grade*` value is accepted, and anything else raises `ValueError` before any work, so a caller can lower the label and never raise it. When set, the result carries `certification_label`; an ungoverned result keeps exactly its old keys. `manifest_certification(result)` is the one rule: a failing gate is `not_certified`, then the caller's label, then `certified`.
+- **`build_slate`.** The governed re-solve passes `certification_label=dg.DEADLINE_LABEL`. The first solve passes none. When the governor walked and the file verified, the brief's `status` is the label.
+- **Late swap.** A swap that took at least one downgrade records `review_grade_downgrade_accepted`; a swap that took none still records `certified`.
+- **Re-promotion.** `promote_run` keeps the earlier row's label when it is review-grade instead of re-deriving `certified`.
+- **Preflight.** The verdict is unchanged: every label but `certified` is `review_ready`, exit 0. The note now gives the reason per label (`REVIEW_GRADE_REASONS`). Preflight imports nothing from the engine, so a test pins that table to the writers' labels.
+
+**The chain test.** `DeliveryLabelAgreementTests` drives the real `run_slate(approve=True)` → mirror → manifest row → tracked delivery record → `preflight_upload.main`, on a salary fixture preflight passes clean (test_upload_integrity's, whose surnames survive `_norm_name`; RunSlateFrontDoorTests' "AAA 1B"/"AAA 3B" read as one person to preflight). Governed: the row and the record both read `review_grade_deadline_build`, and preflight exits 0 with `review_ready`, no failures, and a note naming the deadline rung. Ungoverned: `certified` and `upload_ready`. The two arms differ only in the one kwarg.
+
+**Found and filed.** SKILL.md says to run the fixture evals when the skill's scripts change. `run_evals.py` gives 6 of 8. Evals 2 and 5 fail identically on a clean worktree of 648f8cf: eval 2 since afbaf68 (the R405 merge; it passes at 0c2ea3c), eval 5 already at fa8f343. Neither is this change's. The run also left seven delivery and refusal records in tracked `data/deliveries/`, because the eval surface guard covers `data/slates` and `outputs` only; they were removed and not committed. Filed as R411, roadmap Session 99.
+
+**R233 grep**, the class of a manifest certification written by a production delivery caller: `git grep -n -E "(\bdeliver|record_delivery)\($" -- mlb_engine tools skills`, excluding `mlb_engine/production/` (R302's strangler, off the build path). Four callers: `execution_pipeline.py:6450` (`manifest_certification(result)`), `build_slate.py:4298` (Showdown, `review_grade`, unchanged), `late_swap.py:994` (`swap_certification`), `promote_run.py:289` (the earlier row's review-grade label, else the run manifest's gates). Only preflight branches on the value (`git grep -n "certification\") ==\|recorded_certification"`); `delivery_record` and `outcome_review` only report it.
+
+**Mutation checks** (`tools/_scratch_s03/mutate.py`, 18 for the block, each reverted alone, run and restored). This part's eight all went red: the label ignored by `manifest_certification`, the re-solve passing no label, the brief status left `certified`, the upgrade guard removed, `promote_run` re-deriving `certified`, `swap_certification` ignoring a downgrade, the swap call site reverted, and preflight's reason key renamed. The restored tree is green (58 tests across the five classes).
+
+**Gate.** Before: `PASS  v2.26.0  42 modules  2445 tests  5 skipped` (R410's after-line). After: `PASS  v2.26.0  42 modules  2459 tests  5 skipped` (test_core 4 and test_showdown 1 skipped in place, the same five; 307s in a cloud container). `tests.test_core` pin 1465 -> 1479 for the block. GOLD: 9 tests OK, `tests/golden/` untouched, histogram unmoved. PROBE not required (no bank, allocator or optimizer change). Verification command: 36 tests OK.
+
+**The migrated register text (R388(e), filed 2026-09-22).** "- **(e) One label.** A governed Classic retry is recorded `certified` in the manifest (`execution_pipeline.py:5445, 5684`) and stamped `upload_ready` by preflight (`preflight_upload.py:2937`) while the brief says review-grade (`build_slate.py:3141-3149`). Record `review_grade_deadline` inside `run_slate`."
+
+## 2026-09-23 — R298: three T-5 evidence readers stop lying. The manifest reads the allocator's ladders, the Classic brief carries its mirror facts, a lone prediction file for another slate is refused, and retro's clock start is named for what it is (roadmap Session 03, part b)
+
+**Scope.** `mlb_engine/pipeline/execution_pipeline.py` (`execute_portfolio`'s two returns, `manifest_strategy_state`), `skills/generate-lineups/scripts/build_slate.py` (three brief keys, `_unmirrored`), `tools/qa_portfolio.py` (`find_prior_file`, `_prior_file_tag`), `tools/retro.py` (`clock` and its printer), `skills/generate-lineups/references/retro.md` (one sentence), `tests/test_core.py` (`DeliveryLabelAgreementTests` +1, `DeadlineGovernorWiringTests` +2, `RetroFactsTests` +1 with one renamed, `LeveragePanelTests` +1), `docs/backlog.md` (R298 CLOSED stub).
+
+**What was wrong, verified at 648f8cf** (premise agent, re-run). All three parts held; one row fact was wrong.
+- (a) `manifest_strategy_state` read only `bank_diagnostics` and `candidate_bank`, and `execute_portfolio` returned `candidate_reuse` but neither `primary_stack_floor` nor `five_stack_quota`. The entry's repro (reuse relaxed twice, floor 4 to 3, quota relaxed off, production `candidates_override` bank) gave `{'state': 'unknown', 'counts': {}, 'evidence': 'absent'}`. A clean real build read `unknown` too.
+- (b) The engine sets `manifest_recorded`, `mirror_error` and `delivered_sha256_error` on the result, and the Classic brief dropped all three. On a failed mirror its `delivered_path` fell back to `runs/<id>/final/` under `status: certified`. Correction: the Showdown brief carries `manifest_recorded` and `manifest_error`, not `mirror_error`.
+- (c) `find_prior_file` returned the one `ownership_pred_*.json` in `outputs/<date>/` whenever the by-tag file was missing, even with the brief's tag known. Its callers are the QA report, `resolve_leverage` (which puts `own_pct_by_player_id` into the MILP) and the Showdown `--captain-prior` resolver, which the entry did not name. The function is in `tools/qa_portfolio.py:704`; the row named `tools/ownership_pred.py`.
+- Retro: `gate_clean_utc` came from `manifest_row.recorded_utc`, which `record_delivery` writes before preflight, and on Showdown with no gates run. Its fallback, `record.recorded_utc`, is the delivery record's own later write time, so one name covered two stamps.
+
+**What shipped.**
+- (a) Both `execute_portfolio` returns carry `primary_stack_floor` and `five_stack_quota`, and `manifest_strategy_state` reads each ladder's `relaxations`. A block present is evidence. The entry's repro now reads `relaxed` with counts `{candidate_reuse: 2, primary_stack_floor: 1, five_stack_quota: 1}`, and a clean real build reads `clean` with evidence `recorded`.
+- (b) The three keys ride every Classic brief, `None` when nothing failed. A failed mirror makes the status `certified_unmirrored` (or `review_grade_deadline_build_unmirrored`). A `verify_failed` brief is left as it is.
+- (c) With the brief's tag known and one prediction file present, the file is used only when its own `slate_tag` (which `ownership_pred emit` writes) matches. Otherwise the refusal says AMBIGUOUS, names the file's slate, and points at `--ownership-pred`. With no tag in the brief, the one file is still the answer.
+- Retro: `manifest_recorded_utc` from the row, `delivery_recorded_utc` from the record, and `clock_start_source` naming which one the gap used. The printer says "before preflight". `retro.md` no longer calls it a gate-clean stamp.
+
+**Mutation checks**, red then restored: ladders not read; `execute_portfolio` dropping the quota block (the chain test asks for a quota its one five-stack candidate meets, so all three blocks must arrive); the brief dropping `mirror_error`; no `_unmirrored`; the tag check removed; retro still keyed `gate_clean_utc`; retro reporting the fallback as the manifest's stamp.
+
+**Gate.** In R388(e)'s entry above.
+
+**The migrated register entry (R298, filed 2026-09-02).**
+
+**R298.** Three evidence readers that lie at T-5: `manifest_strategy_state` never reads the allocator ladders, the certified Classic brief carries no `mirror_error`/`manifest_recorded`, and `find_prior_file` can feed another draftgroup's ownership prior into `--leverage` (P2, S) | new 2026-09-02, from the greenfield tenth edition (GF10-P2, GF10-T10, GF10-T16); (a) VERIFIED-repro, (b)(c) VERIFIED-read
+
+**Rider 2026-09-04, R294(a) shipped: (a)'s READ is unchanged and its VALUE went
+up.** R294(a) fixed the prefilter that used to mis-attribute relaxations in the
+three ladder blocks (a) has to read (`contest_allocator.py:3162-3250`, unchanged
+by R294 -- the guards moved, the relaxation records did not). Nothing about what
+(a) must parse changes. What changes is what a relaxation appearing there MEANS:
+before R294 a `primary_stack_floor` or `candidate_reuse` relaxation could be an
+artifact of a starving prefilter, so surfacing it in `manifest_strategy_state`
+would have propagated a false attribution into the field CLAUDE.md's "clean when
+the relaxation counts are zero" is read off. It is now genuinely the bank's or
+the control's. Build (a) on that basis; no premise of it needs re-reading.
+
+(a) `execution_pipeline.py:5087-5118` reads only the `bank_diagnostics`/`candidate_bank` holders; the three allocator ladders (`candidate_reuse`, `primary_stack_floor`, `five_stack_quota` relaxations at `contest_allocator.py:3162-3250`) are never read, and on the production `candidates_override` path `candidate_bank` is `{source, candidate_count}`, so a Classic row reads `state: unknown, evidence: absent` even when reuse, quota and floor all relaxed. Repro: result with `candidate_reuse.relaxations=2`, floor 4→3, quota relaxed_off → `{'state': 'unknown', 'counts': {}, 'evidence': 'absent'}`. CLAUDE.md's "clean when the relaxation counts are zero" is read off this field. Fix: read the three blocks; `execute_portfolio` returns `primary_stack_floor`/`five_stack_quota` beside `candidate_reuse` (:569-570, :594-595). R64(a) covered bank holders only. (b) `build_slate.py:2140-2223`: the Classic brief omits `mirror_error`, `delivered_sha256_error`, `manifest_recorded`; when the mirror fails `delivered_path` falls back to `runs/<id>/final/DKEntries.csv` and `status` stays `certified`; the Showdown brief (:2902-2903) carries both. CHANGELOG (R176(d)) says the brief records `mirror_error`; the brief does not. Fix: add the three keys; `status: certified_unmirrored` when `mirror_error` is set. (c) `qa_portfolio.py:637-644` falls back to "the one prediction file in outputs/<date>/" even when the brief's tag is known and does not match; `resolve_leverage` forwards that file's `own_pct_by_player_id` into MILP constraints (`build_slate.py:2386-2389, :1822, :1981`). Fix: AMBIGUOUS refusal when the single hit's tag differs.
+
+
+## 2026-09-23 — R396(a): the refusal record's note for exit 3 says what exit 3 means (roadmap Session 03, part c)
+
+**Scope.** `skills/generate-lineups/scripts/build_slate.py` (`REFUSAL_EXIT_NOTES`, the module docstring's exit-4 line), `tests/test_core.py` (`RetroFactsTests` +1, and one assertion in `test_a_documented_refusal_exit_is_recorded_and_not_flagged`), `docs/backlog.md` (R396 rewritten to (b)).
+
+**What was wrong, verified at 648f8cf** (premise agent, re-run). The entry said notes 3 and 4 were swapped. Only note 3 was wrong: it read "inputs missing or unusable", exit 4's meaning, while every exit-3 site (`return 3` at BS:2425, 2452, 3247, 4196, 4204, 4248, 4273; `REFUSAL_SITES`' pool_blocked, not_certified, verify_failed and the Showdown refusals) is a build that ran or was pool-blocked and refused. Note 4 was incomplete, not wrong: it omitted missing or unreadable inputs, the docstring's whole definition, and its "a wall" is true (the started-slate refusal at BS:6071 exits 4, and `test_a_documented_refusal_exit_is_recorded_and_not_flagged` pins the word). Swapping the two would have put "units slip / unusable argument" on exit 3, where no site is either.
+
+**What shipped.** Note 3 reads "built and refused: the build ran but did not certify, or the pool blocked it". Note 4 reads "refused before any solve: inputs missing or unreadable, a wall, a units slip, or an unusable argument", which is `REFUSAL_OUT_OF_SCOPE[4]`'s phrasing. The docstring's exit-4 line gains "or a flag value this build cannot use". Key 5 stays: `build_slate` never returns 5 (`grep "return 5"`: none), and the note describes autobuild's supervisor stop, which R396(b) (Session 07) owns.
+
+**Mutation check.** Note 3 reverted: `test_an_exit_3_refusal_reads_as_built_and_refused` red; restored, green.
+
+**Gate.** In R388(e)'s entry above.
+
+**The migrated register text (R396(a), filed 2026-09-22).** "- **(a)** `REFUSAL_EXIT_NOTES` (`build_slate.py:6044-6049`) swaps exits 3 and 4 against the module docstring (`:14-18`) and `autobuild.py:662`, so every refusal record since R369 carries the wrong note."
+
+## 2026-09-23 — R377 (closed): the Classic delivery record carries the controls the build solved under, and a re-promotion carries the earlier record's (roadmap Session 03, part d)
+
+**Scope.** `mlb_engine/pipeline/execution_pipeline.py` (`_deliver_mirror`), `tools/promote_run.py` (`prior_delivery_record`, and controls and relaxations on its `deliver`), `tools/retro.py` (the empty-controls message), `tests/test_core.py` (`DeliveryLabelAgreementTests` +2: the Classic controls and the re-promotion), `tests/test_upload_integrity.py` (`DeliveryRecordBytesTests.test_showdown_and_late_swap_pass_the_controls_in_force` grows the Classic and re-promotion arms; count unchanged), `docs/backlog.md` (R377 CLOSED stub).
+
+**What was wrong, verified at 648f8cf** (premise agent, re-run). The entry's mechanism held. `run_slate` sets `result["merged_controls"] = controls_for_report(controls)` (EP:6127-6132) before `mirror_to_outputs` (EP:6186), `_deliver_mirror` receives the same `result`, `deliver` passes `controls=` through to `write_delivery_record`, and `merged_controls` is the value after the deadline opening and R407's tier (no in-place mutation in `run_slate`). One correction: "the Classic caller" was two. `tools/promote_run.py:264` delivers Classic too and passed no controls, so a re-promoted record would have stayed `{}`.
+
+**What shipped.** `_deliver_mirror` passes `controls=result.get("merged_controls")`. `promote_run` finds the latest delivery record for the run on its date and passes that record's `controls` and `relaxations`. Retro's "passes no controls= until R377's remainder lands" is replaced by what an empty field now means: a record from before R377, or a re-promotion of one.
+
+**Acceptance.** On the real chain, `record.controls` equals the build's `merged_controls` (JSON-normalised, 12 keys on the fixture). A re-promotion's record equals the original's.
+
+**R233 grep**, the class of a production delivery caller that records controls: `git grep -n -E "^\s+controls=" -- mlb_engine tools skills`, excluding `mlb_engine/production/`. The hits are `execution_pipeline.py:6468`, `build_slate.py:4316` (Showdown), `late_swap.py:1005`, `promote_run.py:304`, and `tools/dfs.py:320`, which is the strangler's own CLI, off the build path. That is all four production callers of `deliver` and `record_delivery` from R388(e)'s grep. The source pin now names all four.
+
+**Mutation checks**, red then restored: the Classic `controls=` removed (the chain test and the source pin both red), and `promote_run`'s controls removed.
+
+**Gate.** In R388(e)'s entry above.
+
+**The migrated register entry (R377's remainder, filed 2026-09-19; the first half migrated with Session 02).**
+
+**R377.** The Classic delivery record's `controls` is still empty: `execution_pipeline._deliver_mirror` passes none (P2, XS) | new 2026-09-19; Showdown, late swap and egress SHIPPED 2026-09-23 as roadmap Session 02 (b), that half migrated to CHANGELOG.md | Roadmap: Session 03
+
+- **What remains.** Session 02 was barred from `execution_pipeline`, and the Classic caller lives there. `run_slate` sets `result["merged_controls"] = controls_for_report(controls)` before it calls `mirror_to_outputs(result, salary_csv)`, and `_deliver_mirror` receives that `result`, so the fix is one keyword argument in `_deliver_mirror`'s `deliver(...)` call: `controls=result.get("merged_controls")`. Relaxations already ride on this path as `strategy_state`, and egress now comes from the session-start reading for every caller.
+- **Acceptance.** A Classic delivery record's `controls` equals the build's `merged_controls`; `DeliveryRecordBytesTests.test_showdown_and_late_swap_pass_the_controls_in_force` grows the Classic caller; `tools/retro.py`'s Classic "passes no controls=" message is retired.
+
+
+## 2026-09-23 — R410: the gate is described once per host. The BUILD skill stops presenting Cowork's split gate as the procedure, and three docs stop carrying a gate time of their own (roadmap Session 98)
+
+**Scope.** `skills/generate-lineups/SKILL.md` (Session hygiene), `.claude/skills/dev-session/SKILL.md` (step 3), `.claude/rules/skills.md`, `.claude/rules/engine.md`, `.github/pull_request_template.md`, `CLAUDE.md` (Hosts), `docs/hosts.md` (the gate row), `docs/ROADMAP.md` (Sizing line, the Progress Ledger's backfill command, Session 98 row, ledger row, Session 97's SHA backfilled to 648f8cf), `docs/backlog.md` (R410 CLOSED stub), `tools/audit.py` (`EXPECTED_SUITE_COUNTS`), `tests/test_core.py` (`HostProseIsCurrentTests` +1), this file.
+
+**Source.** Ben, 2026-09-23, three statements filed against main at 648f8cf. Each was re-verified with grep at HEAD before the edit, and each reproduced.
+
+**What was wrong.**
+
+- `skills/generate-lineups/SKILL.md` "## Session hygiene" gave Cowork's split gate (`--gate-run --gate-budget 130 --gate-ceiling 165`, then "expect PASS v2.26.0, 40 modules, 2129 tests") as the procedure, and said `--run-tests` in one call "is not the supported path here and CLAUDE.md says so". `docs/hosts.md` says one call works in a cloud container and on Windows and only Cowork needs the split gate; CLAUDE.md's Hosts bullet says the gate runs in one call in the cloud. The gate is 42 modules and 2444 tests. The same section also said Ben's Windows Python has no scipy, so `--run-tests` "cannot pass on his host"; `docs/hosts.md` gives Windows a pinned `.venv` and a one-call gate. And it said adding tests means moving "the three docs that quote the expected line (CLAUDE.md, the ledger Quick Card, and this file)"; CLAUDE.md quotes `<N>`, not a count.
+- `.claude/rules/skills.md` said R354 took SKILL.md "from 1,371 to 1,358" as if that were the current size. By `wc -l` at each commit: 1,359 after R354 (5d6acfb), then 1,404, 1,432, 1,450, 1,491, 1,528, 1,556 and 1,586 across seven commits (R360-R362, R369, R344/R372, R386, R405, R407, R406). The rule held for none of them.
+- `.claude/skills/dev-session/SKILL.md` step 3 said the gate takes "about 9 minutes", which is the Windows figure. R409's gate measured 4m45s in a cloud container on 2026-09-23.
+- CLAUDE.md's Hosts bullet said "~230s measured 2026-09-19", against its own "do not restate one here" two lines up and against `docs/hosts.md`'s "~5 min". Ben asked to fix it or leave it with a reason: fixed, because two copies of one host fact disagreeing is what R355 filed `docs/hosts.md` to end.
+- Found by the class grep: `docs/ROADMAP.md`'s Sizing line carried its own gate time, and the PR template and `.claude/rules/engine.md` said "40 modules".
+- Found by the backfill: the Progress Ledger said to backfill with `git log -1 --format=%h --grep=<R-number> origin/main`. For R409 that returns 12c6ab1, the commit; every row in the table records the merge (648f8cf for R409, afb833e for R406, 1e1a01d for R408, 1e3311d for R407).
+
+**What shipped.**
+
+- **Session hygiene** gives `python tools/audit.py --run-tests --terse` and one paragraph: whether it fits one call and how long it takes are host facts, `docs/hosts.md` has the table, `docs/cowork_sandbox.md` has Cowork's split gate. The split-gate mechanics, the backgrounding warning and the Windows claim are gone from the body; `docs/cowork_sandbox.md` already carried the first two in full. The pin paragraph says only the ledger Quick Card quotes the counts and that it is ARCHIVE's to move (`ledger/inbox/2026-09-06_DEV_quick-card-pin-stale.md` already asks ARCHIVE to). SKILL.md is 1,578 lines, down 8.
+- **`.claude/rules/skills.md`** states R354's figure as history, the 1,586 it reached, and the 1,578 after this change. "Do not grow the body" stays.
+- **`/dev-session` step 3, CLAUDE.md's Hosts bullet and the ROADMAP Sizing line** each point at `docs/hosts.md` instead of carrying a time. CLAUDE.md is 17,170 bytes against the 18,000 budget.
+- **`docs/hosts.md`**'s cloud cell reads "4m45s measured 2026-09-23" (R409's gate), and the Cowork cell names `docs/cowork_sandbox.md`.
+- **The ledger backfill command** is two `git log` calls that work in bash and PowerShell: the R-number's non-merge commit, then the last merge on its ancestry path to `origin/main`. It returns the recorded merge for all four of R406-R409.
+- **`HostProseIsCurrentTests.test_the_gate_is_described_once_per_host_not_per_doc`** pins the corrections, not the wording: Session hygiene carries `--run-tests` and `docs/hosts.md` and no `--gate-run` or "not the supported path"; `/dev-session` step 3 carries `docs/hosts.md` and no "N minutes"; CLAUDE.md's Hosts section carries no `~Ns` or "N min". Mutation-checked: each of the three files restored from before the edit turns the test red, and the edited tree is green.
+
+**Kept, each with its reason.**
+
+- `.claude/rules/engine.md` L20 and CLAUDE.md's `## Sandbox` quote the call budget (~630s cloud, 130s Cowork). That is a different fact from the gate's time, both name `repo_env.call_budget_s()` as the authority, and `HostProseIsCurrentTests.test_claude_md_sends_every_budget_question_to_one_resolver` pins the Sandbox section to the resolver.
+- `docs/cowork_sandbox.md` L24 keeps the split-gate command: it is the one home the pointers now name.
+- The ledger Quick Card's stale pin line is ARCHIVE's file; the fragment above already carries it.
+- `docs/greenfield/2026-09-19/` and `tests/test_showdown.py`'s docstring (~230s) are dated records.
+
+**R233 grep**, the class of a gate time or count restated outside the host docs: `git grep -n -i -E 'gate.{0,160}([0-9]+ ?(min|minutes)\b|~[0-9]+s\b)|[0-9]+ modules|--gate-run --gate-budget' -- CLAUDE.md .claude skills .github docs/ROADMAP.md docs/hosts.md docs/cowork_sandbox.md`. At HEAD, 10 hits: `.claude/rules/engine.md:20` (call budget, kept) and `:22`, `.claude/skills/dev-session/SKILL.md:17`, `.github/pull_request_template.md:39`, `CLAUDE.md:69`, `docs/ROADMAP.md:28`, `docs/cowork_sandbox.md:24` (kept), `docs/hosts.md:25`, `skills/generate-lineups/SKILL.md:1495` and `:1496`. After, 5: `engine.md:20` and `cowork_sandbox.md:24` (kept, above), `docs/hosts.md:25` (the home), and the two R410 rows in `docs/ROADMAP.md`, which match on "gate" and "40 modules" as quoted text.
+
+**Gate.** Before: `PASS  v2.26.0  42 modules  2444 tests  5 skipped` (test_core 4 and test_showdown 1 skipped in place, the five R409 recorded). After: `PASS  v2.26.0  42 modules  2445 tests  5 skipped` (the same five; 285s in a cloud container). `tests.test_core` pin 1464 -> 1465. Golden histogram unmoved (no engine path touched).
+
 ## 2026-09-23 — R409: the session contract read against Anthropic's prompting guide for the current Claude model. A finish line, a stop list, a task file that survives compaction, a review pass, and four stale "the push is Ben's" sites (roadmap Session 97)
 
 **Scope.** `CLAUDE.md` (Autonomy, Compaction), `.claude/skills/dev-session/SKILL.md`, `.claude/skills/land/SKILL.md`, `.claude/skills/ship/SKILL.md`, `.claude/agents/dfs-premise.md`, `.claude/hooks/precompact_context.py`, `tools/claim.py`, `tools/audit.py` (one warning string, one comment, `EXPECTED_SUITE_COUNTS`), `tests/test_core.py` (`RepoAgentsAndHookEventsTests` +3, `ClaimToolTests` +2, one stale docstring), `docs/ROADMAP.md` (Session 97 row, ledger row, Session 94's SHA backfilled), `docs/backlog.md` (R409 CLOSED stub), this file.

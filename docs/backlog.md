@@ -4245,20 +4245,9 @@ unverifiable incumbent, while statuses 3 and 4 are respectively unreachable
 through this call site and not producible in a probe. Gate 1796 -> 1810,
 18 mutations, 18 killed.
 
-### R298. Three evidence readers that lie at T-5: `manifest_strategy_state` never reads the allocator ladders, the certified Classic brief carries no `mirror_error`/`manifest_recorded`, and `find_prior_file` can feed another draftgroup's ownership prior into `--leverage` (P2, S) | new 2026-09-02, from the greenfield tenth edition (GF10-P2, GF10-T10, GF10-T16); (a) VERIFIED-repro, (b)(c) VERIFIED-read
+### R298. CLOSED 2026-09-23 -- SHIPPED as roadmap Session 03 (b), entry migrated to CHANGELOG.md
 
-**Rider 2026-09-04, R294(a) shipped: (a)'s READ is unchanged and its VALUE went
-up.** R294(a) fixed the prefilter that used to mis-attribute relaxations in the
-three ladder blocks (a) has to read (`contest_allocator.py:3162-3250`, unchanged
-by R294 -- the guards moved, the relaxation records did not). Nothing about what
-(a) must parse changes. What changes is what a relaxation appearing there MEANS:
-before R294 a `primary_stack_floor` or `candidate_reuse` relaxation could be an
-artifact of a starving prefilter, so surfacing it in `manifest_strategy_state`
-would have propagated a false attribution into the field CLAUDE.md's "clean when
-the relaxation counts are zero" is read off. It is now genuinely the bank's or
-the control's. Build (a) on that basis; no premise of it needs re-reading.
-
-(a) `execution_pipeline.py:5087-5118` reads only the `bank_diagnostics`/`candidate_bank` holders; the three allocator ladders (`candidate_reuse`, `primary_stack_floor`, `five_stack_quota` relaxations at `contest_allocator.py:3162-3250`) are never read, and on the production `candidates_override` path `candidate_bank` is `{source, candidate_count}`, so a Classic row reads `state: unknown, evidence: absent` even when reuse, quota and floor all relaxed. Repro: result with `candidate_reuse.relaxations=2`, floor 4→3, quota relaxed_off → `{'state': 'unknown', 'counts': {}, 'evidence': 'absent'}`. CLAUDE.md's "clean when the relaxation counts are zero" is read off this field. Fix: read the three blocks; `execute_portfolio` returns `primary_stack_floor`/`five_stack_quota` beside `candidate_reuse` (:569-570, :594-595). R64(a) covered bank holders only. (b) `build_slate.py:2140-2223`: the Classic brief omits `mirror_error`, `delivered_sha256_error`, `manifest_recorded`; when the mirror fails `delivered_path` falls back to `runs/<id>/final/DKEntries.csv` and `status` stays `certified`; the Showdown brief (:2902-2903) carries both. CHANGELOG (R176(d)) says the brief records `mirror_error`; the brief does not. Fix: add the three keys; `status: certified_unmirrored` when `mirror_error` is set. (c) `qa_portfolio.py:637-644` falls back to "the one prediction file in outputs/<date>/" even when the brief's tag is known and does not match; `resolve_leverage` forwards that file's `own_pct_by_player_id` into MILP constraints (`build_slate.py:2386-2389, :1822, :1981`). Fix: AMBIGUOUS refusal when the single hit's tag differs.
+`manifest_strategy_state` reads the allocator's three ladders (`candidate_reuse`, `primary_stack_floor`, `five_stack_quota`), which `execute_portfolio` now returns on both paths, so a relaxed Classic row reads `relaxed` and a clean one `clean` on recorded evidence. The Classic brief carries `manifest_recorded`, `mirror_error` and `delivered_sha256_error`, and a failed mirror adds `_unmirrored` to its status. `find_prior_file` refuses a lone prediction file whose own `slate_tag` is another slate's. `tools/retro.py`'s clock start is `manifest_recorded_utc`, with the record's own write time named `delivery_recorded_utc`. Gate and commit: the CHANGELOG entry.
 
 ### R339. The strangler needs an adapter before it can be graded: legacy projection frame + ownership prior -> `production.EvidenceBundle`, so R118 can score `dfs.py run` against `build_slate.py` on the same ten archived slates (P1, S-M; after R118) | new 2026-09-10, from the thirteenth edition's own blocker table ("No verified live connector", "No calibrated projection/joint model") read against R302's Done-when
 
@@ -5350,13 +5339,12 @@ Principles only, no engine code. V, S and P are defined in `MLB_Classic.md` §2 
 
 `record_delivery` now hands its hash source (the provisional file inside `deliver`) through `_mirror_to_delivery_record` to `write_delivery_record(entries_source=...)` on both return paths, so a record's rosters are parsed from the bytes its sha256 names on all three writers. `bound_entries` re-hashes the parsed file and writes rosters only on a match; a mismatch records `entries: []` with both hashes in `entries_binding` and never withholds the delivery. Pinned by `test_upload_integrity.DeliveryRecordBytesTests`. Gate: see the CHANGELOG entry.
 
-### R388. Usability, strategy and process are one certification: split them (Package A of the 2026-09-22 audit) (P0, M across five sessions) | new 2026-09-22, audit DD-04, DD-08, DD-09 and §3 | Roadmap: (a) Session 05, (b) 06, (c) 13, (d) 09, (e) 03
+### R388. Usability, strategy and process are one certification: split them (Package A of the 2026-09-22 audit) (P0, M across four sessions) | new 2026-09-22, audit DD-04, DD-08, DD-09 and §3; (e) SHIPPED 2026-09-23 as roadmap Session 03 (a), migrated to CHANGELOG.md | Roadmap: (a) Session 05, (b) 06, (c) 13, (d) 09
 
 - **(a) One taxonomy.** `CLASSIC_GATE_CLASS` (`build_slate.py:383-425`, ILLEGAL/BADLY_SHAPED/READ_IT with an authority) and DG's by-value copy (`deadline_governor.py:66-79`) move into `mlb_engine/entries/gate_classes.py` with V/S/P/MIXED. MIXED names carry their split sub-facts, and evidence is `passed/failed/not_checked/assumed`. build_slate imports it lazily (`test_core.py:5344`).
 - **(b) Control authority.** Each resolved control carries its provenance; there is a `--never-relax` flag; distinct lineups per contest defaults to `operator_never_relax` (F-3); `merge_open_controls` (`deadline_governor.py:331-343`) honours it and records the move.
 - **(c) Essential verdict.** Preflight tags its 49 `rep.fail` sites and emits `essential_valid`. A bookkeeping-only failure (`preflight_upload.py:1496-1588`) gets exit 6 instead of 2.
 - **(d) Review-grade lifecycle.** When every failure is S or P, `execute_portfolio` mirrors the candidate as `DKEntries_<tag>_UNCERTIFIED_<run>.csv` with certification `review_grade`. `passed=False` and `errors[]` stay verbatim for the golden pins; nothing reaches `final/`; there is no promote.
-- **(e) One label.** A governed Classic retry is recorded `certified` in the manifest (`execution_pipeline.py:5445, 5684`) and stamped `upload_ready` by preflight (`preflight_upload.py:2937`) while the brief says review-grade (`build_slate.py:3141-3149`). Record `review_grade_deadline` inside `run_slate`.
 - **Boundary.** "Upload-ready" keeps CLAUDE.md's meaning. A failed flag is never set true.
 
 ### R389. No entry-mapped baseline exists before research, the bank and joint allocation (Package B, baseline half) (P0, M across three sessions) | new 2026-09-22, audit DD-01 | Roadmap: (a) Session 10, (b) 11, (c) 12
@@ -5395,9 +5383,8 @@ Principles only, no engine code. V, S and P are defined in `MLB_Classic.md` §2 
 
 - **Fix.** Add the twelve audit scenarios, plus a hard interruption, corrupt optional metadata and mandatory-rule refusals, to `skills/generate-lineups/evals/run_evals.py`, and gate a fast subset as a new suite registered in `AUDITED_SUITES`/`EXPECTED_SUITE_COUNTS`. Phase D is not production-ready until both halves pass.
 
-### R396. The build's exit contract disagrees with itself (P2, XS each) | new 2026-09-22, the R385 verification pass | Roadmap: (a) Session 03, (b) 07
+### R396. The build's exit contract disagrees with itself (P2, XS) | new 2026-09-22, the R385 verification pass; (a) SHIPPED 2026-09-23 as roadmap Session 03 (c), migrated to CHANGELOG.md | Roadmap: (b) Session 07
 
-- **(a)** `REFUSAL_EXIT_NOTES` (`build_slate.py:6044-6049`) swaps exits 3 and 4 against the module docstring (`:14-18`) and `autobuild.py:662`, so every refusal record since R369 carries the wrong note.
 - **(b)** autobuild accepts exit 5 in `BUILD_SLATE_CONTRACT_CODES` (`autobuild.py:145`) and handles it as 3, and running out of `--max-attempts` returns 3 with no stop record (`:752-753`).
 
 ### R397. `odds_from_paste.py` blocks on a postponed game that is still in the salary file (P2, XS) | new 2026-09-22, from `docs/backlog_inbox/2026-09-22_BUILD_odds-paste-blocks-on-postponed-game.md` | Roadmap: Session 04
@@ -5443,10 +5430,9 @@ Principles only, no engine code. V, S and P are defined in `MLB_Classic.md` §2 
 - **What.** At 19:04 ET on 1905_10g, with a complete DK `Starting` 1-9 for all 20 sides and every data host blocked, `tools/late_swap.py` exited 4 on a missing `lineups_feed.json`. `tools/repair_entry.py` counted every candidate `not_confirmed` and printed `lock: no feed supplied; no team treated as locked` one minute after TB@NYY started. The five benched slots were repaired by hand under R272.
 - **Fix.** Accept "no feed, DK covers every side" the way `build_slate.py` does (`dk_order_coverage`; R143 ranks DK above any feed). Take confirmation from the feed synthesized from the salary file, as `preflight_upload.py` does, and fall back to salary Game Info for locks, as `verify_export.py` does.
 
-### R377. The Classic delivery record's `controls` is still empty: `execution_pipeline._deliver_mirror` passes none (P2, XS) | new 2026-09-19; Showdown, late swap and egress SHIPPED 2026-09-23 as roadmap Session 02 (b), that half migrated to CHANGELOG.md | Roadmap: Session 03
+### R377. CLOSED 2026-09-23 -- SHIPPED: Showdown, late swap and egress as roadmap Session 02 (b), the Classic caller and the re-promotion as Session 03 (d), entry migrated to CHANGELOG.md
 
-- **What remains.** Session 02 was barred from `execution_pipeline`, and the Classic caller lives there. `run_slate` sets `result["merged_controls"] = controls_for_report(controls)` before it calls `mirror_to_outputs(result, salary_csv)`, and `_deliver_mirror` receives that `result`, so the fix is one keyword argument in `_deliver_mirror`'s `deliver(...)` call: `controls=result.get("merged_controls")`. Relaxations already ride on this path as `strategy_state`, and egress now comes from the session-start reading for every caller.
-- **Acceptance.** A Classic delivery record's `controls` equals the build's `merged_controls`; `DeliveryRecordBytesTests.test_showdown_and_late_swap_pass_the_controls_in_force` grows the Classic caller; `tools/retro.py`'s Classic "passes no controls=" message is retired.
+`execution_pipeline._deliver_mirror` passes `controls=result.get("merged_controls")`, and `tools/promote_run.py` carries the earlier delivery record's controls and relaxations, so all four production delivery callers record the controls in force. Gate and commit: the CHANGELOG entry.
 
 ### R324. CLOSED 2026-09-08 -- SHIPPED with R314, entry migrated to CHANGELOG.md
 
@@ -6118,6 +6104,24 @@ is one re-run and it belongs in whatever procedure owns archetype-row additions,
 which is R196's. Filed there, not here.
 
 ## Workstream 6 — Infrastructure, tests, environment, coordination, and docs
+
+### R411. Two fixture evals fail on main, and nothing runs the evals (P2, S) | new 2026-09-23, found by Session 03's eval run | Roadmap: Session 99
+
+- **What.** `python skills/generate-lineups/evals/run_evals.py` at 648f8cf: 6 of 8 pass. Eval 2 (`classic-under-deadline-refuses-rather-than-trims`) exits 0 with brief `status: certified` where it pins exit 3 and `not_certified`; it passed at 0c2ea3c and fails from afbaf68, the R405 merge, onward. Eval 5 (`adversarial-multi-ticket-satellite`) prints the forbidden `/large_wta/`; it already fails at fa8f343 (2026-09-22), so it is older. Both reproduce identically on a clean worktree of main with the session's `.venv`.
+- **Why.** SKILL.md says to run the evals when the skill or its scripts change; they are not in the gate or CI, so both breaks landed green. Eval 2 is the deadline-refusal contract: either R405 changed what that fixture can build (a legitimate re-pin, with the reason in the eval's notes) or the refusal it pins is gone.
+- **The harness leaks into a tracked directory.** `RepoSurfaceGuard.ROOTS` (`run_evals.py`) is `("data/slates", "outputs")`, and R369 (2026-09-19) made every build, refusal and Showdown delivery write a record under `data/deliveries/<date>/`, which is tracked and ARCHIVE's. One full eval run on 2026-09-23 left seven records there (three dates, deliveries and refusals), removed by hand; a `git add data/deliveries` would have committed eval output as real deliveries. The guard's own docstring names this failure shape (R28: "the guard reached one directory short of the damage").
+- **Fix.** Add `data/deliveries` to the guard's roots, or run the evals under `MLB_DFS_ARTIFACT_ROOT` the way the gate does. Bisect eval 5 to its commit. Read eval 2's brief at afbaf68 against 0c2ea3c's and decide re-pin or regression, per eval. Then decide whether a fast eval subset joins the gate (R395(b) plans a gated deadline suite; this may ride it).
+
+### R410. CLOSED 2026-09-23 -- SHIPPED, filed and landed in one commit (roadmap Session 98), entry in CHANGELOG.md
+
+Three statements about the gate described one host as if it were every host:
+the BUILD skill's Session hygiene gave Cowork's split gate as the procedure and
+called the one-call gate unsupported, `/dev-session` gave the Windows time, and
+CLAUDE.md's Hosts bullet a stale cloud time. The time and the split gate now
+live only in `docs/hosts.md` and `docs/cowork_sandbox.md`, and
+`HostProseIsCurrentTests` pins that. Riders fixed in the same commit: the
+`.claude/rules/skills.md` line count, two stale "40 modules", and the Progress
+Ledger's backfill command. Gate and commit: the CHANGELOG entry.
 
 ### R409. CLOSED 2026-09-23 -- SHIPPED, filed and landed in one commit (roadmap Session 97), entry in CHANGELOG.md
 
