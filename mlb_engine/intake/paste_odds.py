@@ -50,6 +50,13 @@ Rows for games the salary file does not carry are DROPPED and reported, never
 blocked: the source table covers the whole day, including in-progress games,
 and filtering that is this module's job.
 
+A game that is not being played is owed no price (R397). It is exempt from the
+"no priced row" block on an OBSERVED signal and named ``excluded_postponed``, the
+word the pool uses for the same fact: a lineups feed that marks it postponed,
+cancelled or suspended (the pool's own classifier), or the operator naming it.
+DK's own ``Postponed`` Game Info literal never reaches the game set at all, and
+is named too. An absent signal exempts nothing.
+
 Nothing here reaches the network. The salary file is authoritative for which
 games are on the slate and for their start times, so the emitted
 ``commence_time`` is the salary file's, and the packet's doubleheader leg
@@ -60,7 +67,7 @@ from __future__ import annotations
 import math
 import re
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Mapping, Optional, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from mlb_engine.team_codes import (
     dk_abbrev_to_team_name, is_dk_abbrev, team_name_to_dk_abbrev, to_dk_abbrev,
@@ -327,6 +334,8 @@ def resolve_paste_to_odds_payload(
     salary_csv: Any,
     default_book: Optional[str] = None,
     fetched_at: Optional[str] = None,
+    exclude_games: Optional[Sequence[str]] = None,
+    lineups_feed: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Paste + salary file -> ({"events": [...], "report": {...}}).
 
@@ -334,35 +343,60 @@ def resolve_paste_to_odds_payload(
     for identity and eligibility everywhere else in this engine. A game it
     carries with no priced row BLOCKS; a priced row for a game it does not carry
     is dropped and named.
+
+    R397. A salary game that is not being played is exempt from that block:
+    ``lineups_feed`` marks it postponed, cancelled or suspended, or
+    ``exclude_games`` names it (``AWAY@HOME``, any spelling the paste accepts).
+    Each exempt game is named in ``excluded_postponed`` with the signal that
+    exempted it, and any priced row for it is dropped rather than written: a
+    price for a game nobody plays would move F1 for teams a stale salary file
+    still carries. A name matching no salary game is a warning, never a block,
+    because the unexempted game still blocks on its own.
     """
     parsed = parse_odds_paste(text, default_book=default_book)
     rows_by_game = parsed["rows_by_game"]
     blockers = list(parsed["blockers"])
 
-    slate_games, game_times, salary_note = _slate_games(salary_csv)
+    slate_games, game_times, salary_note, salary_literal = _slate_games(salary_csv)
     if salary_note:
         blockers.append(salary_note)
         slate_games = set()
 
+    exempt, exclusion_warnings = _postponed_exemptions(
+        slate_games, salary_csv, exclude_games, lineups_feed)
+    required = slate_games - set(exempt)
     off_slate = sorted(set(rows_by_game) - slate_games) if slate_games else []
     kept = {gid: books for gid, books in rows_by_game.items()
-            if not slate_games or gid in slate_games}
-    missing = sorted(slate_games - set(kept)) if slate_games else []
+            if not slate_games or gid in required}
+    missing = sorted(required - set(kept)) if slate_games else []
+    excluded_postponed = [
+        {"game": gid, "teams": gid.split("@"), "signals": signals,
+         "priced_books_dropped": sorted(rows_by_game.get(gid) or {})}
+        for gid, signals in sorted(exempt.items())]
+    for literal, teams in sorted(salary_literal.items()):
+        excluded_postponed.append(
+            {"game": None, "teams": teams,
+             "signals": [f"salary Game Info {literal!r}"],
+             "priced_books_dropped": []})
     if missing:
         blockers.append(
             "no priced row for " + ", ".join(missing) + ". A partial packet "
             "reaches F1 looking like a slate where those teams have no market, "
             "and an even split on a game the book did price is a fabrication "
-            "the report cannot see")
+            "the report cannot see. A game that is not being played is exempt "
+            "on `--feed <lineups_feed.json>` or `--exclude-game AWAY@HOME`")
 
     events = build_events(kept, game_times, fetched_at) if not blockers else []
     report = {
         "games_priced": len(kept),
-        "slate_games": len(slate_games),
+        # The games owed a price: the salary file's set less the exempt ones.
+        "slate_games": len(required),
         "books_by_game": {gid: sorted(books) for gid, books in sorted(kept.items())},
         "books": sorted({book for books in kept.values() for book in books}),
         "games_off_slate_dropped": off_slate,
         "slate_games_unpriced": missing,
+        "excluded_postponed": excluded_postponed,
+        "exclusion_warnings": exclusion_warnings,
         "games_without_a_salary_start": sorted(
             gid for gid in kept if gid not in (game_times or {})),
         "blockers": blockers,
@@ -377,13 +411,21 @@ def resolve_paste_to_odds_payload(
     return {"events": events, "report": report}
 
 
-def _slate_games(salary_csv: Any) -> Tuple[set, Dict[str, datetime], Optional[str]]:
+def _slate_games(salary_csv: Any) -> Tuple[set, Dict[str, datetime], Optional[str],
+                                           Dict[str, List[str]]]:
     """The salary file's game set and start times, without importing the fetchers.
 
     ``live_data_adapters.salary_game_times`` is the one owner of the start-time
     rule and this defers to it, lazily: that module imports ``urllib.request``
     at module scope, and a paste path exists precisely because the network is
     not there. Same deferral ``paste_lineups`` makes, for the same reason.
+
+    The fourth value is R397's naming of a case that was already exempt and
+    silent: teams whose Game Info is a non-blank literal with no ``AWY@HOM``
+    first token (DK's ``Postponed``), keyed by the literal. That is the pool's
+    Signal 1 predicate (``build_slate_pool``, R26), including its stand-down: a
+    file where EVERY team fails to parse is a format change, not a slate of
+    postponements, and names nothing.
     """
     from mlb_engine.intake.slate_intake_manager import parse_dk_salary_csv
     from mlb_engine.intake.live_data_adapters import salary_game_times
@@ -391,15 +433,74 @@ def _slate_games(salary_csv: Any) -> Tuple[set, Dict[str, datetime], Optional[st
     try:
         players = parse_dk_salary_csv(str(salary_csv))
     except Exception as exc:  # noqa: BLE001 - surfaced as a blocker, never a traceback
-        return set(), {}, f"salary file unreadable: {exc}"
+        return set(), {}, f"salary file unreadable: {exc}", {}
     games = {str(getattr(player, "game_id", "") or "").strip().upper()
              for player in players}
     games.discard("")
+    team_game = {str(p.team): str(p.game_id or p.game_info or "")
+                 for p in players if getattr(p, "team", "")}
+    unparsed = {team: game for team, game in team_game.items()
+                if game.strip() and "@" not in game.strip().split()[0]}
+    literal: Dict[str, List[str]] = {}
+    if unparsed and set(unparsed) != set(team_game):
+        for team, game in sorted(unparsed.items()):
+            literal.setdefault(game.strip(), []).append(team)
     try:
         times = salary_game_times(str(salary_csv))
     except Exception:  # noqa: BLE001 - times are a refinement; the game set is not
         times = {}
-    return games, times, None
+    return games, times, None, literal
+
+
+def _postponed_exemptions(
+    slate_games: set,
+    salary_csv: Any,
+    exclude_games: Optional[Sequence[str]],
+    lineups_feed: Optional[Mapping[str, Any]],
+) -> Tuple[Dict[str, List[str]], List[str]]:
+    """R397. Salary games owed no price, each with the signals that say so.
+
+    Two signals, both observations. The feed reading is the pool's own
+    classifier (``build_status_map_from_lineups_feed``: a status containing
+    "postpon", "cancel" or "suspend"), imported lazily for the reason
+    ``_slate_games`` gives. The operator's name resolves through the paste's
+    own team rule. A feed that cannot be read, and a name that matches no
+    salary game, exempt nothing and are returned as warnings: the game they
+    meant still blocks unless something else exempts it.
+    """
+    exempt: Dict[str, List[str]] = {}
+    warnings: List[str] = []
+    for raw in exclude_games or []:
+        # `@` only: the paste's `vs`/`at` alternatives would split a lowercase
+        # "atl@wsh" at its first two letters.
+        parts = str(raw).strip().split("@")
+        teams = [_resolve_team(part) for part in parts] if len(parts) == 2 else []
+        gid = "@".join(teams) if len(teams) == 2 and all(teams) else None
+        if gid and gid in slate_games:
+            exempt.setdefault(gid, []).append("operator --exclude-game")
+        else:
+            warnings.append(
+                f"--exclude-game {str(raw)!r} names no game on this salary "
+                f"file's slate ({', '.join(sorted(slate_games)) or 'none'}); "
+                "nothing exempted on it")
+    if lineups_feed is not None:
+        try:
+            from mlb_engine.intake.live_data_adapters import (
+                build_status_map_from_lineups_feed,
+            )
+            status = build_status_map_from_lineups_feed(lineups_feed, str(salary_csv))
+        except Exception as exc:  # noqa: BLE001 - an unread feed exempts nothing
+            warnings.append(f"lineups feed not read for postponements ({exc}); "
+                            "no game exempted on it")
+        else:
+            meta = status.get("game_meta") or {}
+            for gid in sorted(set(status.get("excluded_game_ids") or [])):
+                if gid not in slate_games:
+                    continue
+                state = str((meta.get(gid) or {}).get("status")
+                            or "postponed/cancelled/suspended")
+                exempt.setdefault(gid, []).append(f"lineups feed status {state!r}")
+    return exempt, warnings
 
 
 def payload_matches_paste(

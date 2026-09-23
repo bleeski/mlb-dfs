@@ -2,6 +2,68 @@
 
 What changed in the engine, the tools and the contracts, when, and why.
 
+## 2026-09-23 — R399(a)(e): `build_slate.py --help` prints again, and the Showdown captain-sleeve surfaces stop describing the build before R382 (roadmap Session 04)
+
+**Scope.** `skills/generate-lineups/scripts/build_slate.py` (the `--captain-prior` and `--captain-sleeve` help), `mlb_engine/optimize/showdown_theses.py` (`captain_sleeve_report`'s label and a `selector` key; one stale R381 comment in `resolve_captain_sleeve`), `tests/test_core.py` (`BuildSlateHelpTests`, new, 3), `tests/test_showdown.py` (`CaptainSleeveBriefTruthTests`, new, 3), `tools/audit.py` (two pins), `docs/backlog.md`, `docs/ROADMAP.md`, `CHANGELOG.md`.
+
+**(a) What was wrong, reproduced.** `python skills/generate-lineups/scripts/build_slate.py --help` exited 1 with `ValueError: unsupported format character 'b' (0x62) at index 319`, and so did `-h`. R382 (`909a621`) wrote "a 100% budget over one slot" into the `--captain-prior` help, and argparse expands help strings with `%`, so it read `% b` as a format spec. A run with no arguments still exited 2 with the usual usage error, because usage never expands help: only the two help flags died.
+
+**(a) What shipped.** `100%%` at `build_slate.py:5858`; the rendered help reads "a 100% budget". The `100%` at `:6096` is a refusal's JSON `note`, not argparse, and stays unescaped. Class grep: every action of the 40 argparse users in `tools/*.py`, `mlb_engine/` and `skills/` (the eval runner included) expanded through `format_help()`. Before the fix `--captain-prior` was the only failure (the `dfs-premise` run, with an AST scan of `help=`, `description=`, `epilog=` and `usage=` constants finding only that line); on the fixed tree all 40 print OK.
+
+**(e) What was wrong.** Three surfaces kept R381's wording after R382 wired the selector form to `--captain-prior`:
+- The `--captain-sleeve` help said the `prior_own_below` form "is refused: it needs a captain-ownership prior this build path does not read", while the `--captain-prior` help beside it said it is that form's input.
+- `captain_sleeve_report`'s label (`brief.captain_sleeve.label`, built in `showdown_theses.py`, not in the script) said "No ownership number exists on this path". For a selector-built sleeve that is always false: the selector cannot run without a prior, and the same brief carries it in `captain_prior`.
+- The block dropped `selector`. `resolve_captain_sleeve` builds it "so the brief can never show a sleeve without showing what chose it", `references/showdown.md` tells the reader to open `captain_sleeve.selector.matched`, and `captain_sleeve_report` rebuilt the dict key by key without it. Found by the premise check beside (e); fixed here because it is the same R382 staleness on the same block.
+
+**(e) What shipped.** The help says the form takes the people under the threshold, coldest first, from the prior `--captain-prior` reads, and refuses when none was read. The block carries `selector` (null for a listed sleeve, one shape on every sleeve), and the label says the prior's shares sit in `captain_prior` and are never averaged over the three populations. The disclaimer sentence R381's test pins is unchanged. The R381 comment in `resolve_captain_sleeve` that still said the selector "has no input in the build path" is removed; the R382 comment under it already says what the code does.
+
+**Tests.** `BuildSlateHelpTests` runs `--help` and `-h` in a subprocess, the way an operator does, and checks the escape renders as one sign and the two helps agree. `CaptainSleeveBriefTruthTests` drives the production `captain_sleeve_report` over a selector sleeve and a listed one. Mutations, each red then restored: the bare `100%` (3 of 3 red), the old sleeve help (1 of 3), the original `showdown_theses.py` (3 of 3).
+
+**Evals.** `run_evals.py`: 6 of 8, the same two R411 names on main (eval 2 exit 0 against an expected 3; eval 5 prints `/large_wta/`), identical to this session's baseline on the unmodified tree. Both runs' seven `data/deliveries/` records were removed by path.
+
+**Gate.** Before: `PASS  v2.26.0  42 modules  2459 tests  5 skipped` (this session's start, at `fd8673a`). After: `PASS  v2.26.0  42 modules  2480 tests  5 skipped  {test_core 1489/1489 (4 skipped) skipped_in_place; test_showdown 337/337 (1 skipped) skipped_in_place}  [tests.test_core ran its pinned 1489 but 4 were SKIPPED, so the count proves nothing about coverage.; tests.test_showdown ran its pinned 337 but 1 were SKIPPED, so the count proves nothing about coverage.]` (the same five absent-file skips; 263s in a cloud container). Pins: `tests.test_core` 1479 -> 1489, `tests.test_showdown` 334 -> 337, `tests.test_paste_lineups` 98 -> 106. GOLD: `tests.test_golden_replay` OK, `tests/golden/` untouched, histogram unmoved; no Classic solver, allocator or pipeline path changed, so PROBE was not required. Verification command: 21 tests OK, `--help` exit 0. LINT exit 0.
+
+## 2026-09-23 — R397: the odds paste exempts a salary game that is not being played, on an observed signal, and names it `excluded_postponed` (roadmap Session 04)
+
+**Scope.** `mlb_engine/intake/paste_odds.py` (`resolve_paste_to_odds_payload`: `exclude_games` and `lineups_feed`; `_slate_games` names DK's literal; `_postponed_exemptions`, new; the refusal names both flags), `tools/odds_from_paste.py` (`--exclude-game`, `--feed`, the report lines), `tests/test_paste_lineups.py` (`OddsPastePostponedTests`, new, 8), `tools/audit.py` (one pin), `docs/backlog.md`, `docs/ROADMAP.md` (the row's target files corrected), `CHANGELOG.md`.
+
+**What was wrong, and where the entry had it.** The refusal ("no priced row for ...") is `paste_odds.py`, not `tools/odds_from_paste.py`, the only file the row named; the tool only prints it and exits 2. The game set comes from `_slate_games`, which reads the salary file and nothing else. Reproduced on the vendored 1910_6g fixture with BOS@ATH cut from the paste: `slate_games 6 games_priced 5`, blocker `no priced row for BOS@ATH`.
+
+**The entry's "reuse `excluded_postponed`" needed an input this tool did not have.** The pool marks a game postponed on two signals (`live_data_adapters.py:1717-1758`): DK's `Postponed` Game Info literal, and a lineups feed's status matched on "postpon", "cancel" or "suspend". On the filed case (a salary file downloaded before the postponement) only the feed signal could fire, and this tool read no feed. The literal was already exempt here, silently: a Game Info with no `@` yields no `game_id`, so the game never entered the set, and no report key said so.
+
+**What shipped.**
+- `--feed <lineups_feed.json>` exempts what the feed marks postponed, cancelled or suspended, read by the pool's own classifier (`build_status_map_from_lineups_feed`), imported lazily so the tool's import graph stays network-free (both no-network tests pass).
+- `--exclude-game AWAY@HOME` (repeatable) exempts a game the operator names, resolved through the paste's own team rule. `@` only: the paste's `vs`/`at` alternatives would split a lowercase `atl@wsh` at its first two letters.
+- Every exempt game is reported under `excluded_postponed` with its signals; DK's literal is named there too, by team, with the pool's stand-down when every team fails to parse.
+- A priced row for an exempt game is dropped, not written, and named as `priced_books_dropped`: a price for a game nobody plays would move F1 for teams a stale salary file still carries.
+- `slate_games` counts the games owed a price.
+- A name that matches no salary game, and a `--feed` that cannot be read, are warnings (`exclusion_warnings`, printed as `WARN`) and exempt nothing, so the game they meant still blocks. An absent signal exempts nothing.
+- The refusal now names the two ways out, so `SKILL.md` did not grow.
+
+**Offline signals considered and not used.** A later DKEntries file's embedded Game Info carries `Postponed`, but `parse_dk_salary_csv` rejects that file and `parse_embedded_player_pool` keeps no Game Info. A pasted feed always says `Pre-Game` (`paste_lineups.py:916`), and a feed fetched before the postponement says Scheduled, which the `--feed` help states.
+
+**Tests.** Mutations, each red then restored byte-identical: the original module (8 of 8), the feed branch off (1), exempt rows kept (1), the literal unnamed (1), the operator name ignored (3). Full `test_paste_lineups`: 106 OK.
+
+**Gate.** In R399(a)(e)'s entry above.
+
+## 2026-09-23 — R170: `build_slate.py` files a preserved brief under its own tag on a collision, and never replaces a named `--odds` file with a live fetch (roadmap Session 04)
+
+**Scope.** `skills/generate-lineups/scripts/build_slate.py` (`preserve_prior_slate`'s fallback; `load_odds_packet`'s named-missing branch; `run_showdown`'s stderr line; `main()`'s `odds_file_missing`; `build_f5_map`'s named-missing `--bundle`; the `--odds` help), `tests/test_core.py` (`PreserveTagAndNamedOddsTests`, new, 7), `tools/audit.py` (one pin, shared with R399), `docs/backlog.md`, `docs/ROADMAP.md` (the class added to the row's Verification command), `CHANGELOG.md`.
+
+**(a) What was wrong, reproduced.** `preserve_prior_slate` names the dest `{stem}_{own or tag}` and its collision fallback used the caller's `{tag}` (`build_slate.py:1100` now). A `build_brief.json` declaring 1905_10g beside a different-bytes `build_brief_1905_10g.json`, preserved under 1915_1g_sd, printed "filing it under its own tag" and then wrote `build_brief_1915_1g_sd_1.json`; with `date` passed, `rename_recorded_delivery` then moves the manifest row onto that name. Reachability is narrower than "same-date rebuild churn": `own` is non-empty only for a brief or a DKEntries file with a sibling brief, and the mislabel needs a bare brief from a slate other than the staged salary's, which a refused, crashed or `--brief`-redirected build leaves behind. Fixed with `own or tag` on both names.
+
+**(b) What was wrong, reproduced.** `load_odds_packet` read `--odds` only `if path and Path(path).exists()`, with no else, so a named file that was not there fell through to the fetch. With a key (mocked, never printed) the build called the-odds-api and recorded `source: the-odds-api`, the operator's path nowhere; without one the warning read "no --odds file". `main()`'s `odds_source` guard skipped it too. The unreadable and bad-shape branches beside it already returned without fetching; this was the only named-file failure that fetched.
+
+**(b) Ben's default, kept, and the reason.** A named missing file warns with its path, is recorded, and is never replaced by a fetch; the build goes on with F1 neutral. The tree argues for it: `MLB_Classic.md` §2 (R386) names odds lookups as an optional input that is "recorded truthfully, and never alone a reason to withhold an independently V-valid file", the 2026-09-22 audit classes `odds_gate_passed` as P, and R392 (Session 21) moves this class of exit 4 to recorded degradation. The contrasts: `--lineups` exits 4 on a named unreadable feed (R213, pinned by `BuildSlateFeedReadGuardTests`), and that feed is pool truth, not an optional prior; `stage_slate`'s R70 hard gate exits 2, not 4, on an operator-typed override.
+
+**(b) What shipped.** The note carries `named_file_missing: <path>`, `source: null` and a warning that names the path. It reaches Classic's `enrichment.f1_odds`, `enrichment.warnings` and stderr through the existing plumbing; Showdown prints the same `odds:` line. The brief records `odds_file_missing: <path>` on both formats, and `odds_source` keeps meaning "the odds came from here".
+
+**R233, the class.** `grep -n "and Path(.*).exists()" build_slate.py`: `:1503` (the odds read, now preceded by the named-missing branch), `:1762` (`--bundle`, the same silent skip on F5: `weather_source: null` with no warning), `:6329` (`main()`'s `odds_source`, now with its `elif`). `--bundle` is fixed here too: `named_file_missing` and a warning on the F5 report, which reaches `enrichment.warnings` as `f5: ...`. No other named input in the script reads existence without a branch.
+
+**Tests.** Mutations, each red then restored byte-identical: the caller's tag on the fallback (1 red), the named-missing branch off (2), the brief's `elif` off (1), the `--bundle` branch off (1).
+
+**Gate.** In R399(a)(e)'s entry above.
+
 ## 2026-09-23 — R412 filed (roadmap Session 87): the Showdown melt's same-name refusal and the brief's hold stand-down; Sessions 98 and 03 SHAs backfilled; R410's backfill command reads a `Session NN:` subject
 
 **Scope.**

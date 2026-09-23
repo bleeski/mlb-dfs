@@ -5019,17 +5019,9 @@ only the control its check is about; `--passthrough` is `shlex.split` and ordere
 before supervisor-owned flags. `autobuild.py` had zero tests and has seven.
 **Numbers reserved; the record is the 2026-08-24 CHANGELOG entry.**
 
-### R170. build_slate smalls: the preserve-fallback re-mints the borrowed tag, and a missing --odds path silently becomes a live fetch (P2, XS) | new 2026-08-22, from the greenfield sixth edition; VERIFIED-read at ec832cf (`build_slate.py:428`, `:772`)
+### R170. CLOSED 2026-09-23 -- SHIPPED as roadmap Session 04 (c), entry migrated to CHANGELOG.md
 
-- **What:** (a) `preserve_prior_slate`'s collision fallback names the dest
-  `{stem}_{tag}_{n}` with the CALLER's tag, not the file's own — the exact
-  borrowed-tag mislabel the function's docstring records fixing, reachable on
-  same-date rebuild churn. (b) `--odds` naming a nonexistent file skips the
-  file silently; with a key resolvable the build fetches live odds instead of
-  the operator's curated packet, and without one the warning falsely says no
-  file was named. Contrast stage_slate's R70 discipline.
-- **Fix:** (a) use `own or tag` in the fallback name. (b) named-but-missing
-  `--odds` exits 4 (or warns with the path).
+`preserve_prior_slate`'s collision fallback names the dest with `own or tag`, as its first name does. A named `--odds` file that does not exist is recorded (`named_file_missing` on the odds note, `odds_file_missing` on the brief, a warning naming the path) and never replaced by a live fetch, on R386's optional-input rule rather than the entry's exit 4; `--bundle`'s identical silent skip is named on the F5 report. Gate `PASS  v2.26.0  42 modules  2480 tests  5 skipped` (the five absent-file skips).
 
 ### R171. qa_portfolio can read clean when it is not: a CWD-relative reference dir and a signal line printed only when good (P2, XS) | new 2026-08-22, from the greenfield sixth edition; (b) VERIFIED-repro at ac8ac05, both re-confirmed at ec832cf (`qa_portfolio.py:893`, `:144`)
 
@@ -5395,23 +5387,20 @@ Principles only, no engine code. V, S and P are defined in `MLB_Classic.md` §2 
 
 - **(b)** autobuild accepts exit 5 in `BUILD_SLATE_CONTRACT_CODES` (`autobuild.py:145`) and handles it as 3, and running out of `--max-attempts` returns 3 with no stop record (`:752-753`).
 
-### R397. `odds_from_paste.py` blocks on a postponed game that is still in the salary file (P2, XS) | new 2026-09-22, from `docs/backlog_inbox/2026-09-22_BUILD_odds-paste-blocks-on-postponed-game.md` | Roadmap: Session 04
+### R397. CLOSED 2026-09-23 -- SHIPPED as roadmap Session 04 (b), entry migrated to CHANGELOG.md
 
-- **What.** On 1840_5g the tool took its game list from a salary file downloaded before TOR@BAL was postponed, and refused `no priced row for TOR@BAL` with four of four live games priced. The workaround was a scratch copy of the salary file.
-- **Fix.** Exempt postponed, cancelled and suspended games as `excluded_postponed` (the pool already has that state), and take `--exclude-game`.
+The refusal was `mlb_engine/intake/paste_odds.py`'s, and the pool's `excluded_postponed` comes from a feed this tool never read. `--feed` (the pool's classifier) and `--exclude-game` exempt a salary game that is not being played; each is named under `excluded_postponed` with its signal, a priced row for it is dropped, DK's `Postponed` literal is named where it was silent, and a name matching no game or an unreadable feed warns and exempts nothing. Gate `PASS  v2.26.0  42 modules  2480 tests  5 skipped` (the five absent-file skips).
 
 ### R398. F4 grades hitters against the opener, not the declared bulk arm (P2, S) | new 2026-09-22, from `docs/backlog_inbox/2026-09-22_BUILD_f4-grades-against-opener-not-bulk-arm.md` | Roadmap: Session 32
 
 - **What.** On 1840_5g, WSH ran Cornelio (PO) then Kent (PLR). `--declare-pitcher` made Kent rosterable, but `extract_opposing_probables` (`live_data_adapters.py:1423`) read the feed's probable, so DET hitters were graded against Cornelio (.296) instead of Kent (.351). Measured on the same inputs: DET mean F4 0.911 → 1.059, primary stacks 0 → 1.
 - **Fix.** When a side is PO and a declared bulk arm exists, grade against the bulk arm or a PA-weighted blend, and name the substitution in `pool_report`.
 
-### R399. Five small defects from the 1915_1g_sd Showdown build (P2, XS each) | new 2026-09-22, from `docs/backlog_inbox/2026-09-22_BUILD_showdown-1915-small-defects.md` | Roadmap: (a)(e) Session 04, (b) 33, (c)(d) 63
+### R399. Five small defects from the 1915_1g_sd Showdown build (P2, XS each) | new 2026-09-22, from `docs/backlog_inbox/2026-09-22_BUILD_showdown-1915-small-defects.md`; (a)(e) SHIPPED 2026-09-23 as roadmap Session 04 (a), migrated to CHANGELOG.md | Roadmap: (b) Session 33, (c)(d) 63
 
-- **(a)** `build_slate.py --help` crashes on a literal "100%" in the `--captain-prior` help. Fix with `%%` plus a `format_help()` test.
 - **(b)** `showdown_handedness` misses accented names (14 of 18 matched). Reuse the NFKD normalization and WARN.
 - **(c)** `f1.prior.factor_by_team` records the first row per team, which is the pinned SP's 1.0.
 - **(d)** `qa_portfolio` prints "F1 NEUTRAL" on a Showdown brief that applied F1, because it reads the Classic `enrichment` shape.
-- **(e)** The `--captain-sleeve` help and `brief.captain_sleeve.label` are stale after R382.
 
 ### R400. Two orphans from the 2026-09-19 greenfield spec's "filed rather than fixed" list (P2, XS each) | new 2026-09-22, `docs/greenfield/2026-09-19/DFS_SYSTEM_GREENFIELD_SPEC_2026-09-19.md` §1.4 | Roadmap: Session 74
 

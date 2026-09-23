@@ -1589,3 +1589,143 @@ class OddsPasteTests(unittest.TestCase):
             # Every refusal path fills the same report keys; the CLI formats one
             # report and should not have to know which failure produced it.
             self.assertEqual(report["rows_parsed"], 0)
+
+
+class OddsPastePostponedTests(unittest.TestCase):
+    """R397. On 1840_5g the salary file predated TOR@BAL's postponement, and the
+    tool refused "no priced row for TOR@BAL" with every live game priced. The
+    workaround was a scratch copy of the salary file with the game's rows cut.
+
+    The refusal lives in `paste_odds.resolve_paste_to_odds_payload`, which took
+    its game set from the salary file alone. A game that is not being played is
+    owed no price, but only on an OBSERVED signal: a lineups feed marking it
+    postponed, cancelled or suspended (the pool's own classifier), or the
+    operator naming it. Each is reported as `excluded_postponed`, the pool's
+    word for the same fact. An absent signal exempts nothing.
+
+    BOS@ATH stands in for TOR@BAL on the vendored 1910_6g fixture.
+    """
+
+    GAME = "BOS@ATH"
+
+    @staticmethod
+    def _paste(without_game=True):
+        lines = ODDS_PASTE.read_text(encoding="utf-8").splitlines()
+        return "\n".join(line for line in lines
+                         if not (without_game and "\tBOS\tATH\t" in line)) + "\n"
+
+    def _resolve(self, text=None, salary=None, **kw):
+        from mlb_engine.intake.paste_odds import resolve_paste_to_odds_payload
+        return resolve_paste_to_odds_payload(
+            text if text is not None else self._paste(), str(salary or ODDS_SALARY),
+            fetched_at=STAMP, **kw)
+
+    def _run(self, extra):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "odds.json"
+            result = subprocess.run(
+                [sys.executable, str(REPO / "tools" / "odds_from_paste.py"),
+                 "--salary", str(ODDS_SALARY), "--paste", "-", "--out", str(out),
+                 *extra],
+                input=self._paste(), capture_output=True, text=True, cwd=str(REPO))
+            events = (json.loads(out.read_text(encoding="utf-8"))
+                      if out.exists() else None)
+            return result, events
+
+    @classmethod
+    def _feed(cls, status):
+        away, home = cls.GAME.split("@")
+        return {"games": [{"away": {"team_abbrev": away},
+                           "home": {"team_abbrev": home}, "status": status,
+                           "game_date_utc": "2026-07-31T01:40:00Z"}]}
+
+    def test_the_filed_case_still_refuses_with_no_signal(self):
+        """The block is right when nothing says the game is off: an absent
+        signal is not an observation of a postponement."""
+        report = self._resolve()["report"]
+        self.assertTrue(any(f"no priced row for {self.GAME}" in b
+                            for b in report["blockers"]), report["blockers"])
+        self.assertEqual(report["excluded_postponed"], [])
+        self.assertTrue(any("--exclude-game AWAY@HOME" in b and "--feed" in b
+                            for b in report["blockers"]),
+                        "the refusal names the two ways out")
+
+    def test_an_operator_named_game_is_exempt_and_named(self):
+        result, events = self._run(["--exclude-game", self.GAME])
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(len(events), 5, "the five live games, written")
+        self.assertIn(f"excluded_postponed: {self.GAME} (operator --exclude-game)",
+                      result.stdout)
+        self.assertIn("5 of 5 slate game(s) priced", result.stdout)
+
+    def test_the_name_resolves_through_the_pastes_own_team_rule(self):
+        for spelling in ("bos@ath", "Red Sox@Athletics", "BOS @ ATH"):
+            with self.subTest(spelling=spelling):
+                report = self._resolve(exclude_games=[spelling])["report"]
+                self.assertEqual(report["blockers"], [])
+                self.assertEqual([r["game"] for r in report["excluded_postponed"]],
+                                 [self.GAME])
+
+    def test_a_feed_marking_the_game_off_exempts_it_with_its_status(self):
+        """The pool's three states, read by the pool's classifier."""
+        for status in ("Postponed", "Cancelled", "Suspended: Rain"):
+            with self.subTest(status=status):
+                report = self._resolve(lineups_feed=self._feed(status))["report"]
+                self.assertEqual(report["blockers"], [])
+                self.assertEqual(report["excluded_postponed"][0]["signals"],
+                                 [f"lineups feed status {status!r}"])
+        scheduled = self._resolve(lineups_feed=self._feed("Scheduled"))["report"]
+        self.assertTrue(any(f"no priced row for {self.GAME}" in b
+                            for b in scheduled["blockers"]),
+                        "a feed that says the game is on exempts nothing")
+
+    def test_a_priced_row_for_an_exempt_game_is_dropped_not_written(self):
+        """A price for a game nobody plays would move F1 for teams a stale
+        salary file still carries."""
+        result = self._resolve(text=self._paste(without_game=False),
+                               exclude_games=[self.GAME])
+        report = result["report"]
+        self.assertEqual(report["blockers"], [])
+        self.assertNotIn(self.GAME, report["books_by_game"])
+        self.assertEqual(report["excluded_postponed"][0]["priced_books_dropped"],
+                         ["draftkings", "fanduel"])
+        self.assertEqual(len(result["events"]), 5)
+        self.assertNotIn(f"paste:{self.GAME}", {e["id"] for e in result["events"]})
+
+    def test_a_name_matching_no_slate_game_warns_and_the_game_still_blocks(self):
+        result, events = self._run(["--exclude-game", "BOS@NYY"])
+        self.assertEqual(result.returncode, 2)
+        self.assertIsNone(events)
+        self.assertIn("WARN  --exclude-game 'BOS@NYY' names no game", result.stderr)
+        self.assertIn(f"no priced row for {self.GAME}", result.stderr)
+
+    def test_an_unreadable_feed_warns_by_path_and_exempts_nothing(self):
+        missing = REPO / "tests" / "fixtures" / "no_such_dir" / "lineups_feed.json"
+        result, events = self._run(["--feed", str(missing)])
+        self.assertEqual(result.returncode, 2)
+        self.assertIsNone(events)
+        self.assertIn(f"WARN  --feed {missing} not read", result.stderr)
+        self.assertIn(f"no priced row for {self.GAME}", result.stderr)
+
+    def test_dks_postponed_literal_is_named_where_it_was_silent(self):
+        """A later salary download carries `Postponed` in Game Info. That game
+        never reached the game set, so it was exempt already, and nothing said
+        so. The pool's Signal 1 predicate names it now."""
+        with tempfile.TemporaryDirectory() as tmp:
+            with ODDS_SALARY.open(encoding="utf-8-sig") as fh:
+                rows = list(csv.DictReader(fh))
+            for row in rows:
+                if row["TeamAbbrev"] in self.GAME.split("@"):
+                    row["Game Info"] = "Postponed"
+            salary = Path(tmp) / "DKSalaries.csv"
+            with salary.open("w", newline="", encoding="utf-8") as fh:
+                writer = csv.DictWriter(fh, fieldnames=list(rows[0]))
+                writer.writeheader()
+                writer.writerows(rows)
+            report = self._resolve(salary=salary)["report"]
+        self.assertEqual(report["blockers"], [])
+        self.assertEqual(report["slate_games"], 5)
+        self.assertEqual(report["excluded_postponed"],
+                         [{"game": None, "teams": ["ATH", "BOS"],
+                           "signals": ["salary Game Info 'Postponed'"],
+                           "priced_books_dropped": []}])

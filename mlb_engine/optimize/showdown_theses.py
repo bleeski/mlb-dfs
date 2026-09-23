@@ -1229,10 +1229,6 @@ def resolve_captain_sleeve(df: pd.DataFrame, spec: Optional[Mapping[str, Any]],
     given = list(raw)
     if not given:
         raise CaptainSleeveError('--captain-sleeve "from" list is empty')
-    # The selector form the entry also offers. It is refused HERE, by name, and
-    # the message says what it is waiting on: the sleeve's selector has no input
-    # in the build path, so accepting it would either resolve a selector name as
-    # a person or silently designate nothing.
     # R382. The selector form R307 asked for and R381 refused by name. It
     # resolves to a MENU of `Player_Key`s and then falls through the same
     # resolution loop below, so nothing downstream of here knows the difference
@@ -2732,9 +2728,19 @@ def captain_sleeve_report(df: pd.DataFrame,
             k: dict(sorted(v.items(), key=lambda kv: (-kv[1], kv[0])))
             for k, v in pops.items()
         },
-        "label": ("realized membership, counted off the DELIVERED captains. No "
-                  "ownership number exists on this path, so nothing here is a "
-                  "leverage, lift, edge, ROI or win-rate claim."),
+        # R399(e). What chose the sleeve, carried through unchanged: None when
+        # the operator listed people, the threshold, the match count and the
+        # prior it read when a selector built the menu. `resolve_captain_sleeve`
+        # built it so the brief could show it, and until R399 this block
+        # dropped it, while `references/showdown.md` told the reader to read
+        # `captain_sleeve.selector.matched`.
+        "selector": captain_sleeve.get("selector"),
+        "label": ("realized membership, counted off the DELIVERED captains. "
+                  "When a selector chose the sleeve, `selector` names its "
+                  "threshold and the prior it read; that prior's shares sit in "
+                  "the brief's `captain_prior` block and are never averaged "
+                  "over these populations. Nothing here is a leverage, lift, "
+                  "edge, ROI or win-rate claim."),
     }
 
 
