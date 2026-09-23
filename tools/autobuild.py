@@ -272,6 +272,44 @@ def lift_controls_override(tokens: List[str]) -> tuple:
     return rest, parsed, None
 
 
+def lift_never_relax(tokens: List[str]) -> tuple:
+    """Pull every ``--never-relax`` out of the passthrough tokens.
+
+    R388(b). For R214's reason: this supervisor applies structural floors of
+    its own, so a never-relax it cannot see is one it can break. Every
+    occurrence is lifted (the flag repeats, so none is dropped) and the names
+    are forwarded once, merged with the supervisor's own flag. Returns
+    ``(tokens without the flag, names, error)``.
+    """
+    rest: List[str] = []
+    names: List[str] = []
+    i = 0
+    while i < len(tokens):
+        tok = tokens[i]
+        if tok == "--never-relax":
+            if i + 1 >= len(tokens):
+                return tokens, [], ("--never-relax in --passthrough has no value "
+                                    "after it")
+            names.append(tokens[i + 1])
+            i += 2
+            continue
+        if tok.startswith("--never-relax="):
+            names.append(tok.split("=", 1)[1])
+            i += 1
+            continue
+        rest.append(tok)
+        i += 1
+    return rest, names, None
+
+
+def never_relax_names(chunks: Optional[List[str]]) -> List[str]:
+    """The comma-separated, repeatable flag's values as one sorted list."""
+    out = set()
+    for chunk in chunks or []:
+        out.update(p.strip() for p in str(chunk).split(",") if p.strip())
+    return sorted(out)
+
+
 class Decisions:
     def __init__(self) -> None:
         self.log: List[Dict[str, Any]] = []
@@ -281,6 +319,9 @@ class Decisions:
         # and never the override they displaced.
         self.user_controls: Dict[str, Any] = {}
         self.derived_controls: Dict[str, Any] = {}
+        # R388(b). The operator's never-relax. A derived floor never lands on
+        # one of these, and `effective_controls` enforces it a second time.
+        self.never_relax: List[str] = []
         # R296(f). The log was durable only at terminal exits, so an outer kill
         # -- the Cowork call ceiling, a Ctrl-C, the sandbox dying -- lost every
         # decision taken up to that point. R212 and R169(a) each fixed one
@@ -294,13 +335,17 @@ class Decisions:
 
     @property
     def effective_controls(self) -> Dict[str, Any]:
-        """What actually reaches build_slate. Supervisor-owned keys win."""
-        return {**self.user_controls, **self.derived_controls}
+        """What actually reaches build_slate. Supervisor-owned keys win, except
+        on a never-relax control, where no derived value lands (R388(b))."""
+        held = set(self.never_relax)
+        return {**self.user_controls,
+                **{k: v for k, v in self.derived_controls.items() if k not in held}}
 
     def controls_block(self) -> Dict[str, Any]:
         return {"user_controls": dict(self.user_controls),
                 "derived_controls": dict(self.derived_controls),
-                "effective_controls": dict(self.effective_controls)}
+                "effective_controls": dict(self.effective_controls),
+                "never_relax": list(self.never_relax)}
 
     def add(self, attempt: int, action: str, why: str, **extra: Any) -> None:
         rec = {"attempt": attempt, "action": action, "why": why,
@@ -394,6 +439,18 @@ def main() -> int:
                          "the lock, and is forwarded to build_slate, whose "
                          "governor turns a badly_shaped refusal into a "
                          "review_grade_deadline_build from T-6.")
+    # R388(b). Forwarded to build_slate, which validates the names and holds
+    # them at the governor's rung and the pipeline's floors, and read here too,
+    # because this supervisor applies structural floors of its own.
+    ap.add_argument("--never-relax", dest="never_relax", action="append",
+                    default=None, metavar="CONTROL[,CONTROL...]",
+                    help="controls that must never be relaxed, comma-separated "
+                         "or repeated. Forwarded to build_slate (which refuses "
+                         "a name it cannot hold, at exit 4). This supervisor "
+                         "never applies a structural floor to one: it stops "
+                         "and names the control instead, because raising it "
+                         "is Ben's call. A --never-relax inside --passthrough "
+                         "is lifted out and merged with this flag.")
     ap.add_argument("--resume", action="store_true",
                     help="continue the run recorded in "
                          "outputs/<date>/autobuild_decisions.json: attempt "
@@ -464,6 +521,21 @@ def main() -> int:
         dec.add(0, "stop", controls_error)
         _write(dec, {}, salary=a.salary)
         return 4
+    passthrough_tokens, passthrough_never_relax, never_relax_error = (
+        lift_never_relax(passthrough_tokens))
+    if never_relax_error:
+        print(f"autobuild: {never_relax_error}", file=sys.stderr)
+        dec.add(0, "stop", never_relax_error)
+        _write(dec, {}, salary=a.salary)
+        return 4
+    dec.never_relax = never_relax_names(
+        list(getattr(a, "never_relax", None) or []) + passthrough_never_relax)
+    if dec.never_relax:
+        dec.add(0, "operator_never_relax",
+                "forwarded to build_slate once, merged from this flag and "
+                "--passthrough; no structural floor this supervisor applies "
+                "lands on one of these controls",
+                never_relax=list(dec.never_relax))
     dec.user_controls = dict(user_controls)
     if user_controls:
         dec.add(0, "operator_controls",
@@ -594,6 +666,8 @@ def main() -> int:
                           ("--deliver-by", getattr(a, "deliver_by", None))):
             if val:
                 cmd += [flag, val]
+        if dec.never_relax:
+            cmd += ["--never-relax", ",".join(dec.never_relax)]
         effective = dec.effective_controls
         if effective:
             cmd += ["--controls-override", json.dumps(effective)]
@@ -721,6 +795,18 @@ def main() -> int:
                 _write(dec, brief, salary=a.salary)
                 return 3
             control, floor_to = m.group(1), int(m.group(2))
+            if control in dec.never_relax:
+                # R388(b). The floor is arithmetic, and the operator's word
+                # outranks it: raising a never-relax control is Ben's call,
+                # so this names it and stops rather than retrying forever.
+                dec.add(attempt, "stop",
+                        f"structural check '{c['name']}' needs {control} raised "
+                        f"to >= {floor_to}, and {control} is --never-relax; "
+                        f"the operator's never-relax holds, so a human decides "
+                        f"whether to lift it",
+                        remedy=c["remedy"], never_relax=list(dec.never_relax))
+                _write(dec, brief, salary=a.salary)
+                return 3
             expected = STRUCTURAL_CONTROL_BY_CHECK[c["name"]]
             if control != expected:
                 dec.add(attempt, "stop",
