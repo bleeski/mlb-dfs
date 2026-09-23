@@ -2,6 +2,139 @@
 
 What changed in the engine, the tools and the contracts, when, and why.
 
+## 2026-09-23 — R406: Classic scenario sleeves. Part of every multi-entry Classic portfolio is built in worlds where the projection is wrong in named ways, and each entry is confined to one sleeve through the allocator's own mask (roadmap Session 94, both breakpoints)
+
+**Scope.**
+- New `mlb_engine/optimize/classic_sleeves.py`, the one owner of:
+  - the sleeve definitions and Ben's weights;
+  - the salary-only transform;
+  - environment ranking, with the static park-factor fallback;
+  - largest-remainder apportionment;
+  - sleeve tagging and membership.
+- `mlb_engine/pipeline/execution_pipeline.py`:
+  - `resolve_sleeve_bank_request`, `build_sleeve_jobs`, `sleeve_candidates`, `_direct_door_sleeves` and `_stacked_on_teams`, with `BANK_SLEEVE_BUDGET_SHARE`;
+  - the direct door and the plan leg build sleeves;
+  - `run_slate(sleeve_implied_total_by_team=)`, and `posture` on each entry requirement;
+  - `classic_sleeves` on both `execute_portfolio` return paths.
+- `mlb_engine/allocate/contest_allocator.py`: `_resolve_classic_sleeves`, the mask, per-sleeve prefilter reserves (the reserve now takes named classes), and the `classic_sleeves` block on success and refusal.
+- `mlb_engine/optimize/bank_cache.py`: `extend_bank(stack_teams=)` and its conditions bucket.
+- `mlb_engine/pipeline/deadline_governor.py`: `classic_sleeves: False` on the T-15 rung.
+- `skills/generate-lineups/scripts/build_slate.py`: the sliced door's sleeves (salary-only in a sibling cache file), the brief's `exposure.classic_sleeves`, and `format_sleeves_line`.
+- `tools/solver_probe.py` (the sleeves term) and `tools/benchmark_engine.py` (`LIVE_LOOSE_CONTROLS`).
+- `tests/test_core.py` (`ClassicSleeveTests`, the R293 census entry), `tests/test_golden_replay.py` (`LOOSE_CONTROLS`, the production bank's sleeves, the frozen sleeve aggregates), `tests/golden/golden_replay_production_2026-06-03.json` (RE-FROZEN, below).
+- `tools/audit.py` (the pin), `skills/generate-lineups/SKILL.md`, `docs/backlog.md`, `docs/ROADMAP.md`, this file.
+
+**What was wrong.** Every Classic candidate was an argmax of ONE projection under a different (SP pair, stack team) constraint. A systematic projection error was therefore shared by every entry, and the caps spread persons, not beliefs. Verified in the tree: no Classic path built a lineup in any other world. Showdown's thesis ladder is the only precedent.
+
+**What shipped.**
+- **Four sleeves.** Each non-projection sleeve is asked for twice the entries it will seat.
+  - `projection`: today's frame, the ordinary bank.
+  - `salary_only`: Base rebuilt from salary through a group points-per-dollar ratio (hitters and pitchers apart), with Ceiling and Floor at the group's median ratios. No player-level factor survives. The frame is a copy, built in its OWN cache file (a different frame is a different projection digest, and sharing would purge the ordinary bucket) and scored in its own world.
+  - `chalk_fails`: the projection frame, with at most one of R405's consensus cluster per lineup (R405's `max_selected_from` with m = 1).
+  - `environment`: the top 2 games by the implied totals F1 priced, else by the static park run factor F5 itself reads, ties broken by game id.
+- **Apportionment and the mask.** The allocator apportions each contest by largest remainder over each entry's own posture and shape, and confines the entry through its existing compatibility mask. A single-entry or cash contest seats `projection` only. The joint MILP and every cap bind across all sleeves.
+- **Counted fallbacks.** Every fallback is counted as a relaxation:
+  - a sleeve with no candidate;
+  - a (contest, sleeve) with fewer distinct lineups than entries, whose excess goes to `projection`;
+  - an entry with nothing compatible in its sleeve, which is left unmasked.
+- **The prefilter** reserves each sleeve's candidates, for R405's reason.
+- **Three doors, one helper** (R340's lesson): the sliced door, the direct door (throwaway caches, ids that cannot collide) and the plan leg all call `build_sleeve_jobs`.
+- **The report.** A brief block with the weights, entries per sleeve per contest, the environment games and their basis, what each sleeve built, the fallbacks, and each sleeve's delivered apex (mean and best contest fit) and washout (max player share, entries at k+ of the cluster) proxies.
+
+**Two things the rider's plan did not survive, found by building it.**
+- **The environment sleeve is a MEMBERSHIP, not a separate build.** A job grid restricted to the chosen games' teams solves the same MILP the ordinary bank already solved for those (pair, team) jobs and returns the same lineup, which the cache then de-duplicates. On the synthetic fixture and on 2026-07-24 night the restricted jobs built 0 new lineups, while re-solving their whole grid in a new bucket.
+  - So the sleeve seats on projection-world lineups whose primary stack is a chosen game's team, and the restricted jobs run only for depth, when the bank holds fewer such lineups than the sleeve needs.
+  - This adds no strategy number. The rejected alternative was the original entry's "that game's bats boosted", which would have needed a boost factor nobody chose.
+- **On a two-game slate the environment sleeve is the whole slate** (its top 2 games are all the games). The request DROPS it and says why, and its seats fall back to `projection`, counted.
+
+**Declined, with reasons.**
+- **Late swap** builds no sleeve bank, so every swapped entry seats as before (`no_sleeve_bank`). Carrying sleeves through a refine needs R284's bank fixes, the same as R405's cap.
+- **No boosted environment frame**, for the reason above.
+
+**Measured.**
+- **2026-06-03 (golden, 2 games, 18 entries, production postures).**
+  - Environment is dropped (whole slate).
+  - The two WTA-satellite contests (7 entries each) seat projection 3, salary-only 2, chalk-fails 2; the large GPP (4 entries) seats 2, 1, 1. Three environment seats fall back, counted.
+  - Chalk-fails lineups carry 0 entries at 3+ cluster members. R405's cap still holds at 9 of 18 across the whole set.
+- **2026-07-24 night (4 games, 20 synthetic large_gpp entries, the R408 pool builder).**
+  - Environment takes ATH@MIN and CIN@STL by park factor (no odds on that slate).
+  - 118 projection lineups stack those teams, so the depth jobs are skipped.
+  - Seats: projection 8, salary-only 4, chalk-fails 4, environment 4, with 0 fallbacks.
+  - Bank time 14.7s, after the depth-skip (18.5s before it).
+
+**The golden replay.** The LOOSE baseline is UNCHANGED: `LOOSE_CONTROLS` sets `classic_sleeves: False` (a portfolio-shaping choice, held out of the construction gate, R343/R405's precedent), and `benchmark_engine`'s R374-pinned mirror does the same. The PRODUCTION baseline is RE-FROZEN on purpose. Its bank now mirrors the sliced door's sleeves, and the aggregates freeze the sleeve request and the seating. Two independent freezes were byte-identical.
+
+| | before (R405 only) | after (R405 + R406) |
+| :--- | :--- | :--- |
+| bank | 58 candidates | 78 (chalk-fails 10, salary-only 10; environment dropped) |
+| entries by sleeve | all projection | 8 projection, 5 salary-only, 5 chalk-fails (3 environment seats fell back) |
+| delivered cluster histogram | `{1: 1, 2: 8, 4: 3, 5: 2, 6: 4}` | `{1: 6, 2: 3, 4: 4, 5: 1, 6: 4}` |
+| delivered at 3+ members | 9/18 | 9/18 |
+| distinct lineups | 18 | 18 |
+| primary stacks | BAL 4, BOS 6, PHI 3, SD 5 | BAL 6, BOS 6, PHI 3, SD 3 |
+| players rostered | 41 | 47 |
+| max player exposure | 8 | 8 |
+| apex ceiling total (cert run) | 2573.4 | 2533.5 (-1.6%) |
+| PURE verdict | certifies | certifies |
+
+What moved: `assignments` (18 of 18) and the aggregates `bank`, `classic_sleeves`, `consensus_cluster`, `exposure_summary` and `sp_pair_distribution`. `meta` and `pure_verdict` did not move.
+
+**PROBE.** `solver_probe --date 2026-06-03 --salary <vendored> --entries 18` gives `base bank 6s + augmentation 0s + consensus-limited 3s (18 lineups, R405) + sleeves 4s (22 lineups, R406) = 14s`, budget 630s, FITS. The same caveat as R405: the archived pool declares no starters without a lineups feed.
+
+**Tests.** `tests.test_core` 1447 -> 1459, twelve in `ClassicSleeveTests`:
+- the salary-only transform keeps no player-level factor, and the frame is a copy;
+- largest remainder and the WTA tilt;
+- single-entry and cash seat projection;
+- environment ranking, its tie-break, the park fallback and the whole-slate drop;
+- chalk-fails carries the cluster limit, and the environment depth jobs are skipped when the bank holds the lineups and run when it does not;
+- the mask confines each entry;
+- environment membership seats on projection lineups stacking the chosen games;
+- caps bind across sleeves;
+- no sleeve bank and `off` change nothing;
+- a thin sleeve falls back and is counted;
+- every door;
+- the brief line.
+
+16 scripted mutations, all red. The R293 census counts the three new `extend_bank` calls, each forwarding the allowance by name.
+
+**Gate.** `PASS  v2.26.0  42 modules  2439 tests  5 skipped  {test_core 1459/1459 (4 skipped) skipped_in_place; test_showdown 334/334 (1 skipped) skipped_in_place}  [tests.test_core ran its pinned 1459 but 4 were SKIPPED, so the count proves nothing about coverage.; tests.test_showdown ran its pinned 334 but 1 were SKIPPED, so the count proves nothing about coverage.]` (the five skips are the absent optional files /ship expects on every host; 42 modules is the new `classic_sleeves.py`).
+
+### The register entry, migrated verbatim
+
+**Rider 2026-09-23 (DEV; Ben's decisions and the approved build plan). Needs R405 landed through (c).**
+
+*Ben's decisions (settled).*
+- Default weights: projection 40%, salary-only 20%, chalk-fails 20%, environment 20%.
+- `wta_satellite` and WTA contests shift 10 points from projection to chalk-fails (30/20/30/20).
+- The environment sleeve takes the top 2 games by implied total, or by park run factor when no odds are priced.
+- Sleeves are on by default.
+
+*Build plan.* New module `mlb_engine/optimize/classic_sleeves.py`, one owner for sleeve definitions, transforms, job lists and apportionment.
+
+- **Sleeve definitions.** Every sleeve is a WORLD in which the portfolio's bank jobs are generated, and each gets its own `conditions_signature` bucket (the R340/R405(c) pattern).
+  1. `projection`: today's frame.
+  2. `salary_only`: DK salary is the only prior. Base is rebuilt from salary through a position-group points-per-dollar ratio measured on the slate's own frame (hitters and pitchers separately). Ceiling is Base x the group's median Ceiling/Base ratio, so no player-level factor survives. Floor keeps its relation to Base. The transform is a copy of the frame, never an edit of it.
+  3. `chalk_fails`: the projection frame, with jobs solved under `max_selected_from=(R405 cluster, 1)`. This reuses R405(c) and needs no new penalty number.
+  4. `environment`: jobs restricted to stack teams from the chosen games. Games are ranked by implied total when F1 priced them, else by park run factor, with ties broken by game id so the order is deterministic.
+- **Apportionment.** Per contest, by largest remainder over the declared weights, deterministic and sorted. A single-entry contest and a cash contest go to `projection`. Each entry is masked to its sleeve's candidates through the allocator's existing `compatible[e][k]` mask (CA, where incompatible x are clamped to 0). That leaves the joint MILP and every cap in force across the whole entered set, so R405's cluster cap still binds at the portfolio level.
+- **Report.** A brief `sleeves` block: weights, entries per sleeve per contest, each sleeve's apex and washout review proxies, the environment games chosen and why, and any sleeve that could not fill (its entries fall back to `projection`, counted as a relaxation).
+- **Truthful labels.** Every sleeve is a deterministic construction over labeled priors. Nothing here is a probability or an edge, and a sleeve winning a replay is "supported in the shapes replayed".
+- **Throughput.** Four buckets cost bank time. Measure on `PROBE` and say what the budget bought; bank growth stays search effort, never a pool cut.
+- **Breakpoint.** Sleeves built and reported with allocation unchanged is a valid first landing; the apportionment mask is the second.
+
+*Tests.* `test_core.ClassicSleeveTests`: the salary-only transform keeps no player-level factor; chalk-fails jobs carry the cluster constraint; environment game ranking and its tie-break; largest-remainder apportionment including the WTA tilt; single-entry and cash go to projection; the mask confines each entry to its sleeve; caps still bind across sleeves; no player dropped. Then `GOLD` re-frozen deliberately with the histogram, and `PROBE`.
+
+- **What.** Every Classic candidate is an argmax of ONE projection under a different (SP pair, stack team) constraint, so a systematic projection error is shared by every entry. The caps spread persons, not beliefs. Showdown already conditions each entry on a game state (`showdown_theses`, the thesis ladder); Classic has no equivalent.
+- **Fix.** Split the entered set into sleeves, each optimized for ceiling inside its own world, and allocate entries across sleeves by declared weights recorded in the brief:
+  - (1) the build's projection;
+  - (2) salary as the only prior (DK's price as the market's projection);
+  - (3) consensus-fails: R405's cluster penalized in that sleeve's bank jobs;
+  - (4) one environment sleeve per high-total or high-park game, that game's bats boosted.
+
+  A stack like 1905_10g's CWS (best bank rank 21 of 408, zero entries) competes for a lineup inside its own world instead of losing every comparison to the consensus. WTA and satellite entries lean on the contrarian sleeves. Sleeves are deterministic constructions over labeled priors; nothing here is a probability.
+- **Relation to R261/R262.** R262 selects by scenario coverage once R261's predictions grade; this CONSTRUCTS by scenario now and grades nothing. It can ship first, and R262 can later replace its weights with coverage.
+- **Needs.** R405(a) for the consensus definition. The sleeve weights and the environment-game rule are Ben's at plan approval.
+
 ## 2026-09-23 — R408: `tools/replay_slate.py --grade-projection` ranks realized points against the engine's Base, Ceiling, salary and APPG on every archived Classic slate, per slate and per side, observed outcomes only (roadmap Session 96)
 
 **Scope.** `tools/replay_slate.py` (the `--grade-projection` and `--date` flags and the grade functions); `tests/test_core.py` (`ProjectionBackfillGradeTests`); `tools/audit.py` (the pin); `ledger/inbox/2026-09-23_DEV_keep-dksalaries-beside-standings.md` (the ARCHIVE note the rider asks for, as a create-only fragment, because DEV does not edit the ledger); `docs/backlog.md`, `docs/ROADMAP.md`, this file.

@@ -645,6 +645,7 @@ def conditions_signature(
     max_opposing_hitters_per_sp: Optional[int] = None,
     *, target: str = "ceiling", leverage: Optional[Mapping[str, Any]] = None,
     max_selected_from: Optional[Tuple[Sequence[str], int]] = None,
+    stack_teams: Optional[Sequence[str]] = None,
 ) -> str:
     """A short digest of everything outside (pair, team, locks) that moves a solve.
 
@@ -686,6 +687,11 @@ def conditions_signature(
         ids, m = max_selected_from
         digest.update(
             f"sel:{int(m)}:{'|'.join(sorted(str(x) for x in (ids or [])))}\n".encode())
+    # R406. A job grid restricted to some stack teams answers a narrower
+    # question and buckets apart; appended only when set, for the rule above.
+    if stack_teams is not None:
+        digest.update(
+            f"teams:{'|'.join(sorted(str(t) for t in stack_teams))}\n".encode())
     digest.update(_projection_bytes(projections_df))
     return digest.hexdigest()[:16]
 
@@ -743,6 +749,7 @@ def extend_bank(
     max_opposing_hitters_per_sp: Optional[int] = None,
     max_selected_from: Optional[Tuple[Sequence[str], int]] = None,
     job_class: Optional[str] = None,
+    stack_teams: Optional[Sequence[str]] = None,
 ) -> Dict[str, Any]:
     """Generate candidates across (SP pair, stack team) until the budget runs out.
 
@@ -750,6 +757,10 @@ def extend_bank(
     at most ``m`` of ``ids`` together (``build_single_lineup``'s argument, m >=
     1), in its own conditions bucket, and ``job_class`` tags what it stores.
     Both default to None, which is this function's behaviour before R405.
+
+    R406. ``stack_teams`` restricts which teams the job grid STACKS (the
+    environment sleeve's games), never who may be rostered: every player stays
+    legal as a filler in every job, and the restriction is its own bucket.
 
     Returns a report with what was built and whether the job list is exhausted, so
     the caller knows whether another slice is worth running. ``locked_slot_assignments``
@@ -801,7 +812,8 @@ def extend_bank(
     conditions_sig = conditions_signature(
         projections_df, excl, stack_min, stack_max,
         max_opposing_hitters_per_sp=max_opposing_hitters_per_sp,
-        target=target, leverage=leverage, max_selected_from=max_selected_from)
+        target=target, leverage=leverage, max_selected_from=max_selected_from,
+        stack_teams=stack_teams)
     pool_digest = projection_digest(projections_df)
     cache.register_conditions(conditions_sig, pool_digest)
     superseded = cache.drop_stale_jobs(conditions_sig, projection_digest=pool_digest)
@@ -828,11 +840,15 @@ def extend_bank(
     game_of = {str(r.Player_ID): str(r.Game_ID) for r in eligible.itertuples()}
     hitters = eligible[eligible["Position"] != "P"]
     teams = sorted({str(t) for t in hitters["Team"]})
+    legal_teams = list(teams)
+    if stack_teams is not None:
+        wanted_teams = {str(t) for t in stack_teams}
+        teams = [t for t in teams if t in wanted_teams]
     all_pitchers = projections_df[projections_df["Position"] == "P"]
     excluded_arms_dropped = int(len(all_pitchers) - len(pitchers))
     all_hitters = projections_df[projections_df["Position"] != "P"]
     excluded_teams_dropped = sorted(
-        {str(t) for t in all_hitters["Team"]} - set(teams))
+        {str(t) for t in all_hitters["Team"]} - set(legal_teams))
 
     # A pinned pitcher slot makes every SP pair that excludes it infeasible, so
     # enumerating them burns the budget on guaranteed failures. Constrain the pair
@@ -1104,6 +1120,7 @@ def extend_bank(
              "m": int(max_selected_from[1])} if max_selected_from is not None
             else None),
         "job_class": job_class,
+        "stack_teams": sorted(str(t) for t in stack_teams) if stack_teams is not None else None,
         # R103. Named so a +0-candidate slice on a fully-pinned entry reads as
         # the pin it is, not as a dry pool: True means both P slots were
         # pinned to a same-game pair and the same-game filter was bypassed to

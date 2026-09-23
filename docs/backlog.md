@@ -1446,41 +1446,18 @@ the histogram in the changelog: 18/18 -> 9/18 entries at 3+ members, 11 -> 18
 distinct lineups, apex ceiling -1.0%. The 1905_10g replay is owed when its
 files are staged. Gate `PASS  v2.26.0  41 modules  2412 tests  5 skipped` (the five absent-file skips).
 
-### R406. Classic scenario sleeves: build the portfolio across worlds where the projection is wrong in named ways (P1, L) | new 2026-09-23, from Ben's post-slate question "what if all our priors and all conventional wisdom are wrong", 1905_10g review | Roadmap: Session 94
+### R406. CLOSED 2026-09-23 -- SHIPPED as roadmap Session 94 (both breakpoints), entry migrated to CHANGELOG.md
 
-**Rider 2026-09-23 (DEV; Ben's decisions and the approved build plan). Needs R405 landed through (c).**
-
-*Ben's decisions (settled).*
-- Default weights: projection 40%, salary-only 20%, chalk-fails 20%, environment 20%.
-- `wta_satellite` and WTA contests shift 10 points from projection to chalk-fails (30/20/30/20).
-- The environment sleeve takes the top 2 games by implied total, or by park run factor when no odds are priced.
-- Sleeves are on by default.
-
-*Build plan.* New module `mlb_engine/optimize/classic_sleeves.py`, one owner for sleeve definitions, transforms, job lists and apportionment.
-
-- **Sleeve definitions.** Every sleeve is a WORLD in which the portfolio's bank jobs are generated, and each gets its own `conditions_signature` bucket (the R340/R405(c) pattern).
-  1. `projection`: today's frame.
-  2. `salary_only`: DK salary is the only prior. Base is rebuilt from salary through a position-group points-per-dollar ratio measured on the slate's own frame (hitters and pitchers separately). Ceiling is Base x the group's median Ceiling/Base ratio, so no player-level factor survives. Floor keeps its relation to Base. The transform is a copy of the frame, never an edit of it.
-  3. `chalk_fails`: the projection frame, with jobs solved under `max_selected_from=(R405 cluster, 1)`. This reuses R405(c) and needs no new penalty number.
-  4. `environment`: jobs restricted to stack teams from the chosen games. Games are ranked by implied total when F1 priced them, else by park run factor, with ties broken by game id so the order is deterministic.
-- **Apportionment.** Per contest, by largest remainder over the declared weights, deterministic and sorted. A single-entry contest and a cash contest go to `projection`. Each entry is masked to its sleeve's candidates through the allocator's existing `compatible[e][k]` mask (CA, where incompatible x are clamped to 0). That leaves the joint MILP and every cap in force across the whole entered set, so R405's cluster cap still binds at the portfolio level.
-- **Report.** A brief `sleeves` block: weights, entries per sleeve per contest, each sleeve's apex and washout review proxies, the environment games chosen and why, and any sleeve that could not fill (its entries fall back to `projection`, counted as a relaxation).
-- **Truthful labels.** Every sleeve is a deterministic construction over labeled priors. Nothing here is a probability or an edge, and a sleeve winning a replay is "supported in the shapes replayed".
-- **Throughput.** Four buckets cost bank time. Measure on `PROBE` and say what the budget bought; bank growth stays search effort, never a pool cut.
-- **Breakpoint.** Sleeves built and reported with allocation unchanged is a valid first landing; the apportionment mask is the second.
-
-*Tests.* `test_core.ClassicSleeveTests`: the salary-only transform keeps no player-level factor; chalk-fails jobs carry the cluster constraint; environment game ranking and its tie-break; largest-remainder apportionment including the WTA tilt; single-entry and cash go to projection; the mask confines each entry to its sleeve; caps still bind across sleeves; no player dropped. Then `GOLD` re-frozen deliberately with the histogram, and `PROBE`.
-
-- **What.** Every Classic candidate is an argmax of ONE projection under a different (SP pair, stack team) constraint, so a systematic projection error is shared by every entry. The caps spread persons, not beliefs. Showdown already conditions each entry on a game state (`showdown_theses`, the thesis ladder); Classic has no equivalent.
-- **Fix.** Split the entered set into sleeves, each optimized for ceiling inside its own world, and allocate entries across sleeves by declared weights recorded in the brief:
-  - (1) the build's projection;
-  - (2) salary as the only prior (DK's price as the market's projection);
-  - (3) consensus-fails: R405's cluster penalized in that sleeve's bank jobs;
-  - (4) one environment sleeve per high-total or high-park game, that game's bats boosted.
-
-  A stack like 1905_10g's CWS (best bank rank 21 of 408, zero entries) competes for a lineup inside its own world instead of losing every comparison to the consensus. WTA and satellite entries lean on the contrarian sleeves. Sleeves are deterministic constructions over labeled priors; nothing here is a probability.
-- **Relation to R261/R262.** R262 selects by scenario coverage once R261's predictions grade; this CONSTRUCTS by scenario now and grades nothing. It can ship first, and R262 can later replace its weights with coverage.
-- **Needs.** R405(a) for the consensus definition. The sleeve weights and the environment-game rule are Ben's at plan approval.
+Four sleeves (projection; salary-only; chalk-fails at most one of R405's cluster;
+environment on the top two games by implied total, else static park factor) at
+Ben's weights (40/20/20/20, WTA 30/20/30/20), built on the sliced, direct and
+plan-leg doors through one helper, apportioned per contest by largest remainder
+and confined through the allocator's compatibility mask, every cap still joint.
+The environment sleeve is a membership (projection lineups stacking the chosen
+games), because a restricted job grid reproduces the ordinary lineups; on a
+two-game slate it is dropped. Fallbacks are counted. Late swap builds no sleeve
+bank (rider on R284). Production golden re-frozen with the table in the
+changelog; loose golden unmoved (sleeves off there). Gate `PASS  v2.26.0  42 modules  2439 tests  5 skipped`.
 
 ### R407. CLOSED 2026-09-23 -- SHIPPED as roadmap Session 95, entry migrated to CHANGELOG.md
 

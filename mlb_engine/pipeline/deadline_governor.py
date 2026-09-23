@@ -131,6 +131,9 @@ OPEN_CONTROL_VALUES: Dict[str, Any] = {
     # R405, 2026-09-23, for R343's reason: the cluster cap ships ON by posture
     # default and is S class under R386, so the T-15 crude move has to open it.
     "max_consensus_cluster_share_pct": 1.0,
+    # R406, 2026-09-23. The sleeves' mask opens too: a governed re-solve seats
+    # any entry on any lineup, the crude move the rung exists to make.
+    "classic_sleeves": False,
 }
 
 #: Showdown's three controls, same rung, same one crude move. Kept separate

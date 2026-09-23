@@ -51,6 +51,7 @@ LIVE_LOOSE_CONTROLS = {
     "max_team_exposure_pct": 1.0,
     # R405: opened, as in the golden's LOOSE_CONTROLS (R374 pins the two equal).
     "max_consensus_cluster_share_pct": 1.0,
+    "classic_sleeves": False,  # R406, as in the golden's LOOSE_CONTROLS
     "max_sp_pair_repetition": 50,
     "max_shared_players": 9,
     "max_candidate_reuse": 20,
