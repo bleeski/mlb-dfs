@@ -724,6 +724,34 @@ stderr line, `consensus_cluster_request` in the checkpoint, and
 `tools/qa_portfolio.py`'s `consensus_cluster` washout axis. A decorrelation
 preference over labeled priors; never a win rate, a cash rate, or a probability.
 
+### Caps that scale with input confidence (R407, Classic only)
+
+The brief already reports when the inputs are weak; since R407 the build reads
+it back. Four facts, each the one the brief prints: no odds priced
+(`enrichment.counts.f1_games_priced == 0`); a side the pool used came from a
+platoon reference older than 7 days (R27's check); a Savant `expected_stats`
+file is past the enrichment age warning's own threshold; no handedness
+(`f4_platoon_applied == 0` with hitters in the pool).
+
+| Tier | Facts | `max_player_exposure_pct` | `max_consensus_cluster_share_pct` |
+| :--- | :--- | :--- | :--- |
+| clean | none | unchanged | unchanged |
+| DEGRADED | exactly one | -0.05 | -0.10 |
+| SEVERE | two or more | -0.10 | -0.20 |
+
+- **Floors win**: the result is `max(tightened, feasibility floor)`. An explicit
+  `--controls-override` of either key wins over the tightening. A cap already
+  at 1.0 is off and stays off.
+- **Relaxed first**: inside T-30 the first solve runs without the tightening,
+  and on a proven-infeasible joint MILP the build re-solves once without it
+  BEFORE the deadline governor moves anything. Both record the before and the
+  would-be after (`relaxed_deadline_t30`, `relaxed_proven_infeasible`).
+- **Where to read it**: the brief's `input_confidence` (tier, the facts that set
+  it, each control's before and after, provenance `confidence_derived`) and the
+  `input confidence:` stderr line. A `run_slate` caller that supplies no facts
+  reads `not_assessed` and nothing moves. A deterministic schedule over labeled
+  inputs, never a probability that the projection is wrong.
+
 ### Projection enrichment (this is what makes the build more than APPG)
 
 The build applies six deterministic priors: the xwOBA Base correction, xISO

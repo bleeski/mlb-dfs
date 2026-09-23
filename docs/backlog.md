@@ -1482,31 +1482,17 @@ files are staged. Gate `PASS  v2.26.0  41 modules  2412 tests  5 skipped` (the f
 - **Relation to R261/R262.** R262 selects by scenario coverage once R261's predictions grade; this CONSTRUCTS by scenario now and grades nothing. It can ship first, and R262 can later replace its weights with coverage.
 - **Needs.** R405(a) for the consensus definition. The sleeve weights and the environment-game rule are Ben's at plan approval.
 
-### R407. Caps that scale with input confidence (P1, M) | new 2026-09-23, from the 1905_10g post-slate review | Roadmap: Session 95
+### R407. CLOSED 2026-09-23 -- SHIPPED as roadmap Session 95, entry migrated to CHANGELOG.md
 
-**Rider 2026-09-23 (DEV; Ben's decisions and the approved build plan). Needs R405(b) for the cluster half.**
-
-*Ben's decisions (settled).* Two tiers from four facts:
-1. no odds priced (`enrichment.counts.f1_games_priced == 0`);
-2. a side the pool used was filled from a platoon reference more than 7 days old (the R27 age check `build_slate_pool` already runs, per used TBD side);
-3. Savant expected stats more than 14 days old (the enrichment age warning's own threshold, `reference_manifest.json` `fetched_at`);
-4. no handedness (`enrichment.counts.f4_platoon_applied == 0` on a slate with hitters in the pool).
-
-DEGRADED is exactly one fact: `max_player_exposure_pct` -0.05 and `max_consensus_cluster_share_pct` -0.10. SEVERE is two or more: -0.10 and -0.20. 1905_10g had all four, so it was SEVERE.
-
-*Build plan.*
-- **Where.** Compute the tier where `run_slate` resolves controls (after `_merged_controls_for_build`, EP:4982-4990; before the floor merge records `controls_feasibility`), from the same enrichment facts the brief prints. There is no second reader of those facts.
-- **Floors win.** The result is `max(tightened, feasibility floor)`, so this can never push a cap below what the slate can carry.
-- **Provenance.** The tightened value carries `confidence_derived` (R388(b)'s vocabulary; coordinate with Session 06 if it has landed).
-- **Under deadline** (R386, inside T-30) or on a proven-infeasible joint MILP, the confidence tightening is the FIRST thing relaxed, recorded with its before and after values.
-- **The brief** states the tier, the facts that set it, and each control's before and after values.
-- **Operator override.** An explicit `--controls-override` value for either key wins over the tightening, and the brief says so.
-
-*Tests.* `test_core.ConfidenceScaledCapTests`: each fact alone gives DEGRADED; two give SEVERE; the floor wins; an override wins; the deadline relaxes it first; the brief block is populated; a clean slate is unchanged. `GOLD` (the vendored 2026-06-03 fixture's facts decide whether it moves; say which).
-
-- **What.** 1905_10g built with no odds (`f1_games_priced: 0`), no handedness (`f4_platoon_applied: 0`), Savant data 23 days old and, on the first build, 12 of 20 sides from a 48.9-day-old platoon file. The brief recorded each fact, and the build concentrated exactly as it would on a clean night: nothing reads a degradation back into the controls.
-- **Fix.** A deterministic confidence tier computed from facts the brief already carries (`enrichment.degraded`, `factors_inert`, `f1_games_priced`, reference ages, `dk_order_coverage`, feed status), mapped by a declared schedule to a tighter `max_player_exposure_pct` and R405's cluster share. The tightened value carries its provenance (`confidence_derived`, in R388(b)'s vocabulary) and is the first thing R386 relaxes under deadline. The brief states the tier, the facts that set it, and the before and after values.
-- **Needs.** R405(b) for the cluster half; the player half stands alone. Coordinates with Session 06 (R388(b) provenance). The schedule is Ben's at plan approval.
+A deterministic tier from the four facts the brief already prints (no odds
+priced, a used side from a platoon file older than 7 days, a stale Savant
+expected_stats file, no handedness): one fact is DEGRADED (player -0.05,
+cluster -0.10), two or more SEVERE (-0.10, -0.20). Applied in `run_slate` where
+the controls are merged; floors win, an explicit override wins, a cap at 1.0
+stays off, provenance `confidence_derived`. Relaxed first inside T-30 and on a
+proven-infeasible joint MILP, before the deadline governor. The golden does not
+move: its door supplies no facts (`not_assessed`). Gate `PASS  v2.26.0  41 modules  2421 tests  5 skipped` (the five
+absent-file skips).
 
 ### R408. Does the projection order players better than salary? Backfill the grade on the archive (P1, M) | new 2026-09-23, from the 1905_10g post-slate review | Roadmap: Session 96
 
