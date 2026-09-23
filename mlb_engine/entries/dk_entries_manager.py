@@ -41,6 +41,10 @@ ALLOWED_PITCHER_ROLES = {"verified_starter", "declared_probable_sp", "viable_bul
 # middle ground to tune, so the threshold only has to be well clear of both.
 EMBEDDED_POOL_MIN_OVERLAP = 0.95
 
+# R388(a). Every name in the three tuples below, and the two allocation gates
+# `validate_upload_ready_gates` adds, has a V/S/P class in
+# `mlb_engine/entries/gate_classes.py` (GATE_VALIDITY); a new name without one
+# fails `GateTaxonomyTests`.
 PRE_EXPORT_GATES = (
     "salary_gate_passed",
     "entry_grid_gate_passed",

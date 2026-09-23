@@ -7679,5 +7679,239 @@ class R323ShowdownPreflightRunsTheCheckTests(unittest.TestCase):
         self.assertNotIn("AAA Bench1", text.split("WARN")[-1])
 
 
+class GateTaxonomyTests(unittest.TestCase):
+    """R388(a). One taxonomy for every gate and refusal the build can stop on.
+
+    The governor's refusal class (R290(c)) and the delivery-first V/S/P class
+    (MLB_Classic.md §2, R386) now sit side by side in
+    `mlb_engine/entries/gate_classes.py`. These pin that the V/S/P half is
+    COMPLETE (every name the certification path can fail under has a class,
+    and a new name raises rather than defaulting), that a MIXED check is only a
+    container of V/S/P facts, and that moving the governor's table changed no
+    value. No behaviour changes here: the governor still reads only its class.
+    """
+
+    BS = REPO / "skills" / "generate-lineups" / "scripts" / "build_slate.py"
+
+    @classmethod
+    def setUpClass(cls):
+        import importlib.util
+        from mlb_engine.entries import gate_classes
+        cls.gc = gate_classes
+        spec = importlib.util.spec_from_file_location("build_slate_r388a", cls.BS)
+        cls.bs = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.bs)
+
+    def test_every_certification_gate_name_has_a_validity_class(self):
+        from mlb_engine.entries.dk_entries_manager import (
+            FORBIDDEN_CALLER_ASSERTIONS, POST_EXPORT_GATES, PRE_EXPORT_GATES,
+        )
+        expected = (set(PRE_EXPORT_GATES) | set(POST_EXPORT_GATES)
+                    | set(FORBIDDEN_CALLER_ASSERTIONS)
+                    | {"allocation_certified", "allocation_method",
+                       "caller_assertion"})
+        self.assertEqual(expected - set(self.gc.GATE_VALIDITY), set(),
+                         "a certification gate has no V/S/P class")
+        self.assertEqual(set(self.gc.GATE_VALIDITY) - expected, set(),
+                         "GATE_VALIDITY classifies a name the engine no longer has")
+
+    def test_every_name_the_validator_can_fail_resolves_through_the_parser(self):
+        """The production path, not the tuples: DKM's own validator fails every
+        gate it can, and build_slate's own parser reads the names back. Each one
+        must resolve, including `caller_assertion`, which is what
+        `_GATE_ERROR_RE` makes of `caller_assertion:<gate>`."""
+        from mlb_engine.entries.dk_entries_manager import (
+            FORBIDDEN_CALLER_ASSERTIONS, PRE_EXPORT_GATES,
+            validate_upload_ready_gates,
+        )
+        values = {name: False for name in PRE_EXPORT_GATES}
+        values.update({name: True for name in FORBIDDEN_CALLER_ASSERTIONS})
+        values.update(allocation_certified=False, allocation_method="greedy_fallback")
+        report = validate_upload_ready_gates(values, allocation_required=True)
+        names = self.bs.gate_failure_detail({"errors": report["errors"]},
+                                            None)["failed_gates"]
+        self.assertIn("caller_assertion", names)
+        self.assertIn("allocation_method", names)
+        # And DKM's raw names, which carry the gate after a colon.
+        self.assertIn("caller_assertion:workflow_valid", report["failed_gates"])
+        for name in names + report["failed_gates"]:
+            with self.subTest(name=name):
+                self.assertIn(self.gc.gate_validity(name).klass,
+                              self.gc.VSP + (self.gc.MIXED,))
+
+    def test_an_unclassified_name_raises(self):
+        with self.assertRaises(self.gc.UnclassifiedGateError) as caught:
+            self.gc.gate_validity("a_gate_added_without_a_class")
+        self.assertIn("MLB_Classic.md", str(caught.exception))
+        with self.assertRaises(self.gc.UnclassifiedGateError):
+            self.gc.refusal_site_validity("a_refusal_added_without_a_class")
+        with self.assertRaises(self.gc.UnclassifiedGateError,
+                               msg="only caller_assertion and caller_assertion:<gate> map"):
+            self.gc.gate_validity("caller_assertions")
+
+    def test_the_governors_lookup_still_defaults_and_does_not_raise(self):
+        """The other half of that rule. The governor's lookup runs on a live
+        refusal path, where an exception is a lost file, so it keeps R290(c)'s
+        READ-IT default: the conservative direction, refused at every clock."""
+        self.assertEqual(self.gc.classic_gate_class("allocation_method"),
+                         (self.gc.REFUSAL_READ_IT, "unclassified"))
+        self.assertEqual(self.bs.classic_gate_class("caller_assertion"),
+                         (self.gc.REFUSAL_READ_IT, "unclassified"))
+
+    def test_a_fact_named_in_two_checks_carries_one_class(self):
+        seen = {}
+        for table in (self.gc.GATE_VALIDITY, self.gc.REFUSAL_SITE_VALIDITY):
+            for name, validity in table.items():
+                for fact, klass in validity.facts:
+                    with self.subTest(fact=fact, check=name):
+                        self.assertEqual(seen.setdefault(fact, klass), klass)
+
+    def test_a_mixed_check_names_facts_and_each_fact_is_one_class(self):
+        for table in (self.gc.GATE_VALIDITY, self.gc.REFUSAL_SITE_VALIDITY):
+            for name, validity in table.items():
+                with self.subTest(name=name):
+                    if validity.klass == self.gc.MIXED:
+                        self.assertGreaterEqual(len(validity.classes()), 2)
+                        self.assertTrue(all(k in self.gc.VSP
+                                            for _, k in validity.facts))
+                    else:
+                        self.assertEqual(validity.facts, ())
+        Validity = self.gc.Validity
+        for bad in (lambda: Validity("MIXED"),
+                    lambda: Validity("MIXED", (("a", "V"), ("b", "V"))),
+                    lambda: Validity("V", (("a", "V"),)),
+                    lambda: Validity("MIXED", (("a", "V"), ("b", "coverage"))),
+                    lambda: Validity("MIXED", (("a", "V"), ("a", "S"))),
+                    lambda: Validity("ILLEGAL")):
+            with self.assertRaises(ValueError):
+                bad()
+
+    def test_the_governor_table_moved_with_every_value_unchanged(self):
+        """No behaviour change, pinned value by value against the table as it
+        stood in build_slate.py at 2864fb7."""
+        R, B, I = (self.gc.REFUSAL_READ_IT, self.gc.REFUSAL_BADLY_SHAPED,
+                   self.gc.REFUSAL_ILLEGAL)
+        before = {
+            "salary_gate_passed": (R, "input_identity"),
+            "entry_grid_gate_passed": (R, "input_identity"),
+            "lineup_gate_passed": (R, "input_identity"),
+            "pitcher_audit_gate_passed": (R, "input_identity"),
+            "weather_gate_passed": (R, "input_identity"),
+            "odds_gate_passed": (R, "input_identity"),
+            "projection_schema_gate_passed": (R, "input_identity"),
+            "optimizer_gate_passed": (R, "provenance"),
+            "selection_certified": (B, "ben_preference"),
+            "template_preservation_passed": (I, "dk_rule"),
+            "entry_reconciliation_passed": (I, "dk_rule"),
+            "roster_legality_passed": (I, "dk_rule"),
+            "locked_immutability_passed": (I, "dk_rule"),
+            "export_hash_binding_passed": (R, "provenance"),
+            "portfolio_caps_passed": (B, "ben_preference"),
+        }
+        self.assertEqual(self.gc.CLASSIC_GATE_CLASS, before)
+        self.assertEqual(self.gc.CLASSIC_ALLOCATION_FAILED_CLASS,
+                         (B, "ben_preference"))
+        self.assertEqual(self.gc.CLASSIC_CONTEST_IDENTITY_CLASS,
+                         (R, "input_identity"))
+        self.assertEqual(self.gc.CLASSIC_GATE_CLASS_DEFAULT, (R, "unclassified"))
+        # The script still answers for the names its readers ask it for.
+        self.assertIs(self.bs.CLASSIC_GATE_CLASS, self.gc.CLASSIC_GATE_CLASS)
+        self.assertIs(self.bs.CLASSIC_CONTEST_IDENTITY_CLASS,
+                      self.gc.CLASSIC_CONTEST_IDENTITY_CLASS)
+        self.assertFalse(hasattr(self.bs, "NOT_A_GATE_TABLE"))
+        # With the engine unimportable, the four names answer AttributeError, so
+        # `hasattr` is False rather than raising. The PACKAGE is blocked: an
+        # already-imported package serves the submodule from its attributes.
+        import unittest.mock
+        with unittest.mock.patch.dict(sys.modules, {"mlb_engine.entries": None}):
+            self.assertFalse(hasattr(self.bs, "CLASSIC_GATE_CLASS"))
+        self.assertTrue(hasattr(self.bs, "CLASSIC_GATE_CLASS"))
+
+    def test_the_three_vocabularies_are_one(self):
+        """build_slate keeps its four strings (it loads without the engine);
+        the governor no longer keeps its own."""
+        from mlb_engine.pipeline import deadline_governor as dg
+        for suffix in ("ILLEGAL", "BADLY_SHAPED", "READ_IT", "SPLIT"):
+            with self.subTest(klass=suffix):
+                self.assertEqual(getattr(self.bs, f"REFUSAL_{suffix}"),
+                                 getattr(self.gc, f"REFUSAL_{suffix}"))
+                self.assertIs(getattr(dg, f"CLASS_{suffix}"),
+                              getattr(self.gc, f"REFUSAL_{suffix}"))
+        self.assertNotIn('CLASS_ILLEGAL = "illegal"',
+                         (REPO / "mlb_engine" / "pipeline" / "deadline_governor.py")
+                         .read_text(encoding="utf-8"))
+
+    def test_the_audits_anchor_classes(self):
+        """The rows the delivery-first contract names outright."""
+        gv = self.gc.gate_validity
+        self.assertEqual(gv("odds_gate_passed").klass, self.gc.P)
+        self.assertEqual(gv("allocation_method").klass, self.gc.P)
+        self.assertEqual(gv("portfolio_caps_passed").klass, self.gc.S)
+        for name in ("salary_gate_passed", "entry_grid_gate_passed",
+                     "template_preservation_passed",
+                     "entry_reconciliation_passed", "locked_immutability_passed",
+                     "caller_assertion"):
+            with self.subTest(name=name):
+                self.assertEqual(gv(name).klass, self.gc.V)
+        roster = gv("roster_legality_passed")
+        self.assertEqual(roster.klass, self.gc.MIXED)
+        self.assertEqual(dict(roster.facts)["distinct_lineups_per_contest"],
+                         self.gc.S, "F-3: an S control, never relaxed")
+        self.assertEqual(dict(roster.facts)["platform_roster_rules"], self.gc.V)
+        self.assertEqual(dict(roster.facts)["reserved_row_blank_or_incomplete"],
+                         self.gc.V, "the validator's completeness error is a "
+                         "row DK rejects or will not take (F-2), never P")
+        crosswalk = self.gc.refusal_site_validity("pool_blocked_crosswalk")
+        self.assertIn(self.gc.V, crosswalk.classes())
+        self.assertEqual(self.bs.REFUSAL_BY_KEY["pool_blocked_crosswalk"]["authority"],
+                         "claude_md_wall",
+                         "the crosswalk wall stays Ben's at any clock")
+
+    def test_evidence_states_keep_not_checked_apart_from_passed(self):
+        es = self.gc.evidence_state
+        values = {"a": True, "b": False, "c": 1, "d": {"passed": True},
+                  "e": {"passed": 1}}
+        self.assertEqual(es(values, "a"), self.gc.EVIDENCE_PASSED)
+        self.assertEqual(es(values, "b"), self.gc.EVIDENCE_FAILED)
+        self.assertEqual(es(values, "c"), self.gc.EVIDENCE_FAILED,
+                         "1 is not True: the gate identity rule")
+        self.assertEqual(es(values, "d"), self.gc.EVIDENCE_PASSED)
+        self.assertEqual(es(values, "e"), self.gc.EVIDENCE_FAILED)
+        self.assertEqual(es(values, "absent"), self.gc.EVIDENCE_NOT_CHECKED)
+        self.assertEqual(es(values, "a", assumed=["a"]), self.gc.EVIDENCE_ASSUMED)
+        self.assertEqual(es({"odds_gate_passed": False}, "odds_gate_passed",
+                            assumed="odds_gate_passed"),
+                         self.gc.EVIDENCE_ASSUMED,
+                         "a bare string is one gate name, not its characters")
+
+    def test_evidence_state_reads_a_gate_exactly_as_dk_entries_manager_does(self):
+        """Two readers of one fact share one rule: `_gate_bool`'s three keys,
+        in order and recursively, and literal True for anything else."""
+        from mlb_engine.entries.dk_entries_manager import _gate_bool
+        for value in (True, False, 1, "true", None, {}, {"passed": True},
+                      {"passed": 1}, {"selection_certified": True},
+                      {"allocation_certified": True},
+                      {"passed": {"passed": True}},
+                      {"passed": False, "selection_certified": True}):
+            with self.subTest(value=value):
+                self.assertEqual(
+                    self.gc.evidence_state({"g": value}, "g")
+                    == self.gc.EVIDENCE_PASSED, _gate_bool(value))
+        self.assertEqual(self.gc.EVIDENCE_STATES,
+                         ("passed", "failed", "not_checked", "assumed"))
+
+    def test_describe_puts_both_classes_side_by_side(self):
+        row = self.gc.describe("lineup_gate_passed")
+        self.assertEqual(row["validity"], "MIXED")
+        self.assertEqual(row["refusal_class"], self.gc.REFUSAL_READ_IT)
+        self.assertEqual(set(row["facts"].values()), {"V", "S", "P"})
+        off_table = self.gc.describe("allocation_method")
+        self.assertEqual((off_table["refusal_class"], off_table["authority"]),
+                         (self.gc.REFUSAL_READ_IT, "unclassified"),
+                         "describe shows the default the governor really applies")
+        site = self.gc.describe("showdown_not_certified", kind="refusal_site")
+        self.assertEqual(site["validity"], "V")
+        self.assertNotIn("refusal_class", site)
+
 if __name__ == "__main__":
     unittest.main()

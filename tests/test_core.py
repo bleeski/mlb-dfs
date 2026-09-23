@@ -24727,10 +24727,13 @@ class RefusalClassificationTests(unittest.TestCase):
                                  "classic_verify_failed"})
 
     def test_every_workflow_gate_is_classified(self):
-        """CLASSIC_GATE_CLASS_DEFAULT is a safety net that must never fire.
+        """No PRE or POST gate may reach CLASSIC_GATE_CLASS_DEFAULT.
         A gate added to the engine without a row here fails the suite, which is
         the point: an unclassified gate defaulting to READ-IT is correct but
-        silent, and silent is how this repo loses things."""
+        silent, and silent is how this repo loses things. (R388(a) found three
+        OTHER names that can reach the default -- `allocation_certified`,
+        `allocation_method`, `caller_assertion` -- and classified their V/S/P
+        half in gate_classes; the table itself stays exactly PRE and POST.)"""
         mod = self._module()
         from mlb_engine.entries.dk_entries_manager import (
             POST_EXPORT_GATES, PRE_EXPORT_GATES,
@@ -24742,6 +24745,36 @@ class RefusalClassificationTests(unittest.TestCase):
         self.assertEqual(
             set(mod.CLASSIC_GATE_CLASS) - engine_gates, set(),
             "CLASSIC_GATE_CLASS classifies a gate the engine no longer has")
+
+    def test_every_refusal_site_has_a_validity_class(self):
+        """R388(a). The V/S/P half of the same completeness claim: every
+        REFUSAL_SITES key has a delivery-first class beside its refusal class,
+        and none is classified that the table no longer has."""
+        mod = self._module()
+        from mlb_engine.entries.gate_classes import REFUSAL_SITE_VALIDITY
+        self.assertEqual(set(mod.REFUSAL_BY_KEY), set(REFUSAL_SITE_VALIDITY))
+
+    def test_the_moved_table_is_read_lazily(self):
+        """R388(a) moved CLASSIC_GATE_CLASS into the engine. The script must
+        still load without it, so nothing may import `gate_classes` until a
+        refusal is classified. Measured in a FRESH interpreter, because this
+        process has already imported the module."""
+        probe = (
+            "import importlib.util, sys\n"
+            f"spec = importlib.util.spec_from_file_location('bs', {str(self._path())!r})\n"
+            "mod = importlib.util.module_from_spec(spec)\n"
+            "spec.loader.exec_module(mod)\n"
+            "print('mlb_engine.entries.gate_classes' in sys.modules)\n"
+            "print(mod.classic_gate_class('portfolio_caps_passed'))\n"
+            "print('mlb_engine.entries.gate_classes' in sys.modules)\n"
+        )
+        out = subprocess.run([sys.executable, "-c", probe], cwd=str(REPO),
+                             capture_output=True, text=True, timeout=120)
+        self.assertEqual(out.returncode, 0, out.stderr[-800:])
+        lines = out.stdout.strip().splitlines()
+        self.assertEqual(lines[0], "False", "the script imported the taxonomy at load")
+        self.assertEqual(lines[1], "('badly_shaped', 'ben_preference')")
+        self.assertEqual(lines[2], "True")
 
     def test_portfolio_caps_is_badly_shaped_and_roster_legality_is_not(self):
         """The finding this commit exists for. `roster_legality_passed` is
@@ -24837,8 +24870,11 @@ class RefusalClassificationTests(unittest.TestCase):
                          "an unclassifiable refusal must not be governable")
 
     def test_an_unclassified_gate_defaults_to_read_it(self):
-        """Reached alone, because the completeness test above means production
-        never gets here. R267's lesson: a guard two other fixes mask is a guard
+        """Reached alone. The completeness test above keeps every PRE and POST
+        gate off this default, but R388(a) measured three other names that can
+        reach it (`allocation_certified`, `allocation_method`,
+        `caller_assertion`), so it is live, and READ-IT is the conservative
+        answer for them. R267's lesson: a guard two other fixes mask is a guard
         nothing tested."""
         mod = self._module()
         self.assertEqual(mod.classic_gate_class("a_gate_that_does_not_exist"),
