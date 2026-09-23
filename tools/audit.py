@@ -870,7 +870,8 @@ EXPECTED_SUITE_COUNTS = {
     # synthetic pair, uncovered open entry, status vocabulary, NEXT target, rows
     # without an R-number and unresolvable ledger ids).
     # R403, 2026-09-23: 1407 -> 1412, the five RefusalRecordTagTests that pin a tagged refusal record and sha-keyed run-less records.
-    "tests.test_core": 1412,
+    # R405, 2026-09-23: 1412 -> 1432, the nineteen ConsensusClusterCapTests (definition, row, headroom, vacuous skip, units, merge, BANK-LIMITED, prefilter reserve, both bank doors, no pool cut, late-swap strip) and the swap-strip test in SwapControlsInheritanceTests.
+    "tests.test_core": 1432,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps

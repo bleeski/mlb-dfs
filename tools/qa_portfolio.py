@@ -474,13 +474,31 @@ def frontier_from_brief(brief: dict) -> List[str]:
 TEAM_FOOTPRINT_MATERIAL = 2
 
 
+def consensus_cluster_from_brief(brief: dict) -> Optional[dict]:
+    """R405. The allocator's cluster block, as the brief carries it.
+
+    The cluster is the BANK's consensus, which this tool cannot see (it reads a
+    delivered CSV and a salary file), so the members come from the artifact and
+    the count below is taken off the delivered bytes independently.
+    """
+    block = ((brief.get("exposure") or {}).get("consensus_cluster")) or None
+    if not block or not block.get("members"):
+        return None
+    return block
+
+
 def section_frontier(
-    sal: Dict[str, dict], hdr: List[str], body: List[List[str]]
+    sal: Dict[str, dict], hdr: List[str], body: List[List[str]],
+    consensus_cluster: Optional[dict] = None,
 ) -> List[str]:
     """Both ends of Ben's dual objective, as deterministic review proxies."""
     n = len(body)
     if not n:
         return []
+    cluster_ids = {str(m.get("player_id")) for m in
+                   ((consensus_cluster or {}).get("members") or [])}
+    cluster_k = int((consensus_cluster or {}).get("min_members_k") or 3)
+    cluster_hits = 0
     axes: Dict[str, Dict[str, int]] = {
         "game": defaultdict(int), "stack_team": defaultdict(int),
         # R343. `stack_team` counts each entry's HEAVIEST team and only at 3+,
@@ -523,6 +541,14 @@ def section_frontier(
                 axes["game"][g] += 1
         for s in sps:
             axes["starting_pitcher"][s] += 1
+        # R405. An entry is on this axis when it carries k or more of the
+        # bank's consensus hitters, the same count the cap bounds.
+        if cluster_ids and sum(1 for pid in set(ids) if pid in cluster_ids) >= cluster_k:
+            cluster_hits += 1
+    if cluster_ids and cluster_hits:
+        axes["consensus_cluster"] = {
+            f"{cluster_k}+ of the {len(cluster_ids)}-member consensus cluster":
+                cluster_hits}
 
     out = ["INDEPENDENT STRUCTURAL CHECK off the delivered bytes, in "
            "share-of-portfolio counts rather than ceiling. Deterministic "
@@ -550,7 +576,15 @@ def section_frontier(
            f"{TEAM_FOOTPRINT_MATERIAL}+ hitters from one team in an entry, any "
            f"stack role; 'stack_team' -> max_primary_stack_exposure_pct, which "
            f"counts the PRIMARY stack only and is why 'team_footprint' can run "
-           f"far above it; 'starting_pitcher' -> max_pitcher_exposure_pct."]
+           f"far above it; 'starting_pitcher' -> max_pitcher_exposure_pct; "
+           f"'consensus_cluster' -> max_consensus_cluster_share_pct, counted at "
+           f"k+ of the bank's consensus hitters (members from the brief, count "
+           f"off these bytes; a cross-team POOL the team and stack axes cannot "
+           f"see)."]
+    if not cluster_ids:
+        out.append("washout axis 'consensus_cluster': not computed; the brief "
+                   "carries no consensus_cluster block (a build before R405, or "
+                   "one that did not pass through the allocator).")
     worst = []
     for axis, ct in axes.items():
         if not ct:
@@ -1118,7 +1152,8 @@ def main() -> int:
     # follow as an independent check. Recomputing a second washout number here
     # off data that carries no Ceiling would put two answers on one screen with
     # nothing saying which one the build actually used.
-    frontier = frontier_from_brief(brief) + section_frontier(sal, hdr, body)
+    frontier = frontier_from_brief(brief) + section_frontier(
+        sal, hdr, body, consensus_cluster=consensus_cluster_from_brief(brief))
     # R136. The third axis: sections 2 and 3 measure this portfolio against the
     # slate, this one measures it against the crowd. Its inputs are a labeled
     # prior and the delivered bytes, and every column it cannot compute says

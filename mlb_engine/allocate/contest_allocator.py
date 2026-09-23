@@ -621,6 +621,119 @@ def candidate_team_footprint(
     return frozenset(t for t, n in counts.items() if n >= floor)
 
 
+#: R405, Ben 2026-09-23. The consensus cluster is the BANK's own consensus: every
+#: hitter present in at least this share of the distinct lineups the
+#: unconstrained search produced, most-shared first, at most twelve. It is
+#: defined from the bank and not from a salary-value rank because the value rank
+#: does not find it: on 1905_10g the top nine hitters by Base per $1k held 2 of
+#: the nine bats the portfolio concentrated on, by Ceiling per $1k 5, and by bank
+#: share 8. The cluster is cross-team, so the team, game and stack caps cannot
+#: see it, and the lineups share a POOL rather than a triple, so a k-subset cap
+#: misses it too (QA's worst shared triple read 4 of 34 on that build).
+CONSENSUS_CLUSTER_MIN_BANK_SHARE = 0.15
+CONSENSUS_CLUSTER_MAX_MEMBERS = 12
+#: R405. An entry counts toward `max_consensus_cluster_share_pct` when its
+#: lineup carries at least this many cluster members. Ben's k, 2026-09-23.
+#: Operators may set `consensus_cluster_min_members` through --controls-override.
+CONSENSUS_CLUSTER_MIN_MEMBERS = 3
+#: R405(c). The `bank_job_class` a candidate carries when it was built by a
+#: cluster-limited bank job. Those candidates are excluded from the cluster's
+#: SOURCE: they were built to avoid the consensus, so counting them would dilute
+#: the definition the limit was derived from and let the sliced, direct and
+#: late-swap paths disagree about who is in it. A candidate with no class is the
+#: unconstrained search.
+CONSENSUS_LIMITED_JOB_CLASS = "consensus_limited"
+
+
+def _consensus_cluster_min_members(controls: Mapping[str, Any]) -> int:
+    """k, read off the controls with the engine default."""
+    try:
+        value = int(controls.get("consensus_cluster_min_members")
+                    or CONSENSUS_CLUSTER_MIN_MEMBERS)
+    except (TypeError, ValueError):
+        return CONSENSUS_CLUSTER_MIN_MEMBERS
+    return max(1, value)
+
+
+def _candidate_hitter_ids(candidate: Mapping[str, Any]) -> FrozenSet[str]:
+    """The candidate's hitters: its roster minus its pitchers.
+
+    A candidate with no readable ten-slot roster contributes no hitters here
+    rather than raising: this runs before the allocator's own roster read, and
+    that read is where a malformed candidate is refused, with its own words.
+    """
+    try:
+        roster = _candidate_ordered_roster(dict(candidate))
+    except ValueError:
+        return frozenset()
+    arms = set(_candidate_pitcher_ids(dict(candidate)) or roster[:2])
+    return frozenset(str(p) for p in roster if p and str(p) not in arms)
+
+
+def consensus_cluster_members(
+    candidates: Sequence[Mapping[str, Any]],
+    *,
+    min_bank_share: float = CONSENSUS_CLUSTER_MIN_BANK_SHARE,
+    max_members: int = CONSENSUS_CLUSTER_MAX_MEMBERS,
+) -> Dict[str, Any]:
+    """R405. The bank's consensus hitters, derived from the candidates handed in.
+
+    The share is over DISTINCT lineups (sorted-roster signatures): two candidate
+    objects holding the same ten players are one lineup, and counting both would
+    let a duplicated payload manufacture a consensus. The source is every
+    candidate whose ``bank_job_class`` is absent -- the unconstrained search --
+    and only when there is none does it fall back to every candidate, which is
+    named in ``source``. Ordering is share descending, then player id, so the
+    twelve-member truncation is deterministic.
+
+    Deterministic bookkeeping over the bank this solve received. A member is a
+    player the SEARCH kept choosing, not a player predicted to score; nothing
+    here is a probability.
+    """
+    rows = [dict(c) for c in candidates]
+    unconstrained = [c for c in rows if not c.get("bank_job_class")]
+    source_rows = unconstrained or rows
+    seen: set = set()
+    counts: Counter = Counter()
+    n_source = 0
+    for c in source_rows:
+        try:
+            sig = tuple(sorted(_candidate_ordered_roster(c)))
+        except ValueError:
+            continue  # refused by the allocator's own roster read, not here
+        if not sig or sig in seen:
+            continue
+        seen.add(sig)
+        n_source += 1
+        counts.update(_candidate_hitter_ids(c))
+    threshold = float(min_bank_share)
+    ranked = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
+    members = [
+        {"player_id": pid, "lineups": int(n),
+         "share": round(n / n_source, 4) if n_source else 0.0}
+        for pid, n in ranked
+        if n_source and n / n_source + 1e-9 >= threshold
+    ][:max(0, int(max_members))]
+    return {
+        "members": members,
+        "member_ids": [m["player_id"] for m in members],
+        "source_lineups": n_source,
+        "source": "unconstrained_bank_jobs" if unconstrained else "all_candidates",
+        "limited_candidates_excluded_from_source": len(rows) - len(unconstrained)
+        if unconstrained else 0,
+        "min_bank_share": threshold,
+        "max_members": int(max_members),
+    }
+
+
+def consensus_member_count(hitter_ids: Iterable[str],
+                           members: Iterable[str]) -> int:
+    """How many of the cluster's members one lineup carries. Pitchers are never
+    members, so a full roster may be passed."""
+    member_set = {str(m) for m in members}
+    return sum(1 for p in {str(x) for x in hitter_ids} if p in member_set)
+
+
 # ---------------------------------------------------------------------------
 # v1.11 (F13) allocator solver semantics
 #
@@ -653,6 +766,7 @@ def _diagnose_binding_constraints(
     feasibility_inputs: Optional[Mapping[str, Any]] = None,
     team_exposure: Optional[Mapping[str, Any]] = None,
     game_exposure: Optional[Mapping[str, Any]] = None,
+    consensus_cluster: Optional[Mapping[str, Any]] = None,
 ) -> List[str]:
     """Name the controls that cannot be satisfied by this bank, arithmetically.
 
@@ -764,6 +878,33 @@ def _diagnose_binding_constraints(
                 f"summing to {capacity} entry-slots < {total * per_entry} "
                 f"({total} entries x {per_entry} games each)"
             )
+    # R405. The consensus-cluster cap in the same counting form: at most
+    # `headroom` entries may take a lineup carrying k or more cluster members,
+    # so at least E - headroom need one carrying fewer, and the bank has to
+    # hold enough of those. The count is over DISTINCT low-cluster lineups times
+    # the reuse cap, the same capacity the reuse rows allow. When the bank holds
+    # too few, the refusal says BANK-LIMITED and names the bank jobs that exist
+    # to supply them (R405(c)), because relaxing the cap to fit a bank that was
+    # never asked for the shape is R98(2)'s strategy-change-to-fit-a-search.
+    cluster = dict(consensus_cluster or {})
+    if cluster.get("row_added"):
+        need = max(0, total - int(cluster.get("headroom") or 0))
+        low_distinct = int(cluster.get("solved_distinct_below_k") or 0)
+        reuse = controls.get("max_candidate_reuse")
+        capacity = low_distinct * (int(reuse) if reuse is not None else need)
+        if need and capacity < need:
+            findings.append(
+                f"max_consensus_cluster_share_pct: at most "
+                f"{int(cluster.get('headroom') or 0)} entries may carry "
+                f"{cluster.get('min_members_k')}+ of the "
+                f"{len(cluster.get('members') or [])}-member consensus cluster, "
+                f"so {need} need a lineup carrying fewer; the solved bank holds "
+                f"{low_distinct} such distinct lineup(s) "
+                f"({cluster.get('bank_candidates_below_k')} of "
+                f"{cluster.get('bank_candidates')} in the bank handed in) -- "
+                f"BANK-LIMITED: grow the cluster-limited bank jobs (R405(c)) "
+                f"before relaxing this cap"
+            )
     return findings
 
 
@@ -789,6 +930,10 @@ STRATEGY_CAP_CONTROLS = frozenset({
     # structural floor in R98(2)'s sense, so `late_swap` must not steer an
     # operator to raise it as though it were arithmetic.
     "max_team_exposure_pct",
+    # R405. Same class and same reason: what the cluster cap can carry is a
+    # property of the BANK (how many low-cluster lineups it holds), never an
+    # arithmetic floor of the slate.
+    "max_consensus_cluster_share_pct",
 })
 
 # R116, 2026-08-15. `max_candidate_reuse` sits in STRATEGY_CAP_CONTROLS above
@@ -941,6 +1086,10 @@ CHECKED_CONTROLS = frozenset({
     # moves a control a threaded verdict was computed from makes that verdict
     # stale.
     "max_team_exposure_pct", "max_game_exposure_pct",
+    # R405. A ceiling handled the way the other ceilings are (checked, floored
+    # before the solve, relaxed under deadline by the T-15 rung), and so NOT a
+    # ladder control: the disjointness assert above holds with it here.
+    "max_consensus_cluster_share_pct",
 })
 LADDER_RELAXED_CONTROLS = frozenset({
     "max_candidate_reuse", "five_stack_share_quota", "primary_stack_min_size",
@@ -1018,6 +1167,8 @@ def compose_infeasibility_errors(
                     # ACTIVE, so a washout-axis cap missing from this list makes
                     # the sentence false on exactly the builds it binds.
                     "max_team_exposure_pct", "max_game_exposure_pct",
+                    # R405, same reason as the two above.
+                    "max_consensus_cluster_share_pct",
                 )) if controls.get(k) is not None
             ) + bank_flag
         )
@@ -1156,6 +1307,15 @@ def _untouchable_cap_conflicts(
         ("max_team_exposure_pct", "team footprint",
          fixed.get("team_counts") or {},
          _cap_count(total, controls.get("max_team_exposure_pct"))),
+        # R405. The fifth, for R343's reason: `headroom()` clamps a negative at
+        # 0, so without it untouchable rows that already overspend the cluster
+        # cap would get a silent zero-headroom row instead of this refusal. The
+        # count is taken by `select_and_assign_entries` against the cluster it
+        # derived from the bank, because the cluster is a property of the bank
+        # and `fixed_portfolio_exposure` never sees one.
+        ("max_consensus_cluster_share_pct", "consensus-cluster lineup",
+         fixed.get("consensus_cluster_counts") or {},
+         _cap_count(total, controls.get("max_consensus_cluster_share_pct"))),
     )
     for control, noun, counts, cap in checks:
         if not cap:
@@ -1206,6 +1366,8 @@ def _prefilter_candidates(
     entries: Sequence[Dict[str, Any]],
     compatible: Sequence[Sequence[bool]],
     keep_target: int,
+    *,
+    reserve: Optional[Tuple[Sequence[int], int]] = None,
 ) -> Tuple[List[int], Dict[str, Any]]:
     """Choose which candidate indices enter the joint MILP.
 
@@ -1317,6 +1479,25 @@ def _prefilter_candidates(
                 _take(k)
                 taken_for_entry += 1
 
+    # R405. A ceiling over a CLASS of candidates needs the class's complement
+    # in the keep set, or the row proves infeasible against a bank that held
+    # the answer -- the consensus-cluster cap limits entries carrying k or more
+    # cluster members, and the candidates that satisfy it score lower by
+    # construction (they avoid the search's consensus), so a score-ordered fill
+    # is exactly the fill that drops them. The caller sizes the reserve to what
+    # the cap needs and passes nothing when the cap cannot bind, so a solve
+    # without it keeps the same set it always kept.
+    reserved_kept = 0
+    if reserve:
+        reserve_set = {int(k) for k in reserve[0]}
+        want = max(0, int(reserve[1]))
+        for k in order:
+            if reserved_kept >= want:
+                break
+            if k in reserve_set:
+                _take(k)
+                reserved_kept += 1
+
     covered_stacks = set()
     covered_pairs = set()
     for k in order:
@@ -1355,6 +1536,7 @@ def _prefilter_candidates(
         "forced_coverage_kept": forced,
         "selectable_in": len(selectable),
         "per_entry_reserve": PREFILTER_PER_ENTRY_RESERVE,
+        **({"consensus_low_cluster_kept": reserved_kept} if reserve else {}),
         "distinct_stacks_represented": len(covered_stacks),
         "distinct_sp_pairs_represented": len(covered_pairs),
         "entries_emptied_by_prefilter": len(emptied),
@@ -2801,6 +2983,23 @@ def select_and_assign_entries(
     fixed = dict(fixed_exposure or {})
     fixed_rows = max(0, int(fixed.get("row_count") or 0))
     total = E + fixed_rows
+
+    # R405. The consensus cluster, derived HERE from the candidate set this
+    # solve received and before the prefilter narrows it, so the sliced, direct
+    # and late-swap paths all answer "who is the consensus" from one function
+    # over the bank they actually hand in. The untouchable rows' count is taken
+    # now because the conflict check below runs before any candidate is scored.
+    cluster = consensus_cluster_members(_all_candidates)
+    cluster_members = list(cluster["member_ids"])
+    cluster_k = _consensus_cluster_min_members(controls)
+    fixed_cluster_high = 0
+    if fixed_rows and cluster_members:
+        fixed_cluster_high = sum(
+            1 for r in (fixed.get("rosters") or [])
+            if consensus_member_count(r, cluster_members) >= cluster_k)
+        fixed["consensus_cluster_counts"] = (
+            {f"at {cluster_k}+ members": fixed_cluster_high}
+            if fixed_cluster_high else {})
     # ONE gate. Every offset below reads these four dicts, and they stay empty
     # unless there is at least one untouchable row -- because `row_count` and the
     # counts are derived from the same rows by `fixed_portfolio_exposure`, so
@@ -2961,8 +3160,26 @@ def select_and_assign_entries(
             MIN_CANDIDATE_PREFILTER_FLOOR,
         )
     )
+    # R405. Resolved before the prefilter, because the prefilter has to keep
+    # the candidates this cap needs (see the reserve in `_prefilter_candidates`).
+    # `cluster_bound` is the headroom the row will carry; a bound at or above E
+    # cannot bind, adds no row, and reserves nothing, which is what keeps a cap
+    # opened to 1.0 byte-identical to no cap at all.
+    bank_member_counts = [
+        consensus_member_count(_candidate_hitter_ids(c), cluster_members)
+        for c in candidates]
+    cluster_pct = controls.get("max_consensus_cluster_share_pct")
+    cluster_cap = _cap_count(total, cluster_pct)
+    cluster_bound: Optional[int] = None
+    cluster_reserve: Optional[Tuple[List[int], int]] = None
+    if cluster_cap and cluster_members:
+        cluster_bound = max(0, int(cluster_cap) - int(fixed_cluster_high))
+        if cluster_bound < E:
+            low_idx = [k for k, n in enumerate(bank_member_counts) if n < cluster_k]
+            cluster_reserve = (low_idx, min(len(low_idx), 2 * (E - cluster_bound)))
     kept_idx, prefilter_report = _prefilter_candidates(
-        candidates, entries, full_compatible, keep_target
+        candidates, entries, full_compatible, keep_target,
+        reserve=cluster_reserve,
     )
     if prefilter_report["applied"]:
         candidates = [candidates[k] for k in kept_idx]
@@ -3289,6 +3506,42 @@ def select_and_assign_entries(
         # and could not answer" rather than a cap silently reported as held.
         pass
 
+    # R405. The consensus-cluster cap, in R343's shape: `total` denominator,
+    # headroom for untouchable rows, the vacuous row skipped, the binding
+    # diagnosis named. It caps how many ENTRIES take a lineup carrying k or more
+    # of the bank's consensus hitters, which is the concentration the person,
+    # team, game and stack caps cannot see: on 1905_10g nine hitters sat at the
+    # 0.35 person cap and filled 36% of hitter slots, every lineup carried 2 of
+    # them and 27 of 34 carried 3 or more, while the brief read 15 distinct
+    # primary stacks and a 29% max team footprint. S class under R386.
+    member_counts = [bank_member_counts[k] for k in kept_idx]
+    cluster_high = [k for k in range(K) if member_counts[k] >= cluster_k]
+    cluster_row_added = False
+    if cluster_bound is not None and cluster_bound < E:
+        add({x_idx(e, k): 1.0 for e in range(E) for k in cluster_high},
+            -np.inf, float(cluster_bound))
+        cluster_row_added = True
+    cluster_report: Dict[str, Any] = {
+        **{k: v for k, v in cluster.items() if k != "member_ids"},
+        "min_members_k": cluster_k,
+        "requested_pct": float(cluster_pct) if cluster_pct is not None else None,
+        "count": cluster_cap,
+        "status": ("not_requested" if not cluster_cap
+                   else "no_cluster" if not cluster_members
+                   else "applied" if cluster_row_added else "vacuous"),
+        "row_added": cluster_row_added,
+        "headroom": cluster_bound,
+        "bank_candidates": len(bank_member_counts),
+        "bank_candidates_below_k": sum(1 for n in bank_member_counts if n < cluster_k),
+        "solved_candidates_below_k": sum(1 for n in member_counts if n < cluster_k),
+        "solved_distinct_below_k": len({signatures[k] for k in range(K)
+                                        if member_counts[k] < cluster_k}),
+        **({"fixed_rows_at_k_or_more": fixed_cluster_high} if fixed_rows else {}),
+        "note": "the bank's consensus hitters (share of the distinct lineups the "
+                "unconstrained search built); deterministic review proxy, never "
+                "a probability",
+    }
+
     if use_y:
         for k in range(K):
             usage = {x_idx(e, k): 1.0 for e in range(E)}
@@ -3420,6 +3673,12 @@ def select_and_assign_entries(
             binding = _diagnose_binding_constraints(
                 E, stacks, sp_pairs, signatures, largest_contest, controls,
                 feasibility_inputs=feasibility_inputs,
+                # R405. Passed to THIS call, the one that writes `errors`, and
+                # not only to the report call below: a refusal whose first line
+                # cannot say BANK-LIMITED sends the operator to the cap instead
+                # of the bank. The two R343/R333 reports stay on the report call
+                # alone, as they shipped.
+                consensus_cluster=cluster_report,
             )
             # R112 rider (2026-08-14). This flag rides EVERY finding line below,
             # not only a remedy trailing the whole list: two separate blocked
@@ -3637,7 +3896,8 @@ def select_and_assign_entries(
             _diagnose_binding_constraints(
                 E, stacks, sp_pairs, signatures, largest_contest, controls,
                 feasibility_inputs=feasibility_inputs,
-                team_exposure=team_cap_report, game_exposure=game_cap_report)
+                team_exposure=team_cap_report, game_exposure=game_cap_report,
+                consensus_cluster=cluster_report)
             if proven_infeasible else []
         )
         return {
@@ -3647,6 +3907,9 @@ def select_and_assign_entries(
             "allocation_solver_report": solver_report,
             "errors": errors,
             "candidate_reuse": dict(reuse_state_report),
+            # R405. Known before the solve, so it rides the refusal: a refusal
+            # on this cap is read against the bank's low-cluster count.
+            "consensus_cluster": dict(cluster_report),
             # R294(a). The refusal path is where an emptied entry matters most,
             # and it is the one path that carried no `warnings` key at all, so
             # the count lived only inside `solver_report.candidate_prefilter`
@@ -3675,6 +3938,7 @@ def select_and_assign_entries(
     )
 
     assignments: List[Dict[str, Any]] = []
+    chosen_k: List[int] = []  # R405: the solved-bank index behind each assignment
     for e, entry in enumerate(entries):
         chosen = [k for k in range(K) if incumbent[x_idx(e, k)] > 0.5]
         if len(chosen) != 1:
@@ -3686,6 +3950,7 @@ def select_and_assign_entries(
                 "errors": [f"Entry ID {entry_ids[e]} resolved to {len(chosen)} candidates"],
             }
         k = chosen[0]
+        chosen_k.append(k)
         assignments.append({
             "entry_id": entry_ids[e],
             "contest_id": str(entry.get("contest_id") or ""),
@@ -3801,6 +4066,51 @@ def select_and_assign_entries(
             "need_met": (assigned_q >= int(quota_report.get("applied_need") or 0)),
         }}
 
+    # R405. What the DELIVERED set carries, counted off the assignments on the
+    # R37 precedent: the cap is a claim about the output. `objective_median` is
+    # the price of the protection in the build's own objective units, bank and
+    # delivered side by side -- on 1905_10g the low-cluster candidates had a
+    # median objective of 133.0 against the bank's 138.6. A median of a
+    # deterministic objective, never a probability or an expected value.
+    def _objective(c: Mapping[str, Any]) -> Optional[float]:
+        for key in ("objective", "proj_points"):
+            try:
+                if c.get(key) is not None:
+                    return float(c.get(key))
+            except (TypeError, ValueError):
+                continue
+        return None
+
+    def _median(values: Sequence[Optional[float]]) -> Optional[float]:
+        vals = sorted(v for v in values if v is not None)
+        if not vals:
+            return None
+        mid = len(vals) // 2
+        return round(vals[mid] if len(vals) % 2 else (vals[mid - 1] + vals[mid]) / 2, 3)
+
+    delivered_counts = [member_counts[k] for k in chosen_k]
+    delivered_high = sum(1 for n in delivered_counts if n >= cluster_k)
+    cluster_block: Dict[str, Any] = {"consensus_cluster": {
+        **cluster_report,
+        "delivered_member_count_histogram": {
+            str(n): c for n, c in sorted(Counter(delivered_counts).items())},
+        "delivered_at_k_or_more": delivered_high,
+        "delivered_share_at_k_or_more": (
+            round(delivered_high / len(assignments), 4) if assignments else 0.0),
+        "objective_median": {
+            "bank": _median([_objective(c) for c in _all_candidates]),
+            "bank_below_k": _median([
+                _objective(c) for c, n in zip(_all_candidates, bank_member_counts)
+                if n < cluster_k]),
+            "delivered_below_k": _median([
+                _objective(candidates[k]) for k in chosen_k
+                if member_counts[k] < cluster_k]),
+            "delivered_at_k_or_more": _median([
+                _objective(candidates[k]) for k in chosen_k
+                if member_counts[k] >= cluster_k]),
+        },
+    }}
+
     floor_warnings: List[str] = []
     _qr = quota_block.get("five_stack_quota") if quota_block else None
     if _qr:
@@ -3859,6 +4169,7 @@ def select_and_assign_entries(
         **floor_block,
         **quota_block,
         **reuse_block,
+        **cluster_block,
         "passed": True,
         "assignments": assignments,
         "selection_certified": True,
@@ -3902,6 +4213,8 @@ def select_and_assign_entries(
             # constrained this solve" got no answer about the team footprint at
             # all, which is the same gap R116 closed for the reuse cap.
             "max_team_count": team_cap,
+            # R405. The resolved count, for the same reason.
+            "max_consensus_cluster_count": cluster_cap,
         },
         # R333 / R343. Both washout-axis caps report whether they were WIRED,
         # not just what was asked for: `unknown` means the id map was absent, so

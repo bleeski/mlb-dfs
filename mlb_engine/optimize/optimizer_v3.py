@@ -1040,6 +1040,7 @@ def _build_single_lineup_scipy(
     max_opposing_hitters_per_sp=None,
     time_limit_s=None,
     status_out=None,
+    max_selected_from=None,
 ):
     """SciPy MILP backend with exact DraftKings slot assignment locks."""
     if not SCIPY_AVAILABLE:
@@ -1351,6 +1352,18 @@ def _build_single_lineup_scipy(
             original, pids = _whole_combination(combo)
             if len(original) >= 2 and len(pids) == len(original):
                 add_selected_sum_constraint(pids, -np.inf, len(pids) - 1)
+    if max_selected_from is not None:
+        # R405(c). At most m of these players in one lineup: the consensus-
+        # cluster limit a reserved share of bank jobs is solved under. The
+        # overlap-reference reading of absent members is the right one here
+        # (an absent player cannot be selected, so dropping it leaves the row's
+        # meaning intact and weaker), and m >= 1 is enforced by the wrapper, so
+        # every member stays rosterable in every job: a limit on how many
+        # together, never a removal from the legal pool.
+        limit_ids, limit_m = max_selected_from
+        pids = _known_pids(sorted(str(x) for x in (limit_ids or [])))
+        if pids and len(pids) > int(limit_m):
+            add_selected_sum_constraint(pids, -np.inf, int(limit_m))
 
     row_idx, col_idx, data = [], [], []
     for row_number, coefs in enumerate(rows):
@@ -1468,10 +1481,16 @@ def build_single_lineup(
     max_opposing_hitters_per_sp=None,
     time_limit_s=None,
     status_out=None,
+    max_selected_from=None,
 ):
     """Single-lineup optimizer with optional exact DK slot locks.
 
     ``time_limit_s`` bounds this one solve; ``None`` uses SOLVER_TIME_LIMIT_S.
+
+    ``max_selected_from`` (R405(c)) is ``(player_ids, m)``: at most ``m`` of
+    those players in this lineup. ``m`` must be at least 1, so the limit bounds
+    how many appear TOGETHER and never removes a player from the legal pool.
+    ``None`` (the default) adds no row.
     ``status_out`` is a caller-owned dict filled with the structured solver
     status (v3.20 / F13). Pass one whenever the difference between "the clock
     ran out" and "this is infeasible" changes what you do next, which is every
@@ -1480,6 +1499,13 @@ def build_single_lineup(
     # F19: sorted before constraint emission. These ids become one equality row
     # each, and the row order is a branch-and-bound tie-break input.
     locked_ids = stable_union(locks, (locked_slot_assignments or {}).values())
+    if max_selected_from is not None:
+        _limit_ids, _limit_m = max_selected_from
+        if int(_limit_m) < 1:
+            raise ValueError(
+                "max_selected_from needs m >= 1: m = 0 would remove every listed "
+                "player from this solve's legal pool, which R405 forbids")
+        max_selected_from = (stable_union(_limit_ids), int(_limit_m))
     df, suppression_bonus = _prepare_single_lineup_df(
         projections_df, target=target, locks=locked_ids, excludes=excludes,
         stack_constraints=stack_constraints, skip_feasibility_check=skip_feasibility_check,
@@ -1496,6 +1522,7 @@ def build_single_lineup(
         low_owned_threshold_pct=low_owned_threshold_pct,
         max_opposing_hitters_per_sp=max_opposing_hitters_per_sp,
         time_limit_s=time_limit_s, status_out=status_out,
+        max_selected_from=max_selected_from,
     )
 
 
@@ -4309,9 +4336,20 @@ def build_diverse_candidate_bank(
     solver_time_limit_s=None,
     bank_stack_min_size=4,
     bank_secondary_size=0,
+    consensus_limited_jobs=None,
     **bank_kwargs
 ):
     """Coverage-guaranteed wrapper over build_candidate_lineup_bank (v3.18).
+
+    R405(c): ``consensus_limited_jobs`` is
+    ``execution_pipeline.resolve_consensus_limited_request``'s return. When it is
+    active, a third phase derives the consensus cluster from the unconstrained
+    bank built so far (``contest_allocator.consensus_cluster_members``, the
+    allocator's own function) and appends lineups solved under
+    ``max_selected_from=(cluster, k - 1)``, tagged ``bank_job_class``, until it
+    has the request's ``min_candidates`` or the budget ends. Phase 2 leaves a
+    quarter of the budget for it; Phase 1's SP-pair coverage is untouched.
+    ``None`` (the default) is this function before R405.
 
     R34: ``bank_stack_min_size`` and ``bank_secondary_size`` shape what the
     forced-augmentation pass generates. The defaults, 4 and 0, are exactly the
@@ -4533,16 +4571,22 @@ def build_diverse_candidate_bank(
     aug_cost = {'max': 0.0}
     aug_timeouts = {'n': 0, 'accepted_time_limited': 0}
 
-    def _budget_exhausted():
+    _consensus_req = dict(consensus_limited_jobs or {})
+    _consensus_active = bool(_consensus_req.get('active'))
+    # R405(c). What Phase 2 leaves for Phase 3, and nothing when Phase 3 is off.
+    _phase3_reserve_s = (0.25 * _budget_s) if (_consensus_active and _budget_s) else 0.0
+
+    def _budget_exhausted(reserve_s=0.0):
         left = _budget_left()
         if left is None:
             return False
-        return left <= max(aug_cost['max'], MIN_SOLVER_TIME_LIMIT_S)
+        return left - reserve_s <= max(aug_cost['max'], MIN_SOLVER_TIME_LIMIT_S)
 
-    def _try_accept(pair, team):
+    def _try_accept(pair, team, extra_kwargs=None, job_class=None):
         nonlocal next_candidate_id
         attempts['n'] += 1
         kwargs = dict(single_lineup_kwargs)
+        kwargs.update(extra_kwargs or {})
         kwargs['locks'] = stable_union(kwargs.get('locks'), pair)  # F19
         # R34. This was a hardcoded min_size of 4 and it was the whole reason
         # the bank was a 4-stack bank: nothing else in the solve forces a stack
@@ -4620,6 +4664,8 @@ def build_diverse_candidate_bank(
         enriched['primary_stack'] = candidate_primary_stack(ldf)  # F15
         enriched['primary_stack_size'] = candidate_primary_stack_size(ldf)  # R34
         enriched['du_signature'] = sig
+        if job_class:
+            enriched['bank_job_class'] = job_class  # R405(c)
         existing.append(record)
         existing_sigs.append(sig)
         scored.append(enriched)
@@ -4649,7 +4695,8 @@ def build_diverse_candidate_bank(
     round_idx = 1
     max_rounds = len(stack_teams) + 2
     while (len(existing) < target_size and round_idx <= max_rounds
-           and attempts['n'] < max_attempts and not _budget_exhausted()):
+           and attempts['n'] < max_attempts
+           and not _budget_exhausted(_phase3_reserve_s)):
         progress = False
         for p_idx, pair in enumerate(viable_pairs):
             if len(existing) >= target_size or attempts['n'] >= max_attempts:
@@ -4665,6 +4712,53 @@ def build_diverse_candidate_bank(
         round_idx += 1
         if not progress:
             break
+
+    # Phase 3 (R405(c)): cluster-limited lineups, so the allocator's consensus
+    # cap has candidates below k to choose from. The cluster comes from the
+    # UNCONSTRAINED lineups built above, by the allocator's own function, and
+    # the jobs rotate (pair, team) the way Phase 2 does. A search-effort pass:
+    # every player stays legal in every job and m >= 1 is enforced by
+    # build_single_lineup.
+    consensus_phase = {'requested': _consensus_active, 'attempted': False,
+                       'appended': 0}
+    if _consensus_active:
+        from mlb_engine.allocate.contest_allocator import (
+            CONSENSUS_LIMITED_JOB_CLASS, consensus_cluster_members,
+        )
+        cl = consensus_cluster_members(
+            scored,
+            min_bank_share=float(_consensus_req.get('min_bank_share')),
+            max_members=int(_consensus_req.get('max_members')))
+        members = list(cl['member_ids'])
+        m_limit = int(_consensus_req.get('m') or 0)
+        want = int(_consensus_req.get('min_candidates') or 0)
+        consensus_phase.update({'cluster_members': members, 'm': m_limit,
+                                'min_candidates': want})
+        if len(members) > m_limit and want > 0:
+            consensus_phase['attempted'] = True
+            before = len(scored)
+            p3_attempts = 0
+            p3_max_attempts = want * 4 + 20
+            for round3 in range(len(stack_teams) + 1):
+                if (len(scored) - before >= want or p3_attempts >= p3_max_attempts
+                        or _budget_exhausted()):
+                    break
+                for p_idx, pair in enumerate(viable_pairs):
+                    if (len(scored) - before >= want or p3_attempts >= p3_max_attempts
+                            or _budget_exhausted()):
+                        break
+                    excluded_teams = _teams_of_pair(pair)
+                    team = stack_teams[(p_idx + round3) % len(stack_teams)]
+                    if team in excluded_teams:
+                        continue
+                    p3_attempts += 1
+                    _try_accept(pair, team,
+                                extra_kwargs={'max_selected_from': (members, m_limit)},
+                                job_class=CONSENSUS_LIMITED_JOB_CLASS)
+            consensus_phase['appended'] = len(scored) - before
+            consensus_phase['attempts'] = p3_attempts
+            consensus_phase['budget_exhausted'] = bool(_budget_exhausted())
+    augmentation['consensus_limited'] = consensus_phase
 
     bank['lineups'] = existing
     bank['du_signatures'] = existing_sigs

@@ -1432,76 +1432,19 @@ checkpoint has both objects in scope roughly 240 lines above.
 
 ## Workstream 2 — Strategy controls and the evidence that moves them
 
-### R405. The consensus-cluster cap: cap lineups by how many of the bank's consensus bats they share, not only by person (P1, M) | new 2026-09-23, Ben's answer to R247(d) ("cap correlated blocks instead of persons"), from the 1905_10g post-slate review | Roadmap: Session 93
+### R405. CLOSED 2026-09-23 -- SHIPPED as roadmap Session 93 (all three parts), entry migrated to CHANGELOG.md
 
-**Rider 2026-09-23 (DEV; Ben's decisions and the approved build plan, for a fresh session). Line numbers are at `70d9dc1`; re-grep before editing.**
-
-*Ben's decisions (settled; do not re-ask).*
-- The cap ships ON once part (c) lands.
-- The cluster is every hitter present in 15% or more of the candidate bank, most-shared first, at most 12 members.
-- k = 3.
-- `max_consensus_cluster_share_pct` is 0.50 on `wta_satellite`, `large_gpp`, `small_gpp` and `mme`, and 1.0 (off) on `single_entry` and `cash`. MIN wins across a mixed entered set, like every other ceiling.
-- On 1905_10g that means at most 17 of 34 lineups carrying 3 or more of the ten, against 27 delivered.
-
-*Measured on 1905_10g (rebuild run `20260922T222901Z_3d5abaff`, 408-candidate sliced bank; the slate files are gitignored and not in the repo).*
-- With the cluster at 15% (10 hitters) and k = 3, only 6 of 408 candidates carry fewer than 3. That is why (c) is required, not optional.
-- Those low-cluster candidates had a median objective of 133.0 against the bank median of 138.6, about 4% lower. That is the price of the protection, and the brief should report the realized version of it.
-- A salary value rank does not find the cluster; bank share does (entry text above).
-
-*Build plan, three landings in order.*
-
-- **(a) Report; no byte moves, golden unmoved.**
-  - Compute it in `select_and_assign_entries` (CA) from the candidate set it receives, so the sliced, direct and late-swap paths agree.
-  - Return `consensus_cluster`: members with their shares, T, k, the per-delivered-lineup member-count histogram, and the share at k or more.
-  - Put it on the BS brief beside `team_footprint_any_role` (BS:5037-5041). The brief's `exposure` block comes from `portfolio_exposure` (BS:4969) over the delivered file, so carry the members from the allocation result into it.
-  - `tools/qa_portfolio.py` `section_frontier` (L477-585) reads only the delivered file and salary. Give it the members from the brief (QA already reads the brief in `frontier_from_brief`, L331), print a `consensus_cluster` washout axis, and name the control on the CONTROLS line (L547-553).
-
-- **(b) Control.**
-  - Keys: `max_consensus_cluster_share_pct` (a fraction) and `consensus_cluster_min_members` (an int k).
-  - Units gate: add the key to `FRACTION_CONTROL_KEYS` (BS:586-598) and to EP's `_fraction_control_keys` (EP:3203-3219), which checks through `CA.assert_fraction_cap` (CA:1369).
-  - Merge: in `_merged_controls_for_build` (EP:3143) the pct key joins `pct_keys` (MIN, default 1.0; EP:3164-3165, 3284-3286) and k joins `rep_keys` (integer MIN; EP:3166, 3287-3289). A posture key in no tuple never reaches `merged`.
-  - Posture defaults: `STRATEGY_DEFAULTS` (EP:850-960). `cash` carries no controls.
-  - The row: in CA after R343's team cap (CA:3228-3290) and in its shape. It uses `_cap_count(total, pct)` and `headroom(cap, fixed)`, and skips the row when the bound is E or more (the R343 vacuous-row guard, which keeps the golden stable).
-  - Diagnosis: `_diagnose_binding_constraints` (CA:646-767, the team check at 744-755) names it with the bank's count of low-cluster candidates, so a refusal reads BANK-LIMITED when the bank lacks them.
-  - Control lists: the key joins `STRATEGY_CAP_CONTROLS` (CA:782-792), `CHECKED_CONTROLS` (CA:924-944; must stay disjoint from `LADDER_RELAXED_CONTROLS`, and a test pins that), and the "Active:" list at CA:1013-1021.
-  - Late-swap fixed rows: add an entry to `_untouchable_cap_conflicts` (CA:1142-1159), counted from `fixed`.
-  - Feasibility: a floor like `floor_team_exposure_pct` (EP:3495, 3599-3604, 3384; the check at `_feasibility_report`, EP:3622 and 3708). Here the floor is BANK-dependent, so only the arithmetic half belongs in `_slate_feasibility`; the rest is the diagnosis above.
-  - S class under R386: relaxed under deadline and recorded.
-  - Default OFF until (c) lands.
-
-- **(c) Bank.**
-  - `build_single_lineup` (OV:1449-1471, forwarded at 1489-1499) and `_build_single_lineup_scipy` (OV:1026-1043) gain `max_selected_from=(ids, m)`, emitted through the nested closure `add_selected_sum_constraint(pids, lb, ub)` (OV:1138-1143).
-  - SLICED (BS ~L2615-2682, the R340 two-call split): after the normal slice, derive the cluster from the normal bucket, then call `extend_bank` for a reserved share of jobs with `max_selected_from=(cluster, k-1)`. `conditions_signature` (bank_cache:627-668) must hash the ids and m, so these land in their own bucket. `max_candidates` compares against the WHOLE cache (bank_cache:908, `__len__` at 562), so split `_total_max` between buckets the way the five-stack quota does, clamped so neither starves. Size the reserved share to cover the cap: at least (1 - pct) x E x 2 candidates.
-  - DIRECT (`build_diverse_candidate_bank`, OV:4300; called at EP:5293-5321): per-job kwargs pass the `passthrough_keys` whitelist (OV:4354-4380), and every subset rule is a hard-coded branch in `build_multi_lineup` (OV:2791-2838). Add the limited jobs there. Otherwise the control is a silent no-op on whichever path the clock picks (R246's lesson).
-  - Never a pool reduction: every player stays legal, and the limit applies only to the reserved jobs.
-  - Then turn the defaults ON and re-freeze `tests/golden/` deliberately, with the histogram before and after in the CHANGELOG.
-
-- **Late swap (declined for this item, filed).** `tools/late_swap.py` passes the posture-merged controls (L173, L803). An enforced cap would bind against the swap's own bank (no limited jobs) and against untouched rows that may already exceed it. For now the swap strips the key, reports the parent brief's cluster, and says so on stderr and in its brief. Enforcement is a rider on R284.
-
-*Tests.* `test_core.ConsensusClusterCapTests`, mirroring R343's `TeamFootprintCapTests` (tests/test_core.py:26843), `WashoutCapFeasibilityFloorTests` (27175) and `WashoutControlReportingTests` (27262). Cover:
-- cluster derivation and ordering;
-- the row binding with headroom;
-- the vacuous skip;
-- the units gate (`50` refused);
-- the posture MIN merge;
-- the BANK-LIMITED diagnosis;
-- limited jobs carrying the constraint on BOTH bank paths;
-- no player dropped from the pool;
-- late swap stripping the key.
-
-Mutation-check each one.
-
-*Verification.* `UT test_core.ConsensusClusterCapTests`; `GOLD` (unmoved through (a) and (b), re-frozen at (c)); `PROBE`; then a replay on the vendored 2026-06-03 slate reporting the cluster share, portfolio ceiling, distinct primary stacks and bank time, each before and after. If Ben re-attaches 1905_10g's files, repeat it there: 27 of 34 at 3 or more before, 17 or fewer after.
-
-- **What.** The drawdown half of the dual objective has per-person, per-team, per-game and per-SP-pair ceilings, and nothing that counts how many lineups carry the same prior bet across teams. On 1905_10g (rebuild run `20260922T222901Z_3d5abaff`, delivered after the late swap as sha256 `a65077667789`), nine hitters sat at the 0.35 player cap (11 of 34 each) and filled 99 of 272 hitter slots (36%). Every lineup carried at least 2 of them and 27 carried 3 or more, while the brief read 15 distinct primary stacks and a 29% max team footprint. The cluster is cross-team, so the team, game and stack caps cannot see it. QA's correlated-block axis (worst shared pair and triple, R247(c)) read 4 of 34 on the first build: the lineups share a POOL, not a triple, so a k-subset cap misses it too.
-- **The cap alone is not enough.** The 408-candidate bank carried at least 2 of the nine in every candidate, 3 or more in 396 and 4 or more in 268. An allocator row with nothing low-cluster to choose from would be infeasible, or would choose among 12 candidates.
-- **Definition, measured.** A salary value rank does not find the cluster: the top 9 hitters by Base per $1k hold 2 of the nine, and by Ceiling per $1k hold 5. The top 9 by bank share (the fraction of candidates carrying the player) hold 8. The shares run 69.4% (Acuna), 61.5% (Vargas), 53.9%, 50.2%, 41.2%, 35.5%, 32.1%, 21.3%, 18.6%, 18.4% (Marte), then 9.6%. The cluster is the search's own consensus, so it is defined from the bank.
-- **What the person cap did instead.** Rationing the nine one or two per lineup shut out every ATL, ATH and TEX primary stack (bank objective ranks 1, 2 and 5 of 408) while LAD, COL, SF and LAA (best ranks 161 to 243) took 2 to 4 each.
-- **Fix, three parts, each a valid landing in order.**
-  - (a) Report, on every Classic brief and in `tools/qa_portfolio.py`: the consensus cluster (hitters above a bank-share threshold), the per-lineup member-count histogram, and the share of lineups at k or more. Report-only; no delivered byte moves.
-  - (b) Control: a joint-MILP row in `select_and_assign_entries` capping the share of entries whose candidate carries k or more cluster members. Same shape as R343's team cap: `total` denominator, headroom for fixed rows, a vacuous row skipped, a named binding diagnosis, and S class under R386, so it relaxes under deadline.
-  - (c) Bank: cluster-limited jobs in their own conditions bucket (the R340 pattern), so the allocator has low-cluster candidates to choose from. Never a pool reduction: every player stays legal, and the limit applies to a share of jobs only.
-- **Ben's at plan approval.** The defaults: the bank-share threshold, k, the share, and whether the cap ships on.
+The bank's consensus cluster (hitters in 15% or more of the distinct lineups the
+unconstrained search built, at most twelve) is reported on every Classic brief
+and in QA, capped by `max_consensus_cluster_share_pct` (0.50 on the four
+multi-entry postures, 1.0 on `single_entry`, k = 3) in an R343-shaped MILP row,
+and supplied by cluster-limited bank jobs on all three doors (sliced, direct,
+plan leg), each in its own conditions bucket, never a pool cut. Late swap strips
+the cap (rider on R284); the post-export validator does not grade it (the
+cluster is a property of the bank). The production golden was re-frozen with
+the histogram in the changelog: 18/18 -> 9/18 entries at 3+ members, 11 -> 18
+distinct lineups, apex ceiling -1.0%. The 1905_10g replay is owed when its
+files are staged. Gate `PASS  v2.26.0  41 modules  2412 tests  5 skipped` (the five absent-file skips).
 
 ### R406. Classic scenario sleeves: build the portfolio across worlds where the projection is wrong in named ways (P1, L) | new 2026-09-23, from Ben's post-slate question "what if all our priors and all conventional wisdom are wrong", 1905_10g review | Roadmap: Session 94
 

@@ -129,7 +129,7 @@ def lateswap_dest_name(slate_tag: str, run_id: str) -> str:
 
 def resolve_swap_controls(postures, override, solver_budget,
                           requirements=None, projections=None,
-                          excluded_player_ids=None) -> dict:
+                          excluded_player_ids=None, stripped_out=None) -> dict:
     """Merged portfolio controls for the swap, with the joint solve bounded (R25).
 
     R29(3): these used to be one flat dict applied to every contest, and its
@@ -203,7 +203,50 @@ def resolve_swap_controls(postures, override, solver_budget,
     if solver_budget is not None:
         controls["time_limit"] = float(solver_budget)
     controls.update(override or {})
+    # R405. The consensus-cluster cap is derived like every other control and
+    # then STRIPPED, the item's one declined door. Enforced here it would bind
+    # against a swap bank that holds no cluster-limited jobs and against
+    # untouched rows that may already exceed it, so a legal refinement inside a
+    # lock window would refuse on a cap the swap cannot satisfy. It is stripped
+    # even when typed in --controls-override, and `stripped_out` names what was
+    # removed so the caller says so out loud. Enforcement is a rider on R284.
+    for key in SWAP_UNENFORCED_CONTROLS:
+        if key in controls:
+            value = controls.pop(key)
+            if stripped_out is not None:
+                stripped_out[key] = value
     return controls
+
+
+#: R405. Controls the swap derives and does not enforce; see `resolve_swap_controls`.
+SWAP_UNENFORCED_CONTROLS = ("max_consensus_cluster_share_pct",
+                            "consensus_cluster_min_members")
+
+
+def consensus_cluster_summary(block) -> str:
+    """R405. One line for an allocator `consensus_cluster` block, or why not."""
+    if not block:
+        return "not recorded"
+    members = [m.get("player_id") for m in (block.get("members") or [])]
+    hist = block.get("delivered_member_count_histogram") or {}
+    n = sum(int(v) for v in hist.values())
+    return (f"{len(members)} member(s) at >= "
+            f"{float(block.get('min_bank_share') or 0):.0%} bank share, "
+            f"{block.get('delivered_at_k_or_more')}/{n} entries carry "
+            f"{block.get('min_members_k')}+ (histogram {hist}); members "
+            f"{members[:12]}")
+
+
+def parent_consensus_cluster(runs_root: Path, parent_run_id):
+    """R405. The parent build's cluster block, read from its immutable run record."""
+    if not parent_run_id:
+        return None
+    path = Path(runs_root) / str(parent_run_id) / "final" / "diagnostics.json"
+    try:
+        diag = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return ((diag.get("allocation") or {}).get("consensus_cluster")) or None
 
 
 # Every portfolio-control violation the entries validator can report, mapped to
@@ -757,9 +800,18 @@ def main() -> int:
                           "candidate_scoring": payload_report}, indent=1))
         return 0
 
+    swap_stripped: dict = {}
     controls = resolve_swap_controls(
         postures, args.controls_override, args.solver_budget,
-        requirements=requirements, projections=projections)
+        requirements=requirements, projections=projections,
+        stripped_out=swap_stripped)
+    if swap_stripped:
+        print(f"consensus-cluster cap NOT enforced on a late swap (R405): stripped "
+              f"{', '.join(f'{k}={v}' for k, v in sorted(swap_stripped.items()))} "
+              f"from the derived controls. The swap's bank holds no "
+              f"cluster-limited jobs and untouched rows may already exceed it; "
+              f"the parent's cluster and the swapped file's are printed after "
+              f"the solve. Enforcement is a rider on R284.", file=sys.stderr)
     # R29(3): print them. A cap that is invisible until it fails is a cap the
     # operator debugs by guessing, and last night that guess was "the bank is
     # thin" for twenty minutes. An empty set prints as such, because a swap that
@@ -913,6 +965,15 @@ def main() -> int:
     print(f"gates: workflow_valid={result.get('workflow_valid')} "
           f"selection={result.get('selection_certified')} "
           f"allocation={result.get('allocation_certified')}")
+    # R405. Reported, never enforced here (see `resolve_swap_controls`). The
+    # parent's line is the build's own record; the swapped file's is the same
+    # function over the swap's bank, so the two can differ in membership.
+    print("consensus cluster, parent build: " + consensus_cluster_summary(
+        parent_consensus_cluster(REPO / "runs", result.get("parent_run_id"))),
+          file=sys.stderr)
+    print("consensus cluster, swapped file (against the swap's bank, not "
+          "enforced): " + consensus_cluster_summary(result.get("consensus_cluster")),
+          file=sys.stderr)
     delivered_sha = ""
     delivered = provisional
     try:

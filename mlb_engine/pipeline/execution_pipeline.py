@@ -155,6 +155,7 @@ from __future__ import annotations
 
 import csv
 import json
+import math
 import shutil
 import sys
 import time
@@ -169,6 +170,7 @@ from mlb_engine.pipeline.build_state_manager import (
     sha256_file, snapshot_run_inputs, update_run_certification,
 )
 from mlb_engine.allocate.contest_allocator import (
+    CONSENSUS_CLUSTER_MIN_MEMBERS,
     TEAM_EXPOSURE_MIN_HITTERS, assert_fraction_cap, select_and_assign_entries,
 )
 from mlb_engine.contest_shapes import (
@@ -576,6 +578,9 @@ def execute_portfolio(
             # paths carry it: a late swap that lost the block would report a
             # refined portfolio with no concentration facts at all.
             "portfolio_frontier": portfolio_frontier,
+            # R405. The allocator's consensus-cluster block, on both return
+            # paths for R126's reason.
+            "consensus_cluster": allocation.get("consensus_cluster"),
             "workflow_valid": True,
             "selection_certified": certification["selection_certified"],
             "allocation_certified": certification["allocation_certified"],
@@ -599,6 +604,8 @@ def execute_portfolio(
         "candidate_reuse_counts": allocation.get("candidate_reuse_counts"),
         # R126, see the deferred branch above.
         "portfolio_frontier": portfolio_frontier,
+        # R405, see the deferred branch above.
+        "consensus_cluster": allocation.get("consensus_cluster"),
         "workflow_valid": bool(promotion["passed"]),
         "selection_certified": certification["selection_certified"],
         "allocation_certified": certification["allocation_certified"],
@@ -846,6 +853,23 @@ def run_late_swap(
 # is a decorrelation preference, and Ben's to move.
 MAX_TEAM_EXPOSURE_NOTE = "R343: team footprint over all hitter slots, any role"
 
+# R405, Ben's decisions of 2026-09-23. `max_consensus_cluster_share_pct` caps the
+# share of entries whose lineup carries k = 3 or more members of the BANK's
+# consensus cluster (every hitter in 15% or more of the distinct lineups the
+# unconstrained search built, most-shared first, at most twelve). 0.50 on
+# `wta_satellite`, `large_gpp`, `small_gpp` and `mme`; 1.0 on `single_entry`;
+# `cash` declares no controls. MIN wins across a mixed entered set. On 1905_10g
+# that is at most 17 of 34 lineups at 3+ of the ten, against 27 delivered.
+#
+# It needs lineups below k to choose from, and the ordinary bank holds almost
+# none (6 of 408 on 1905_10g, 0 of 30 on the vendored 2026-06-03 slate), so it
+# ships with cluster-limited bank jobs on every door
+# (`resolve_consensus_limited_request`). A decorrelation preference over the
+# washout half of the dual objective: nothing here is a win rate, a cash rate or
+# a probability, and the value is Ben's to move.
+MAX_CONSENSUS_CLUSTER_NOTE = ("R405: entries at k+ of the bank's consensus "
+                              "hitters, capped per posture")
+
 STRATEGY_DEFAULTS: Dict[str, Dict[str, Any]] = {
     "single_entry": {
         "construction": "single",
@@ -857,6 +881,8 @@ STRATEGY_DEFAULTS: Dict[str, Dict[str, Any]] = {
             "max_player_exposure_pct": 1.0, "max_pitcher_exposure_pct": 1.0,
             "max_primary_stack_exposure_pct": 1.0, "max_sp_pair_repetition": 1,
             "primary_stack_min_size": 4, "max_team_exposure_pct": 1.0,
+            # R405: off at one entry, and MIN-merged, so it loosens nobody.
+            "max_consensus_cluster_share_pct": 1.0,
         },
         "note": "one max-ceiling lineup; no decorrelation needed at one entry",
     },
@@ -882,6 +908,8 @@ STRATEGY_DEFAULTS: Dict[str, Dict[str, Any]] = {
             # R343, 2026-09-15. See MAX_TEAM_EXPOSURE_NOTE below for how these
             # five numbers were chosen and what they are not.
             "max_team_exposure_pct": 0.55,
+            # R405, 2026-09-23. See MAX_CONSENSUS_CLUSTER_NOTE below.
+            "max_consensus_cluster_share_pct": 0.50,
             # R34, 2026-07-30. Ships at 0.0, which is today's behaviour exactly.
             # The archive (138 contests, 43,045 Classic field entries) shows
             # 5-2-1 is the only shape whose within-contest top-decile lift
@@ -911,6 +939,7 @@ STRATEGY_DEFAULTS: Dict[str, Dict[str, Any]] = {
             "max_primary_stack_exposure_pct": 0.55, "max_sp_pair_repetition": 2,
             "max_shared_players": 6, "primary_stack_min_size": 4,
             "max_team_exposure_pct": 0.75,
+            "max_consensus_cluster_share_pct": 0.50,  # R405
         },
         "note": "tight consecutive stacks; cover viable SP pairs only on deep slates",
     },
@@ -925,6 +954,7 @@ STRATEGY_DEFAULTS: Dict[str, Dict[str, Any]] = {
             "max_primary_stack_exposure_pct": 0.50, "max_sp_pair_repetition": 3,
             "max_shared_players": 6, "primary_stack_min_size": 4,
             "max_team_exposure_pct": 0.70,
+            "max_consensus_cluster_share_pct": 0.50,  # R405
         },
         "note": "top-heavy field rewards a tight five-stack plus a secondary",
     },
@@ -949,6 +979,7 @@ STRATEGY_DEFAULTS: Dict[str, Dict[str, Any]] = {
             "max_primary_stack_exposure_pct": 0.45, "max_sp_pair_repetition": 3,
             "max_shared_players": 6, "primary_stack_min_size": 4,
             "max_team_exposure_pct": 0.65,
+            "max_consensus_cluster_share_pct": 0.50,  # R405
         },
         "note": "wider exposure and higher decorrelation; deployed count scales with bank coverage",
     },
@@ -2032,6 +2063,119 @@ def resolve_bank_stack_request(
                 "rate, cash rate, or probability claim",
     }
 
+
+
+#: R405(c). The consensus-limited bank jobs' share of a budgeted bank, clamped
+#: like the five-stack request's (R340) so neither bucket is ever starved: the
+#: ordinary bucket is what DEFINES the cluster and what fills every entry the cap
+#: does not touch, and the limited bucket is what lets the cap bind at all.
+BANK_CONSENSUS_LIMITED_MIN_SHARE = 0.25
+BANK_CONSENSUS_LIMITED_MAX_SHARE = 0.50
+
+
+def resolve_consensus_limited_request(
+    controls: Optional[Mapping[str, Any]],
+    entries: int,
+    total_max: Optional[int] = None,
+) -> Dict[str, Any]:
+    """What to ask the bank for so the consensus-cluster cap has something to bind.
+
+    R405(c), one derivation for all three bank doors (the sliced build door,
+    the direct auto-bank door, and the plan leg, which has to solve the build's
+    own MILP -- R340's lesson about the door the entry did not name). Reads the
+    MERGED controls. The cap limits entries carrying k or more of the bank's
+    consensus hitters, and the ordinary bank holds almost nothing below k: on
+    1905_10g 6 of 408 candidates, on the vendored 2026-06-03 slate 0 of 30. So a
+    cap below 1.0 asks for jobs solved under ``max_selected_from=(cluster, k-1)``
+    and sizes them to cover it: at least ``(1 - pct) x E x 2`` candidates.
+
+    Search effort, never a pool reduction: the limit applies to the reserved
+    jobs only, every player stays legal in every job, and m = k - 1 >= 1 is
+    enforced by the solver wrapper. Not a claim that a low-consensus lineup
+    scores better.
+    """
+    from mlb_engine.allocate.contest_allocator import (
+        CONSENSUS_CLUSTER_MAX_MEMBERS, CONSENSUS_CLUSTER_MIN_BANK_SHARE,
+        _consensus_cluster_min_members,
+    )
+    merged = dict(controls or {})
+    try:
+        pct = merged.get("max_consensus_cluster_share_pct")
+        pct = None if pct is None else float(pct)
+    except (TypeError, ValueError):
+        pct = None
+    k = _consensus_cluster_min_members(merged)
+    n = max(0, int(entries or 0))
+    active = pct is not None and 0.0 < pct < 1.0 and n > 1 and k >= 2
+    need = int(math.ceil((1.0 - pct) * n * 2)) if active else 0
+    share = None
+    limited_max = None
+    if active and total_max:
+        share = min(BANK_CONSENSUS_LIMITED_MAX_SHARE,
+                    max(BANK_CONSENSUS_LIMITED_MIN_SHARE, need / max(1, int(total_max))))
+        limited_max = max(need, int(int(total_max) * share))
+    return {
+        "active": bool(active),
+        "requested_pct": pct,
+        "min_members_k": k,
+        "m": (k - 1) if active else None,
+        "min_candidates": need,
+        "budget_share": share,
+        "max_candidates": limited_max,
+        "min_bank_share": CONSENSUS_CLUSTER_MIN_BANK_SHARE,
+        "max_members": CONSENSUS_CLUSTER_MAX_MEMBERS,
+        "reason": ("max_consensus_cluster_share_pct below 1.0: the cap needs "
+                   "lineups carrying fewer than k cluster members, and the "
+                   "ordinary bank holds almost none" if active else
+                   "no consensus-cluster cap below 1.0 in the merged controls"),
+        "note": "deterministic search-effort routing; never a win rate, cash "
+                "rate, or probability claim",
+    }
+
+
+def build_consensus_limited_jobs(
+    cache: Any,
+    projections: Any,
+    request: Mapping[str, Any],
+    *,
+    max_opposing_hitters_per_sp: Optional[int] = None,
+    **extend_kwargs: Any,
+) -> Dict[str, Any]:
+    """R405(c). Derive the cluster from the cache's ORDINARY bucket, then extend
+    the bank with cluster-limited jobs in their own conditions bucket.
+
+    One function for the sliced build door and the plan leg, so the two cannot
+    disagree about the cluster or the job size. ``extend_kwargs`` is the
+    caller's own ``extend_bank`` arguments (budget, max_candidates, leverage,
+    anti-correlation, stack size), passed through unchanged apart from the two
+    this function owns.
+    """
+    from mlb_engine.allocate.contest_allocator import (
+        CONSENSUS_LIMITED_JOB_CLASS, consensus_cluster_members,
+    )
+    from mlb_engine.optimize.bank_cache import extend_bank
+
+    cluster = consensus_cluster_members(
+        cache.as_candidates(None, requested_n=1),
+        min_bank_share=float(request.get("min_bank_share")),
+        max_members=int(request.get("max_members")))
+    members = list(cluster["member_ids"])
+    m = int(request.get("m") or 0)
+    if not request.get("active") or len(members) <= m:
+        return {"attempted": False, "cluster_members": members,
+                "reason": ("not requested" if not request.get("active") else
+                           f"the ordinary bank's cluster has {len(members)} "
+                           f"member(s), at most m = {m}, so no lineup can exceed it")}
+    report = extend_bank(
+        cache, projections, max_selected_from=(members, m),
+        job_class=CONSENSUS_LIMITED_JOB_CLASS,
+        # R288/R293: named, not splatted, so the solve-producer census can see
+        # that this call forwards the anti-correlation allowance.
+        max_opposing_hitters_per_sp=max_opposing_hitters_per_sp,
+        **extend_kwargs)
+    return {"attempted": True, "cluster_members": members, "m": m,
+            "cluster_source_lineups": cluster["source_lineups"],
+            "report": report}
 
 def _payout_breadth_by_shape_from_csv(archetypes_path: Optional[str]) -> Dict[str, float]:
     """Read the optional payout_breadth column from the archetype CSV, aggregated
@@ -3161,9 +3305,17 @@ def _merged_controls_for_build(
     # to the tightest across contests. It belongs with the other three and not
     # in a set of its own: one portfolio has to satisfy every contest's team
     # ceiling exactly as it satisfies every contest's player ceiling.
+    # R405 adds the fifth ceiling. A cluster cap merges by MIN for the same
+    # reason: one portfolio has to satisfy every contest's cluster ceiling, and
+    # `single_entry` at 1.0 is no opinion that loosens nobody. Its k merges as
+    # an integer MIN beside the repetition caps, and a LOWER k is the tighter
+    # reading (more lineups count toward the cap), which is the direction MIN
+    # takes.
     pct_keys = ("max_player_exposure_pct", "max_pitcher_exposure_pct",
-                "max_primary_stack_exposure_pct", "max_team_exposure_pct")
-    rep_keys = ("max_sp_pair_repetition", "max_shared_players")
+                "max_primary_stack_exposure_pct", "max_team_exposure_pct",
+                "max_consensus_cluster_share_pct")
+    rep_keys = ("max_sp_pair_repetition", "max_shared_players",
+                "consensus_cluster_min_members")
     # R167. The override is the ONLY unvalidated way a control reaches the
     # build: postures and feasibility floors are engine-authored, an override
     # is typed by an operator, and `--controls-override
@@ -3383,6 +3535,9 @@ def feasibility_floors_from(feasibility_inputs: Mapping[str, Any]) -> Dict[str, 
         # operator sets one, and the scalar below is what a floor can reach.
         ("floor_team_exposure_pct", "max_team_exposure_pct"),
         ("floor_game_exposure_pct", "max_game_exposure_pct"),
+        # R405. Only the ARITHMETIC half of the cluster cap's feasibility lives
+        # here; the rest is bank-dependent and is the allocator's diagnosis.
+        ("floor_consensus_cluster_share_pct", "max_consensus_cluster_share_pct"),
     ):
         if feasibility_inputs.get(floor_key):
             floors[control_key] = feasibility_inputs[floor_key]
@@ -3515,6 +3670,7 @@ def _slate_feasibility(
         "game_count": None,
         "floor_team_exposure_count": None, "floor_team_exposure_pct": None,
         "floor_game_exposure_count": None, "floor_game_exposure_pct": None,
+        "legal_hitter_count": None, "floor_consensus_cluster_share_pct": None,
         "floor_pitcher_exposure_count": None, "floor_pitcher_exposure_pct": None,
         "floor_stack_exposure_count": None, "floor_stack_exposure_pct": None,
         "floor_player_exposure_count": None, "floor_player_exposure_pct": None,
@@ -3612,6 +3768,34 @@ def _slate_feasibility(
                 gc = int(_ceil(entries / n_games))
                 info["floor_game_exposure_count"] = gc
                 info["floor_game_exposure_pct"] = min(1.0, gc / entries)
+
+            # R405. The consensus-cluster cap's ARITHMETIC half, and the only
+            # half a pool can decide: the cluster itself is defined from the
+            # bank, which does not exist yet. A lineup holds eight hitters, so
+            # it can carry fewer than k of a cluster of C only if the legal pool
+            # has at least 8 - (k - 1) hitters OUTSIDE the cluster. Taken at the
+            # largest cluster the definition allows (C = 12) and the engine's k,
+            # a pool smaller than that forces every lineup to k or more and the
+            # cap floors to 1.0, inert, the way R343's team floor makes a
+            # one-game slate inert. The worst-case C errs toward LOOSENING the
+            # ceiling. Everything bank-shaped is `_diagnose_binding_constraints`'.
+            # Its own guard: a frame this count cannot read must not take the
+            # other floors in this block down with it.
+            try:
+                from mlb_engine.allocate.contest_allocator import (
+                    CONSENSUS_CLUSTER_MAX_MEMBERS, CONSENSUS_CLUSTER_MIN_MEMBERS)
+                from mlb_engine.optimize.optimizer_v3 import _drop_excluded_rows
+                _legal = _drop_excluded_rows(projections)
+                _excl = {str(x) for x in (excluded_player_ids or [])}
+                n_hitters = int(sum(
+                    1 for pos, pid in zip(_legal["Position"], _legal["Player_ID"])
+                    if str(pos) != "P" and str(pid) not in _excl))
+                info["legal_hitter_count"] = n_hitters
+                if (n_hitters - CONSENSUS_CLUSTER_MAX_MEMBERS
+                        < 8 - (CONSENSUS_CLUSTER_MIN_MEMBERS - 1)):
+                    info["floor_consensus_cluster_share_pct"] = 1.0
+            except Exception:  # noqa: BLE001 - advisory, never blocks
+                info["legal_hitter_count"] = None
 
         info["available"] = True
     except Exception as exc:  # defensive: never block the checkpoint on this
@@ -3728,6 +3912,36 @@ def _feasibility_report(feas: Mapping[str, Any], controls: Mapping[str, Any]) ->
                 report["binding_constraints"].append(f"{check_name} infeasible: {detail}; {remedy}")
                 report["passed"] = False
             report["checks"].append({"name": check_name, "passed": ok, "detail": detail, "remedy": remedy})
+
+        # R405. The arithmetic half only (see `_slate_feasibility`): the check
+        # fails when the legal pool cannot seat a lineup below k members of a
+        # full-size cluster and the cap was nonetheless held below the entered
+        # set, which only an explicit override can do once the floor applied.
+        cluster_pct = controls.get("max_consensus_cluster_share_pct")
+        n_hitters = feas.get("legal_hitter_count")
+        if cluster_pct is not None and n_hitters is not None:
+            cap = _cap_count_local(cluster_pct)
+            if cap is not None:
+                from mlb_engine.allocate.contest_allocator import (
+                    CONSENSUS_CLUSTER_MAX_MEMBERS, CONSENSUS_CLUSTER_MIN_MEMBERS)
+                forced = feas.get("floor_consensus_cluster_share_pct") is not None
+                ok = not (forced and cap < entries)
+                detail = (f"max_consensus_cluster_share_pct {cluster_pct} -> cap {cap} "
+                          f"of {entries}; the legal pool holds {n_hitters} hitters, "
+                          f"and a lineup can carry fewer than "
+                          f"{CONSENSUS_CLUSTER_MIN_MEMBERS} of a "
+                          f"{CONSENSUS_CLUSTER_MAX_MEMBERS}-member cluster only "
+                          f"with >= {8 - (CONSENSUS_CLUSTER_MIN_MEMBERS - 1)} "
+                          f"hitters outside it")
+                remedy = None
+                if not ok:
+                    remedy = "raise max_consensus_cluster_share_pct to >= 1.000"
+                    report["binding_constraints"].append(
+                        f"consensus_cluster_capacity infeasible: {detail}; {remedy}")
+                    report["passed"] = False
+                report["checks"].append({"name": "consensus_cluster_capacity",
+                                         "passed": ok, "detail": detail,
+                                         "remedy": remedy})
 
         player_pct = controls.get("max_player_exposure_pct")
         floor_player = feas.get("floor_player_exposure_count")
@@ -3880,6 +4094,31 @@ def _plan_joint_allocation(
                     # merged controls.
                     stack_min=_plan_stack_request["bank_stack_min_size"],
                 )
+                # R405(c), the third door for R340's reason: the build's bank
+                # carries cluster-limited jobs whenever the cap is below 1.0, so
+                # a plan bank without them would prove the cap infeasible
+                # against a question the build never asks. Same derivation, same
+                # merged controls, the budget that is left; and the same rule as
+                # the ordinary call below -- a limited bucket that did not
+                # exhaust leaves the verdict unchecked rather than wrong.
+                _plan_consensus = resolve_consensus_limited_request(
+                    controls, len(entries))
+                if _plan_consensus["active"] and report.get("job_list_exhausted"):
+                    _left = float(budget_s) - (time.monotonic() - started)
+                    _limited = build_consensus_limited_jobs(
+                        cache, bank_projections, _plan_consensus,
+                        time_budget_s=max(1.0, _left),
+                        excludes=excl or None,
+                        solver_time_limit_s=solver_time_limit_s,
+                        max_opposing_hitters_per_sp=controls.get(
+                            "max_opposing_hitters_per_sp"),
+                        stack_min=_plan_stack_request["bank_stack_min_size"],
+                    )
+                    verdict["consensus_limited_jobs"] = {
+                        k: v for k, v in _limited.items() if k != "report"}
+                    if _limited.get("report") is not None:
+                        report = {**report, "job_list_exhausted": bool(
+                            _limited["report"].get("job_list_exhausted"))}
                 if not report.get("job_list_exhausted"):
                     built = len(cache.candidates)
                     verdict["bank_source"] = "sliced_plan_bank"
@@ -5151,6 +5390,15 @@ def run_slate(
             "map_wired": bool(controls.get("player_team_by_id")),
             "note": MAX_TEAM_EXPOSURE_NOTE,
         },
+        # R405. The cap as requested, before the bank defines the cluster; the
+        # realized block is the allocator's `consensus_cluster`.
+        "consensus_cluster_request": {
+            "max_consensus_cluster_share_pct": controls.get(
+                "max_consensus_cluster_share_pct"),
+            "min_members_k": controls.get(
+                "consensus_cluster_min_members", CONSENSUS_CLUSTER_MIN_MEMBERS),
+            "note": MAX_CONSENSUS_CLUSTER_NOTE,
+        },
         "controls_feasibility": controls_feasibility,
         "feasibility": checkpoint["feasibility"],
         "exclusions": exclusion_block,
@@ -5290,6 +5538,12 @@ def run_slate(
         # branch -- carries them through `bank_cache._leverage_kwargs`.
         from mlb_engine.optimize.bank_cache import _leverage_kwargs
         bank_stack_request = resolve_bank_stack_request(controls)
+        # R405(c). The direct door's half of the cluster-limited jobs: the same
+        # derivation the sliced door and the plan leg call, over the same
+        # merged controls, so the cap never binds against a bank that was never
+        # asked for what it needs (R246's lesson about the path the clock picks).
+        consensus_request = resolve_consensus_limited_request(
+            controls, len(entry_requirements))
         bank = build_diverse_candidate_bank(
             bank_projections, requested_n=n, mode=mode, target="ceiling",
             contest_shapes=sorted(shape_counts) or None,
@@ -5317,6 +5571,7 @@ def run_slate(
             # reads the floor.
             bank_stack_min_size=bank_stack_request["bank_stack_min_size"],
             bank_secondary_size=controls.get("bank_secondary_size") or 0,
+            consensus_limited_jobs=consensus_request,
             **_leverage_kwargs(leverage),
         )
         candidates = _bank_records_to_candidates(bank.get("candidate_lineups") or [])
@@ -5326,6 +5581,8 @@ def run_slate(
             # floor or quota that finds nothing can say whether the bank was
             # asked and could not, or was never asked at all.
             "stack_request": bank_stack_request,
+            # R405(c), same reason.
+            "consensus_limited_request": consensus_request,
             "candidate_count": len(candidates),
             "excluded_player_ids_applied": bank_excludes,
             "solver_report": bank.get("solver_report"),
@@ -5412,6 +5669,15 @@ def run_slate(
             "counts": "hitter_slots",
             "map_wired": bool(controls.get("player_team_by_id")),
             "note": MAX_TEAM_EXPOSURE_NOTE,
+        },
+        # R405. The cap as requested, before the bank defines the cluster; the
+        # realized block is the allocator's `consensus_cluster`.
+        "consensus_cluster_request": {
+            "max_consensus_cluster_share_pct": controls.get(
+                "max_consensus_cluster_share_pct"),
+            "min_members_k": controls.get(
+                "consensus_cluster_min_members", CONSENSUS_CLUSTER_MIN_MEMBERS),
+            "note": MAX_CONSENSUS_CLUSTER_NOTE,
         },
         "controls_feasibility": controls_feasibility,
         "feasibility": checkpoint["feasibility"],

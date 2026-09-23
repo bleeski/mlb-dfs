@@ -595,6 +595,9 @@ FRACTION_CONTROL_KEYS = (
     # silent-disable R215(a) closed for the per-game dict.
     "max_team_exposure_pct",
     "max_game_exposure_pct",
+    # R405, 2026-09-23. The ninth: the consensus-cluster ceiling, a fraction of
+    # the entered set like the eight above.
+    "max_consensus_cluster_share_pct",
 )
 
 # R215(a). The sixth fraction control, and the reason it needs its own tuple:
@@ -2307,7 +2310,8 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
     # R340. The one derivation of what to ask the bank for, and the two
     # clamps that keep either stack size from being starved of budget.
     from mlb_engine.pipeline.execution_pipeline import (
-        resolve_bank_stack_request,
+        resolve_bank_stack_request, resolve_consensus_limited_request,
+        build_consensus_limited_jobs,
         BANK_FIVE_STACK_BUDGET_MIN_SHARE,
         BANK_FIVE_STACK_BUDGET_MAX_SHARE,
     )
@@ -2648,17 +2652,35 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         _slice_reports = []
         _sizes = list(bank_stack_request["sizes"])
         _total_max = max(n_entries * 12, 60)
+        # R405(c). The consensus-limited bucket's request, from the same merged
+        # controls plus any cluster key the operator typed (the merge above
+        # takes no override, and an override that turns the cap on has to reach
+        # the bank or the row binds against nothing). When active, the ordinary
+        # slices below run inside (1 - share) of the budget and the candidate
+        # ceiling, and the limited call after them takes the rest: ordinary
+        # FIRST, because the cluster is derived from the ordinary bucket.
+        _cluster_controls = dict(_merged_controls or {})
+        for _ck in ("max_consensus_cluster_share_pct", "consensus_cluster_min_members"):
+            if _ck in (args.controls_override or {}):
+                _cluster_controls[_ck] = args.controls_override[_ck]
+        consensus_request = resolve_consensus_limited_request(
+            _cluster_controls, n_entries, _total_max)
+        _ordinary_budget = slice_budget
+        _ordinary_max = _total_max
+        if consensus_request["active"]:
+            _ordinary_budget = slice_budget * (1.0 - float(consensus_request["budget_share"]))
+            _ordinary_max = max(30, _total_max - int(consensus_request["max_candidates"]))
         _started_slices = time.monotonic()
         for _idx, _size in enumerate(_sizes):
-            _left = slice_budget - (time.monotonic() - _started_slices)
+            _left = _ordinary_budget - (time.monotonic() - _started_slices)
             if _idx == len(_sizes) - 1:
-                _call_budget, _call_max = max(1.0, _left), _total_max
+                _call_budget, _call_max = max(1.0, _left), _ordinary_max
             else:
                 _share = min(BANK_FIVE_STACK_BUDGET_MAX_SHARE,
                              max(BANK_FIVE_STACK_BUDGET_MIN_SHARE,
                                  float(bank_stack_request["five_share_target"])))
                 _call_budget = max(1.0, _left * _share)
-                _call_max = max(int(_total_max * _share), 30)
+                _call_max = max(int(_ordinary_max * _share), 30)
             _rep = extend_bank(
                 cache, projections,
                 time_budget_s=_call_budget,
@@ -2680,8 +2702,41 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
             )
             _rep["stack_min_requested"] = int(_size)
             _slice_reports.append(_rep)
+        # R405(c). The limited bucket, after the ordinary slices it derives its
+        # cluster from. Same leverage, anti-correlation and stack floor as the
+        # ordinary call (the default four), so the only difference between the
+        # buckets is the cluster limit itself.
+        consensus_jobs = {"attempted": False, "reason": consensus_request["reason"]}
+        if consensus_request["active"]:
+            _left = slice_budget - (time.monotonic() - _started_slices)
+            consensus_jobs = build_consensus_limited_jobs(
+                cache, projections, consensus_request,
+                time_budget_s=max(1.0, _left),
+                max_candidates=_total_max,
+                leverage=leverage,
+                max_opposing_hitters_per_sp=getattr(
+                    args, "max_opposing_hitters_per_sp", None),
+                stack_min=int(_sizes[-1]),
+            )
+            if consensus_jobs.get("report"):
+                _lrep = dict(consensus_jobs["report"])
+                _lrep["stack_min_requested"] = int(_sizes[-1])
+                _slice_reports.append(_lrep)
         bank_report = _merge_bank_slice_reports(_slice_reports)
+        # The merge keeps the LAST slice's scalar fields, and the limited slice
+        # runs last; these two describe that slice alone, so they stay under
+        # `slices` rather than reading as a fact about the whole bank.
+        bank_report.pop("max_selected_from", None)
+        bank_report.pop("job_class", None)
         bank_report["stack_request"] = bank_stack_request
+        bank_report["consensus_limited_request"] = consensus_request
+        bank_report["consensus_limited_jobs"] = {
+            k: v for k, v in consensus_jobs.items() if k != "report"}
+        if consensus_jobs.get("report"):
+            bank_report["consensus_limited_jobs"]["built"] = consensus_jobs[
+                "report"].get("built_this_slice")
+            bank_report["consensus_limited_jobs"]["job_list_exhausted"] = consensus_jobs[
+                "report"].get("job_list_exhausted")
         bank_report["budget_floored"] = bank_budget_floored
         candidates = cache.as_candidates(
             projections, requested_n=n_entries, contest_shapes=slice_shapes)
@@ -3076,6 +3131,14 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
     # it once out loud where the operator reads before approving.
     exposure["frontier"] = result.get("portfolio_frontier")
     print(f"frontier: {format_frontier_line(exposure['frontier'])}", file=sys.stderr)
+    # R405. Beside `team_footprint_any_role`, in the block a reader already
+    # goes to for concentration. The team, game and stack lines cannot see a
+    # CROSS-TEAM pool of consensus bats; this is the line that can. The members
+    # come from the allocation, because the cluster is a property of the bank
+    # and `portfolio_exposure` reads only the delivered file.
+    exposure["consensus_cluster"] = result.get("consensus_cluster")
+    print(f"consensus: {format_consensus_cluster_line(exposure['consensus_cluster'])}",
+          file=sys.stderr)
     # R247(a). Read before approving, on the same footing as the frontier line.
     # The block itself lives inside the frontier (it is computed where the
     # entered set and the Ceiling column are both in hand); it is echoed here
@@ -4923,6 +4986,37 @@ def showdown_degraded_entries(assignments, bank) -> dict:
          for a, lu in zip(rows, lineups)],
         **kwargs,
     )
+
+
+def format_consensus_cluster_line(cluster: dict | None) -> str:
+    """One review line for R405's block: the cluster and what the file carries.
+
+    The members are the BANK's consensus (hitters in at least the threshold
+    share of the distinct lineups the unconstrained search built), so the line
+    says "bank share", never a chance of anything. The count at k or more is
+    the number the cap bounds, and the cap line says whether a row was added.
+    """
+    if not cluster:
+        return "UNAVAILABLE (the allocator reported no consensus_cluster block)"
+    members = cluster.get("members") or []
+    k = cluster.get("min_members_k")
+    hist = cluster.get("delivered_member_count_histogram") or {}
+    n = sum(int(v) for v in hist.values())
+    at_k = cluster.get("delivered_at_k_or_more")
+    head = ", ".join(f"{m.get('player_id')} {float(m.get('share') or 0):.0%}"
+                     for m in members[:4])
+    more = f" +{len(members) - 4} more" if len(members) > 4 else ""
+    cap = cluster.get("count")
+    status = cluster.get("status")
+    cap_text = (f"cap {cap} of {n} ({status})" if cap and status != "not_requested"
+                else "no cap requested")
+    price = cluster.get("objective_median") or {}
+    return (f"{len(members)} member(s) at >= "
+            f"{float(cluster.get('min_bank_share') or 0):.0%} bank share "
+            f"[{head}{more}]; {at_k}/{n} entries carry {k}+; {cap_text}; "
+            f"histogram {hist}; objective median bank {price.get('bank')} / "
+            f"delivered below k {price.get('delivered_below_k')} / at k+ "
+            f"{price.get('delivered_at_k_or_more')} (review proxy, not a probability)")
 
 
 def format_degraded_line(degraded: dict | None) -> str:

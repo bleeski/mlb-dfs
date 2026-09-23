@@ -385,15 +385,23 @@ class BankCache:
         os.replace(tmp, self.path)
         self._cleared = set()
 
-    def add(self, roster: Sequence[str], objective: float, job: str = "") -> bool:
-        """Store a candidate. Dedupes on the ordered roster, never the player set."""
+    def add(self, roster: Sequence[str], objective: float, job: str = "",
+            job_class: Optional[str] = None) -> bool:
+        """Store a candidate. Dedupes on the ordered roster, never the player set.
+
+        R405(c). ``job_class`` names a job built under a non-default search
+        constraint (``consensus_limited``); it is stored only when set, so an
+        ordinary entry keeps the three keys every cache file on disk holds.
+        """
         key = tuple(str(p) for p in roster)
         if len(key) != 10 or not all(key) or key in self._seen:
             return False
         self._seen.add(key)
-        self.candidates.append(
-            {"roster": list(key), "objective": float(objective), "job": job}
-        )
+        entry: Dict[str, Any] = {"roster": list(key), "objective": float(objective),
+                                 "job": job}
+        if job_class:
+            entry["job_class"] = str(job_class)
+        self.candidates.append(entry)
         return True
 
     def as_candidates(self, projections_df=None, requested_n: int = 1,
@@ -501,6 +509,11 @@ class BankCache:
                 # stackless lineups.
                 "primary_stack_size": 0,
             }
+            # R405(c). The allocator derives the consensus cluster from the
+            # candidates WITHOUT a class, so a limited job's lineup cannot dilute
+            # the definition it was limited against.
+            if entry.get("job_class"):
+                payload["bank_job_class"] = str(entry["job_class"])
             if by_id is not None:
                 try:
                     lineup_df = by_id.loc[[p for p in roster if p in by_id.index]]
@@ -631,6 +644,7 @@ def conditions_signature(
     stack_max: Optional[int] = None,
     max_opposing_hitters_per_sp: Optional[int] = None,
     *, target: str = "ceiling", leverage: Optional[Mapping[str, Any]] = None,
+    max_selected_from: Optional[Tuple[Sequence[str], int]] = None,
 ) -> str:
     """A short digest of everything outside (pair, team, locks) that moves a solve.
 
@@ -664,6 +678,14 @@ def conditions_signature(
     if max_opposing_hitters_per_sp not in (None, ANTI_CORRELATION_DEFAULT_MAX):
         digest.update(
             f"opp:{int(max_opposing_hitters_per_sp)}\n".encode())
+    # R405(c). A cluster-limited job answers a different question (at most m
+    # of these players together), so its candidates bucket apart: the ids and
+    # m are hashed, sorted, and appended ONLY when set, which keeps every
+    # signature already on disk meaning what it meant (the R288 rule above).
+    if max_selected_from is not None:
+        ids, m = max_selected_from
+        digest.update(
+            f"sel:{int(m)}:{'|'.join(sorted(str(x) for x in (ids or [])))}\n".encode())
     digest.update(_projection_bytes(projections_df))
     return digest.hexdigest()[:16]
 
@@ -719,8 +741,15 @@ def extend_bank(
     solver_time_limit_s: Optional[float] = None,
     leverage: Optional[Mapping[str, Any]] = None,
     max_opposing_hitters_per_sp: Optional[int] = None,
+    max_selected_from: Optional[Tuple[Sequence[str], int]] = None,
+    job_class: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Generate candidates across (SP pair, stack team) until the budget runs out.
+
+    R405(c). ``max_selected_from=(ids, m)`` solves every job in this call with
+    at most ``m`` of ``ids`` together (``build_single_lineup``'s argument, m >=
+    1), in its own conditions bucket, and ``job_class`` tags what it stores.
+    Both default to None, which is this function's behaviour before R405.
 
     Returns a report with what was built and whether the job list is exhausted, so
     the caller knows whether another slice is worth running. ``locked_slot_assignments``
@@ -772,7 +801,7 @@ def extend_bank(
     conditions_sig = conditions_signature(
         projections_df, excl, stack_min, stack_max,
         max_opposing_hitters_per_sp=max_opposing_hitters_per_sp,
-        target=target, leverage=leverage)
+        target=target, leverage=leverage, max_selected_from=max_selected_from)
     pool_digest = projection_digest(projections_df)
     cache.register_conditions(conditions_sig, pool_digest)
     superseded = cache.drop_stale_jobs(conditions_sig, projection_digest=pool_digest)
@@ -941,6 +970,8 @@ def extend_bank(
                 # control that reached only the auto-bank would be a silent
                 # no-op on most builds.
                 max_opposing_hitters_per_sp=max_opposing_hitters_per_sp,
+                # R405(c). None on every ordinary slice.
+                max_selected_from=max_selected_from,
             )
             # R293. Recorded from the SOLVE, on the same "on every rung"
             # reasoning as the two lines above: this path was already wired, and
@@ -1005,7 +1036,7 @@ def extend_bank(
             )
             if bad:
                 continue
-        if cache.add(roster, objective, job=key):
+        if cache.add(roster, objective, job=key, job_class=job_class):
             built += 1
 
     cache.save()
@@ -1066,6 +1097,13 @@ def extend_bank(
         # solves; the two agreeing is a measurement, not a restatement.
         "anti_correlation": anti_correlation_report(
             anti_corr_observed, requested=max_opposing_hitters_per_sp),
+        # R405(c). What this call's jobs were limited to, so a reader can tell
+        # the limited bucket from the ordinary one without the signature.
+        "max_selected_from": (
+            {"members": sorted(str(x) for x in (max_selected_from[0] or [])),
+             "m": int(max_selected_from[1])} if max_selected_from is not None
+            else None),
+        "job_class": job_class,
         # R103. Named so a +0-candidate slice on a fully-pinned entry reads as
         # the pin it is, not as a dry pool: True means both P slots were
         # pinned to a same-game pair and the same-game filter was bypassed to

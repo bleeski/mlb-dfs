@@ -128,6 +128,9 @@ OPEN_CONTROL_VALUES: Dict[str, Any] = {
     # explicit per-game entry, because the two merge by MIN. That dict is only
     # ever operator-typed, so the operator who set it is the one who can open it.
     "max_game_exposure_pct": 1.0,
+    # R405, 2026-09-23, for R343's reason: the cluster cap ships ON by posture
+    # default and is S class under R386, so the T-15 crude move has to open it.
+    "max_consensus_cluster_share_pct": 1.0,
 }
 
 #: Showdown's three controls, same rung, same one crude move. Kept separate
