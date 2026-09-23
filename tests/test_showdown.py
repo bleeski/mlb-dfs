@@ -6077,6 +6077,70 @@ class R381CaptainSleeveWiringTests(unittest.TestCase):
         self.assertIn("captain_sleeve", brief)
         self.assertIsNone(brief["captain_sleeve"])
 
+class CaptainSleeveBriefTruthTests(unittest.TestCase):
+    """R399(e). R382 wired the sleeve's selector form to the captain prior, and
+    the brief's `captain_sleeve` block kept describing the build before it.
+
+    Its label said no ownership number exists on this path, and it dropped the
+    `selector` report `resolve_captain_sleeve` builds so the brief can show
+    what chose the sleeve, which `references/showdown.md` tells the reader to
+    open as `captain_sleeve.selector.matched`. `captain_sleeve_report` is the
+    production builder of that block (`portfolio_report` -> the brief, as-is).
+    Counts and names only; nothing here is a lift, edge, ROI, win rate or
+    probability.
+    """
+
+    def setUp(self):
+        self.df = _sleeve_frame()
+        util_by_key = dict(zip(self.df["Player_Key"], self.df["UTIL_ID"]))
+        own = {str(util_by_key[key]): (1.0 + _COLD.index(key) if key in _COLD
+                                       else 40.0)
+               for key in self.df["Player_Key"]}
+        self.prior = st.captain_prior_by_person(
+            self.df, _captain_payload(self.df, own_by_util=own),
+            "large_field_gpp", source="p.json")
+
+    def _report(self, sleeve):
+        cpts = list(sleeve["captain_keys"][:2]) + ["Taj Bradley|MIN",
+                                                    "Matthew Boyd|CHC"]
+        theses = [{"template": f"t{i}", "name": f"t{i}", "why": "",
+                   "captain_sleeve": i < 2, "cpt": c, "locks": [],
+                   "excludes": [], "mult": {}} for i, c in enumerate(cpts)]
+        lineups = [{"captain": {"player_key": c}, "utils": [],
+                    "player_keys": [c]} for c in cpts]
+        return st.captain_sleeve_report(self.df, theses, lineups, sleeve)
+
+    def _selected(self):
+        return st.resolve_captain_sleeve(
+            self.df, {"entries": 2, "from": ["prior_own_below", 25.0]}, 4,
+            captain_prior=self.prior)
+
+    def test_a_selector_sleeve_carries_what_chose_it(self):
+        sleeve = self._selected()
+        rep = self._report(sleeve)
+        self.assertEqual(rep["selector"], sleeve["selector"])
+        self.assertEqual(rep["selector"]["selector"], "prior_own_below")
+        self.assertEqual(rep["selector"]["threshold_pct"], 25.0)
+        self.assertEqual(rep["selector"]["matched"], len(_COLD))
+        self.assertEqual(rep["honoured_count"], 2)
+
+    def test_a_listed_sleeve_carries_the_key_as_null(self):
+        """One shape on every sleeve: a listed sleeve says no selector chose it
+        rather than leaving the key out."""
+        rep = self._report(st.resolve_captain_sleeve(
+            self.df, {"entries": 2, "from": _COLD[:2]}, 4))
+        self.assertIn("selector", rep)
+        self.assertIsNone(rep["selector"])
+
+    def test_the_label_stops_denying_the_prior_the_build_read(self):
+        label = self._report(self._selected())["label"].lower()
+        self.assertNotIn("no ownership number exists", label)
+        self.assertIn("captain_prior", label)
+        self.assertIn("never averaged", label)
+        self.assertIn("nothing here is a leverage, lift, edge, roi or "
+                      "win-rate claim", label)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
 

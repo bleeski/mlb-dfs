@@ -22029,6 +22029,192 @@ class BuildSlateFeedReadGuardTests(unittest.TestCase):
         self.assertIn("stale feed reused", err)
 
 
+class BuildSlateHelpTests(unittest.TestCase):
+    """R399(a)(e). `build_slate.py --help` is the operator's first read of every
+    flag. R382's `--captain-prior` help carried a bare "100%", which argparse
+    expands as a format spec, so `--help` and `-h` both exited 1 with
+    `ValueError: unsupported format character 'b'` before printing a line.
+
+    Run as a subprocess, the way an operator runs it, so every help string is
+    expanded by argparse itself rather than one string being checked by hand.
+    """
+
+    BS = REPO / "skills" / "generate-lineups" / "scripts" / "build_slate.py"
+
+    @classmethod
+    def setUpClass(cls):
+        cls.runs = {
+            flag: subprocess.run(
+                [sys.executable, str(cls.BS), flag], capture_output=True,
+                text=True, timeout=300,
+                env={**os.environ, "PYTHONHASHSEED": "0"})
+            for flag in ("--help", "-h")}
+        cls.text = " ".join(cls.runs["--help"].stdout.split())
+
+    def test_help_prints_and_exits_zero(self):
+        for flag, proc in self.runs.items():
+            with self.subTest(flag=flag):
+                self.assertEqual(proc.returncode, 0, proc.stderr[-800:])
+                self.assertNotIn("Traceback", proc.stderr)
+                self.assertIn("--captain-prior", proc.stdout)
+
+    def test_the_escaped_percent_renders_as_one_sign(self):
+        """`%%` is argparse's escape for a literal percent sign. The reader sees
+        "100%"; a doubled sign would mean the escape landed somewhere argparse
+        does not expand."""
+        self.assertIn("a 100% budget over one slot", self.text)
+        self.assertNotIn("%%", self.text)
+
+    def test_the_captain_sleeve_help_agrees_with_the_captain_prior_help(self):
+        """R399(e). R382 wired the selector form to `--captain-prior`. The
+        `--captain-prior` help said it was that form's input while the
+        `--captain-sleeve` help still said the form was refused because this
+        build path read no prior."""
+        start = self.text.index("--captain-sleeve CAPTAIN_SLEEVE Showdown")
+        block = self.text[start:self.text.index("--bundle BUNDLE", start)]
+        self.assertNotIn("does not read", block)
+        self.assertIn("--captain-prior", block)
+        self.assertIn("refuses when no prior was read", block)
+
+
+class PreserveTagAndNamedOddsTests(unittest.TestCase):
+    """R170, two `build_slate.py` smalls from the greenfield sixth edition.
+
+    (a) `preserve_prior_slate` names a moved file with the tag the file
+    declares (`own or tag`, the 2026-07-25 borrowed-tag fix), and its collision
+    fallback used the CALLER's tag: the log said "filing it under its own tag"
+    and the next line filed it under the borrowed one.
+
+    (b) `--odds` naming a file that does not exist skipped it without a word.
+    With a key resolvable the build priced the slate off the-odds-api instead
+    of the operator's packet; without one the warning said no file was named.
+    Odds are an optional input (MLB_Classic.md §2, R386), so the fix records
+    and builds; it never substitutes a fetch for a file the operator named.
+    """
+
+    _SALARY = REPO / "tests" / "fixtures" / "slates" / "DKSalaries_frozen_2026-07-29.csv"
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+
+    @staticmethod
+    def _module():
+        import importlib.util
+        path = (REPO / "skills" / "generate-lineups" / "scripts" / "build_slate.py")
+        spec = importlib.util.spec_from_file_location("build_slate_r170_test", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    @staticmethod
+    def _brief(path, tag, marker):
+        path.write_text(json.dumps({"slate": {"tag": tag}, "marker": marker}),
+                        encoding="utf-8")
+
+    def _preserve(self, paths, tag):
+        mod = self._module()
+        with contextlib.redirect_stderr(io.StringIO()) as err:
+            moved = mod.preserve_prior_slate(paths, tag)
+        return moved, err.getvalue()
+
+    def test_a_collision_files_the_brief_under_its_own_tag(self):
+        brief = self.root / "build_brief.json"
+        self._brief(brief, "1905_10g", "the bare brief")
+        self._brief(self.root / "build_brief_1905_10g.json", "1905_10g", "older")
+        moved, err = self._preserve([brief], "1915_1g_sd")
+        self.assertEqual(moved, [str(self.root / "build_brief_1905_10g_1.json")])
+        self.assertIn("filing it under its own tag", err)
+        self.assertFalse((self.root / "build_brief_1915_1g_sd_1.json").exists(),
+                         "the fallback re-minted the borrowed tag")
+
+    def test_a_file_that_declares_nothing_keeps_the_callers_tag(self):
+        """`own` is "" for a salary file, so `own or tag` is the caller's tag on
+        both names, exactly as before."""
+        salary = self.root / "DKSalaries.csv"
+        salary.write_text("a\n", encoding="utf-8")
+        (self.root / "DKSalaries_1915_1g_sd.csv").write_text("b\n", encoding="utf-8")
+        moved, _ = self._preserve([salary], "1915_1g_sd")
+        self.assertEqual(moved, [str(self.root / "DKSalaries_1915_1g_sd_1.csv")])
+
+    def _load(self, odds, key):
+        mod = self._module()
+        called = []
+
+        def no_fetch(*a, **k):
+            called.append(a)
+            raise AssertionError("a live fetch was attempted")
+
+        args = types.SimpleNamespace(odds=odds)
+        with unittest.mock.patch("mlb_engine.repo_env.resolve_odds_api_key",
+                                 lambda: key), \
+                unittest.mock.patch.object(mod.urllib.request, "urlopen", no_fetch):
+            packet, note = mod.load_odds_packet(args, salary_csv=self._SALARY)
+        return packet, note, called
+
+    def test_a_named_missing_file_is_never_replaced_by_a_fetch(self):
+        missing = self.root / "nope" / "odds.json"
+        packet, note, called = self._load(str(missing), key="k-not-printed")
+        self.assertEqual(called, [], "the build fetched in place of the named file")
+        self.assertEqual(packet, {})
+        self.assertEqual(note["named_file_missing"], str(missing))
+        self.assertIsNone(note["source"])
+        self.assertIn(str(missing), note["warning"])
+        self.assertNotIn("k-not-printed", json.dumps(note))
+
+    def test_without_a_key_the_warning_names_the_file_not_its_absence(self):
+        missing = self.root / "nope" / "odds.json"
+        _, note, _ = self._load(str(missing), key=None)
+        self.assertIn(str(missing), note["warning"])
+        self.assertNotIn("no --odds file", note["warning"])
+
+    def test_no_odds_flag_still_reads_as_no_file(self):
+        """The unchanged branch: nothing named, no key."""
+        _, note, called = self._load(None, key=None)
+        self.assertEqual(called, [])
+        self.assertIn("no --odds file", note["warning"])
+        self.assertNotIn("named_file_missing", note)
+
+    def test_the_brief_records_the_path_the_operator_named(self):
+        """Through `main()`, where the brief's `odds_source` is set. It keeps
+        meaning "the odds came from here", so a missing file gets its own key."""
+        mod = self._module()
+        missing = self.root / "nope" / "odds.json"
+
+        def fake_run_classic(args, slate_dir, salary, entries, feed, deadline):
+            return 0, {"status": "stub"}
+
+        argv = ["build_slate.py", "--salary", str(self._SALARY),
+                "--entries", str(self._SALARY), "--past-slate-replay",
+                "--odds", str(missing)]
+        with unittest.mock.patch.object(mod, "REPO", self.root), \
+                unittest.mock.patch.object(mod, "run_classic", fake_run_classic), \
+                unittest.mock.patch.object(sys, "argv", argv), \
+                contextlib.redirect_stdout(io.StringIO()), \
+                contextlib.redirect_stderr(io.StringIO()):
+            mod.main()
+        briefs = sorted((self.root / "outputs").glob("*/build_brief*.json"))
+        self.assertTrue(briefs, "main wrote no brief")
+        for path in briefs:
+            brief = json.loads(path.read_text(encoding="utf-8"))
+            self.assertEqual(brief["odds_file_missing"], str(missing), path.name)
+            self.assertNotIn("odds_source", brief)
+
+    def test_a_named_missing_bundle_is_named_on_the_f5_report(self):
+        """The class grep's other member: `--bundle` had the same silent skip,
+        so the brief's F5 block read as though no bundle had been passed."""
+        mod = self._module()
+        missing = self.root / "nope" / "slate_bundle.json"
+        _, named = mod.build_f5_map({}, types.SimpleNamespace(bundle=str(missing)), {})
+        self.assertIsNone(named["weather_source"])
+        self.assertEqual(named["named_file_missing"], str(missing))
+        self.assertIn(str(missing), named["warning"])
+        _, absent = mod.build_f5_map({}, types.SimpleNamespace(bundle=None), {})
+        self.assertNotIn("named_file_missing", absent)
+        self.assertNotIn("warning", absent)
+
+
 class SupervisorHardeningTests(unittest.TestCase):
     """R169. autobuild had zero tests. Four rails, each reached by a fixture
     that drives main() with a patched subprocess."""

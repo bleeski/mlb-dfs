@@ -22,6 +22,8 @@ Usage:
         [--out data/slates/<date>/odds_from_paste.json]
         [--book draftkings]     # names the book for a paste with no book column
         [--fetched-at <iso>]    # defaults to now, UTC
+        [--exclude-game AWAY@HOME ...]   # a salary game not being played
+        [--feed <lineups_feed.json>]     # its postponed/cancelled/suspended games
         [--json]
 
 The paste, delimiter-tolerant (tab, comma, pipe, or two-plus spaces), with '#'
@@ -43,6 +45,14 @@ paste, so a file the engine cannot parse is never left on disk.
 Nothing here fetches anything. The salary file is authoritative for which games
 are on the slate and for their start times; a priced row for a game it does not
 carry is dropped and reported, because the source table covers the whole day.
+
+R397. A salary game that is not being played is owed no price. On 1840_5g the
+salary file predated TOR@BAL's postponement and this tool refused "no priced row
+for TOR@BAL" with every live game priced. ``--feed`` exempts what a lineups feed
+marks postponed, cancelled or suspended (the pool's own reading); ``--exclude-game``
+exempts a game the operator names. Both are reported as ``excluded_postponed``.
+A feed that cannot be read, or a name that matches no salary game, is a warning
+and exempts nothing, so the game it meant still blocks.
 """
 from __future__ import annotations
 
@@ -90,6 +100,17 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     ap.add_argument("--fetched-at",
                     help="ISO stamp recorded as each book's last_update; "
                          "defaults to now in UTC")
+    ap.add_argument("--exclude-game", dest="exclude_games", action="append",
+                    default=[], metavar="AWAY@HOME",
+                    help="a salary-file game that is not being played "
+                         "(postponed, cancelled, suspended); repeatable. It is "
+                         "owed no price, any priced row for it is dropped, and "
+                         "the report names it as excluded_postponed")
+    ap.add_argument("--feed",
+                    help="a lineups_feed.json; games it marks postponed, "
+                         "cancelled or suspended are exempt the same way. A "
+                         "feed fetched before the postponement says Scheduled, "
+                         "and a pasted feed never says Postponed")
     ap.add_argument("--json", action="store_true", help="print the report as JSON")
     args = ap.parse_args(argv)
 
@@ -100,9 +121,20 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print(f"ERROR  {exc}", file=sys.stderr)
         return 3
 
+    feed, feed_warning = None, None
+    if args.feed:
+        try:
+            feed = json.loads(Path(args.feed).read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            feed_warning = (f"--feed {args.feed} not read ({exc}); no game "
+                            "exempted on it")
+
     result = resolve_paste_to_odds_payload(
-        text, args.salary, default_book=args.book, fetched_at=args.fetched_at)
+        text, args.salary, default_book=args.book, fetched_at=args.fetched_at,
+        exclude_games=args.exclude_games, lineups_feed=feed)
     events, report = result["events"], result["report"]
+    if feed_warning:
+        report["exclusion_warnings"].insert(0, feed_warning)
 
     if events and not report["blockers"]:
         try:
@@ -126,6 +158,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         if report["duplicate_rows_ignored"]:
             print("identical duplicate row(s) ignored: "
                   + ", ".join(report["duplicate_rows_ignored"]))
+        for row in report["excluded_postponed"]:
+            print(f"excluded_postponed: {row['game'] or '/'.join(row['teams'])} "
+                  f"({'; '.join(row['signals'])})"
+                  + (f", priced row(s) dropped: {', '.join(row['priced_books_dropped'])}"
+                     if row["priced_books_dropped"] else ""))
+        for line in report["exclusion_warnings"]:
+            print(f"WARN  {line}", file=sys.stderr)
         if report["games_without_a_salary_start"]:
             print("no salary start time (leg resolution falls back to earliest): "
                   + ", ".join(report["games_without_a_salary_start"]))

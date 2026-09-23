@@ -877,7 +877,8 @@ EXPECTED_SUITE_COUNTS = {
     # R409, 2026-09-23: 1459 -> 1464, the three RepoAgentsAndHookEventsTests that pin PreCompact's task-file read (held claim injected verbatim; released claims and an earlier holder's list left out and named; the cap) and the two ClaimToolTests (take/re-take pointer; a re-take moves the earlier holder's list aside).
     # R410, 2026-09-23: 1464 -> 1465, the one HostProseIsCurrentTests test that pins the gate's time and split gate to the host docs.
     # Session 03 (R388(e), R298, R396(a), R377), 2026-09-23: 1465 -> 1479, the eight DeliveryLabelAgreementTests (real run_slate -> manifest -> record -> preflight: governed label, ungoverned control arm, upgrade refused, Classic controls, three ladders, re-promotion, late-swap downgrade, preflight reason table), three DeadlineGovernorWiringTests (label to run_slate and the brief status; delivery facts; unmirrored), two RetroFactsTests (the record fallback named; exit 3 reads built-and-refused) and one LeveragePanelTests (a prediction file for another slate is refused).
-    "tests.test_core": 1479,
+    # Session 04 (R399(a)(e), R170), 2026-09-23: 1479 -> 1489, the three BuildSlateHelpTests (`--help` and `-h` exit 0 in a subprocess; the escaped percent renders once; the --captain-sleeve help agrees with --captain-prior) and the seven PreserveTagAndNamedOddsTests (the collision fallback keeps the file's own tag; a tagless file keeps the caller's; a named missing --odds is never replaced by a fetch; its no-key warning names the path; no flag still reads as no file; main records odds_file_missing; a named missing --bundle is named on F5).
+    "tests.test_core": 1489,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps
@@ -1176,7 +1177,8 @@ EXPECTED_SUITE_COUNTS = {
     # count now counted from the AST, and TWO end-to-end runs of
     # `resolve_captain_prior` itself over a real emitted file -- R300's rule,
     # because every string pin above it would stay green on a dead branch).
-    "tests.test_showdown": 334,
+    # R399(e), 2026-09-23: 334 -> 337, the three CaptainSleeveBriefTruthTests (a selector sleeve's brief block carries what chose it; a listed sleeve carries the key as null; the label stops denying the prior the build read).
+    "tests.test_showdown": 337,
     # R96, 2026-08-11: 141 -> 162, the twenty-one tests that pin the delivery
     # path. A `grew` verdict is the one case where moving a pin is correct.
     # R46 round 2, 2026-08-12: 162 -> 168, the six that pin the PARTIAL side.
@@ -1407,7 +1409,8 @@ EXPECTED_SUITE_COUNTS = {
     # unresolved team, a slate game with no priced row, two rows for one book
     # that disagree (against an exact repeat, which does not block), a price
     # inside the +/-100 gap, and a header the parser cannot read.
-    "tests.test_paste_lineups": 98,
+    # R397, 2026-09-23: 98 -> 106, the eight OddsPastePostponedTests (no signal still refuses and names the flags; an operator-named game is exempt; the name resolves through the paste's team rule; a feed marking the game postponed, cancelled or suspended exempts it; a priced row for an exempt game is dropped; a name on no slate game warns and the game still blocks; an unreadable feed warns by path; DK's Postponed literal is named).
+    "tests.test_paste_lineups": 106,
     # R338 step 5, 2026-09-11. Two pytest suites the thirteenth edition wrote
     # and this gate could not see (R180(e)). Both pins are counted off a run
     # under the pinned `requirements-production.lock` stack, not off the

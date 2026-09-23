@@ -20,6 +20,14 @@ R-number comes from scanning this file AND CHANGELOG.md.
 
 ## Workstream 1 — Showdown correctness and certification
 
+### R412. The Showdown melt refuses a same-name role collision among players nobody can roster, and the brief drops the hold that stood down for a lock (P2, S) | new 2026-09-23, Ben's review of closed PR #18 against main's R295 (c12fd2a) | Roadmap: Session 87
+
+- **What (a).** `melt_showdown_salary_csv` (`showdown.py`) collects `role_collisions` in the parse loop (L326-331) and raises at L337, before the participation filter (L440, `starters_only`) and the health filter (L443, `exclude_out`) run. Two benched or OUT players sharing a name and a team stop a Showdown build over people no lineup can hold. No file in the repo has carried such a pair (R295's scan), so this is latent. Under R386 it is a V-style stop on a fact that is not V: the collision can reach an upload only through a pooled person.
+- **What (b).** `solve_ladder` records `captain_budget_hold_yielded` (`showdown_theses.py` L2455, filled at L2114), one row per (slot, player) where R250's hold stood down for a thesis lock. The Showdown brief's `captain_budget` block (`BS` L4819-4824) carries `reserved` and `util_blocked_slots` only, and `showdown_relaxation_counts` (`BS` L965) keeps integer `relax` counters only, so the list reaches neither the brief nor the delivery record and dies with the process. R295's own entry calls a hold that silently did not apply "the same invisibility R250 was filed against".
+- **Prior art.** Closed PR #18 (branch deleted; read through the PR's file list) scoped the refusal to `rows` after both filters (`pooled_keys` against the collision list) and put the list in the brief as `captain_budget.hold_yielded_to_lock`, set on both the ladder and the bank path. Its tests: `R295dDuplicateRoleRowsAreRefusedTests.test_a_duplicate_outside_the_pool_does_not_refuse` and `R295aTheHoldYieldsToAContradictingLockTests.test_the_brief_carries_the_stand_down`.
+- **Why PR #18's (a) cannot be ported as written.** The melt ORs `Status_Out` across a key's rows (L304-305), and `Starting` is first-non-empty (L308-309). Twin A healthy and posted, twin B OUT: the merged record is `Status_Out`, `exclude_out` drops it, the collision is outside `pooled_keys`, and no refusal fires, so A leaves the legal pool unseen. Measured on the MIN@CHC fixture with an OUT twin of Michael Busch (posted 3rd): main refuses the file; the melt with PR #18's scoping returns 19 persons instead of 20, Busch absent, no error (the parse-loop raise disabled and PR #18's `pooled_keys` check added before `pd.DataFrame(rows)`, run 2026-09-23). The port would turn a loud over-broad stop into a silent pool trim, which CLAUDE.md's hard walls forbid.
+- **Fix.** (a) Decide pool membership per PERSON, not per merged key: `rec["_role_rows"]` keeps every raw row, so refuse unless every colliding row is itself dropped by its own `Starting` (on a decided side) or its own `Status`. Pin the healthy-twin-beside-OUT-twin case as a refusal and the both-benched case as a pass. (b) Carry `hold_yielded_to_lock` in the brief's `captain_budget` block on both paths (`[]` on the bank path), as PR #18 did; reported, never counted, outside `clean`.
+
 ### R379. The Showdown ladder's floor rung re-solves the overlap-relaxed rung argument for argument whenever nothing is excluded and nothing is held (S, XS) | new 2026-09-21, VERIFIED-repro while fixing R295(c); same defect class, different rung pair
 
 **What.** `solve_ladder`'s floor rung (`showdown_theses.py:1563`) fires on
@@ -5011,17 +5019,9 @@ only the control its check is about; `--passthrough` is `shlex.split` and ordere
 before supervisor-owned flags. `autobuild.py` had zero tests and has seven.
 **Numbers reserved; the record is the 2026-08-24 CHANGELOG entry.**
 
-### R170. build_slate smalls: the preserve-fallback re-mints the borrowed tag, and a missing --odds path silently becomes a live fetch (P2, XS) | new 2026-08-22, from the greenfield sixth edition; VERIFIED-read at ec832cf (`build_slate.py:428`, `:772`)
+### R170. CLOSED 2026-09-23 -- SHIPPED as roadmap Session 04 (c), entry migrated to CHANGELOG.md
 
-- **What:** (a) `preserve_prior_slate`'s collision fallback names the dest
-  `{stem}_{tag}_{n}` with the CALLER's tag, not the file's own — the exact
-  borrowed-tag mislabel the function's docstring records fixing, reachable on
-  same-date rebuild churn. (b) `--odds` naming a nonexistent file skips the
-  file silently; with a key resolvable the build fetches live odds instead of
-  the operator's curated packet, and without one the warning falsely says no
-  file was named. Contrast stage_slate's R70 discipline.
-- **Fix:** (a) use `own or tag` in the fallback name. (b) named-but-missing
-  `--odds` exits 4 (or warns with the path).
+`preserve_prior_slate`'s collision fallback names the dest with `own or tag`, as its first name does. A named `--odds` file that does not exist is recorded (`named_file_missing` on the odds note, `odds_file_missing` on the brief, a warning naming the path) and never replaced by a live fetch, on R386's optional-input rule rather than the entry's exit 4; `--bundle`'s identical silent skip is named on the F5 report. Gate `PASS  v2.26.0  42 modules  2480 tests  5 skipped` (the five absent-file skips).
 
 ### R171. qa_portfolio can read clean when it is not: a CWD-relative reference dir and a signal line printed only when good (P2, XS) | new 2026-08-22, from the greenfield sixth edition; (b) VERIFIED-repro at ac8ac05, both re-confirmed at ec832cf (`qa_portfolio.py:893`, `:144`)
 
@@ -5387,23 +5387,20 @@ Principles only, no engine code. V, S and P are defined in `MLB_Classic.md` §2 
 
 - **(b)** autobuild accepts exit 5 in `BUILD_SLATE_CONTRACT_CODES` (`autobuild.py:145`) and handles it as 3, and running out of `--max-attempts` returns 3 with no stop record (`:752-753`).
 
-### R397. `odds_from_paste.py` blocks on a postponed game that is still in the salary file (P2, XS) | new 2026-09-22, from `docs/backlog_inbox/2026-09-22_BUILD_odds-paste-blocks-on-postponed-game.md` | Roadmap: Session 04
+### R397. CLOSED 2026-09-23 -- SHIPPED as roadmap Session 04 (b), entry migrated to CHANGELOG.md
 
-- **What.** On 1840_5g the tool took its game list from a salary file downloaded before TOR@BAL was postponed, and refused `no priced row for TOR@BAL` with four of four live games priced. The workaround was a scratch copy of the salary file.
-- **Fix.** Exempt postponed, cancelled and suspended games as `excluded_postponed` (the pool already has that state), and take `--exclude-game`.
+The refusal was `mlb_engine/intake/paste_odds.py`'s, and the pool's `excluded_postponed` comes from a feed this tool never read. `--feed` (the pool's classifier) and `--exclude-game` exempt a salary game that is not being played; each is named under `excluded_postponed` with its signal, a priced row for it is dropped, DK's `Postponed` literal is named where it was silent, and a name matching no game or an unreadable feed warns and exempts nothing. Gate `PASS  v2.26.0  42 modules  2480 tests  5 skipped` (the five absent-file skips).
 
 ### R398. F4 grades hitters against the opener, not the declared bulk arm (P2, S) | new 2026-09-22, from `docs/backlog_inbox/2026-09-22_BUILD_f4-grades-against-opener-not-bulk-arm.md` | Roadmap: Session 32
 
 - **What.** On 1840_5g, WSH ran Cornelio (PO) then Kent (PLR). `--declare-pitcher` made Kent rosterable, but `extract_opposing_probables` (`live_data_adapters.py:1423`) read the feed's probable, so DET hitters were graded against Cornelio (.296) instead of Kent (.351). Measured on the same inputs: DET mean F4 0.911 → 1.059, primary stacks 0 → 1.
 - **Fix.** When a side is PO and a declared bulk arm exists, grade against the bulk arm or a PA-weighted blend, and name the substitution in `pool_report`.
 
-### R399. Five small defects from the 1915_1g_sd Showdown build (P2, XS each) | new 2026-09-22, from `docs/backlog_inbox/2026-09-22_BUILD_showdown-1915-small-defects.md` | Roadmap: (a)(e) Session 04, (b) 33, (c)(d) 63
+### R399. Five small defects from the 1915_1g_sd Showdown build (P2, XS each) | new 2026-09-22, from `docs/backlog_inbox/2026-09-22_BUILD_showdown-1915-small-defects.md`; (a)(e) SHIPPED 2026-09-23 as roadmap Session 04 (a), migrated to CHANGELOG.md | Roadmap: (b) Session 33, (c)(d) 63
 
-- **(a)** `build_slate.py --help` crashes on a literal "100%" in the `--captain-prior` help. Fix with `%%` plus a `format_help()` test.
 - **(b)** `showdown_handedness` misses accented names (14 of 18 matched). Reuse the NFKD normalization and WARN.
 - **(c)** `f1.prior.factor_by_team` records the first row per team, which is the pinned SP's 1.0.
 - **(d)** `qa_portfolio` prints "F1 NEUTRAL" on a Showdown brief that applied F1, because it reads the Classic `enrichment` shape.
-- **(e)** The `--captain-sleeve` help and `brief.captain_sleeve.label` are stale after R382.
 
 ### R400. Two orphans from the 2026-09-19 greenfield spec's "filed rather than fixed" list (P2, XS each) | new 2026-09-22, `docs/greenfield/2026-09-19/DFS_SYSTEM_GREENFIELD_SPEC_2026-09-19.md` §1.4 | Roadmap: Session 74
 

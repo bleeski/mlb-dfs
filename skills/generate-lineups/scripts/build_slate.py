@@ -1094,7 +1094,10 @@ def preserve_prior_slate(paths, tag: str, date: str = "") -> list:
             continue
         n = 1
         while dest.exists():
-            dest = path.with_name(f"{path.stem}_{tag}_{n}{path.suffix}")
+            # R170(a). `own or tag`, as on the first name: the caller's tag here
+            # filed a brief that declares 1905_10g as `_1915_1g_sd_1` on the
+            # line after printing that it was filing it under its own tag.
+            dest = path.with_name(f"{path.stem}_{own or tag}_{n}{path.suffix}")
             n += 1
         path.rename(dest)
         moved.append(str(dest))
@@ -1484,6 +1487,19 @@ def load_odds_packet(args, salary_csv=None) -> tuple[dict, dict]:
     source = None
     shape = None
     path = getattr(args, "odds", None)
+    if path and not Path(path).exists():
+        # R170(b). A named file that is not there fell through to the live fetch
+        # below: with a key, the build priced the slate off the-odds-api instead
+        # of the operator's packet and said nothing; without one, the warning
+        # read "no --odds file". Odds are an optional input (MLB_Classic.md §2,
+        # R386), so this records and builds rather than exiting, and it never
+        # substitutes a fetch for a file the operator named.
+        return {}, {"source": None, "matched": False,
+                    "named_file_missing": str(path),
+                    "warning": f"--odds names {path}, which does not exist; no "
+                               "live fetch was substituted for the file the "
+                               "operator named, so F1 stays neutral for this "
+                               "build"}
     if path and Path(path).exists():
         try:
             payload = json.loads(Path(path).read_text(encoding="utf-8"))
@@ -1752,6 +1768,13 @@ def build_f5_map(pool: dict, args, venues_by_game_id: dict | None = None) -> tup
             report["warning"] = f"bundle unreadable ({exc}); park factors only"
     else:
         report["weather_source"] = None
+        if bundle_path:
+            # R170(b)'s class, on F5: a named bundle that is not there was
+            # skipped without a word, and the brief read like no bundle was
+            # passed at all.
+            report["named_file_missing"] = str(bundle_path)
+            report["warning"] = (f"--bundle names {bundle_path}, which does not "
+                                 "exist; park factors only, no wind")
 
     try:
         park_factors = load_f5_park_factors(str(REPO / "data/reference/f5_park_factors.csv"))
@@ -4019,6 +4042,10 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
     bat_side, pitcher_hand, feed_note = showdown_handedness(args, slate_dir, df)
     moneyline, odds_note, odds_packet = showdown_moneyline(args, df,
                                                            salary_csv=salary)
+    if odds_note.get("named_file_missing"):
+        # R170(b). Classic prints its odds warning at its own call site; this
+        # one names the operator's path the same way.
+        print(f"odds: {odds_note['warning']}", file=sys.stderr)
     # R334(a). The packet the moneyline read was matched against, spent a second
     # time and on the other half of it. Best-effort like everything else in this
     # block: a Showdown build must not fail because an odds endpoint is down.
@@ -5637,7 +5664,9 @@ def main() -> int:
                     help="game-odds JSON (raw the-odds-api events, an "
                          "mlb-game-odds payload, or a slate_bundle). Feeds the "
                          "F1 game-environment prior. When omitted, totals are "
-                         "fetched if THE_ODDS_API_KEY is set, else F1 stays 1.0.")
+                         "fetched if THE_ODDS_API_KEY is set, else F1 stays 1.0. "
+                         "A named file that does not exist is recorded "
+                         "(`odds_file_missing`) and never replaced by a fetch.")
     ap.add_argument("--date", help="slate date; derived from the salary file if omitted")
     ap.add_argument("--no-rotowire", dest="rotowire", action="store_false",
                     help="skip the RotoWire projected-lineup fallback for TBD teams "
@@ -5735,8 +5764,10 @@ def main() -> int:
                          "of the portfolio. Counted and reported, never a "
                          "leverage, lift, edge, ROI or win-rate claim. The "
                          "'{\"from\": [\"prior_own_below\", 25.0]}' "
-                         "selector form is refused: it needs a captain-"
-                         "ownership prior this build path does not read.")
+                         "selector form takes the people under that captain-"
+                         "ownership share, coldest first, from the prior "
+                         "--captain-prior reads, and refuses when no prior "
+                         "was read.")
     ap.add_argument("--bundle",
                     help="slate_bundle.json from tools/fetch_slate_bundle.py. "
                          "Supplies the per-venue forecast for F5. Park factors "
@@ -5824,7 +5855,7 @@ def main() -> int:
                          "tools/ownership_pred.py emit`). Bare resolves the "
                          "archetype when the file carries exactly one; name "
                          "one otherwise, e.g. `--captain-prior "
-                         "large_field_gpp`. Reads the `captain` block (a 100% "
+                         "large_field_gpp`. Reads the `captain` block (a 100%% "
                          "budget over one slot), never the Classic 800/200 "
                          "split beside it. It is the input the --captain-sleeve "
                          "selector form needs. An UNGRADED, UNCALIBRATED prior: "
@@ -6297,6 +6328,10 @@ def main() -> int:
     if brief:
         if args.odds and Path(args.odds).exists():
             brief["odds_source"] = args.odds
+        elif args.odds:
+            # R170(b). The path the operator named, recorded on both formats'
+            # briefs. `odds_source` keeps meaning "the odds came from here".
+            brief["odds_file_missing"] = args.odds
         _REFUSAL_CONTEXT["brief"] = brief
         brief["elapsed_s"] = round(time.monotonic() - started, 1)
         brief["labels"] = ("deterministic review proxies and labeled priors only; "
