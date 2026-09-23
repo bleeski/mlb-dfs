@@ -1494,38 +1494,18 @@ proven-infeasible joint MILP, before the deadline governor. The golden does not
 move: its door supplies no facts (`not_assessed`). Gate `PASS  v2.26.0  41 modules  2421 tests  5 skipped` (the five
 absent-file skips).
 
-### R408. Does the projection order players better than salary? Backfill the grade on the archive (P1, M) | new 2026-09-23, from the 1905_10g post-slate review | Roadmap: Session 96
+### R408. CLOSED 2026-09-23 -- SHIPPED as roadmap Session 96, entry migrated to CHANGELOG.md
 
-**Rider 2026-09-23 (DEV; premise measured, build plan). Ben asked to extend `tools/replay_slate.py`.**
-
-*Premise, measured at `70d9dc1`.*
-- `replay_slate.py` settles a LINEUP SET against an archived field. It does not grade per-player projections.
-- `data/archive/` holds 41 dates, and each `mined_*.json` carries a `player_table` of realized `fpts` and `pct_drafted` per player (296 on the 2026-07-21 sample).
-- Only 5 archived DKSalaries files exist, on 4 dates (2026-06-03, 06-28, 07-19 afternoon, 07-24 main and night), plus `salary_extracted_*.csv` on some dates.
-- A projection needs the salary file's `AvgPointsPerGame` and IDs, so the backfill's honest n is about 5 slates, not 41. Say so in the output.
-- The forward grade (R255) becomes the main instrument. Recommend to Ben, as a one-line ARCHIVE note, that every standings pull keeps that slate's DKSalaries file beside it.
-
-*Build plan.*
-- **The mode.** Add a `--grade-projection` mode to `tools/replay_slate.py` that reuses its archive loaders and integer-hundredths accounting. For each archived Classic slate with a salary file:
-  - rebuild the projection frame through the production builder on that salary file;
-  - join to the mined `player_table` realized FPTS by the miner's `player_norm`;
-  - rank realized FPTS against Base, Ceiling, salary, and APPG, separately for hitters and pitchers.
-- **Per slate, report:**
-  - n;
-  - Spearman rank correlation;
-  - top-decile hits (predicted top 10% that land in the realized top 10%);
-  - tail hits (predicted top 10% that land at realized p90 or above);
-  - which predictor led on each.
-- **Never pool** across slates or archetypes into a single number. A one-line count ("engine Base led salary on X of N slates") is allowed, labeled an observed-outcome count.
-- **Reference caveat.** Reference data (Savant, platoon) today is not what it was on that date unless it was frozen (R251). A slate whose inputs were not frozen is graded with the date-independent factors only, and the table says which factors were live.
-- **Labels.** Observed outcomes only; never ROI, a win rate, a probability or an edge.
-
-*Tests.* `test_core.ProjectionBackfillGradeTests` on the vendored 2026-06-03 slate: the join rate is reported; the Spearman ranking is deterministic; top-decile and tail counts are computed on a hand-checked toy frame; nothing is pooled; the labels are present.
-
-- **What.** The projection's base is DK's own AvgPointsPerGame, and every factor on top is an uncalibrated labeled prior. No measurement says the engine ranks players better than DK's salary does, yet builds put a third of hitter slots on engine-picked value. R255 grades the skill signal against the salary baseline going forward, one slate at a time; nothing answers the question from the archive already held (235 contests over 14 dates in the 2026-09-14 mine).
-- **Fix.** Through `tools/replay_slate.py` (R384), for each archived Classic slate whose replay inputs are on disk, rank realized FPTS against (a) the engine's projection, (b) salary alone and (c) APPG alone. Report rank correlation plus top-decile and tail (p90+) hit counts per slate, n stated, observed outcomes only. A slate whose reference inputs were not frozen (R251) is graded on (b) and (c) only and says so.
-- **Premise to verify first.** Which archived slates carry salary files and the inputs a replay needs; run `dfs-premise` before building.
-- **Relation.** R255's forward grader and this share metric definitions. Whichever lands first defines them and the other reuses them.
+`tools/replay_slate.py --grade-projection` ranks realized points against the
+engine's Base, Ceiling, salary and APPG on every archived Classic slate with a
+salary file, per slate and per side: n, tie-averaged Spearman, top-decile and
+p90-tail hits, the leader on each, observed outcomes only and never pooled.
+Premise corrected before building: 9 gradeable slates (7 archive, 2 tracked
+fixtures), not 5; contests map through `field_miner.resolve_salary_file`; the
+platoon reference is withheld because it post-dates every slate; Ceiling ranks
+identically to Base without a live multiplier. The ARCHIVE note (keep each
+slate's DKSalaries beside its standings) is a `ledger/inbox/` fragment. Gate
+`PASS  v2.26.0  41 modules  2427 tests  5 skipped` (the five absent-file skips).
 
 ### R340. CLOSED 2026-09-15 -- SHIPPED as roadmap CC-1, entry migrated to CHANGELOG.md
 

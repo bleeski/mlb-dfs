@@ -2,6 +2,112 @@
 
 What changed in the engine, the tools and the contracts, when, and why.
 
+## 2026-09-23 — R408: `tools/replay_slate.py --grade-projection` ranks realized points against the engine's Base, Ceiling, salary and APPG on every archived Classic slate, per slate and per side, observed outcomes only (roadmap Session 96)
+
+**Scope.** `tools/replay_slate.py` (the `--grade-projection` and `--date` flags and the grade functions); `tests/test_core.py` (`ProjectionBackfillGradeTests`); `tools/audit.py` (the pin); `ledger/inbox/2026-09-23_DEV_keep-dksalaries-beside-standings.md` (the ARCHIVE note the rider asks for, as a create-only fragment, because DEV does not edit the ledger); `docs/backlog.md`, `docs/ROADMAP.md`, this file.
+
+**What was wrong.** The projection's base is DK's own AvgPointsPerGame, and every factor on top of it is an uncalibrated labeled prior. Nothing measured whether the engine ranks players better than DK's salary does, even though builds put a third of hitter slots on engine-picked value. `replay_slate.py` settled lineup sets and graded no player.
+
+**The premise, measured before building (dfs-premise), and what it corrected.**
+- **The rider's inventory is right**: five DKSalaries files on four dates. Its conclusion, "honest n about 5 slates", was FALSE:
+  - 2026-06-28 has a salary file and no mined outcomes;
+  - three `salary_extracted_*.csv` files are full DK Classic salary files;
+  - two tracked fixture salary files cover archived dates (07-29, 07-30).
+
+  **Gradeable: 9 slates** (7 in the archive, 2 through the fixtures). Another 36 contests on those dates resolve to no salary file on disk, and the output names each one.
+- **Contests map to a salary file by `field_miner.resolve_salary_file`, never by name overlap.** One 07-19 contest name-joins 40/40 against a salary file that is a different slate. The resolver rejects it on team coverage.
+- **"Rebuild through the production builder on the salary file" needed a pool.** `_assemble_projection_frame` takes projection rows, so the grade runs the production intake: `merge_dk_starting_into_feed`, then `build_slate_pool`, then the unenriched frame build `run_classic` itself uses.
+- **A leak the entry did not name.** Left to its default, `build_slate_pool` loads TODAY's platoon reference file into a June slate. It is withheld with an empty mapping, so TBD sides take the intake's own top-9-by-APPG fallback. `live_factors.platoon_source` measures this off the pool and reads `withheld` rather than asserting it; a mutation that restores the default goes red.
+- **Every enrichment input on disk post-dates these slates** (Savant fetched 2026-08-30; the frozen fixtures are 07-25 and 07-16, after the July slates), and R251 has not landed. So every slate is graded on date-independent factors only, and the table says which were live: F2 only where DK's `Starting` column exists, plus the value guard.
+- **Base and Ceiling are not independent here.** With no live ceiling multiplier, Ceiling is 1.42 x Base, and the output flags `ceiling_rank_identical_to_engine_base` on every side.
+- **Pitcher n is 6 to 19**, and a slate without a `Starting` column declares no starter, so it grades no pitcher and says why.
+
+**What shipped.**
+- Per slate, per side, for each of engine Base (`Base_Projection`), Ceiling, salary and APPG:
+  - n and the join rate;
+  - tie-averaged Spearman;
+  - top-decile hits: of the predictor's top ceil(n/10), how many land in the realized top ceil(n/10);
+  - tail hits: of the same set, how many land at or above the realized p90, nearest rank;
+  - which predictor led on each metric.
+- Realized points are joined by the miner's own `normalize_name`, in integer hundredths through the existing `fpts_cents_by_norm`. Colliding names on either side, and cross-contest conflicts, are excluded and counted.
+- Nothing is pooled. The one cross-slate line is a COUNT of slate-sides, labeled as one.
+- Replay mode stays standard-library only; the grade imports the engine lazily, and the strangler-wall test still passes.
+
+**The table, observed outcomes on archived fields (never a win rate or a probability):**
+
+| slate | side | n (join) | Spearman engine / salary / APPG | top-decile hits engine / salary / APPG (of k) | tail hits engine / salary / APPG | F2 live |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| 2026-06-03 2026-06-03 | hitters | 30 (0.8333) | 0.3372 / 0.2612 / 0.3259 | 1 / 1 / 1 (of 3) | 1 / 1 / 1 | no |
+| 2026-06-03 2026-06-03 | pitchers | 0 | not graded (no declared starter) | | | |
+| 2026-07-19 2026-07-19-afternoon4 | hitters | 72 (1.0) | 0.2086 / 0.1577 / 0.2307 | 1 / 1 / 1 (of 8) | 1 / 1 / 1 | yes |
+| 2026-07-19 2026-07-19-afternoon4 | pitchers | 8 (1.0) | 0.1429 / 0.119 / 0.1429 | 1 / 1 / 1 (of 1) | 1 / 1 / 1 | yes |
+| 2026-07-22 salary_extracted_earlyslate | hitters | 109 (0.7569) | 0.0373 / 0.1128 / 0.0581 | 2 / 2 / 3 (of 11) | 2 / 2 / 3 | no |
+| 2026-07-22 salary_extracted_earlyslate | pitchers | 0 | not graded (no declared starter) | | | |
+| 2026-07-22 salary_extracted_nightslate | hitters | 47 (0.8704) | 0.2372 / 0.1696 / 0.2081 | 1 / 1 / 1 (of 5) | 1 / 1 / 1 | no |
+| 2026-07-22 salary_extracted_nightslate | pitchers | 0 | not graded (no declared starter) | | | |
+| 2026-07-23 salary_extracted_classic | hitters | 27 (0.75) | 0.4089 / 0.4682 / 0.3065 | 1 / 0 / 1 (of 3) | 1 / 0 / 1 | no |
+| 2026-07-23 salary_extracted_classic | pitchers | 0 | not graded (no declared starter) | | | |
+| 2026-07-24 2026-07-24_mainslate | hitters | 178 (0.9889) | 0.1779 / 0.109 / 0.197 | 2 / 3 / 3 (of 18) | 2 / 3 / 3 | yes |
+| 2026-07-24 2026-07-24_mainslate | pitchers | 19 (1.0) | -0.2651 / -0.2561 / -0.2651 | 0 / 0 / 0 (of 2) | 0 / 0 / 0 | yes |
+| 2026-07-24 2026-07-24_nightslate | hitters | 72 (1.0) | 0.1676 / 0.0493 / 0.1616 | 1 / 1 / 1 (of 8) | 2 / 1 / 2 | yes |
+| 2026-07-24 2026-07-24_nightslate | pitchers | 8 (1.0) | -0.2381 / -0.2381 / -0.2381 | 0 / 0 / 0 (of 1) | 0 / 0 / 0 | yes |
+| 2026-07-29 frozen_2026-07-29 | hitters | 54 (1.0) | 0.0701 / 0.0189 / 0.0347 | 0 / 0 / 0 (of 6) | 0 / 0 / 0 | yes |
+| 2026-07-29 frozen_2026-07-29 | pitchers | 6 (1.0) | -0.0286 / -0.7143 / -0.0286 | 0 / 0 / 0 (of 1) | 0 / 0 / 0 | yes |
+| 2026-07-30 1910_6g_frozen_2026-07-30 | hitters | 106 (0.9815) | 0.1756 / 0.2445 / 0.1521 | 2 / 3 / 2 (of 11) | 2 / 3 / 2 | yes |
+| 2026-07-30 1910_6g_frozen_2026-07-30 | pitchers | 11 (1.0) | 0.4182 / 0.3455 / 0.4182 | 0 / 0 / 0 (of 2) | 0 / 0 / 0 | yes |
+
+engine Base led salary on Spearman on 9 of 14 slate-sides (an observed-outcome COUNT, not a pooled statistic and not a probability). By side: {"hitters": {"slate_sides": 9, "engine_base_led_salary": 6}, "pitchers": {"slate_sides": 5, "engine_base_led_salary": 3}}
+
+Reading it: in this backfill the engine projection is APPG x F2 x the value guard, so "engine vs APPG" measures F2 and the value guard and nothing else. The count is small and mixed (hitters 6 of 9, pitchers 3 of 5), and n per side is the players DK's tables record as drafted. The forward grade (R255) is the main instrument; this is its backfill, and the two share these metric definitions.
+
+**Tests.** `tests.test_core` 1441 -> 1447, six in `ProjectionBackfillGradeTests` on the vendored 2026-06-03 slate and a hand-checked toy:
+- the join rate is reported, and a starterless side says why;
+- tie-averaged Spearman is correct and the whole grade is deterministic;
+- top-decile and tail counts, including `decile_size` off multiples of ten;
+- nothing is pooled;
+- no post-dated input reaches the prior, and contests map through the resolver;
+- the labels are present.
+
+Eight scripted mutations, all red. The first run had three survivors, each a test measuring nothing, and all three were fixed:
+- a tie toy where averaged and unaveraged ranks correlate identically;
+- n = 20, which cannot tell `ceil` from `//`;
+- a hardcoded `platoon_reference: False`, now derived from the pool.
+
+**Gate.** `PASS  v2.26.0  41 modules  2427 tests  5 skipped  {test_core 1447/1447 (4 skipped) skipped_in_place; test_showdown 334/334 (1 skipped) skipped_in_place}  [tests.test_core ran its pinned 1447 but 4 were SKIPPED, so the count proves nothing about coverage.; tests.test_showdown ran its pinned 334 but 1 were SKIPPED, so the count proves nothing about coverage.]` (the five skips are the absent optional files /ship expects on every host).
+
+### The register entry, migrated verbatim
+
+**Rider 2026-09-23 (DEV; premise measured, build plan). Ben asked to extend `tools/replay_slate.py`.**
+
+*Premise, measured at `70d9dc1`.*
+- `replay_slate.py` settles a LINEUP SET against an archived field. It does not grade per-player projections.
+- `data/archive/` holds 41 dates, and each `mined_*.json` carries a `player_table` of realized `fpts` and `pct_drafted` per player (296 on the 2026-07-21 sample).
+- Only 5 archived DKSalaries files exist, on 4 dates (2026-06-03, 06-28, 07-19 afternoon, 07-24 main and night), plus `salary_extracted_*.csv` on some dates.
+- A projection needs the salary file's `AvgPointsPerGame` and IDs, so the backfill's honest n is about 5 slates, not 41. Say so in the output.
+- The forward grade (R255) becomes the main instrument. Recommend to Ben, as a one-line ARCHIVE note, that every standings pull keeps that slate's DKSalaries file beside it.
+
+*Build plan.*
+- **The mode.** Add a `--grade-projection` mode to `tools/replay_slate.py` that reuses its archive loaders and integer-hundredths accounting. For each archived Classic slate with a salary file:
+  - rebuild the projection frame through the production builder on that salary file;
+  - join to the mined `player_table` realized FPTS by the miner's `player_norm`;
+  - rank realized FPTS against Base, Ceiling, salary, and APPG, separately for hitters and pitchers.
+- **Per slate, report:**
+  - n;
+  - Spearman rank correlation;
+  - top-decile hits (predicted top 10% that land in the realized top 10%);
+  - tail hits (predicted top 10% that land at realized p90 or above);
+  - which predictor led on each.
+- **Never pool** across slates or archetypes into a single number. A one-line count ("engine Base led salary on X of N slates") is allowed, labeled an observed-outcome count.
+- **Reference caveat.** Reference data (Savant, platoon) today is not what it was on that date unless it was frozen (R251). A slate whose inputs were not frozen is graded with the date-independent factors only, and the table says which factors were live.
+- **Labels.** Observed outcomes only; never ROI, a win rate, a probability or an edge.
+
+*Tests.* `test_core.ProjectionBackfillGradeTests` on the vendored 2026-06-03 slate: the join rate is reported; the Spearman ranking is deterministic; top-decile and tail counts are computed on a hand-checked toy frame; nothing is pooled; the labels are present.
+
+- **What.** The projection's base is DK's own AvgPointsPerGame, and every factor on top is an uncalibrated labeled prior. No measurement says the engine ranks players better than DK's salary does, yet builds put a third of hitter slots on engine-picked value. R255 grades the skill signal against the salary baseline going forward, one slate at a time; nothing answers the question from the archive already held (235 contests over 14 dates in the 2026-09-14 mine).
+- **Fix.** Through `tools/replay_slate.py` (R384), for each archived Classic slate whose replay inputs are on disk, rank realized FPTS against (a) the engine's projection, (b) salary alone and (c) APPG alone. Report rank correlation plus top-decile and tail (p90+) hit counts per slate, n stated, observed outcomes only. A slate whose reference inputs were not frozen (R251) is graded on (b) and (c) only and says so.
+- **Premise to verify first.** Which archived slates carry salary files and the inputs a replay needs; run `dfs-premise` before building.
+- **Relation.** R255's forward grader and this share metric definitions. Whichever lands first defines them and the other reuses them.
+
 ## 2026-09-23 — R407: two caps scale with input confidence. The brief's own degradation facts set a tier, and the tier tightens the player cap and R405's cluster share (roadmap Session 95)
 
 **Scope.**
