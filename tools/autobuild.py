@@ -873,19 +873,31 @@ def main() -> int:
             if c.get("passed") is not False or not c.get("remedy"):
                 continue
             if c.get("name") not in STRUCTURAL_CHECKS:
+                # R207. Still a stop: a strategy cap is Ben's to move. The typed
+                # remedy rides the record, so the escalation carries the number
+                # rather than a sentence to re-read.
                 dec.add(attempt, "stop",
                         f"failing check '{c.get('name')}' is a STRATEGY control "
                         f"with no engine-named floor; not mine to move",
-                        remedy=c.get("remedy"))
+                        remedy=c.get("remedy"),
+                        **({"remedy_typed": c["remedy_typed"]}
+                           if c.get("remedy_typed") else {}))
                 _write(dec, brief, salary=a.salary)
                 return 3
-            m = CONTROL_FLOOR_RE.search(c["remedy"])
-            if not m:
-                dec.add(attempt, "stop", "structural remedy not machine-readable",
-                        remedy=c["remedy"])
-                _write(dec, brief, salary=a.salary)
-                return 3
-            control, floor_to = m.group(1), int(m.group(2))
+            # R207. The pipeline types the remedy where it computes the
+            # sentence; read that first, and the sentence only for a brief that
+            # predates it. One number, one writer.
+            typed = c.get("remedy_typed") or {}
+            if typed.get("control") and isinstance(typed.get("to"), int):
+                control, floor_to = str(typed["control"]), int(typed["to"])
+            else:
+                m = CONTROL_FLOOR_RE.search(c["remedy"])
+                if not m:
+                    dec.add(attempt, "stop", "structural remedy not machine-readable",
+                            remedy=c["remedy"])
+                    _write(dec, brief, salary=a.salary)
+                    return 3
+                control, floor_to = m.group(1), int(m.group(2))
             if control in dec.never_relax:
                 # R388(b). The floor is arithmetic, and the operator's word
                 # outranks it: raising a never-relax control is Ben's call,
@@ -921,8 +933,14 @@ def main() -> int:
                     **dec.controls_block())
             continue
 
+        # R207. The interaction refusal ends here: no failing check and an
+        # exhausted bank. The build's typed remedies (the probe's single
+        # controls and their steps) ride the stop, so the escalation to Ben
+        # carries the number the four-build search on 1240_6g had to find.
         dec.add(attempt, "stop", "refused with no remedy this supervisor may take",
-                errors=(brief.get("errors") or [])[:2])
+                errors=(brief.get("errors") or [])[:2],
+                **({"refusal_remedy": brief["refusal_remedy"]}
+                   if brief.get("refusal_remedy") else {}))
         _write(dec, brief, salary=a.salary)
         return 3
 

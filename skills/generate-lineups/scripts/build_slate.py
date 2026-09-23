@@ -537,6 +537,18 @@ def refusal_stamp(key: str, **extra) -> dict:
     }
     if rec.get("override"):
         out["refusal_override"] = rec["override"]
+    # R207. The delivery-first class beside the governor's (MLB_Classic.md §2),
+    # read from the one taxonomy. Lazily, because this script loads without the
+    # engine, and never at the cost of the refusal: a stamp that cannot read the
+    # table says so rather than raising on the path that reports a failure.
+    try:
+        from mlb_engine.entries.gate_classes import refusal_site_validity
+        validity = refusal_site_validity(key)
+        out["refusal_validity"] = validity.klass
+        if validity.facts:
+            out["refusal_validity_facts"] = {f: k for f, k in validity.facts}
+    except ImportError:
+        out["refusal_validity"] = "unavailable"
     out.update(extra)
     # R403. Most refusals return an empty brief, so the stamp is the only place
     # the wrapper can learn the class from.
@@ -558,6 +570,111 @@ _REFUSAL_CONTEXT: dict = {}
 # The old hint called both "not a strategy or player-pool change", which is how
 # 1910_9g moved three exposure caps from 0.35/0.43 to 0.56.
 STRUCTURAL_FEASIBILITY_CHECKS = frozenset({"shared_players_floor", "sp_pair_capacity"})
+
+#: R207. The most wall clock a refusal may spend naming the one control that
+#: binds (the allocator's interaction probe), and the margin it leaves before
+#: the build's own deadline.
+INTERACTION_PROBE_CAP_S = 45.0
+INTERACTION_PROBE_MARGIN_S = 30.0
+
+
+def typed_refusal_remedy(feasibility, interaction_probe, bank_report,
+                         control_provenance=None, never_relax=()) -> list:
+    """R207 (+R204's naming half). The Classic refusal's remedies, as data.
+
+    Three sources, in the order a session should read them, each already in
+    the result as a verdict and none re-derived here:
+      * a failing slate check's ``remedy_typed`` (the pipeline types it where
+        it computes the sentence); ``arithmetic`` says whether the check is one
+        of STRUCTURAL_FEASIBILITY_CHECKS, the floors autobuild may take;
+      * the allocator's ``interaction_probe``: each control that, dropped
+        ALONE, restores feasibility, with its smallest step and whether the
+        step alone restores it;
+      * a bank job list that was not exhausted (search effort, first).
+    Every raise is class S (MLB_Classic.md §2). A control the build holds by
+    never-relax is listed with ``held: true``, never as something to move.
+    ``errors[]`` is not read or written: its text stays byte-identical.
+    """
+    by_control = dict((control_provenance or {}).get("by_control") or {})
+    holding = set(never_relax or ())
+    remedies = []
+
+    def _provenance(control):
+        row = by_control.get(control)
+        return row.get("provenance") if isinstance(row, dict) else None
+
+    for check in (feasibility or {}).get("checks") or []:
+        typed = check.get("remedy_typed")
+        if check.get("passed") is not False or not typed:
+            continue
+        control = typed.get("control")
+        remedies.append({
+            "kind": "raise_control", "source": f"feasibility_check:{check.get('name')}",
+            "control": control, "op": typed.get("op", ">="), "to": typed.get("to"),
+            **({"count": typed["count"]} if "count" in typed else {}),
+            **({"alternative": typed["alternative"]} if typed.get("alternative") else {}),
+            "arithmetic": check.get("name") in STRUCTURAL_FEASIBILITY_CHECKS,
+            "class": "S", "provenance": _provenance(control),
+            "held": control in holding,
+        })
+    probe = interaction_probe or {}
+    if probe.get("ran"):
+        restoring = [r for r in probe.get("controls") or []
+                     if r.get("alone_restores") is True]
+        for row in restoring:
+            step = row.get("step") or {}
+            remedies.append({
+                "kind": "raise_control", "source": "interaction_probe",
+                "control": row.get("control"), "op": ">=",
+                "from": row.get("value"), "to": step.get("to"),
+                "count_from": step.get("count_from"), "count_to": step.get("count_to"),
+                "restores_when_dropped": True, "step_restores": step.get("restores"),
+                "arithmetic": False, "class": "S",
+                "provenance": _provenance(row.get("control")),
+                "held": row.get("control") in holding,
+            })
+        if not restoring:
+            unprobed = [r.get("control") for r in probe.get("controls") or []
+                        if r.get("status") == "not_probed"]
+            remedies.append({
+                "kind": "no_single_control", "source": "interaction_probe",
+                "note": ("no active control, dropped alone, restores feasibility: "
+                         "the binding set has two or more members"
+                         + (f"; not probed inside the budget: {', '.join(unprobed)}"
+                            if unprobed else "")),
+            })
+    if (bank_report or {}).get("job_list_exhausted") is False:
+        remedies.insert(0, {
+            "kind": "grow_bank", "source": "bank",
+            "jobs_attempted": bank_report.get("jobs_attempted"),
+            "jobs_total": bank_report.get("jobs_total"),
+            "class": "S", "note": "search effort, the first remedy (R98(2))",
+        })
+    return remedies
+
+
+def format_typed_remedy(remedy) -> str:
+    """One stderr line per typed remedy."""
+    if remedy.get("kind") == "grow_bank":
+        return (f"grow the bank ({remedy.get('jobs_attempted')} of "
+                f"{remedy.get('jobs_total')} jobs attempted)")
+    if remedy.get("kind") == "no_single_control":
+        return remedy.get("note", "")
+    text = f"{remedy.get('control')} "
+    if remedy.get("from") is not None:
+        text += f"{remedy['from']} -> "
+    text += f"{remedy.get('op', '>=')} {remedy.get('to')}"
+    if remedy.get("count_from") is not None:
+        text += f" (count {remedy['count_from']} -> {remedy['count_to']})"
+    if remedy.get("source") == "interaction_probe":
+        text += (", which alone restores feasibility" if remedy.get("step_restores")
+                 else ", dropping it restores feasibility; the step alone "
+                      + ("does not" if remedy.get("step_restores") is False
+                         else "was not re-solved"))
+    text += f" [{remedy.get('source')}; class {remedy.get('class')}"
+    if remedy.get("held"):
+        text += "; HELD by --never-relax"
+    return text + "]"
 
 # R167. Every control in --controls-override that is a FRACTION of the entered
 # set, Classic and Showdown together. Named rather than pattern-matched on
@@ -3021,6 +3138,17 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
     never_relax = frozenset(getattr(args, "_never_relax", None)
                             or _dg_nr.DEFAULT_NEVER_RELAX)
 
+    def _probe_budget():
+        # R207. What the allocator may spend naming the one binding control on
+        # an interaction refusal: capped, clear of the build's own deadline,
+        # and none inside the governor's window, where rung 1 opens every
+        # control at once and a number for one of them changes nothing.
+        governor_now = getattr(args, "_governor", None)
+        if governor_now is not None and governor_now.in_window():
+            return None
+        left = deadline - time.monotonic() - INTERACTION_PROBE_MARGIN_S
+        return None if left < 1.0 else min(INTERACTION_PROBE_CAP_S, left)
+
     def _solve(controls: dict, certification_label: str | None = None,
                control_moves: list | None = None):
         # R290(c) step 2. Extracted so the deadline governor can re-solve with
@@ -3048,6 +3176,7 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
             certification_label=certification_label,
             never_relax_controls=sorted(never_relax),
             control_moves=control_moves,
+            interaction_probe_budget_s=_probe_budget(),
             **slate_kwargs,
         )
 
@@ -3248,6 +3377,16 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
                 "total_candidates": bank_report.get("total_candidates"),
                 "budget_floored": bank_report.get("budget_floored"),
             }
+        # R207 (+R204 naming half). The remedies as data, beside the sentence
+        # that errors[] keeps byte-identical, and the probe that named them.
+        payload["refusal_remedy"] = typed_refusal_remedy(
+            feas, result.get("interaction_probe"), bank_report,
+            control_provenance=result.get("control_provenance"),
+            never_relax=never_relax)
+        if result.get("interaction_probe") is not None:
+            payload["interaction_probe"] = result["interaction_probe"]
+        for remedy in payload["refusal_remedy"]:
+            print(f"REMEDY: {format_typed_remedy(remedy)}", file=sys.stderr)
         # R28(5): the refusal writes the brief too. This used to return an empty
         # brief, so `--brief` produced no file on the one path where the reader
         # most needs one, and a session that captured only the brief learned
