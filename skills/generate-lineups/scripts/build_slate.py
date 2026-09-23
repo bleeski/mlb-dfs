@@ -3013,7 +3013,15 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
     confidence_relax = ("deadline_t30" if isinstance(_minutes, (int, float))
                         and _minutes < 30 else None)
 
-    def _solve(controls: dict, certification_label: str | None = None):
+    # R388(b). F-3 on every build, plus the operator's --never-relax (main
+    # resolved and validated it before staging). A direct caller that never
+    # went through main still holds F-3.
+    from mlb_engine.pipeline import deadline_governor as _dg_nr  # noqa: PLC0415
+    never_relax = frozenset(getattr(args, "_never_relax", None)
+                            or _dg_nr.DEFAULT_NEVER_RELAX)
+
+    def _solve(controls: dict, certification_label: str | None = None,
+               control_moves: list | None = None):
         # R290(c) step 2. Extracted so the deadline governor can re-solve with
         # the controls open WITHOUT a second copy of this call. A governor that
         # re-solves through a duplicated invocation is R267's dependency
@@ -3037,6 +3045,8 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
             input_confidence_facts=confidence_facts,
             input_confidence_relax=confidence_relax,
             certification_label=certification_label,
+            never_relax_controls=sorted(never_relax),
+            control_moves=control_moves,
             **slate_kwargs,
         )
 
@@ -3096,18 +3106,28 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
                   "require_all_reserved_filled at both validator calls. "
                   "Delivering the refusal.", file=sys.stderr)
             break
+        # R388(b). The rung reads the refused attempt's own resolved controls,
+        # so each move's `before` is the value that attempt ran and its
+        # provenance is the authority the rung relaxes. A never-relax control
+        # is left closed at both locks, the rung and the merge.
         opened = governor.take_rung(
             dg.RUNG_OPEN_CONTROLS, contest_type="classic",
             before=attempt_controls,
             reason=f"refusal_class={payload_class} inside the "
-                   f"T-{governor.window_minutes:.0f} window")
-        attempt_controls = dg.merge_open_controls(attempt_controls, opened)
+                   f"T-{governor.window_minutes:.0f} window",
+            never_relax=never_relax,
+            resolved=(result.get("control_provenance") or {}).get("by_control"))
+        attempt_controls = dg.merge_open_controls(attempt_controls, opened,
+                                                  never_relax=never_relax)
+        held = governor.walked[-1].get("held") or {}
         print(f"DEADLINE: {round(governor.minutes_remaining(), 1)} min to "
               f"deliver-by; opening every portfolio control in one move and "
-              f"re-solving. Opened: {json.dumps(opened, sort_keys=True)}. This "
-              f"file will be labelled {dg.DEADLINE_LABEL} and never certified.",
-              file=sys.stderr)
-        result = _solve(attempt_controls, certification_label=dg.DEADLINE_LABEL)
+              f"re-solving. Opened: {json.dumps(opened, sort_keys=True)}."
+              + (f" Held by never-relax: {', '.join(sorted(held))}." if held else "")
+              + f" This file will be labelled {dg.DEADLINE_LABEL} and never "
+              f"certified.", file=sys.stderr)
+        result = _solve(attempt_controls, certification_label=dg.DEADLINE_LABEL,
+                        control_moves=governor.walked[-1].get("moves"))
 
     if not result.get("passed"):
         for blocker in result.get("contest_identity_blockers") or []:
@@ -3372,6 +3392,10 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         "exposure": exposure,
         "verification": checks,
         "controls_override_applied": args.controls_override,
+        # R388(b). Each resolved control's value and provenance as run_slate
+        # resolved it, and the never-relax set the build ran under.
+        "control_provenance": result.get("control_provenance"),
+        "never_relax": sorted(never_relax),
         # R246. On every Classic brief, `applied: false` when nothing was asked
         # for, so "was the ownership prior in this build" has an answer.
         "leverage": leverage_brief,
@@ -3958,6 +3982,43 @@ def showdown_excluded_block(df) -> dict:
     }
 
 
+def showdown_control_provenance(solved: dict, before: dict, governor,
+                                never_relax) -> dict:
+    """R388(b). Showdown's control-provenance block, in run_slate's shape.
+
+    ``before`` is the provenance each control had going into the ladder, which
+    stays its provenance after a deadline rung opens it (the rung relaxed that
+    authority; it did not become the operator's). A moved row says so under
+    ``relaxed``. F-3 has a row too: every Showdown lineup is solved against each
+    prior one as a forbidden exact set, so no two entries share a roster.
+    """
+    from mlb_engine.entries.gate_classes import (  # noqa: PLC0415
+        PROV_OPERATOR_NEVER_RELAX,
+    )
+    moves = {}
+    for rung in (governor.walked if governor is not None else []):
+        for move in rung.get("moves") or []:
+            moves[move.get("control")] = move
+    by_control = {}
+    for key in sorted(solved):
+        row = {"value": solved[key]["value"],
+               "provenance": (before.get(key) or solved[key])["provenance"]}
+        if key in moves:
+            m = moves[key]
+            row["relaxed"] = {"from": m.get("before"), "to": m.get("after"),
+                              "by": m.get("by"), "reason": m.get("reason")}
+        by_control[key] = row
+    by_control["distinct_lineups_per_contest"] = {
+        "value": True, "provenance": PROV_OPERATOR_NEVER_RELAX,
+        "enforced_by": "each Showdown lineup is solved against every prior one "
+                       "as a forbidden exact set (F-3)"}
+    return {"by_control": by_control, "never_relax": sorted(never_relax),
+            "moved": sorted(moves),
+            "note": ("the solver's per-slot relaxations under R153's order are "
+                     "counted_relaxations, not rows here; never-relax on a "
+                     "Showdown control is refused until that ladder reads it")}
+
+
 def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[int, dict]:
     from mlb_engine.optimize import showdown as sd
     from mlb_engine.optimize import showdown_theses as st
@@ -4135,6 +4196,23 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
     # about the delivered attempt, not the sum of the abandoned ones.
     from mlb_engine.pipeline import deadline_governor as dg  # noqa: PLC0415
     governor = getattr(args, "_governor", None)
+    # R388(b). Only F-3 can be never-relax on Showdown (main refuses the rest:
+    # the solver relaxes all three controls per slot under R153's order and
+    # reads no never-relax yet), so the rung below always opens its three.
+    never_relax = frozenset(getattr(args, "_never_relax", None)
+                            or dg.DEFAULT_NEVER_RELAX)
+
+    def _sd_provenance() -> dict:
+        typed = args.controls_override or {}
+        return {key: {"value": value,
+                      "provenance": dg.control_provenance_of(
+                          key, typed=typed, never_relax=never_relax)}
+                for key, value in (("max_shared_players", share_cap),
+                                   ("max_cpt_exposure_pct", cpt_cap),
+                                   ("max_player_exposure_pct", player_cap_pct),
+                                   ("max_cpt_per_contest", cpt_per_contest))}
+
+    sd_resolved = _sd_provenance()
     while True:
         solve_diag.clear()
         cpt_diagnostics.clear()
@@ -4201,7 +4279,8 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                         "max_cpt_exposure_pct": cpt_cap,
                         "max_player_exposure_pct": player_cap_pct},
                 reason=f"{refusal_status} inside the "
-                       f"T-{governor.window_minutes:.0f} window")
+                       f"T-{governor.window_minutes:.0f} window",
+                never_relax=never_relax, resolved=sd_resolved)
             share_cap = opened.get("max_shared_players", share_cap)
             cpt_cap = opened.get("max_cpt_exposure_pct", cpt_cap)
             player_cap_pct = opened.get("max_player_exposure_pct", player_cap_pct)
@@ -4734,6 +4813,13 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
             "overlap_relaxed_slots": overlap_relaxed,
             "all_unique_rosters": report.get("all_unique_rosters") if use_ladder else None,
         },
+        # R388(b). The four controls as solved, each with its provenance: the
+        # authority the value had before any deadline rung moved it, and what
+        # moved it. The solver's own per-slot relaxations are
+        # `counted_relaxations`, below.
+        "control_provenance": showdown_control_provenance(
+            _sd_provenance(), sd_resolved, governor, never_relax),
+        "never_relax": sorted(never_relax),
         # R54. The counts that decide whether the portfolio is clean. A portfolio
         # is not clean because the gates passed; it is clean when these are zero.
         # ``both_relaxed_slots`` is a subset of the other two, which each count
@@ -5726,6 +5812,23 @@ def main() -> int:
                          "one player may fill in ANY role. Each cap count is a "
                          "floor() of pct x entries, so realized exposure never "
                          "exceeds the pct. Pass null to disable a cap.")
+    # R388(b). The operator's never-relax. A typed --controls-override value
+    # is a relaxable preference; this is the word that a control holds under
+    # every deadline rung and every feasibility floor.
+    ap.add_argument("--never-relax", dest="never_relax", action="append",
+                    default=None, metavar="CONTROL[,CONTROL...]",
+                    help="controls that must never be relaxed, comma-separated "
+                         "or repeated, e.g. 'max_player_exposure_pct,"
+                         "max_shared_players'. The deadline governor's rung "
+                         "leaves them closed, a feasibility floor does not raise "
+                         "them, and autobuild stops rather than floor one. A "
+                         "value typed in --controls-override alone stays "
+                         "relaxable. Distinct lineups per contest (F-3) is held "
+                         "on every build without the flag. A control the "
+                         "engine cannot hold at every relaxer yet (the "
+                         "allocator's own ladders and sleeves; all three "
+                         "Showdown controls) refuses at exit 4 with the reason, "
+                         "before anything is staged.")
     # R381 (CC-5, R307 batch 1). Ben's design ruling, 2026-09-03: "we dont need
     # to artificially zero out players, but we should figure out how we can find
     # leverage in the captain ranks and devote a few lineups to those picks."
@@ -5993,6 +6096,22 @@ def main() -> int:
     contest = detect_contest_type(salary, entries)
     signature = slate_signature(salary)
     _REFUSAL_CONTEXT["slate_tag"] = str(signature.get("tag") or "")
+
+    # R388(b). Before staging, beside --deliver-by's parse and for its reason:
+    # a never-relax the build cannot hold is refused in the same second, not
+    # discovered after the bank. Per format, because Showdown's solver relaxes
+    # its three controls per slot and reads no never-relax yet.
+    from mlb_engine.pipeline import deadline_governor as _dg_nr  # noqa: PLC0415
+    try:
+        args._never_relax = _dg_nr.resolve_never_relax(
+            getattr(args, "never_relax", None), contest_type=contest)
+    except ValueError as exc:
+        print(json.dumps({"status": "never_relax_not_holdable",
+                          "date": args.date, "contest_type": contest,
+                          "error": str(exc),
+                          "note": ("nothing was staged and no run directory "
+                                   "was created")}, indent=1))
+        return 4
 
     # R249. `--projections` is a Showdown seam. On Classic the enrichment stack
     # owns the projection and a supplied Base would have to be reconciled with
