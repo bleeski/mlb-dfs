@@ -84,10 +84,10 @@ builds, which is a count over the BANK, while the one failing SLATE check
 (`shared_players_floor`, carrying `remedy: raise max_shared_players to >= 7`)
 never appeared in `errors[]` at all. The session escalated the cap 1 -> 2 -> 10
 and grew the bank twice, spending ten minutes of a twenty-three minute window on
-a check that was passing. Since R286 the refusal leads with the failing check and
-subordinates the bank count, so `errors[0]` is now the right thing to read — but
-the artifact is still the authority and the check list is still where the remedy
-is.
+a check that was passing. Since R286 the refusal leads with the failing check, so
+`errors[0]` is right to read; since R207 `refusal_remedy` carries each remedy as
+data (printed as `REMEDY:` lines), and on an interaction refusal it names the one
+control that, dropped alone, restores feasibility, and its smallest step.
 
 **A slate-level check and a bank-level count are different objects.** A failing
 `feasibility.checks` entry is arithmetic about the SLATE: no bank growth can
@@ -157,7 +157,7 @@ Ben has delegated build decisions (CLAUDE.md, Autonomy). Start here:
 python <repo>/tools/autobuild.py \
   --salary <DKSalaries.csv> --entries <DKEntries.csv> \
   --lineups <feed.json> --postures '<id>=<posture>,...' \
-  --stop-after-minutes 12
+  --stop-after-minutes 12   # + --declare-pitcher <id>[=<role>] per PLR/PO arm (R345)
 ```
 
 `--per-build-seconds` is left off on purpose: it defaults to this host's call

@@ -537,6 +537,18 @@ def refusal_stamp(key: str, **extra) -> dict:
     }
     if rec.get("override"):
         out["refusal_override"] = rec["override"]
+    # R207. The delivery-first class beside the governor's (MLB_Classic.md §2),
+    # read from the one taxonomy. Lazily, because this script loads without the
+    # engine, and never at the cost of the refusal: a stamp that cannot read the
+    # table says so rather than raising on the path that reports a failure.
+    try:
+        from mlb_engine.entries.gate_classes import refusal_site_validity
+        validity = refusal_site_validity(key)
+        out["refusal_validity"] = validity.klass
+        if validity.facts:
+            out["refusal_validity_facts"] = {f: k for f, k in validity.facts}
+    except Exception:  # noqa: BLE001 -- never at the cost of the refusal
+        out["refusal_validity"] = "unavailable"
     out.update(extra)
     # R403. Most refusals return an empty brief, so the stamp is the only place
     # the wrapper can learn the class from.
@@ -558,6 +570,172 @@ _REFUSAL_CONTEXT: dict = {}
 # The old hint called both "not a strategy or player-pool change", which is how
 # 1910_9g moved three exposure caps from 0.35/0.43 to 0.56.
 STRUCTURAL_FEASIBILITY_CHECKS = frozenset({"shared_players_floor", "sp_pair_capacity"})
+
+#: R207. The most wall clock a refusal may spend naming the one control that
+#: binds (the allocator's interaction probe), and the margin it leaves before
+#: the build's own deadline.
+INTERACTION_PROBE_CAP_S = 45.0
+INTERACTION_PROBE_MARGIN_S = 30.0
+#: CLAUDE.md's T-15 rung opens every binding control at once, so inside it a
+#: number for one control changes nothing and the probe is skipped.
+INTERACTION_PROBE_T_MINUS_MINUTES = 15.0
+
+
+def interaction_probe_limits(deadline, now, governor=None, minutes_to_deadline=None,
+                             replay=False, confidence_may_relax=False):
+    """R207. ``(budget_s, not_after)`` for the allocator's interaction probe, or
+    ``(None, None)`` when it should not run. ``deadline`` and ``now`` are
+    ``time.monotonic()`` readings; ``not_after`` is absolute, so a budget sized
+    here cannot run past the deadline or into the governor's window however
+    long the solves before the probe take. Skipped:
+      * inside the governor's window, where rung 1 opens every control;
+      * inside T-15 of first lock on a live slate (a past-slate replay has no
+        clock to respect), for CLAUDE.md's T-15 rung;
+      * while R407's tightening is still applied and relaxable, because a
+        refusal then re-solves at once with it relaxed, and that re-solve is
+        the one worth probing.
+    """
+    if confidence_may_relax:
+        return None, None
+    if (not replay and isinstance(minutes_to_deadline, (int, float))
+            and minutes_to_deadline < INTERACTION_PROBE_T_MINUS_MINUTES):
+        return None, None
+    not_after = deadline - INTERACTION_PROBE_MARGIN_S
+    if governor is not None:
+        if governor.in_window():
+            return None, None
+        window_open = now + (governor.minutes_remaining()
+                             - governor.window_minutes) * 60.0
+        not_after = min(not_after, window_open)
+    left = not_after - now
+    if left < 1.0:
+        return None, None
+    return min(INTERACTION_PROBE_CAP_S, left), not_after
+
+
+def typed_refusal_remedy(feasibility, interaction_probe, bank_report,
+                         control_provenance=None, never_relax=()) -> list:
+    """R207 (+R204's naming half). The Classic refusal's remedies, as data.
+
+    Three sources, in the order a session should read them, each already in
+    the result as a verdict and none re-derived here:
+      * a failing slate check's ``remedy_typed`` (the pipeline types it where
+        it computes the sentence); ``arithmetic`` says whether the check is one
+        of STRUCTURAL_FEASIBILITY_CHECKS, the floors autobuild may take;
+      * the allocator's ``interaction_probe``: each control that, dropped
+        ALONE, restores feasibility, with its smallest step and whether the
+        step alone restores it;
+      * a bank job list that was not exhausted (search effort, first).
+    Every raise is class S (MLB_Classic.md §2). A control the build holds by
+    never-relax is listed with ``held: true``, never as something to move.
+    ``errors[]`` is not read or written: its text stays byte-identical.
+    """
+    by_control = dict((control_provenance or {}).get("by_control") or {})
+    holding = set(never_relax or ())
+    remedies = []
+
+    def _provenance(control):
+        row = by_control.get(control)
+        return row.get("provenance") if isinstance(row, dict) else None
+
+    for check in (feasibility or {}).get("checks") or []:
+        typed = check.get("remedy_typed")
+        if check.get("passed") is not False or not typed:
+            continue
+        control = typed.get("control")
+        remedies.append({
+            "kind": "raise_control", "source": f"feasibility_check:{check.get('name')}",
+            "control": control, "op": typed.get("op", ">="), "to": typed.get("to"),
+            **({"count": typed["count"]} if "count" in typed else {}),
+            **({"alternative": typed["alternative"]} if typed.get("alternative") else {}),
+            "arithmetic": check.get("name") in STRUCTURAL_FEASIBILITY_CHECKS,
+            "class": "S", "provenance": _provenance(control),
+            "held": control in holding,
+        })
+    probe = interaction_probe or {}
+    if probe.get("ran"):
+        restoring = [r for r in probe.get("controls") or []
+                     if r.get("alone_restores") is True]
+        for row in restoring:
+            step = row.get("step") or {}
+            remedies.append({
+                "kind": "raise_control", "source": "interaction_probe",
+                "control": row.get("control"), "op": ">=",
+                "from": row.get("value"), "to": step.get("to"),
+                "count_from": step.get("count_from"), "count_to": step.get("count_to"),
+                "restores_when_dropped": True, "step_restores": step.get("restores"),
+                "arithmetic": False, "class": "S",
+                "provenance": _provenance(row.get("control")),
+                "held": row.get("control") in holding,
+            })
+        if not restoring:
+            rows = probe.get("controls") or []
+            unprobed = [r.get("control") for r in rows if r.get("status") == "not_probed"]
+            undecided = [r.get("control") for r in rows
+                         if r.get("status") == "probed" and r.get("alone_restores") is None]
+            if rows and not unprobed and not undecided:
+                # Every active control was dropped alone and each drop was
+                # PROVEN infeasible. That is a claim about the probed set only:
+                # the ladder controls and the sleeve mask are not in it.
+                remedies.append({
+                    "kind": "no_single_control", "source": "interaction_probe",
+                    "note": ("every probed control, dropped alone, was proven "
+                             "infeasible: no single one of them clears this; the "
+                             "bind needs two or more moved, or a control the probe "
+                             "does not drop (the ladder controls, the sleeve mask)"),
+                })
+            else:
+                # Not established either way. Never read as R157's "no single
+                # binding control": the probe did not finish the question.
+                remedies.append({
+                    "kind": "undetermined", "source": "interaction_probe",
+                    "note": ("no probed control was shown to restore feasibility "
+                             "alone, and the question is open"
+                             + (f"; undecided within its time limit: {', '.join(undecided)}"
+                                if undecided else "")
+                             + (f"; not probed inside the budget: {', '.join(unprobed)}"
+                                if unprobed else "")),
+                    "undecided": undecided, "not_probed": unprobed,
+                })
+    if (bank_report or {}).get("job_list_exhausted") is False:
+        remedies.insert(0, {
+            "kind": "grow_bank", "source": "bank",
+            "jobs_attempted": bank_report.get("jobs_attempted"),
+            "jobs_total": bank_report.get("jobs_total"),
+            "class": "S", "note": "search effort, the first remedy (R98(2))",
+        })
+    return remedies
+
+
+def format_typed_remedy(remedy) -> str:
+    """One stderr line per typed remedy."""
+    if remedy.get("kind") == "grow_bank":
+        return (f"grow the bank ({remedy.get('jobs_attempted')} of "
+                f"{remedy.get('jobs_total')} jobs attempted)")
+    if remedy.get("kind") in ("no_single_control", "undetermined"):
+        return remedy.get("note", "")
+    text = f"{remedy.get('control')} "
+    if remedy.get("to") is None:
+        # The per-game caps: dropping them restores feasibility and no single
+        # step is separable, so there is no value to print.
+        text += "dropped entirely"
+    else:
+        if remedy.get("from") is not None:
+            text += f"{remedy['from']} -> "
+        text += f"{remedy.get('op', '>=')} {remedy.get('to')}"
+    if remedy.get("count_from") is not None:
+        text += f" (count {remedy['count_from']} -> {remedy['count_to']})"
+    if remedy.get("source") == "interaction_probe" and remedy.get("to") is None:
+        text += " restores feasibility; no single step is separable"
+    elif remedy.get("source") == "interaction_probe":
+        text += (", which alone restores feasibility" if remedy.get("step_restores")
+                 else ", dropping it restores feasibility; the step alone "
+                      + ("does not" if remedy.get("step_restores") is False
+                         else "was not re-solved"))
+    text += f" [{remedy.get('source')}; class {remedy.get('class')}"
+    if remedy.get("held"):
+        text += "; HELD by --never-relax"
+    return text + "]"
 
 # R167. Every control in --controls-override that is a FRACTION of the entered
 # set, Classic and Showdown together. Named rather than pattern-matched on
@@ -3021,6 +3199,21 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
     never_relax = frozenset(getattr(args, "_never_relax", None)
                             or _dg_nr.DEFAULT_NEVER_RELAX)
 
+    # R207. Whether R407's tightening can still be relaxed on a refusal: then
+    # the refusal re-solves at once, and the probe waits for that re-solve.
+    from mlb_engine.pipeline.execution_pipeline import (  # noqa: PLC0415
+        INPUT_CONFIDENCE_TIGHTENING, resolve_input_confidence,
+    )
+    _tier_tightens = bool(INPUT_CONFIDENCE_TIGHTENING.get(
+        resolve_input_confidence(confidence_facts).get("tier")))
+
+    def _probe_limits():
+        return interaction_probe_limits(
+            deadline, time.monotonic(), governor=getattr(args, "_governor", None),
+            minutes_to_deadline=clock.get("minutes_to_deadline"),
+            replay=bool(getattr(args, "past_slate_replay", False)),
+            confidence_may_relax=_tier_tightens and confidence_relax is None)
+
     def _solve(controls: dict, certification_label: str | None = None,
                control_moves: list | None = None):
         # R290(c) step 2. Extracted so the deadline governor can re-solve with
@@ -3030,6 +3223,7 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         # and the rung that matters is the one the copy forgot.
         # R388(e): the governed re-solve passes the deadline label, so the
         # manifest row records what the brief says rather than `certified`.
+        probe_budget, probe_not_after = _probe_limits()
         return run_slate(
             runs_root=str(REPO / "runs"),
             salary_csv=str(salary), entries_csv=str(entries),
@@ -3048,6 +3242,8 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
             certification_label=certification_label,
             never_relax_controls=sorted(never_relax),
             control_moves=control_moves,
+            interaction_probe_budget_s=probe_budget,
+            interaction_probe_not_after=probe_not_after,
             **slate_kwargs,
         )
 
@@ -3248,6 +3444,16 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
                 "total_candidates": bank_report.get("total_candidates"),
                 "budget_floored": bank_report.get("budget_floored"),
             }
+        # R207 (+R204 naming half). The remedies as data, beside the sentence
+        # that errors[] keeps byte-identical, and the probe that named them.
+        payload["refusal_remedy"] = typed_refusal_remedy(
+            feas, result.get("interaction_probe"), bank_report,
+            control_provenance=result.get("control_provenance"),
+            never_relax=never_relax)
+        if result.get("interaction_probe") is not None:
+            payload["interaction_probe"] = result["interaction_probe"]
+        for remedy in payload["refusal_remedy"]:
+            print(f"REMEDY: {format_typed_remedy(remedy)}", file=sys.stderr)
         # R28(5): the refusal writes the brief too. This used to return an empty
         # brief, so `--brief` produced no file on the one path where the reader
         # most needs one, and a session that captured only the brief learned
@@ -5445,7 +5651,7 @@ class CliValueError(ValueError):
     """A command-line VALUE this build cannot use. R296(a).
 
     These parsers used to ``raise SystemExit(str)``, which exits 1. Exit 1 is
-    off build_slate's documented 0/3/4/5/10 contract, so every consumer reads it
+    off build_slate's documented 0/3/4/10 contract, so every consumer reads it
     as a crash: ``tools/autobuild.py`` logged it as "refused with no remedy",
     the SKILL's rerun-on-10 loop cannot classify it, and no brief exists to say
     what was wrong. R168(a) fixed exactly that shape for the one refusal in
@@ -6361,7 +6567,7 @@ def main() -> int:
                 # run_showdown legitimately return (code, brief) tuples; main()
                 # returns an int, and `raise SystemExit((3, {}))` exits 1 with a
                 # stray tuple on stderr. Every documented consumer reads that as
-                # a crash: autobuild's 0/3/4/5/10 contract, the SKILL's
+                # a crash: autobuild's 0/3/4/10 contract, the SKILL's
                 # rerun-on-10 loop, and build_asserted.py, which inherits main().
                 # So the one refusal in this file that says "your feed is for
                 # another slate" arrived looking like a bug in the build.

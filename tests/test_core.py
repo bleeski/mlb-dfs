@@ -23094,11 +23094,15 @@ class FiveStackQuotaLadderTests(unittest.TestCase):
         recursive = [n for n in _ast.walk(fn)
                      if isinstance(n, _ast.Call)
                      and getattr(n.func, "id", "") == "select_and_assign_entries"]
-        self.assertEqual(len(recursive), 4,
+        # R207 grew it to five: the interaction probe's solve, which relaxes
+        # nothing either and must see the refused solve's own ladder states,
+        # or it would probe a model the refusal was not about.
+        self.assertEqual(len(recursive), 5,
                          "three relaxation ladders plus R326's full-bank retry: "
                          "engine-default reuse cap, five-stack quota, primary-"
                          "stack floor, and the retry that widens the SEARCH "
-                         "before any of them moves a STRATEGY control")
+                         "before any of them moves a STRATEGY control; plus "
+                         "R207's interaction probe")
         for call in recursive:
             passed = {kw.arg for kw in call.keywords}
             for state in ("_floor_state", "_reuse_state", "_quota_state"):
@@ -24389,6 +24393,213 @@ class SupervisorLostWindowTests(unittest.TestCase):
         self.assertEqual(records[-1]["attempt"], 3,
                          "the resumed run restarted the attempt numbering")
 
+    # ---- R396(b): the exit contract ------------------------------------
+
+    def test_the_contract_codes_are_the_codes_build_slate_returns(self):
+        """R396(b). The tuple said it mirrored build_slate's exit vocabulary and
+        listed 5, which is this supervisor's own stop and which build_slate
+        never returns. Read off the script's own return sites, so the tuple
+        cannot drift from the tree in either direction."""
+        import ast as _ast
+        tree = _ast.parse((REPO / "skills" / "generate-lineups" / "scripts"
+                           / "build_slate.py").read_text(encoding="utf-8"))
+
+        def codes(node):
+            if isinstance(node, _ast.Tuple) and node.elts:
+                return codes(node.elts[0])
+            if isinstance(node, _ast.Constant) and isinstance(node.value, int):
+                return {node.value}
+            if isinstance(node, _ast.IfExp):
+                return codes(node.body) | codes(node.orelse)
+            return set()
+        returned = set()
+        for fn in tree.body:
+            if isinstance(fn, _ast.FunctionDef) and fn.name in (
+                    "main", "run_classic", "run_showdown"):
+                for node in _ast.walk(fn):
+                    if isinstance(node, _ast.Return) and node.value is not None:
+                        returned |= codes(node.value)
+        self.assertEqual(returned, set(self.ab.BUILD_SLATE_CONTRACT_CODES))
+        self.assertNotIn(5, self.ab.BUILD_SLATE_CONTRACT_CODES)
+
+    def test_a_child_exit_5_is_an_off_contract_stop_not_a_refusal(self):
+        """A child 5 fell into the refusal branch, which asked a brief that
+        does not exist what was refused and logged "refused with no remedy"
+        with neither the code nor stderr: R296(d)'s shape, through the one
+        code the tuple let past."""
+        def five(n, cmd, kwargs):
+            return self._proc(5, stderr="Traceback: boom")
+        code, records, cmds, _logs = self._run(five)
+        self.assertEqual(code, 3)
+        self.assertEqual([r["action"] for r in records], ["stop"])
+        self.assertEqual(records[-1]["returncode"], 5)
+        self.assertIn("outside its documented", records[-1]["why"])
+        self.assertIn("boom", records[-1]["stderr"])
+        self.assertNotIn("refused with no remedy", records[-1]["why"])
+
+    def test_a_child_exit_5_with_a_growable_brief_is_not_retried(self):
+        def five(n, cmd, kwargs):
+            return self._proc(5, brief={
+                "status": "not_certified", "date": "2026-07-29",
+                "solve": {"bank": {"job_list_exhausted": False}}})
+        code, records, cmds, _logs = self._run(five, extra_argv=["--max-attempts", "3"])
+        self.assertEqual(code, 3)
+        self.assertEqual(len(cmds), 1, "an off-contract exit was retried as grow_bank")
+        self.assertNotIn("grow_bank", [r["action"] for r in records])
+
+    def test_running_out_of_max_attempts_writes_a_stop_record(self):
+        """The one terminal exit that wrote no stop: the log's last word was a
+        decision to try again that was never taken."""
+        def thin(n, cmd, kwargs):
+            return self._proc(10, brief={"status": "partial", "date": "2026-07-29",
+                                         "solve": {"bank": {"jobs_attempted": n}}})
+        code, records, cmds, _logs = self._run(thin, extra_argv=["--max-attempts", "2"])
+        self.assertEqual(code, 3)
+        self.assertEqual(len(cmds), 2)
+        stop = records[-1]
+        self.assertEqual(stop["action"], "stop")
+        self.assertIn("--max-attempts 2 spent", stop["why"])
+        self.assertEqual((stop["max_attempts"], stop["attempts_this_call"],
+                          stop["last_action"]), (2, 2, "grow_bank"))
+
+    def test_a_resume_with_its_attempts_spent_writes_a_stop_record(self):
+        root = Path(self.tmp.name)
+        out = root / "outputs" / "2026-07-29"
+        out.mkdir(parents=True)
+        (out / "autobuild_decisions.json").write_text(json.dumps({
+            "decisions": [{"attempt": 1, "action": "grow_bank", "why": "x"},
+                          {"attempt": 2, "action": "grow_bank", "why": "y"}],
+            "controls": {"user_controls": {}, "derived_controls": {},
+                         "effective_controls": {}}}), encoding="utf-8")
+        code, records, cmds, _logs = self._run(
+            lambda *_a: self.fail("no attempt should run"),
+            extra_argv=["--max-attempts", "2", "--resume"], root=root)
+        self.assertEqual(code, 3)
+        self.assertEqual(cmds, [])
+        self.assertEqual(records[-1]["action"], "stop")
+        self.assertEqual(records[-1]["attempts_this_call"], 0)
+        self.assertEqual(records[-1]["last_action"], "resumed")
+
+    def test_a_delivery_writes_no_exhaustion_stop(self):
+        def certify(n, cmd, kwargs):
+            return self._proc(0, brief={"status": "certified", "date": "2026-07-29",
+                                        "delivered_sha256": "a" * 64,
+                                        "delivered_path": "fixture.csv"})
+        code, records, _cmds, _logs = self._run(certify, extra_argv=["--max-attempts", "1"])
+        self.assertEqual(code, 0)
+        self.assertEqual(records[-1]["action"], "delivered")
+
+    # ---- R207: typed remedies ------------------------------------------
+
+    def test_autobuild_takes_the_typed_structural_floor(self):
+        """The pipeline types the remedy where it writes the sentence; the
+        supervisor reads the type first, so a reworded sentence cannot move or
+        lose the floor."""
+        brief = {"status": "not_certified", "date": "2026-07-29",
+                 "solve": {"bank": {"job_list_exhausted": True}},
+                 "feasibility": {"checks": [
+                     {"name": "shared_players_floor", "passed": False,
+                      "remedy": "reworded: lift the overlap floor",
+                      "remedy_typed": {"control": "max_shared_players", "op": ">=",
+                                       "to": 7}}]}}
+
+        def side(n, cmd, kwargs):
+            return self._proc(3, brief) if n == 1 else self._certify(n, cmd, kwargs)
+        code, records, cmds, _logs = self._run(side)
+        self.assertEqual(code, 0)
+        self.assertEqual([r["action"] for r in records],
+                         ["apply_structural_floor", "delivered"])
+        joined = " ".join(cmds[1])
+        self.assertIn('"max_shared_players": 7', joined)
+
+    def test_the_interaction_stop_carries_the_builds_typed_remedy(self):
+        remedy = [{"kind": "raise_control", "source": "interaction_probe",
+                   "control": "max_player_exposure_pct", "from": 0.4, "to": 0.5}]
+        brief = {"status": "not_certified", "date": "2026-07-29",
+                 "solve": {"bank": {"job_list_exhausted": True}},
+                 "feasibility": {"checks": []}, "refusal_remedy": remedy}
+        code, records, _cmds, _logs = self._run(lambda *_a: self._proc(3, brief))
+        self.assertEqual(code, 3)
+        self.assertEqual(records[-1]["action"], "stop")
+        self.assertEqual(records[-1]["refusal_remedy"], remedy)
+
+    def test_a_strategy_stop_carries_the_checks_typed_remedy(self):
+        typed = {"control": "max_player_exposure_pct", "op": ">=", "to": 0.6, "count": 6}
+        brief = {"status": "not_certified", "date": "2026-07-29",
+                 "solve": {"bank": {"job_list_exhausted": True}},
+                 "feasibility": {"checks": [
+                     {"name": "player_exposure_floor", "passed": False,
+                      "remedy": "raise max_player_exposure_pct to >= 0.600 (cap 6)",
+                      "remedy_typed": typed}]}}
+        code, records, _cmds, _logs = self._run(lambda *_a: self._proc(3, brief))
+        self.assertEqual(code, 3)
+        self.assertIn("STRATEGY control", records[-1]["why"])
+        self.assertEqual(records[-1]["remedy_typed"], typed)
+
+    # ---- R345: --declare-pitcher ----------------------------------------
+
+    @staticmethod
+    def _declared_in(cmd):
+        return [cmd[i + 1] for i, tok in enumerate(cmd) if tok == "--declare-pitcher"]
+
+    def _certify(self, n, cmd, kwargs):
+        return self._proc(0, brief={"status": "certified", "date": "2026-07-29",
+                                    "delivered_sha256": "a" * 64,
+                                    "delivered_path": "fixture.csv"})
+
+    def test_declare_pitcher_is_forwarded_verbatim_and_recorded_as_an_input(self):
+        """R345. The declaration reached the child through --passthrough and
+        nowhere else: no named flag the recipe could show, and no record in the
+        log. It is an operator INPUT, so the record says so."""
+        code, records, cmds, logs = self._run(self._certify, extra_argv=[
+            "--declare-pitcher", "111=viable_bulk_or_alt_sp",
+            "--passthrough", "--declare-pitcher 222"])
+        self.assertEqual(code, 0)
+        self.assertEqual(self._declared_in(cmds[0]),
+                         ["111=viable_bulk_or_alt_sp", "222"],
+                         "each declaration once, the flag's first, in order")
+        rec = [r for r in records if r["action"] == "operator_declared_pitchers"]
+        self.assertEqual(len(rec), 1)
+        self.assertEqual(rec[0]["declare_pitcher"], ["111=viable_bulk_or_alt_sp", "222"])
+        self.assertIn("not a decision this supervisor took", rec[0]["why"])
+        payload = json.loads(logs[0].read_text(encoding="utf-8"))
+        self.assertEqual(payload["operator_inputs"]["declare_pitcher"],
+                         ["111=viable_bulk_or_alt_sp", "222"])
+
+    def test_a_flag_is_never_taken_as_a_declarations_value(self):
+        code, records, cmds, _logs = self._run(
+            self._certify, extra_argv=["--passthrough", "--declare-pitcher --odds x.json"])
+        self.assertEqual(code, 4)
+        self.assertEqual(cmds, [])
+        self.assertIn("has no value", records[-1]["why"])
+
+    def test_no_declaration_leaves_the_log_shape_alone(self):
+        _code, records, cmds, logs = self._run(self._certify)
+        self.assertEqual(self._declared_in(cmds[0]), [])
+        self.assertNotIn("operator_inputs", json.loads(logs[0].read_text(encoding="utf-8")))
+        self.assertNotIn("operator_declared_pitchers", [r["action"] for r in records])
+
+    def test_a_resume_restores_the_declarations_unless_restated(self):
+        root = Path(self.tmp.name)
+
+        def thin(n, cmd, kwargs):
+            return self._proc(10, brief={"status": "partial", "date": "2026-07-29",
+                                         "solve": {"bank": {"jobs_attempted": n}}})
+        self._run(thin, extra_argv=["--max-attempts", "1", "--declare-pitcher", "111"],
+                  root=root)
+        _code, records, cmds, _logs = self._run(
+            self._certify, extra_argv=["--max-attempts", "3", "--resume"], root=root)
+        self.assertEqual(self._declared_in(cmds[0]), ["111"],
+                         "a resumed call dropped the run's declaration")
+        self.assertIn("the resumed run's log", [
+            r for r in records if r["action"] == "operator_declared_pitchers"][-1]["why"])
+        _code, records, cmds, _logs = self._run(
+            self._certify, extra_argv=["--max-attempts", "5", "--resume",
+                                       "--declare-pitcher", "333"], root=root)
+        self.assertEqual(self._declared_in(cmds[0]), ["333"])
+        last = [r for r in records if r["action"] == "operator_declared_pitchers"][-1]
+        self.assertEqual(last["replaced"], ["111"])
+
     def test_a_fresh_run_ignores_a_stale_log_unless_resume_is_asked_for(self):
         """The positive control on the other side: resume is opt-in, so an
         ordinary run is never silently continued from yesterday's decisions."""
@@ -24544,6 +24755,371 @@ class SwapAndProbeLostWindowTests(unittest.TestCase):
             capture_output=True, text=True, cwd=str(REPO))
         self.assertEqual(result.returncode, 4)
         self.assertIn("salary file", result.stderr)
+
+
+class TypedRefusalTests(unittest.TestCase):
+    """R207 (+R204's naming half). The refusal names the one control to move.
+
+    On 1240_6g the build refused three times with "no single control is
+    arithmetically binding against this bank, so the interaction of the active
+    controls is", and finding the cap that mattered (max_player_exposure_pct
+    0.4 -> 0.5, floor(pct * n) 2 -> 3) cost four full builds. The allocator's
+    interaction probe drops each active control ALONE on that refusal and says
+    which restore feasibility and at what step; the remedies travel as data
+    beside errors[], which stays byte-identical. The fixtures are two entries
+    and three candidates where each lineup pair is killed by one cap, so every
+    cap alone is satisfiable and the three together are not."""
+
+    ENTRIES = [{"entry_id": str(i), "contest_id": "c1", "contest_shape": "large_wta"}
+               for i in (1, 2)]
+    CONTROLS = {"max_primary_stack_exposure_pct": 0.5, "max_sp_pair_repetition": 1,
+                "max_shared_players": 5}
+
+    @staticmethod
+    def _cand(cid, roster, score, stack):
+        return {"candidate_id": cid, "lineup_ids": roster, "player_ids": roster,
+                "sp_ids": roster[:2], "primary_stack": stack, "objective": score,
+                "contest_fit_score": score}
+
+    def _every_cap_restores(self):
+        """{A,B} share a stack, {A,C} an SP pair, {B,C} six hitters."""
+        shared = [f"h{i}" for i in range(6)]
+        return [self._cand("A", ["x1", "x2", *[f"a{i}" for i in range(8)]], 100, "S1"),
+                self._cand("B", ["y1", "y2", *shared, "b0", "b1"], 99, "S1"),
+                self._cand("C", ["x1", "x2", *shared, "c0", "c1"], 98, "S2")]
+
+    def _one_cap_does_not(self):
+        """{A,B} is killed by the stack cap AND by overlap, so dropping the stack
+        cap alone leaves it dead: that control does not restore alone."""
+        A = self._cand("A", ["x1", "x2", "g0", "g1", "g2", "a0", "a1", "a2", "a3", "a4"], 100, "S1")
+        B = self._cand("B", ["y1", "y2", "g0", "g1", "g2", "h0", "h1", "h2", "b0", "b1"], 99, "S1")
+        C = self._cand("C", ["x1", "x2", "h0", "h1", "h2", "c0", "c1", "c2", "c3", "c4"], 98, "S2")
+        return [A, B, C], dict(self.CONTROLS, max_shared_players=2)
+
+    def test_the_probe_names_each_control_that_alone_restores_and_its_step(self):
+        out = ca.select_and_assign_entries(self._every_cap_restores(), self.ENTRIES,
+                                           dict(self.CONTROLS),
+                                           interaction_probe_budget_s=30)
+        self.assertFalse(out["passed"])
+        self.assertIn("the interaction of the active controls is", out["errors"][0])
+        probe = out["interaction_probe"]
+        self.assertTrue(probe["ran"])
+        self.assertEqual(probe["restoring"], ["max_primary_stack_exposure_pct",
+                                              "max_shared_players", "max_sp_pair_repetition"])
+        rows = {r["control"]: r for r in probe["controls"]}
+        self.assertEqual(rows["max_primary_stack_exposure_pct"]["step"],
+                         {"from": 0.5, "to": 1.0, "count_from": 1, "count_to": 2,
+                          "restores": True})
+        self.assertEqual((rows["max_sp_pair_repetition"]["step"]["to"],
+                          rows["max_shared_players"]["step"]["to"]), (2, 6))
+        self.assertEqual(probe["solves"], 6, "one drop and one step per control")
+
+    def test_a_control_that_does_not_restore_alone_says_so(self):
+        bank, controls = self._one_cap_does_not()
+        out = ca.select_and_assign_entries(bank, self.ENTRIES, controls,
+                                           interaction_probe_budget_s=30)
+        rows = {r["control"]: r for r in out["interaction_probe"]["controls"]}
+        self.assertIs(rows["max_primary_stack_exposure_pct"]["alone_restores"], False)
+        self.assertNotIn("step", rows["max_primary_stack_exposure_pct"])
+        self.assertEqual(out["interaction_probe"]["restoring"],
+                         ["max_shared_players", "max_sp_pair_repetition"])
+
+    def test_the_budget_bounds_the_probe_and_names_what_it_skipped(self):
+        out = ca.select_and_assign_entries(self._every_cap_restores(), self.ENTRIES,
+                                           dict(self.CONTROLS),
+                                           interaction_probe_budget_s=0.0)
+        probe = out["interaction_probe"]
+        self.assertEqual(probe["solves"], 0)
+        self.assertEqual({r["status"] for r in probe["controls"]}, {"not_probed"})
+        self.assertEqual(probe["restoring"], [])
+
+    def test_no_budget_runs_nothing_and_errors_stay_byte_identical(self):
+        plain = ca.select_and_assign_entries(self._every_cap_restores(), self.ENTRIES,
+                                             dict(self.CONTROLS))
+        probed = ca.select_and_assign_entries(self._every_cap_restores(), self.ENTRIES,
+                                              dict(self.CONTROLS),
+                                              interaction_probe_budget_s=30)
+        self.assertNotIn("interaction_probe", plain)
+        self.assertEqual(plain["errors"], probed["errors"])
+        self.assertEqual(sorted(set(probed) - set(plain)), ["interaction_probe"])
+
+    def test_the_probe_runs_only_on_the_interaction_refusal(self):
+        """A singleton-binding refusal already names its control, and a solve
+        that succeeds has nothing to probe."""
+        same = [self._cand("A", ["x1", "x2", *[f"a{i}" for i in range(8)]], 100, "S1"),
+                self._cand("B", ["y1", "y2", *[f"b{i}" for i in range(8)]], 99, "S1")]
+        singleton = ca.select_and_assign_entries(
+            same, self.ENTRIES, {"max_primary_stack_exposure_pct": 0.5},
+            interaction_probe_budget_s=30)
+        self.assertFalse(singleton["passed"])
+        self.assertNotIn("the interaction of the active controls", singleton["errors"][0])
+        self.assertNotIn("interaction_probe", singleton)
+        fine = ca.select_and_assign_entries(self._every_cap_restores(), self.ENTRIES,
+                                            {"max_sp_pair_repetition": 2},
+                                            interaction_probe_budget_s=30)
+        self.assertTrue(fine["passed"], fine.get("errors"))
+        self.assertNotIn("interaction_probe", fine)
+
+    def test_the_step_is_the_next_count_1240_6g_numbers(self):
+        """The filed case: 6 entries, 0.4 -> count 2; the step is 0.5 -> 3."""
+        self.assertEqual(ca.interaction_step("max_player_exposure_pct", 0.4, 6),
+                         {"from": 0.4, "to": 0.5, "count_from": 2, "count_to": 3})
+        self.assertEqual(ca.interaction_step("max_sp_pair_repetition", 1, 6)["to"], 2)
+        self.assertEqual(ca.interaction_step("max_team_exposure_pct", 0.9, 6)["to"], 1.0)
+        # The message and the probe name one set.
+        self.assertEqual(ca.INTERACTION_CONTROLS, tuple(sorted(ca.INTERACTION_CONTROLS)))
+        self.assertLessEqual(ca.INTERACTION_COUNT_CONTROLS, set(ca.INTERACTION_CONTROLS))
+
+    def test_remedy_typed_agrees_with_every_failing_remedy_sentence(self):
+        """Typed where the sentence is computed, so the two cannot disagree:
+        every failing check that names a control carries the same control, the
+        same value and (for a fraction cap) the same count as its sentence, and
+        a passing check carries nothing."""
+        feas = {"available": True, "entries": 10, "viable_sp_pairs": 2,
+                "max_stack_size": 5, "viable_sp_count": 2, "stackable_team_count": 2,
+                "game_count": 2, "legal_hitter_count": 30,
+                "floor_consensus_cluster_share_pct": 0.5,
+                "floor_player_exposure_count": 6}
+        controls = {"max_sp_pair_repetition": 1, "max_shared_players": 3,
+                    "max_pitcher_exposure_pct": 0.2, "max_primary_stack_exposure_pct": 0.2,
+                    "max_team_exposure_pct": 0.2, "max_game_exposure_pct": 0.2,
+                    "max_consensus_cluster_share_pct": 0.5,
+                    "max_player_exposure_pct": 0.2}
+        report = epi._feasibility_report(feas, controls)
+        failing = [c for c in report["checks"] if c.get("passed") is False]
+        self.assertEqual(len(failing), 8, [c["name"] for c in failing])
+        sentence = re.compile(r"raise (\w+) to >= ([0-9.]+)(?: \(cap (\d+)\))?")
+        for check in failing:
+            with self.subTest(check=check["name"]):
+                typed = check["remedy_typed"]
+                m = sentence.search(check["remedy"])
+                self.assertEqual(typed["control"], m.group(1))
+                self.assertAlmostEqual(float(typed["to"]), float(m.group(2)), places=6)
+                if m.group(3):
+                    self.assertEqual(typed["count"], int(m.group(3)))
+        self.assertEqual(
+            {c["name"]: c["remedy_typed"]["to"] for c in failing
+             if c["name"] in ("sp_pair_capacity", "shared_players_floor")},
+            {"sp_pair_capacity": 5, "shared_players_floor": 5})
+        for check in report["checks"]:
+            if check.get("passed") is not False:
+                self.assertNotIn("remedy_typed", check)
+
+    def test_typed_refusal_remedy_orders_sources_and_marks_held(self):
+        mod = RefusalClassificationTests._module()
+        feas = {"checks": [
+            {"name": "shared_players_floor", "passed": False, "remedy": "raise ...",
+             "remedy_typed": {"control": "max_shared_players", "op": ">=", "to": 7}},
+            {"name": "stack_exposure_capacity", "passed": True}]}
+        probe = {"ran": True, "controls": [
+            {"control": "max_player_exposure_pct", "value": 0.4, "alone_restores": True,
+             "status": "probed", "step": {"from": 0.4, "to": 0.5, "count_from": 2,
+                                          "count_to": 3, "restores": True}},
+            {"control": "max_team_exposure_pct", "value": 0.5, "alone_restores": False,
+             "status": "probed"}]}
+        prov = {"by_control": {"max_player_exposure_pct": {
+            "value": 0.4, "provenance": "posture_default"}}}
+        out = mod.typed_refusal_remedy(
+            feas, probe, {"job_list_exhausted": False, "jobs_attempted": 4,
+                          "jobs_total": 40},
+            control_provenance=prov, never_relax={"max_shared_players"})
+        self.assertEqual([r["kind"] for r in out],
+                         ["grow_bank", "raise_control", "raise_control"])
+        self.assertEqual((out[1]["control"], out[1]["arithmetic"], out[1]["held"]),
+                         ("max_shared_players", True, True))
+        self.assertEqual((out[2]["control"], out[2]["from"], out[2]["to"],
+                          out[2]["count_to"], out[2]["provenance"], out[2]["class"]),
+                         ("max_player_exposure_pct", 0.4, 0.5, 3, "posture_default", "S"))
+        self.assertIn("which alone restores feasibility", mod.format_typed_remedy(out[2]))
+        self.assertIn("HELD by --never-relax", mod.format_typed_remedy(out[1]))
+        self.assertEqual(mod.typed_refusal_remedy({}, None, {"job_list_exhausted": True}), [])
+
+    def test_no_single_control_is_claimed_only_when_every_drop_was_proven(self):
+        """The review's second blocking finding. "Two or more members" reads as
+        R157's licence to open every exposure cap, so it may be said only when
+        every active control was dropped and each drop PROVED infeasible; a
+        budget that ran out or a solve that timed out leaves it open."""
+        mod = RefusalClassificationTests._module()
+        proven = {"ran": True, "controls": [
+            {"control": "max_team_exposure_pct", "status": "probed", "alone_restores": False},
+            {"control": "max_shared_players", "status": "probed", "alone_restores": False}]}
+        out = mod.typed_refusal_remedy({}, proven, None)
+        self.assertEqual(out[0]["kind"], "no_single_control")
+        self.assertIn("the probe does not drop", out[0]["note"])
+        open_q = {"ran": True, "controls": [
+            {"control": "max_team_exposure_pct", "status": "not_probed"},
+            {"control": "max_shared_players", "status": "probed", "alone_restores": None},
+            {"control": "max_sp_pair_repetition", "status": "probed", "alone_restores": False}]}
+        out = mod.typed_refusal_remedy({}, open_q, None)
+        self.assertEqual(out[0]["kind"], "undetermined")
+        self.assertEqual((out[0]["undecided"], out[0]["not_probed"]),
+                         (["max_shared_players"], ["max_team_exposure_pct"]))
+        self.assertNotIn("two or more", out[0]["note"])
+        none_run = mod.typed_refusal_remedy({}, {"ran": True, "controls": [
+            {"control": "max_team_exposure_pct", "status": "not_probed"}]}, None)
+        self.assertEqual(none_run[0]["kind"], "undetermined")
+        self.assertIn("not probed inside the budget: max_team_exposure_pct",
+                      mod.format_typed_remedy(none_run[0]))
+
+    def test_every_step_enforces_the_count_it_names_and_is_the_smallest(self):
+        """The review's first blocking finding: `round((c + 1) / total, 4)`
+        rounded down for 9,170 (total, count) pairs up to 200, so the step
+        re-solved the refused model and the brief said it does not restore."""
+        for total in range(2, 201):
+            for count in range(1, total):
+                step = ca.interaction_step("max_player_exposure_pct",
+                                           (count + 0.5) / total, total)
+                if step["to"] >= 1.0:
+                    continue
+                self.assertEqual(ca._cap_count(total, step["to"]), step["count_to"],
+                                 (total, count, step))
+                self.assertLess(ca._cap_count(total, round(step["to"] - 1e-4, 4)),
+                                step["count_to"], ("not the smallest", total, count))
+        self.assertEqual(ca.interaction_step("max_player_exposure_pct", 0.35, 9)["to"], 0.4445)
+
+    def test_a_remedy_value_enforces_the_cap_it_names_at_nine_entries(self):
+        """The sentence's `:.3f` rounded down (9 entries, cap 4: 0.444 enforces
+        3); the sentence and the typed value now name the pct that enforces it."""
+        # Three stackable teams: need 3 of 9, where `:.3f` gave 0.333 (cap 2).
+        feas = {"available": True, "entries": 9, "viable_sp_count": 2,
+                "stackable_team_count": 3, "game_count": 2,
+                "floor_player_exposure_count": 4}
+        controls = {"max_primary_stack_exposure_pct": 0.2, "max_player_exposure_pct": 0.2}
+        report = epi._feasibility_report(feas, controls)
+        for check in report["checks"]:
+            typed = check.get("remedy_typed")
+            if not typed or "count" not in typed:
+                continue
+            with self.subTest(check=check["name"]):
+                import math as _m
+                self.assertGreaterEqual(_m.floor(9 * typed["to"] + 1e-9), typed["count"])
+                self.assertIn(f"to >= {typed['to']:.3f} (cap {typed['count']})",
+                              check["remedy"])
+        player = [c for c in report["checks"] if c["name"] == "player_exposure_floor"][0]
+        self.assertEqual(player["remedy_typed"]["to"], 0.445)
+        stack = [c for c in report["checks"] if c["name"] == "stack_exposure_capacity"][0]
+        self.assertEqual(stack["remedy_typed"]["to"], 0.334)
+        self.assertIn("to >= 0.334 (cap 3)", stack["remedy"])
+
+    def test_the_probe_waits_for_a_grown_bank_and_honours_not_after(self):
+        import time as _t
+        partial = ca.select_and_assign_entries(
+            self._every_cap_restores(), self.ENTRIES, dict(self.CONTROLS),
+            bank_report={"job_list_exhausted": False}, interaction_probe_budget_s=30)
+        self.assertNotIn("interaction_probe", partial, "a partial bank's remedy is growth")
+        late = ca.select_and_assign_entries(
+            self._every_cap_restores(), self.ENTRIES, dict(self.CONTROLS),
+            interaction_probe_budget_s=30, interaction_probe_not_after=_t.monotonic() - 1)
+        self.assertEqual({r["status"] for r in late["interaction_probe"]["controls"]},
+                         {"not_probed"})
+
+    def test_the_per_game_caps_are_one_row_with_no_step(self):
+        """The dict merges the scalar, operator per-game values and weather by
+        MIN, so dropping the scalar alone would drop all three; the probe says
+        so and names no step. A dict with no scalar still gets its row."""
+        calls = []
+
+        def resolve(trial):
+            calls.append(dict(trial))
+            ok = trial.get("max_game_exposure_pct_by_game") is None
+            return {"passed": ok, "allocation_solver_report": {"scipy_status": 2}}
+        out = ca._interaction_probe(
+            resolve, {"max_game_exposure_pct_by_game": {"g1": 0.25},
+                      "max_shared_players": 5}, 4, 30)
+        rows = {r["control"]: r for r in out["controls"]}
+        self.assertIn("max_game_exposure_pct_by_game", rows)
+        game = rows["max_game_exposure_pct_by_game"]
+        self.assertTrue(game["alone_restores"])
+        self.assertIsNone(game["step"]["to"])
+        self.assertIn("weather", game["scope"])
+        self.assertIs(rows["max_shared_players"]["alone_restores"], False)
+        mod = RefusalClassificationTests._module()
+        line = mod.format_typed_remedy(mod.typed_refusal_remedy({}, out, None)[0])
+        self.assertIn("dropped entirely", line)
+        self.assertNotIn("None", line)
+
+    def test_the_probe_limits_skip_the_window_t15_and_a_relaxable_tightening(self):
+        mod = RefusalClassificationTests._module()
+        import datetime as dt
+        from mlb_engine.pipeline import deadline_governor as dg
+        now_utc = dt.datetime(2026, 9, 23, 23, 0, tzinfo=dt.timezone.utc)
+
+        def gov(minutes):
+            return dg.DeadlineGovernor(now_utc + dt.timedelta(minutes=minutes),
+                                       now_fn=lambda: now_utc)
+        budget, not_after = mod.interaction_probe_limits(1000.0, 0.0)
+        self.assertEqual((budget, not_after), (45.0, 970.0))
+        self.assertEqual(mod.interaction_probe_limits(1000.0, 0.0, governor=gov(2)),
+                         (None, None), "inside the governor's window")
+        budget, not_after = mod.interaction_probe_limits(1000.0, 0.0, governor=gov(7))
+        self.assertAlmostEqual(not_after, 60.0, "stops when the window opens")
+        self.assertEqual(mod.interaction_probe_limits(1000.0, 0.0, minutes_to_deadline=10),
+                         (None, None), "inside T-15")
+        self.assertEqual(mod.interaction_probe_limits(1000.0, 0.0, minutes_to_deadline=-60,
+                                                      replay=True)[0], 45.0,
+                         "a past-slate replay has no clock to respect")
+        self.assertEqual(mod.interaction_probe_limits(1000.0, 0.0, confidence_may_relax=True),
+                         (None, None), "R407 re-solves first")
+        self.assertEqual(mod.interaction_probe_limits(20.0, 0.0), (None, None),
+                         "less than a second clear of the deadline margin")
+
+    def test_run_slate_passes_the_budget_and_returns_the_probe(self):
+        """The wiring, through the real run_slate and execute_portfolio: only
+        the allocator is faked, so the budget and the result are the door's."""
+        seen = {}
+        fake_probe = {"ran": True, "controls": [], "restoring": []}
+
+        def fake(candidates, entries, controls, **kw):
+            seen.update(kw)
+            return {"passed": False, "assignments": [], "errors": ["refused"],
+                    "selection_certified": False, "allocation_certified": False,
+                    "interaction_probe": fake_probe}
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            salary = root / "salary.csv"; ids = write_salary(salary)
+            entries = root / "DKEntries.csv"; write_entries(entries)
+            r1, r2 = legal_rosters(ids)
+            with unittest.mock.patch.object(epi, "select_and_assign_entries", fake):
+                out = run_slate(
+                    runs_root=root / "runs", salary_csv=salary, entries_csv=entries,
+                    projections_override=projection_frame(ids),
+                    candidates_override=[candidate("A", r1, 100), candidate("B", r2, 99, "CCC")],
+                    portfolio_controls_override=RunSlateFrontDoorTests.LOOSE,
+                    assume_gates=RunSlateFrontDoorTests.UNEVIDENCED,
+                    approve=True, interaction_probe_budget_s=7.5)
+        self.assertEqual(seen.get("interaction_probe_budget_s"), 7.5)
+        self.assertFalse(out["passed"])
+        self.assertEqual(out["interaction_probe"], fake_probe)
+        self.assertEqual(out["errors"][:1], ["refused"])
+
+    def test_run_classic_puts_the_typed_remedy_on_the_refusal(self):
+        """Through run_classic (only run_slate faked): outside the governor's
+        window the solve gets a probe budget, and the refusal carries the typed
+        remedies; inside it, the budget is None."""
+        wiring = DeadlineGovernorWiringTests("test_an_illegal_refusal_is_never_governed")
+        wiring.setUp()
+        self.addCleanup(wiring.doCleanups)
+        probe = {"ran": True, "restoring": ["max_player_exposure_pct"], "controls": [
+            {"control": "max_player_exposure_pct", "value": 0.4, "alone_restores": True,
+             "status": "probed", "step": {"from": 0.4, "to": 0.5, "count_from": 2,
+                                          "count_to": 3, "restores": True}}]}
+        refusal = dict(DeadlineGovernorWiringTests._REFUSAL, interaction_probe=probe)
+        code, brief, _calls, err = wiring._run(30, refusal=refusal)
+        self.assertEqual(code, 3)
+        budget = wiring.solve_kwargs[0]["interaction_probe_budget_s"]
+        self.assertIsInstance(budget, float)
+        self.assertLessEqual(budget, 45.0)
+        remedy = [r for r in brief["refusal_remedy"] if r["source"] == "interaction_probe"]
+        self.assertEqual((remedy[0]["control"], remedy[0]["to"]),
+                         ("max_player_exposure_pct", 0.5))
+        self.assertEqual(brief["interaction_probe"], probe)
+        self.assertIn("REMEDY: max_player_exposure_pct 0.4 -> >= 0.5 (count 2 -> 3)", err)
+        from mlb_engine.entries import gate_classes as gc
+        self.assertEqual(brief["refusal_validity"],
+                         gc.refusal_site_validity("classic_not_certified").klass)
+        _code, _brief, _calls, _err = wiring._run(2, refusal=refusal)
+        self.assertIsNone(wiring.solve_kwargs[0]["interaction_probe_budget_s"],
+                          "inside the window rung 1 opens every control; no probe")
 
 
 class RefusalClassificationTests(unittest.TestCase):
@@ -24949,6 +25525,21 @@ class RefusalClassificationTests(unittest.TestCase):
                             self._refusal_return_sites() for code in codes),
                         "no exit-10 return site found, so the row is stale")
 
+
+
+    def test_every_refusal_stamp_carries_its_delivery_first_class(self):
+        """R207. The stamp carried the governor's class and not the V/S/P one
+        Session 05 gave every site, so a reader had to look it up by hand."""
+        mod = self._module()
+        from mlb_engine.entries import gate_classes as gc
+        for key in mod.REFUSAL_BY_KEY:
+            with self.subTest(key=key):
+                stamp = mod.refusal_stamp(key)
+                validity = gc.refusal_site_validity(key)
+                self.assertEqual(stamp["refusal_validity"], validity.klass)
+                if validity.facts:
+                    self.assertEqual(stamp["refusal_validity_facts"],
+                                     dict(validity.facts))
 
 class BlankRowVersusPartialRowTests(unittest.TestCase):
     """R290(c). `verify_classic` emitted ONE failure string, "blank slot", over
@@ -27019,7 +27610,12 @@ class AllocatorTruthTests(unittest.TestCase):
         the three rungs, read the other way round: a PROVEN infeasibility is a
         fact about the bank that a wider bank can answer, while a TIME LIMIT
         means the model was already too big for the clock and re-solving on more
-        candidates is the wrong direction."""
+        candidates is the wrong direction.
+
+        R207 made it five: the interaction probe's solve. It is guarded on the
+        same two conjuncts, and it runs with `_probe=True`, which is what keeps
+        it from climbing a ladder or probing again; the second assertion block
+        below pins that, so the fifth call cannot turn into a sixth path."""
         source = (REPO / "mlb_engine" / "allocate" / "contest_allocator.py").read_text(
             encoding="utf-8")
         tree = ast.parse(source)
@@ -27029,8 +27625,18 @@ class AllocatorTruthTests(unittest.TestCase):
         reentries = [n for n in ast.walk(func)
                      if isinstance(n, ast.Return) and isinstance(n.value, ast.Call)
                      and getattr(n.value.func, "id", "") == "select_and_assign_entries"]
-        self.assertEqual(len(reentries), 4,
-                         f"expected four re-entries, found {len(reentries)}")
+        self.assertEqual(len(reentries), 5,
+                         f"expected four ladder re-entries and the probe's solve, "
+                         f"found {len(reentries)}")
+        probing = [n for n in reentries
+                   if any(k.arg == "_probe" and getattr(k.value, "value", None) is True
+                          for k in n.value.keywords)]
+        self.assertEqual(len(probing), 1, "the probe's solve must run in probe mode")
+        ladder_guards = [n for n in ast.walk(func) if isinstance(n, ast.If)
+                         and "not _probe" in ast.unparse(n.test)
+                         and "proven_infeasible" in ast.unparse(n.test)]
+        self.assertEqual(len(ladder_guards), 5,
+                         "every ladder re-entry and the probe itself skip probe mode")
         guards = [n for n in ast.walk(func)
                   if isinstance(n, ast.If)
                   and any(isinstance(b, ast.Return) and isinstance(b.value, ast.Call)
@@ -27041,7 +27647,7 @@ class AllocatorTruthTests(unittest.TestCase):
             test = ast.unparse(node.test)
             if "proven_infeasible" in test and "not slate_blocked" in test:
                 guarded += 1
-        self.assertEqual(guarded, 4,
+        self.assertEqual(guarded, 5,
                          "a re-entry is not guarded on both conjuncts")
         # And the verdict it reads is computed from the failing checks, not
         # inlined per guard, so the three cannot disagree.
@@ -28918,6 +29524,58 @@ class PlanStatusTests(unittest.TestCase):
         self.assertIn("Session 02: a non-Deferred row names no R-number", err)
         self.assertIn("Progress Ledger names Session 07", err)
         self.assertNotIn("Session 90: a non-Deferred", err)
+
+    # -- three-digit Session IDs (89 is the last free two-digit one) -------- #
+    def test_a_three_digit_row_is_parsed_and_its_status_is_linted(self):
+        """The row was never parsed, so a status outside the vocabulary passed
+        the gate. Measured on a scratch copy of the roadmap before the fix."""
+        rows = self._good_rows() + [self._row("100", "R10.", "Maybe someday")]
+        code, err = self._run(self._roadmap(rows), self._register("R10. open"))
+        self.assertEqual(code, 2)
+        self.assertIn("Session 100: status 'Maybe someday' is outside the vocabulary", err)
+        rows[-1] = self._row("100", "R10.", "Complete 2026-09-23")
+        code, err = self._run(self._roadmap(rows), self._register("R10. open"))
+        self.assertEqual(code, 0, err)
+
+    def test_print_lists_a_three_digit_session_in_numeric_order(self):
+        mod = self._mod()
+        rows = self._good_rows() + [self._row("100", "R10. the hundredth.")]
+        with tempfile.TemporaryDirectory() as raw:
+            tmp = Path(raw)
+            (tmp / "docs").mkdir()
+            (tmp / "docs" / "ROADMAP.md").write_text(self._roadmap(rows), encoding="utf-8")
+            (tmp / "docs" / "backlog.md").write_text(self._register("R10. open"),
+                                                     encoding="utf-8")
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                code = mod.main(["--print", "--root", str(tmp)])
+        self.assertEqual(code, 0)
+        text = out.getvalue()
+        self.assertIn("Session 100 | Pending", text)
+        self.assertLess(text.index("Session 90 |"), text.index("Session 100 |"),
+                        "rows sort by number: 100 follows 90, not 00")
+        self.assertIn("of 4 sessions", text)
+
+    def test_next_may_name_a_three_digit_session(self):
+        """`**NEXT:** Session 100` failed the gate with 'found 0'."""
+        rows = self._good_rows() + [self._row("100", "R10.")]
+        code, err = self._run(self._roadmap(rows, next_sid="100"),
+                              self._register("R10. open"))
+        self.assertEqual(code, 0, err)
+        code, err = self._run(self._roadmap(self._good_rows(), next_sid="100"),
+                              self._register("R10. open"))
+        self.assertEqual(code, 2)
+        self.assertIn("NEXT names Session 100, which is not in the master table", err)
+
+    def test_a_ledger_row_naming_a_three_digit_session_resolves(self):
+        rows = self._good_rows() + [self._row("100", "R10.", "Complete 2026-09-23")]
+        code, err = self._run(self._roadmap(rows, ledger=("00", "100")),
+                              self._register("R10. open"))
+        self.assertEqual(code, 0, err)
+        code, err = self._run(self._roadmap(rows, ledger=("00", "101")),
+                              self._register("R10. open"))
+        self.assertEqual(code, 2)
+        self.assertIn("Progress Ledger names Session 101", err)
 
 
 class OutcomeReviewTests(unittest.TestCase):
