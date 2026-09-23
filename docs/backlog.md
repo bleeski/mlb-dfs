@@ -1109,6 +1109,8 @@ replay row for a played slate is a second answer to "what was delivered".
 
 ### R284. A leverage cap binds at BUILD and not at REFINE: `late_swap.py` calls `extend_bank` twice with no `leverage` (P2, S) | new 2026-09-01, from R246's class-A R233 enumeration; verified in tree by AST, with production callers
 
+**Rider 2026-09-23 (from R405's plan): the consensus-cluster cap is a second control late swap does not carry.** R405 (Session 93) strips `max_consensus_cluster_share_pct` from the swap's controls and reports the parent's cluster. An enforced cap would bind against a swap bank with no cluster-limited jobs and against untouched rows that may already exceed it. Enforcing it at refine needs the same two fixes as leverage: the swap's `extend_bank` calls carry the limited jobs, and `_untouchable_cap_conflicts` counts fixed rows.
+
 **Rider 2026-09-15 (R340/CC-1): the same two calls are ALSO missing `stack_min`.** R340 threaded the bank stack request to all three BUILD doors and deliberately left `late_swap.py:663` and `:694` alone, for this item's own stated reason: a late-swap pool has 3 to 9 slots already pinned, so it is strictly tighter than the build pool the control was chosen against, and a stack floor that refuses inside a lock window is worse than an unconstrained refinement. `extend_bank` already relaxes `stack_min` to the free hitter slots and reports `stack_min_relaxed_to`, so the machinery exists and what is missing is the measurement of where the edge moves under pins -- the SAME measurement this item already owes for `leverage`. Do both in one session: a portfolio delivered under a five-stack quota is now refined by candidates built at four, which is this item's own sentence with one word changed.
 
 **What.** R246 wired `max_cumulative_ownership_pct` / `min_low_owned_hitters`
@@ -1432,6 +1434,65 @@ checkpoint has both objects in scope roughly 240 lines above.
 
 ### R405. The consensus-cluster cap: cap lineups by how many of the bank's consensus bats they share, not only by person (P1, M) | new 2026-09-23, Ben's answer to R247(d) ("cap correlated blocks instead of persons"), from the 1905_10g post-slate review | Roadmap: Session 93
 
+**Rider 2026-09-23 (DEV; Ben's decisions and the approved build plan, for a fresh session). Line numbers are at `70d9dc1`; re-grep before editing.**
+
+*Ben's decisions (settled; do not re-ask).*
+- The cap ships ON once part (c) lands.
+- The cluster is every hitter present in 15% or more of the candidate bank, most-shared first, at most 12 members.
+- k = 3.
+- `max_consensus_cluster_share_pct` is 0.50 on `wta_satellite`, `large_gpp`, `small_gpp` and `mme`, and 1.0 (off) on `single_entry` and `cash`. MIN wins across a mixed entered set, like every other ceiling.
+- On 1905_10g that means at most 17 of 34 lineups carrying 3 or more of the ten, against 27 delivered.
+
+*Measured on 1905_10g (rebuild run `20260922T222901Z_3d5abaff`, 408-candidate sliced bank; the slate files are gitignored and not in the repo).*
+- With the cluster at 15% (10 hitters) and k = 3, only 6 of 408 candidates carry fewer than 3. That is why (c) is required, not optional.
+- Those low-cluster candidates had a median objective of 133.0 against the bank median of 138.6, about 4% lower. That is the price of the protection, and the brief should report the realized version of it.
+- A salary value rank does not find the cluster; bank share does (entry text above).
+
+*Build plan, three landings in order.*
+
+- **(a) Report; no byte moves, golden unmoved.**
+  - Compute it in `select_and_assign_entries` (CA) from the candidate set it receives, so the sliced, direct and late-swap paths agree.
+  - Return `consensus_cluster`: members with their shares, T, k, the per-delivered-lineup member-count histogram, and the share at k or more.
+  - Put it on the BS brief beside `team_footprint_any_role` (BS:5037-5041). The brief's `exposure` block comes from `portfolio_exposure` (BS:4969) over the delivered file, so carry the members from the allocation result into it.
+  - `tools/qa_portfolio.py` `section_frontier` (L477-585) reads only the delivered file and salary. Give it the members from the brief (QA already reads the brief in `frontier_from_brief`, L331), print a `consensus_cluster` washout axis, and name the control on the CONTROLS line (L547-553).
+
+- **(b) Control.**
+  - Keys: `max_consensus_cluster_share_pct` (a fraction) and `consensus_cluster_min_members` (an int k).
+  - Units gate: add the key to `FRACTION_CONTROL_KEYS` (BS:586-598) and to EP's `_fraction_control_keys` (EP:3203-3219), which checks through `CA.assert_fraction_cap` (CA:1369).
+  - Merge: in `_merged_controls_for_build` (EP:3143) the pct key joins `pct_keys` (MIN, default 1.0; EP:3164-3165, 3284-3286) and k joins `rep_keys` (integer MIN; EP:3166, 3287-3289). A posture key in no tuple never reaches `merged`.
+  - Posture defaults: `STRATEGY_DEFAULTS` (EP:850-960). `cash` carries no controls.
+  - The row: in CA after R343's team cap (CA:3228-3290) and in its shape. It uses `_cap_count(total, pct)` and `headroom(cap, fixed)`, and skips the row when the bound is E or more (the R343 vacuous-row guard, which keeps the golden stable).
+  - Diagnosis: `_diagnose_binding_constraints` (CA:646-767, the team check at 744-755) names it with the bank's count of low-cluster candidates, so a refusal reads BANK-LIMITED when the bank lacks them.
+  - Control lists: the key joins `STRATEGY_CAP_CONTROLS` (CA:782-792), `CHECKED_CONTROLS` (CA:924-944; must stay disjoint from `LADDER_RELAXED_CONTROLS`, and a test pins that), and the "Active:" list at CA:1013-1021.
+  - Late-swap fixed rows: add an entry to `_untouchable_cap_conflicts` (CA:1142-1159), counted from `fixed`.
+  - Feasibility: a floor like `floor_team_exposure_pct` (EP:3495, 3599-3604, 3384; the check at `_feasibility_report`, EP:3622 and 3708). Here the floor is BANK-dependent, so only the arithmetic half belongs in `_slate_feasibility`; the rest is the diagnosis above.
+  - S class under R386: relaxed under deadline and recorded.
+  - Default OFF until (c) lands.
+
+- **(c) Bank.**
+  - `build_single_lineup` (OV:1449-1471, forwarded at 1489-1499) and `_build_single_lineup_scipy` (OV:1026-1043) gain `max_selected_from=(ids, m)`, emitted through the nested closure `add_selected_sum_constraint(pids, lb, ub)` (OV:1138-1143).
+  - SLICED (BS ~L2615-2682, the R340 two-call split): after the normal slice, derive the cluster from the normal bucket, then call `extend_bank` for a reserved share of jobs with `max_selected_from=(cluster, k-1)`. `conditions_signature` (bank_cache:627-668) must hash the ids and m, so these land in their own bucket. `max_candidates` compares against the WHOLE cache (bank_cache:908, `__len__` at 562), so split `_total_max` between buckets the way the five-stack quota does, clamped so neither starves. Size the reserved share to cover the cap: at least (1 - pct) x E x 2 candidates.
+  - DIRECT (`build_diverse_candidate_bank`, OV:4300; called at EP:5293-5321): per-job kwargs pass the `passthrough_keys` whitelist (OV:4354-4380), and every subset rule is a hard-coded branch in `build_multi_lineup` (OV:2791-2838). Add the limited jobs there. Otherwise the control is a silent no-op on whichever path the clock picks (R246's lesson).
+  - Never a pool reduction: every player stays legal, and the limit applies only to the reserved jobs.
+  - Then turn the defaults ON and re-freeze `tests/golden/` deliberately, with the histogram before and after in the CHANGELOG.
+
+- **Late swap (declined for this item, filed).** `tools/late_swap.py` passes the posture-merged controls (L173, L803). An enforced cap would bind against the swap's own bank (no limited jobs) and against untouched rows that may already exceed it. For now the swap strips the key, reports the parent brief's cluster, and says so on stderr and in its brief. Enforcement is a rider on R284.
+
+*Tests.* `test_core.ConsensusClusterCapTests`, mirroring R343's `TeamFootprintCapTests` (tests/test_core.py:26843), `WashoutCapFeasibilityFloorTests` (27175) and `WashoutControlReportingTests` (27262). Cover:
+- cluster derivation and ordering;
+- the row binding with headroom;
+- the vacuous skip;
+- the units gate (`50` refused);
+- the posture MIN merge;
+- the BANK-LIMITED diagnosis;
+- limited jobs carrying the constraint on BOTH bank paths;
+- no player dropped from the pool;
+- late swap stripping the key.
+
+Mutation-check each one.
+
+*Verification.* `UT test_core.ConsensusClusterCapTests`; `GOLD` (unmoved through (a) and (b), re-frozen at (c)); `PROBE`; then a replay on the vendored 2026-06-03 slate reporting the cluster share, portfolio ceiling, distinct primary stacks and bank time, each before and after. If Ben re-attaches 1905_10g's files, repeat it there: 27 of 34 at 3 or more before, 17 or fewer after.
+
 - **What.** The drawdown half of the dual objective has per-person, per-team, per-game and per-SP-pair ceilings, and nothing that counts how many lineups carry the same prior bet across teams. On 1905_10g (rebuild run `20260922T222901Z_3d5abaff`, delivered after the late swap as sha256 `a65077667789`), nine hitters sat at the 0.35 player cap (11 of 34 each) and filled 99 of 272 hitter slots (36%). Every lineup carried at least 2 of them and 27 carried 3 or more, while the brief read 15 distinct primary stacks and a 29% max team footprint. The cluster is cross-team, so the team, game and stack caps cannot see it. QA's correlated-block axis (worst shared pair and triple, R247(c)) read 4 of 34 on the first build: the lineups share a POOL, not a triple, so a k-subset cap misses it too.
 - **The cap alone is not enough.** The 408-candidate bank carried at least 2 of the nine in every candidate, 3 or more in 396 and 4 or more in 268. An allocator row with nothing low-cluster to choose from would be infeasible, or would choose among 12 candidates.
 - **Definition, measured.** A salary value rank does not find the cluster: the top 9 hitters by Base per $1k hold 2 of the nine, and by Ceiling per $1k hold 5. The top 9 by bank share (the fraction of candidates carrying the player) hold 8. The shares run 69.4% (Acuna), 61.5% (Vargas), 53.9%, 50.2%, 41.2%, 35.5%, 32.1%, 21.3%, 18.6%, 18.4% (Marte), then 9.6%. The cluster is the search's own consensus, so it is defined from the bank.
@@ -1443,6 +1504,29 @@ checkpoint has both objects in scope roughly 240 lines above.
 - **Ben's at plan approval.** The defaults: the bank-share threshold, k, the share, and whether the cap ships on.
 
 ### R406. Classic scenario sleeves: build the portfolio across worlds where the projection is wrong in named ways (P1, L) | new 2026-09-23, from Ben's post-slate question "what if all our priors and all conventional wisdom are wrong", 1905_10g review | Roadmap: Session 94
+
+**Rider 2026-09-23 (DEV; Ben's decisions and the approved build plan). Needs R405 landed through (c).**
+
+*Ben's decisions (settled).*
+- Default weights: projection 40%, salary-only 20%, chalk-fails 20%, environment 20%.
+- `wta_satellite` and WTA contests shift 10 points from projection to chalk-fails (30/20/30/20).
+- The environment sleeve takes the top 2 games by implied total, or by park run factor when no odds are priced.
+- Sleeves are on by default.
+
+*Build plan.* New module `mlb_engine/optimize/classic_sleeves.py`, one owner for sleeve definitions, transforms, job lists and apportionment.
+
+- **Sleeve definitions.** Every sleeve is a WORLD in which the portfolio's bank jobs are generated, and each gets its own `conditions_signature` bucket (the R340/R405(c) pattern).
+  1. `projection`: today's frame.
+  2. `salary_only`: DK salary is the only prior. Base is rebuilt from salary through a position-group points-per-dollar ratio measured on the slate's own frame (hitters and pitchers separately). Ceiling is Base x the group's median Ceiling/Base ratio, so no player-level factor survives. Floor keeps its relation to Base. The transform is a copy of the frame, never an edit of it.
+  3. `chalk_fails`: the projection frame, with jobs solved under `max_selected_from=(R405 cluster, 1)`. This reuses R405(c) and needs no new penalty number.
+  4. `environment`: jobs restricted to stack teams from the chosen games. Games are ranked by implied total when F1 priced them, else by park run factor, with ties broken by game id so the order is deterministic.
+- **Apportionment.** Per contest, by largest remainder over the declared weights, deterministic and sorted. A single-entry contest and a cash contest go to `projection`. Each entry is masked to its sleeve's candidates through the allocator's existing `compatible[e][k]` mask (CA, where incompatible x are clamped to 0). That leaves the joint MILP and every cap in force across the whole entered set, so R405's cluster cap still binds at the portfolio level.
+- **Report.** A brief `sleeves` block: weights, entries per sleeve per contest, each sleeve's apex and washout review proxies, the environment games chosen and why, and any sleeve that could not fill (its entries fall back to `projection`, counted as a relaxation).
+- **Truthful labels.** Every sleeve is a deterministic construction over labeled priors. Nothing here is a probability or an edge, and a sleeve winning a replay is "supported in the shapes replayed".
+- **Throughput.** Four buckets cost bank time. Measure on `PROBE` and say what the budget bought; bank growth stays search effort, never a pool cut.
+- **Breakpoint.** Sleeves built and reported with allocation unchanged is a valid first landing; the apportionment mask is the second.
+
+*Tests.* `test_core.ClassicSleeveTests`: the salary-only transform keeps no player-level factor; chalk-fails jobs carry the cluster constraint; environment game ranking and its tie-break; largest-remainder apportionment including the WTA tilt; single-entry and cash go to projection; the mask confines each entry to its sleeve; caps still bind across sleeves; no player dropped. Then `GOLD` re-frozen deliberately with the histogram, and `PROBE`.
 
 - **What.** Every Classic candidate is an argmax of ONE projection under a different (SP pair, stack team) constraint, so a systematic projection error is shared by every entry. The caps spread persons, not beliefs. Showdown already conditions each entry on a game state (`showdown_theses`, the thesis ladder); Classic has no equivalent.
 - **Fix.** Split the entered set into sleeves, each optimized for ceiling inside its own world, and allocate entries across sleeves by declared weights recorded in the brief:
@@ -1457,11 +1541,57 @@ checkpoint has both objects in scope roughly 240 lines above.
 
 ### R407. Caps that scale with input confidence (P1, M) | new 2026-09-23, from the 1905_10g post-slate review | Roadmap: Session 95
 
+**Rider 2026-09-23 (DEV; Ben's decisions and the approved build plan). Needs R405(b) for the cluster half.**
+
+*Ben's decisions (settled).* Two tiers from four facts:
+1. no odds priced (`enrichment.counts.f1_games_priced == 0`);
+2. a side the pool used was filled from a platoon reference more than 7 days old (the R27 age check `build_slate_pool` already runs, per used TBD side);
+3. Savant expected stats more than 14 days old (the enrichment age warning's own threshold, `reference_manifest.json` `fetched_at`);
+4. no handedness (`enrichment.counts.f4_platoon_applied == 0` on a slate with hitters in the pool).
+
+DEGRADED is exactly one fact: `max_player_exposure_pct` -0.05 and `max_consensus_cluster_share_pct` -0.10. SEVERE is two or more: -0.10 and -0.20. 1905_10g had all four, so it was SEVERE.
+
+*Build plan.*
+- **Where.** Compute the tier where `run_slate` resolves controls (after `_merged_controls_for_build`, EP:4982-4990; before the floor merge records `controls_feasibility`), from the same enrichment facts the brief prints. There is no second reader of those facts.
+- **Floors win.** The result is `max(tightened, feasibility floor)`, so this can never push a cap below what the slate can carry.
+- **Provenance.** The tightened value carries `confidence_derived` (R388(b)'s vocabulary; coordinate with Session 06 if it has landed).
+- **Under deadline** (R386, inside T-30) or on a proven-infeasible joint MILP, the confidence tightening is the FIRST thing relaxed, recorded with its before and after values.
+- **The brief** states the tier, the facts that set it, and each control's before and after values.
+- **Operator override.** An explicit `--controls-override` value for either key wins over the tightening, and the brief says so.
+
+*Tests.* `test_core.ConfidenceScaledCapTests`: each fact alone gives DEGRADED; two give SEVERE; the floor wins; an override wins; the deadline relaxes it first; the brief block is populated; a clean slate is unchanged. `GOLD` (the vendored 2026-06-03 fixture's facts decide whether it moves; say which).
+
 - **What.** 1905_10g built with no odds (`f1_games_priced: 0`), no handedness (`f4_platoon_applied: 0`), Savant data 23 days old and, on the first build, 12 of 20 sides from a 48.9-day-old platoon file. The brief recorded each fact, and the build concentrated exactly as it would on a clean night: nothing reads a degradation back into the controls.
 - **Fix.** A deterministic confidence tier computed from facts the brief already carries (`enrichment.degraded`, `factors_inert`, `f1_games_priced`, reference ages, `dk_order_coverage`, feed status), mapped by a declared schedule to a tighter `max_player_exposure_pct` and R405's cluster share. The tightened value carries its provenance (`confidence_derived`, in R388(b)'s vocabulary) and is the first thing R386 relaxes under deadline. The brief states the tier, the facts that set it, and the before and after values.
 - **Needs.** R405(b) for the cluster half; the player half stands alone. Coordinates with Session 06 (R388(b) provenance). The schedule is Ben's at plan approval.
 
 ### R408. Does the projection order players better than salary? Backfill the grade on the archive (P1, M) | new 2026-09-23, from the 1905_10g post-slate review | Roadmap: Session 96
+
+**Rider 2026-09-23 (DEV; premise measured, build plan). Ben asked to extend `tools/replay_slate.py`.**
+
+*Premise, measured at `70d9dc1`.*
+- `replay_slate.py` settles a LINEUP SET against an archived field. It does not grade per-player projections.
+- `data/archive/` holds 41 dates, and each `mined_*.json` carries a `player_table` of realized `fpts` and `pct_drafted` per player (296 on the 2026-07-21 sample).
+- Only 5 archived DKSalaries files exist, on 4 dates (2026-06-03, 06-28, 07-19 afternoon, 07-24 main and night), plus `salary_extracted_*.csv` on some dates.
+- A projection needs the salary file's `AvgPointsPerGame` and IDs, so the backfill's honest n is about 5 slates, not 41. Say so in the output.
+- The forward grade (R255) becomes the main instrument. Recommend to Ben, as a one-line ARCHIVE note, that every standings pull keeps that slate's DKSalaries file beside it.
+
+*Build plan.*
+- **The mode.** Add a `--grade-projection` mode to `tools/replay_slate.py` that reuses its archive loaders and integer-hundredths accounting. For each archived Classic slate with a salary file:
+  - rebuild the projection frame through the production builder on that salary file;
+  - join to the mined `player_table` realized FPTS by the miner's `player_norm`;
+  - rank realized FPTS against Base, Ceiling, salary, and APPG, separately for hitters and pitchers.
+- **Per slate, report:**
+  - n;
+  - Spearman rank correlation;
+  - top-decile hits (predicted top 10% that land in the realized top 10%);
+  - tail hits (predicted top 10% that land at realized p90 or above);
+  - which predictor led on each.
+- **Never pool** across slates or archetypes into a single number. A one-line count ("engine Base led salary on X of N slates") is allowed, labeled an observed-outcome count.
+- **Reference caveat.** Reference data (Savant, platoon) today is not what it was on that date unless it was frozen (R251). A slate whose inputs were not frozen is graded with the date-independent factors only, and the table says which factors were live.
+- **Labels.** Observed outcomes only; never ROI, a win rate, a probability or an edge.
+
+*Tests.* `test_core.ProjectionBackfillGradeTests` on the vendored 2026-06-03 slate: the join rate is reported; the Spearman ranking is deterministic; top-decile and tail counts are computed on a hand-checked toy frame; nothing is pooled; the labels are present.
 
 - **What.** The projection's base is DK's own AvgPointsPerGame, and every factor on top is an uncalibrated labeled prior. No measurement says the engine ranks players better than DK's salary does, yet builds put a third of hitter slots on engine-picked value. R255 grades the skill signal against the salary baseline going forward, one slate at a time; nothing answers the question from the archive already held (235 contests over 14 dates in the 2026-09-14 mine).
 - **Fix.** Through `tools/replay_slate.py` (R384), for each archived Classic slate whose replay inputs are on disk, rank realized FPTS against (a) the engine's projection, (b) salary alone and (c) APPG alone. Report rank correlation plus top-decile and tail (p90+) hit counts per slate, n stated, observed outcomes only. A slate whose reference inputs were not frozen (R251) is graded on (b) and (c) only and says so.
