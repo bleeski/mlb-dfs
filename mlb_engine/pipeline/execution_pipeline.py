@@ -154,11 +154,13 @@ v1.1 changes:
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 import math
 import shutil
 import sys
 import time
+import traceback
 from collections import Counter
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, MutableMapping, Optional, Sequence, Tuple
@@ -166,8 +168,9 @@ from typing import Any, Dict, Iterable, List, Mapping, MutableMapping, Optional,
 import pandas as pd
 
 from mlb_engine.pipeline.build_state_manager import (
-    create_run, promote_run, read_pointer_sha256, register_artifact,
-    sha256_file, snapshot_run_inputs, update_run_certification,
+    create_run, mark_run_crashed, promote_run, read_pointer_sha256,
+    read_run_manifest, register_artifact, sha256_file, snapshot_run_inputs,
+    update_run_certification, verify_inputs_unmoved,
 )
 from mlb_engine.allocate.contest_allocator import (
     CONSENSUS_CLUSTER_MIN_MEMBERS,
@@ -179,7 +182,8 @@ from mlb_engine.contest_shapes import (
     satellite_shape_for, validate_shape,
 )
 from mlb_engine.entries.dk_entries_manager import (
-    derive_workflow_certification, fixed_portfolio_exposure,
+    derive_essential_validity, derive_workflow_certification, entry_coverage,
+    fixed_portfolio_exposure,
     reconcile_entries_against_assignments,
     validate_dk_entries_file, validate_template_preservation,
     validate_upload_ready_gates, write_candidate_from_template,
@@ -309,6 +313,193 @@ def _blocked_result(run: Dict[str, Any], errors: Sequence[str], diagnostics: Dic
     }
 
 
+# R393(b), roadmap Session 08: the last usable artifact. A run result carries the
+# best current essential-valid export it produced -- bytes, sha256, coverage,
+# label, path -- so a failure AFTER that export exists (a crashed promotion, a
+# raising brief, a failed mirror) can still hand it back. Session 08 attaches one
+# only to an export that certified; Session 09 widens that to review-grade
+# exports whose failing gates are all S or P, through this same object.
+UPLOAD_READY_LABEL = "upload_ready"
+REVIEW_GRADE_LABEL = "review_grade"
+_CERTIFICATION_GATES = ("workflow_valid", "selection_certified", "allocation_certified")
+
+
+def artifact_label(certification: Mapping[str, Any],
+                   certification_label: Optional[str] = None) -> str:
+    """The label an artifact earns from its OWN certification record.
+
+    ``upload_ready`` only when all three gates are literally True and no
+    review-grade label (R388(e)'s deadline or downgrade label) was recorded for
+    it; the recorded label when there is one; ``review_grade`` otherwise. Never
+    read off a caller's status or a later stage, so a file handed back after a
+    later failure is upload-ready only if it certified on its own.
+    """
+    if certification_label and str(certification_label).startswith(REVIEW_GRADE_LABEL):
+        return str(certification_label)
+    if all((certification or {}).get(k) is True for k in _CERTIFICATION_GATES):
+        return UPLOAD_READY_LABEL
+    return REVIEW_GRADE_LABEL
+
+
+def usable_artifact(run_dir: str | Path,
+                    certification_label: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """The run's registered export as a last-usable-artifact record, or None.
+
+    Everything comes from the run's own manifest and the exact bytes on disk:
+    the registered ``dk_export`` path and sha256, the certification the run
+    recorded for it, and `derive_essential_validity` over that certification's
+    post-export facts. The bytes are read once and must hash to the registered
+    sha256, or the export is not essential-valid (delivered byte identity is V).
+    ``bytes`` rides the record for R393(a)'s reconstruction (Session 23);
+    :func:`artifact_record` is the JSON view without them.
+    """
+    run_path = Path(run_dir)
+    manifest = read_run_manifest(run_path)
+    record = next((r for r in (manifest.get("artifacts") or {}).values()
+                   if r.get("role") == "dk_export"), None)
+    if record is None:
+        return None
+    path = run_path / str(record.get("relative_path"))
+    data = path.read_bytes()
+    digest = hashlib.sha256(data).hexdigest()
+    certification = dict(manifest.get("certification") or {})
+    essential = derive_essential_validity(certification.get("post_export_gates") or {})
+    essential["bytes_match_record"] = digest == record.get("sha256")
+    if not essential["bytes_match_record"]:
+        essential["essential_valid"] = False
+        essential["failed"] = list(essential["failed"]) + ["delivered_byte_identity"]
+    return {
+        "path": str(path),
+        "sha256": digest,
+        "size_bytes": len(data),
+        "bytes": data,
+        "coverage": entry_coverage(path),
+        "essential_valid": essential,
+        "label": artifact_label(certification, certification_label),
+        "certification": {k: certification.get(k) for k in _CERTIFICATION_GATES},
+        "run_id": manifest.get("run_id"),
+    }
+
+
+def artifact_record(artifact: Optional[Mapping[str, Any]]) -> Optional[Dict[str, Any]]:
+    """The JSON-safe view of a last-usable-artifact record: everything but the
+    bytes, which a brief, a refusal record or a decision log cannot carry."""
+    if not artifact:
+        return None
+    return {k: v for k, v in artifact.items() if k != "bytes"}
+
+
+def _attachable(artifact: Optional[Mapping[str, Any]]) -> bool:
+    """Session 08's attach rule: the export certified AND is essential-valid."""
+    return bool(artifact) and \
+        (artifact.get("essential_valid") or {}).get("essential_valid") is True and \
+        (artifact.get("certification") or {}).get("workflow_valid") is True
+
+
+def _crashed_result(run: Mapping[str, Any], exc: BaseException, mode: str) -> Dict[str, Any]:
+    """R297(c). A crash after `create_run` ends the run terminal, never `building`.
+
+    Before certification (every trigger the register names): the register's
+    fix shape, `_blocked_result` with ``crashed: True``, plus the manifest's own
+    ``crashed`` marker. After certification (a raising promotion): the certified
+    record is left intact, the run is marked ``blocked``/``crashed``, the inputs
+    are re-checked as promotion would have, and the export rides the result as
+    the last usable artifact. This never raises: a failed write falls back to
+    the manifest alone, and a failed fallback says so on the result.
+    """
+    try:
+        error = f"{type(exc).__name__}: {exc}"
+    except Exception:  # noqa: BLE001 - an exception whose __str__ raises
+        error = f"{type(exc).__name__}: <unprintable>"
+    # The stack, kept: `errors` holds one line, and without this the crash's
+    # location reached no record and no terminal (the review's first finding).
+    try:
+        stack = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+    except Exception:  # noqa: BLE001
+        stack = ""
+    run_dir = Path(run["run_dir"])
+    try:
+        print(f"ENGINE CRASHED after create_run  {error}; run {run['run_id']} "
+              f"ends blocked (crashed), not building\n{stack}", file=sys.stderr)
+    except Exception:  # noqa: BLE001 - a closed stderr never costs the result
+        pass
+    result: Dict[str, Any] = {
+        "passed": False, "run_id": run["run_id"], "run_dir": str(run_dir),
+        "errors": [error], "workflow_valid": False, "crashed": True,
+        "traceback": stack,
+        "diagnostics_path": str(run_dir / "final" / "diagnostics.json"),
+    }
+    try:
+        certified = (read_run_manifest(run_dir).get("certification") or {}).get(
+            "workflow_valid") is True
+    except Exception:  # noqa: BLE001 - an unreadable manifest certified nothing
+        certified = False
+    if not certified:
+        try:
+            blocked = _blocked_result(run, [error], {
+                "run_id": run["run_id"], "mode": mode, "crashed": True,
+                "traceback": stack,
+                "diagnostic_source_file": "", "diagnostic_source_sha256": "",
+                "workflow_valid": False,
+            })
+            mark_run_crashed(run_dir, error)
+            return {**blocked, "crashed": True, "traceback": stack,
+                    "terminal_state_recorded": True}
+        except Exception as write_exc:  # noqa: BLE001
+            result["diagnostics_error"] = f"{type(write_exc).__name__}: {write_exc}"
+    try:
+        status = mark_run_crashed(run_dir, error).get("status")
+        # A promoted run is immutable and `mark_run_crashed` leaves it alone,
+        # so the flag says what the manifest now reads, not that a write ran.
+        result["terminal_state_recorded"] = status == "blocked"
+        if status == "promoted":
+            result["terminal_state_note"] = ("the run was already promoted; a "
+                                             "promoted run is immutable")
+    except Exception as mark_exc:  # noqa: BLE001
+        result["terminal_state_recorded"] = False
+        result["terminal_state_error"] = f"{type(mark_exc).__name__}: {mark_exc}"
+    if certified:
+        try:
+            artifact = usable_artifact(run_dir)
+            unmoved = verify_inputs_unmoved(run_dir)
+            if artifact is not None:
+                artifact["inputs_unmoved"] = bool(unmoved.get("passed"))
+            if _attachable(artifact) and unmoved.get("passed"):
+                result["last_usable_artifact"] = artifact
+            else:
+                result["last_usable_artifact_withheld"] = (
+                    list(unmoved.get("errors") or [])
+                    + list(((artifact or {}).get("essential_valid") or {}).get("failed") or [])
+                    or ["no registered dk_export"])
+        except Exception as art_exc:  # noqa: BLE001
+            result["last_usable_artifact_error"] = f"{type(art_exc).__name__}: {art_exc}"
+    return result
+
+
+class EngineCrashed(RuntimeError):
+    """R297(c). A door handed back a crashed run with nothing usable in it.
+
+    The engine ended the run terminal (``blocked``, ``crashed: True``). A caller
+    keeps the crash a crash rather than reading the blocked result as a
+    refusal: build_slate's deadline governor would re-solve it, and late_swap
+    would print "late swap did not pass" and exit 3, both the crash-wearing-a-
+    refusal shape R296(d) was filed against. Raised, it exits 1 as it did.
+    """
+
+
+def raise_on_engine_crash(result: Mapping[str, Any]) -> Mapping[str, Any]:
+    """Raise :class:`EngineCrashed` for a crashed result with no artifact,
+    after printing the crash's stack; any other result passes through."""
+    if result.get("crashed") and not result.get("last_usable_artifact"):
+        if result.get("traceback"):
+            print(result["traceback"], file=sys.stderr, end="")
+        raise EngineCrashed(
+            f"the engine crashed after create_run; run {result.get('run_id')} "
+            f"ended blocked (crashed), not building: "
+            f"{'; '.join(str(e) for e in result.get('errors') or [])}")
+    return result
+
+
 def execute_portfolio(
     *,
     runs_root: str | Path,
@@ -354,287 +545,317 @@ def execute_portfolio(
     """Execute the canonical entry-level portfolio workflow."""
     controls = dict(portfolio_controls or {})
     run = create_run(runs_root, mode, parent_run_id=parent_run_id, metadata={"pipeline_version": VERSION, **(metadata or {})})
-    # R20(c): the compare half of promotion's compare-and-swap, captured the
-    # moment this run begins. If another session promotes while this run is
-    # building, promotion below refuses instead of silently overwriting.
-    pointer_sha_at_create = read_pointer_sha256(runs_root)
-    run_dir = Path(run["run_dir"])
-    input_paths = [salary_csv, entries_csv, *(additional_input_paths or [])]
-    snapshot_run_inputs(run_dir, input_paths)
+    # R297(c). Everything after create_run is inside this try, so a crash
+    # anywhere in the body -- the allocator, the writer, a validator, a
+    # promotion -- ends the run terminal instead of stranding it at
+    # `building` with empty errors, which reads exactly like a build still in
+    # flight. `except Exception`: an interrupt or SystemExit still propagates,
+    # and a hard kill still strands the run; no wrapper can reach that.
+    try:
+        # R20(c): the compare half of promotion's compare-and-swap, captured the
+        # moment this run begins. If another session promotes while this run is
+        # building, promotion below refuses instead of silently overwriting.
+        pointer_sha_at_create = read_pointer_sha256(runs_root)
+        run_dir = Path(run["run_dir"])
+        input_paths = [salary_csv, entries_csv, *(additional_input_paths or [])]
+        snapshot_run_inputs(run_dir, input_paths)
 
-    projection_path = run_dir / "final" / "projections.csv"
-    _materialize_projections(projections, projection_path)
-    register_artifact(run_dir, projection_path, "projections")
+        projection_path = run_dir / "final" / "projections.csv"
+        _materialize_projections(projections, projection_path)
+        register_artifact(run_dir, projection_path, "projections")
 
-    # R61: on a late swap the solve is handed a SUBSET of the file's complete
-    # rows, and the export validator grades all of them. Hand the allocator what
-    # the rows it cannot touch already hold so both ends resolve the same caps
-    # against the same denominator.
-    #
-    # Late swap only, deliberately. On an initial build from a reserved template
-    # the authorized set and the complete-row set are the same set, so there is
-    # nothing to offset and passing None keeps the build byte-identical (the R28
-    # precedent). `preserve_completed=True` below means an initial build CAN in
-    # principle carry completed rows outside the requirements; that case is
-    # filed as R61-tail rather than changed silently here.
-    fixed_exposure = None
-    if mode == "late_swap":
-        fixed_exposure = fixed_portfolio_exposure(
-            entries_csv,
-            [str(req["entry_id"]) for req in entry_requirements],
+        # R61: on a late swap the solve is handed a SUBSET of the file's complete
+        # rows, and the export validator grades all of them. Hand the allocator what
+        # the rows it cannot touch already hold so both ends resolve the same caps
+        # against the same denominator.
+        #
+        # Late swap only, deliberately. On an initial build from a reserved template
+        # the authorized set and the complete-row set are the same set, so there is
+        # nothing to offset and passing None keeps the build byte-identical (the R28
+        # precedent). `preserve_completed=True` below means an initial build CAN in
+        # principle carry completed rows outside the requirements; that case is
+        # filed as R61-tail rather than changed silently here.
+        fixed_exposure = None
+        if mode == "late_swap":
+            fixed_exposure = fixed_portfolio_exposure(
+                entries_csv,
+                [str(req["entry_id"]) for req in entry_requirements],
+                salary_csv_path=salary_csv,
+                # R343 + R61. The offset has to be counted at the SAME threshold the
+                # cap is enforced at, or the untouched rows are subtracted from a
+                # cap they were never measured against.
+                team_exposure_min_hitters=controls.get("team_exposure_min_hitters"),
+            )
+        # R98(2): the bank record travels with the candidates it produced. The
+        # allocator can prove infeasibility against a bank; it cannot see whether
+        # that bank was a completed search or a slice, and that difference decides
+        # whether the honest remedy is another slice or a control change.
+        allocation = select_and_assign_entries(
+            candidates, entry_requirements, controls, bank_report=bank_diagnostics,
+            fixed_exposure=fixed_exposure, feasibility_inputs=feasibility_inputs,
+            feasibility_checks=feasibility_checks,
+            interaction_probe_budget_s=interaction_probe_budget_s,
+            interaction_probe_not_after=interaction_probe_not_after)
+        if not allocation.get("passed"):
+            diagnostics = {
+                "run_id": run["run_id"], "mode": mode, "allocation": allocation,
+                "diagnostic_source_file": "", "diagnostic_source_sha256": "",
+                "workflow_valid": False,
+            }
+            blocked = _blocked_result(run, allocation.get("errors", ["allocation failed"]), diagnostics)
+            # R207. The probe rides the result as well as diagnostics.json, because
+            # the refusal a caller prints is built from the result; only when it ran.
+            if allocation.get("interaction_probe") is not None:
+                blocked["interaction_probe"] = allocation["interaction_probe"]
+            return blocked
+
+        bank_coverage = _bank_coverage(projections, candidates) if compute_bank_coverage else None
+
+        assignments = allocation["assignments"]
+        # R126. Both ends of the stated objective, over the set that is actually
+        # being entered rather than over the bank. Computed here because this is the
+        # first point where the entered set exists and the projections are still in
+        # hand; a caller writing the brief would otherwise have to re-join the export
+        # against projections.csv, which is exactly what BUILD did by hand.
+        portfolio_frontier = _portfolio_frontier(projections, assignments)
+        assignment_path = run_dir / "final" / "assignments.csv"
+        _write_assignments(assignment_path, assignments)
+        assignment_record = register_artifact(run_dir, assignment_path, "assignments")
+
+        pre_gate_values = dict(workflow_gates)
+        pre_gate_values.update({
+            "selection_certified": allocation.get("selection_certified"),
+            "allocation_required": True,
+            "allocation_certified": allocation.get("allocation_certified"),
+            "allocation_method": allocation.get("allocation_method"),
+        })
+        pre = validate_upload_ready_gates(pre_gate_values, allocation_required=True)
+
+        candidate_path = run_dir / "candidate" / "DO_NOT_UPLOAD_DKEntries.csv"
+        write_result = write_candidate_from_template(entries_csv, assignments, candidate_path, preserve_completed=(mode != "late_swap"))
+        if not write_result["passed"]:
+            diagnostics = {
+                "run_id": run["run_id"], "mode": mode, "allocation": allocation,
+                "pre_export": pre, "candidate_write": write_result,
+                "bank_coverage": bank_coverage,
+                "diagnostic_source_file": "", "diagnostic_source_sha256": "",
+                "workflow_valid": False,
+            }
+            return _blocked_result(run, write_result["errors"], diagnostics)
+        register_artifact(run_dir, candidate_path, "candidate_export")
+
+        mutable_ids = [str(req["entry_id"]) for req in entry_requirements]
+        locked_slots = {
+            str(req["entry_id"]): dict(req.get("locked_slot_assignments") or {})
+            for req in entry_requirements if req.get("locked_slot_assignments")
+        }
+        template = validate_template_preservation(entries_csv, candidate_path, mutable_entry_ids=mutable_ids if mode == "late_swap" else None)
+        reconciliation = reconcile_entries_against_assignments(assignments, candidate_path)
+        candidate_validation = validate_dk_entries_file(
+            candidate_path,
             salary_csv_path=salary_csv,
-            # R343 + R61. The offset has to be counted at the SAME threshold the
-            # cap is enforced at, or the untouched rows are subtracted from a
-            # cap they were never measured against.
-            team_exposure_min_hitters=controls.get("team_exposure_min_hitters"),
+            confirmed_hitter_ids=confirmed_hitter_ids,
+            confirmed_teams=confirmed_teams,
+            pitcher_roles=pitcher_roles,
+            excluded_player_ids=excluded_player_ids,
+            locked_slot_assignments=locked_slots,
+            portfolio_controls=controls,
+            require_all_reserved_filled=True,
         )
-    # R98(2): the bank record travels with the candidates it produced. The
-    # allocator can prove infeasibility against a bank; it cannot see whether
-    # that bank was a completed search or a slice, and that difference decides
-    # whether the honest remedy is another slice or a control change.
-    allocation = select_and_assign_entries(
-        candidates, entry_requirements, controls, bank_report=bank_diagnostics,
-        fixed_exposure=fixed_exposure, feasibility_inputs=feasibility_inputs,
-        feasibility_checks=feasibility_checks,
-        interaction_probe_budget_s=interaction_probe_budget_s,
-        interaction_probe_not_after=interaction_probe_not_after)
-    if not allocation.get("passed"):
-        diagnostics = {
-            "run_id": run["run_id"], "mode": mode, "allocation": allocation,
-            "diagnostic_source_file": "", "diagnostic_source_sha256": "",
-            "workflow_valid": False,
+        if mode == "late_swap":
+            delta = validate_late_swap_delta(entries_csv, candidate_path, mutable_entry_ids=mutable_ids)
+        else:
+            delta = {"passed": True, "errors": [], "changed_entry_ids": mutable_ids}
+
+        early_errors = pre["errors"] + template["errors"] + reconciliation["errors"] + candidate_validation["errors"] + delta["errors"]
+        if early_errors:
+            diagnostics = {
+                "run_id": run["run_id"], "mode": mode, "allocation": allocation,
+                "pre_export": pre, "template_preservation": template,
+                "entry_reconciliation": reconciliation, "candidate_validation": candidate_validation,
+                "late_swap_delta": delta,
+                "bank_coverage": bank_coverage,
+                "diagnostic_source_file": str(candidate_path.relative_to(run_dir)),
+                "diagnostic_source_sha256": sha256_file(candidate_path),
+                "assignment_sha256": assignment_record["sha256"],
+                "workflow_valid": False,
+            }
+            return _blocked_result(run, early_errors, diagnostics)
+
+        final_export = run_dir / "final" / "DKEntries.csv"
+        shutil.copy2(candidate_path, final_export)
+        final_hash = sha256_file(final_export)
+        candidate_hash = sha256_file(candidate_path)
+        final_validation = validate_dk_entries_file(
+            final_export,
+            salary_csv_path=salary_csv,
+            confirmed_hitter_ids=confirmed_hitter_ids,
+            confirmed_teams=confirmed_teams,
+            pitcher_roles=pitcher_roles,
+            excluded_player_ids=excluded_player_ids,
+            locked_slot_assignments=locked_slots,
+            portfolio_controls=controls,
+            require_all_reserved_filled=True,
+        )
+        final_reconciliation = reconcile_entries_against_assignments(assignments, final_export)
+        post = {
+            "template_preservation_passed": template["passed"],
+            "entry_reconciliation_passed": final_reconciliation["passed"],
+            "roster_legality_passed": final_validation["roster_legality_passed"],
+            "portfolio_caps_passed": final_validation["portfolio_caps_passed"],
+            "locked_immutability_passed": final_validation["locked_immutability_passed"] and delta["passed"],
+            "export_hash_binding_passed": candidate_hash == final_hash,
         }
-        blocked = _blocked_result(run, allocation.get("errors", ["allocation failed"]), diagnostics)
-        # R207. The probe rides the result as well as diagnostics.json, because
-        # the refusal a caller prints is built from the result; only when it ran.
-        if allocation.get("interaction_probe") is not None:
-            blocked["interaction_probe"] = allocation["interaction_probe"]
-        return blocked
-
-    bank_coverage = _bank_coverage(projections, candidates) if compute_bank_coverage else None
-
-    assignments = allocation["assignments"]
-    # R126. Both ends of the stated objective, over the set that is actually
-    # being entered rather than over the bank. Computed here because this is the
-    # first point where the entered set exists and the projections are still in
-    # hand; a caller writing the brief would otherwise have to re-join the export
-    # against projections.csv, which is exactly what BUILD did by hand.
-    portfolio_frontier = _portfolio_frontier(projections, assignments)
-    assignment_path = run_dir / "final" / "assignments.csv"
-    _write_assignments(assignment_path, assignments)
-    assignment_record = register_artifact(run_dir, assignment_path, "assignments")
-
-    pre_gate_values = dict(workflow_gates)
-    pre_gate_values.update({
-        "selection_certified": allocation.get("selection_certified"),
-        "allocation_required": True,
-        "allocation_certified": allocation.get("allocation_certified"),
-        "allocation_method": allocation.get("allocation_method"),
-    })
-    pre = validate_upload_ready_gates(pre_gate_values, allocation_required=True)
-
-    candidate_path = run_dir / "candidate" / "DO_NOT_UPLOAD_DKEntries.csv"
-    write_result = write_candidate_from_template(entries_csv, assignments, candidate_path, preserve_completed=(mode != "late_swap"))
-    if not write_result["passed"]:
+        certification = derive_workflow_certification(pre, post, allocation_required=True)
         diagnostics = {
-            "run_id": run["run_id"], "mode": mode, "allocation": allocation,
-            "pre_export": pre, "candidate_write": write_result,
-            "bank_coverage": bank_coverage,
-            "diagnostic_source_file": "", "diagnostic_source_sha256": "",
-            "workflow_valid": False,
-        }
-        return _blocked_result(run, write_result["errors"], diagnostics)
-    register_artifact(run_dir, candidate_path, "candidate_export")
-
-    mutable_ids = [str(req["entry_id"]) for req in entry_requirements]
-    locked_slots = {
-        str(req["entry_id"]): dict(req.get("locked_slot_assignments") or {})
-        for req in entry_requirements if req.get("locked_slot_assignments")
-    }
-    template = validate_template_preservation(entries_csv, candidate_path, mutable_entry_ids=mutable_ids if mode == "late_swap" else None)
-    reconciliation = reconcile_entries_against_assignments(assignments, candidate_path)
-    candidate_validation = validate_dk_entries_file(
-        candidate_path,
-        salary_csv_path=salary_csv,
-        confirmed_hitter_ids=confirmed_hitter_ids,
-        confirmed_teams=confirmed_teams,
-        pitcher_roles=pitcher_roles,
-        excluded_player_ids=excluded_player_ids,
-        locked_slot_assignments=locked_slots,
-        portfolio_controls=controls,
-        require_all_reserved_filled=True,
-    )
-    if mode == "late_swap":
-        delta = validate_late_swap_delta(entries_csv, candidate_path, mutable_entry_ids=mutable_ids)
-    else:
-        delta = {"passed": True, "errors": [], "changed_entry_ids": mutable_ids}
-
-    early_errors = pre["errors"] + template["errors"] + reconciliation["errors"] + candidate_validation["errors"] + delta["errors"]
-    if early_errors:
-        diagnostics = {
-            "run_id": run["run_id"], "mode": mode, "allocation": allocation,
-            "pre_export": pre, "template_preservation": template,
-            "entry_reconciliation": reconciliation, "candidate_validation": candidate_validation,
+            "run_id": run["run_id"],
+            "parent_run_id": parent_run_id,
+            "mode": mode,
+            "pipeline_version": VERSION,
+            "allocation": allocation,
+            "pre_export": pre,
+            "post_export": post,
+            "template_preservation": template,
+            "entry_reconciliation": final_reconciliation,
+            "final_export_validation": final_validation,
             "late_swap_delta": delta,
             "bank_coverage": bank_coverage,
-            "diagnostic_source_file": str(candidate_path.relative_to(run_dir)),
-            "diagnostic_source_sha256": sha256_file(candidate_path),
+            # R126. In the immutable run record, beside bank_coverage, because "how
+            # concentrated was the set we entered" is a question asked weeks later
+            # and the answer has to survive without the projections frame.
+            "portfolio_frontier": portfolio_frontier,
+            "diagnostic_source_file": str(final_export.relative_to(run_dir)),
+            "diagnostic_source_sha256": final_hash,
             "assignment_sha256": assignment_record["sha256"],
-            "workflow_valid": False,
+            # F4: what the pre-export gates were built from, recorded in the immutable
+            # run record. "Upload-ready" is defined as all three gates passing, so the
+            # artifact has to say which of its inputs were checked, which were
+            # asserted by the caller, and which were assumed without checking.
+            "workflow_gate_evidence": dict((metadata or {}).get("workflow_gate_evidence") or {}),
+            "assumed_gates": list((metadata or {}).get("assumed_gates") or []),
+            "caller_asserted_gates": list((metadata or {}).get("caller_asserted_gates") or []),
+            # F11: what the build actually did. build_multi_lineup returns relaxation
+            # counts, DU and anchor validation, and failed_indices; none of it was
+            # written down, so the immutable run record could not answer "what did the
+            # engine give up to produce this file". Relaxations are exactly the facts
+            # post-slate review needs, and a portfolio is clean when they are zero,
+            # not when the gates pass.
+            "bank_diagnostics": _json_safe(bank_diagnostics),
+            "warnings": list(bank_warnings or []),
+            "status": "certified" if certification.get("workflow_valid") else "blocked",
+            "export_declared": True,
+            "hash_binding_applicable": True,
+            **certification,
         }
-        return _blocked_result(run, early_errors, diagnostics)
-
-    final_export = run_dir / "final" / "DKEntries.csv"
-    shutil.copy2(candidate_path, final_export)
-    final_hash = sha256_file(final_export)
-    candidate_hash = sha256_file(candidate_path)
-    final_validation = validate_dk_entries_file(
-        final_export,
-        salary_csv_path=salary_csv,
-        confirmed_hitter_ids=confirmed_hitter_ids,
-        confirmed_teams=confirmed_teams,
-        pitcher_roles=pitcher_roles,
-        excluded_player_ids=excluded_player_ids,
-        locked_slot_assignments=locked_slots,
-        portfolio_controls=controls,
-        require_all_reserved_filled=True,
-    )
-    final_reconciliation = reconcile_entries_against_assignments(assignments, final_export)
-    post = {
-        "template_preservation_passed": template["passed"],
-        "entry_reconciliation_passed": final_reconciliation["passed"],
-        "roster_legality_passed": final_validation["roster_legality_passed"],
-        "portfolio_caps_passed": final_validation["portfolio_caps_passed"],
-        "locked_immutability_passed": final_validation["locked_immutability_passed"] and delta["passed"],
-        "export_hash_binding_passed": candidate_hash == final_hash,
-    }
-    certification = derive_workflow_certification(pre, post, allocation_required=True)
-    diagnostics = {
-        "run_id": run["run_id"],
-        "parent_run_id": parent_run_id,
-        "mode": mode,
-        "pipeline_version": VERSION,
-        "allocation": allocation,
-        "pre_export": pre,
-        "post_export": post,
-        "template_preservation": template,
-        "entry_reconciliation": final_reconciliation,
-        "final_export_validation": final_validation,
-        "late_swap_delta": delta,
-        "bank_coverage": bank_coverage,
-        # R126. In the immutable run record, beside bank_coverage, because "how
-        # concentrated was the set we entered" is a question asked weeks later
-        # and the answer has to survive without the projections frame.
-        "portfolio_frontier": portfolio_frontier,
-        "diagnostic_source_file": str(final_export.relative_to(run_dir)),
-        "diagnostic_source_sha256": final_hash,
-        "assignment_sha256": assignment_record["sha256"],
-        # F4: what the pre-export gates were built from, recorded in the immutable
-        # run record. "Upload-ready" is defined as all three gates passing, so the
-        # artifact has to say which of its inputs were checked, which were
-        # asserted by the caller, and which were assumed without checking.
-        "workflow_gate_evidence": dict((metadata or {}).get("workflow_gate_evidence") or {}),
-        "assumed_gates": list((metadata or {}).get("assumed_gates") or []),
-        "caller_asserted_gates": list((metadata or {}).get("caller_asserted_gates") or []),
-        # F11: what the build actually did. build_multi_lineup returns relaxation
-        # counts, DU and anchor validation, and failed_indices; none of it was
-        # written down, so the immutable run record could not answer "what did the
-        # engine give up to produce this file". Relaxations are exactly the facts
-        # post-slate review needs, and a portfolio is clean when they are zero,
-        # not when the gates pass.
-        "bank_diagnostics": _json_safe(bank_diagnostics),
-        "warnings": list(bank_warnings or []),
-        "status": "certified" if certification.get("workflow_valid") else "blocked",
-        "export_declared": True,
-        "hash_binding_applicable": True,
-        **certification,
-    }
-    diagnostic_path = run_dir / "final" / "diagnostics.json"
-    _write_json(diagnostic_path, diagnostics)
-    register_artifact(run_dir, final_export, "dk_export")
-    register_artifact(run_dir, diagnostic_path, "diagnostics")
-    update_run_certification(
-        run_dir, certification, errors=[],
-        warnings=final_validation.get("warnings", []),
-        status=None if certification["workflow_valid"] else "blocked",
-    )
-    if not certification["workflow_valid"]:
+        diagnostic_path = run_dir / "final" / "diagnostics.json"
+        _write_json(diagnostic_path, diagnostics)
+        register_artifact(run_dir, final_export, "dk_export")
+        register_artifact(run_dir, diagnostic_path, "diagnostics")
+        update_run_certification(
+            run_dir, certification, errors=[],
+            warnings=final_validation.get("warnings", []),
+            status=None if certification["workflow_valid"] else "blocked",
+        )
+        if not certification["workflow_valid"]:
+            return {
+                "passed": False, "run_id": run["run_id"], "run_dir": str(run_dir),
+                "errors": [f"failed post-export gate: {x}" for x in certification["failed_post_export_gates"]],
+                "diagnostics_path": str(diagnostic_path), "workflow_valid": False,
+            }
+        # R393(b). The certified export as the run's last usable artifact, read
+        # back from its own manifest and bytes. Building the record must never
+        # cost a certified build its delivery, so a failure is named on the
+        # result and the build goes on; a caller treats it as a later failure.
+        artifact_fields: Dict[str, Any] = {}
+        try:
+            artifact = usable_artifact(run_dir)
+            if _attachable(artifact):
+                artifact_fields["last_usable_artifact"] = artifact
+            else:
+                artifact_fields["last_usable_artifact_withheld"] = list(
+                    ((artifact or {}).get("essential_valid") or {}).get("failed")
+                    or ["no registered dk_export"])
+        except Exception as art_exc:  # noqa: BLE001
+            artifact_fields["last_usable_artifact_error"] = (
+                f"{type(art_exc).__name__}: {art_exc}")
+        if defer_promotion:
+            # R29(2): certification and delivery are two different facts, and the
+            # pointer is a claim about delivery. A caller that can still refuse the
+            # file after this point (late_swap.py's downgrade check) must promote
+            # afterwards, or the pointer names a run nothing was mirrored from and
+            # the next swap dies on a parent mismatch that reads like a
+            # multi-session collision. The run stays mutable and valid.
+            return {
+                "passed": True,
+                "run_id": run["run_id"],
+                "run_dir": str(run_dir),
+                "output_path": str(final_export),
+                "assignments_path": str(assignment_path),
+                "projections_path": str(projection_path),
+                "diagnostics_path": str(diagnostic_path),
+                "bank_coverage": bank_coverage,
+                # R116. Rides beside bank_coverage for the same reason it does: the
+                # fact lives in diagnostics.json, and a caller writing a brief should
+                # not have to re-open the run directory to state how many distinct
+                # lineups it just delivered and what capped them.
+                "candidate_reuse": allocation.get("candidate_reuse"),
+                "candidate_reuse_counts": allocation.get("candidate_reuse_counts"),
+                # R298(a). The allocator's other two ladders, beside the first, so
+                # `manifest_strategy_state` can read all three off the result. The
+                # allocator emits each only when its control was requested.
+                "primary_stack_floor": allocation.get("primary_stack_floor"),
+                "five_stack_quota": allocation.get("five_stack_quota"),
+                # R126, same reasoning, and the same requirement that BOTH return
+                # paths carry it: a late swap that lost the block would report a
+                # refined portfolio with no concentration facts at all.
+                "portfolio_frontier": portfolio_frontier,
+                # R405. The allocator's consensus-cluster block, on both return
+                # paths for R126's reason.
+                "consensus_cluster": allocation.get("consensus_cluster"),
+                # R406, the same.
+                "classic_sleeves": allocation.get("classic_sleeves"),
+                "workflow_valid": True,
+                "selection_certified": certification["selection_certified"],
+                "allocation_certified": certification["allocation_certified"],
+                "errors": [],
+                "promotion_deferred": True,
+                "promoted": False,
+                "pointer_sha_at_create": pointer_sha_at_create,
+                **artifact_fields,
+            }
+        promotion = promote_run(run_dir, expected_pointer_sha256=pointer_sha_at_create)
         return {
-            "passed": False, "run_id": run["run_id"], "run_dir": str(run_dir),
-            "errors": [f"failed post-export gate: {x}" for x in certification["failed_post_export_gates"]],
-            "diagnostics_path": str(diagnostic_path), "workflow_valid": False,
-        }
-    if defer_promotion:
-        # R29(2): certification and delivery are two different facts, and the
-        # pointer is a claim about delivery. A caller that can still refuse the
-        # file after this point (late_swap.py's downgrade check) must promote
-        # afterwards, or the pointer names a run nothing was mirrored from and
-        # the next swap dies on a parent mismatch that reads like a
-        # multi-session collision. The run stays mutable and valid.
-        return {
-            "passed": True,
+            "passed": bool(promotion["passed"]),
             "run_id": run["run_id"],
             "run_dir": str(run_dir),
-            "output_path": str(final_export),
+            "output_path": str(final_export) if promotion["passed"] else None,
             "assignments_path": str(assignment_path),
             "projections_path": str(projection_path),
             "diagnostics_path": str(diagnostic_path),
             "bank_coverage": bank_coverage,
-            # R116. Rides beside bank_coverage for the same reason it does: the
-            # fact lives in diagnostics.json, and a caller writing a brief should
-            # not have to re-open the run directory to state how many distinct
-            # lineups it just delivered and what capped them.
+            # R116, see the deferred branch above.
             "candidate_reuse": allocation.get("candidate_reuse"),
             "candidate_reuse_counts": allocation.get("candidate_reuse_counts"),
-            # R298(a). The allocator's other two ladders, beside the first, so
-            # `manifest_strategy_state` can read all three off the result. The
-            # allocator emits each only when its control was requested.
+            # R298(a), see the deferred branch above.
             "primary_stack_floor": allocation.get("primary_stack_floor"),
             "five_stack_quota": allocation.get("five_stack_quota"),
-            # R126, same reasoning, and the same requirement that BOTH return
-            # paths carry it: a late swap that lost the block would report a
-            # refined portfolio with no concentration facts at all.
+            # R126, see the deferred branch above.
             "portfolio_frontier": portfolio_frontier,
-            # R405. The allocator's consensus-cluster block, on both return
-            # paths for R126's reason.
+            # R405, see the deferred branch above.
             "consensus_cluster": allocation.get("consensus_cluster"),
             # R406, the same.
             "classic_sleeves": allocation.get("classic_sleeves"),
-            "workflow_valid": True,
+            "workflow_valid": bool(promotion["passed"]),
             "selection_certified": certification["selection_certified"],
             "allocation_certified": certification["allocation_certified"],
-            "errors": [],
-            "promotion_deferred": True,
-            "promoted": False,
-            "pointer_sha_at_create": pointer_sha_at_create,
+            "errors": promotion.get("errors", []),
+            # R393(b). A refused promotion (the pointer CAS, moved inputs) is a
+            # refusal of the delivery claim and carries no artifact; R393(a),
+            # Session 23, owns publication.
+            **(artifact_fields if promotion["passed"] else {}),
         }
-    promotion = promote_run(run_dir, expected_pointer_sha256=pointer_sha_at_create)
-    return {
-        "passed": bool(promotion["passed"]),
-        "run_id": run["run_id"],
-        "run_dir": str(run_dir),
-        "output_path": str(final_export) if promotion["passed"] else None,
-        "assignments_path": str(assignment_path),
-        "projections_path": str(projection_path),
-        "diagnostics_path": str(diagnostic_path),
-        "bank_coverage": bank_coverage,
-        # R116, see the deferred branch above.
-        "candidate_reuse": allocation.get("candidate_reuse"),
-        "candidate_reuse_counts": allocation.get("candidate_reuse_counts"),
-        # R298(a), see the deferred branch above.
-        "primary_stack_floor": allocation.get("primary_stack_floor"),
-        "five_stack_quota": allocation.get("five_stack_quota"),
-        # R126, see the deferred branch above.
-        "portfolio_frontier": portfolio_frontier,
-        # R405, see the deferred branch above.
-        "consensus_cluster": allocation.get("consensus_cluster"),
-        # R406, the same.
-        "classic_sleeves": allocation.get("classic_sleeves"),
-        "workflow_valid": bool(promotion["passed"]),
-        "selection_certified": certification["selection_certified"],
-        "allocation_certified": certification["allocation_certified"],
-        "errors": promotion.get("errors", []),
-    }
+    except Exception as exc:  # noqa: BLE001 - R297(c), see above
+        return _crashed_result(run, exc, mode)
 
 
 def promote_deferred_run(result: MutableMapping[str, Any]) -> Dict[str, Any]:
@@ -666,6 +887,10 @@ def promote_deferred_run(result: MutableMapping[str, Any]) -> Dict[str, Any]:
         result["errors"] = list(result.get("errors") or []) + list(
             promotion.get("errors") or [])
         result["pointer_conflict"] = bool(promotion.get("pointer_conflict"))
+        # R393(b). A promotion refusal carries no artifact, on this path as on
+        # execute_portfolio's inline one.
+        if result.pop("last_usable_artifact", None) is not None:
+            result["last_usable_artifact_withheld"] = ["promotion refused"]
         # `passed` and `workflow_valid` mean the same thing here as on the inline
         # path, where a refused promotion sets both False. A caller that reads
         # the idiomatic `if not result["passed"]` must not read a pointer
@@ -761,36 +986,42 @@ def run_late_swap(
             runs_root, "validate_only", parent_run_id=parent_id,
             metadata={"pipeline_version": VERSION, **lineage_metadata},
         )
-        run_dir = Path(run["run_dir"])
-        snapshot_run_inputs(run_dir, [current_entries_csv])
-        certification = late_swap_certification("validate_only")
-        requirements_path = run_dir / "final" / "late_swap_requirements.json"
-        _write_json(requirements_path, {
-            "run_id": run["run_id"],
-            "parent_run_id": parent_id,
-            "mode": "validate_only",
-            "entry_requirements": requirements,
-            **lineage_metadata,
-            **certification,
-        })
-        register_artifact(run_dir, requirements_path, "late_swap_requirements")
-        update_run_certification(
-            run_dir,
-            {"workflow_valid": False,
-             "selection_certified": False,
-             "allocation_certified": False},
-            errors=[], warnings=[], status="diagnostic",
-        )
-        return {
-            "passed": True,
-            "run_id": run["run_id"],
-            "run_dir": str(run_dir),
-            "parent_run_id": parent_id,
-            "entry_requirements": requirements,
-            "requirements_path": str(requirements_path),
-            **lineage_metadata,
-            **certification,
-        }
+        # R297(c). The late-swap validate_only door creates its own run, so it
+        # gets the same guard as execute_portfolio's: a crash ends it blocked
+        # (crashed) rather than stranded at `building`.
+        try:
+            run_dir = Path(run["run_dir"])
+            snapshot_run_inputs(run_dir, [current_entries_csv])
+            certification = late_swap_certification("validate_only")
+            requirements_path = run_dir / "final" / "late_swap_requirements.json"
+            _write_json(requirements_path, {
+                "run_id": run["run_id"],
+                "parent_run_id": parent_id,
+                "mode": "validate_only",
+                "entry_requirements": requirements,
+                **lineage_metadata,
+                **certification,
+            })
+            register_artifact(run_dir, requirements_path, "late_swap_requirements")
+            update_run_certification(
+                run_dir,
+                {"workflow_valid": False,
+                 "selection_certified": False,
+                 "allocation_certified": False},
+                errors=[], warnings=[], status="diagnostic",
+            )
+            return {
+                "passed": True,
+                "run_id": run["run_id"],
+                "run_dir": str(run_dir),
+                "parent_run_id": parent_id,
+                "entry_requirements": requirements,
+                "requirements_path": str(requirements_path),
+                **lineage_metadata,
+                **certification,
+            }
+        except Exception as exc:  # noqa: BLE001 - R297(c)
+            return _crashed_result(run, exc, "validate_only")
 
     projections = kwargs.get("projections")
     if confirmed_order_by_player_id is not None and isinstance(projections, pd.DataFrame):
@@ -6402,73 +6633,99 @@ def run_slate(
         interaction_probe_budget_s=interaction_probe_budget_s,
         interaction_probe_not_after=interaction_probe_not_after,
     )
-    result.update({
-        "approved": True,
-        "checkpoint_plan": checkpoint,
-        "projection_schema": schema,
-        "posture_by_contest": posture_by_contest,
-        # R388(e). Only when a caller passed one, so an ungoverned result keeps
-        # exactly its old keys.
-        **({"certification_label": str(certification_label)}
-           if certification_label else {}),
-        "merged_controls": controls_for_report(controls),
-        # R333 / R343. The washout-axis controls, on every Classic build
-        # including the ones that set neither, so the ABSENCE of a game cap is
-        # visible rather than merely true -- R333's fix asks for exactly this.
-        "game_exposure_request": game_exposure_request,
-        "team_exposure": {
-            "max_team_exposure_pct": controls.get("max_team_exposure_pct"),
-            "min_hitters_per_entry": controls.get(
-                "team_exposure_min_hitters", TEAM_EXPOSURE_MIN_HITTERS),
-            "counts": "hitter_slots",
-            "map_wired": bool(controls.get("player_team_by_id")),
-            "note": MAX_TEAM_EXPOSURE_NOTE,
-        },
-        # R407. The tier, the facts that set it, and each control's before and
-        # after, on the checkpoint and on the approved result alike.
-        "input_confidence": input_confidence,
-        # R388(b). Every resolved control's value and provenance, the
-        # never-relax set, and what a deadline rung moved.
-        "control_provenance": control_provenance,
-        # R405. The cap as requested, before the bank defines the cluster; the
-        # realized block is the allocator's `consensus_cluster`.
-        "consensus_cluster_request": {
-            "max_consensus_cluster_share_pct": controls.get(
-                "max_consensus_cluster_share_pct"),
-            "min_members_k": controls.get(
-                "consensus_cluster_min_members", CONSENSUS_CLUSTER_MIN_MEMBERS),
-            "note": MAX_CONSENSUS_CLUSTER_NOTE,
-        },
-        "controls_feasibility": controls_feasibility,
-        "feasibility": checkpoint["feasibility"],
-        "exclusions": exclusion_block,
-        "slate_clock": clock,
-        # R246. Present on every approved build, `applied: false` when no
-        # leverage was asked for, so "was the ownership prior in this build"
-        # has an answer rather than an absence.
-        "leverage": {
-            **leverage_report,
-            "constraints": {k: (leverage or {}).get(k)
-                            for k in ("max_cumulative_ownership_pct",
-                                      "min_low_owned_hitters",
-                                      "low_owned_threshold_pct")},
-        },
-        "candidate_bank": bank_diag,
-        "bank_player_coverage": bank_player_coverage,
-        "script_routing": script_routing,
-        "fill_depth_plan": fill_depth_plan,
-        "projected_order": projected_order,
-        "projection_enrichment": projection_enrichment,
-        "caller_asserted_gates": caller_asserted,
-        "workflow_gate_evidence": gate_evidence,
-        "assumed_gates": assumed,
-        "overridden_gates": overridden_gates,
-        "gates_assumption_refused": gates_assumption_refused,
-        "contest_identity_blockers": contest_identity_blockers,
-        "strategy_defaults_are_priors": True,
-        "light_satellite": bool(light_satellite),
-    })
-    result["delivered_path"] = mirror_to_outputs(result, salary_csv)
+    # R393(b). A certified export already exists here (promoted by
+    # execute_portfolio), so a raise while assembling the report fields
+    # below must not withhold it: the failure is named on the result, the
+    # already-guarded mirror still runs, and the caller exits 7.
+    # R388(e)'s label is the export's own certification record, so the
+    # artifact carries it too.
+    if certification_label and isinstance(result.get("last_usable_artifact"), dict):
+        result["last_usable_artifact"]["label"] = artifact_label(
+            result["last_usable_artifact"].get("certification") or {},
+            certification_label)
+    try:
+        result.update({
+            "approved": True,
+            "checkpoint_plan": checkpoint,
+            "projection_schema": schema,
+            "posture_by_contest": posture_by_contest,
+            # R388(e). Only when a caller passed one, so an ungoverned result keeps
+            # exactly its old keys.
+            **({"certification_label": str(certification_label)}
+               if certification_label else {}),
+            "merged_controls": controls_for_report(controls),
+            # R333 / R343. The washout-axis controls, on every Classic build
+            # including the ones that set neither, so the ABSENCE of a game cap is
+            # visible rather than merely true -- R333's fix asks for exactly this.
+            "game_exposure_request": game_exposure_request,
+            "team_exposure": {
+                "max_team_exposure_pct": controls.get("max_team_exposure_pct"),
+                "min_hitters_per_entry": controls.get(
+                    "team_exposure_min_hitters", TEAM_EXPOSURE_MIN_HITTERS),
+                "counts": "hitter_slots",
+                "map_wired": bool(controls.get("player_team_by_id")),
+                "note": MAX_TEAM_EXPOSURE_NOTE,
+            },
+            # R407. The tier, the facts that set it, and each control's before and
+            # after, on the checkpoint and on the approved result alike.
+            "input_confidence": input_confidence,
+            # R388(b). Every resolved control's value and provenance, the
+            # never-relax set, and what a deadline rung moved.
+            "control_provenance": control_provenance,
+            # R405. The cap as requested, before the bank defines the cluster; the
+            # realized block is the allocator's `consensus_cluster`.
+            "consensus_cluster_request": {
+                "max_consensus_cluster_share_pct": controls.get(
+                    "max_consensus_cluster_share_pct"),
+                "min_members_k": controls.get(
+                    "consensus_cluster_min_members", CONSENSUS_CLUSTER_MIN_MEMBERS),
+                "note": MAX_CONSENSUS_CLUSTER_NOTE,
+            },
+            "controls_feasibility": controls_feasibility,
+            "feasibility": checkpoint["feasibility"],
+            "exclusions": exclusion_block,
+            "slate_clock": clock,
+            # R246. Present on every approved build, `applied: false` when no
+            # leverage was asked for, so "was the ownership prior in this build"
+            # has an answer rather than an absence.
+            "leverage": {
+                **leverage_report,
+                "constraints": {k: (leverage or {}).get(k)
+                                for k in ("max_cumulative_ownership_pct",
+                                          "min_low_owned_hitters",
+                                          "low_owned_threshold_pct")},
+            },
+            "candidate_bank": bank_diag,
+            "bank_player_coverage": bank_player_coverage,
+            "script_routing": script_routing,
+            "fill_depth_plan": fill_depth_plan,
+            "projected_order": projected_order,
+            "projection_enrichment": projection_enrichment,
+            "caller_asserted_gates": caller_asserted,
+            "workflow_gate_evidence": gate_evidence,
+            "assumed_gates": assumed,
+            "overridden_gates": overridden_gates,
+            "gates_assumption_refused": gates_assumption_refused,
+            "contest_identity_blockers": contest_identity_blockers,
+            "strategy_defaults_are_priors": True,
+            "light_satellite": bool(light_satellite),
+        })
+    except Exception as exc:  # noqa: BLE001 - R393(b), see above
+        result.setdefault("later_failures", []).append(
+            {"stage": "run_slate_report_fields",
+             "error": f"{type(exc).__name__}: {exc}"})
+        print(f"RUN_SLATE REPORT FIELDS FAILED  {type(exc).__name__}: {exc}; "
+              f"the export is unaffected", file=sys.stderr)
+    # R393(b). When the report fields failed, the manifest row the mirror would
+    # record reads a result missing its label and its contests, so nothing is
+    # published from it: build_slate presents the immutable runs/ export.
+    if any(f.get("stage") == "run_slate_report_fields"
+           for f in result.get("later_failures") or []):
+        result["delivered_path"] = None
+        result["mirror_skipped"] = ("the report fields failed, so no manifest "
+                                    "row was recorded from an incomplete result")
+    else:
+        result["delivered_path"] = mirror_to_outputs(result, salary_csv)
     # Repo-relative alongside the absolute path: every recorded delivered_path in
     # outputs/2026-07-25/ pointed at a session mount that no longer exists.
     if result.get("delivered_path"):
@@ -6537,6 +6794,11 @@ def mirror_to_outputs(result: Mapping[str, Any], salary_csv: Any) -> Optional[st
             result["manifest_recorded"] = bool(outcome["recorded"])
             result["staged_salary"] = outcome.get("staged_salary")
         if outcome["error"]:
+            # R393(b). Named on the result too: "recorded but not promoted"
+            # returns recorded=True with the DO_NOT_UPLOAD_ path, and without
+            # this the build read it as a clean delivery.
+            if isinstance(result, dict):
+                result["manifest_error"] = str(outcome["error"])
             print(f"MANIFEST NOT RECORDED  {outcome['error']}")
         return str(outcome["path"])
     except Exception as exc:  # noqa: BLE001 - a mirror must never fail a certified build

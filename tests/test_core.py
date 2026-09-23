@@ -24415,12 +24415,46 @@ class SupervisorLostWindowTests(unittest.TestCase):
         returned = set()
         for fn in tree.body:
             if isinstance(fn, _ast.FunctionDef) and fn.name in (
-                    "main", "run_classic", "run_showdown"):
+                    "main", "run_classic", "run_showdown",
+                    # R393(b): the exit door returns 7 after a later exception.
+                    "_deliver_after_exception"):
                 for node in _ast.walk(fn):
                     if isinstance(node, _ast.Return) and node.value is not None:
                         returned |= codes(node.value)
         self.assertEqual(returned, set(self.ab.BUILD_SLATE_CONTRACT_CODES))
         self.assertNotIn(5, self.ab.BUILD_SLATE_CONTRACT_CODES)
+
+    def test_a_child_exit_7_is_a_delivery_after_a_later_failure(self):
+        """R393(b). The child's file passed its essential checks and a later
+        stage failed. It is the deliverable: recorded with its sha, label and
+        the failure, never re-run, and the supervisor exits 7 too."""
+        brief = {"status": "delivered_after_failure", "date": "2026-07-29",
+                 "delivered_path": "outputs/2026-07-29/DKEntries_x.csv",
+                 "delivered_sha256": "ab" * 32, "label": "upload_ready",
+                 "last_usable_artifact": {"path": "runs/r1/final/DKEntries.csv",
+                                          "label": "upload_ready"},
+                 "later_failures": [{"stage": "after_delivery",
+                                     "error": "TypeError: boom"}]}
+
+        def seven(n, cmd, kwargs):
+            return self._proc(7, brief=brief)
+        code, records, cmds, _logs = self._run(seven)
+        self.assertEqual(code, 7)
+        self.assertEqual(len(cmds), 1, "a delivery must not be rebuilt")
+        self.assertEqual([r["action"] for r in records], ["delivered_after_failure"])
+        self.assertEqual(records[-1]["delivered"], "runs/r1/final/DKEntries.csv")
+        self.assertEqual(records[-1]["label"], "upload_ready")
+        self.assertEqual(records[-1]["later_failures"][0]["stage"], "after_delivery")
+
+    def test_a_child_exit_7_without_a_hash_bound_brief_is_a_stop(self):
+        """The same rule as exit 0: no path and sha, no file to hand over."""
+        def seven(n, cmd, kwargs):
+            return self._proc(7, brief={"status": "delivered_after_failure"},
+                              stderr="Traceback: boom")
+        code, records, _cmds, _logs = self._run(seven)
+        self.assertEqual(code, 3)
+        self.assertEqual([r["action"] for r in records], ["stop"])
+        self.assertIn("hash-bound", records[-1]["why"])
 
     def test_a_child_exit_5_is_an_off_contract_stop_not_a_refusal(self):
         """A child 5 fell into the refusal branch, which asked a brief that
@@ -26942,17 +26976,758 @@ class DeadlineGovernorWiringTests(unittest.TestCase):
     def test_a_failed_mirror_says_unmirrored_on_the_status(self):
         """R298(b). A failed mirror delivered nothing to outputs/ and the brief
         pointed at runs/ under `status: certified`. The error rides the brief
-        and the status says so, governed or not."""
+        and the status says so, governed or not.
+
+        R393(b), 2026-09-23: exit 0 -> 7. A failed mirror is a later failure
+        after a valid artifact, so the exit says so; status and keys unchanged."""
         failed = {"mirror_error": "OSError: disk full", "manifest_recorded": False,
                   "output_path": str(self._delivered_csv())}
         code, brief, _calls, err = self._run(30, refusal=dict(self._PASSING, **failed))
-        self.assertEqual(code, 0, err[-400:])
+        self.assertEqual(code, 7, err[-400:])
+        self.assertEqual([f["stage"] for f in brief["later_failures"]], ["mirror"])
         self.assertEqual(brief["status"], "certified_unmirrored")
         self.assertEqual(brief["mirror_error"], "OSError: disk full")
         self.assertIs(brief["manifest_recorded"], False)
         from mlb_engine.pipeline import deadline_governor as dg
         _code, governed, _calls, _err = self._run(2, second_result=dict(self._PASSING, **failed))
         self.assertEqual(governed["status"], f"{dg.DEADLINE_LABEL}_unmirrored")
+
+
+class LastUsableArtifactTests(unittest.TestCase):
+    """R393(b) + R297(c), roadmap Session 08: the last usable artifact.
+
+    A run result carries the best current essential-valid export it produced
+    (bytes, sha256, coverage, label, path); a crash after `create_run` ends the
+    run terminal instead of stranding it at `building`; and in build_slate a
+    stage that fails after the file exists -- a crashed promotion, a raising
+    brief, a failed mirror or manifest write -- presents the file first and
+    exits 7 rather than withholding it. The engine half runs the production
+    `execute_portfolio`; the script half runs the production `run_classic`,
+    `run_showdown` and `_main_recording_refusals`, faking only `run_slate`.
+    """
+
+    # The build_slate harness, borrowed by reference from
+    # DeadlineGovernorWiringTests (not inherited, so its tests do not run
+    # twice): `_run` drives run_classic with only run_slate faked.
+    _SALARY = DeadlineGovernorWiringTests._SALARY
+    _SLOTS = DeadlineGovernorWiringTests._SLOTS
+    _REFUSAL = DeadlineGovernorWiringTests._REFUSAL
+    _legal_ids = DeadlineGovernorWiringTests._legal_ids
+    _entries_csv = DeadlineGovernorWiringTests._entries_csv
+    _delivered_csv = DeadlineGovernorWiringTests._delivered_csv
+    _run = DeadlineGovernorWiringTests._run
+
+    _GATES = {
+        "salary_gate_passed": True, "entry_grid_gate_passed": True,
+        "lineup_gate_passed": True, "pitcher_audit_gate_passed": True,
+        "weather_gate_passed": True, "odds_gate_passed": True,
+        "projection_schema_gate_passed": True, "optimizer_gate_passed": True,
+    }
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+
+    # ---- the engine: execute_portfolio and its doors -----------------------
+
+    def _build(self, **extra):
+        salary = self.root / "salary.csv"
+        ids = write_salary(salary)
+        entries = self.root / "DKEntries.csv"
+        write_entries(entries)
+        r1, r2 = legal_rosters(ids)
+        with contextlib.redirect_stderr(io.StringIO()):
+            return self._build_quiet(salary, ids, entries, r1, r2, **extra)
+
+    def _build_quiet(self, salary, ids, entries, r1, r2, **extra):
+        return run_initial_build(
+            runs_root=self.root / "runs", salary_csv=salary, entries_csv=entries,
+            projections=projection_frame(ids),
+            candidates=[candidate("A", r1, 100), candidate("B", r2, 99, "CCC")],
+            entry_requirements=[
+                {"entry_id": "5001", "contest_id": "900",
+                 "contest_name": "Test WTA", "contest_shape": "large_wta"},
+                {"entry_id": "5002", "contest_id": "900",
+                 "contest_name": "Test WTA", "contest_shape": "large_wta"},
+            ],
+            workflow_gates=dict(self._GATES),
+            portfolio_controls={"max_player_exposure_pct": 1.0,
+                                "max_pitcher_exposure_pct": 1.0,
+                                "max_primary_stack_exposure_pct": 1.0,
+                                "max_sp_pair_repetition": 2,
+                                "max_shared_players": 9},
+            **extra)
+
+    @staticmethod
+    def _manifest(result):
+        return json.loads((Path(result["run_dir"]) / "manifest.json").read_text())
+
+    @staticmethod
+    def _diagnostics(result):
+        return json.loads((Path(result["run_dir"]) / "final"
+                           / "diagnostics.json").read_text())
+
+    def _only_run(self):
+        runs = [p for p in (self.root / "runs").iterdir() if p.is_dir()]
+        self.assertEqual(len(runs), 1, runs)
+        return runs[0]
+
+    def test_a_crash_after_create_run_ends_the_run_blocked_not_building(self):
+        """R297(c)'s verification: the allocator raising after create_run left
+        `status: building` and empty errors, indistinguishable from a build in
+        flight. It now ends blocked, crashed, with the exception named."""
+        with unittest.mock.patch.object(
+                epi, "select_and_assign_entries",
+                side_effect=RuntimeError("allocator exploded")):
+            result = self._build()
+        self.assertFalse(result["passed"])
+        self.assertTrue(result["crashed"])
+        self.assertEqual(result["errors"], ["RuntimeError: allocator exploded"])
+        self.assertNotIn("last_usable_artifact", result)
+        manifest = self._manifest(result)
+        self.assertEqual(manifest["status"], "blocked")
+        self.assertIs(manifest["crashed"], True)
+        self.assertEqual(manifest["errors"], ["RuntimeError: allocator exploded"])
+        diagnostics = self._diagnostics(result)
+        self.assertEqual(diagnostics["status"], "blocked")
+        self.assertIs(diagnostics["crashed"], True)
+        from mlb_engine.pipeline.build_state_manager import verify_run_bundle
+        self.assertTrue(verify_run_bundle(result["run_dir"])["passed"])
+
+    def test_a_crash_past_the_first_refusal_site_ends_blocked_too(self):
+        """The span is the whole body, not up to the first `_blocked_result`:
+        the writer runs after the allocator's refusal site."""
+        with unittest.mock.patch.object(
+                epi, "write_candidate_from_template",
+                side_effect=ValueError("assignment has no ten-slot roster")):
+            result = self._build()
+        self.assertTrue(result["crashed"])
+        self.assertEqual(self._manifest(result)["status"], "blocked")
+        self.assertIn("ValueError: assignment has no ten-slot roster",
+                      self._manifest(result)["errors"])
+
+    def test_a_crash_in_promotion_keeps_the_certified_export_and_hands_it_back(self):
+        """A raising promotion (a locked publication database) came after the
+        export certified. The certified record stays exactly as it was, the run
+        ends blocked and crashed, and the export rides the result with its own
+        label, its exact bytes and its sha256."""
+        import sqlite3
+        with unittest.mock.patch.object(
+                epi, "promote_run",
+                side_effect=sqlite3.OperationalError("database is locked")):
+            result = self._build()
+        self.assertFalse(result["passed"])
+        self.assertTrue(result["crashed"])
+        artifact = result["last_usable_artifact"]
+        data = Path(artifact["path"]).read_bytes()
+        self.assertEqual(artifact["bytes"], data)
+        import hashlib
+        self.assertEqual(artifact["sha256"], hashlib.sha256(data).hexdigest())
+        self.assertEqual(artifact["size_bytes"], len(data))
+        self.assertEqual(artifact["label"], "upload_ready")
+        self.assertEqual(artifact["coverage"], {"reserved": 2, "filled": 2})
+        self.assertIs(artifact["essential_valid"]["essential_valid"], True)
+        self.assertIs(artifact["inputs_unmoved"], True)
+        manifest = self._manifest(result)
+        self.assertEqual(manifest["status"], "blocked")
+        self.assertIs(manifest["crashed"], True)
+        self.assertIs(manifest["certification"]["workflow_valid"], True,
+                      "the export's own certification must survive the crash")
+        self.assertEqual(self._diagnostics(result)["status"], "certified")
+        from mlb_engine.pipeline.build_state_manager import verify_run_bundle
+        self.assertTrue(verify_run_bundle(result["run_dir"])["passed"])
+
+    def test_a_crash_in_promotion_after_the_inputs_moved_hands_nothing_back(self):
+        """Promotion re-checks the staged inputs before the certified claim
+        ships (R20(b)); a crash there must not skip that check. The world moved
+        underneath the run, so the export is withheld and the reason named."""
+        salary = self.root / "salary.csv"
+
+        def moved_then_crashed(*_a, **_k):
+            salary.write_text(salary.read_text() + "\n", encoding="utf-8")
+            raise OSError("pointer write failed")
+
+        with unittest.mock.patch.object(epi, "promote_run",
+                                        side_effect=moved_then_crashed):
+            result = self._build()
+        self.assertTrue(result["crashed"])
+        self.assertNotIn("last_usable_artifact", result)
+        self.assertTrue(any("inputs moved underneath the run" in e
+                            for e in result["last_usable_artifact_withheld"]),
+                        result.get("last_usable_artifact_withheld"))
+        self.assertEqual(self._manifest(result)["status"], "blocked")
+
+    def test_bytes_that_no_longer_match_the_record_are_not_essential_valid(self):
+        """Delivered byte identity is V: the record is read off the bytes, and
+        bytes that no longer hash to the registered sha256 are not usable."""
+        result = self._build()
+        self.assertTrue(result["passed"], result.get("errors"))
+        path = Path(result["output_path"])
+        path.write_bytes(path.read_bytes() + b"\n")
+        artifact = epi.usable_artifact(result["run_dir"])
+        self.assertIs(artifact["essential_valid"]["essential_valid"], False)
+        self.assertIn("delivered_byte_identity", artifact["essential_valid"]["failed"])
+        self.assertFalse(epi._attachable(artifact))
+
+    def test_the_crash_handler_never_raises_when_its_own_write_fails(self):
+        """A crash whose blocked diagnostics cannot be written still ends the
+        run terminal, through the manifest alone, and still returns."""
+        with unittest.mock.patch.object(
+                epi, "select_and_assign_entries",
+                side_effect=RuntimeError("boom")), \
+                unittest.mock.patch.object(
+                    epi, "_write_json", side_effect=OSError("disk full")):
+            result = self._build()
+        self.assertTrue(result["crashed"])
+        self.assertIn("OSError: disk full", result["diagnostics_error"])
+        self.assertIs(result["terminal_state_recorded"], True)
+        manifest = json.loads((self._only_run() / "manifest.json").read_text())
+        self.assertEqual(manifest["status"], "blocked")
+        self.assertIs(manifest["crashed"], True)
+
+    def test_a_crash_in_the_validate_only_door_ends_blocked(self):
+        """run_late_swap's validate_only branch mints its own run (L760 at
+        1c82928) and had the same unguarded shape."""
+        _, ids, _, _, _, initial = build_promoted_initial(self.root)
+        self.assertTrue(initial["passed"], initial.get("errors"))
+        with unittest.mock.patch.object(
+                epi, "late_swap_certification",
+                side_effect=KeyError("certification")), \
+                contextlib.redirect_stderr(io.StringIO()):
+            result = run_late_swap(
+                runs_root=self.root / "runs",
+                current_entries_csv=initial["output_path"],
+                status_by_player_id=future_statuses(ids), as_of=NOW,
+                late_swap_mode="validate_only")
+        self.assertTrue(result["crashed"])
+        manifest = self._manifest(result)
+        self.assertEqual(manifest["mode"], "validate_only")
+        self.assertEqual(manifest["status"], "blocked")
+        self.assertIs(manifest["crashed"], True)
+
+    def test_a_certified_build_carries_its_last_usable_artifact(self):
+        result = self._build()
+        self.assertTrue(result["passed"], result.get("errors"))
+        artifact = result["last_usable_artifact"]
+        self.assertEqual(Path(artifact["path"]), Path(result["output_path"]))
+        self.assertEqual(artifact["sha256"], sha256_file(result["output_path"]))
+        self.assertEqual(artifact["label"], "upload_ready")
+        self.assertEqual(artifact["run_id"], result["run_id"])
+        record = epi.artifact_record(artifact)
+        self.assertNotIn("bytes", record)
+        json.dumps(record)  # the view a brief carries serialises
+
+    def test_the_label_comes_from_the_artifacts_own_certification(self):
+        gates = {"workflow_valid": True, "selection_certified": True,
+                 "allocation_certified": True}
+        self.assertEqual(epi.artifact_label(gates), "upload_ready")
+        self.assertEqual(epi.artifact_label(gates, "review_grade_deadline_build"),
+                         "review_grade_deadline_build")
+        self.assertEqual(epi.artifact_label(dict(gates, allocation_certified=None)),
+                         "review_grade")
+        self.assertEqual(epi.artifact_label(dict(gates, workflow_valid=1)),
+                         "review_grade", "a truthy stand-in is not a certification")
+
+    def test_essential_validity_requires_the_v_gates_and_excludes_strategy(self):
+        """Session 08's definition, derived from gate_classes rather than listed:
+        every post-export gate with a V class or a V fact is required."""
+        from mlb_engine.entries import dk_entries_manager as dkm
+        from mlb_engine.entries import gate_classes as gc
+        expected = tuple(
+            n for n in dkm.POST_EXPORT_GATES
+            if gc.gate_validity(n).klass == gc.V
+            or any(k == gc.V for _f, k in gc.gate_validity(n).facts))
+        self.assertEqual(dkm.essential_post_export_gates(), expected)
+        self.assertNotIn("portfolio_caps_passed", expected)
+        passing = {n: True for n in dkm.POST_EXPORT_GATES}
+        caps_only = dkm.derive_essential_validity(
+            dict(passing, portfolio_caps_passed=False))
+        self.assertIs(caps_only["essential_valid"], True)
+        self.assertEqual(caps_only["excluded"], ["portfolio_caps_passed"])
+        illegal = dkm.derive_essential_validity(
+            dict(passing, roster_legality_passed=False))
+        self.assertIs(illegal["essential_valid"], False)
+        self.assertEqual(illegal["failed"], ["roster_legality_passed"])
+        self.assertIs(dkm.derive_essential_validity(
+            dict(passing, template_preservation_passed=1))["essential_valid"], False)
+        self.assertIsNone(caps_only["preflight"], "R388(c)'s seam starts empty")
+
+    def test_entry_coverage_reads_filled_rows_off_the_bytes(self):
+        from mlb_engine.entries.dk_entries_manager import entry_coverage
+        salary = self.root / "salary.csv"
+        ids = write_salary(salary)
+        r1, _r2 = legal_rosters(ids)
+        entries = self.root / "DKEntries.csv"
+        write_entries(entries, rosters=[r1, None])
+        self.assertEqual(entry_coverage(entries), {"reserved": 2, "filled": 1})
+
+    # ---- build_slate: the file is presented first and never withheld -------
+
+    def _engine_artifact(self, path):
+        import hashlib
+        data = Path(path).read_bytes()
+        return {"path": str(path), "sha256": hashlib.sha256(data).hexdigest(),
+                "size_bytes": len(data), "bytes": data, "label": "upload_ready",
+                "coverage": {"reserved": 2, "filled": 2},
+                "essential_valid": {"essential_valid": True,
+                                    "basis": "engine_post_export"},
+                "certification": {"workflow_valid": True,
+                                  "selection_certified": True,
+                                  "allocation_certified": True},
+                "run_id": "r1"}
+
+    @staticmethod
+    def _index(text, needle):
+        at = text.find(needle)
+        return at if at >= 0 else len(text) + 1
+
+    def test_the_file_is_presented_before_any_narrative_on_a_clean_delivery(self):
+        delivered = self._delivered_csv()
+        passing = dict(DeadlineGovernorWiringTests._PASSING,
+                       delivered_path=str(delivered), manifest_recorded=True,
+                       last_usable_artifact=self._engine_artifact(delivered))
+        code, brief, _calls, err = self._run(30, refusal=passing)
+        self.assertEqual(code, 0, err[-400:])
+        self.assertEqual(brief["later_failures"], [])
+        self.assertEqual(brief["last_usable_artifact"]["path"], str(delivered))
+        self.assertNotIn("bytes", brief["last_usable_artifact"])
+        self.assertLess(self._index(err, "FILE  "), self._index(err, "frontier:"))
+        self.assertIn(f"sha256={sha256_file(delivered)}", err)
+
+    def test_a_crashed_result_with_nothing_usable_is_a_crash_not_a_refusal(self):
+        """Read as a refusal, a crash went to the deadline governor, which
+        re-solved it with every control opened, and then printed allocation
+        remedies for it. Two minutes out, the governor is armed; it must not
+        see the crash."""
+        crashed = {"passed": False, "crashed": True, "run_id": "r1",
+                   "workflow_valid": False, "errors": ["RuntimeError: boom"],
+                   "feasibility": {"passed": False, "checks": []}}
+        with self.assertRaisesRegex(RuntimeError, "crashed after create_run"):
+            self._run(2, refusal=crashed)
+        self.assertEqual(len(self.labels), 1, "the governor re-solved a crash")
+
+    def test_a_crash_after_certification_delivers_its_export_with_exit_7(self):
+        delivered = self._delivered_csv()
+        # `feasibility` because run_slate stamps it on every approved result,
+        # and it is what makes a governor read a failed result as the
+        # allocator's refusal: without it the class is READ-IT and the
+        # governor passes whatever this code does.
+        crashed = {"passed": False, "crashed": True, "run_id": "r1",
+                   "workflow_valid": False,
+                   "errors": ["OperationalError: database is locked"],
+                   "feasibility": {"passed": True, "checks": []},
+                   "last_usable_artifact": self._engine_artifact(delivered)}
+        code, brief, _calls, err = self._run(2, refusal=crashed)
+        self.assertEqual(code, 7, err[-400:])
+        self.assertEqual(len(self.labels), 1, "a delivery was re-solved")
+        self.assertEqual([f["stage"] for f in brief["later_failures"]],
+                         ["engine_after_certification"])
+        self.assertEqual(brief["delivered_path"], str(delivered))
+        self.assertEqual(brief["last_usable_artifact"]["label"], "upload_ready")
+        # Review finding 4: the gates are the delivered export's own, not the
+        # crashed result's `workflow_valid: False`.
+        self.assertEqual(brief["gates"], {"workflow_valid": True,
+                                          "selection_certified": True,
+                                          "allocation_certified": True})
+        self.assertTrue(brief["verification"]["passed"])
+        json.dumps(brief)  # no bytes reached the brief
+        self.assertLess(self._index(err, "FILE  "), self._index(err, "frontier:"))
+
+    def test_a_raising_brief_still_delivers_the_file(self):
+        """The row's verification: an exception in the report AFTER the file
+        exists used to exit 1 with the file unpresented, no brief and no
+        record. Driven through `_main_recording_refusals`, the real exit door:
+        the file line prints first, the brief names it, the record says 7."""
+        import importlib.util
+        import types as _types
+        import time as _time
+        from mlb_engine.entries import upload_manifest
+        spec = importlib.util.spec_from_file_location(
+            "build_slate_last_usable", REPO / "skills" / "generate-lineups"
+            / "scripts" / "build_slate.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        mod.REPO = self.root
+        delivered = self._delivered_csv()
+        passing = dict(DeadlineGovernorWiringTests._PASSING,
+                       delivered_path=str(delivered), manifest_recorded=True,
+                       last_usable_artifact=self._engine_artifact(delivered))
+        args = _types.SimpleNamespace(
+            date="2026-07-29", entries=2, controls_override=None,
+            projections=None, lineups=None, odds=None, postures=None,
+            deliver_by=None, _governor=None, max_seconds=20.0,
+            declare_pitcher=None, ignore_pool_blockers=True, assume_gates=None,
+            rotowire=False, enrichment=False, reference_dir=None,
+            reference_max_age_days=14.0, past_slate_replay=True, leverage=None,
+            max_opposing_hitters_per_sp=None, ownership_pred=None,
+            feed_max_age_minutes=90.0, bundle=None, tbd_fallback=None,
+            brief=None)
+        slate_dir = self.root / "slate"
+        slate_dir.mkdir(parents=True, exist_ok=True)
+        entries = self._entries_csv()
+
+        def main():
+            code, _brief = mod.run_classic(args, slate_dir, self._SALARY, entries,
+                                           {"games": []}, _time.monotonic() + 60)
+            return code
+
+        def raising(*_a, **_k):
+            raise TypeError("Object of type Timestamp is not JSON serializable")
+
+        out, err = io.StringIO(), io.StringIO()
+        with unittest.mock.patch.object(epi, "run_slate", lambda **kw: dict(passing)), \
+                unittest.mock.patch.object(mod, "main", main), \
+                unittest.mock.patch.object(mod, "portfolio_exposure", raising), \
+                unittest.mock.patch.object(upload_manifest, "REPO_ROOT", self.root), \
+                unittest.mock.patch.object(sys, "argv",
+                                           ["build_slate.py", "--date", "2026-07-29"]), \
+                contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = mod._main_recording_refusals()
+        err_text, out_text = err.getvalue(), out.getvalue()
+        self.assertEqual(code, 7, err_text[-600:])
+        sha = sha256_file(delivered)
+        self.assertLess(self._index(err_text, f"FILE  {delivered}"),
+                        self._index(err_text, "LATER FAILURE"))
+        self.assertLess(self._index(err_text, "LATER FAILURE"),
+                        self._index(err_text, "Traceback"))
+        briefs = [json.loads(line) for line in [out_text[out_text.find("{"):]]]
+        brief = briefs[-1]
+        self.assertEqual(brief["status"], "delivered_after_failure")
+        self.assertEqual(brief["delivered_sha256"], sha)
+        self.assertEqual(brief["date"], "2026-07-29")
+        self.assertEqual(brief["label"], "upload_ready")
+        self.assertIn("TypeError", brief["later_failures"][0]["error"])
+        records = sorted((self.root / "data" / "deliveries" / "2026-07-29").glob("*.json"))
+        self.assertEqual(len(records), 1, records)
+        record = json.loads(records[0].read_text(encoding="utf-8"))
+        self.assertEqual(record["exit_code"], 7)
+        self.assertEqual(record["refusal"]["last_usable_artifact"]["sha256"], sha)
+        self.assertIn("later failure", record["refusal"]["note"])
+
+    def test_an_exception_with_nothing_usable_still_propagates(self):
+        """The guard is scoped to a file that exists: before one, a crash
+        stays a crash (exit 1), exactly as it was."""
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "build_slate_last_usable_none", REPO / "skills" / "generate-lineups"
+            / "scripts" / "build_slate.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+
+        def main():
+            raise ValueError("nothing written yet")
+
+        with unittest.mock.patch.object(mod, "main", main), \
+                self.assertRaisesRegex(ValueError, "nothing written yet"):
+            mod._main_recording_refusals()
+
+    def test_build_asserted_exits_through_the_same_door(self):
+        """R233's N+1: tools/build_asserted.py, which autobuild runs as its
+        child after a pool override, called build_slate's bare `main()`, so its
+        builds skipped the refusal record and the exit-7 guard. Driven against
+        a stand-in script whose two doors return different codes."""
+        import importlib
+        stub = self.root / "build_slate_stub.py"
+        stub.write_text("def main():\n    return 11\n"
+                        "def _main_recording_refusals():\n    return 22\n",
+                        encoding="utf-8")
+        ba = importlib.import_module("tools.build_asserted")
+        import mlb_engine.pipeline.execution_pipeline as ep_mod
+        original = ep_mod.run_slate
+        try:
+            with unittest.mock.patch.object(ba, "BUILD", stub), \
+                    unittest.mock.patch.object(
+                        sys, "argv", ["build_asserted.py", "--assert-gate",
+                                      "lineup_gate_passed"]):
+                code = ba.main()
+        finally:
+            ep_mod.run_slate = original
+        self.assertEqual(code, 22)
+
+    # ---- the /code-review pass's findings, each pinned ----------------------
+
+    def test_a_crash_keeps_its_stack(self):
+        """`errors` holds one line; the stack has to reach the terminal and
+        the record, or a crash has no location anywhere (review finding 1)."""
+        def deep():
+            raise KeyError("contest_shape")
+
+        with unittest.mock.patch.object(epi, "select_and_assign_entries",
+                                        side_effect=lambda *a, **k: deep()):
+            result = self._build()
+        self.assertIn("Traceback", result["traceback"])
+        self.assertIn("in deep", result["traceback"])
+        self.assertIn("in deep", self._diagnostics(result)["traceback"])
+        self.assertEqual(result["errors"], ["KeyError: 'contest_shape'"])
+
+    def test_raise_on_engine_crash_keeps_a_crash_a_crash_and_prints_its_stack(self):
+        crashed = {"crashed": True, "run_id": "r1", "errors": ["KeyError: 'x'"],
+                   "traceback": "Traceback (most recent call last):\n  in deep\n"}
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err), \
+                self.assertRaisesRegex(epi.EngineCrashed, "crashed after create_run"):
+            epi.raise_on_engine_crash(crashed)
+        self.assertIn("in deep", err.getvalue())
+        with_file = dict(crashed, last_usable_artifact={"path": "x"})
+        self.assertIs(epi.raise_on_engine_crash(with_file), with_file)
+        self.assertEqual(epi.raise_on_engine_crash({"passed": False}), {"passed": False})
+
+    def test_late_swap_raises_a_crash_before_it_can_read_as_a_refusal(self):
+        """R297(c) made the swap door RETURN a crashed run; late_swap.py read
+        any non-passing result as "late swap did not pass" and exited 3, the
+        crash-wearing-a-refusal shape (review finding 3). `main` is too heavy
+        to drive here, so this pins the order in its source: the crash check
+        sits between the `run_late_swap` call and the first `passed` read."""
+        import ast as _ast
+        src = (REPO / "tools" / "late_swap.py").read_text(encoding="utf-8")
+        main = next(n for n in _ast.parse(src).body
+                    if isinstance(n, _ast.FunctionDef) and n.name == "main")
+        def calls(name):
+            return sorted(n.lineno for n in _ast.walk(main)
+                          if isinstance(n, _ast.Call) and isinstance(n.func, _ast.Name)
+                          and n.func.id == name)
+        swap_at = calls("run_late_swap")[0]
+        crash_at = [line for line in calls("raise_on_engine_crash") if line > swap_at]
+        passed_at = min(n.lineno for n in _ast.walk(main)
+                        if isinstance(n, _ast.If) and n.lineno > swap_at
+                        and "result.get('passed')" in _ast.unparse(n.test))
+        self.assertTrue(crash_at, "late_swap.main never checks for a crash")
+        self.assertLess(crash_at[0], passed_at)
+        import importlib
+        tools = str(REPO / "tools")
+        if tools not in sys.path:
+            sys.path.insert(0, tools)
+        self.assertIs(importlib.import_module("late_swap").raise_on_engine_crash,
+                      epi.raise_on_engine_crash, "one definition, not a copy")
+
+    def test_a_failed_report_tail_publishes_no_mirror(self):
+        """A manifest row recorded from a result missing its label and its
+        contests is a false permanent record (review finding 2): the mirror is
+        skipped and the immutable export is what gets handed over."""
+        salary = self.root / "salary.csv"
+        ids = write_salary(salary)
+        entries = self.root / "DKEntries.csv"
+        write_entries(entries)
+        r1, r2 = legal_rosters(ids)
+        real = epi.controls_for_report
+        calls = []
+
+        def second_call_raises(controls):
+            calls.append(1)
+            if len(calls) > 1:
+                raise RuntimeError("report fields broke")
+            return real(controls)
+
+        mirrored = []
+        with unittest.mock.patch.object(epi, "controls_for_report", second_call_raises), \
+                unittest.mock.patch.object(epi, "mirror_to_outputs",
+                                           lambda *a, **k: mirrored.append(a)), \
+                contextlib.redirect_stderr(io.StringIO()):
+            built = run_slate(
+                runs_root=self.root / "runs", salary_csv=salary, entries_csv=entries,
+                projections_override=projection_frame(ids),
+                candidates_override=[candidate("A", r1, 100), candidate("B", r2, 99, "CCC")],
+                portfolio_controls_override=RunSlateFrontDoorTests.LOOSE, approve=True,
+                assume_gates=RunSlateFrontDoorTests.UNEVIDENCED)
+        self.assertTrue(built["passed"], built.get("errors"))
+        self.assertEqual([f["stage"] for f in built["later_failures"]],
+                         ["run_slate_report_fields"])
+        self.assertEqual(mirrored, [], "a mirror was recorded from a broken result")
+        self.assertIsNone(built["delivered_path"])
+        self.assertIn("report fields failed", built["mirror_skipped"])
+        self.assertTrue(Path(built["last_usable_artifact"]["path"]).exists())
+
+    def test_a_mirror_whose_name_was_never_promoted_is_not_presented(self):
+        """`deliver` can record the row and then fail to rename the file, which
+        returned recorded=True beside a DO_NOT_UPLOAD_ path: the build exited 0
+        and presented that name as upload_ready (review finding 5)."""
+        delivered = self._delivered_csv()
+        unrecorded = delivered.with_name("DO_NOT_UPLOAD_" + delivered.name)
+        unrecorded.write_bytes(delivered.read_bytes())
+        result = dict(DeadlineGovernorWiringTests._PASSING,
+                      delivered_path=str(unrecorded), manifest_recorded=True,
+                      manifest_error="recorded but not promoted: rename failed",
+                      last_usable_artifact=self._engine_artifact(delivered))
+        code, brief, _calls, err = self._run(30, refusal=result)
+        self.assertEqual(code, 7, err[-400:])
+        self.assertEqual([f["stage"] for f in brief["later_failures"]], ["mirror_name"])
+        self.assertEqual(brief["last_usable_artifact"]["path"], str(delivered))
+        self.assertNotIn(f"FILE  {unrecorded}", err)
+
+    def test_the_mirrors_own_error_reaches_the_result(self):
+        """The engine half of finding 5: `mirror_to_outputs` printed the
+        mirror's error and kept it off the result, so nothing downstream saw a
+        row recorded beside a name that was never promoted."""
+        from mlb_engine.entries import upload_manifest
+        salary = self.root / "salary.csv"
+        write_salary(salary)
+        source = self.root / "DKEntries.csv"
+        source.write_text("x\n", encoding="utf-8")
+        outcome = {"path": self.root / "DO_NOT_UPLOAD_DKEntries.csv",
+                   "recorded": True, "record": None, "staged_salary": None,
+                   "error": "recorded but not promoted: rename failed"}
+        result = {"passed": True, "output_path": str(source)}
+        with unittest.mock.patch.object(epi, "_deliver_mirror", lambda *a, **k: outcome), \
+                unittest.mock.patch.object(upload_manifest, "REPO_ROOT", self.root), \
+                contextlib.redirect_stdout(io.StringIO()):
+            epi.mirror_to_outputs(result, salary)
+        self.assertIs(result["manifest_recorded"], True)
+        self.assertEqual(result["manifest_error"],
+                         "recorded but not promoted: rename failed")
+
+    def test_a_refused_deferred_promotion_carries_no_artifact(self):
+        """Promotion refusals carry no artifact on the inline path; the
+        deferred path kept it (review finding 6)."""
+        result = self._build(defer_promotion=True)
+        self.assertIn("last_usable_artifact", result)
+        (self.root / "runs" / "latest_valid_run.json").write_text(
+            json.dumps({"run_id": "another_session"}), encoding="utf-8")
+        refused = promote_deferred_run(result)
+        self.assertTrue(refused["pointer_conflict"])
+        self.assertNotIn("last_usable_artifact", refused)
+        self.assertEqual(refused["last_usable_artifact_withheld"], ["promotion refused"])
+
+    def test_the_file_is_presented_when_its_record_cannot_be_built(self):
+        """The presentation step's own metadata ran unguarded before the file
+        was noted, so a raise there turned a verified file into exit 1 with no
+        file line (review finding 7)."""
+        delivered = self._delivered_csv()
+        passing = dict(DeadlineGovernorWiringTests._PASSING,
+                       delivered_path=str(delivered), manifest_recorded=True,
+                       last_usable_artifact=self._engine_artifact(delivered))
+        with unittest.mock.patch.object(epi, "artifact_record",
+                                        side_effect=OSError("stale NFS handle")):
+            code, brief, _calls, err = self._run(30, refusal=passing)
+        self.assertEqual(code, 7, err[-400:])
+        self.assertIn(f"FILE  {delivered}  sha256={sha256_file(delivered)}", err)
+        self.assertEqual(brief["last_usable_artifact"]["label"], "upload_ready")
+        self.assertEqual([f["stage"] for f in brief["later_failures"]], ["artifact_record"])
+
+    def test_the_exception_brief_takes_the_slate_date_from_the_file(self):
+        """autobuild never passes --date, and an exception before the brief
+        existed left `date: ""` (review finding 10)."""
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "build_slate_last_usable_date", REPO / "skills" / "generate-lineups"
+            / "scripts" / "build_slate.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        mod._LAST_USABLE.update({"path": "x.csv", "sha256": "ab" * 32,
+                                 "label": "upload_ready", "date": "2026-07-29"})
+        out = io.StringIO()
+        with unittest.mock.patch.object(sys, "argv", ["build_slate.py", "--salary", "s.csv"]), \
+                contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+            try:
+                raise ValueError("after the file")
+            except ValueError as exc:
+                self.assertEqual(mod._deliver_after_exception(exc), 7)
+        text = out.getvalue()
+        self.assertEqual(json.loads(text[text.find("{"):])["date"], "2026-07-29")
+
+    def test_the_crash_handler_survives_an_unprintable_exception_and_a_promoted_run(self):
+        """`_crashed_result` never raises (review finding 11): an exception
+        whose __str__ raises is named without it, and a promoted run, which is
+        immutable, is reported as not re-marked rather than as recorded."""
+        from mlb_engine.pipeline.build_state_manager import create_run
+        run = create_run(self.root / "runs", "initial_build")
+        manifest_path = Path(run["run_dir"]) / "manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["status"] = "promoted"
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+        class Unprintable(Exception):
+            def __str__(self):
+                raise RuntimeError("no")
+
+        with contextlib.redirect_stderr(io.StringIO()):
+            result = epi._crashed_result(run, Unprintable(), "initial_build")
+        self.assertEqual(result["errors"], ["Unprintable: <unprintable>"])
+        self.assertIs(result["terminal_state_recorded"], False)
+        self.assertIn("already promoted", result["terminal_state_note"])
+        self.assertEqual(json.loads(manifest_path.read_text())["status"], "promoted")
+
+    def test_a_deadline_showdown_file_carries_the_deadline_label(self):
+        """The Showdown record hard-coded `review_grade` even when a deadline
+        rung opened its controls (review finding 9). Rung 1 on the vendored
+        fixture: the first ladder solve is infeasible, the governor opens the
+        three controls, the re-solve delivers."""
+        import datetime as _dt
+        import importlib.util
+        import shutil
+        from mlb_engine.entries import upload_manifest
+        from mlb_engine.optimize import showdown_theses as st
+        from mlb_engine.pipeline import deadline_governor as dg
+        fixture = REPO / "tests" / "fixtures" / "showdown"
+        sal, ent = self.root / "DKSalaries.csv", self.root / "DKEntries.csv"
+        shutil.copy2(fixture / "DKSalaries_showdown_MIN_CHC.csv", sal)
+        shutil.copy2(fixture / "DKEntries_showdown_MIN_CHC.csv", ent)
+        spec = importlib.util.spec_from_file_location(
+            "build_slate_last_usable_sd_rung", REPO / "skills" / "generate-lineups"
+            / "scripts" / "build_slate.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        real, calls = st.solve_ladder, []
+
+        def first_infeasible(priced, theses, **kw):
+            calls.append(1)
+            return [None] * len(theses) if len(calls) == 1 else real(priced, theses, **kw)
+
+        args = types.SimpleNamespace(
+            date="2026-07-18", entries=None, controls_override=None,
+            projections=None, declare_pitcher=[], lineups=None, odds=None,
+            no_odds=True, brief=None,
+            _governor=dg.DeadlineGovernor(_dt.datetime.now(_dt.timezone.utc)
+                                          + _dt.timedelta(minutes=2)))
+        err = io.StringIO()
+        with unittest.mock.patch.object(mod, "REPO", self.root), \
+                unittest.mock.patch.object(upload_manifest, "REPO_ROOT", self.root), \
+                unittest.mock.patch.object(st, "solve_ladder", first_infeasible), \
+                contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(err):
+            code, brief = mod.run_showdown(args, self.root, sal, ent)
+        self.assertEqual(code, 0, err.getvalue()[-600:])
+        self.assertEqual(len(calls), 2, "the governor did not re-solve")
+        self.assertEqual(brief["last_usable_artifact"]["label"], dg.DEADLINE_LABEL)
+        self.assertIn(f"label={dg.DEADLINE_LABEL}", err.getvalue())
+
+    def test_a_showdown_file_whose_record_failed_is_presented_and_exits_7(self):
+        """run_showdown, end to end on the vendored fixture: a failed manifest
+        record leaves the only copy under DO_NOT_UPLOAD_, and that copy is the
+        one presented, review-grade, with exit 7."""
+        import importlib.util
+        import shutil
+        from mlb_engine.entries import upload_manifest
+        fixture = REPO / "tests" / "fixtures" / "showdown"
+        sal, ent = self.root / "DKSalaries.csv", self.root / "DKEntries.csv"
+        shutil.copy2(fixture / "DKSalaries_showdown_MIN_CHC.csv", sal)
+        shutil.copy2(fixture / "DKEntries_showdown_MIN_CHC.csv", ent)
+        spec = importlib.util.spec_from_file_location(
+            "build_slate_last_usable_sd", REPO / "skills" / "generate-lineups"
+            / "scripts" / "build_slate.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        args = types.SimpleNamespace(
+            date="2026-07-18", entries=None, controls_override=None,
+            projections=None, declare_pitcher=[], lineups=None,
+            odds=None, no_odds=True, brief=None)
+
+        def refuse(**_kw):
+            raise OSError("manifest locked")
+
+        err = io.StringIO()
+        with unittest.mock.patch.object(mod, "REPO", self.root), \
+                unittest.mock.patch.object(upload_manifest, "REPO_ROOT", self.root), \
+                unittest.mock.patch.object(upload_manifest, "record_delivery", refuse), \
+                contextlib.redirect_stdout(io.StringIO()), \
+                contextlib.redirect_stderr(err):
+            code, brief = mod.run_showdown(args, self.root, sal, ent)
+        self.assertEqual(code, 7, err.getvalue()[-600:])
+        artifact = brief["last_usable_artifact"]
+        self.assertEqual(artifact["label"], "review_grade")
+        self.assertTrue(Path(artifact["path"]).name.startswith("DO_NOT_UPLOAD_"))
+        self.assertEqual(artifact["sha256"], sha256_file(artifact["path"]))
+        self.assertEqual([f["stage"] for f in brief["later_failures"]], ["manifest"])
+        self.assertIn(f"FILE  {artifact['path']}", err.getvalue())
 
 
 class DeliveryLabelAgreementTests(unittest.TestCase):

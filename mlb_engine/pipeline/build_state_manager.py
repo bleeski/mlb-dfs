@@ -216,8 +216,10 @@ def update_run_certification(
 
     ``status`` may be one of ``building``, ``blocked``, or ``diagnostic``.
     ``promoted`` can only be set through :func:`promote_run`, which re-verifies
-    every recorded hash first. Gate-blocked runs should be marked ``blocked``
-    so a crashed run and a gate-blocked run are distinguishable in the manifest.
+    every recorded hash first. Gate-blocked runs are marked ``blocked``. A run
+    that crashed is ``blocked`` too since R297(c), with ``crashed: True`` in the
+    manifest (:func:`mark_run_crashed`), so the two stay distinguishable without
+    leaving a crash looking like an in-flight ``building``.
     """
     run_path = Path(run_dir)
     manifest = _load_manifest(run_path)
@@ -231,6 +233,35 @@ def update_run_certification(
         if status not in ASSIGNABLE_RUN_STATUSES:
             raise ValueError(f"status must be one of {sorted(ASSIGNABLE_RUN_STATUSES)}")
         manifest["status"] = status
+    _save_manifest(run_path, manifest)
+    return manifest
+
+
+def read_run_manifest(run_dir: str | Path) -> Dict[str, Any]:
+    """A run's manifest, read-only (R393(b): the usable-artifact record reads
+    the certification and the registered export from here, never from the
+    caller's view of the run)."""
+    return _load_manifest(run_dir)
+
+
+def mark_run_crashed(run_dir: str | Path, error: str) -> Dict[str, Any]:
+    """R297(c). End a crashed run in a terminal state, touching nothing else.
+
+    Status ``blocked``, ``crashed: True`` and the error appended; certification,
+    artifacts and diagnostics are left exactly as they are, so a run that
+    certified its export before it crashed keeps a certified, hash-bound record.
+    A promoted run is immutable and is returned unchanged.
+    """
+    run_path = Path(run_dir)
+    manifest = _load_manifest(run_path)
+    if manifest.get("status") == "promoted":
+        return manifest
+    manifest["status"] = "blocked"
+    manifest["crashed"] = True
+    errors = list(manifest.get("errors") or [])
+    if str(error) not in errors:
+        errors.append(str(error))
+    manifest["errors"] = errors
     _save_manifest(run_path, manifest)
     return manifest
 

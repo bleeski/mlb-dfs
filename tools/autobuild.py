@@ -43,7 +43,9 @@ because "WILL NOT DO, EVER" reads as a complete boundary to anyone who lands in
 this file first, and on 2026-08-29 a session asked Ben a repair question inside
 a lock window that it was entitled to answer itself.
 
-Exit: 0 certified, 3 refused with reasons, 4 bad input, 5 out of time.
+Exit: 0 certified, 3 refused with reasons, 4 bad input, 5 out of time, 7
+delivered a prior valid artifact after a later failure (R393(b): the child's
+file passed its essential checks and a later stage failed; it is not retried).
 Every decision lands in outputs/<date>/autobuild_decisions.json, flushed as it
 is taken rather than at the end, so a killed call keeps what it had decided.
 
@@ -150,7 +152,12 @@ def default_per_build_seconds(budget: Optional[float] = None) -> int:
 # off-contract check and fell into the refusal branch, which asks the brief what
 # was refused, finds none, and logs "refused with no remedy" -- the R296(d)
 # shape. Off the list, a child 5 is a stop that records its code and stderr.
-BUILD_SLATE_CONTRACT_CODES = (0, 3, 4, 10)
+#
+# R393(b), 2026-09-23. 7 joins it: build_slate exits 7 when its file passed its
+# essential checks and a later stage failed (a crashed promotion, a raising
+# brief, a failed mirror or manifest write). The file is the deliverable, so a
+# child 7 is a delivery this supervisor records and stops on, never a retry.
+BUILD_SLATE_CONTRACT_CODES = (0, 3, 4, 7, 10)
 
 # lineup_gate_passed derives from the pool report, so overriding a benign pool
 # blocker is not enough on its own: the gate keeps reading the same finding and
@@ -818,6 +825,27 @@ def main() -> int:
                     delivered=brief.get("delivered_path"))
             break
 
+        if code == 7:
+            # R393(b). A delivery, and a later stage failed. Re-running would
+            # spend the window rebuilding a file that already passed its
+            # essential checks, so this records both facts and stops. The same
+            # hash-bound rule as exit 0: no path and sha, no delivery.
+            if not brief or not brief.get("delivered_path") or not brief.get("delivered_sha256"):
+                dec.add(attempt, "stop", "exit 7 without a structured, hash-bound "
+                        "delivery names no file to hand over",
+                        returncode=code, stderr=(proc.stderr or "")[-2000:])
+                _write(dec, brief, salary=a.salary)
+                return 3
+            artifact = brief.get("last_usable_artifact") or {}
+            dec.add(attempt, "delivered_after_failure",
+                    f"sha256={brief.get('delivered_sha256', '?')[:12]}; the file "
+                    f"passed its essential checks and a later stage failed; it is "
+                    f"the deliverable, labelled {artifact.get('label') or brief.get('label')}",
+                    delivered=artifact.get("path") or brief.get("delivered_path"),
+                    label=artifact.get("label") or brief.get("label"),
+                    later_failures=list(brief.get("later_failures") or []))
+            break
+
         if code == 4:
             # R388(b). Exit 4 is every pre-staging refusal, not only a missing
             # input, and the child's own status says which: an unholdable
@@ -946,7 +974,8 @@ def main() -> int:
         _write(dec, brief, salary=a.salary)
         return 3
 
-    delivered = bool(dec.log) and dec.log[-1]["action"] == "delivered"
+    last_action = dec.log[-1]["action"] if dec.log else None
+    delivered = last_action in ("delivered", "delivered_after_failure")
     if not delivered:
         # R396(b). Running out of --max-attempts was the one terminal exit that
         # wrote no stop: the log's last record read `grow_bank` or
@@ -963,7 +992,8 @@ def main() -> int:
                 max_attempts=a.max_attempts, attempts_this_call=spent - attempts_done,
                 last_action=last)
     _write(dec, last_brief, salary=a.salary)
-    return 0 if delivered else 3
+    return (7 if last_action == "delivered_after_failure"
+            else 0 if delivered else 3)
 
 
 def _resume_state(dec: "Decisions", salary: Optional[str]) -> Dict[str, Any]:

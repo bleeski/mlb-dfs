@@ -1212,6 +1212,71 @@ def derive_workflow_certification(pre_export: Dict[str, Any], post_export: Dict[
     }
 
 
+#: The six post-export facts `derive_workflow_certification` grades, in its order.
+POST_EXPORT_GATES = (
+    "template_preservation_passed", "entry_reconciliation_passed",
+    "roster_legality_passed", "portfolio_caps_passed",
+    "locked_immutability_passed", "export_hash_binding_passed",
+)
+
+#: R393(b). What Session 08 counts as essential-valid, and where it came from.
+ESSENTIAL_VALIDITY_BASIS = "engine_post_export"
+
+
+def essential_post_export_gates() -> Tuple[str, ...]:
+    """The post-export gates an essential-valid export must pass (R393(b)).
+
+    Derived from `gate_classes`, never listed by hand: a gate whose class is V,
+    or a MIXED gate with any V fact, is required; an S- or P-only gate is not.
+    The validator emits ONE boolean per MIXED gate, so `roster_legality_passed`
+    and `export_hash_binding_passed` are required whole, which is stricter than
+    their V facts alone. Splitting them is R388(c)'s (roadmap Session 13).
+    """
+    from mlb_engine.entries import gate_classes as gc  # stdlib-only, no cycle
+    required = []
+    for name in POST_EXPORT_GATES:
+        validity = gc.gate_validity(name)
+        if validity.klass == gc.V or (
+                validity.klass == gc.MIXED
+                and any(klass == gc.V for _fact, klass in validity.facts)):
+            required.append(name)
+    return tuple(required)
+
+
+def derive_essential_validity(post_export: Mapping[str, Any]) -> Dict[str, Any]:
+    """R393(b). Is this export essential-valid, on the engine's own evidence?
+
+    Session 08's definition: every post-export gate `essential_post_export_gates`
+    requires is literally True on the exact bytes (`_gate_bool`, so a truthy
+    stand-in fails). Strategy gates are excluded and named, so a file that
+    failed only a cap is still essential-valid. `preflight` is the seam for
+    R388(c): preflight's own `essential_valid` verdict lands there, and until it
+    does the block says the verdict is the engine's alone.
+    """
+    required = essential_post_export_gates()
+    failed = [name for name in required if not _gate_bool(post_export.get(name))]
+    return {
+        "essential_valid": not failed,
+        "basis": ESSENTIAL_VALIDITY_BASIS,
+        "required": list(required),
+        "failed": failed,
+        "excluded": [n for n in POST_EXPORT_GATES if n not in required],
+        "preflight": None,
+    }
+
+
+def entry_coverage(path: str | Path) -> Dict[str, int]:
+    """R393(b). Reserved entry rows in an export and how many are filled.
+
+    Read off the file's own bytes rather than the assignment count, so it
+    describes what would be uploaded. A row is filled when every roster slot
+    of its format holds an id (ten on Classic, six on Showdown).
+    """
+    rows = parse_dk_entry_rows(path)
+    filled = sum(1 for row in rows if row.roster_cells and all(row.roster_cells))
+    return {"reserved": len(rows), "filled": filled}
+
+
 def populate_dk_entries_template(
     template_path: str,
     assignments: Sequence[Dict[str, Any]],

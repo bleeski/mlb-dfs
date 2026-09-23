@@ -92,7 +92,11 @@ def main() -> int:
     spec.loader.exec_module(mod)
 
     sys.argv = ["build_slate.py"] + passthrough
-    return mod.main()
+    # R393(b). The same exit door `python build_slate.py` uses, not bare
+    # `main()`: autobuild runs THIS file as its child once it overrides pool
+    # blockers, and `main()` alone skipped both the refusal record (R369) and
+    # the guard that presents a written file after a later exception (exit 7).
+    return mod._main_recording_refusals()
 
 
 if __name__ == "__main__":
