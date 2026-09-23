@@ -157,7 +157,7 @@ Ben has delegated build decisions (CLAUDE.md, Autonomy). Start here:
 python <repo>/tools/autobuild.py \
   --salary <DKSalaries.csv> --entries <DKEntries.csv> \
   --lineups <feed.json> --postures '<id>=<posture>,...' \
-  --stop-after-minutes 12
+  --stop-after-minutes 12   # + --declare-pitcher <id>[=<role>] per PLR/PO arm (R345)
 ```
 
 `--per-build-seconds` is left off on purpose: it defaults to this host's call

@@ -142,7 +142,15 @@ def default_per_build_seconds(budget: Optional[float] = None) -> int:
 
 # build_slate.py's documented exit vocabulary. Anything else is a crash wearing
 # a refusal's label; see the off-contract branch in main().
-BUILD_SLATE_CONTRACT_CODES = (0, 3, 4, 5, 10)
+#
+# R396(b), 2026-09-23. 5 is NOT in it. It was, and it is this supervisor's own
+# code (the wall clock, the call budget or a child timeout ran out), which
+# build_slate never returns (`grep "return 5"` in the script and
+# `tools/build_asserted.py`: none). Listed here, a child 5 passed the
+# off-contract check and fell into the refusal branch, which asks the brief what
+# was refused, finds none, and logs "refused with no remedy" -- the R296(d)
+# shape. Off the list, a child 5 is a stop that records its code and stderr.
+BUILD_SLATE_CONTRACT_CODES = (0, 3, 4, 10)
 
 # lineup_gate_passed derives from the pool report, so overriding a benign pool
 # blocker is not enough on its own: the gate keeps reading the same finding and
@@ -302,6 +310,30 @@ def lift_never_relax(tokens: List[str]) -> tuple:
     return rest, names, None
 
 
+def lift_repeatable(tokens: List[str], flag: str) -> tuple:
+    """Pull every ``flag VALUE`` / ``flag=VALUE`` out of the passthrough tokens,
+    in order. R345, `lift_never_relax`'s shape for a flag whose values are kept
+    verbatim rather than merged: returns ``(rest, values, error)``."""
+    rest: List[str] = []
+    values: List[str] = []
+    i = 0
+    while i < len(tokens):
+        tok = tokens[i]
+        if tok == flag:
+            if i + 1 >= len(tokens):
+                return tokens, [], f"{flag} in --passthrough has no value after it"
+            values.append(tokens[i + 1])
+            i += 2
+            continue
+        if tok.startswith(flag + "="):
+            values.append(tok.split("=", 1)[1])
+            i += 1
+            continue
+        rest.append(tok)
+        i += 1
+    return rest, values, None
+
+
 def never_relax_names(chunks: Optional[List[str]]) -> List[str]:
     """The comma-separated, repeatable flag's values as one sorted list."""
     out = set()
@@ -322,6 +354,8 @@ class Decisions:
         # R388(b). The operator's never-relax. A derived floor never lands on
         # one of these, and `effective_controls` enforces it a second time.
         self.never_relax: List[str] = []
+        # R345. The operator's --declare-pitcher values, verbatim and in order.
+        self.declared_pitchers: List[str] = []
         # R296(f). The log was durable only at terminal exits, so an outer kill
         # -- the Cowork call ceiling, a Ctrl-C, the sandbox dying -- lost every
         # decision taken up to that point. R212 and R169(a) each fixed one
@@ -442,6 +476,19 @@ def main() -> int:
                          "the lock, and is forwarded to build_slate, whose "
                          "governor turns a badly_shaped refusal into a "
                          "review_grade_deadline_build from T-6.")
+    # R345. An operator INPUT, forwarded verbatim: R104's answer for a PLR or
+    # PO arm, which build_slate validates at exit 4 before staging. It reached
+    # the child through --passthrough already; this makes it a named flag the
+    # SKILL.md recipe can show, and the decision log records it.
+    ap.add_argument("--declare-pitcher", dest="declare_pitcher", action="append",
+                    default=None, metavar="ID[=ROLE]",
+                    help="forwarded verbatim to build_slate's --declare-pitcher "
+                         "(repeatable; a bare ID means declared_probable_sp). "
+                         "Recorded in the decision log as an operator input, "
+                         "never as a decision this supervisor took. One inside "
+                         "--passthrough is lifted out and forwarded with these. "
+                         "On --resume with none passed, the run's recorded "
+                         "declarations are restored; passing any replaces them.")
     # R388(b). Forwarded to build_slate, which validates the names and holds
     # them at the governor's rung and the pipeline's floors, and read here too,
     # because this supervisor applies structural floors of its own.
@@ -495,9 +542,11 @@ def main() -> int:
     a._resumed_attempts = 0
     a._resumed_ignore_pool = False
     a._resumed_never_relax = []
+    a._resumed_declarations = []
     if a.resume:
         resumed = _resume_state(dec, a.salary)
         a._resumed_never_relax = list(resumed.get("never_relax") or [])
+        a._resumed_declarations = list(resumed.get("declare_pitcher") or [])
         if resumed["attempts_done"]:
             a._resumed_attempts = resumed["attempts_done"]
             a._resumed_ignore_pool = resumed["ignore_pool"]
@@ -536,6 +585,32 @@ def main() -> int:
     dec.never_relax = never_relax_names(
         list(getattr(a, "never_relax", None) or []) + passthrough_never_relax
         + list(getattr(a, "_resumed_never_relax", None) or []))
+    # R345. --declare-pitcher: this flag's values, then any lifted from
+    # --passthrough, forwarded once each in that order. A resuming call that
+    # passes none restores the run's; one that passes any replaces them, and
+    # the record says which.
+    passthrough_tokens, passthrough_declared, declare_error = lift_repeatable(
+        passthrough_tokens, "--declare-pitcher")
+    if declare_error:
+        print(f"autobuild: {declare_error}", file=sys.stderr)
+        dec.add(0, "stop", declare_error)
+        _write(dec, {}, salary=a.salary)
+        return 4
+    typed_declared = (list(getattr(a, "declare_pitcher", None) or [])
+                      + passthrough_declared)
+    resumed_declared = list(getattr(a, "_resumed_declarations", None) or [])
+    dec.declared_pitchers = typed_declared or resumed_declared
+    if dec.declared_pitchers:
+        source = ("this call" if typed_declared else "the resumed run's log")
+        replaced = (bool(typed_declared) and bool(resumed_declared)
+                    and typed_declared != resumed_declared)
+        dec.add(0, "operator_declared_pitchers",
+                f"an operator input from {source}, forwarded verbatim to "
+                f"build_slate as --declare-pitcher; not a decision this "
+                f"supervisor took"
+                + ("; it replaces the resumed run's declarations" if replaced else ""),
+                declare_pitcher=list(dec.declared_pitchers),
+                **({"replaced": resumed_declared} if replaced else {}))
     if dec.never_relax:
         dec.add(0, "operator_never_relax",
                 "forwarded to build_slate once, merged from this flag and "
@@ -674,6 +749,8 @@ def main() -> int:
                 cmd += [flag, val]
         if dec.never_relax:
             cmd += ["--never-relax", ",".join(dec.never_relax)]
+        for declared in dec.declared_pitchers:
+            cmd += ["--declare-pitcher", declared]
         effective = dec.effective_controls
         if effective:
             cmd += ["--controls-override", json.dumps(effective)]
@@ -849,8 +926,24 @@ def main() -> int:
         _write(dec, brief, salary=a.salary)
         return 3
 
+    delivered = bool(dec.log) and dec.log[-1]["action"] == "delivered"
+    if not delivered:
+        # R396(b). Running out of --max-attempts was the one terminal exit that
+        # wrote no stop: the log's last record read `grow_bank` or
+        # `apply_structural_floor`, a decision to try again that was never
+        # taken. A resumed run whose attempts were already spent reached here
+        # without entering the loop, with `resumed` as its last word.
+        spent = max(attempts_done, a.max_attempts)
+        last = dec.log[-1]["action"] if dec.log else None
+        dec.add(spent, "stop",
+                f"--max-attempts {a.max_attempts} spent ({spent} attempt(s), "
+                f"{spent - attempts_done} this call); the last decision was "
+                f"{last!r} and nothing delivered. Re-run with a higher "
+                f"--max-attempts, or read the last brief's refusal",
+                max_attempts=a.max_attempts, attempts_this_call=spent - attempts_done,
+                last_action=last)
     _write(dec, last_brief, salary=a.salary)
-    return 0 if bool(dec.log) and dec.log[-1]["action"] == "delivered" else 3
+    return 0 if delivered else 3
 
 
 def _resume_state(dec: "Decisions", salary: Optional[str]) -> Dict[str, Any]:
@@ -890,6 +983,11 @@ def _resume_state(dec: "Decisions", salary: Optional[str]) -> Dict[str, Any]:
     held = (payload.get("controls") or {}).get("never_relax") or []
     if isinstance(held, list):
         out["never_relax"] = [str(x) for x in held]
+    # R345. The declarations the run was under, for main() to restore when the
+    # resuming call passes none.
+    declared = (payload.get("operator_inputs") or {}).get("declare_pitcher") or []
+    if isinstance(declared, list):
+        out["declare_pitcher"] = [str(x) for x in declared]
     # The prior log is the run's history, so keep it rather than starting a new
     # file: the flush rewrites the whole document and a resumed run that dropped
     # the earlier attempts would make the artifact say the floors appeared from
@@ -966,6 +1064,11 @@ def _write(dec: Decisions, brief: Dict[str, Any],
                         # level, so a post-mortem does not have to reconstruct
                         # "what did the operator ask for" from the records.
                         "controls": dec.controls_block(),
+                        # R345. Operator inputs that are not controls, only
+                        # when one was given, so an older log's shape holds.
+                        **({"operator_inputs": {
+                            "declare_pitcher": list(dec.declared_pitchers)}}
+                           if dec.declared_pitchers else {}),
                         "labels": "deterministic review proxies and labeled priors "
                                   "only; never ROI, win rate, cash rate, or "
                                   "probability"}, indent=1),

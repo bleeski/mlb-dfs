@@ -24389,6 +24389,159 @@ class SupervisorLostWindowTests(unittest.TestCase):
         self.assertEqual(records[-1]["attempt"], 3,
                          "the resumed run restarted the attempt numbering")
 
+    # ---- R396(b): the exit contract ------------------------------------
+
+    def test_the_contract_codes_are_the_codes_build_slate_returns(self):
+        """R396(b). The tuple said it mirrored build_slate's exit vocabulary and
+        listed 5, which is this supervisor's own stop and which build_slate
+        never returns. Read off the script's own return sites, so the tuple
+        cannot drift from the tree in either direction."""
+        import ast as _ast
+        tree = _ast.parse((REPO / "skills" / "generate-lineups" / "scripts"
+                           / "build_slate.py").read_text(encoding="utf-8"))
+
+        def codes(node):
+            if isinstance(node, _ast.Tuple) and node.elts:
+                return codes(node.elts[0])
+            if isinstance(node, _ast.Constant) and isinstance(node.value, int):
+                return {node.value}
+            if isinstance(node, _ast.IfExp):
+                return codes(node.body) | codes(node.orelse)
+            return set()
+        returned = set()
+        for fn in tree.body:
+            if isinstance(fn, _ast.FunctionDef) and fn.name in (
+                    "main", "run_classic", "run_showdown"):
+                for node in _ast.walk(fn):
+                    if isinstance(node, _ast.Return) and node.value is not None:
+                        returned |= codes(node.value)
+        self.assertEqual(returned, set(self.ab.BUILD_SLATE_CONTRACT_CODES))
+        self.assertNotIn(5, self.ab.BUILD_SLATE_CONTRACT_CODES)
+
+    def test_a_child_exit_5_is_an_off_contract_stop_not_a_refusal(self):
+        """A child 5 fell into the refusal branch, which asked a brief that
+        does not exist what was refused and logged "refused with no remedy"
+        with neither the code nor stderr: R296(d)'s shape, through the one
+        code the tuple let past."""
+        def five(n, cmd, kwargs):
+            return self._proc(5, stderr="Traceback: boom")
+        code, records, cmds, _logs = self._run(five)
+        self.assertEqual(code, 3)
+        self.assertEqual([r["action"] for r in records], ["stop"])
+        self.assertEqual(records[-1]["returncode"], 5)
+        self.assertIn("outside its documented", records[-1]["why"])
+        self.assertIn("boom", records[-1]["stderr"])
+        self.assertNotIn("refused with no remedy", records[-1]["why"])
+
+    def test_a_child_exit_5_with_a_growable_brief_is_not_retried(self):
+        def five(n, cmd, kwargs):
+            return self._proc(5, brief={
+                "status": "not_certified", "date": "2026-07-29",
+                "solve": {"bank": {"job_list_exhausted": False}}})
+        code, records, cmds, _logs = self._run(five, extra_argv=["--max-attempts", "3"])
+        self.assertEqual(code, 3)
+        self.assertEqual(len(cmds), 1, "an off-contract exit was retried as grow_bank")
+        self.assertNotIn("grow_bank", [r["action"] for r in records])
+
+    def test_running_out_of_max_attempts_writes_a_stop_record(self):
+        """The one terminal exit that wrote no stop: the log's last word was a
+        decision to try again that was never taken."""
+        def thin(n, cmd, kwargs):
+            return self._proc(10, brief={"status": "partial", "date": "2026-07-29",
+                                         "solve": {"bank": {"jobs_attempted": n}}})
+        code, records, cmds, _logs = self._run(thin, extra_argv=["--max-attempts", "2"])
+        self.assertEqual(code, 3)
+        self.assertEqual(len(cmds), 2)
+        stop = records[-1]
+        self.assertEqual(stop["action"], "stop")
+        self.assertIn("--max-attempts 2 spent", stop["why"])
+        self.assertEqual((stop["max_attempts"], stop["attempts_this_call"],
+                          stop["last_action"]), (2, 2, "grow_bank"))
+
+    def test_a_resume_with_its_attempts_spent_writes_a_stop_record(self):
+        root = Path(self.tmp.name)
+        out = root / "outputs" / "2026-07-29"
+        out.mkdir(parents=True)
+        (out / "autobuild_decisions.json").write_text(json.dumps({
+            "decisions": [{"attempt": 1, "action": "grow_bank", "why": "x"},
+                          {"attempt": 2, "action": "grow_bank", "why": "y"}],
+            "controls": {"user_controls": {}, "derived_controls": {},
+                         "effective_controls": {}}}), encoding="utf-8")
+        code, records, cmds, _logs = self._run(
+            lambda *_a: self.fail("no attempt should run"),
+            extra_argv=["--max-attempts", "2", "--resume"], root=root)
+        self.assertEqual(code, 3)
+        self.assertEqual(cmds, [])
+        self.assertEqual(records[-1]["action"], "stop")
+        self.assertEqual(records[-1]["attempts_this_call"], 0)
+        self.assertEqual(records[-1]["last_action"], "resumed")
+
+    def test_a_delivery_writes_no_exhaustion_stop(self):
+        def certify(n, cmd, kwargs):
+            return self._proc(0, brief={"status": "certified", "date": "2026-07-29",
+                                        "delivered_sha256": "a" * 64,
+                                        "delivered_path": "fixture.csv"})
+        code, records, _cmds, _logs = self._run(certify, extra_argv=["--max-attempts", "1"])
+        self.assertEqual(code, 0)
+        self.assertEqual(records[-1]["action"], "delivered")
+
+    # ---- R345: --declare-pitcher ----------------------------------------
+
+    @staticmethod
+    def _declared_in(cmd):
+        return [cmd[i + 1] for i, tok in enumerate(cmd) if tok == "--declare-pitcher"]
+
+    def _certify(self, n, cmd, kwargs):
+        return self._proc(0, brief={"status": "certified", "date": "2026-07-29",
+                                    "delivered_sha256": "a" * 64,
+                                    "delivered_path": "fixture.csv"})
+
+    def test_declare_pitcher_is_forwarded_verbatim_and_recorded_as_an_input(self):
+        """R345. The declaration reached the child through --passthrough and
+        nowhere else: no named flag the recipe could show, and no record in the
+        log. It is an operator INPUT, so the record says so."""
+        code, records, cmds, logs = self._run(self._certify, extra_argv=[
+            "--declare-pitcher", "111=viable_bulk_or_alt_sp",
+            "--passthrough", "--declare-pitcher 222"])
+        self.assertEqual(code, 0)
+        self.assertEqual(self._declared_in(cmds[0]),
+                         ["111=viable_bulk_or_alt_sp", "222"],
+                         "each declaration once, the flag's first, in order")
+        rec = [r for r in records if r["action"] == "operator_declared_pitchers"]
+        self.assertEqual(len(rec), 1)
+        self.assertEqual(rec[0]["declare_pitcher"], ["111=viable_bulk_or_alt_sp", "222"])
+        self.assertIn("not a decision this supervisor took", rec[0]["why"])
+        payload = json.loads(logs[0].read_text(encoding="utf-8"))
+        self.assertEqual(payload["operator_inputs"]["declare_pitcher"],
+                         ["111=viable_bulk_or_alt_sp", "222"])
+
+    def test_no_declaration_leaves_the_log_shape_alone(self):
+        _code, records, cmds, logs = self._run(self._certify)
+        self.assertEqual(self._declared_in(cmds[0]), [])
+        self.assertNotIn("operator_inputs", json.loads(logs[0].read_text(encoding="utf-8")))
+        self.assertNotIn("operator_declared_pitchers", [r["action"] for r in records])
+
+    def test_a_resume_restores_the_declarations_unless_restated(self):
+        root = Path(self.tmp.name)
+
+        def thin(n, cmd, kwargs):
+            return self._proc(10, brief={"status": "partial", "date": "2026-07-29",
+                                         "solve": {"bank": {"jobs_attempted": n}}})
+        self._run(thin, extra_argv=["--max-attempts", "1", "--declare-pitcher", "111"],
+                  root=root)
+        _code, records, cmds, _logs = self._run(
+            self._certify, extra_argv=["--max-attempts", "3", "--resume"], root=root)
+        self.assertEqual(self._declared_in(cmds[0]), ["111"],
+                         "a resumed call dropped the run's declaration")
+        self.assertIn("the resumed run's log", [
+            r for r in records if r["action"] == "operator_declared_pitchers"][-1]["why"])
+        _code, records, cmds, _logs = self._run(
+            self._certify, extra_argv=["--max-attempts", "5", "--resume",
+                                       "--declare-pitcher", "333"], root=root)
+        self.assertEqual(self._declared_in(cmds[0]), ["333"])
+        last = [r for r in records if r["action"] == "operator_declared_pitchers"][-1]
+        self.assertEqual(last["replaced"], ["111"])
+
     def test_a_fresh_run_ignores_a_stale_log_unless_resume_is_asked_for(self):
         """The positive control on the other side: resume is opt-in, so an
         ordinary run is never silently continued from yesterday's decisions."""
