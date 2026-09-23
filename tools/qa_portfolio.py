@@ -701,6 +701,15 @@ def read_prior(path: Optional[Path]) -> Optional[dict]:
     return doc if isinstance(doc, dict) else None
 
 
+def _prior_file_tag(path: Path) -> str:
+    """The `slate_tag` a prediction file records about itself, or ""."""
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return ""
+    return str(doc.get("slate_tag") or "") if isinstance(doc, dict) else ""
+
+
 def find_prior_file(brief: dict, explicit: Optional[str],
                     root: Path) -> Tuple[Optional[Path], str]:
     """(path, how it was resolved). Ambiguity is named, never picked from.
@@ -722,6 +731,20 @@ def find_prior_file(brief: dict, explicit: Optional[str],
         if by_tag.exists():
             return by_tag, f"brief date + slate tag ({date}/{tag})"
     found = sorted(outdir.glob("ownership_pred_*.json"))
+    if len(found) == 1 and tag:
+        # R298(c). The brief names its slate and no file carries that tag, so
+        # the one file here is another draftgroup's unless it says otherwise:
+        # `ownership_pred emit` stamps `slate_tag` inside the file. This used to
+        # return it anyway, and `resolve_leverage` forwarded its
+        # `own_pct_by_player_id` into the MILP as this slate's ownership.
+        file_tag = _prior_file_tag(found[0])
+        if file_tag != tag:
+            return None, (f"AMBIGUOUS: the one prediction file in "
+                          f"outputs/{date}/ ({found[0].name}) is for slate "
+                          f"{file_tag or 'unrecorded'}, not {tag}; pass "
+                          f"--ownership-pred to name it")
+        return found[0], (f"the one prediction file in outputs/{date}/, "
+                          f"slate_tag {tag} inside it")
     if len(found) == 1:
         return found[0], f"the one prediction file in outputs/{date}/"
     if len(found) > 1:

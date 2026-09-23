@@ -120,31 +120,39 @@ _MISSING = _Missing()
 
 def clock(record: Mapping[str, Any], brief: Optional[Mapping[str, Any]],
           handover_utc: str = "") -> Dict[str, Any]:
-    """Gate-clean to hand-over, which is the one number retro.md asks for first.
+    """Manifest-recorded to hand-over, the one number retro.md asks for first.
 
-    GATE-CLEAN is when the delivery row was written: `record_delivery` runs
-    after the three gates, so its `recorded_utc` is the moment the file became
-    the deliverable. HAND-OVER is when Ben got it, and NO artifact in this tree
-    carries that stamp -- the session is the only thing that knows. So it is an
-    argument, and without it this prints the gate-clean stamp and the command
-    that reads the clock rather than inventing a gap. `elapsed_s` is the build's
-    own wall time and is a different quantity: it ends where this one starts.
+    The start is when the delivery row was written, and R371 called it
+    GATE-CLEAN. It is not: `record_delivery` runs after the engine's gates on
+    Classic (a row is written only for a passed build), with no gates at all on
+    Showdown (`review_grade`), and on every path BEFORE preflight, whose
+    `checked_utc` lands on the live manifest and never on this record's copy.
+    So it is named for what it is (R298). A row with no `recorded_utc` falls
+    back to the record's own write time, a later stamp, named separately.
+    HAND-OVER is when Ben got it, and NO artifact in this tree carries that
+    stamp -- the session is the only thing that knows. So it is an argument,
+    and without it this prints the recorded stamp and the command that reads
+    the clock rather than inventing a gap. `elapsed_s` is the build's own wall
+    time and is a different quantity: it ends where this one starts.
     """
     row = record.get("manifest_row") or {}
-    gate_clean = _parse_utc(row.get("recorded_utc")) or _parse_utc(record.get("recorded_utc"))
+    manifest_recorded = _parse_utc(row.get("recorded_utc"))
+    record_written = _parse_utc(record.get("recorded_utc"))
+    start = manifest_recorded or record_written
     handed = _parse_utc(handover_utc)
     out: Dict[str, Any] = {
-        "gate_clean_utc": gate_clean.isoformat() if gate_clean else None,
-        "gate_clean_source": ("manifest_row.recorded_utc" if row.get("recorded_utc")
-                              else "record.recorded_utc"),
+        "manifest_recorded_utc": manifest_recorded.isoformat() if manifest_recorded else None,
+        "delivery_recorded_utc": record_written.isoformat() if record_written else None,
+        "clock_start_source": ("manifest_row.recorded_utc" if manifest_recorded
+                               else "record.recorded_utc" if record_written else None),
         "handover_utc": handed.isoformat() if handed else None,
         "gap_minutes": None,
         "build_elapsed_s": (brief or {}).get("elapsed_s"),
         "minutes_to_deadline_at_build": _clean(_dig(brief or {}, "slate_clock.minutes_to_deadline")),
         "first_lock_utc": _clean(_dig(brief or {}, "slate_clock.first_lock_utc")),
     }
-    if gate_clean and handed:
-        out["gap_minutes"] = round((handed - gate_clean).total_seconds() / 60.0, 1)
+    if start and handed:
+        out["gap_minutes"] = round((handed - start).total_seconds() / 60.0, 1)
     else:
         out["note"] = ("no artifact stamps the hand-over; pass --handover-utc "
                        "(read it with `TZ=UTC date -Is`) to get the gap")
@@ -237,11 +245,14 @@ def hand_passed_numbers(record: Mapping[str, Any],
         for key in sorted(controls):
             out.append({"control": key, "value": controls[key], "source": "record.controls"})
     else:
+        # R377. Every delivery path passes controls= now: Classic
+        # (`_deliver_mirror`), Showdown, late swap, and a re-promotion carries
+        # the earlier record's. An empty field is a record written before that.
         out.append({"control": "(none)", "value": None,
-                    "source": "record.controls is empty; the Classic path "
-                              "(execution_pipeline._deliver_mirror) passes no "
-                              "controls= until R377's remainder lands, so the "
-                              "brief below is the only record of them"})
+                    "source": "record.controls is empty: the record predates "
+                              "R377, or re-promotes a run whose earlier record "
+                              "carried none, so the brief below is the only "
+                              "record of them"})
     strategy = (record.get("manifest_row") or {}).get("strategy_state") or {}
     if strategy:
         out.append({"control": "strategy_state", "value": json.dumps(strategy, default=str),
@@ -527,8 +538,8 @@ def render(facts: Mapping[str, Any]) -> str:
 
     block = facts.get("clock") or {}
     out.append("## The clock")
-    out.append(f"  gate-clean: {block.get('gate_clean_utc') or 'unrecorded'} "
-               f"({block.get('gate_clean_source')})")
+    out.append(f"  recorded:   {block.get('manifest_recorded_utc') or block.get('delivery_recorded_utc') or 'unrecorded'} "
+               f"({block.get('clock_start_source')}; before preflight)")
     out.append(f"  hand-over:  {block.get('handover_utc') or 'not stamped by any artifact'}")
     gap = block.get("gap_minutes")
     out.append(f"  gap:        {gap if gap is not None else 'not computable'}"

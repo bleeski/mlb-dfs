@@ -88,6 +88,12 @@ VALID_POSTURES = ("cash", "wta_satellite", "single_entry", "small_gpp",
 # A feed for the WRONG DATE is a different thing and does block.
 FEED_AGE_WARN_MINUTES = 90
 
+# R388(e). What the manifest records for a swap that took a downgrade under
+# --accept-downgrade. CLAUDE.md (R386): the file ships review-grade, and it used
+# to be recorded `certified` whenever the gates passed, so preflight stamped it
+# `upload_ready`. `preflight_upload.REVIEW_GRADE_REASONS` carries the same key.
+DOWNGRADE_LABEL = "review_grade_downgrade_accepted"
+
 # F4: these were eight hardcoded True values on the path that runs closest to
 # lock with the least verification. A swap does not re-derive weather, odds, or a
 # pitcher audit, and it has no business claiming it did. What it can state is
@@ -111,6 +117,14 @@ LATE_SWAP_ASSUMED_GATES = [
 # floors them the way the build does; a default that can disagree with the build
 # is a second source of truth for the same number, and keeping one around to fall
 # back to is how it comes back.
+
+
+def swap_certification(result: dict, downgraded: list) -> str:
+    """The manifest label for a delivered swap (R388(e)): failing gates win,
+    then an accepted downgrade, then `certified`."""
+    if not result.get("workflow_valid"):
+        return "not_certified"
+    return DOWNGRADE_LABEL if downgraded else "certified"
 
 
 def lateswap_dest_name(slate_tag: str, run_id: str) -> str:
@@ -983,8 +997,7 @@ def main() -> int:
             slate_tag=slate_tag, contest_ids=sorted(contest_shapes),
             entries=len(after_rosters), run_id=result.get("run_id"),
             status="candidate",
-            certification=("certified" if result.get("workflow_valid")
-                           else "not_certified"),
+            certification=swap_certification(result, downgraded),
             projection_tier="proxy",  # the swap assembles emergency-proxy projections
             notes=f"late swap; parent {args.parent_entries}",
             # R377. The controls the joint solve ran under, and the one thing a

@@ -17978,6 +17978,33 @@ class LeveragePanelTests(unittest.TestCase):
             self.assertEqual(path.name, "ownership_pred_b.json")
             self.assertIn("brief date + slate tag", note)
 
+    def test_one_prediction_file_for_another_slate_is_refused_not_used(self):
+        """R298(c). The brief names its slate, no file carries that tag, and the
+        one file present is another draftgroup's: it was returned anyway, and
+        `resolve_leverage` fed its ownership into the MILP. A hand-named file
+        whose own `slate_tag` matches is still found."""
+        qa = self._qa()
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / "outputs" / "2026-08-18"
+            out.mkdir(parents=True)
+            other = out / "ownership_pred_1905_10g.json"
+            other.write_text(json.dumps({"slate_tag": "1905_10g"}), encoding="utf-8")
+            brief = {"date": "2026-08-18", "slate": {"tag": "2110_2g"}}
+            path, note = qa.find_prior_file(brief, None, Path(td))
+            self.assertIsNone(path)
+            self.assertIn("AMBIGUOUS", note)
+            self.assertIn("1905_10g", note)
+            self.assertIn("--ownership-pred", note)
+            # No tag in the brief: the one file is still the answer.
+            path, _note = qa.find_prior_file({"date": "2026-08-18"}, None, Path(td))
+            self.assertEqual(path, other)
+            other.rename(out / "ownership_pred_manual.json")
+            (out / "ownership_pred_manual.json").write_text(
+                json.dumps({"slate_tag": "2110_2g"}), encoding="utf-8")
+            path, note = qa.find_prior_file(brief, None, Path(td))
+            self.assertEqual(path.name, "ownership_pred_manual.json")
+            self.assertIn("slate_tag 2110_2g inside it", note)
+
     def test_a_wrong_schema_refuses_to_guess_at_the_layout(self):
         text = "\n".join(self._run(prior={"schema": "something/v9"}))
         self.assertIn("is schema 'something/v9', not ownership_pred/v1", text)
@@ -25293,9 +25320,12 @@ class DeadlineGovernorWiringTests(unittest.TestCase):
         mod.REPO = self.root
 
         calls = []
+        # R388(e). The label each solve was handed, beside its controls.
+        self.labels = []
 
         def fake_run_slate(**kw):
             calls.append(dict(kw.get("portfolio_controls_override") or {}))
+            self.labels.append(kw.get("certification_label"))
             if len(calls) == 1:
                 return dict(refusal or self._REFUSAL)
             return dict(second_result or (refusal or self._REFUSAL))
@@ -25408,6 +25438,246 @@ class DeadlineGovernorWiringTests(unittest.TestCase):
                       inspect.getsource(epi.execute_portfolio),
                       "the engine constraint this refusal cites is gone, so the "
                       "boundary is stale and rung 2 may now be reachable")
+
+    # ---- R388(e) and R298(b): the brief's own status and delivery facts
+
+    _PASSING = {"passed": True, "run_id": "r2", "workflow_valid": True,
+                "selection_certified": True, "allocation_certified": True}
+
+    def test_the_governed_re_solve_carries_the_deadline_label_to_run_slate(self):
+        """R388(e). The manifest row is written INSIDE `run_slate`, so the
+        label has to reach it there: the first solve passes none, the governed
+        re-solve passes the deadline label, and the brief's status reads it
+        rather than `certified` beside a review-grade label."""
+        second = dict(self._PASSING, delivered_path=str(self._delivered_csv()))
+        code, brief, calls, err = self._run(2, second_result=second)
+        from mlb_engine.pipeline import deadline_governor as dg
+        self.assertEqual(code, 0, err[-400:])
+        self.assertEqual(self.labels, [None, dg.DEADLINE_LABEL])
+        self.assertEqual(brief["status"], dg.DEADLINE_LABEL)
+        self.assertEqual(brief["label"], dg.DEADLINE_LABEL)
+
+    def test_an_ungoverned_brief_carries_the_delivery_facts_and_stays_certified(self):
+        """R298(b). The three keys ride every Classic brief, None when nothing
+        failed, and an ungoverned passing build keeps `certified`."""
+        first = dict(self._PASSING, delivered_path=str(self._delivered_csv()),
+                     manifest_recorded=True)
+        code, brief, calls, err = self._run(30, refusal=first)
+        self.assertEqual(code, 0, err[-400:])
+        self.assertEqual(self.labels, [None])
+        self.assertEqual(brief["status"], "certified")
+        self.assertIs(brief["manifest_recorded"], True)
+        self.assertIsNone(brief["mirror_error"])
+        self.assertIsNone(brief["delivered_sha256_error"])
+
+    def test_a_failed_mirror_says_unmirrored_on_the_status(self):
+        """R298(b). A failed mirror delivered nothing to outputs/ and the brief
+        pointed at runs/ under `status: certified`. The error rides the brief
+        and the status says so, governed or not."""
+        failed = {"mirror_error": "OSError: disk full", "manifest_recorded": False,
+                  "output_path": str(self._delivered_csv())}
+        code, brief, _calls, err = self._run(30, refusal=dict(self._PASSING, **failed))
+        self.assertEqual(code, 0, err[-400:])
+        self.assertEqual(brief["status"], "certified_unmirrored")
+        self.assertEqual(brief["mirror_error"], "OSError: disk full")
+        self.assertIs(brief["manifest_recorded"], False)
+        from mlb_engine.pipeline import deadline_governor as dg
+        _code, governed, _calls, _err = self._run(2, second_result=dict(self._PASSING, **failed))
+        self.assertEqual(governed["status"], f"{dg.DEADLINE_LABEL}_unmirrored")
+
+
+class DeliveryLabelAgreementTests(unittest.TestCase):
+    """R388(e), roadmap Session 03: every surface tells the same story.
+
+    A deadline-governed Classic retry was recorded `certified` in the manifest
+    and stamped `upload_ready` by preflight while its brief said review-grade.
+    These drive the REAL chain: `run_slate(approve=True)`, its mirror into
+    outputs/, the manifest row, the tracked delivery record, and
+    `preflight_upload` on the delivered bytes. `DeadlineGovernorWiringTests`
+    fakes `run_slate` and never reaches a manifest, which is how the label
+    disagreed with every test green.
+    """
+
+    def setUp(self):
+        from mlb_engine.entries import upload_manifest as um
+        self.um = um
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self._original_root = um.REPO_ROOT
+        um.REPO_ROOT = self.root
+        self.addCleanup(self._restore)
+
+    def _restore(self):
+        self.um.REPO_ROOT = self._original_root
+        self.tmp.cleanup()
+
+    def _build(self, label=None, controls=None):
+        """One reserved entry, one legal candidate (a five-stack), a salary
+        file preflight passes clean (distinct surnames; `_norm_name` strips
+        digits)."""
+        from tests.test_upload_integrity import (
+            CLASSIC_HEADER, blank_classic_entry, write_classic_salary)
+        from tests.test_upload_integrity import write_entries as write_rows
+        from mlb_engine.intake.slate_intake_manager import parse_dk_salary_csv
+        salary = self.root / "DKSalaries.csv"
+        lineup = write_classic_salary(salary)
+        entries = self.root / "DKEntries.csv"
+        write_rows(entries, CLASSIC_HEADER,
+                   [blank_classic_entry("5001", "900", name="Test WTA")])
+        projections = pd.DataFrame([{
+            "Player_ID": sp.player_id, "Name": sp.name, "Team": sp.team,
+            "Opponent": sp.opponent, "Position": sp.raw["Roster Position"],
+            "Salary": sp.salary, "Game_ID": sp.game_id,
+            "Floor": 12.0 if "P" in sp.positions else 5.0,
+            "Ceiling": 25.0 if "P" in sp.positions else 12.0,
+            "Excluded": False, "Locked": False,
+        } for sp in parse_dk_salary_csv(str(salary))])
+        with contextlib.redirect_stdout(io.StringIO()):
+            result = run_slate(
+                runs_root=self.root / "runs", salary_csv=salary,
+                entries_csv=entries, projections_override=projections,
+                candidates_override=[candidate("A", lineup, 100)],
+                portfolio_controls_override={**RunSlateFrontDoorTests.LOOSE,
+                                             **(controls or {})},
+                approve=True, assume_gates=RunSlateFrontDoorTests.UNEVIDENCED,
+                certification_label=label)
+        self.assertTrue(result["passed"], result.get("errors"))
+        self.assertTrue(result.get("manifest_recorded"), result.get("mirror_error"))
+        return salary, result
+
+    def _rows(self, result):
+        date = Path(result["delivered_path"]).parent.name
+        manifest = json.loads((self.root / "outputs" / date / "upload_manifest.json")
+                              .read_text(encoding="utf-8"))
+        from mlb_engine.entries.delivery_record import read_records
+        records = [r for r in read_records(date=date) if r.get("kind") == "delivery"]
+        return manifest["deliveries"], records
+
+    def _preflight(self, salary, result):
+        from tests.test_upload_integrity import FIXTURE_AS_OF_BEFORE_FIRST_PITCH
+        from tools import preflight_upload
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+            code = preflight_upload.main([
+                "--entries", result["delivered_path"], "--salary", str(salary),
+                "--json", "--as-of", FIXTURE_AS_OF_BEFORE_FIRST_PITCH])
+        return code, json.loads(out.getvalue())
+
+    def test_a_governed_label_reaches_the_manifest_the_record_and_preflight(self):
+        from mlb_engine.pipeline import deadline_governor as dg
+        salary, result = self._build(dg.DEADLINE_LABEL)
+        rows, records = self._rows(result)
+        self.assertEqual(rows[-1]["certification"], dg.DEADLINE_LABEL)
+        self.assertEqual(records[-1]["manifest_row"]["certification"], dg.DEADLINE_LABEL)
+        code, verdict = self._preflight(salary, result)
+        self.assertEqual(code, 0, verdict.get("failures"))
+        self.assertEqual(verdict["failures"], [])
+        self.assertEqual(verdict["verdict"], "review_ready")
+        self.assertIn("deadline rung", verdict["verdict_note"])
+        rows, _records = self._rows(result)
+        self.assertNotEqual(rows[-1]["status"], "upload_ready")
+
+    def test_an_ungoverned_build_still_records_certified_and_is_upload_ready(self):
+        """The control arm: the label moves only when a caller passes one."""
+        salary, result = self._build()
+        self.assertNotIn("certification_label", result)
+        rows, records = self._rows(result)
+        self.assertEqual(rows[-1]["certification"], "certified")
+        self.assertEqual(records[-1]["manifest_row"]["certification"], "certified")
+        code, verdict = self._preflight(salary, result)
+        self.assertEqual((code, verdict["verdict"]), (0, "upload_ready"))
+
+    def test_a_label_that_would_upgrade_the_gates_is_refused_before_any_work(self):
+        from mlb_engine.pipeline.execution_pipeline import manifest_certification
+        with self.assertRaisesRegex(ValueError, "review_grade"):
+            run_slate(runs_root=self.root / "runs", salary_csv=self.root / "x.csv",
+                      entries_csv=self.root / "y.csv", certification_label="certified")
+        self.assertFalse((self.root / "runs").exists())
+        # A failing gate wins over any label.
+        self.assertEqual(manifest_certification(
+            {"workflow_valid": False, "certification_label": "review_grade_x"}),
+            "not_certified")
+
+    def test_the_classic_record_carries_the_controls_the_build_solved_under(self):
+        """R377's acceptance, on the real path: `record.controls` equals the
+        build's `merged_controls`, not `{}`."""
+        _salary, result = self._build()
+        _rows, records = self._rows(result)
+        expected = json.loads(json.dumps(result["merged_controls"], default=str))
+        self.assertTrue(expected)
+        self.assertEqual(records[-1]["controls"], expected)
+
+    def test_the_manifest_row_reads_the_three_allocator_ladders(self):
+        """R298(a). The repro from the entry: reuse relaxed twice, floor 4 to 3,
+        quota relaxed off, on the production `candidates_override` bank shape,
+        read `unknown / absent`. And a clean real build now reads `clean` on
+        recorded evidence rather than `unknown`."""
+        from mlb_engine.pipeline.execution_pipeline import manifest_strategy_state
+        state = manifest_strategy_state({
+            "candidate_bank": {"source": "candidates_override", "candidate_count": 5},
+            "candidate_reuse": {"relaxations": 2, "cap_applied": 3},
+            "primary_stack_floor": {"relaxations": 1, "requested": 4, "applied": 3},
+            "five_stack_quota": {"relaxations": 1, "status": "relaxed_off"}})
+        self.assertEqual(state["state"], "relaxed")
+        self.assertEqual(state["counts"], {"candidate_reuse": 2,
+                                           "primary_stack_floor": 1,
+                                           "five_stack_quota": 1})
+        # A quota the one five-stack candidate meets, so the allocator emits
+        # all three blocks and `execute_portfolio` has to carry each of them.
+        _salary, result = self._build(controls={"min_five_stack_share_pct": 0.2})
+        for ladder in ("candidate_reuse", "primary_stack_floor", "five_stack_quota"):
+            self.assertIsInstance(result.get(ladder), dict, ladder)
+        rows, _records = self._rows(result)
+        self.assertEqual(rows[-1]["strategy_state"]["evidence"], "recorded")
+        self.assertEqual(rows[-1]["strategy_state"]["state"], "clean")
+
+    def test_a_re_promotion_keeps_the_review_grade_label_and_the_controls(self):
+        """`tools/promote_run.py` re-derived `certified` from workflow_valid and
+        passed no controls, so re-promoting a governed run upgraded its label
+        and emptied its record."""
+        from mlb_engine.pipeline import deadline_governor as dg
+        from tools import promote_run
+        _salary, result = self._build(dg.DEADLINE_LABEL)
+        _rows, before = self._rows(result)
+        args = promote_run.build_parser().parse_args(
+            ["--run-id", result["run_id"], "--repo-root", str(self.root)])
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(promote_run.run(args), 0)
+        rows, records = self._rows(result)
+        self.assertEqual(rows[-1]["re_promoted_from"], result["run_id"])
+        self.assertEqual(rows[-1]["certification"], dg.DEADLINE_LABEL)
+        self.assertEqual(records[-1]["controls"], before[-1]["controls"])
+        self.assertTrue(records[-1]["controls"])
+
+    def test_a_late_swap_that_took_a_downgrade_records_review_grade(self):
+        """CLAUDE.md (R386): an accepted downgrade ships review-grade, and the
+        swap recorded `certified` whenever its gates passed."""
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "late_swap_tool", REPO / "tools" / "late_swap.py")
+        ls = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(ls)
+        ok = {"workflow_valid": True}
+        self.assertEqual(ls.swap_certification(ok, ["5001 [x] -1.20"]), ls.DOWNGRADE_LABEL)
+        self.assertEqual(ls.swap_certification(ok, []), "certified")
+        self.assertEqual(ls.swap_certification({}, ["5001"]), "not_certified")
+        source = (REPO / "tools" / "late_swap.py").read_text(encoding="utf-8")
+        call = source[source.index("record = record_delivery("):]
+        self.assertIn("certification=swap_certification(result, downgraded)",
+                      call[:call.index("\n        )")])
+
+    def test_preflight_names_a_reason_for_every_review_grade_label_written(self):
+        """Preflight imports nothing from the engine, so its reason table is a
+        copy; this pins it to the writers' labels."""
+        import importlib.util
+        from mlb_engine.pipeline import deadline_governor as dg
+        from tools.preflight_upload import REVIEW_GRADE_REASONS
+        spec = importlib.util.spec_from_file_location(
+            "late_swap_tool", REPO / "tools" / "late_swap.py")
+        ls = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(ls)
+        for label in ("review_grade", dg.DEADLINE_LABEL, ls.DOWNGRADE_LABEL):
+            self.assertIn(label, REVIEW_GRADE_REASONS)
 
 
 class DeadlineGovernorCliTests(unittest.TestCase):
@@ -28096,7 +28366,10 @@ class RetroFactsTests(unittest.TestCase):
         record["_path"] = str(path.relative_to(root))
         return record
 
-    def test_the_clock_gap_is_computed_from_gate_clean_to_the_handover_given(self):
+    def test_the_clock_gap_runs_from_the_manifest_record_to_the_handover_given(self):
+        """R298, the R371 correction: the start is when the manifest row was
+        recorded, which is before preflight, so it is named that and not
+        gate-clean."""
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
             record = self._tree(root, brief={"elapsed_s": 412.3,
@@ -28106,6 +28379,25 @@ class RetroFactsTests(unittest.TestCase):
             self.assertEqual(facts["clock"]["gap_minutes"], 18.0)
             self.assertEqual(facts["clock"]["build_elapsed_s"], 412.3)
             self.assertEqual(facts["clock"]["minutes_to_deadline_at_build"], 38)
+            self.assertEqual(facts["clock"]["manifest_recorded_utc"],
+                             "2026-09-19T22:05:00+00:00")
+            self.assertEqual(facts["clock"]["clock_start_source"],
+                             "manifest_row.recorded_utc")
+            self.assertNotIn("gate_clean_utc", facts["clock"])
+
+    def test_a_row_with_no_recorded_stamp_falls_back_to_the_record_named_as_such(self):
+        """The fallback is the record's own write time, a later stamp: it is
+        used, and it is never reported as the manifest's."""
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            record = self._tree(root, brief={"elapsed_s": 1.0})
+            record["manifest_row"].pop("recorded_utc")
+            facts = self._mod().retro(record, root, handover_utc="2026-09-19T22:23:00Z")
+            self.assertIsNone(facts["clock"]["manifest_recorded_utc"])
+            self.assertEqual(facts["clock"]["delivery_recorded_utc"],
+                             "2026-09-19T22:10:00+00:00")
+            self.assertEqual(facts["clock"]["clock_start_source"], "record.recorded_utc")
+            self.assertEqual(facts["clock"]["gap_minutes"], 13.0)
 
     def test_without_a_handover_stamp_the_gap_is_not_invented(self):
         with tempfile.TemporaryDirectory() as raw:
@@ -28172,6 +28464,24 @@ class RetroFactsTests(unittest.TestCase):
             self.assertEqual(len(rows), 1)
             self.assertFalse(rows[0]["undocumented"])
             self.assertIn("wall", rows[0]["contract"])
+            self.assertIn("before any solve", rows[0]["contract"])
+
+    def test_an_exit_3_refusal_reads_as_built_and_refused(self):
+        """R396(a). Note 3 carried exit 4's meaning ("inputs missing"), so every
+        exit-3 record described a build that ran and refused as one that never
+        had its inputs. The module docstring and every exit-3 site say
+        otherwise."""
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            record = self._tree(root, brief={"elapsed_s": 1.0}, refusal_exit=3)
+            facts = self._mod().retro(record, root)
+            rows = [r for r in facts["contract_failures"] if "exit 3" in r.get("what", "")]
+            self.assertEqual(len(rows), 1)
+            self.assertIn("did not certify", rows[0]["contract"])
+            self.assertNotIn("inputs missing", rows[0]["contract"])
+        doc = (REPO / "skills" / "generate-lineups" / "scripts" / "build_slate.py"
+               ).read_text(encoding="utf-8").split('"""')[1]
+        self.assertIn("3   build ran but did not certify", doc)
 
     def test_degraded_inputs_come_off_the_brief_and_name_their_source(self):
         with tempfile.TemporaryDirectory() as raw:

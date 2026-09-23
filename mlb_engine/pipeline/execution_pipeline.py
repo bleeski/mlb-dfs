@@ -574,6 +574,11 @@ def execute_portfolio(
             # lineups it just delivered and what capped them.
             "candidate_reuse": allocation.get("candidate_reuse"),
             "candidate_reuse_counts": allocation.get("candidate_reuse_counts"),
+            # R298(a). The allocator's other two ladders, beside the first, so
+            # `manifest_strategy_state` can read all three off the result. The
+            # allocator emits each only when its control was requested.
+            "primary_stack_floor": allocation.get("primary_stack_floor"),
+            "five_stack_quota": allocation.get("five_stack_quota"),
             # R126, same reasoning, and the same requirement that BOTH return
             # paths carry it: a late swap that lost the block would report a
             # refined portfolio with no concentration facts at all.
@@ -604,6 +609,9 @@ def execute_portfolio(
         # R116, see the deferred branch above.
         "candidate_reuse": allocation.get("candidate_reuse"),
         "candidate_reuse_counts": allocation.get("candidate_reuse_counts"),
+        # R298(a), see the deferred branch above.
+        "primary_stack_floor": allocation.get("primary_stack_floor"),
+        "five_stack_quota": allocation.get("five_stack_quota"),
         # R126, see the deferred branch above.
         "portfolio_frontier": portfolio_frontier,
         # R405, see the deferred branch above.
@@ -5518,6 +5526,11 @@ def run_slate(
     input_confidence_facts: Optional[Mapping[str, Any]] = None,
     input_confidence_relax: Optional[str] = None,
     sleeve_implied_total_by_team: Optional[Mapping[str, float]] = None,
+    # R388(e). The label the manifest records for this build's delivery, when
+    # the CALLER knows something the gates cannot: build_slate's deadline
+    # governor opened controls to get here, so the file is review-grade however
+    # the gates read. It can only lower the label; see the guard below.
+    certification_label: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Single front door: raw slate inputs -> certified DKEntries file plus diagnostics.
 
@@ -5557,6 +5570,14 @@ def run_slate(
     metadata = dict(metadata or {})
     caller_bank_diagnostics = metadata.pop("bank_diagnostics", None)
     caller_bank_warnings = metadata.pop("bank_warnings", None)
+    # R388(e). Refused before any work: a caller-supplied label that is not a
+    # review-grade one would let a caller write `certified` (or anything
+    # preflight might read as it) over gates that said otherwise.
+    if certification_label is not None and not str(
+            certification_label).startswith("review_grade"):
+        raise ValueError(
+            f"certification_label={certification_label!r}: only a review_grade* "
+            f"label may be passed; certification comes from the gates")
 
     entry_rows = parse_dk_entry_rows(str(entries_csv))
     reserved = [r for r in entry_rows]
@@ -6129,6 +6150,10 @@ def run_slate(
         "checkpoint_plan": checkpoint,
         "projection_schema": schema,
         "posture_by_contest": posture_by_contest,
+        # R388(e). Only when a caller passed one, so an ungoverned result keeps
+        # exactly its old keys.
+        **({"certification_label": str(certification_label)}
+           if certification_label else {}),
         "merged_controls": controls_for_report(controls),
         # R333 / R343. The washout-axis controls, on every Classic build
         # including the ones that set neither, so the ABSENCE of a game cap is
@@ -6369,6 +6394,19 @@ def manifest_strategy_state(result: Mapping[str, Any]) -> Dict[str, Any]:
             for key, value in showdown.items():
                 if value:
                     counts[key] = max(counts.get(key, 0), value)
+    # R298(a). The allocator's three ladders -- max_candidate_reuse, the
+    # primary-stack floor and the five-stack quota -- each count their own
+    # relaxations, and this read none of them, so a Classic row read `unknown`
+    # with reuse, floor and quota all relaxed. `execute_portfolio` returns the
+    # three blocks on the result; a block present is evidence the ladder ran.
+    for ladder in ("candidate_reuse", "primary_stack_floor", "five_stack_quota"):
+        block = result.get(ladder)
+        if not isinstance(block, Mapping):
+            continue
+        saw_evidence = True
+        steps = block.get("relaxations")
+        if isinstance(steps, int) and not isinstance(steps, bool) and steps:
+            counts[ladder] = max(counts.get(ladder, 0), steps)
     seen: set = set()
     relax_warnings = [w for w in relax_warnings if not (w in seen or seen.add(w))]
     if counts or relax_warnings:
@@ -6422,7 +6460,23 @@ def _deliver_mirror(slate_date: str, dest: Path, source: Path,
         entries=_entries_in(source),
         run_id=result.get("run_id"),
         status="candidate",
-        certification="certified" if result.get("workflow_valid") else "not_certified",
+        certification=manifest_certification(result),
         projection_tier=manifest_projection_tier(result),
         strategy_state=manifest_strategy_state(result),
+        # R377. The controls the build solved under, after any deadline opening
+        # and R407's tier: `run_slate` sets this before it calls the mirror.
+        controls=result.get("merged_controls"),
     )
+
+
+def manifest_certification(result: Mapping[str, Any]) -> str:
+    """The label the manifest records for a Classic delivery.
+
+    R388(e). This was `certified` whenever `workflow_valid`, so a deadline-
+    governed retry was recorded certified and preflight stamped it
+    `upload_ready` while the brief said review-grade. A caller's review-grade
+    label wins over a passing gate; a failing gate wins over any label.
+    """
+    if not result.get("workflow_valid"):
+        return "not_certified"
+    return str(result.get("certification_label") or "certified")

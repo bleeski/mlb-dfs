@@ -155,6 +155,20 @@ ARCHETYPE_TYPE_PRECEDENCE = {
 STATUS_VALUES = ("candidate", "upload_ready", "blocked", "acknowledged",
                  "superseded")
 
+# R388(e). Why a recorded review-grade label is not `upload_ready`, by label,
+# for the verdict note. The verdict itself is the same for every label but
+# `certified`; only the sentence that says why differs. The strings mirror
+# `deadline_governor.DEADLINE_LABEL` and `late_swap`'s downgrade label.
+REVIEW_GRADE_REASONS = {
+    "review_grade": "Showdown ships review-grade by design.",
+    "review_grade_deadline_build": (
+        "A deadline rung opened portfolio controls to deliver this file, so it "
+        "ships review-grade (R386); the brief's deadline block names what "
+        "was opened."),
+    "review_grade_downgrade_accepted": (
+        "A late swap took entries that score below the lineups they replaced "
+        "(--accept-downgrade), so it ships review-grade (R386)."),
+}
 CLASSIC_MAX_HITTERS_PER_TEAM = 5
 CLASSIC_MIN_GAMES = 2
 # A posted MLB lineup is nine hitters. R46 round 2 subtracts the posted count
@@ -2949,7 +2963,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 f"certification={certification!r}, so this is NOT upload_ready: "
                 f"that label is reserved for a run where workflow_valid, "
                 f"selection_certified and allocation_certified all passed. "
-                f"Showdown ships review-grade by design.")
+                + REVIEW_GRADE_REASONS.get(
+                    certification, "Showdown ships review-grade by design."))
         else:
             verdict = "upload_ready"
     elif args.force:
