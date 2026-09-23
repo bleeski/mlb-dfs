@@ -2,6 +2,72 @@
 
 What changed in the engine, the tools and the contracts, when, and why.
 
+## 2026-09-23 — R407: two caps scale with input confidence. The brief's own degradation facts set a tier, and the tier tightens the player cap and R405's cluster share (roadmap Session 95)
+
+**Scope.**
+- `mlb_engine/pipeline/execution_pipeline.py`: `INPUT_CONFIDENCE_TIGHTENING` (Ben's schedule), `INPUT_CONFIDENCE_FACTS`, `CONFIDENCE_DERIVED`, `resolve_input_confidence`, `apply_input_confidence`; `run_slate(input_confidence_facts=, input_confidence_relax=)`, applied where the controls are merged, published as `input_confidence` on the checkpoint and the approved result.
+- `skills/generate-lineups/scripts/build_slate.py`: `input_confidence_facts` and `format_input_confidence_line`; the enrichment summary computed once before the solve and reused by the brief; the facts and the T-30 relax passed to `run_slate`; the one proven-infeasible re-solve before the deadline governor; `input_confidence` on the brief and on the refusal payload; the `input confidence:` stderr line.
+- `tests/test_core.py` (`ConfidenceScaledCapTests`), `tools/audit.py` (the pin), `skills/generate-lineups/SKILL.md`, `docs/backlog.md`, `docs/ROADMAP.md`, this file.
+
+**What was wrong.** 1905_10g built with no odds, no handedness, Savant data 23 days old and, on the first build, 12 of 20 sides from a 48.9-day-old platoon file. The brief recorded every one of those facts, and the controls did not change: the build concentrated exactly as it would on a clean night. Verified against the tree before building: no `run_slate` input and no control read any of the four facts back. They live only in build_slate's enrichment summary, its reference status and the pool report, all printed into the brief after the solve.
+
+**What shipped.**
+- **The tier**, from exactly Ben's four facts, each read off the block the brief prints, so there is no second reader:
+  - no odds priced: `enrichment.counts.f1_games_priced == 0`;
+  - a side the pool used came from a platoon reference older than R27's `PLATOON_AGE_BLOCK_DAYS` (7);
+  - a Savant `expected_stats` file carries `reference_status`'s own `stale` flag, which is the enrichment age warning's 14-day threshold;
+  - no handedness: `enrichment.counts.f4_platoon_applied == 0` with hitters in the pool.
+
+  One fact is DEGRADED and two or more is SEVERE. An absent input is `unknown` and never fires, because an absent measurement is not a bad one.
+- **The schedule** (Ben, 2026-09-23). DEGRADED: `max_player_exposure_pct` -0.05 and `max_consensus_cluster_share_pct` -0.10. SEVERE: -0.10 and -0.20.
+- **Where.** In `run_slate`, right after `_merged_controls_for_build` and before the floor record reads the controls.
+  - Floors win: the result is `max(tightened, floor)`, using the floors the merge just applied.
+  - An explicit override of either key wins.
+  - A cap already at 1.0 is off and stays off, because tightening it would switch on a control no posture asked for. The rider did not name this case, and this is the conservative reading.
+  - Each moved value carries `confidence_derived`, in R388(b)'s vocabulary. Session 06 has not landed, so this is the first writer of the word.
+- **Relaxed first (R386).**
+  - Inside T-30, build_slate runs the first solve with the tightening relaxed (`relaxed_deadline_t30`).
+  - On a proven-infeasible joint MILP with the tightening applied, it re-solves once, relaxed (`relaxed_proven_infeasible`), before the deadline governor or any other control moves.
+  - Both record the before value and the would-be after.
+  - The governor's T-15 rung needs nothing new: it opens both keys through the override, and the override wins.
+- **The brief** carries the tier, the facts that set it and each control's before and after, on a delivery and on a refusal.
+
+**Measured on the vendored 2026-06-03 slate** through `run_slate(approve=False)` with the production postures and SEVERE facts: `max_player_exposure_pct` 0.40 -> 0.30 (its feasibility floor is 0.278, so the floor did not bind) and `max_consensus_cluster_share_pct` 0.50 -> 0.30. The plan leg then proves the tightened grid infeasible, which is exactly the case the proven-infeasible relaxation exists for. 1905_10g had all four facts, so it would have read SEVERE.
+
+**The golden replay is UNMOVED**, and the reason is the door, not the fixture. Both baselines call `run_slate` directly and supply no facts, so the tier is `not_assessed` and nothing is tightened. That is the documented behaviour for any caller without the brief's facts. Had the fixture gone through build_slate it would read SEVERE: its replay prices no odds (fact 1), and F4 is not wired in the replay (fact 4). `UT test_golden_replay`: 9 passed.
+
+**The R233 enumeration.** `grep -rn "run_slate(" --include=*.py mlb_engine tools skills`, excluding prose and the definition, gives two production callers. `build_slate.py`'s `_solve` is the only Classic build door, since both bank strategies deliver through it, and it supplies the facts. `tools/benchmark_engine.py`'s `--live` replay runs `LIVE_LOOSE_CONTROLS` and deliberately supplies none, so a benchmark measures construction and not confidence. `tools/autobuild.py` runs build_slate as a subprocess and inherits it. Late swap goes through `run_late_swap`, not `run_slate`, and re-derives the posture caps without the tightening. Those caps are looser than a tightened build shipped, so untouched rows can never fail them. Enforcing the tier on a swap is not asked for and is not done.
+
+**Tests.** `tests.test_core` 1432 -> 1441, nine in `ConfidenceScaledCapTests`: each fact alone gives DEGRADED; two give SEVERE, and all four is 1905_10g; Ben's schedule moves exactly the two caps; clean and unassessed slates move nothing; the floor wins; an override wins and an off cap stays off; the deadline relaxes first (plus the build_slate call sites: T-30 on the first solve, the proven-infeasible retry placed before the governor); `run_slate` on the vendored slate; the facts read off the brief's own blocks, and the brief line. 16 scripted mutations, each reverting one fix, all red.
+
+**Gate.** `PASS  v2.26.0  41 modules  2421 tests  5 skipped  {test_core 1441/1441 (4 skipped) skipped_in_place; test_showdown 334/334 (1 skipped) skipped_in_place}  [tests.test_core ran its pinned 1441 but 4 were SKIPPED, so the count proves nothing about coverage.; tests.test_showdown ran its pinned 334 but 1 were SKIPPED, so the count proves nothing about coverage.]` (the five skips are the absent optional files /ship expects on every host).
+
+### The register entry, migrated verbatim
+
+**Rider 2026-09-23 (DEV; Ben's decisions and the approved build plan). Needs R405(b) for the cluster half.**
+
+*Ben's decisions (settled).* Two tiers from four facts:
+1. no odds priced (`enrichment.counts.f1_games_priced == 0`);
+2. a side the pool used was filled from a platoon reference more than 7 days old (the R27 age check `build_slate_pool` already runs, per used TBD side);
+3. Savant expected stats more than 14 days old (the enrichment age warning's own threshold, `reference_manifest.json` `fetched_at`);
+4. no handedness (`enrichment.counts.f4_platoon_applied == 0` on a slate with hitters in the pool).
+
+DEGRADED is exactly one fact: `max_player_exposure_pct` -0.05 and `max_consensus_cluster_share_pct` -0.10. SEVERE is two or more: -0.10 and -0.20. 1905_10g had all four, so it was SEVERE.
+
+*Build plan.*
+- **Where.** Compute the tier where `run_slate` resolves controls (after `_merged_controls_for_build`, EP:4982-4990; before the floor merge records `controls_feasibility`), from the same enrichment facts the brief prints. There is no second reader of those facts.
+- **Floors win.** The result is `max(tightened, feasibility floor)`, so this can never push a cap below what the slate can carry.
+- **Provenance.** The tightened value carries `confidence_derived` (R388(b)'s vocabulary; coordinate with Session 06 if it has landed).
+- **Under deadline** (R386, inside T-30) or on a proven-infeasible joint MILP, the confidence tightening is the FIRST thing relaxed, recorded with its before and after values.
+- **The brief** states the tier, the facts that set it, and each control's before and after values.
+- **Operator override.** An explicit `--controls-override` value for either key wins over the tightening, and the brief says so.
+
+*Tests.* `test_core.ConfidenceScaledCapTests`: each fact alone gives DEGRADED; two give SEVERE; the floor wins; an override wins; the deadline relaxes it first; the brief block is populated; a clean slate is unchanged. `GOLD` (the vendored 2026-06-03 fixture's facts decide whether it moves; say which).
+
+- **What.** 1905_10g built with no odds (`f1_games_priced: 0`), no handedness (`f4_platoon_applied: 0`), Savant data 23 days old and, on the first build, 12 of 20 sides from a 48.9-day-old platoon file. The brief recorded each fact, and the build concentrated exactly as it would on a clean night: nothing reads a degradation back into the controls.
+- **Fix.** A deterministic confidence tier computed from facts the brief already carries (`enrichment.degraded`, `factors_inert`, `f1_games_priced`, reference ages, `dk_order_coverage`, feed status), mapped by a declared schedule to a tighter `max_player_exposure_pct` and R405's cluster share. The tightened value carries its provenance (`confidence_derived`, in R388(b)'s vocabulary) and is the first thing R386 relaxes under deadline. The brief states the tier, the facts that set it, and the before and after values.
+- **Needs.** R405(b) for the cluster half; the player half stands alone. Coordinates with Session 06 (R388(b) provenance). The schedule is Ben's at plan approval.
+
 ## 2026-09-23 — R405: the consensus-cluster cap. The bank's consensus bats are reported, capped per posture, and the bank is given cluster-limited jobs on all three doors so the cap has something to bind (roadmap Session 93, all three parts)
 
 **Scope.**

@@ -1992,6 +1992,58 @@ def pool_brief_block(report: dict, pool: dict) -> dict:
     }
 
 
+def input_confidence_facts(enrichment_summary: dict, reference_status: dict,
+                           pool_report: dict, projections=None) -> dict:
+    """R407. The four facts `run_slate` scales two caps by, read off the SAME
+    blocks this brief prints -- the enrichment counts, the reference status and
+    the pool report -- so the tier and the brief cannot disagree about a fact.
+
+    Nothing is recomputed here: the Savant half is the reference status's own
+    `stale` flag (the enrichment age warning's threshold), the platoon half is
+    R27's age and the sides the pool actually filled from it.
+    """
+    counts = dict((enrichment_summary or {}).get("counts") or {})
+    files = dict((reference_status or {}).get("files") or {})
+    hitters = None
+    if projections is not None and hasattr(projections, "columns"):
+        hitters = int((projections["Position"].astype(str) != "P").sum())
+    return {
+        "f1_games_priced": counts.get("f1_games_priced"),
+        "f4_platoon_applied": counts.get("f4_platoon_applied"),
+        "hitters_in_pool": hitters,
+        "platoon_age_days": (pool_report or {}).get("platoon_age_days"),
+        "platoon_dependent_teams": list(
+            (pool_report or {}).get("platoon_dependent_teams") or []),
+        "savant_expected_stats": {
+            name: {"age_days": info.get("age_days"), "stale": bool(info.get("stale"))}
+            for name, info in sorted(files.items())
+            if name.startswith("expected_stats_") and info.get("exists")},
+    }
+
+
+def format_input_confidence_line(block: dict | None) -> str:
+    """R407. One review line: the tier, the facts that set it, what moved."""
+    if not block:
+        return "UNAVAILABLE (run_slate reported no input_confidence block)"
+    if not block.get("assessed"):
+        return f"not assessed ({block.get('note')})"
+    moves = []
+    for key, change in sorted((block.get("changes") or {}).items()):
+        src = change.get("source")
+        if src == "confidence_derived":
+            moves.append(f"{key} {change.get('before')} -> {change.get('after')}"
+                         + (" (floor won)" if change.get("floor_won") else ""))
+        elif str(src).startswith("relaxed_"):
+            moves.append(f"{key} held at {change.get('before')} (would be "
+                         f"{change.get('would_be')}; {src})")
+        elif src in ("operator_override", "off_stays_off"):
+            moves.append(f"{key} {change.get('before')} ({src})")
+    fired = ", ".join(block.get("fired") or []) or "none"
+    return (f"tier {str(block.get('tier')).upper()} (facts: {fired}); "
+            + ("; ".join(moves) if moves else "no control moved")
+            + " (deterministic schedule, not a probability)")
+
+
 def summarize_enrichment(reference_status: dict, enrichment: dict,
                          f4_report: dict, degraded_reason,
                          f1_report: dict | None = None,
@@ -2892,6 +2944,18 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         **(args.controls_override or {}),
     }
 
+    # R407. The facts the tier is computed from, read once off the blocks the
+    # brief prints. Inside T-30 the confidence tightening is the FIRST thing
+    # relaxed (R386), before anything else moves, and the block records it.
+    enrichment_summary = summarize_enrichment(
+        reference["status"], enrichment, f4_report, degraded_reason,
+        f1_report, f5_report, projections=projections)
+    confidence_facts = input_confidence_facts(
+        enrichment_summary, reference["status"], report, projections)
+    _minutes = clock.get("minutes_to_deadline")
+    confidence_relax = ("deadline_t30" if isinstance(_minutes, (int, float))
+                        and _minutes < 30 else None)
+
     def _solve(controls: dict):
         # R290(c) step 2. Extracted so the deadline governor can re-solve with
         # the controls open WITHOUT a second copy of this call. A governor that
@@ -2911,10 +2975,26 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
             bank_time_budget_s=run_bank_budget,
             portfolio_controls_override=dict(controls) or None,
             leverage=leverage or None,
+            input_confidence_facts=confidence_facts,
+            input_confidence_relax=confidence_relax,
             **slate_kwargs,
         )
 
     result = _solve(attempt_controls)
+    # R407. On a PROVEN-infeasible joint MILP the confidence tightening is the
+    # first thing relaxed, once, before the deadline governor or any other
+    # control moves; the re-solve's block records the before and the would-be.
+    if (not result.get("passed") and confidence_relax is None
+            and (result.get("input_confidence") or {}).get("applied")
+            and any("proven infeasible" in str(e) for e in (result.get("errors") or []))):
+        confidence_relax = "proven_infeasible"
+        print("input confidence: the joint MILP proved infeasible with the "
+              "confidence tightening applied; relaxing it first and re-solving "
+              "(R407)", file=sys.stderr)
+        result = _solve(attempt_controls)
+    print(f"input confidence: "
+          f"{format_input_confidence_line(result.get('input_confidence'))}",
+          file=sys.stderr)
 
     # Contest identity, one line per contest, with where it came from. The
     # objective the portfolio is built to is the single most consequential
@@ -3102,6 +3182,8 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         # R117(b). A refusal is read harder than a delivery, and an inert factor
         # is one candidate reason the bank had nothing to separate.
         payload["factors_inert"] = factors_inert
+        # R407. On the refusal too: which tier the refused solve ran under.
+        payload["input_confidence"] = result.get("input_confidence")
         print(f"factors: {format_inert_factors_line(factors_inert)}",
               file=sys.stderr)
         payload["pool_blockers_soft"] = soft
@@ -3221,9 +3303,10 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         "anti_correlation": anti_correlation_brief_block(
             getattr(args, "max_opposing_hitters_per_sp", None),
             bank_report, result),
-        "enrichment": summarize_enrichment(
-            reference["status"], enrichment, f4_report, degraded_reason,
-            f1_report, f5_report, projections=projections),
+        "enrichment": enrichment_summary,
+        # R407. The tier, the facts that set it, and each control's before and
+        # after, as run_slate applied them.
+        "input_confidence": result.get("input_confidence"),
     }
     # R290(c) step 2. On a DELIVERED Classic file the deadline block records
     # whether a rung moved this build, and the LABEL is what changes -- never

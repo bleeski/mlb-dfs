@@ -28769,3 +28769,179 @@ class ConsensusClusterCapTests(unittest.TestCase):
         src = self._source("mlb_engine", "pipeline", "execution_pipeline.py")
         body = src.split("def execute_portfolio(", 1)[1].split("\ndef ", 1)[0]
         self.assertEqual(body.count('"consensus_cluster": allocation.get("consensus_cluster")'), 2)
+
+
+class ConfidenceScaledCapTests(unittest.TestCase):
+    """R407 (Session 95, Ben's decisions of 2026-09-23). Two caps scale with the
+    input confidence the brief already reports.
+
+    1905_10g built with no odds, no handedness, Savant data 23 days old and 12
+    of 20 sides from a 48.9-day-old platoon file, and concentrated exactly as
+    it would on a clean night. DEGRADED (one fact): player -0.05, cluster
+    -0.10. SEVERE (two or more): -0.10 and -0.20.
+    """
+
+    CLEAN = {"f1_games_priced": 5, "f4_platoon_applied": 120, "hitters_in_pool": 160,
+             "platoon_age_days": 2, "platoon_dependent_teams": ["NYY"],
+             "savant_expected_stats": {
+                 "expected_stats_batting.csv": {"age_days": 3.0, "stale": False},
+                 "expected_stats_pitching.csv": {"age_days": 3.0, "stale": False}}}
+    ONE_FACT = {
+        "no_odds_priced": {"f1_games_priced": 0},
+        "stale_platoon_reference": {"platoon_age_days": 48},
+        "stale_savant_expected_stats": {"savant_expected_stats": {
+            "expected_stats_batting.csv": {"age_days": 23.0, "stale": True},
+            "expected_stats_pitching.csv": {"age_days": 3.0, "stale": False}}},
+        "no_handedness": {"f4_platoon_applied": 0},
+    }
+    CONTROLS = {"max_player_exposure_pct": 0.40,
+                "max_consensus_cluster_share_pct": 0.50,
+                "max_team_exposure_pct": 0.70}
+
+    def test_each_fact_alone_is_degraded(self):
+        self.assertEqual(epi.resolve_input_confidence(self.CLEAN)["tier"], "clean")
+        for name, change in self.ONE_FACT.items():
+            with self.subTest(fact=name):
+                conf = epi.resolve_input_confidence({**self.CLEAN, **change})
+                self.assertEqual(conf["tier"], "degraded")
+                self.assertEqual(conf["fired"], [name])
+
+    def test_two_or_more_facts_are_severe_and_1905_10g_had_all_four(self):
+        two = {**self.CLEAN, **self.ONE_FACT["no_odds_priced"],
+               **self.ONE_FACT["no_handedness"]}
+        self.assertEqual(epi.resolve_input_confidence(two)["tier"], "severe")
+        all_four = dict(self.CLEAN)
+        for change in self.ONE_FACT.values():
+            all_four.update(change)
+        conf = epi.resolve_input_confidence(all_four)
+        self.assertEqual(conf["tier"], "severe")
+        self.assertEqual(conf["fired"], list(epi.INPUT_CONFIDENCE_FACTS))
+
+    def test_bens_schedule_moves_exactly_the_two_caps(self):
+        for tier, player, cluster in (("degraded", 0.35, 0.40), ("severe", 0.30, 0.30)):
+            with self.subTest(tier=tier):
+                out, block = epi.apply_input_confidence(self.CONTROLS, {"tier": tier})
+                self.assertEqual(out["max_player_exposure_pct"], player)
+                self.assertEqual(out["max_consensus_cluster_share_pct"], cluster)
+                self.assertEqual(out["max_team_exposure_pct"], 0.70, "no other cap moves")
+                self.assertTrue(block["applied"])
+                self.assertEqual(block["provenance"], "confidence_derived")
+                self.assertEqual(
+                    block["changes"]["max_player_exposure_pct"]["source"],
+                    "confidence_derived")
+
+    def test_a_clean_slate_and_an_unassessed_one_move_nothing(self):
+        clean = epi.resolve_input_confidence(self.CLEAN)
+        out, block = epi.apply_input_confidence(self.CONTROLS, clean)
+        self.assertEqual(out, self.CONTROLS)
+        self.assertFalse(block["applied"])
+        unassessed = epi.resolve_input_confidence(None)
+        self.assertEqual(unassessed["tier"], "not_assessed")
+        out, block = epi.apply_input_confidence(self.CONTROLS, unassessed)
+        self.assertEqual(out, self.CONTROLS)
+        # An absent measurement is not a bad one.
+        partial = epi.resolve_input_confidence({"f1_games_priced": None})
+        self.assertEqual(partial["facts"]["no_odds_priced"]["state"], "unknown")
+        self.assertEqual(partial["tier"], "clean")
+
+    def test_the_feasibility_floor_wins(self):
+        out, block = epi.apply_input_confidence(
+            self.CONTROLS, {"tier": "severe"},
+            floors={"max_player_exposure_pct": 0.38})
+        self.assertEqual(out["max_player_exposure_pct"], 0.38)
+        self.assertTrue(block["changes"]["max_player_exposure_pct"]["floor_won"])
+        self.assertEqual(out["max_consensus_cluster_share_pct"], 0.30)
+
+    def test_an_explicit_override_wins_and_an_off_cap_stays_off(self):
+        out, block = epi.apply_input_confidence(
+            {**self.CONTROLS, "max_consensus_cluster_share_pct": 1.0},
+            {"tier": "severe"}, override_keys={"max_player_exposure_pct"})
+        self.assertEqual(out["max_player_exposure_pct"], 0.40)
+        self.assertEqual(block["changes"]["max_player_exposure_pct"]["source"],
+                         "operator_override")
+        self.assertEqual(out["max_consensus_cluster_share_pct"], 1.0)
+        self.assertEqual(block["changes"]["max_consensus_cluster_share_pct"]["source"],
+                         "off_stays_off")
+        self.assertFalse(block["applied"])
+
+    def test_the_deadline_relaxes_it_first_and_records_the_before_and_after(self):
+        out, block = epi.apply_input_confidence(
+            self.CONTROLS, {"tier": "severe"}, relax="deadline_t30")
+        self.assertEqual(out, self.CONTROLS)
+        change = block["changes"]["max_player_exposure_pct"]
+        self.assertEqual((change["before"], change["after"], change["would_be"]),
+                         (0.40, 0.40, 0.30))
+        self.assertEqual(change["source"], "relaxed_deadline_t30")
+        self.assertEqual(block["relaxed"], "deadline_t30")
+        self.assertFalse(block["applied"])
+        # build_slate: T-30 relaxes on the first solve, and a proven-infeasible
+        # refusal with the tightening applied re-solves ONCE, relaxed, BEFORE the
+        # deadline governor's loop is reached.
+        src = (REPO / "skills" / "generate-lineups" / "scripts" / "build_slate.py"
+               ).read_text(encoding="utf-8")
+        run = src.split("def run_classic(", 1)[1]
+        self.assertIn('"deadline_t30" if isinstance(_minutes, (int, float))', run)
+        retry = run.index('confidence_relax = "proven_infeasible"')
+        governor = run.index("governor = getattr(args, \"_governor\", None)")
+        self.assertLess(retry, governor)
+
+    def test_run_slate_applies_it_and_publishes_the_block(self):
+        """On the vendored 2026-06-03 slate, whose tiny test fixtures cannot
+        show a move (their feasibility floors lift both caps to 1.0)."""
+        from tests import test_golden_replay as g
+        salary, entries = g._find_archive_inputs(g.ARCHIVE_DIR)
+        if salary is None or entries is None:
+            self.skipTest("vendored data/archive/2026-06-03 inputs absent")
+        rows = g._projection_rows_from_salary_csv(salary)
+        severe_facts = {**self.CLEAN, "f1_games_priced": 0, "f4_platoon_applied": 0}
+        with tempfile.TemporaryDirectory() as tmp:
+            common = dict(salary_csv=salary, entries_csv=entries,
+                          projection_mode="emergency_proxy",
+                          contest_postures=g.PRODUCTION_POSTURES, approve=False)
+            base = run_slate(runs_root=Path(tmp) / "a", projection_rows=[dict(r) for r in rows],
+                             **common)
+            severe = run_slate(runs_root=Path(tmp) / "b",
+                               projection_rows=[dict(r) for r in rows],
+                               input_confidence_facts=severe_facts, **common)
+            relaxed = run_slate(runs_root=Path(tmp) / "c",
+                                projection_rows=[dict(r) for r in rows],
+                                input_confidence_facts=severe_facts,
+                                input_confidence_relax="deadline_t30", **common)
+        self.assertEqual(base["input_confidence"]["tier"], "not_assessed")
+        self.assertEqual(base["merged_controls"]["max_player_exposure_pct"], 0.4)
+        self.assertEqual(base["merged_controls"]["max_consensus_cluster_share_pct"], 0.5)
+        block = severe["input_confidence"]
+        self.assertEqual(block["tier"], "severe")
+        self.assertEqual(severe["merged_controls"]["max_player_exposure_pct"], 0.3)
+        self.assertEqual(severe["merged_controls"]["max_consensus_cluster_share_pct"], 0.3)
+        self.assertEqual(block["changes"]["max_player_exposure_pct"]["before"], 0.4)
+        self.assertEqual(severe["checkpoint_plan"]["feasibility"]["controls_feasibility"],
+                         base["checkpoint_plan"]["feasibility"]["controls_feasibility"],
+                         "the tightening is not a feasibility floor and is not reported as one")
+        self.assertEqual(relaxed["merged_controls"]["max_player_exposure_pct"], 0.4)
+        self.assertEqual(relaxed["input_confidence"]["relaxed"], "deadline_t30")
+
+    def test_build_slate_reads_the_facts_off_the_briefs_own_blocks(self):
+        bs = ConsensusClusterCapTests._build_slate()
+        facts = bs.input_confidence_facts(
+            {"counts": {"f1_games_priced": 0, "f4_platoon_applied": 0}},
+            {"files": {"expected_stats_batting.csv": {"age_days": 23.0, "stale": True,
+                                                       "exists": True},
+                       "expected_stats_pitching.csv": {"age_days": None, "stale": False,
+                                                        "exists": False},
+                       "statsapi_season_pitching.csv": {"age_days": 1.0, "stale": False,
+                                                         "exists": True}}},
+            {"platoon_age_days": 48, "platoon_dependent_teams": ["CWS", "ATL"]},
+            projection_frame(write_salary(Path(tempfile.mkdtemp()) / "s.csv")))
+        self.assertEqual(facts["f1_games_priced"], 0)
+        self.assertEqual(sorted(facts["savant_expected_stats"]), ["expected_stats_batting.csv"])
+        self.assertGreater(facts["hitters_in_pool"], 0)
+        conf = epi.resolve_input_confidence(facts)
+        self.assertEqual(conf["tier"], "severe")
+        self.assertEqual(len(conf["fired"]), 4)
+        _, block = epi.apply_input_confidence(self.CONTROLS, conf)
+        line = bs.format_input_confidence_line(block)
+        self.assertIn("tier SEVERE", line)
+        self.assertIn("max_player_exposure_pct 0.4 -> 0.3", line)
+        self.assertIn("not a probability", line)
+        self.assertTrue(bs.format_input_confidence_line(None).startswith("UNAVAILABLE"))

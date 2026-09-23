@@ -3265,6 +3265,143 @@ def resolve_game_exposure_request(
 CONTROL_ID_MAP_KEYS = ("player_team_by_id", "player_game_by_id")
 
 
+
+# R407, Ben's decisions of 2026-09-23. Caps that scale with input confidence.
+# 1905_10g built with no odds (`f1_games_priced: 0`), no handedness
+# (`f4_platoon_applied: 0`), Savant data 23 days old and, on the first build,
+# 12 of 20 sides from a 48.9-day-old platoon file. The brief recorded each fact
+# and the build concentrated exactly as it would on a clean night: nothing read
+# a degradation back into the controls. Two tiers from four facts, each fact the
+# one the brief already prints: DEGRADED is exactly one, SEVERE two or more.
+# A deterministic schedule over labeled inputs, never a probability that the
+# projection is wrong.
+INPUT_CONFIDENCE_TIGHTENING: Dict[str, Dict[str, float]] = {
+    "degraded": {"max_player_exposure_pct": 0.05,
+                 "max_consensus_cluster_share_pct": 0.10},
+    "severe": {"max_player_exposure_pct": 0.10,
+               "max_consensus_cluster_share_pct": 0.20},
+}
+INPUT_CONFIDENCE_FACTS = ("no_odds_priced", "stale_platoon_reference",
+                          "stale_savant_expected_stats", "no_handedness")
+#: The provenance a tightened value carries (R388(b)'s vocabulary; that item
+#: has not landed, so this is the first writer of the word).
+CONFIDENCE_DERIVED = "confidence_derived"
+
+
+def resolve_input_confidence(facts: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
+    """R407. The tier, from the four facts the brief already carries.
+
+    ``facts`` is what `build_slate.input_confidence_facts` read off the brief's
+    own enrichment block, reference status and pool report -- one reader of
+    each fact, not a second derivation. ``None`` means the caller supplied none
+    (a direct `run_slate` caller: a test, the golden replay), and the tier is
+    ``not_assessed``, which tightens nothing and says so. A fact whose input is
+    absent is ``unknown``, never fired: an absent measurement is not a bad one.
+    """
+    if facts is None:
+        return {"assessed": False, "tier": "not_assessed", "fired": [],
+                "facts": {}, "note": "no input-confidence facts supplied by the "
+                                     "caller; nothing was tightened"}
+    from mlb_engine.intake.live_data_adapters import PLATOON_AGE_BLOCK_DAYS
+    f = dict(facts)
+
+    def _fact(value_known: bool, fired: bool, value: Any, rule: str) -> Dict[str, Any]:
+        return {"state": ("fired" if fired else "clear") if value_known else "unknown",
+                "value": value, "rule": rule}
+
+    priced = f.get("f1_games_priced")
+    platoon_age = f.get("platoon_age_days")
+    platoon_sides = list(f.get("platoon_dependent_teams") or [])
+    savant = dict(f.get("savant_expected_stats") or {})
+    f4_applied = f.get("f4_platoon_applied")
+    hitters = f.get("hitters_in_pool")
+    table = {
+        "no_odds_priced": _fact(
+            priced is not None, priced is not None and int(priced) == 0,
+            priced, "enrichment.counts.f1_games_priced == 0"),
+        "stale_platoon_reference": _fact(
+            platoon_age is not None or not platoon_sides,
+            platoon_age is not None and bool(platoon_sides)
+            and int(platoon_age) > PLATOON_AGE_BLOCK_DAYS,
+            {"age_days": platoon_age, "sides": platoon_sides},
+            f"a side the pool used came from a platoon reference older than "
+            f"{PLATOON_AGE_BLOCK_DAYS} days (R27's check)"),
+        "stale_savant_expected_stats": _fact(
+            bool(savant), any(bool(v.get("stale")) for v in savant.values()),
+            {k: v.get("age_days") for k, v in sorted(savant.items())},
+            "an expected_stats file past the enrichment age warning's own "
+            "threshold (reference_status `stale`)"),
+        "no_handedness": _fact(
+            f4_applied is not None and hitters is not None,
+            f4_applied is not None and hitters is not None
+            and int(hitters) > 0 and int(f4_applied) == 0,
+            {"f4_platoon_applied": f4_applied, "hitters_in_pool": hitters},
+            "enrichment.counts.f4_platoon_applied == 0 with hitters in the pool"),
+    }
+    fired = [name for name in INPUT_CONFIDENCE_FACTS if table[name]["state"] == "fired"]
+    tier = "severe" if len(fired) >= 2 else "degraded" if len(fired) == 1 else "clean"
+    return {"assessed": True, "tier": tier, "fired": fired, "facts": table,
+            "note": "a deterministic tier over the brief's own degradation facts; "
+                    "never a probability that the projection is wrong"}
+
+
+def apply_input_confidence(
+    controls: Mapping[str, Any],
+    confidence: Mapping[str, Any],
+    *,
+    floors: Optional[Mapping[str, Any]] = None,
+    override_keys: Iterable[str] = (),
+    relax: Optional[str] = None,
+) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    """R407. Tighten the two caps by the tier's schedule, and say what moved.
+
+    Floors win (``max(tightened, floor)``), so the tightening can never push a
+    cap below what the slate can carry. An explicit override of either key wins
+    over the tightening. A cap already at 1.0 is OFF and stays off: tightening
+    it would switch on a control no posture asked for. ``relax`` names why the
+    tightening is not applied this solve -- ``deadline_t30`` (R386: inside T-30
+    it is the FIRST thing relaxed) or ``proven_infeasible`` (the first thing
+    relaxed on a refused joint MILP) -- and the block still records the before
+    and the would-be after, so the relaxation is counted rather than silent.
+    """
+    out = dict(controls)
+    tier = str(confidence.get("tier") or "not_assessed")
+    schedule = INPUT_CONFIDENCE_TIGHTENING.get(tier) or {}
+    overrides = {str(k) for k in override_keys}
+    changes: Dict[str, Any] = {}
+    for key, delta in sorted(schedule.items()):
+        before = out.get(key)
+        if before is None:
+            changes[key] = {"before": None, "after": None, "delta": delta,
+                            "source": "not_declared"}
+            continue
+        if key in overrides:
+            changes[key] = {"before": before, "after": before, "delta": delta,
+                            "source": "operator_override"}
+            continue
+        if float(before) >= 1.0:
+            changes[key] = {"before": before, "after": before, "delta": delta,
+                            "source": "off_stays_off"}
+            continue
+        floor_val = (floors or {}).get(key)
+        target = round(float(before) - float(delta), 4)
+        after = round(max(target, float(floor_val) if floor_val else 0.0), 4)
+        if after <= 0.0:
+            after = float(before)
+        entry = {"before": before, "after": after, "delta": delta,
+                 "floor": floor_val, "source": CONFIDENCE_DERIVED,
+                 "floor_won": bool(floor_val) and after > target}
+        if relax:
+            entry = {**entry, "after": before, "would_be": after,
+                     "source": f"relaxed_{relax}"}
+        else:
+            out[key] = after
+        changes[key] = entry
+    applied = any(v.get("source") == CONFIDENCE_DERIVED for v in changes.values())
+    block = {**dict(confidence), "changes": changes, "applied": applied,
+             "relaxed": relax, "provenance": CONFIDENCE_DERIVED if applied else None}
+    return out, block
+
 def controls_for_report(controls: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
     """The merged controls as a reader should see them: maps summarised.
 
@@ -5082,6 +5219,8 @@ def run_slate(
     # behaviour and every existing caller's.
     weather_game_caps: Optional[Mapping[str, float]] = None,
     leverage: Optional[Mapping[str, Any]] = None,
+    input_confidence_facts: Optional[Mapping[str, Any]] = None,
+    input_confidence_relax: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Single front door: raw slate inputs -> certified DKEntries file plus diagnostics.
 
@@ -5235,6 +5374,14 @@ def run_slate(
         weather_game_caps=weather_game_caps)
 
     override_keys = set(dict(portfolio_controls_override or {}).keys())
+    # R407. The confidence tier, where the controls are resolved and before the
+    # floor record below reads them: the tightening is floored by the same
+    # `floors` the merge just applied, loses to an explicit override, and is
+    # recorded with its before and after on the checkpoint and the result.
+    input_confidence = resolve_input_confidence(input_confidence_facts)
+    controls, input_confidence = apply_input_confidence(
+        controls, input_confidence, floors=floors, override_keys=override_keys,
+        relax=input_confidence_relax)
     controls_feasibility: Dict[str, Any] = {"floors_applied": {}, "notes": []}
     for key, floor_val in floors.items():
         base = merged_default.get(key)
@@ -5390,6 +5537,9 @@ def run_slate(
             "map_wired": bool(controls.get("player_team_by_id")),
             "note": MAX_TEAM_EXPOSURE_NOTE,
         },
+        # R407. The tier, the facts that set it, and each control's before and
+        # after, on the checkpoint and on the approved result alike.
+        "input_confidence": input_confidence,
         # R405. The cap as requested, before the bank defines the cluster; the
         # realized block is the allocator's `consensus_cluster`.
         "consensus_cluster_request": {
@@ -5670,6 +5820,9 @@ def run_slate(
             "map_wired": bool(controls.get("player_team_by_id")),
             "note": MAX_TEAM_EXPOSURE_NOTE,
         },
+        # R407. The tier, the facts that set it, and each control's before and
+        # after, on the checkpoint and on the approved result alike.
+        "input_confidence": input_confidence,
         # R405. The cap as requested, before the bank defines the cluster; the
         # realized block is the allocator's `consensus_cluster`.
         "consensus_cluster_request": {
