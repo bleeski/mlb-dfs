@@ -5575,7 +5575,7 @@ guess is R273's failure with the roles reversed.
 
 ### R297. CLOSED 2026-09-23 -- (a)(b)(e) and F24 SHIPPED 2026-09-11 with R338, (d) 2026-09-06 with R304, (c) as roadmap Session 08; entry migrated to CHANGELOG.md
 
-(c) closed the stranded-run class. `execute_portfolio` and `run_late_swap`'s `validate_only` door run everything after `create_run` inside a try, so a crash ends `blocked` with `crashed: true` in the manifest and the diagnostics instead of an unmarked `building`; a crash after certification (a raising promotion) keeps the certified record and hands the export back as the last usable artifact (R393(b)). `build_slate` keeps a crash a crash (`EngineCrashed`), so no rung re-solves it. The full entry, the premise corrections and the gate line are in the Session 08 CHANGELOG entries.
+(c) closed the stranded-run class. `execute_portfolio` and `run_late_swap`'s `validate_only` door run everything after `create_run` inside a try, so a crash ends `blocked` with `crashed: true` in the manifest and the diagnostics instead of an unmarked `building`; a crash after certification (a raising promotion) keeps the certified record and hands the export back as the last usable artifact (R393(b)). `build_slate` keeps a crash a crash (`EngineCrashed`), so no rung re-solves it. The full entry, the premise corrections and the gate line are in the Session 08 CHANGELOG entries. Gate `PASS  v2.26.0  43 modules  2592 tests  5 skipped` (the five absent-file skips).
 
 What reaches outputs/ and what the record claims about it. R96 CLOSED and
 migrated 2026-08-11 — every delivery path now records or self-labels, the
