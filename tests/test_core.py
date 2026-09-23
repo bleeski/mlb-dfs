@@ -24566,6 +24566,13 @@ class SupervisorLostWindowTests(unittest.TestCase):
         self.assertEqual(payload["operator_inputs"]["declare_pitcher"],
                          ["111=viable_bulk_or_alt_sp", "222"])
 
+    def test_a_flag_is_never_taken_as_a_declarations_value(self):
+        code, records, cmds, _logs = self._run(
+            self._certify, extra_argv=["--passthrough", "--declare-pitcher --odds x.json"])
+        self.assertEqual(code, 4)
+        self.assertEqual(cmds, [])
+        self.assertIn("has no value", records[-1]["why"])
+
     def test_no_declaration_leaves_the_log_shape_alone(self):
         _code, records, cmds, logs = self._run(self._certify)
         self.assertEqual(self._declared_in(cmds[0]), [])
@@ -24925,11 +24932,136 @@ class TypedRefusalTests(unittest.TestCase):
                          ("max_player_exposure_pct", 0.4, 0.5, 3, "posture_default", "S"))
         self.assertIn("which alone restores feasibility", mod.format_typed_remedy(out[2]))
         self.assertIn("HELD by --never-relax", mod.format_typed_remedy(out[1]))
-        none = mod.typed_refusal_remedy({}, {"ran": True, "controls": [
-            {"control": "max_team_exposure_pct", "status": "not_probed"}]}, None)
-        self.assertEqual(none[0]["kind"], "no_single_control")
-        self.assertIn("not probed inside the budget: max_team_exposure_pct", none[0]["note"])
         self.assertEqual(mod.typed_refusal_remedy({}, None, {"job_list_exhausted": True}), [])
+
+    def test_no_single_control_is_claimed_only_when_every_drop_was_proven(self):
+        """The review's second blocking finding. "Two or more members" reads as
+        R157's licence to open every exposure cap, so it may be said only when
+        every active control was dropped and each drop PROVED infeasible; a
+        budget that ran out or a solve that timed out leaves it open."""
+        mod = RefusalClassificationTests._module()
+        proven = {"ran": True, "controls": [
+            {"control": "max_team_exposure_pct", "status": "probed", "alone_restores": False},
+            {"control": "max_shared_players", "status": "probed", "alone_restores": False}]}
+        out = mod.typed_refusal_remedy({}, proven, None)
+        self.assertEqual(out[0]["kind"], "no_single_control")
+        self.assertIn("the probe does not drop", out[0]["note"])
+        open_q = {"ran": True, "controls": [
+            {"control": "max_team_exposure_pct", "status": "not_probed"},
+            {"control": "max_shared_players", "status": "probed", "alone_restores": None},
+            {"control": "max_sp_pair_repetition", "status": "probed", "alone_restores": False}]}
+        out = mod.typed_refusal_remedy({}, open_q, None)
+        self.assertEqual(out[0]["kind"], "undetermined")
+        self.assertEqual((out[0]["undecided"], out[0]["not_probed"]),
+                         (["max_shared_players"], ["max_team_exposure_pct"]))
+        self.assertNotIn("two or more", out[0]["note"])
+        none_run = mod.typed_refusal_remedy({}, {"ran": True, "controls": [
+            {"control": "max_team_exposure_pct", "status": "not_probed"}]}, None)
+        self.assertEqual(none_run[0]["kind"], "undetermined")
+        self.assertIn("not probed inside the budget: max_team_exposure_pct",
+                      mod.format_typed_remedy(none_run[0]))
+
+    def test_every_step_enforces_the_count_it_names_and_is_the_smallest(self):
+        """The review's first blocking finding: `round((c + 1) / total, 4)`
+        rounded down for 9,170 (total, count) pairs up to 200, so the step
+        re-solved the refused model and the brief said it does not restore."""
+        for total in range(2, 201):
+            for count in range(1, total):
+                step = ca.interaction_step("max_player_exposure_pct",
+                                           (count + 0.5) / total, total)
+                if step["to"] >= 1.0:
+                    continue
+                self.assertEqual(ca._cap_count(total, step["to"]), step["count_to"],
+                                 (total, count, step))
+                self.assertLess(ca._cap_count(total, round(step["to"] - 1e-4, 4)),
+                                step["count_to"], ("not the smallest", total, count))
+        self.assertEqual(ca.interaction_step("max_player_exposure_pct", 0.35, 9)["to"], 0.4445)
+
+    def test_a_remedy_value_enforces_the_cap_it_names_at_nine_entries(self):
+        """The sentence's `:.3f` rounded down (9 entries, cap 4: 0.444 enforces
+        3); the sentence and the typed value now name the pct that enforces it."""
+        # Three stackable teams: need 3 of 9, where `:.3f` gave 0.333 (cap 2).
+        feas = {"available": True, "entries": 9, "viable_sp_count": 2,
+                "stackable_team_count": 3, "game_count": 2,
+                "floor_player_exposure_count": 4}
+        controls = {"max_primary_stack_exposure_pct": 0.2, "max_player_exposure_pct": 0.2}
+        report = epi._feasibility_report(feas, controls)
+        for check in report["checks"]:
+            typed = check.get("remedy_typed")
+            if not typed or "count" not in typed:
+                continue
+            with self.subTest(check=check["name"]):
+                import math as _m
+                self.assertGreaterEqual(_m.floor(9 * typed["to"] + 1e-9), typed["count"])
+                self.assertIn(f"to >= {typed['to']:.3f} (cap {typed['count']})",
+                              check["remedy"])
+        player = [c for c in report["checks"] if c["name"] == "player_exposure_floor"][0]
+        self.assertEqual(player["remedy_typed"]["to"], 0.445)
+        stack = [c for c in report["checks"] if c["name"] == "stack_exposure_capacity"][0]
+        self.assertEqual(stack["remedy_typed"]["to"], 0.334)
+        self.assertIn("to >= 0.334 (cap 3)", stack["remedy"])
+
+    def test_the_probe_waits_for_a_grown_bank_and_honours_not_after(self):
+        import time as _t
+        partial = ca.select_and_assign_entries(
+            self._every_cap_restores(), self.ENTRIES, dict(self.CONTROLS),
+            bank_report={"job_list_exhausted": False}, interaction_probe_budget_s=30)
+        self.assertNotIn("interaction_probe", partial, "a partial bank's remedy is growth")
+        late = ca.select_and_assign_entries(
+            self._every_cap_restores(), self.ENTRIES, dict(self.CONTROLS),
+            interaction_probe_budget_s=30, interaction_probe_not_after=_t.monotonic() - 1)
+        self.assertEqual({r["status"] for r in late["interaction_probe"]["controls"]},
+                         {"not_probed"})
+
+    def test_the_per_game_caps_are_one_row_with_no_step(self):
+        """The dict merges the scalar, operator per-game values and weather by
+        MIN, so dropping the scalar alone would drop all three; the probe says
+        so and names no step. A dict with no scalar still gets its row."""
+        calls = []
+
+        def resolve(trial):
+            calls.append(dict(trial))
+            ok = trial.get("max_game_exposure_pct_by_game") is None
+            return {"passed": ok, "allocation_solver_report": {"scipy_status": 2}}
+        out = ca._interaction_probe(
+            resolve, {"max_game_exposure_pct_by_game": {"g1": 0.25},
+                      "max_shared_players": 5}, 4, 30)
+        rows = {r["control"]: r for r in out["controls"]}
+        self.assertIn("max_game_exposure_pct_by_game", rows)
+        game = rows["max_game_exposure_pct_by_game"]
+        self.assertTrue(game["alone_restores"])
+        self.assertIsNone(game["step"]["to"])
+        self.assertIn("weather", game["scope"])
+        self.assertIs(rows["max_shared_players"]["alone_restores"], False)
+        mod = RefusalClassificationTests._module()
+        line = mod.format_typed_remedy(mod.typed_refusal_remedy({}, out, None)[0])
+        self.assertIn("dropped entirely", line)
+        self.assertNotIn("None", line)
+
+    def test_the_probe_limits_skip_the_window_t15_and_a_relaxable_tightening(self):
+        mod = RefusalClassificationTests._module()
+        import datetime as dt
+        from mlb_engine.pipeline import deadline_governor as dg
+        now_utc = dt.datetime(2026, 9, 23, 23, 0, tzinfo=dt.timezone.utc)
+
+        def gov(minutes):
+            return dg.DeadlineGovernor(now_utc + dt.timedelta(minutes=minutes),
+                                       now_fn=lambda: now_utc)
+        budget, not_after = mod.interaction_probe_limits(1000.0, 0.0)
+        self.assertEqual((budget, not_after), (45.0, 970.0))
+        self.assertEqual(mod.interaction_probe_limits(1000.0, 0.0, governor=gov(2)),
+                         (None, None), "inside the governor's window")
+        budget, not_after = mod.interaction_probe_limits(1000.0, 0.0, governor=gov(7))
+        self.assertAlmostEqual(not_after, 60.0, "stops when the window opens")
+        self.assertEqual(mod.interaction_probe_limits(1000.0, 0.0, minutes_to_deadline=10),
+                         (None, None), "inside T-15")
+        self.assertEqual(mod.interaction_probe_limits(1000.0, 0.0, minutes_to_deadline=-60,
+                                                      replay=True)[0], 45.0,
+                         "a past-slate replay has no clock to respect")
+        self.assertEqual(mod.interaction_probe_limits(1000.0, 0.0, confidence_may_relax=True),
+                         (None, None), "R407 re-solves first")
+        self.assertEqual(mod.interaction_probe_limits(20.0, 0.0), (None, None),
+                         "less than a second clear of the deadline margin")
 
     def test_run_slate_passes_the_budget_and_returns_the_probe(self):
         """The wiring, through the real run_slate and execute_portfolio: only

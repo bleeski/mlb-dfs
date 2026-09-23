@@ -171,7 +171,8 @@ from mlb_engine.pipeline.build_state_manager import (
 )
 from mlb_engine.allocate.contest_allocator import (
     CONSENSUS_CLUSTER_MIN_MEMBERS,
-    TEAM_EXPOSURE_MIN_HITTERS, assert_fraction_cap, select_and_assign_entries,
+    TEAM_EXPOSURE_MIN_HITTERS, assert_fraction_cap, fraction_for_count,
+    select_and_assign_entries,
 )
 from mlb_engine.contest_shapes import (
     SATELLITE_PAYOUT_TOKENS, SATELLITE_TYPE_TOKENS, WTA_CONSTRUCTION_SHAPES,
@@ -348,6 +349,7 @@ def execute_portfolio(
     # R207. Arms the allocator's interaction probe on the one refusal it
     # answers; None runs nothing (every caller but run_slate's build path).
     interaction_probe_budget_s: Optional[float] = None,
+    interaction_probe_not_after: Optional[float] = None,
 ) -> Dict[str, Any]:
     """Execute the canonical entry-level portfolio workflow."""
     controls = dict(portfolio_controls or {})
@@ -394,7 +396,8 @@ def execute_portfolio(
         candidates, entry_requirements, controls, bank_report=bank_diagnostics,
         fixed_exposure=fixed_exposure, feasibility_inputs=feasibility_inputs,
         feasibility_checks=feasibility_checks,
-        interaction_probe_budget_s=interaction_probe_budget_s)
+        interaction_probe_budget_s=interaction_probe_budget_s,
+        interaction_probe_not_after=interaction_probe_not_after)
     if not allocation.get("passed"):
         diagnostics = {
             "run_id": run["run_id"], "mode": mode, "allocation": allocation,
@@ -4510,11 +4513,15 @@ def _feasibility_report(feas: Mapping[str, Any], controls: Mapping[str, Any]) ->
             remedy = None
             if not ok:
                 need = int(_ceil(demand / int(n_units)))
-                remedy = f"raise {key} to >= {min(1.0, need / entries):.3f} (cap {need})"
+                # R207. Rounded UP: `:.3f` of need / entries rounded down about
+                # half the time and named a pct that enforces the cap below the
+                # one in brackets (9 entries, cap 4: 0.444 enforces 3).
+                remedy = (f"raise {key} to >= {fraction_for_count(need, entries, 3):.3f} "
+                          f"(cap {need})")
                 report["binding_constraints"].append(f"{check_name} infeasible: {detail}; {remedy}")
                 report["passed"] = False
             report["checks"].append({"name": check_name, "passed": ok, "detail": detail, "remedy": remedy,
-                                     **(_typed_remedy(ok, key, round(min(1.0, need / entries), 3),
+                                     **(_typed_remedy(ok, key, fraction_for_count(need, entries, 3),
                                                       count=need) if not ok else {})})
 
         # R405. The arithmetic half only (see `_slate_feasibility`): the check
@@ -4559,14 +4566,15 @@ def _feasibility_report(feas: Mapping[str, Any], controls: Mapping[str, Any]) ->
                 remedy = None
                 if not ok:
                     remedy = (f"raise max_player_exposure_pct to >= "
-                              f"{min(1.0, int(floor_player) / entries):.3f} (cap {floor_player})")
+                              f"{fraction_for_count(int(floor_player), entries, 3):.3f} "
+                              f"(cap {floor_player})")
                     report["binding_constraints"].append(f"player_exposure_floor infeasible: {detail}; {remedy}")
                     report["passed"] = False
                 report["checks"].append({"name": "player_exposure_floor", "passed": ok,
                                          "detail": detail, "remedy": remedy,
                                          **_typed_remedy(
                                              ok, "max_player_exposure_pct",
-                                             round(min(1.0, int(floor_player) / entries), 3),
+                                             fraction_for_count(int(floor_player), entries, 3),
                                              count=int(floor_player))})
 
     largest = feas.get("largest_contest_entries") or 0
@@ -5741,8 +5749,11 @@ def run_slate(
     # R207. Seconds the allocator may spend, on a proven-infeasible refusal
     # whose errors can only name "the interaction of the active controls",
     # re-solving once per active control with that control dropped. None
-    # (every existing caller) runs nothing.
+    # (every existing caller) runs nothing. `interaction_probe_not_after` is an
+    # absolute time.monotonic() bound, so a budget sized before this call's
+    # solves cannot run past the caller's deadline.
     interaction_probe_budget_s: Optional[float] = None,
+    interaction_probe_not_after: Optional[float] = None,
 ) -> Dict[str, Any]:
     """Single front door: raw slate inputs -> certified DKEntries file plus diagnostics.
 
@@ -6389,6 +6400,7 @@ def run_slate(
             + list(((bank_diag or {}).get("relaxations") or {}).get("warnings") or [])),
         compute_bank_coverage=not light_satellite,
         interaction_probe_budget_s=interaction_probe_budget_s,
+        interaction_probe_not_after=interaction_probe_not_after,
     )
     result.update({
         "approved": True,

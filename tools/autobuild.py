@@ -320,7 +320,9 @@ def lift_repeatable(tokens: List[str], flag: str) -> tuple:
     while i < len(tokens):
         tok = tokens[i]
         if tok == flag:
-            if i + 1 >= len(tokens):
+            if i + 1 >= len(tokens) or tokens[i + 1].startswith("--"):
+                # `--declare-pitcher --odds x` would forward `--odds` as the
+                # declaration and drop the flag the operator meant.
                 return tokens, [], f"{flag} in --passthrough has no value after it"
             values.append(tokens[i + 1])
             i += 2

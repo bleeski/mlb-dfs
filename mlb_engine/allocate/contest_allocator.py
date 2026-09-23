@@ -2925,12 +2925,32 @@ def _resolve_primary_stack_floor(
     return report
 
 
+def fraction_for_count(count: int, total: int, places: int = 4) -> float:
+    """The smallest fraction, at ``places`` decimals, that `_cap_count`
+    resolves to at least ``count`` entries of ``total``.
+
+    ``round(count / total, places)`` rounds DOWN about half the time, and a
+    rounded-down pct enforces the count below the one it was meant to name
+    (9 entries, count 4: 0.4444 enforces 3). So this rounds up and then checks
+    against `_cap_count`'s own floor, the rule the solve enforces. Capped at
+    1.0, which is the cap switched off.
+    """
+    if total <= 0 or count >= total:
+        return 1.0
+    scale = 10 ** places
+    value = math.ceil(count / float(total) * scale - 1e-6) / scale
+    while value < 1.0 and math.floor(total * value + 1e-9) < count:
+        value = round(value + 1.0 / scale, places)
+    return min(1.0, round(value, places))
+
+
 def interaction_step(key: str, value: Any, total: int) -> Dict[str, Any]:
     """R207. The smallest move of one control that changes what it enforces.
 
     A fraction cap binds as ``_cap_count(total, pct)`` entries, so the smallest
-    useful raise is the pct at which that count goes up by one, ``(c + 1) /
-    total``; any value between the two enforces the same count. An integer cap
+    useful raise is the smallest pct at which that count goes up by one
+    (`fraction_for_count`, rounded UP so the step enforces the count it names);
+    any value between the two enforces the same count. An integer cap
     goes up by one. A step that reaches 1.0 is the cap switched off.
     """
     if key in INTERACTION_COUNT_CONTROLS:
@@ -2940,9 +2960,8 @@ def interaction_step(key: str, value: Any, total: int) -> Dict[str, Any]:
     count = _cap_count(total, value)
     if count is None:
         return {"from": value, "to": None, "count_from": None, "count_to": None}
-    to = round(min(1.0, (count + 1) / float(total)), 4)
-    return {"from": value, "to": to, "count_from": count,
-            "count_to": min(total, count + 1)}
+    return {"from": value, "to": fraction_for_count(count + 1, total, 4),
+            "count_from": count, "count_to": min(total, count + 1)}
 
 
 def _probe_verdict(result: Mapping[str, Any]) -> Optional[bool]:
@@ -2955,11 +2974,21 @@ def _probe_verdict(result: Mapping[str, Any]) -> Optional[bool]:
     return False if report.get("scipy_status") == 2 else None
 
 
+#: What the probe drops as one row when per-game caps bind: the scalar's
+#: expansion, an operator's per-game values and F5 weather caps all land in one
+#: dict, merged by MIN, and the solve enforces the dict. Dropping any of them
+#: alone would need the merge's inputs, which the allocator does not have.
+PER_GAME_SCOPE = ("every per-game cap: the max_game_exposure_pct scalar's "
+                  "expansion, operator per-game values and F5 weather caps, "
+                  "merged by MIN")
+
+
 def _interaction_probe(
     resolve: Any,
     controls: Mapping[str, Any],
     total: int,
     budget_s: float,
+    not_after: Optional[float] = None,
 ) -> Dict[str, Any]:
     """R207. Which ONE active control, dropped alone, restores feasibility.
 
@@ -2975,11 +3004,13 @@ def _interaction_probe(
 
     Bounded by ``budget_s`` of wall clock across every solve, each solve's own
     time limit clamped to what remains; a control the budget did not reach reads
-    ``not_probed``. A dropped game scalar drops the per-game dict with it,
-    because that dict is what the solve enforces (the pipeline expands the
-    scalar into it and merges weather caps in by MIN), and its step is not
-    re-solved for the same reason. Truthful labels: a restored solve is
-    feasibility of a MILP against this bank, never a claim about outcomes.
+    ``not_probed``. ``not_after`` is an absolute ``time.monotonic()`` bound
+    the caller computed from its own deadline and the governor's window, so a
+    budget sized before a long solve cannot run past either. The per-game caps
+    are one row (`PER_GAME_SCOPE`): the scalar when it is set, the dict when
+    only the dict is, and never a step, since the dict is what the solve
+    enforces. Truthful labels: a restored solve is feasibility of a MILP
+    against this bank, never a claim about outcomes.
     """
     import time as _time
     started = _time.monotonic()
@@ -2987,7 +3018,10 @@ def _interaction_probe(
     solves = 0
 
     def _left() -> float:
-        return float(budget_s) - (_time.monotonic() - started)
+        left = float(budget_s) - (_time.monotonic() - started)
+        if not_after is not None:
+            left = min(left, float(not_after) - _time.monotonic())
+        return left
 
     def _run(trial: Dict[str, Any]) -> Optional[bool]:
         nonlocal solves
@@ -2996,27 +3030,40 @@ def _interaction_probe(
         solves += 1
         return _probe_verdict(resolve(trial))
 
-    for key in INTERACTION_CONTROLS:
+    probe_keys = [k for k in INTERACTION_CONTROLS if controls.get(k) is not None]
+    if ("max_game_exposure_pct" not in probe_keys
+            and controls.get("max_game_exposure_pct_by_game")):
+        probe_keys.append("max_game_exposure_pct_by_game")
+    for key in probe_keys:
         value = controls.get(key)
-        if value is None:
-            continue
         row: Dict[str, Any] = {"control": key, "value": value}
+        if key in ("max_game_exposure_pct", "max_game_exposure_pct_by_game"):
+            row["scope"] = PER_GAME_SCOPE
         if _left() <= 0.5:
             row["status"] = "not_probed"
             rows.append(row)
             continue
         dropped = dict(controls)
         dropped[key] = None
-        if key == "max_game_exposure_pct":
+        if key in ("max_game_exposure_pct", "max_game_exposure_pct_by_game"):
+            dropped["max_game_exposure_pct"] = None
             dropped["max_game_exposure_pct_by_game"] = None
         row["alone_restores"] = _run(dropped)
         row["status"] = "probed"
         if row["alone_restores"] is True:
+            if key in ("max_game_exposure_pct", "max_game_exposure_pct_by_game"):
+                step = {"from": value, "to": None, "count_from": None,
+                        "count_to": None, "restores": None,
+                        "note": ("no single step: dropping the per-game caps "
+                                 "restores feasibility, and which of their "
+                                 "writers binds is not separable here")}
+                row["step"] = step
+                rows.append(row)
+                continue
             step = interaction_step(key, value, total)
-            if key == "max_game_exposure_pct" or step["to"] is None:
+            if step["to"] is None:
                 step["restores"] = None
-                step["note"] = ("not re-solved: the per-game caps, not the "
-                                "scalar, are what the solve enforces")
+                step["note"] = "not re-solved: the control resolves to no count"
             elif _left() <= 0.5:
                 step["restores"] = None
                 step["note"] = "not re-solved: the probe budget was spent"
@@ -3055,6 +3102,7 @@ def select_and_assign_entries(
     _quota_state: Optional[Mapping[str, Any]] = None,
     _search_state: Optional[Mapping[str, Any]] = None,
     interaction_probe_budget_s: Optional[float] = None,
+    interaction_probe_not_after: Optional[float] = None,
     _probe: bool = False,
 ) -> Dict[str, Any]:
     """Select one candidate for every exact Entry ID in a single SciPy MILP.
@@ -3133,10 +3181,13 @@ def select_and_assign_entries(
     ``interaction_probe_budget_s`` (R207) arms `_interaction_probe` on the one
     refusal it answers: PROVEN infeasible, every ladder spent, no failing slate
     check and no bank-level finding, which is when ``errors[]`` can only say
-    "the interaction of the active controls is". The refusal then carries
-    ``interaction_probe``. None (the default) runs nothing, so every caller that
-    does not pass it is byte-identical. ``_probe`` is private: the probe's own
-    solves, which skip every ladder and retry and never probe again.
+    "the interaction of the active controls is", and not on a partial bank,
+    whose first remedy is to grow it. The refusal then carries
+    ``interaction_probe``. ``interaction_probe_not_after`` is an absolute
+    ``time.monotonic()`` bound on it. None (the default) runs nothing, so every
+    caller that does not pass a budget is byte-identical. ``_probe`` is
+    private: the probe's own solves, which skip every ladder and retry and
+    never probe again.
     """
     candidates = list(candidates)
     # Kept whole for the floor re-entry below: `candidates` is rebound by the
@@ -4002,6 +4053,7 @@ def select_and_assign_entries(
                 feasibility_inputs=feasibility_inputs,
                 feasibility_checks=feasibility_checks,
                 interaction_probe_budget_s=interaction_probe_budget_s,
+                interaction_probe_not_after=interaction_probe_not_after,
                 # Every sibling state rides this re-entry, same rule as R116 and
                 # R37(2)(b): the retry widens the SEARCH and must not silently
                 # reset a ladder position the earlier passes paid for.
@@ -4038,6 +4090,7 @@ def select_and_assign_entries(
                 feasibility_inputs=feasibility_inputs,
                 feasibility_checks=feasibility_checks,
                 interaction_probe_budget_s=interaction_probe_budget_s,
+                interaction_probe_not_after=interaction_probe_not_after,
                 _floor_state=_floor_state,
                 _reuse_state={
                     "rung_index": reuse_rung_index + 1,
@@ -4098,6 +4151,7 @@ def select_and_assign_entries(
                     feasibility_inputs=feasibility_inputs,
                     feasibility_checks=feasibility_checks,
                     interaction_probe_budget_s=interaction_probe_budget_s,
+                    interaction_probe_not_after=interaction_probe_not_after,
                     _floor_state=_floor_state,
                     _reuse_state=_reuse_state,
                     _quota_state={
@@ -4138,6 +4192,7 @@ def select_and_assign_entries(
                     feasibility_inputs=feasibility_inputs,
                     feasibility_checks=feasibility_checks,
                     interaction_probe_budget_s=interaction_probe_budget_s,
+                    interaction_probe_not_after=interaction_probe_not_after,
                     # R116: the reuse state rides the floor's re-entry too, or a
                     # ladder step would silently re-add the default this solve
                     # already proved infeasible and buy an extra round trip per
@@ -4172,15 +4227,19 @@ def select_and_assign_entries(
         # above and not touched; the probe is a new key beside it.
         probe_block = None
         if (interaction_probe_budget_s is not None and not _probe
-                and proven_infeasible and not slate_blocked and not binding):
+                and proven_infeasible and not slate_blocked and not binding
+                # A partial bank's first remedy is to grow it (R98(2)); a
+                # probe there is a number the next slice will change.
+                and (bank_report or {}).get("job_list_exhausted") is not False):
             exhausted_reuse = {"rung_index": len(reuse_rungs)}
 
             def _resolve(trial: Dict[str, Any]) -> Dict[str, Any]:
                 # The refused model, rebuilt: the same bank and entries, the
-                # enforced controls (the engine's reuse default included, since
-                # it was written into `controls`), and the same ladder states.
-                # Dropping the reuse cap also moves its ladder past the end, or
-                # the engine default would re-enter where the probe removed it.
+                # enforced controls and the same ladder states. At this refusal
+                # the reuse ladder has always re-entered past its end first, so
+                # an engine default is never in `controls`; an operator's cap
+                # is, and dropping it also moves the ladder past its end, or an
+                # engine default would re-enter where the probe removed it.
                 return select_and_assign_entries(
                     _all_candidates, entry_requirements, trial,
                     bank_report=bank_report, fixed_exposure=fixed_exposure,
@@ -4193,7 +4252,8 @@ def select_and_assign_entries(
                     _search_state={"full_bank": True}, _probe=True)
 
             probe_block = _interaction_probe(
-                _resolve, controls, total, float(interaction_probe_budget_s))
+                _resolve, controls, total, float(interaction_probe_budget_s),
+                not_after=interaction_probe_not_after)
         return {
             "passed": False, "assignments": [], "selection_certified": False,
             "allocation_certified": False, "allocation_method": "scipy_milp_entry_level",
