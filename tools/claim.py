@@ -294,12 +294,42 @@ def cmd_take(args: argparse.Namespace) -> int:
             pass  # marker removal needs the delete grant; owner.json is authoritative
         print(f"re-took {name} as {args.role} (release-then-retake is "
               f"check-then-write, not atomic; the mkdir guards the first take)")
+        _rotate_tasks(target, name)
+        _print_tasks_note(name)
         _print_host_note()
         return 0
     _write_owner(target, payload)
     print(f"took {name} as {args.role}")
+    _print_tasks_note(name)
     _print_host_note()
     return 0
+
+
+def _rotate_tasks(target: Path, name: str) -> None:
+    """R409. A re-take inherits the directory, and with it the earlier holder's
+    TASKS.md. The hook's mtime guard stops injecting that file only until the
+    new holder appends to it, so the file moves aside here and the new session
+    starts its own. One generation is kept; a failed move says so and leaves
+    the mtime guard as the only protection."""
+    tasks = target / "TASKS.md"
+    if not tasks.exists():
+        return
+    try:
+        tasks.replace(target / "TASKS.prev.md")
+    except OSError as exc:
+        print(f"notes  could not move the earlier holder's claims/{name}/TASKS.md "
+              f"aside ({exc}); start a fresh one rather than appending to it")
+        return
+    print(f"notes  moved the earlier holder's list to claims/{name}/TASKS.prev.md")
+
+
+def _print_tasks_note(name: str) -> None:
+    """R409. The one list that survives a compaction is the one on disk:
+    `.claude/hooks/precompact_context.py` re-injects each held claim's TASKS.md,
+    and a file older than the claim (an earlier holder's) is left out."""
+    print(f"notes  keep this session's list in claims/{name}/TASKS.md: Ben's "
+          f"instructions, what is in flight and its files, the last gate line. "
+          f"The PreCompact hook re-injects it.")
 
 
 def cmd_check(args: argparse.Namespace) -> int:

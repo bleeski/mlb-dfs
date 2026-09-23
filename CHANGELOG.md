@@ -2,6 +2,55 @@
 
 What changed in the engine, the tools and the contracts, when, and why.
 
+## 2026-09-23 — R409: the session contract read against Anthropic's prompting guide for the current Claude model. A finish line, a stop list, a task file that survives compaction, a review pass, and four stale "the push is Ben's" sites (roadmap Session 97)
+
+**Scope.** `CLAUDE.md` (Autonomy, Compaction), `.claude/skills/dev-session/SKILL.md`, `.claude/skills/land/SKILL.md`, `.claude/skills/ship/SKILL.md`, `.claude/agents/dfs-premise.md`, `.claude/hooks/precompact_context.py`, `tools/claim.py`, `tools/audit.py` (one warning string, one comment, `EXPECTED_SUITE_COUNTS`), `tests/test_core.py` (`RepoAgentsAndHookEventsTests` +3, `ClaimToolTests` +2, one stale docstring), `docs/ROADMAP.md` (Session 97 row, ledger row, Session 94's SHA backfilled), `docs/backlog.md` (R409 CLOSED stub), this file.
+
+**Source.** Ben, 2026-09-23: review the repo against Anthropic's prompting guide for the current Claude model (claude.dev blog, read 2026-09-23) and make the tweaks it supports. Each point in the guide, what it found here, and what moved:
+
+| The guide | Found in the tree | Moved |
+|---|---|---|
+| Name the finish line, then let it run | `/dev-session` named no finish line, and its §4 still ended "do not push" | A "Done means" paragraph; §4 hands off to `/ship` |
+| Say which stops you want; put status notes in the same message as the next action | CLAUDE.md's Autonomy said "ask only for a fact only Ben has" and nothing about progress reports | One sentence in Autonomy; `/dev-session` names the three real stops |
+| Keep the task list in a file, because long runs compact | `precompact_context.py` said the R-numbers in flight, the last gate line and Ben's instructions were "NOT readable from disk" | `claims/<claim>/TASKS.md`, re-injected verbatim |
+| Split an audit across subagents and check each one's evidence before accepting it | `dfs-premise` existed, and nothing in `/dev-session` routed to it or said to reproduce its verdicts | `/dev-session` §1 step 6 |
+| Mark what could not be confirmed, and say where you looked | `dfs-premise` had VERIFIED, FALSE and UNSCOPED, and no verdict for a claim the tree cannot answer | UNCHECKED, listed with where it looked, never counted in `FINDINGS` |
+| Run a review pass before human review | No human reviews a PR here before the merge (R353), and `/land` had no review step | A `/code-review` step in `/land` for diffs that touch code |
+| Read first what it needs from you | `/ship` §5 closed on a one-liner with no slot for a question | Report order in `/dev-session` §4 and `/ship` §5 |
+| Delete "think carefully" lines; never ask for reasoning in the reply | `grep -rniE "think (carefully\|hard\|step by step\|deeply)\|ultrathink\|show (your\|its) reasoning\|explain your reasoning"` over CLAUDE.md, MLB_Classic.md, `.claude/`, `skills/`, `docs/`: zero hits | Nothing to delete |
+
+**What was wrong, beyond the table.**
+
+- `/land` and `/ship` carry `disable-model-invocation: true`. Probed this session, the Skill tool refuses `land` and says "Ask the user to run /land themselves". So every DEV session that follows `/dev-session` §4 stops and waits for Ben to type two commands, which R353 ("shipping is the session's, end to end") did not intend. Dropping the flag was denied by the session's auto-mode classifier as self-modification, and that call is right: the flag bounds what the model may invoke without Ben. It stays, and `/dev-session` now names `/land` and `/ship` as stops Ben makes. Whether to drop it is Ben's decision.
+- `precompact_context.held_claims` listed every claim directory with an `owner.json`, released ones included. `claim.py release` stamps `released_utc` and keeps the directory, so on a long-lived tree (Ben's Windows machine) the post-compaction "claims held:" line named every claim since the clone. It now filters on `released_utc`, as `session_start.held_claims` already did.
+- The gate told a session holding unpushed commits "sessions commit and Ben pushes, so this is a push Ben owes": a stop instruction, printed by the audit, left over from before R350. It now says to push the branch (`/ship`).
+
+**What shipped.**
+
+- **The task file.** `precompact_context.task_files` injects each held claim's `TASKS.md` verbatim, capped at `TASKS_MAX_CHARS` (6,000) with a truncation note that names the file. A file last written before its claim's `taken_utc` belongs to an earlier holder of the same name, and it is named rather than injected. With no task file the hook says so and tells the session to start one. `claim.py take` prints the path on a take and a re-take. A re-take moves the earlier holder's file to `TASKS.prev.md`, keeping one generation; a failed move says so and leaves the mtime guard as the only protection.
+- **CLAUDE.md**, two sentences, 16,945 to 17,159 bytes against the 18,000 budget: Autonomy's "A progress report is not a stop", and Compaction's pointer to the task file. The Compaction sentence reaches the hook's output verbatim, because the hook reads the section live.
+- **`/dev-session`.** A "Done means" paragraph: the verification command, the gate, the CHANGELOG entry and roadmap row in one commit, and a merge on a green `gate`. The stops between here and there are a fact only Ben has, the §2 nod, and `/land` and `/ship`. Step 1.2 starts the task file. Step 1.6 hands every filed entry to its own `dfs-premise` agent, all in one message for a block, and requires the parent to re-run each report's sharpest grep before building on it. §3 keeps the files-touched list in the task file. §4 ends in `/ship` and sets the closing report's order: blocked on Ben, then changed, then found.
+- **`/land` step 1.** When the diff touches `mlb_engine/`, `tools/`, `tests/`, `.claude/hooks/` or a `scripts/` file, run `/code-review` and fix every finding you would block the merge for; the entry names any declined.
+- **`/ship` §5.** The report leads with anything waiting on Ben.
+- **`dfs-premise`.** An UNCHECKED verdict for a claim the tree cannot answer (a file on Ben's disk, a live feed, a slate never archived), with where it looked, listed and not counted.
+
+**The review pass, run on this diff** (`/code-review medium`, the step this entry adds to `/land`). One finding, fixed: the mtime guard alone held only until a re-take's new holder appended to the inherited `TASKS.md`, after which the earlier session's list, Ben's instructions included, would have been injected as the new session's. That is `_rotate_tasks` in `claim.py` and `test_retake_moves_the_earlier_holders_task_file_aside`. Nothing declined.
+
+**Declined, each with its reason.**
+
+- Dropping `disable-model-invocation` from `/land` and `/ship`: denied as self-modification, above. Ben's.
+- A "treat an earlier answer as settled" rule: the guide says to leave it out of work where later steps can expose earlier errors, and re-adjudicating at the landing HEAD is this repo's discipline (`.claude/rules/board.md`).
+- `effort:` frontmatter on the two agents. Claude Code supports the field for subagents and skills, but nothing here measures what a lower effort costs the premise check, which guards the most expensive failure mode. `data/agent_runs/` records wall time per run, so a trial can measure it first.
+- Pinning the agents' model: `model: opus` is an alias that advances with Claude Code releases, and a pinned ID would hold the agents back when a newer model ships.
+- Fast mode: a per-user toggle (`/fast`), not a repo setting.
+- The guide's sections on images, design styles, long-document checks and flagged messages: no surface here they apply to.
+
+**R233 grep**, the class of "the push is Ben's": `git grep -n -i -E "do not push|push is Ben|Ben pushes|push Ben owes|Ben's push" -- CLAUDE.md MLB_Classic.md .claude skills docs/hosts.md docs/cowork_sync_protocol.md docs/production_runbook.md .github tools tests`. At HEAD it returned 11 lines at 10 sites. Fixed 4: `dev-session/SKILL.md:33` ("do not push"), `audit.py:1676-1677` (the warning), `audit.py:1666` ("Ahead is Ben's push"), and `test_core.py`'s `test_unpushed_commits_are_named_as_a_push_ben_owes` docstring (the test name stays, the docstring now dates the rule). Kept 6, each for a reason: `guard_commands.py:25` is history ("R301 until then"); `land/SKILL.md:19` quotes the old rule to retire it; `audit.py:183` is a pin-history comment; `audit.py:3147` is R146's docstring on why a fetch is needed; `sync_check.py:12` and `:324` describe the Cowork mount, where `origin/main` still moves only when Ben pushes from Windows.
+
+**Mutation checks**, each reverted against its fix, run, and restored (`tools/_scratch_r409/mutate.py`): no injection, released claims counted held, no `taken_utc` check, no cap, re-take without the pointer, re-take without the rotation. All six went red; the restored tree is green.
+
+**Gate.** Before: `PASS  v2.26.0  42 modules  2439 tests  5 skipped` (test_core 4 and test_showdown 1 skipped in place, the five absent optional files `/ship` expects). After: `PASS  v2.26.0  42 modules  2444 tests  5 skipped` (the same five, test_core 4 and test_showdown 1; 4m45s in a cloud container). One wording edit to `dfs-premise.md`'s FINDINGS paragraph followed the gate; `RepoAgentsAndHookEventsTests` re-ran green after it (24 passed), and the CI `gate` runs on the pushed bytes. `tests.test_core` pin 1459 -> 1464. Golden histogram unmoved (no engine path touched).
+
 ## 2026-09-23 — R406: Classic scenario sleeves. Part of every multi-entry Classic portfolio is built in worlds where the projection is wrong in named ways, and each entry is confined to one sleeve through the allocator's own mask (roadmap Session 94, both breakpoints)
 
 **Scope.**

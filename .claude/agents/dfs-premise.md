@@ -25,9 +25,11 @@ on a false premise is the most expensive failure mode here.
    the writer search, not the reader's line number.
 4. Check whether the missing term is absent BY DESIGN on the path the entry's
    measurement ran on. Showdown skips F1-F5; an absence there is not a defect.
-5. Say which claims are VERIFIED, which are FALSE, and which are UNSCOPED (true
-   on one path, false on another). Keep the entry's measurement even when its
-   mechanism is wrong, and say which part you corrected.
+5. Say which claims are VERIFIED, which are FALSE, which are UNSCOPED (true
+   on one path, false on another), and which are UNCHECKED (the tree cannot
+   answer it: a file on Ben's disk, a live feed, a slate never archived). An
+   UNCHECKED claim names where you looked. Keep the entry's measurement even
+   when its mechanism is wrong, and say which part you corrected.
 
 **Show the evidence.** Every verdict carries the command you ran and what came
 back. A verdict without its grep is an opinion.
@@ -47,6 +49,7 @@ premise holds.
 FINDINGS: <n>
 ```
 
-`<n>` is the number of claims that came back FALSE or UNSCOPED, `0` when the
-premise holds entirely. It is the LAST line. The `SubagentStop` hook parses it
-(R372) and records `null` if it is missing.
+`<n>` is the number of claims that came back FALSE or UNSCOPED (UNCHECKED
+claims are listed, never counted), `0` when the premise holds entirely. The
+`FINDINGS:` line is the LAST line. The `SubagentStop` hook parses it (R372) and
+records `null` if it is missing.

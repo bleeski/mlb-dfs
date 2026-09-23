@@ -25,7 +25,7 @@ Every diagnostic, prior, screen, plan, and scan is a deterministic review proxy 
 - Deliverables land in `outputs/<date>/`; `runs/<run_id>/final/DKEntries.csv` is immutable; refinements go through `run_late_swap` with `authorized_entry_ids`, never a rebuild. Every brief states the delivered file's sha256.
 
 ## Autonomy (Ben, 2026-08-16 and 2026-09-22; R157, R272, R288, R386)
-Use your judgment to override, relax, and constrain without asking, then poke holes in the result. Ask only for a fact only Ben has. Delegated:
+Use your judgment to override, relax, and constrain without asking, then poke holes in the result. Ask only for a fact only Ben has. A progress report is not a stop: when the next step needs nothing from Ben, take it and put the status note in the same message. Delegated:
 - Grow the bank, always: search effort, not strategy, and the first remedy for every refusal against an unexhausted job list.
 - Apply a feasibility remedy the engine named in `STRUCTURAL_FEASIBILITY_CHECKS`, to the named value.
 - Override a pool blocker you classified benign AND assert `lineup_gate_passed` on the same evidence; both or neither (R133).
@@ -93,7 +93,7 @@ A ladder with actions, rewritten 2026-09-01 after a 23-minute window shipped not
 | Any tool's flags | `python tools/<tool>.py --help` |
 
 ## Compaction
-When compacting, preserve: the role and the claim held, the R-numbers in flight and their files, the last gate line, and any instruction Ben gave this session.
+When compacting, preserve: the role and the claim held, the R-numbers in flight and their files, the last gate line, and any instruction Ben gave this session. Keep them in `claims/<claim>/TASKS.md` as you go; the PreCompact hook re-injects it.
 
 ## Editing this file
 Stay under 200 lines. A rule earns a line here only if removing it would cause a mistake in most sessions. A dated incident goes in the CHANGELOG entry it cites and leaves its R-number here. A procedure goes in a skill or `docs/`. A host fact goes in `CLAUDE.local.md`. A rule for one part of the tree goes in `.claude/rules/`. Scheduled tasks: none exist; ask Ben before creating one.
