@@ -3691,6 +3691,10 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
           f"{format_degraded_line((exposure['frontier'] or {}).get('degraded_entries'))}",
           file=sys.stderr)
     print(f"factors: {format_inert_factors_line(factors_inert)}", file=sys.stderr)
+    # R393(b). A crashed delivery's result reads workflow_valid False; the
+    # gates of the file it delivered are the export's own certification.
+    gate_source = (((result.get("last_usable_artifact") or {}).get("certification")
+                    or {}) if result.get("crashed") else result)
     brief = {
         "status": "certified" if checks["passed"] else "verify_failed",
         "contest_type": "classic",
@@ -3734,13 +3738,11 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         # name, because the weights are the thing that actually ranked the
         # candidates and the table they come from is versioned code.
         "contests": _contest_objective_block(result.get("posture_by_contest")),
-        # R393(b). A crashed delivery's result reads workflow_valid False; the
-        # gates of the file it delivered are the export's own certification.
-        "gates": {k: ((result.get("last_usable_artifact") or {}).get(
-                          "certification") or {} if result.get("crashed")
-                      else result).get(k)
-                  for k in ("workflow_valid", "selection_certified",
-                            "allocation_certified")},
+        "gates": {
+            "workflow_valid": gate_source.get("workflow_valid"),
+            "selection_certified": gate_source.get("selection_certified"),
+            "allocation_certified": gate_source.get("allocation_certified"),
+        },
         # R117(b). Beside the gates, deliberately NOT inside them: these three
         # keys are the certification vocabulary and an inert factor certifies
         # nothing and blocks nothing. It sits here because this is where a
