@@ -2,6 +2,95 @@
 
 What changed in the engine, the tools and the contracts, when, and why.
 
+## 2026-09-23 — R207 (+R204 naming half): the interaction refusal names the one control to move. The allocator's probe drops each active control alone and says which restore feasibility and at what step; the remedies are typed on the refusal beside a byte-identical `errors[]` (roadmap Session 07, part a)
+
+**Scope.** `mlb_engine/allocate/contest_allocator.py` (`INTERACTION_CONTROLS`, `interaction_step`, `_interaction_probe`, `select_and_assign_entries(interaction_probe_budget_s=, _probe=)`, the ladder guards, the message reads the one tuple), `mlb_engine/pipeline/execution_pipeline.py` (`_typed_remedy` on five failing-check sites, `execute_portfolio` and `run_slate` thread the budget and return the probe), `skills/generate-lineups/scripts/build_slate.py` (`refusal_validity` in `refusal_stamp`, `typed_refusal_remedy`, `format_typed_remedy`, `_probe_budget`, the Classic refusal's `refusal_remedy` and `interaction_probe`), `tools/autobuild.py` (reads `remedy_typed`; the stops carry the typed remedies), `skills/generate-lineups/SKILL.md` (the refusal paragraph, same line count), `tests/test_core.py` (`TypedRefusalTests` new, `RefusalClassificationTests` +1, `SupervisorLostWindowTests` +3, two AST enumerations 4 -> 5), `tools/audit.py` (pin), `docs/ROADMAP.md`, `docs/backlog.md`, `CHANGELOG.md`.
+
+**What was wrong, verified at 1eb592c** (the `dfs-premise` run, re-reproduced). On a proven-infeasible joint MILP with no failing slate check and no bank-level finding, `compose_infeasibility_errors` (CA L1157) prints "no single control is arithmetically binding against this bank, so the interaction of the active controls is" and the active set, and nothing says which member to move or by how much. No drop-one or minimal-step logic existed anywhere. No IIS route exists: scipy 1.15.3's `milp` takes only `disp`, `presolve`, `time_limit`, `node_limit`, `mip_rel_gap`, and `highspy` is not installed. No remedy existed as data: the only form was the sentence, and autobuild read it back with `raise (\w+) to >= (\d+)`.
+
+**Premise corrections.**
+- The row's `refusal.class` / `refusal.remedy` could not be literal keys: `refusal` is already a STRING in every stamp and in CA's own refusals, and readers expect it (`late_swap.py`, `build_slate.py`, two tests). The class half already shipped flat as `refusal_class`, so this adds `refusal_validity` (the V/S/P class Session 05 gave every site) beside it, and the remedy as `refusal_remedy`.
+- The row's reason for keeping `errors[]` byte-identical is stale: the golden `pure_verdict` is `{"errors": [], "passed": true}` since R405 (`3ee03cb`), and the text is pinned by `FalseSignalBatchTests`. The rule holds anyway and is kept.
+- The register's "five solves" is nine controls now (`INTERACTION_CONTROLS`), and the model is built inline in a ~1,100-line function, so the probe re-enters the function in a private probe mode rather than a separate builder.
+- R125(a)'s "refusal-text half" is `live_data_adapters.py`'s no-starter text, outside this row's files: declined here, carried by Session 32 (register rider and row).
+
+**What shipped.**
+- **The probe** (`_interaction_probe`): armed only by `interaction_probe_budget_s`, only on the refusal every ladder falls through to, and only in the interaction case (proven infeasible, `not slate_blocked`, empty `binding`). It rebuilds the refused model (the same bank, entries, `fixed_exposure`, ladder states and the enforced controls, the engine's reuse default included) and, per active control, drops it alone; dropping the reuse cap also moves its ladder past the end so the default cannot re-enter, and dropping the game scalar drops the per-game dict the solve enforces. Each control whose removal restores feasibility gets one more solve at `interaction_step` (fraction caps: `(c + 1) / total`, the next `_cap_count`; integer caps: +1). A verdict is True (feasible), False (scipy status 2) or None (undecided within its time limit), never a probability. The budget bounds the whole probe, each solve's `time_limit` is clamped to what remains, and a control the budget did not reach reads `not_probed`. Probe solves run with `_probe=True`: every ladder and retry is skipped and no probe runs inside a probe.
+- **Typed remedies at their source**: each failing `_feasibility_report` check that names a control and a value carries `remedy_typed: {control, op, to[, count][, alternative]}`; passing checks carry nothing and every sentence is unchanged.
+- **The refusal** (`build_slate.py`): every `refusal_stamp` carries `refusal_validity` (and `refusal_validity_facts` for a MIXED site), read lazily from `gate_classes` and never at the cost of the refusal. The Classic refusal carries `refusal_remedy` (a grow-the-bank line first when the job list was not exhausted, then the failing checks' typed remedies, flagged `arithmetic` for the structural floors, then the probe's single controls and steps; each class S with its provenance, and `held: true` for a never-relax control) and the `interaction_probe` itself, and prints one `REMEDY:` line per entry. `run_classic` passes a budget of `min(45s, deadline - now - 30s)` and none inside the governor's window, where rung 1 opens every control at once.
+- **autobuild** reads a structural floor from `remedy_typed` first (the regex only for a brief without one), and its strategy-cap stop and its "refused with no remedy" stop carry the typed remedies, so the escalation to Ben carries the number R207 asked for. It still moves no strategy control.
+- Nothing runs without a budget: the plan leg (`_plan_joint_allocation`), `late_swap` and every direct caller are byte-identical, and every golden MILP returns status 0.
+
+**R233, the class.** Every recursive call inside `select_and_assign_entries`: the four ladder re-entries (R326's full-bank retry, R116's reuse default, R37's quota and floor) and the probe's solve. `AllocatorTruthTests.test_the_three_guards_all_read_proven_infeasible_and_slate_blocked` and `FiveStackQuotaLadderTests.test_every_ladder_re_entry_carries_every_sibling_ladder_state` enumerate them by AST: both moved 4 -> 5, the first now also pins that exactly one call runs in probe mode and that all five guards read `not _probe`, and the probe's call carries all three ladder states. Every reader of a remedy sentence: `tools/autobuild.py` (`CONTROL_FLOOR_RE`, now the fallback) is the only one (`grep -rn "raise .* to >= \|CONTROL_FLOOR_RE" tools skills mlb_engine`).
+
+**Tests.** `TypedRefusalTests` (new, 10), on two hand-built 2-entry, 3-candidate banks where each lineup pair is killed by one cap: the probe names each restoring control and its step (6 solves); a control killed twice says it does not restore alone; a zero budget marks all `not_probed`; no budget adds no key and leaves `errors[]` identical; a singleton-binding refusal and a passing solve are not probed; the 1240_6g step (6 entries, 0.4 -> 0.5, count 2 -> 3); `remedy_typed` agrees with all eight failing sentences on one report; `typed_refusal_remedy` orders its sources and marks a held control; the real `run_slate` threads the budget and returns the probe (allocator faked); `run_classic` carries the remedy and passes no budget inside the window. `RefusalClassificationTests` +1 (every stamp's `refusal_validity` is the taxonomy's), `SupervisorLostWindowTests` +3 (the typed floor with an unparseable sentence; the interaction stop's `refusal_remedy`; the strategy stop's `remedy_typed`). Mutations, 18, each red then restored byte-identical: CA (probe never armed; drop not applied; step off by one; probe on a singleton; budget ignored; probe solve outside probe mode; a ladder running in probe mode), EP (no `remedy_typed`; `execute_portfolio` or `run_slate` dropping the budget; the blocked result dropping the probe), BS (no `refusal_validity`; no `refusal_remedy`; a probe inside the window; `held` unmarked), AB (typed floor ignored; either stop dropping its remedy).
+
+**Review.** <REVIEW07>
+
+**The migrated register entry.**
+
+- **What:** on 2026-08-20 `1240_6g` (6 entries, 4 contests, 6-game Classic)
+  `build_slate.py` refused three times at the posture/auto-floored defaults
+  against a bank grown 25 → 68 candidates with 61 distinct SP pairs and 12
+  distinct stacks. Each refusal printed only "no single control is
+  arithmetically binding against this bank, so the interaction of the active
+  controls is." Bank growth first, per the autonomy policy: did not clear it.
+  Both STRUCTURAL remedies (`max_shared_players` 6→8, `max_sp_pair_repetition`
+  1→2): did not clear it either. What cleared it was **one cap, alone**:
+  `max_player_exposure_pct` 0.4 → 0.5, i.e. `floor(pct*n)` 2 → 3. Locating that
+  cost **four full builds at ~35s each**, because the hint names the active set
+  and not which member to move, so the only way to find the minimum change is
+  to re-run the whole build once per candidate control. The delivered portfolio
+  then posted 6 distinct primary stacks, 6 distinct SP pairs, 0 candidate-reuse
+  relaxations, and a realized max player exposure of exactly 3/6 — so the
+  binding cap was genuinely that one and every other control had slack.
+- **Why:** this is the concrete, cheap answer to the gap R203 and R204 both
+  describe, and it is cheaper than either. Raising an exposure cap is
+  explicitly Ben's call outside R157's feasibility-rescue case, and the current
+  hint gives him no way to see how far the raise has to go — so the cost is not
+  only the four builds, it is that the escalation to Ben carries no number.
+- **Fix:** when the joint MILP proves infeasible, re-solve once per active
+  control with that control ALONE dropped — five solves against the in-memory
+  bank, cheap next to four bank rebuilds — and name the controls whose removal
+  restores feasibility, each with the smallest pct step that changes
+  `floor(pct*n)`. That turns a four-build search into one line. Smaller
+  alternative worth checking first: an IIS from HiGHS would say it directly if
+  that backend exposes one. **Lands with R203 and R204's second half — same
+  message, same call site, and this is the version that produces an actionable
+  number rather than a named set.**
+
+## 2026-09-23 — R396(b): exit 5 is autobuild's own stop, not a child exit, and running out of attempts writes a stop record (roadmap Session 07, part b)
+
+**Scope.** `tools/autobuild.py` (`BUILD_SLATE_CONTRACT_CODES`, the exhaustion stop), `tests/test_core.py` (`SupervisorLostWindowTests` +6), `docs/backlog.md` (R396 CLOSED), `CHANGELOG.md`.
+
+**What was wrong, verified at 1eb592c** (premise agent, re-run). The entry's "exit 5 has no handler" had the wrong mechanism. `build_slate` never returns 5 (`grep "return 5"`: none in the script or `tools/build_asserted.py`); 5 is autobuild's own code for the call budget, the wall clock and a child timeout. But `BUILD_SLATE_CONTRACT_CODES = (0, 3, 4, 5, 10)` claimed to be build_slate's vocabulary and listed it, so a child 5 passed the off-contract check and fell into the refusal branch, which asked a brief that did not exist and logged "refused with no remedy" with neither the code nor stderr (R296(d)'s shape), and a 5 with a growable brief would have been retried as `grow_bank`. Running out of `--max-attempts` returned 3 with the log's last record a decision to try again (`grow_bank`, `apply_structural_floor`); a `--resume` whose attempts were spent ended on `resumed`.
+
+**What shipped.** The tuple is `(0, 3, 4, 10)`, so a child 5 is an off-contract stop recording its code and stderr. When the loop ends without a delivery, a `stop` names `--max-attempts`, the attempts in all and this call, and the last decision; exit stays 3. `test_the_contract_codes_are_the_codes_build_slate_returns` reads the tuple off build_slate's own `main`, `run_classic` and `run_showdown` return sites by AST.
+
+**Tests.** +6: the tuple equals build_slate's returns; a child 5 is a stop with its code and stderr and no "refused with no remedy"; a child 5 with a growable brief runs once; exhaustion writes the stop (`2, 2, grow_bank`); a spent resume writes one with no attempt run; a delivery writes none. Mutations: 5 back in the tuple (3 red), the stop removed (2 red).
+
+**The migrated register entry.**
+
+- **(b)** autobuild accepts exit 5 in `BUILD_SLATE_CONTRACT_CODES` (`autobuild.py:145`) and handles it as 3, and running out of `--max-attempts` returns 3 with no stop record (`:752-753`).
+
+## 2026-09-23 — R345: autobuild takes `--declare-pitcher`, forwards it verbatim, and records it as an operator input (roadmap Session 07, part c)
+
+**Scope.** `tools/autobuild.py` (the flag, `lift_repeatable`, the record, `operator_inputs` in the log, `--resume`), `skills/generate-lineups/SKILL.md` (the fast-path recipe's last line, same line count), `tests/test_core.py` (`SupervisorLostWindowTests` +3), `docs/backlog.md` (R345 CLOSED), `CHANGELOG.md`.
+
+**What was wrong, verified at 1eb592c** (premise agent, re-run). The measurement held (`grep -c declare tools/autobuild.py` -> 0); the mechanism did not. `--passthrough "--declare-pitcher ..."` already reached the child verbatim, since only `--controls-override` and `--never-relax` are lifted out, so the fast path worked on a PLR/PO slate. What was missing: a named flag the SKILL.md recipe could show, any record of the declaration in `autobuild_decisions.json` (the build's own brief records `declared_pitchers`), and carrying it across `--resume`.
+
+**What shipped.** `--declare-pitcher ID[=ROLE]` (repeatable) on autobuild, forwarded once per value after the flag's own and any lifted from `--passthrough`, in order. `operator_declared_pitchers` records them as an operator input, "not a decision this supervisor took", and the log's `operator_inputs.declare_pitcher` holds them only when there are any. `--resume` restores the run's declarations when the resuming call passes none, and a call that passes any replaces them, with `replaced` in the record. The recipe shows the flag as a trailing comment.
+
+**Tests.** +3: forwarded verbatim and recorded (flag and passthrough, order kept); no declaration leaves the log's shape alone; a resume restores the declarations and a restated one replaces them. Mutations, each red: not forwarded, passthrough not lifted, no record, resume not restored, `operator_inputs` always written.
+
+**The migrated register entry.**
+
+- **What.** The supervisor forwards `--lineups`, `--odds`, `--postures`, `--deliver-by`, `--controls-override` and has no surface for R104's operator answer. 1905_2g (2026-09-10): DK tagged CWS Hagen Smith `PO` (barred) and Erick Fedde `PLR`; R104 routes the PLR arm to `--declare-pitcher`; without it CWS has no rosterable arm and a 2-game slate has 3 arms and 3 SP pairs for 10 entries instead of 4 and 6. SKILL.md says "The fast path: let the supervisor take its own retries ... Start here"; the session went direct to `build_slate.py` for the one flag.
+- **Why P1.** A lost fast path under a clock is the L class; September is bullpen-game season. This is not the docstring's "WILL NOT DO, EVER" boundary: a declaration is an operator INPUT, not an exposure cap, a pool reduction or an unclassified blocker.
+- **Fix.** Pass `--declare-pitcher` through verbatim (repeatable) and record it in `autobuild_decisions.json` as an operator input, never as a decision the supervisor took.
+
+**Session 07's evals, PROBE and gate** (all three parts). Evals: `run_evals.py` 6 of 8, the two R411 names (2 and 5) as on main; the seven `data/deliveries/` records the run wrote were removed by path and the listing matches the 34 files before it. PROBE: `data/slates/2026-06-03/` is absent in a cloud clone, so `solver_probe.py --date 2026-06-03 --salary data/archive/2026-06-03/DKSalaries_2026-06-03.csv` ran on the vendored file: FITS at 7s of 630s, but the pool it read was 36 players and 0 SPs, so the timing is of a degenerate pool and says little about the allocator; the probe adds no solve unless a refusal passes a budget. GOLD: 9 OK, `tests/golden/` untouched (`15d915b5…`, `424dd0f4…`), cluster histogram `{1: 6, 2: 3, 4: 4, 5: 1, 6: 4}` over 18 entries unmoved. Gate before: `PASS  v2.26.0  43 modules  2527 tests  5 skipped` (at 1eb592c). After: <GATE07>. Pin: `tests.test_core` 1528 -> 1551 (R413's fold-in moved it 1524 -> 1528 first). Verification command (`UT test_core.TypedRefusalTests test_core.RefusalClassificationTests test_core.SupervisorLostWindowTests`): 50 tests OK. LINT exit 0.
+
 ## 2026-09-23 — R413: `tools/plan_status.py` reads a two- or three-digit Session ID, so Session 100 is parsed, linted, printed and can be NEXT (roadmap Session 100, filed and landed in one commit)
 
 **Scope.** `tools/plan_status.py` (the three patterns through one `SESSION_ID`, numeric row order, the docstring), `tests/test_core.py` (`PlanStatusTests` +4), `tools/audit.py` (one pin), `docs/ROADMAP.md` (the Session 100 row in Phase G, its Progress Ledger row, the IDs line), `docs/backlog.md` (the R413 CLOSED stub), `CHANGELOG.md`.

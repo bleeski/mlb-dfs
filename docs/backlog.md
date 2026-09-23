@@ -3799,11 +3799,12 @@ for anything retrospective; forward-going, the snapshots are the record.
 
 ## Workstream 4 — Solver, allocator, swap, and brief truth
 
-### R345. `tools/autobuild.py` cannot forward `--declare-pitcher`, so the supervisor's fast path is unusable on any PLR/PO slate (P1, XS; roadmap CC-11) | new 2026-09-15, merged from BUILD fragment `2026-09-10_BUILD_container-build-loses-k-rate-and-plr-answer.md` part (b); premise VERIFIED (`grep -c declare tools/autobuild.py` -> 0)
+### R345. CLOSED 2026-09-23 -- SHIPPED as roadmap Session 07 (c), entry migrated to CHANGELOG.md
 
-- **What.** The supervisor forwards `--lineups`, `--odds`, `--postures`, `--deliver-by`, `--controls-override` and has no surface for R104's operator answer. 1905_2g (2026-09-10): DK tagged CWS Hagen Smith `PO` (barred) and Erick Fedde `PLR`; R104 routes the PLR arm to `--declare-pitcher`; without it CWS has no rosterable arm and a 2-game slate has 3 arms and 3 SP pairs for 10 entries instead of 4 and 6. SKILL.md says "The fast path: let the supervisor take its own retries ... Start here"; the session went direct to `build_slate.py` for the one flag.
-- **Why P1.** A lost fast path under a clock is the L class; September is bullpen-game season. This is not the docstring's "WILL NOT DO, EVER" boundary: a declaration is an operator INPUT, not an exposure cap, a pool reduction or an unclassified blocker.
-- **Fix.** Pass `--declare-pitcher` through verbatim (repeatable) and record it in `autobuild_decisions.json` as an operator input, never as a decision the supervisor took.
+`--declare-pitcher` already reached the build through `--passthrough`; the gap
+was a named flag, a record and `--resume`. autobuild now takes the flag,
+forwards it verbatim, records `operator_declared_pitchers` as an operator
+input, and restores it on `--resume` unless restated.
 
 ### R333. CLOSED 2026-09-15 -- SHIPPED with R343 as roadmap CC-2, entry migrated to CHANGELOG.md
 
@@ -4339,37 +4340,14 @@ entry in Workstream 5; **its MECHANISM was fixed by R294(a) on 2026-09-04**
 and its re-measure is still owed on the next live pinned-entry swap, now as a
 confirmation rather than a diagnosis. See the STATUS note on the F10 line.
 
-### R207. The infeasibility hint names the active SET and makes the operator binary-search it, four builds at a time (P1, S) | new 2026-08-23, merged from BUILD fragment `2026-08-20_BUILD_infeasibility-hint-does-not-name-the-minimum-cap.md`; measured on 1240_6g
+### R207. CLOSED 2026-09-23 -- SHIPPED as roadmap Session 07 (a), entry migrated to CHANGELOG.md
 
-- **What:** on 2026-08-20 `1240_6g` (6 entries, 4 contests, 6-game Classic)
-  `build_slate.py` refused three times at the posture/auto-floored defaults
-  against a bank grown 25 → 68 candidates with 61 distinct SP pairs and 12
-  distinct stacks. Each refusal printed only "no single control is
-  arithmetically binding against this bank, so the interaction of the active
-  controls is." Bank growth first, per the autonomy policy: did not clear it.
-  Both STRUCTURAL remedies (`max_shared_players` 6→8, `max_sp_pair_repetition`
-  1→2): did not clear it either. What cleared it was **one cap, alone**:
-  `max_player_exposure_pct` 0.4 → 0.5, i.e. `floor(pct*n)` 2 → 3. Locating that
-  cost **four full builds at ~35s each**, because the hint names the active set
-  and not which member to move, so the only way to find the minimum change is
-  to re-run the whole build once per candidate control. The delivered portfolio
-  then posted 6 distinct primary stacks, 6 distinct SP pairs, 0 candidate-reuse
-  relaxations, and a realized max player exposure of exactly 3/6 — so the
-  binding cap was genuinely that one and every other control had slack.
-- **Why:** this is the concrete, cheap answer to the gap R203 and R204 both
-  describe, and it is cheaper than either. Raising an exposure cap is
-  explicitly Ben's call outside R157's feasibility-rescue case, and the current
-  hint gives him no way to see how far the raise has to go — so the cost is not
-  only the four builds, it is that the escalation to Ben carries no number.
-- **Fix:** when the joint MILP proves infeasible, re-solve once per active
-  control with that control ALONE dropped — five solves against the in-memory
-  bank, cheap next to four bank rebuilds — and name the controls whose removal
-  restores feasibility, each with the smallest pct step that changes
-  `floor(pct*n)`. That turns a four-build search into one line. Smaller
-  alternative worth checking first: an IIS from HiGHS would say it directly if
-  that backend exposes one. **Lands with R203 and R204's second half — same
-  message, same call site, and this is the version that produces an actionable
-  number rather than a named set.**
+On the proven-infeasible refusal whose errors can only name "the interaction of
+the active controls", the allocator's interaction probe re-solves once per
+active control with that control dropped alone (`interaction_probe`), names the
+ones that restore feasibility and tests each one's smallest step; the Classic
+refusal carries them as `refusal_remedy` beside a byte-identical `errors[]`.
+No IIS: scipy 1.15.3's `milp` exposes none and `highspy` is not installed.
 
 ### R203. Teach `autobuild.py` the R157 exposure-cap rescue (P1, M; Tier 3) | new 2026-08-23, merged from DEV fragment `2026-08-22_DEV_autobuild-exposure-cap-rescue.md`, which traced the design in full
 
@@ -4637,6 +4615,8 @@ but the observed `time_budget_s: 5.0` came from `:1346` — the bank report's
   conditional.
 
 ### R125. Autonomy defaults: bullpen-day auto-declaration, posture fallback, and a counted Classic relaxation ladder (P2, S-M; (b) and (c) decided 2026-09-22 by R386) | new 2026-08-14, merged from the delivery-guarantee fragment's autonomy section
+
+**Rider 2026-09-23 (Session 07): the refusal-text half did not ride R207.** The text ("no probable or declared starter; declare one via declared_pitchers") is `live_data_adapters.py`'s (the unconfirmed-side branch), outside Session 07's files, and it belongs with (a)'s PO/PLR handling in Session 32, which now carries it: name the PO arm, its price and `--declare-pitcher` in the refusal.
 
 **Rider 2026-09-22 (R386): (b) and (c) are decided; only the build remains.** `MLB_Classic.md` §2, "Delivery first", is the record. (b) A known Entry ID and contest whose name matches no posture may take a stated default posture, recorded in the brief and review-grade only; contest identity stays a V gate. (c) Classic S controls relax autonomously under deadline (inside T-30), never-relax controls held and every move counted in the brief. The fixed four-step order (c) proposed is retired: the audit's bounded-recovery contract (§8) mandates no universal order, and CLAUDE.md's T-15 rung still opens every binding control at once. The "Why decision-first" paragraph below is history.
 
@@ -5141,6 +5121,8 @@ before supervisor-owned flags. `autobuild.py` had zero tests and has seven.
 
 ### R204. "Grow the bank" is unbounded advice against a solve cost that is not, and the diffuse-infeasibility message names no set (P2, S) | new 2026-08-23, merged from BUILD fragment `2026-08-19_BUILD_pitchhand-missing-and-bank-solve-ceiling.md` item 2; measured on the 1835_9g slate
 
+**Rider 2026-09-23 (Session 07): the naming half SHIPPED with R207.** On the interaction refusal the probe names the single controls that restore feasibility, and each failing check's remedy is typed (`remedy_typed`); see R207's CHANGELOG entry. Open: the ceiling half, Session 16.
+
 **Rider 2026-09-22 (R385): the ceiling half is docs/ROADMAP.md Session 16; the naming half rides R207 in Session 07.** 1905_10g sighting: the bank capped at `max(34 * 12, 60) = 408` at 462 of 3240 jobs, seven sliced re-runs added zero candidates, and every refusal still printed "FIRST REMEDY, grow the bank".
 
 - **What:** measured on a 14-entry 9-game slate, following the engine's own
@@ -5383,9 +5365,11 @@ Principles only, no engine code. V, S and P are defined in `MLB_Classic.md` §2 
 
 - **Fix.** Add the twelve audit scenarios, plus a hard interruption, corrupt optional metadata and mandatory-rule refusals, to `skills/generate-lineups/evals/run_evals.py`, and gate a fast subset as a new suite registered in `AUDITED_SUITES`/`EXPECTED_SUITE_COUNTS`. Phase D is not production-ready until both halves pass.
 
-### R396. The build's exit contract disagrees with itself (P2, XS) | new 2026-09-22, the R385 verification pass; (a) SHIPPED 2026-09-23 as roadmap Session 03 (c), migrated to CHANGELOG.md | Roadmap: (b) Session 07
+### R396. CLOSED 2026-09-23 -- (a) SHIPPED as roadmap Session 03 (c), (b) as Session 07 (b), both migrated to CHANGELOG.md
 
-- **(b)** autobuild accepts exit 5 in `BUILD_SLATE_CONTRACT_CODES` (`autobuild.py:145`) and handles it as 3, and running out of `--max-attempts` returns 3 with no stop record (`:752-753`).
+build_slate never returns 5 (5 is autobuild's own out-of-time stop), so 5 left
+`BUILD_SLATE_CONTRACT_CODES` and a child 5 is an off-contract stop; running out
+of `--max-attempts`, or resuming with them spent, writes a stop record.
 
 ### R397. CLOSED 2026-09-23 -- SHIPPED as roadmap Session 04 (b), entry migrated to CHANGELOG.md
 
