@@ -4583,7 +4583,9 @@ but the observed `time_budget_s: 5.0` came from `:1346` — the bank report's
   action: none. Rollback: new control defaults off; gate change is one
   conditional.
 
-### R125. Autonomy defaults: bullpen-day auto-declaration, posture fallback, and a counted Classic relaxation ladder (P2, S-M, decision-first on two of three) | new 2026-08-14, merged from the delivery-guarantee fragment's autonomy section
+### R125. Autonomy defaults: bullpen-day auto-declaration, posture fallback, and a counted Classic relaxation ladder (P2, S-M; (b) and (c) decided 2026-09-22 by R386) | new 2026-08-14, merged from the delivery-guarantee fragment's autonomy section
+
+**Rider 2026-09-22 (R386): (b) and (c) are decided; only the build remains.** `MLB_Classic.md` §2, "Delivery first", is the record. (b) A known Entry ID and contest whose name matches no posture may take a stated default posture, recorded in the brief and review-grade only; contest identity stays a V gate. (c) Classic S controls relax autonomously under deadline (inside T-30), never-relax controls held and every move counted in the brief. The fixed four-step order (c) proposed is retired: the audit's bounded-recovery contract (§8) mandates no universal order, and CLAUDE.md's T-15 rung still opens every binding control at once. The "Why decision-first" paragraph below is history.
 
 **Rider 2026-09-22 (R385): Ben's 2026-09-22 delivery-first instruction is recorded as the decision halves of (b) and (c).** (a) → docs/ROADMAP.md Session 32 (grading included); (b) → Session 21 (a labelled default posture ships review-grade only); (c) → Session 19; the refusal-text half → Session 07 with R207.
 
@@ -5284,12 +5286,9 @@ supervisor takes this class; noted on its entry via this number.
 
 *Entries R386-R404 filed 2026-09-22 by R385 (the docs/ROADMAP.md consolidation). Delivery-program items sit here whichever subsystem they touch; each names its session.*
 
-### R386. The delivery-first contract: CLAUDE.md still reserves S- and P-class recovery for Ben, and the T-schedule spends the live window on engineering health checks (P1, S) | new 2026-09-22, R385 consolidation of the 2026-09-22 deadline-delivery audit (DD-05, §5) | Roadmap: Session 01
+### R386. CLOSED 2026-09-22 -- SHIPPED as roadmap Session 01, entry migrated to CHANGELOG.md
 
-- **What.** CLAUDE.md's "Ben's, not the session's" paragraph reserves any strategy change without a dead player and "anything ... leaving a gate failing" for Ben. The session-start protocol runs the full gate and the solver probe before every BUILD. Ben's 2026-09-22 instruction: on-time delivery of a legal, accessible file outranks optional research, simulation and quality gates.
-- **Why.** An S- or P-class stop at T-10 costs the slate. The audit found 14 autobuild stop sites and one silent exit where the instruction, not the platform, was the wall.
-- **Fix.** Principles only (the procedure lands with the code that performs it): define V/S/P in MLB_Classic.md; the session relaxes S and records P under deadline, and V stays a wall; inside T-30 a BUILD session skips the gate and the probe; `--accept-downgrade` on an authorized repair is the session's; record F-1..F-4 (docs/ROADMAP.md); record Ben's instruction as the decision halves of R125(b)(c).
-- **Acceptance.** `RootContractBudgetTests` and `PreflightContractDocumentation` stay green; CLAUDE.md stays at or under 18,000 bytes.
+Principles only, no engine code. V, S and P are defined in `MLB_Classic.md` §2 ("Delivery first"). CLAUDE.md's Autonomy section and T-schedule give the session S relaxation and P recording under deadline (inside T-30), keep V a wall at every clock, skip the gate and the solver probe inside T-30, and make `--accept-downgrade` on an authorized repair the session's call; `--force` stays Ben's. F-1..F-4 and the R125(b)(c) decision are recorded in MLB_Classic.md §2. `skills/generate-lineups/SKILL.md` mirrors the principles. Gate: see the CHANGELOG entry.
 
 ### R387. The tracked delivery record reads its rosters from the destination file before the provisional file is promoted to it (P1, S) | new 2026-09-22, from `docs/backlog_inbox/2026-09-22_BUILD_delivery-record-reads-dest-before-promote.md` (audit DD-10) | Roadmap: Session 02
 
