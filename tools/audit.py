@@ -874,7 +874,8 @@ EXPECTED_SUITE_COUNTS = {
     # R407, 2026-09-23: 1432 -> 1441, the nine ConfidenceScaledCapTests (each fact alone, two severe, Ben's schedule, clean and unassessed, floor wins, override and off-stays-off, deadline relaxes first, run_slate on the vendored slate, the brief's own facts).
     # R408, 2026-09-23: 1441 -> 1447, the six ProjectionBackfillGradeTests (join rate and a starterless side, tie-averaged Spearman and determinism, hand-checked top-decile and tail, nothing pooled, no post-dated input, labels).
     # R406, 2026-09-23: 1447 -> 1459, the twelve ClassicSleeveTests (salary-only transform, apportionment and the WTA tilt, single-entry and cash, environment ranking and the whole-slate drop, chalk-fails and environment constraints, the mask, environment membership, caps across sleeves, no sleeve bank and off, thin-sleeve fallback, every door, the brief line).
-    "tests.test_core": 1459,
+    # R409, 2026-09-23: 1459 -> 1464, the three RepoAgentsAndHookEventsTests that pin PreCompact's task-file read (held claim injected verbatim; released claims and an earlier holder's list left out and named; the cap) and the two ClaimToolTests (take/re-take pointer; a re-take moves the earlier holder's list aside).
+    "tests.test_core": 1464,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps
@@ -1663,7 +1664,7 @@ def run_audit(root: Path, run_tests: bool = False,
     if fresh["available"]:
         age = fresh["fetch_age_hours"]
         # Behind is the one that makes session start's `git log` read a lie, so
-        # it leads. Ahead is Ben's push. A long-stale contact is said either
+        # it leads. Ahead is an unpushed branch. A long-stale contact is said either
         # way, because it is what both numbers are worth.
         if fresh["behind"]:
             warnings.append(
@@ -1673,8 +1674,8 @@ def run_audit(root: Path, run_tests: bool = False,
         if fresh["ahead"]:
             warnings.append(
                 f"{fresh['ahead']} commit(s) on {fresh['branch']} are not on "
-                f"{fresh['upstream']}; sessions commit and Ben pushes, so this "
-                f"is a push Ben owes, and until then no clone can see them")
+                f"{fresh['upstream']}; push the branch (`/ship`, R353), and "
+                f"until then no clone can see them")
         # Only hedge when the fetch did NOT happen. After a successful fetch
         # `behind` is a measurement and saying it might be stale would be
         # false caution, which trains the reader to discount the real warnings.

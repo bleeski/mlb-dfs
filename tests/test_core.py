@@ -10696,6 +10696,35 @@ class ClaimToolTests(unittest.TestCase):
         self.assertEqual(owner["role"], "BUILD")
         self.assertIsNone(owner["released_utc"])
 
+    def test_take_and_retake_point_at_the_claims_task_file(self):
+        """R409: the PreCompact hook reads `claims/<claim>/TASKS.md`, so the
+        moment a session learns its claim's name is the moment to name the
+        file. A re-take gets the line too: it is a new session on an old name."""
+        name = "engine_2026-07-29"
+        took = self._claim("take", "engine", "--role", "DEV", "--date", "2026-07-29")
+        self._claim("release", "engine", "--date", "2026-07-29")
+        retook = self._claim("take", "engine", "--role", "DEV", "--date", "2026-07-29")
+        for proc in (took, retook):
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            self.assertIn(f"claims/{name}/TASKS.md", proc.stdout)
+        self.assertIn("re-took", retook.stdout)
+
+    def test_retake_moves_the_earlier_holders_task_file_aside(self):
+        """Found by the R409 review pass: the hook's mtime guard holds only until
+        the new holder appends to the inherited file, after which the earlier
+        session's list, Ben's instructions included, is injected as this one's."""
+        self._claim("take", "engine", "--role", "DEV", "--date", "2026-07-30")
+        d = Path(self.root, "claims", "engine_2026-07-30")
+        (d / "TASKS.md").write_text("EARLIER-SESSION", encoding="utf-8")
+        self._claim("release", "engine", "--date", "2026-07-30")
+        retook = self._claim("take", "engine", "--role", "DEV", "--date", "2026-07-30")
+        self.assertEqual(retook.returncode, 0, retook.stderr)
+        self.assertFalse((d / "TASKS.md").exists(),
+                         "the new holder would append to the earlier list")
+        self.assertEqual((d / "TASKS.prev.md").read_text(encoding="utf-8"),
+                         "EARLIER-SESSION")
+        self.assertIn("TASKS.prev.md", retook.stdout)
+
     def test_second_take_is_held_exit_2_and_names_the_owner(self):
         self._claim("take", "ledger", "--role", "ARCHIVE", "--date", "2026-07-28")
         proc = self._claim("take", "ledger", "--role", "DEV",
@@ -13801,6 +13830,96 @@ class RepoAgentsAndHookEventsTests(unittest.TestCase):
         self.assertIn("R-numbers in flight", ctx)
         self.assertIn("NOT readable from disk", ctx)
         self.assertIn("claims held:", ctx)
+
+    # R409: the task file is what the hook CAN read of the list above.
+
+    def _claim_dir(self, root, name, *, taken, released=None, tasks=None,
+                   tasks_mtime=None):
+        import json
+        d = Path(root) / "claims" / name
+        d.mkdir(parents=True)
+        (d / "owner.json").write_text(json.dumps(
+            {"role": "DEV", "scope": name, "released_utc": released,
+             "taken_utc": taken.strftime("%Y-%m-%dT%H:%M:%SZ")}), encoding="utf-8")
+        if tasks is not None:
+            path = d / "TASKS.md"
+            path.write_text(tasks, encoding="utf-8")
+            if tasks_mtime is not None:
+                os.utime(path, (tasks_mtime.timestamp(), tasks_mtime.timestamp()))
+        return d
+
+    def _precompact_context(self, root):
+        import io, json
+        mod = self._hook("precompact_context")
+        old_stdin, old_env = sys.stdin, os.environ.get("CLAUDE_PROJECT_DIR")
+        os.environ["CLAUDE_PROJECT_DIR"] = str(root)
+        buf = io.StringIO()
+        try:
+            sys.stdin = io.StringIO(json.dumps({"hook_event_name": "PreCompact"}))
+            old_out, sys.stdout = sys.stdout, buf
+            try:
+                self.assertEqual(mod.main(), 0)
+            finally:
+                sys.stdout = old_out
+        finally:
+            sys.stdin = old_stdin
+            if old_env is None:
+                os.environ.pop("CLAUDE_PROJECT_DIR", None)
+            else:
+                os.environ["CLAUDE_PROJECT_DIR"] = old_env
+        return json.loads(buf.getvalue())["hookSpecificOutput"]["additionalContext"]
+
+    def test_precompact_injects_each_held_claims_task_file_verbatim(self):
+        import tempfile
+        from datetime import datetime, timedelta, timezone
+        now = datetime.now(timezone.utc)
+        with tempfile.TemporaryDirectory() as root:
+            body = ("## Ben's instructions\n- no model names in the repo\n"
+                    "## In flight\n- [ ] R999 tools/x.py\n## Last gate line\n- PASS")
+            self._claim_dir(root, "engine_2099-01-01",
+                            taken=now - timedelta(hours=1), tasks=body)
+            ctx = self._precompact_context(root)
+        self.assertIn(body, ctx, "the task file was not injected verbatim")
+        self.assertIn("claims/engine_2099-01-01/TASKS.md", ctx)
+        self.assertIn("NOT readable from disk", ctx)
+
+    def test_precompact_leaves_out_released_claims_and_an_earlier_holders_list(self):
+        """`release` stamps `released_utc` and keeps the directory, so a released
+        claim is most of what a long-lived `claims/` holds. And a same-name
+        re-take inherits the directory, so a list older than `taken_utc` is the
+        previous session's."""
+        import tempfile
+        from datetime import datetime, timedelta, timezone
+        now = datetime.now(timezone.utc)
+        with tempfile.TemporaryDirectory() as root:
+            self._claim_dir(root, "engine_2099-01-02", taken=now - timedelta(days=1),
+                            released="2099-01-02T23:00:00Z",
+                            tasks="RELEASED-SESSION-LIST")
+            self._claim_dir(root, "engine_2099-01-03", taken=now,
+                            tasks="EARLIER-HOLDER-LIST",
+                            tasks_mtime=now - timedelta(hours=2))
+            ctx = self._precompact_context(root)
+        held = next(l for l in ctx.splitlines() if "claims held:" in l)
+        self.assertNotIn("engine_2099-01-02", held,
+                         "a released claim is listed as held")
+        self.assertIn("engine_2099-01-03", held)
+        self.assertNotIn("RELEASED-SESSION-LIST", ctx)
+        self.assertNotIn("EARLIER-HOLDER-LIST", ctx)
+        self.assertIn("earlier holder's list", ctx,
+                      "a left-out list must be named, not dropped silently")
+
+    def test_precompact_caps_an_oversized_task_file_and_says_so(self):
+        import tempfile
+        from datetime import datetime, timedelta, timezone
+        mod = self._hook("precompact_context")
+        now = datetime.now(timezone.utc)
+        with tempfile.TemporaryDirectory() as root:
+            body = "x" * (mod.TASKS_MAX_CHARS + 500) + "TAIL-MARKER"
+            self._claim_dir(root, "engine_2099-01-04",
+                            taken=now - timedelta(hours=1), tasks=body)
+            ctx = self._precompact_context(root)
+        self.assertNotIn("TAIL-MARKER", ctx)
+        self.assertIn(f"truncated at {mod.TASKS_MAX_CHARS}", ctx)
 
     # -- SessionEnd -------------------------------------------------------
 
@@ -18155,9 +18274,9 @@ class GitFreshnessTests(unittest.TestCase):
         self.assertEqual((0, 0), (out["ahead"], out["behind"]))
 
     def test_unpushed_commits_are_named_as_a_push_ben_owes(self):
-        """Sessions commit and Ben pushes (docs/cowork_sync_protocol.md). Until
-        he does, no other clone can see the work at all -- which is exactly how
-        14 commits sat invisible from 2026-08-14 to 08-17."""
+        """Until the branch is pushed (the session's since R353), no other clone
+        can see the work at all -- which is exactly how 14 commits sat invisible
+        from 2026-08-14 to 08-17, when the push was still Ben's."""
         module = self._audit()
         with tempfile.TemporaryDirectory() as tmp:
             work, git = self._pair(tmp)

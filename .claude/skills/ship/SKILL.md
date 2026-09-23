@@ -80,7 +80,9 @@ five are absent optional files, on every host including CI. A sixth is a finding
 ## 5. Merge
 
 Once `gate` is green and there is no conflict, merge it and delete the branch.
-Then say, in one line: the merge sha, the gate line, and what Ben would notice.
+Then report. Lead with anything waiting on Ben (a question, a declined part that
+needs his call); then one line: the merge sha, the gate line, and what Ben would
+notice.
 
 ## 6. If you cannot finish
 

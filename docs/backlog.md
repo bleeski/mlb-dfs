@@ -6119,6 +6119,16 @@ which is R196's. Filed there, not here.
 
 ## Workstream 6 — Infrastructure, tests, environment, coordination, and docs
 
+### R409. CLOSED 2026-09-23 -- SHIPPED, filed and landed in one commit (roadmap Session 97), entry in CHANGELOG.md
+
+The session contract read against Anthropic's prompting guide for the current
+Claude model: a finish line and stop list in `/dev-session`, a keep-going line in
+CLAUDE.md's Autonomy, `claims/<claim>/TASKS.md` re-injected by the PreCompact
+hook, a `dfs-premise` fan-out whose evidence the parent reproduces, an UNCHECKED
+verdict, a `/code-review` pass in `/land`, and four stale push-is-Ben's sites.
+Open and Ben's: `disable-model-invocation` on `/land` and `/ship` still makes both
+a stop he types. Gate and commit: the CHANGELOG entry.
+
 ### R383. `qa_portfolio` tiers a delivered Showdown CAPTAIN off the CLASSIC market, and the repo now holds two opposite postures on that exact read (P2, S) | new 2026-09-21, found by the R382 premise check; the stated mechanism was refuted by a second premise check and the item is filed on the corrected one
 
 **What.** `tools/qa_portfolio.py:921` is the only production reader of
