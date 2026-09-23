@@ -580,24 +580,14 @@ _LAST_USABLE: dict = {}
 EXIT_DELIVERED_AFTER_FAILURE = 7
 
 
-class EngineCrashed(RuntimeError):
-    """R297(c). run_slate handed back a crashed run with nothing usable in it.
-
-    The engine ended the run terminal (``blocked``, ``crashed: True``); this
-    keeps the crash a crash here too. A crashed result is not a refusal, so
-    neither R407's relax, the deadline governor nor the refusal path may read
-    it as one, and autobuild sees the off-contract exit it records as a crash.
-    """
-
-
 def raise_on_engine_crash(result: Mapping[str, Any]) -> Mapping[str, Any]:
-    """Raise :class:`EngineCrashed` for a crashed result with no artifact."""
-    if result.get("crashed") and not result.get("last_usable_artifact"):
-        raise EngineCrashed(
-            f"the engine crashed after create_run; run {result.get('run_id')} "
-            f"ended blocked (crashed), not building: "
-            f"{'; '.join(str(e) for e in result.get('errors') or [])}")
-    return result
+    """R297(c). EP's `raise_on_engine_crash`, the one definition: a crashed
+    result with nothing usable leaves as a crash, so neither R407's relax, the
+    deadline governor nor the refusal path reads it as a refusal."""
+    from mlb_engine.pipeline.execution_pipeline import (
+        raise_on_engine_crash as _raise_on_engine_crash,
+    )
+    return _raise_on_engine_crash(result)
 
 
 def has_deliverable(result: Mapping[str, Any]) -> bool:
@@ -610,7 +600,12 @@ def later_failures(result: Mapping[str, Any]) -> list:
     out = []
     if result.get("crashed") and result.get("last_usable_artifact"):
         out.append({"stage": "engine_after_certification",
-                    "error": "; ".join(str(e) for e in result.get("errors") or [])})
+                    "error": "; ".join(str(e) for e in result.get("errors") or []),
+                    "note": "not mirrored to outputs/ and not promoted: hand over "
+                            "the runs/ export; it has no manifest row, and a late "
+                            "swap from it needs --allow-parent-mismatch because "
+                            "the latest-run pointer still names the prior run "
+                            "(publication is R393(a), Session 23)"})
     out += [dict(f) for f in result.get("later_failures") or []]
     if result.get("last_usable_artifact_error"):
         out.append({"stage": "last_usable_artifact",
@@ -619,8 +614,14 @@ def later_failures(result: Mapping[str, Any]) -> list:
         out.append({"stage": "mirror", "error": result["mirror_error"]})
     elif result.get("manifest_recorded") is False:
         out.append({"stage": "manifest",
-                    "error": "the upload manifest row was not recorded, so the "
-                             "mirror keeps its DO_NOT_UPLOAD_ name"})
+                    "error": result.get("manifest_error")
+                    or "the upload manifest row was not recorded, so the "
+                       "mirror keeps its DO_NOT_UPLOAD_ name"})
+    elif result.get("manifest_error"):
+        # Recorded, but the mirror's name was never promoted.
+        out.append({"stage": "mirror_name", "error": result["manifest_error"]})
+    if result.get("mirror_skipped"):
+        out.append({"stage": "mirror", "error": result["mirror_skipped"]})
     if result.get("delivered_sha256_error"):
         out.append({"stage": "delivered_sha256",
                     "error": result["delivered_sha256_error"]})
@@ -658,30 +659,51 @@ def classic_artifact_record(result: Mapping[str, Any], delivered) -> dict:
     otherwise the immutable ``runs/`` export: a mirror that failed, or kept its
     DO_NOT_UPLOAD_ name, is not the path to hand over.
     """
-    from mlb_engine.pipeline.execution_pipeline import artifact_label, artifact_record
+    from mlb_engine.entries.upload_manifest import is_unrecorded_name
+    from mlb_engine.pipeline.execution_pipeline import artifact_record
     engine = artifact_record(result.get("last_usable_artifact"))
     if engine:
         record = dict(engine, run_path=engine.get("path"))
         mirror = result.get("delivered_path")
         if mirror and result.get("manifest_recorded") is True and \
+                not is_unrecorded_name(mirror) and \
                 manifest_sha256(mirror) == engine.get("sha256"):
             record["path"] = str(mirror)
         return record
     # A result with no engine record (its construction failed, and that is a
     # later failure of its own): the gates the result carries are still that
     # export's certification.
-    return {
-        "path": str(delivered), "run_path": result.get("output_path"),
-        "sha256": manifest_sha256(delivered),
-        "label": artifact_label(
+    return _fallback_artifact_record(result, delivered)
+
+
+def _fallback_artifact_record(result: Mapping[str, Any], delivered,
+                              failure: str = "") -> dict:
+    """The minimal record: the path, its sha from the bytes, and the label the
+    result's own gates give. Every step is guarded, so a verified file is
+    never left unpresented by the metadata about it."""
+    import hashlib as _hashlib
+    try:
+        sha = _hashlib.sha256(Path(delivered).read_bytes()).hexdigest()
+    except Exception:  # noqa: BLE001
+        sha = None
+    try:
+        from mlb_engine.pipeline.execution_pipeline import artifact_label
+        label = artifact_label(
             {k: result.get(k) for k in
              ("workflow_valid", "selection_certified", "allocation_certified")},
-            result.get("certification_label")),
-        "coverage": _coverage(delivered),
+            result.get("certification_label"))
+    except Exception:  # noqa: BLE001
+        label = "review_grade"
+    record = {
+        "path": str(delivered), "run_path": result.get("output_path"),
+        "sha256": sha, "label": label, "coverage": _coverage(delivered),
         "essential_valid": {"essential_valid": None,
                             "basis": "not_recorded_by_engine"},
         "run_id": result.get("run_id"),
     }
+    if failure:
+        record["record_error"] = failure
+    return record
 
 # R98(2). Which failing feasibility checks name a floor the ENGINE derived from
 # the slate, and which name a number that is merely the minimum clearing THIS
@@ -3617,8 +3639,14 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
     # below; anything after this that raises can no longer withhold it
     # (`_main_recording_refusals` presents it and exits 7).
     if checks["passed"]:
-        note_last_usable(dict(classic_artifact_record(result, delivered),
-                              contest_type="classic"))
+        try:
+            _record = classic_artifact_record(result, delivered)
+        except Exception as exc:  # noqa: BLE001 - the metadata never withholds the file
+            _failure = f"{type(exc).__name__}: {exc}"
+            result.setdefault("later_failures", []).append(
+                {"stage": "artifact_record", "error": _failure})
+            _record = _fallback_artifact_record(result, delivered, _failure)
+        note_last_usable(dict(_record, contest_type="classic", date=args.date))
     exposure = portfolio_exposure(salary, Path(delivered))
     # R116. The concentration facts join the exposure block, which is where a
     # reader already goes to ask how concentrated this portfolio is. Two
@@ -3706,11 +3734,13 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         # name, because the weights are the thing that actually ranked the
         # candidates and the table they come from is versioned code.
         "contests": _contest_objective_block(result.get("posture_by_contest")),
-        "gates": {
-            "workflow_valid": result.get("workflow_valid"),
-            "selection_certified": result.get("selection_certified"),
-            "allocation_certified": result.get("allocation_certified"),
-        },
+        # R393(b). A crashed delivery's result reads workflow_valid False; the
+        # gates of the file it delivered are the export's own certification.
+        "gates": {k: ((result.get("last_usable_artifact") or {}).get(
+                          "certification") or {} if result.get("crashed")
+                      else result).get(k)
+                  for k in ("workflow_valid", "selection_certified",
+                            "allocation_certified")},
         # R117(b). Beside the gates, deliberately NOT inside them: these three
         # keys are the certification vocabulary and an inert factor certifies
         # nothing and blocks nothing. It sits here because this is where a
@@ -4777,22 +4807,30 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
     # the template survived, before any narrative. Showdown is review-grade
     # by contract, so its label is never upload_ready. When the record failed,
     # the DO_NOT_UPLOAD_ copy is the only copy, so it is the one presented.
+    # A deadline rung that left reserved rows BLANK is not essential-valid (a
+    # blank reserved row is V; DK takes a partial file only with those rows
+    # removed, F-2), so that file is neither presented here nor exit 7.
+    from mlb_engine.pipeline import deadline_governor as _dg  # noqa: PLC0415
+    showdown_essential = bool(template.get("passed")) and not deadline_blank_rows
     showdown_later_failures = (
-        [{"stage": "manifest", "error": manifest_error}] if manifest_error else [])
-    if template.get("passed"):
+        [{"stage": "manifest", "error": manifest_error}]
+        if manifest_error and showdown_essential else [])
+    if showdown_essential:
         _sd_bytes = Path(delivered).read_bytes()
         note_last_usable({
             "path": str(delivered),
             "sha256": hashlib.sha256(_sd_bytes).hexdigest(),
             "size_bytes": len(_sd_bytes),
             "coverage": _coverage(delivered),
-            "label": "review_grade",
+            "label": (_dg.DEADLINE_LABEL if governor is not None and governor.walked
+                      else "review_grade"),
             "essential_valid": {
                 "essential_valid": True,
                 "basis": "showdown_lineup_checks_and_template",
                 "preflight": None},
             "run_id": None,
             "contest_type": "showdown",
+            "date": args.date,
         })
 
     if use_ladder:
@@ -5007,7 +5045,7 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         "manifest_error": manifest_error,
         # R393(b), the same two keys the Classic brief carries.
         "later_failures": showdown_later_failures,
-        "last_usable_artifact": dict(_LAST_USABLE) if template.get("passed") else None,
+        "last_usable_artifact": dict(_LAST_USABLE) if showdown_essential else None,
         "upload_manifest": manifest_repo_relative(
             REPO / "outputs" / args.date / "upload_manifest.json"),
         "showdown_module_version": sd.VERSION,
@@ -6916,7 +6954,7 @@ def _deliver_after_exception(exc: BaseException) -> int:
     brief = {
         "status": "delivered_after_failure",
         # R296(e): autobuild dates its decision log off `brief['date']` first.
-        "date": prior.get("date") or _argv_date(sys.argv[1:]),
+        "date": record.get("date") or prior.get("date") or _argv_date(sys.argv[1:]),
         "contest_type": record.get("contest_type"),
         "delivered_path": record.get("path"),
         "delivered_sha256": record.get("sha256"),

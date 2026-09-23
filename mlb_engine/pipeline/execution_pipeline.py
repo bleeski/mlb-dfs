@@ -160,6 +160,7 @@ import math
 import shutil
 import sys
 import time
+import traceback
 from collections import Counter
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, MutableMapping, Optional, Sequence, Tuple
@@ -406,13 +407,26 @@ def _crashed_result(run: Mapping[str, Any], exc: BaseException, mode: str) -> Di
     the last usable artifact. This never raises: a failed write falls back to
     the manifest alone, and a failed fallback says so on the result.
     """
-    error = f"{type(exc).__name__}: {exc}"
+    try:
+        error = f"{type(exc).__name__}: {exc}"
+    except Exception:  # noqa: BLE001 - an exception whose __str__ raises
+        error = f"{type(exc).__name__}: <unprintable>"
+    # The stack, kept: `errors` holds one line, and without this the crash's
+    # location reached no record and no terminal (the review's first finding).
+    try:
+        stack = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+    except Exception:  # noqa: BLE001
+        stack = ""
     run_dir = Path(run["run_dir"])
-    print(f"ENGINE CRASHED after create_run  {error}; run {run['run_id']} ends "
-          f"blocked (crashed), not building", file=sys.stderr)
+    try:
+        print(f"ENGINE CRASHED after create_run  {error}; run {run['run_id']} "
+              f"ends blocked (crashed), not building\n{stack}", file=sys.stderr)
+    except Exception:  # noqa: BLE001 - a closed stderr never costs the result
+        pass
     result: Dict[str, Any] = {
         "passed": False, "run_id": run["run_id"], "run_dir": str(run_dir),
         "errors": [error], "workflow_valid": False, "crashed": True,
+        "traceback": stack,
         "diagnostics_path": str(run_dir / "final" / "diagnostics.json"),
     }
     try:
@@ -424,16 +438,23 @@ def _crashed_result(run: Mapping[str, Any], exc: BaseException, mode: str) -> Di
         try:
             blocked = _blocked_result(run, [error], {
                 "run_id": run["run_id"], "mode": mode, "crashed": True,
+                "traceback": stack,
                 "diagnostic_source_file": "", "diagnostic_source_sha256": "",
                 "workflow_valid": False,
             })
             mark_run_crashed(run_dir, error)
-            return {**blocked, "crashed": True, "terminal_state_recorded": True}
+            return {**blocked, "crashed": True, "traceback": stack,
+                    "terminal_state_recorded": True}
         except Exception as write_exc:  # noqa: BLE001
             result["diagnostics_error"] = f"{type(write_exc).__name__}: {write_exc}"
     try:
-        mark_run_crashed(run_dir, error)
-        result["terminal_state_recorded"] = True
+        status = mark_run_crashed(run_dir, error).get("status")
+        # A promoted run is immutable and `mark_run_crashed` leaves it alone,
+        # so the flag says what the manifest now reads, not that a write ran.
+        result["terminal_state_recorded"] = status == "blocked"
+        if status == "promoted":
+            result["terminal_state_note"] = ("the run was already promoted; a "
+                                             "promoted run is immutable")
     except Exception as mark_exc:  # noqa: BLE001
         result["terminal_state_recorded"] = False
         result["terminal_state_error"] = f"{type(mark_exc).__name__}: {mark_exc}"
@@ -452,6 +473,30 @@ def _crashed_result(run: Mapping[str, Any], exc: BaseException, mode: str) -> Di
                     or ["no registered dk_export"])
         except Exception as art_exc:  # noqa: BLE001
             result["last_usable_artifact_error"] = f"{type(art_exc).__name__}: {art_exc}"
+    return result
+
+
+class EngineCrashed(RuntimeError):
+    """R297(c). A door handed back a crashed run with nothing usable in it.
+
+    The engine ended the run terminal (``blocked``, ``crashed: True``). A caller
+    keeps the crash a crash rather than reading the blocked result as a
+    refusal: build_slate's deadline governor would re-solve it, and late_swap
+    would print "late swap did not pass" and exit 3, both the crash-wearing-a-
+    refusal shape R296(d) was filed against. Raised, it exits 1 as it did.
+    """
+
+
+def raise_on_engine_crash(result: Mapping[str, Any]) -> Mapping[str, Any]:
+    """Raise :class:`EngineCrashed` for a crashed result with no artifact,
+    after printing the crash's stack; any other result passes through."""
+    if result.get("crashed") and not result.get("last_usable_artifact"):
+        if result.get("traceback"):
+            print(result["traceback"], file=sys.stderr, end="")
+        raise EngineCrashed(
+            f"the engine crashed after create_run; run {result.get('run_id')} "
+            f"ended blocked (crashed), not building: "
+            f"{'; '.join(str(e) for e in result.get('errors') or [])}")
     return result
 
 
@@ -842,6 +887,10 @@ def promote_deferred_run(result: MutableMapping[str, Any]) -> Dict[str, Any]:
         result["errors"] = list(result.get("errors") or []) + list(
             promotion.get("errors") or [])
         result["pointer_conflict"] = bool(promotion.get("pointer_conflict"))
+        # R393(b). A promotion refusal carries no artifact, on this path as on
+        # execute_portfolio's inline one.
+        if result.pop("last_usable_artifact", None) is not None:
+            result["last_usable_artifact_withheld"] = ["promotion refused"]
         # `passed` and `workflow_valid` mean the same thing here as on the inline
         # path, where a refused promotion sets both False. A caller that reads
         # the idiomatic `if not result["passed"]` must not read a pointer
@@ -6667,7 +6716,16 @@ def run_slate(
              "error": f"{type(exc).__name__}: {exc}"})
         print(f"RUN_SLATE REPORT FIELDS FAILED  {type(exc).__name__}: {exc}; "
               f"the export is unaffected", file=sys.stderr)
-    result["delivered_path"] = mirror_to_outputs(result, salary_csv)
+    # R393(b). When the report fields failed, the manifest row the mirror would
+    # record reads a result missing its label and its contests, so nothing is
+    # published from it: build_slate presents the immutable runs/ export.
+    if any(f.get("stage") == "run_slate_report_fields"
+           for f in result.get("later_failures") or []):
+        result["delivered_path"] = None
+        result["mirror_skipped"] = ("the report fields failed, so no manifest "
+                                    "row was recorded from an incomplete result")
+    else:
+        result["delivered_path"] = mirror_to_outputs(result, salary_csv)
     # Repo-relative alongside the absolute path: every recorded delivered_path in
     # outputs/2026-07-25/ pointed at a session mount that no longer exists.
     if result.get("delivered_path"):
@@ -6736,6 +6794,11 @@ def mirror_to_outputs(result: Mapping[str, Any], salary_csv: Any) -> Optional[st
             result["manifest_recorded"] = bool(outcome["recorded"])
             result["staged_salary"] = outcome.get("staged_salary")
         if outcome["error"]:
+            # R393(b). Named on the result too: "recorded but not promoted"
+            # returns recorded=True with the DO_NOT_UPLOAD_ path, and without
+            # this the build read it as a clean delivery.
+            if isinstance(result, dict):
+                result["manifest_error"] = str(outcome["error"])
             print(f"MANIFEST NOT RECORDED  {outcome['error']}")
         return str(outcome["path"])
     except Exception as exc:  # noqa: BLE001 - a mirror must never fail a certified build

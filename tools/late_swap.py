@@ -75,7 +75,8 @@ from mlb_engine.pipeline.execution_pipeline import (  # noqa: E402
     controls_for_report, derive_roster_id_maps,
     resolve_shape_bands, slate_game_count,
     _resolve_contest_postures, _slate_tag, feasibility_floors_from,
-    promote_deferred_run, run_late_swap, unresolved_contest_blockers,
+    promote_deferred_run, raise_on_engine_crash, run_late_swap,
+    unresolved_contest_blockers,
 )
 from mlb_engine.swap.late_swap_manager import build_entry_requirements  # noqa: E402
 
@@ -904,6 +905,10 @@ def main() -> int:
     )
     print("gates assumed by late swap (not checked): "
           + ", ".join(LATE_SWAP_ASSUMED_GATES), file=sys.stderr)
+    # R297(c). The engine now ends a crashed swap run `blocked` and returns it
+    # instead of raising; a crash still exits 1 here, never "did not pass" at
+    # exit 3 (R296(d)'s crash-wearing-a-refusal shape). The file half is R414.
+    raise_on_engine_crash(result)
 
     if not result.get("passed"):
         print("late swap did not pass:", file=sys.stderr)
