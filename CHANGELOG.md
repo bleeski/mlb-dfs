@@ -2,6 +2,29 @@
 
 What changed in the engine, the tools and the contracts, when, and why.
 
+## 2026-09-23 — R412 filed (roadmap Session 87): the Showdown melt's same-name refusal and the brief's hold stand-down; Sessions 98 and 03 SHAs backfilled; R410's backfill command reads a `Session NN:` subject
+
+**Scope.**
+- `docs/backlog.md`: R412 filed at the head of Workstream 1.
+- `docs/ROADMAP.md`: Session 87 added to Phase G after Session 64 (Pending); the Progress Ledger's Session 98 and Session 03 rows backfilled to `fd8673a`; a Session 87 ledger row; the ledger header's step 1 corrected.
+- No engine, tool, test or skill file changed.
+
+**The backfill, and the command that could not do it.** Both rows merged in PR #38. The header's two-step command, run as written:
+- R410: step 1 `3ab23c9`, step 2 `fd8673a`. Correct.
+- Session 03 (R388(e), R298, R396(a), R377): step 1 returns nothing for R388, R298 and R396, and returns `dc5df59` for R377, which is Session 02's commit (its merge is `9532367`, a wrong answer with no error). The cause is the subject: `e4235db` leads with `Session 03:`, and `--grep=^R<num>` never sees it.
+
+Step 1 now passes a second pattern, `--grep='^Session <NN>:'`, which git ORs with the first; `-1` takes the newest match. Re-run on seven ledger rows, it prints every recorded SHA: Session 98 and Session 03 `fd8673a`, 97 `648f8cf`, 94 `afb833e`, 96 `1e1a01d`, 02 `9532367` (R377 alone now resolves to `e4235db`, not `dc5df59`). No test or tool reads the line (`grep -rn "grep=\^R\|ancestry-path" tests/ tools/ .claude/`: no hits outside this session's gitignored scratch).
+
+**R412, from Ben's review of closed PR #18 against main's R295 (`c12fd2a`).** Both gaps re-verified at `fd8673a`:
+- (a) `melt_showdown_salary_csv` raises on `role_collisions` at `showdown.py:337`, before the participation filter (`:440`) and the health filter (`:443`), so two benched players sharing a name and a team stop a Showdown build.
+- (b) `solve_ladder` writes `captain_budget_hold_yielded` (`showdown_theses.py:2455`); the brief's `captain_budget` block (`build_slate.py:4819`) and `showdown_relaxation_counts` (`:965`, integer `relax` counters only) both drop it.
+
+**The finding that changes the fix.** PR #18 scoped the refusal to `rows` after both filters, keyed per merged `(Name, TeamAbbrev)` record. The melt ORs `Status_Out` across a key's rows (`:304-305`), so a healthy posted player beside an OUT namesake is dropped with the OUT one and no refusal fires. Measured on the MIN@CHC fixture with an OUT twin of Michael Busch (posted 3rd): main refuses the file; the melt with PR #18's scoping returns 19 persons instead of 20, Busch absent, no error. Ported as written, it would replace an over-broad stop with a silent pool trim. The entry files the per-person scope instead, read from `_role_rows`, with the healthy-twin case pinned as a refusal.
+
+**Session IDs.** The linter's row pattern is `Session (\d{2})` (`tools/plan_status.py:42`). With 87 taken, 89 is the only free two-digit ID.
+
+**Gate.** Docs only: `python tools/plan_status.py --check` exit 0, `docs/ROADMAP.md is consistent with docs/backlog.md`. The full gate runs with Session 04, on the same branch.
+
 ## 2026-09-23 — R388(e): one label. A deadline-governed Classic retry is recorded review-grade inside `run_slate`, so the brief, the manifest row, the delivery record and preflight's verdict agree; an accepted late-swap downgrade and a re-promotion follow (roadmap Session 03, part a)
 
 **Scope.** `mlb_engine/pipeline/execution_pipeline.py` (`run_slate`'s `certification_label` and its guard, `manifest_certification`, `_deliver_mirror`), `skills/generate-lineups/scripts/build_slate.py` (`_solve`, the governed re-solve, the brief's status), `tools/preflight_upload.py` (`REVIEW_GRADE_REASONS`, the verdict note), `tools/late_swap.py` (`DOWNGRADE_LABEL`, `swap_certification`), `tools/promote_run.py` (the earlier row's label), `tests/test_core.py` (`DeliveryLabelAgreementTests`, new; `DeadlineGovernorWiringTests` +1 and a label list in its harness), `tools/audit.py` (`EXPECTED_SUITE_COUNTS`, shared with the three entries below), `docs/ROADMAP.md` (Session 03 row Complete, NEXT to Session 04, Session 99 row, ledger row), `docs/backlog.md` (R388 rewritten to (a)-(d), R411 filed), this file.
