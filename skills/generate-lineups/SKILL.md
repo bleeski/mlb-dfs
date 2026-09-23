@@ -404,6 +404,8 @@ On a host with a short per-call ceiling this command will not fit in one call.
 Read "Running a build: what costs time, and the traps" below before you start,
 and confirm the salary file is the slate Ben meant.
 
+A typed `--controls-override` value stays relaxable; `--never-relax <control>` holds one under every deadline rung and floor (R388(b)), and a name the engine cannot hold refuses at exit 4. `references/never_relax.md` has the rules.
+
 ### Better data when there is time
 
 The script fetches probable pitchers and batting orders itself if it has to, but

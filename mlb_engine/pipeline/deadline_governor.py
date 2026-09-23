@@ -62,6 +62,9 @@ Every one of these is a wall in CLAUDE.md and none of them is reopened here:
 - The money-and-entry wall and the manual-DK rule. This writes a FILE.
 - It reaches only BADLY-SHAPED refusals. ILLEGAL and READ-IT refuse at every
   clock, and `governed_classes()` is the whole of what it can reach.
+- It never opens a control the operator named with `--never-relax`, or F-3's
+  distinct lineups per contest, which holds on every build (R388(b)). A typed
+  cap alone is not a never-relax, so `--controls-override` values still open.
 """
 from __future__ import annotations
 
@@ -76,6 +79,10 @@ from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
 # `test_the_class_vocabularies_agree_with_build_slate` still holds all three
 # in step.
 from mlb_engine.entries.gate_classes import (
+    FACT_AUTHORITY,
+    PROV_ENGINE_DEFAULT,
+    PROV_OPERATOR_NEVER_RELAX,
+    PROV_OPERATOR_RELAXABLE,
     REFUSAL_BADLY_SHAPED as CLASS_BADLY_SHAPED,
     REFUSAL_ILLEGAL as CLASS_ILLEGAL,
     REFUSAL_READ_IT as CLASS_READ_IT,
@@ -101,15 +108,18 @@ RUNG_ACCEPT_BLANK_ROWS = "accept_blank_rows"
 #: made inside a six-minute window by code nobody is watching is the thing this
 #: module exists to avoid.
 #:
-#: `max_shared_players` is ROSTER SIZE MINUS ONE, not roster size, and that one
-#: is the difference between a legal file and an illegal one. Two lineups
-#: sharing all ten slots are the SAME lineup, and two identical entries in one
-#: contest are `duplicate_same_contest` -- a DK rejection, inside
-#: `roster_legality_passed`. So opening overlap all the way would invite the
-#: allocator to build the one thing the governor may never deliver, and would
-#: convert a BADLY-SHAPED refusal it is allowed to fix into an ILLEGAL one it
-#: is not. Nine is maximally permissive and still legal by construction.
-#: `test_the_open_overlap_value_cannot_produce_an_identical_pair` pins it.
+#: `max_shared_players` is ROSTER SIZE MINUS ONE, not roster size: maximal
+#: overlap short of identity. Two lineups sharing all ten slots are the SAME
+#: lineup, and two identical entries in one contest are
+#: `duplicate_same_contest`, inside `roster_legality_passed`. That is not a DK
+#: rejection. F-3 (Ben, 2026-09-22): DK accepts it, and Ben never wants it, so
+#: distinct lineups per contest is an S control with `operator_never_relax`
+#: authority (`gate_classes.FACT_AUTHORITY`), kept under every deadline. No rung
+#: opens it and none can: the allocator's one-per-signature-per-contest row is
+#: unconditional and DKM's validator fails the gate, which is ILLEGAL and so
+#: never governed. Nine keeps the rung from even asking for a pair it could
+#: not deliver. `test_the_open_overlap_value_cannot_produce_an_identical_pair`
+#: pins it.
 CLASSIC_ROSTER_SIZE = 10
 SHOWDOWN_ROSTER_SIZE = 6
 
@@ -127,9 +137,13 @@ OPEN_CONTROL_VALUES: Dict[str, Any] = {
     # The game SCALAR opens too. `max_game_exposure_pct_by_game` deliberately
     # does NOT: this dict maps a control to a VALUE and the per-game form's keys
     # are the slate's game ids, which this module does not have. Stated rather
-    # than left as a silent gap -- opening the scalar does not loosen an
-    # explicit per-game entry, because the two merge by MIN. That dict is only
-    # ever operator-typed, so the operator who set it is the one who can open it.
+    # than left as a silent gap -- opening the scalar does not loosen a per-game
+    # entry, because the per-game caps merge by MIN. That dict has TWO writers,
+    # not one: the operator's typed `max_game_exposure_pct_by_game` and the F5
+    # material-weather cap (`weather_derived`), which
+    # `execution_pipeline.resolve_game_exposure_request` merges in by MIN. So
+    # the rung loosens neither, and a weather cap survives it. R391 (Session
+    # 19) is where the per-game caps join the deadline policy.
     "max_game_exposure_pct": 1.0,
     # R405, 2026-09-23, for R343's reason: the cluster cap ships ON by posture
     # default and is S class under R386, so the T-15 crude move has to open it.
@@ -148,6 +162,118 @@ OPEN_SHOWDOWN_CONTROL_VALUES: Dict[str, Any] = {
 }
 
 LADDER: Tuple[str, ...] = (RUNG_OPEN_CONTROLS, RUNG_ACCEPT_BLANK_ROWS)
+
+# --------------------------------------------------------------------------- #
+# R388(b). Never-relax: the operator's explicit word that a control holds under
+# every deadline. A typed cap alone is NOT that word (audit §2: "an old
+# configuration or a typed cap alone is not proof that the operator prohibited
+# relaxation"), so `--controls-override` stays relaxable and only
+# `--never-relax` names a control this module will not open.
+# --------------------------------------------------------------------------- #
+
+#: Held on every build with or without the flag: the facts
+#: `gate_classes.FACT_AUTHORITY` gives operator never-relax authority. F-3's
+#: distinct lineups per contest is the one today.
+DEFAULT_NEVER_RELAX: frozenset = frozenset(
+    fact for fact, authority in FACT_AUTHORITY.items()
+    if authority == PROV_OPERATOR_NEVER_RELAX)
+
+#: The Classic controls a never-relax is HONOURED on, end to end: every
+#: relaxer that can move one of them reads the set. Those relaxers are this
+#: module's rung, the pipeline's feasibility floors
+#: (`execution_pipeline.feasibility_floors_from`) and autobuild's structural
+#: floors. Two keys nothing relaxes today are here too, so a never-relax on them
+#: is true now and stays the rule when R391 (Session 19) widens the rung.
+NEVER_RELAX_CLASSIC_CONTROLS: frozenset = frozenset(
+    (set(OPEN_CONTROL_VALUES) - {"classic_sleeves"})
+    | {"max_opposing_hitters_per_sp", "max_game_exposure_pct_by_game"}
+    | DEFAULT_NEVER_RELAX)
+
+#: Controls a never-relax would NOT be honoured on yet, each with the relaxer
+#: that does not read it. Refused by name rather than accepted and quietly
+#: broken: a never-relax that holds at one relaxer and not the next is a label
+#: the file does not keep. R391(a) (Session 19) wires the allocator's ladders
+#: and sleeves; R391(b) (Session 20) wires Showdown's.
+NEVER_RELAX_NOT_HONOURED: Dict[str, str] = {
+    "classic_sleeves": "the allocator falls an entry back out of its sleeve "
+                       "and counts it (contest_allocator._resolve_classic_sleeves)",
+    "max_candidate_reuse": "the allocator's re-entry ladder relaxes it "
+                           "(contest_allocator.LADDER_RELAXED_CONTROLS)",
+    "primary_stack_min_size": "the allocator's re-entry ladder relaxes it "
+                              "(contest_allocator.LADDER_RELAXED_CONTROLS)",
+    "min_five_stack_share_pct": "the allocator's re-entry ladder relaxes the "
+                                "five-stack quota (LADDER_RELAXED_CONTROLS)",
+    "five_stack_min_size": "the allocator's re-entry ladder relaxes the "
+                           "five-stack quota (LADDER_RELAXED_CONTROLS)",
+    "max_cpt_exposure_pct": "Showdown's solver relaxes it per slot under "
+                            "R153's order and counts it (optimize/showdown.py)",
+    "max_cpt_per_contest": "Showdown's solver relaxes the captain lock per "
+                           "slot under R153's order (optimize/showdown.py)",
+}
+
+#: On a Showdown build only F-3 is honoured: the solver relaxes all three of
+#: its portfolio controls per slot under R153's order (overlap, player
+#: exposure, captain lock), counted in the brief, and that ladder reads no
+#: never-relax yet.
+NEVER_RELAX_SHOWDOWN_CONTROLS: frozenset = DEFAULT_NEVER_RELAX
+SHOWDOWN_CONTROLS = frozenset(OPEN_SHOWDOWN_CONTROL_VALUES) | {"max_cpt_per_contest"}
+SHOWDOWN_NOT_HONOURED_REASON = (
+    "Showdown's solver relaxes max_shared_players, max_player_exposure_pct and "
+    "the captain caps per slot under R153's order and counts each relaxation in "
+    "the brief; that ladder reads no never-relax yet (R391(b), Session 20)")
+
+
+def resolve_never_relax(names: Any = None, *, contest_type: str = "classic"
+                        ) -> frozenset:
+    """The never-relax set a build runs under: the default plus the operator's.
+
+    ``names`` is what `--never-relax` parsed to: None, one comma-separated
+    string, or a list of them (the flag repeats). Raises ValueError naming the
+    accepted controls on anything else, BEFORE any solve: a misspelled
+    never-relax protects nothing and says nothing, the silent-disable shape
+    R215 closed for the units gate.
+    """
+    raw: List[str] = []
+    for chunk in ([names] if isinstance(names, str) else list(names or [])):
+        raw.extend(p.strip() for p in str(chunk).split(",") if p.strip())
+    showdown = str(contest_type).lower().startswith("showdown")
+    accepted = NEVER_RELAX_SHOWDOWN_CONTROLS if showdown else NEVER_RELAX_CLASSIC_CONTROLS
+    problems: List[str] = []
+    for name in raw:
+        if name in accepted:
+            continue
+        if showdown and name in SHOWDOWN_CONTROLS:
+            problems.append(f"{name}: {SHOWDOWN_NOT_HONOURED_REASON}")
+        elif showdown and name in NEVER_RELAX_CLASSIC_CONTROLS | set(
+                NEVER_RELAX_NOT_HONOURED):
+            problems.append(f"{name}: a Classic control; a Showdown build has "
+                            f"no such control to hold")
+        elif name in NEVER_RELAX_NOT_HONOURED:
+            problems.append(f"{name}: not honoured yet, because "
+                            f"{NEVER_RELAX_NOT_HONOURED[name]} (R391)")
+        else:
+            problems.append(f"{name}: not a control this engine knows")
+    if problems:
+        raise ValueError(
+            "--never-relax names a control it cannot hold: "
+            + "; ".join(problems) + ". Accepted: " + ", ".join(sorted(accepted)))
+    return frozenset(DEFAULT_NEVER_RELAX | set(raw))
+
+
+def control_provenance_of(key: str, *, typed: Mapping[str, Any],
+                          never_relax: Any = (), default: str = PROV_ENGINE_DEFAULT
+                          ) -> str:
+    """One control's provenance where the caller resolved it from a default
+    and a typed dict (Showdown's three; the pipeline resolves Classic's).
+
+    Never-relax outranks everything, a typed value is relaxable, and anything
+    else takes ``default``.
+    """
+    if key in set(never_relax or ()):
+        return PROV_OPERATOR_NEVER_RELAX
+    if key in (typed or {}):
+        return PROV_OPERATOR_RELAXABLE
+    return default
 
 #: The label a governed delivery carries. Never `upload_ready`.
 DEADLINE_LABEL = "review_grade_deadline_build"
@@ -278,12 +404,26 @@ class DeadlineGovernor:
 
     def take_rung(self, rung: str, *, contest_type: str = "classic",
                   before: Optional[Mapping[str, Any]] = None,
-                  reason: str = "") -> Dict[str, Any]:
+                  reason: str = "",
+                  never_relax: Any = (),
+                  resolved: Optional[Mapping[str, Mapping[str, Any]]] = None,
+                  ) -> Dict[str, Any]:
         """Record a rung and return the controls it opens.
 
         The record is the deliverable half. A governed file that does not say
         which controls were opened, from what, is the false-reassurance failure
         this item is filed against wearing a different hat.
+
+        R388(b). A control in ``never_relax`` is not opened: it is listed under
+        ``held`` with its value, and the rung returns everything else. ``moves``
+        carries one row per opened control with its before and after value,
+        the provenance it had before the move, and the reason. ``resolved`` is
+        the pipeline's ``control_provenance.by_control`` from the attempt being
+        governed, so ``before`` is the value that attempt really ran rather
+        than only what the operator typed; without it the operator's own dict
+        is the best evidence and a key it lacks reads None, never a fabricated
+        prior. ``from`` keeps its R290(c) meaning, the operator's displaced
+        value.
         """
         if rung not in LADDER:
             raise ValueError(f"{rung!r} is not a rung of the fixed ladder "
@@ -291,17 +431,45 @@ class DeadlineGovernor:
         if rung in self.rungs_walked():
             raise ValueError(f"rung {rung!r} was already walked; the ladder is "
                              f"walked once and its record is the artifact")
+        holding = frozenset(DEFAULT_NEVER_RELAX | set(never_relax or ()))
+        typed = dict(before or {})
+        by_control = {str(k): dict(v) for k, v in (resolved or {}).items()
+                      if isinstance(v, Mapping)}
+
+        def _prior(key: str) -> Tuple[Any, Optional[str]]:
+            if key in by_control:
+                return by_control[key].get("value"), by_control[key].get("provenance")
+            if key in typed:
+                return typed[key], control_provenance_of(
+                    key, typed=typed, never_relax=holding)
+            return None, None
+
         opened: Dict[str, Any] = {}
+        held: Dict[str, Any] = {}
         if rung == RUNG_OPEN_CONTROLS:
-            opened = dict(OPEN_SHOWDOWN_CONTROL_VALUES
-                          if str(contest_type).lower().startswith("showdown")
-                          else OPEN_CONTROL_VALUES)
+            rung_values = (OPEN_SHOWDOWN_CONTROL_VALUES
+                           if str(contest_type).lower().startswith("showdown")
+                           else OPEN_CONTROL_VALUES)
+            for key, value in rung_values.items():
+                if key in holding:
+                    held[key] = {"value": _prior(key)[0],
+                                 "provenance": PROV_OPERATOR_NEVER_RELAX}
+                else:
+                    opened[key] = value
+        moves = []
+        for key, value in opened.items():
+            prior, provenance = _prior(key)
+            moves.append({"control": key, "before": prior, "after": value,
+                          "provenance": provenance, "reason": reason,
+                          "by": rung})
         record = {
             "rung": rung,
             "at_utc": self.now().isoformat().replace("+00:00", "Z"),
             "minutes_remaining": round(self.minutes_remaining(), 2),
             "opened": opened,
-            "from": {k: (before or {}).get(k) for k in opened} if opened else {},
+            "from": {k: typed.get(k) for k in opened} if opened else {},
+            "moves": moves,
+            "held": held,
             "reason": reason,
         }
         self._walked.append(record)
@@ -338,15 +506,23 @@ class DeadlineGovernor:
 
 
 def merge_open_controls(existing: Optional[Mapping[str, Any]],
-                        opened: Mapping[str, Any]) -> Dict[str, Any]:
+                        opened: Mapping[str, Any], *,
+                        never_relax: Any = ()) -> Dict[str, Any]:
     """Apply a rung's values ON TOP of the operator's own overrides.
 
     Deliberately this direction, and it is the one place the governor outranks
     a person. An operator who passed `--controls-override` chose those numbers
     before the window; the governor fires only inside it, and inside it the
-    choice is the operator's numbers or no file. The `from` block in the rung
-    record preserves what was displaced, so nothing is lost silently.
+    choice is the operator's numbers or no file. A typed cap alone is a
+    relaxable preference, not a prohibition (R388(b), audit §2).
+
+    The prohibition is `--never-relax`, and a control it names is skipped here
+    even when ``opened`` carries it: `take_rung` already leaves it out, and this
+    is the second of two locks because the merge is the one that reaches the
+    solve. The rung record's ``moves`` and ``held`` blocks say what moved, from
+    what, on whose authority, and what did not, so nothing is lost silently.
     """
+    holding = frozenset(DEFAULT_NEVER_RELAX | set(never_relax or ()))
     merged = dict(existing or {})
-    merged.update(opened)
+    merged.update({k: v for k, v in opened.items() if k not in holding})
     return merged

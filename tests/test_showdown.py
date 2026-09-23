@@ -6588,8 +6588,8 @@ class R382CaptainPriorWiringTests(unittest.TestCase):
                         n += 1
                 counts[fn.name] = n
         total = sum(counts.values())
-        self.assertIn(f"# EXIT 4, NINETEEN sites", self.src)
-        self.assertEqual(total, 19, counts)
+        self.assertIn(f"# EXIT 4, TWENTY sites", self.src)
+        self.assertEqual(total, 20, counts)
         self.assertIn(f"run_showdown:{counts['run_showdown']}, "
                       f"main:{counts['main']})", self.src)
 

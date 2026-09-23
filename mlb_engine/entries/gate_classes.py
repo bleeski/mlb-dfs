@@ -18,6 +18,10 @@ had no home at all:
 * **Evidence state**: ``passed``, ``failed``, ``not_checked``, ``assumed``.
   "Not checked" and "checked and passed" are different facts (audit §3), and an
   assumed gate is a third one.
+* **Control provenance** (R388(b)): where a resolved portfolio control's value
+  came from and whether it may relax, down to ``operator_never_relax``, plus
+  the authority on a fact whose authority is not its gate's (F-3's distinct
+  lineups per contest). The deadline governor and the pipeline read it.
 
 The two classes are kept side by side rather than one derived from the other,
 because they disagree on purpose until Sessions 06, 09 and 13 wire the V/S/P
@@ -428,3 +432,51 @@ def describe(name: str, kind: str = "gate") -> Dict[str, Any]:
     if kind == "gate":
         out["refusal_class"], out["authority"] = classic_gate_class(_base_name(name))
     return out
+
+
+# --------------------------------------------------------------------------- #
+# Control provenance (R388(b)). Where a resolved portfolio control's value came
+# from, and so who may relax it. S controls relax under deadline (MLB_Classic.md
+# §2) unless a current explicit never-relax applies; this is the vocabulary
+# that tells the two apart. "An old configuration or a typed cap alone is not
+# proof that the operator prohibited relaxation" (audit §2), so a value typed
+# through --controls-override is `operator_relaxable`, and only --never-relax
+# (or F-3, below) makes one `operator_never_relax`.
+# --------------------------------------------------------------------------- #
+PROV_ENGINE_DEFAULT = "engine_default"
+PROV_POSTURE_DEFAULT = "posture_default"
+PROV_DERIVED_FLOOR = "derived_floor"
+PROV_WEATHER_DERIVED = "weather_derived"
+#: R407 wrote this word first, ahead of the item that owns the vocabulary: a
+#: cap the input-confidence tier tightened.
+PROV_CONFIDENCE_DERIVED = "confidence_derived"
+PROV_OPERATOR_RELAXABLE = "operator_relaxable"
+PROV_OPERATOR_NEVER_RELAX = "operator_never_relax"
+CONTROL_PROVENANCES = (
+    PROV_ENGINE_DEFAULT, PROV_POSTURE_DEFAULT, PROV_DERIVED_FLOOR,
+    PROV_WEATHER_DERIVED, PROV_CONFIDENCE_DERIVED, PROV_OPERATOR_RELAXABLE,
+    PROV_OPERATOR_NEVER_RELAX,
+)
+#: Every provenance but one may be relaxed, by the deadline governor or a
+#: feasibility floor. The one that may not is the operator's explicit word.
+RELAXABLE_PROVENANCES = frozenset(CONTROL_PROVENANCES) - {PROV_OPERATOR_NEVER_RELAX}
+
+#: The authority on a named FACT inside a MIXED gate, where it is not the gate's
+#: own. `roster_legality_passed` is ILLEGAL with `dk_rule` authority as a whole,
+#: because its platform facts are DK's; its distinct-lineups fact is not. F-3
+#: (Ben, 2026-09-22): DK accepts one lineup in two entries of one contest, and
+#: Ben never wants it. That makes it an operator rule, never relaxed, and it
+#: stays inside an ILLEGAL gate so no deadline rung can reach it.
+FACT_AUTHORITY: Dict[str, str] = {
+    "distinct_lineups_per_contest": PROV_OPERATOR_NEVER_RELAX,
+}
+
+
+def fact_authority(fact: str) -> str:
+    """The authority on one named fact. Raises on a fact with no entry."""
+    try:
+        return FACT_AUTHORITY[str(fact)]
+    except KeyError:
+        raise UnclassifiedGateError(
+            f"fact {fact!r} has no authority in mlb_engine/entries/"
+            "gate_classes.py FACT_AUTHORITY") from None

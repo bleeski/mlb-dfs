@@ -3614,8 +3614,11 @@ def select_and_assign_entries(
                     -np.inf, bound)
     elif team_cap and not team_by_player:
         # NOT a refusal, and the asymmetry with the game cap above is deliberate.
-        # `max_game_exposure_pct_by_game` is only ever set by an operator who
-        # typed it, so a missing map means that operator's instruction cannot be
+        # `max_game_exposure_pct_by_game` is never a posture default: it is set
+        # by an operator who typed it (or the scalar it expands from) or by an
+        # F5 material-weather cap, which the pipeline merges in by MIN
+        # (R388(b) corrected "only ever an operator"). Each is an explicit
+        # instruction about this slate, so a missing map means one cannot be
         # honoured and silence would be the R289 failure. This cap ships as a
         # POSTURE DEFAULT on every Classic build, so refusing here would turn a
         # caller that never passed a team map -- the legacy wrapper, a test, an
