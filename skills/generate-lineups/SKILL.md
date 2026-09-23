@@ -404,22 +404,7 @@ On a host with a short per-call ceiling this command will not fit in one call.
 Read "Running a build: what costs time, and the traps" below before you start,
 and confirm the salary file is the slate Ben meant.
 
-### `--never-relax`: a control that holds under every deadline (R388(b))
-
-A value typed in `--controls-override` is a relaxable preference: the rung
-above opens it, and the brief's `control_provenance` calls it
-`operator_relaxable`. Only `--never-relax <control>[,<control>...]` (comma-separated
-or repeated) makes one `operator_never_relax`. The rung leaves it closed and
-lists it under `held`, a feasibility floor does not raise it, and
-`tools/autobuild.py` (which forwards the flag) stops and names it rather than
-floor it. Distinct lineups per contest (F-3) is held on every build without the
-flag. The build refuses at exit 4, before staging, a name it cannot hold at
-every relaxer: the allocator's own ladders and sleeve fallback
-(`classic_sleeves`, `max_candidate_reuse`, the stack floor and five-stack
-quota) and all three Showdown controls, whose solver relaxes them per slot
-(R391 wires those). Use it only for a restriction Ben stated for this slate.
-`brief.control_provenance.by_control` gives every resolved control's value and
-provenance; a row a rung moved carries `relaxed` with its before value.
+A typed `--controls-override` value stays relaxable; `--never-relax <control>` holds one under every deadline rung and floor (R388(b)), and a name the engine cannot hold refuses at exit 4. `references/never_relax.md` has the rules.
 
 ### Better data when there is time
 

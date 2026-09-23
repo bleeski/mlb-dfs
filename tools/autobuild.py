@@ -494,8 +494,10 @@ def main() -> int:
 
     a._resumed_attempts = 0
     a._resumed_ignore_pool = False
+    a._resumed_never_relax = []
     if a.resume:
         resumed = _resume_state(dec, a.salary)
+        a._resumed_never_relax = list(resumed.get("never_relax") or [])
         if resumed["attempts_done"]:
             a._resumed_attempts = resumed["attempts_done"]
             a._resumed_ignore_pool = resumed["ignore_pool"]
@@ -532,7 +534,8 @@ def main() -> int:
         _write(dec, {}, salary=a.salary)
         return 4
     dec.never_relax = never_relax_names(
-        list(getattr(a, "never_relax", None) or []) + passthrough_never_relax)
+        list(getattr(a, "never_relax", None) or []) + passthrough_never_relax
+        + list(getattr(a, "_resumed_never_relax", None) or []))
     if dec.never_relax:
         dec.add(0, "operator_never_relax",
                 "forwarded to build_slate once, merged from this flag and "
@@ -737,7 +740,15 @@ def main() -> int:
             break
 
         if code == 4:
-            dec.add(attempt, "stop", "inputs missing; nothing to decide")
+            # R388(b). Exit 4 is every pre-staging refusal, not only a missing
+            # input, and the child's own status says which: an unholdable
+            # --never-relax read "inputs missing" here. Carried verbatim.
+            status = (brief or {}).get("status")
+            dec.add(attempt, "stop",
+                    f"build_slate refused before staging ({status}); nothing "
+                    f"to decide" if status else "inputs missing; nothing to decide",
+                    **({"status": status, "error": brief.get("error")}
+                       if status else {}))
             _write(dec, brief, salary=a.salary)
             return 4
 
@@ -874,6 +885,11 @@ def _resume_state(dec: "Decisions", salary: Optional[str]) -> Dict[str, Any]:
     derived = ((payload.get("controls") or {}).get("derived_controls") or {})
     if isinstance(derived, dict):
         dec.derived_controls.update(derived)
+    # R388(b). A resumed run keeps the never-relax the run it continues was
+    # under; otherwise a restored floor lands on the control it held.
+    held = (payload.get("controls") or {}).get("never_relax") or []
+    if isinstance(held, list):
+        out["never_relax"] = [str(x) for x in held]
     # The prior log is the run's history, so keep it rather than starting a new
     # file: the flush rewrites the whole document and a resumed run that dropped
     # the earlier attempts would make the artifact say the floors appeared from

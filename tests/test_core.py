@@ -25409,9 +25409,12 @@ class ControlProvenanceTests(unittest.TestCase):
         ]
         for postures, override, kw in cases:
             with self.subTest(postures=sorted(postures)):
+                from mlb_engine.pipeline import deadline_governor as dg
                 plain = epi._merged_controls_for_build(postures, override, **kw)
+                # What run_slate passes on a build with no flag: F-3's default.
                 traced = epi._merged_controls_for_build(
-                    postures, override, never_relax=(), provenance_out={}, **kw)
+                    postures, override, never_relax=dg.DEFAULT_NEVER_RELAX,
+                    provenance_out={}, override_provenance={}, **kw)
                 self.assertEqual(plain, traced)
 
     def test_every_accepted_never_relax_is_held_at_every_relaxer_that_moves_it(self):
@@ -25466,10 +25469,146 @@ class ControlProvenanceTests(unittest.TestCase):
                              ["distinct_lineups_per_contest", "max_shared_players"])
             self.assertTrue(any(n.startswith("max_shared_players: never-relax held")
                                 for n in held["controls_feasibility"]["notes"]))
+            # approve=True, so a refusal that came AFTER the work would have
+            # left a run directory behind; the plan calls above create none.
             with self.assertRaises(ValueError) as caught:
-                run_slate(**common, never_relax_controls=["classic_sleeves"])
+                run_slate(**dict(common, approve=True),
+                          never_relax_controls=["classic_sleeves"])
             self.assertIn("classic_sleeves", str(caught.exception))
             self.assertFalse((root / "runs").exists())
+            # A bare string is one name, not its characters.
+            one = run_slate(**common, never_relax_controls="max_shared_players")
+            self.assertEqual(one["control_provenance"]["never_relax"],
+                             ["distinct_lineups_per_contest", "max_shared_players"])
+
+    def test_confidence_tightening_never_loosens_a_cap_held_below_its_floor(self):
+        """The review's blocking finding. The merge holds a never-relax cap
+        under its feasibility floor; R407 is handed the same floors, and
+        `max(tightened, floor)` alone would put the cap back AT the floor --
+        the move the never-relax blocked -- while the row still read held."""
+        floors = {"max_player_exposure_pct": 0.6}
+        held = {"max_player_exposure_pct"}
+        merged, prov = self._resolve(feasibility_floors=floors, never_relax=held)
+        self.assertLess(merged["max_player_exposure_pct"], 0.6)
+        confidence = epi.resolve_input_confidence({"f1_games_priced": 0})
+        controls, block = epi.apply_input_confidence(merged, confidence, floors=floors)
+        self.assertEqual(controls["max_player_exposure_pct"],
+                         merged["max_player_exposure_pct"],
+                         "the tightening loosened a held cap to its floor")
+        row = epi._control_provenance_block(controls, prov, block, held)[
+            "by_control"]["max_player_exposure_pct"]
+        self.assertEqual(row, {"value": merged["max_player_exposure_pct"],
+                               "provenance": "operator_never_relax"})
+        # An unheld cap is unchanged by the cap on `after`: still tightened.
+        free, _ = self._resolve()
+        tightened, _ = epi.apply_input_confidence(free, confidence)
+        self.assertLess(tightened["max_player_exposure_pct"],
+                        free["max_player_exposure_pct"])
+
+    def test_the_games_a_scalar_sets_carry_the_scalars_provenance(self):
+        """Per game, the games the scalar expanded into read what the scalar
+        reads: held when the scalar is never-relax, and the rung's (not an
+        operator's) when a deadline move put the scalar there."""
+        held, prov = self._resolve(
+            override={"max_game_exposure_pct": 0.5,
+                      "max_game_exposure_pct_by_game": {"g2": 0.4}},
+            roster_id_maps=self._GAMES, weather_game_caps={"g3": 0.25},
+            never_relax={"max_game_exposure_pct"})
+        self.assertEqual(prov["max_game_exposure_pct_by_game"],
+                         {"g1": "operator_never_relax", "g2": "operator_relaxable",
+                          "g3": "weather_derived"})
+        # A rung-opened scalar: the override carries it, the moves say whose.
+        _moved, prov = self._resolve(
+            override={"max_game_exposure_pct": 1.0,
+                      "max_game_exposure_pct_by_game": {"g2": 0.4}},
+            roster_id_maps=self._GAMES,
+            override_provenance={"max_game_exposure_pct": "engine_default"})
+        self.assertEqual(prov["max_game_exposure_pct"], "engine_default")
+        self.assertEqual(prov["max_game_exposure_pct_by_game"],
+                         {"g1": "engine_default", "g2": "operator_relaxable",
+                          "g3": "engine_default"})
+
+    def test_run_slate_labels_a_moved_key_from_its_move(self):
+        """Through the door: `control_moves` reaches the resolver, so the row a
+        rung opened reads its pre-move provenance and says what moved it."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            salary = root / "salary.csv"; ids = write_salary(salary)
+            entries = root / "DKEntries.csv"; write_entries(entries)
+            r1, r2 = legal_rosters(ids)
+            moves = [{"control": "max_player_exposure_pct", "before": 0.45,
+                      "after": 1.0, "provenance": "posture_default",
+                      "reason": "bank_short", "by": "open_controls"},
+                     {"control": "max_game_exposure_pct", "before": None,
+                      "after": 1.0, "provenance": None,
+                      "reason": "bank_short", "by": "open_controls"}]
+            plan = run_slate(
+                runs_root=root / "runs", salary_csv=salary, entries_csv=entries,
+                projections_override=projection_frame(ids),
+                candidates_override=[candidate("A", r1, 100),
+                                     candidate("B", r2, 99, "CCC")],
+                approve=False,
+                portfolio_controls_override={"max_player_exposure_pct": 1.0,
+                                             "max_game_exposure_pct": 1.0},
+                control_moves=moves)
+            by_game = plan["control_provenance"]["by_control"][
+                "max_game_exposure_pct_by_game"]["provenance"]
+            self.assertTrue(by_game)
+            self.assertEqual(set(by_game.values()), {"engine_default"},
+                             "the games the opened scalar set read as typed")
+            row = plan["control_provenance"]["by_control"]["max_player_exposure_pct"]
+            self.assertEqual(row["provenance"], "posture_default")
+            self.assertEqual(row["relaxed"]["from"], 0.45)
+            self.assertTrue(any(n.startswith("max_player_exposure_pct: deadline "
+                                             "governor opened")
+                                for n in plan["controls_feasibility"]["notes"]))
+
+    def test_late_swap_restates_never_relax_and_refuses_the_cap_it_strips(self):
+        """The merge's third door. A swap re-derives the floors, so without the
+        build's never-relax it would grade the refined file against a looser
+        cap than the one the build held."""
+        import contextlib
+        import importlib
+        tools = str(REPO / "tools")
+        if tools not in sys.path:
+            sys.path.insert(0, tools)
+        ls = importlib.import_module("late_swap")
+        postures = {"c1": {"posture": "large_gpp"}}
+        base = ls.resolve_swap_controls(postures, None, None)
+        floor = base["max_shared_players"] + 2
+        with unittest.mock.patch.object(ls, "_slate_feasibility", lambda *a, **k: {}), \
+                unittest.mock.patch.object(ls, "feasibility_floors_from",
+                                           lambda _i: {"max_shared_players": floor}), \
+                unittest.mock.patch.object(ls, "slate_game_count", lambda _p: None), \
+                unittest.mock.patch.object(ls, "derive_roster_id_maps", lambda _p: None):
+            floored = ls.resolve_swap_controls(postures, None, None,
+                                               requirements=[], projections=object())
+            held = ls.resolve_swap_controls(postures, None, None,
+                                            requirements=[], projections=object(),
+                                            never_relax={"max_shared_players"})
+        self.assertEqual(floored["max_shared_players"], floor)
+        self.assertEqual(held["max_shared_players"], base["max_shared_players"])
+        for name, needle in (("max_consensus_cluster_share_pct", "does not enforce"),
+                             ("classic_sleves", "not a control this engine knows")):
+            with self.subTest(name=name):
+                err = io.StringIO()
+                argv = ["late_swap.py", "--date", "2026-09-23", "--parent-entries",
+                        "nowhere.csv", "--never-relax", name]
+                with unittest.mock.patch.object(sys, "argv", argv), \
+                        contextlib.redirect_stderr(err):
+                    code = ls.main()
+                self.assertEqual(code, 4)
+                self.assertIn(needle, err.getvalue())
+                self.assertIn("no swap was attempted", err.getvalue())
+
+    def test_a_showdown_refusal_names_the_right_reason(self):
+        from mlb_engine.pipeline import deadline_governor as dg
+        for name, needle in (("max_cpt_per_contest", "R153"),
+                             ("max_team_exposure_pct", "a Classic control")):
+            with self.subTest(name=name):
+                with self.assertRaises(ValueError) as caught:
+                    dg.resolve_never_relax([name], contest_type="showdown")
+                self.assertIn(needle, str(caught.exception))
 
     # -- autobuild ------------------------------------------------------- #
     def _supervisor(self):
@@ -25516,6 +25655,40 @@ class ControlProvenanceTests(unittest.TestCase):
         dec.never_relax = []
         self.assertNotIn("never_relax", dec.controls_block(),
                          "a run without the flag keeps R214's three fields")
+
+    def test_autobuild_resume_keeps_the_never_relax_it_continues(self):
+        """A resumed call without the flag restores the floors; without the set
+        they would land on the control the first call held."""
+        import importlib
+        ab = importlib.import_module("tools.autobuild")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            path = root / "outputs" / "2026-07-29" / "autobuild_decisions.json"
+            path.parent.mkdir(parents=True)
+            path.write_text(json.dumps({
+                "decisions": [{"attempt": 1, "action": "operator_never_relax"}],
+                "controls": {"derived_controls": {"max_shared_players": 8},
+                             "never_relax": ["max_shared_players"]}}),
+                encoding="utf-8")
+            dec = ab.Decisions()
+            with unittest.mock.patch.object(ab, "REPO", root), \
+                    unittest.mock.patch.object(ab, "_decision_log_date",
+                                               lambda *_a, **_k: "2026-07-29"):
+                out = ab._resume_state(dec, None)
+        self.assertEqual(out["never_relax"], ["max_shared_players"])
+        dec.never_relax = ab.never_relax_names(out["never_relax"])
+        self.assertNotIn("max_shared_players", dec.effective_controls)
+
+    def test_autobuild_names_the_childs_exit_4_status(self):
+        h = self._supervisor()
+
+        def side(n, cmd, kwargs):
+            return h._proc(4, {"status": "never_relax_not_holdable",
+                               "error": "--never-relax names a control it cannot hold"})
+        code, records, _cmds, _logs = h._run(side)
+        self.assertEqual(code, 4)
+        self.assertIn("never_relax_not_holdable", records[-1]["why"])
+        self.assertEqual(records[-1]["status"], "never_relax_not_holdable")
 
 
 class DeadlineGovernorTests(unittest.TestCase):

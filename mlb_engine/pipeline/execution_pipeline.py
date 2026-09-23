@@ -3562,6 +3562,7 @@ INPUT_CONFIDENCE_FACTS = ("no_odds_priced", "stale_platoon_reference",
 #: R388(b) it lives in `gate_classes.CONTROL_PROVENANCES` with the other six.
 from mlb_engine.entries.gate_classes import (  # noqa: E402
     PROV_CONFIDENCE_DERIVED as CONFIDENCE_DERIVED,
+    PROV_ENGINE_DEFAULT as _PROV_ENGINE_DEFAULT,
 )
 
 
@@ -3633,7 +3634,8 @@ def apply_input_confidence(
     """R407. Tighten the two caps by the tier's schedule, and say what moved.
 
     Floors win (``max(tightened, floor)``), so the tightening can never push a
-    cap below what the slate can carry. An explicit override of either key wins
+    cap below what the slate can carry, and the result never exceeds the cap it
+    started from (R388(b)): a never-relax cap already below its floor stays put. An explicit override of either key wins
     over the tightening. A cap already at 1.0 is OFF and stays off: tightening
     it would switch on a control no posture asked for. ``relax`` names why the
     tightening is not applied this solve -- ``deadline_t30`` (R386: inside T-30
@@ -3662,7 +3664,13 @@ def apply_input_confidence(
             continue
         floor_val = (floors or {}).get(key)
         target = round(float(before) - float(delta), 4)
-        after = round(max(target, float(floor_val) if floor_val else 0.0), 4)
+        # R388(b). Capped at `before`: a tightening never loosens. A cap held
+        # below its feasibility floor by `--never-relax` would otherwise come
+        # back AT the floor, the exact move the never-relax blocked. For every
+        # other cap `before` is already at or above its floor after the merge,
+        # so the cap changes nothing there.
+        after = round(min(float(before),
+                          max(target, float(floor_val) if floor_val else 0.0)), 4)
         if after <= 0.0:
             after = float(before)
         entry = {"before": before, "after": after, "delta": delta,
@@ -3692,9 +3700,10 @@ def _control_provenance_block(
     landed. Two layers run after it and are applied here, in order:
 
     * R407's tightening: a cap the tier moved is `confidence_derived`, unless
-      the operator named it never-relax, which outranks every source (the
-      tightening only ever tightens, so the value is still at least as strict
-      as the one the operator pinned).
+      the operator named it never-relax, which outranks every source. That is
+      true of the value because `apply_input_confidence` caps its result at
+      the value it started from, so a tightening never loosens a held cap,
+      even one held below its feasibility floor.
     * The deadline governor's ``control_moves``: its opened values arrive as an
       override, so without this the row would read `operator_relaxable` for a
       number no operator typed. A moved row keeps the provenance the control
@@ -3775,6 +3784,7 @@ def _merged_controls_for_build(
     *,
     never_relax: Iterable[str] = (),
     provenance_out: Optional[MutableMapping[str, Any]] = None,
+    override_provenance: Optional[Mapping[str, str]] = None,
 ) -> Dict[str, Any]:
     """Merge strategy-default controls across contests (tightest cap wins), floor to
     feasibility, then apply overrides.
@@ -3794,8 +3804,12 @@ def _merged_controls_for_build(
     posture merge, a floor that moved a value, the override, the per-game caps
     (a per-game dict of its own, since weather and the operator both write it),
     and never-relax last, because it outranks every other source. The id maps
-    are data, not controls, and carry none. Every caller that passes neither
-    gets the dict it got before.
+    are data, not controls, and carry none. ``override_provenance`` names the
+    provenance of override keys that are NOT the operator's: `run_slate` passes
+    the deadline rung's moves through it, so a game the opened scalar expands
+    into is labelled with the scalar rather than as typed. None of the three
+    arguments changes a value except ``never_relax``; every caller that passes
+    none gets the dict it got before.
     """
     from mlb_engine.entries import gate_classes as _gc  # noqa: PLC0415
     holding = {str(k) for k in (never_relax or ())}
@@ -3996,7 +4010,11 @@ def _merged_controls_for_build(
     merged.update(coerced_override)
     # R388(b): a typed cap alone is relaxable (audit §2).
     for key in coerced_override:
-        prov[key] = _gc.PROV_OPERATOR_RELAXABLE
+        prov[key] = (override_provenance or {}).get(key) or _gc.PROV_OPERATOR_RELAXABLE
+    # Never-relax reaches the game scalar before the per-game expansion reads
+    # its provenance, so every game the held scalar sets reads held too.
+    if "max_game_exposure_pct" in holding and "max_game_exposure_pct" in merged:
+        prov["max_game_exposure_pct"] = _gc.PROV_OPERATOR_NEVER_RELAX
 
     # R333 / R343. The id maps and the resolved per-game caps land HERE, after
     # the override, because this is the one boundary every production door
@@ -5731,7 +5749,7 @@ def run_slate(
     # nothing and says nothing. The same resolver build_slate's flag uses, so
     # the two doors accept the same names; F-3 is in the set on every build.
     from mlb_engine.pipeline import deadline_governor as _dg  # noqa: PLC0415
-    never_relax = _dg.resolve_never_relax(sorted(never_relax_controls or ()))
+    never_relax = _dg.resolve_never_relax(never_relax_controls)
 
     entry_rows = parse_dk_entry_rows(str(entries_csv))
     reserved = [r for r in entry_rows]
@@ -5837,11 +5855,18 @@ def run_slate(
         roster_id_maps=roster_id_maps, weather_game_caps=weather_game_caps)
     floors = feasibility_floors_from(feasibility_inputs)
     provenance: Dict[str, Any] = {}
+    # R388(b). A rung-opened key arrives in the override; its provenance is the
+    # one it had before the move (or the governor's engine table where nothing
+    # was set), never the operator's.
+    moved_provenance = {
+        str(m.get("control")): (m.get("provenance") or _PROV_ENGINE_DEFAULT)
+        for m in (control_moves or ()) if m.get("control")}
     controls = _merged_controls_for_build(
         posture_by_contest, portfolio_controls_override, feasibility_floors=floors,
         shape_bands=shape_bands, roster_id_maps=roster_id_maps,
         weather_game_caps=weather_game_caps,
         never_relax=never_relax, provenance_out=provenance,
+        override_provenance=moved_provenance,
     )
     # Re-derived from the merged controls rather than carried out of the merge:
     # same pure function, same three inputs, so the record and the enforced dict

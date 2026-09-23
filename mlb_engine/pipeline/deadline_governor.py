@@ -216,9 +216,10 @@ NEVER_RELAX_NOT_HONOURED: Dict[str, str] = {
 #: exposure, captain lock), counted in the brief, and that ladder reads no
 #: never-relax yet.
 NEVER_RELAX_SHOWDOWN_CONTROLS: frozenset = DEFAULT_NEVER_RELAX
+SHOWDOWN_CONTROLS = frozenset(OPEN_SHOWDOWN_CONTROL_VALUES) | {"max_cpt_per_contest"}
 SHOWDOWN_NOT_HONOURED_REASON = (
     "Showdown's solver relaxes max_shared_players, max_player_exposure_pct and "
-    "the captain cap per slot under R153's order and counts each relaxation in "
+    "the captain caps per slot under R153's order and counts each relaxation in "
     "the brief; that ladder reads no never-relax yet (R391(b), Session 20)")
 
 
@@ -241,9 +242,12 @@ def resolve_never_relax(names: Any = None, *, contest_type: str = "classic"
     for name in raw:
         if name in accepted:
             continue
-        if showdown and name in NEVER_RELAX_CLASSIC_CONTROLS | set(
-                OPEN_SHOWDOWN_CONTROL_VALUES) | set(NEVER_RELAX_NOT_HONOURED):
+        if showdown and name in SHOWDOWN_CONTROLS:
             problems.append(f"{name}: {SHOWDOWN_NOT_HONOURED_REASON}")
+        elif showdown and name in NEVER_RELAX_CLASSIC_CONTROLS | set(
+                NEVER_RELAX_NOT_HONOURED):
+            problems.append(f"{name}: a Classic control; a Showdown build has "
+                            f"no such control to hold")
         elif name in NEVER_RELAX_NOT_HONOURED:
             problems.append(f"{name}: not honoured yet, because "
                             f"{NEVER_RELAX_NOT_HONOURED[name]} (R391)")

@@ -143,7 +143,8 @@ def lateswap_dest_name(slate_tag: str, run_id: str) -> str:
 
 def resolve_swap_controls(postures, override, solver_budget,
                           requirements=None, projections=None,
-                          excluded_player_ids=None, stripped_out=None) -> dict:
+                          excluded_player_ids=None, stripped_out=None,
+                          never_relax=()) -> dict:
     """Merged portfolio controls for the swap, with the joint solve bounded (R25).
 
     R29(3): these used to be one flat dict applied to every contest, and its
@@ -181,6 +182,11 @@ def resolve_swap_controls(postures, override, solver_budget,
     its one monolithic stage. --solver-budget is that way; an explicit
     --controls-override time_limit still wins, because an operator who passed
     JSON meant it.
+
+    R388(b). ``never_relax`` is the build's `--never-relax`, restated: the swap
+    is the merge's third door, and a feasibility floor here must not raise a
+    control the build held below it, or the refined file is graded against a
+    looser cap than the one it was built to.
     """
     floors: dict = {}
     if requirements is not None and projections is not None:
@@ -213,7 +219,7 @@ def resolve_swap_controls(postures, override, solver_budget,
                       if projections is not None else None)
     controls = dict(_merged_controls_for_build(
         postures, None, feasibility_floors=floors, shape_bands=shape_bands,
-        roster_id_maps=roster_id_maps))
+        roster_id_maps=roster_id_maps, never_relax=never_relax or ()))
     if solver_budget is not None:
         controls["time_limit"] = float(solver_budget)
     controls.update(override or {})
@@ -571,6 +577,14 @@ def main() -> int:
     ap.add_argument("--ignore-unresolved-postures", action="store_true",
                     help="proceed when a contest name matches no archetype, "
                          "accepting the fallback posture. Recorded on stderr.")
+    ap.add_argument("--never-relax", dest="never_relax", action="append",
+                    default=None, metavar="CONTROL[,CONTROL...]",
+                    help="restate the parent build's --never-relax (R388(b)): a "
+                         "feasibility floor does not raise these controls, so "
+                         "the swap grades the portfolio against the caps the "
+                         "build held. A name the swap cannot hold (the "
+                         "consensus-cluster cap, which a swap does not enforce) "
+                         "refuses before anything is read.")
     ap.add_argument("--controls-override", dest="controls_override", type=json.loads,
                     default=None,
                     help="JSON dict merged over the controls derived from this "
@@ -593,6 +607,22 @@ def main() -> int:
               f"{type(args.controls_override).__name__} "
               f"({json.dumps(args.controls_override)[:120]}). Nothing was read "
               f"and no swap was attempted.", file=sys.stderr)
+        return 4
+    # R388(b). The same resolver the build's flag uses, so the two accept the
+    # same names; plus the one control the swap derives and then strips.
+    from mlb_engine.pipeline.deadline_governor import resolve_never_relax  # noqa: PLC0415
+    try:
+        swap_never_relax = resolve_never_relax(args.never_relax)
+    except ValueError as exc:
+        print(f"{exc}. Nothing was read and no swap was attempted.",
+              file=sys.stderr)
+        return 4
+    unheld = sorted(swap_never_relax & set(SWAP_UNENFORCED_CONTROLS))
+    if unheld:
+        print(f"--never-relax names {', '.join(unheld)}, which a late swap does "
+              f"not enforce (R405: its bank holds no cluster-limited jobs), so "
+              f"the swap cannot hold it. Nothing was read and no swap was "
+              f"attempted.", file=sys.stderr)
         return 4
 
     slate = REPO / "data" / "slates" / args.date
@@ -818,7 +848,7 @@ def main() -> int:
     controls = resolve_swap_controls(
         postures, args.controls_override, args.solver_budget,
         requirements=requirements, projections=projections,
-        stripped_out=swap_stripped)
+        stripped_out=swap_stripped, never_relax=swap_never_relax)
     if swap_stripped:
         print(f"consensus-cluster cap NOT enforced on a late swap (R405): stripped "
               f"{', '.join(f'{k}={v}' for k, v in sorted(swap_stripped.items()))} "

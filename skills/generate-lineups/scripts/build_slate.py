@@ -5827,9 +5827,10 @@ def main() -> int:
                          "relaxable. Distinct lineups per contest (F-3) is held "
                          "on every build without the flag. A control the "
                          "engine cannot hold at every relaxer yet (the "
-                         "allocator's own ladders and sleeves; all three "
+                         "allocator's own ladders and sleeves; all four "
                          "Showdown controls) refuses at exit 4 with the reason, "
-                         "before anything is staged.")
+                         "before anything is staged. A late swap re-derives "
+                         "floors: restate it on tools/late_swap.py.")
     # R381 (CC-5, R307 batch 1). Ben's design ruling, 2026-09-03: "we dont need
     # to artificially zero out players, but we should figure out how we can find
     # leverage in the captain ranks and devote a few lineups to those picks."
