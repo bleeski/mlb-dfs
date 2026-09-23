@@ -1,0 +1,52 @@
+{
+ "code": {
+  "contest_allocator": "v1.12",
+  "execution_pipeline": "v1.17",
+  "git_dirty": true,
+  "git_sha": "2eb9267ec1b2b3ac44a6e9c46d5223b298c932c2"
+ },
+ "date": "2026-09-23",
+ "exit_code": 3,
+ "host": {
+  "call_budget_s": 630.0,
+  "declared_ceiling_s": 900.0,
+  "host": "claude_code"
+ },
+ "kind": "refusal",
+ "labels": "a refusal is an observed build outcome, never a claim about the slate",
+ "recorded_utc": "2026-09-23T21:44:15.745805+00:00",
+ "refusal": {
+  "argv": [
+   "--date",
+   "2026-09-23",
+   "--salary",
+   "data/slates/2026-09-23/667b7484-DKSalaries_108.csv",
+   "--entries",
+   "data/slates/2026-09-23/c5a5990a-DKEntries_85.csv",
+   "--odds",
+   "data/slates/2026-09-23/odds_from_paste.json",
+   "--no-rotowire",
+   "--postures",
+   "195997188=cash,195997458=small_gpp,195997953=single_entry,195999789=wta_satellite",
+   "--declare-pitcher",
+   "44242170=viable_bulk_or_alt_sp",
+   "--declare-pitcher",
+   "44242169=viable_bulk_or_alt_sp",
+   "--controls-override",
+   "{\"max_primary_stack_exposure_pct\": 0.40}",
+   "--deliver-by",
+   "18:30"
+  ],
+  "errors": [
+   "entry-level joint MILP proven infeasible: no single control is arithmetically binding against this bank, so the interaction of the active controls is. Active: max_consensus_cluster_share_pct=0.5, max_pitcher_exposure_pct=0.43, max_player_exposure_pct=0.45, max_primary_stack_exposure_pct=0.4, max_shared_players=6, max_sp_pair_repetition=1, max_team_exposure_pct=0.55"
+  ],
+  "failing_checks": [],
+  "note": "built and refused: the build ran but did not certify, or the pool blocked it",
+  "refusal": "classic_not_certified",
+  "refusal_class": "badly_shaped",
+  "run_id": "20260923T214415Z_776f7219",
+  "status": "not_certified"
+ },
+ "schema_version": 1,
+ "slate_tag": "1835_3g"
+}

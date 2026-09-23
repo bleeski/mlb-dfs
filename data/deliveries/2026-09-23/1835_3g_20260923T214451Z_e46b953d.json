@@ -1,0 +1,220 @@
+{
+ "code": {
+  "contest_allocator": "v1.12",
+  "execution_pipeline": "v1.17",
+  "git_dirty": true,
+  "git_sha": "2eb9267ec1b2b3ac44a6e9c46d5223b298c932c2"
+ },
+ "controls": {
+  "five_stack_min_size": 5,
+  "max_consensus_cluster_share_pct": 0.3,
+  "max_pitcher_exposure_pct": 0.43,
+  "max_player_exposure_pct": 0.4,
+  "max_primary_stack_exposure_pct": 0.4,
+  "max_shared_players": 6,
+  "max_sp_pair_repetition": 1,
+  "max_team_exposure_pct": 0.6,
+  "min_five_stack_share_pct": 0.0,
+  "player_game_by_id": {
+   "distinct_values": 3,
+   "players_mapped": 61,
+   "wired": true
+  },
+  "player_team_by_id": {
+   "distinct_values": 6,
+   "players_mapped": 61,
+   "wired": true
+  },
+  "primary_stack_min_size": 4
+ },
+ "date": "2026-09-23",
+ "egress": "egress: statsapi unreachable, odds unreachable, savant unreachable, mlb-lineups unreachable, fangraphs unreachable (curl), open-meteo unreachable",
+ "egress_source": "session_start 2026-09-23T21:40:25+00:00",
+ "entries": [
+  {
+   "contest_id": "195997188",
+   "contest_name": "MLB $1 Triple Up [Top 9 Win $3] (Turbo)",
+   "entry_fee": 1.0,
+   "entry_id": "5267288807",
+   "filled": true,
+   "roster_ids": [
+    "44241965",
+    "44241970",
+    "44242001",
+    "44241984",
+    "44242005",
+    "44241995",
+    "44242014",
+    "44242032",
+    "44241998",
+    "44241972"
+   ]
+  },
+  {
+   "contest_id": "195997458",
+   "contest_name": "MLB $30 Quarter Jukebox [Just $0.25!] (Turbo)",
+   "entry_fee": 0.25,
+   "entry_id": "5267280404",
+   "filled": true,
+   "roster_ids": [
+    "44241966",
+    "44241967",
+    "44242007",
+    "44241982",
+    "44241992",
+    "44242058",
+    "44241978",
+    "44242032",
+    "44241974",
+    "44241979"
+   ]
+  },
+  {
+   "contest_id": "195997458",
+   "contest_name": "MLB $30 Quarter Jukebox [Just $0.25!] (Turbo)",
+   "entry_fee": 0.25,
+   "entry_id": "5267288466",
+   "filled": true,
+   "roster_ids": [
+    "44241968",
+    "44241965",
+    "44242044",
+    "44241973",
+    "44241976",
+    "44242022",
+    "44242004",
+    "44241980",
+    "44241990",
+    "44242041"
+   ]
+  },
+  {
+   "contest_id": "195997953",
+   "contest_name": "MLB $250 Solo Shot (Turbo)",
+   "entry_fee": 1.0,
+   "entry_id": "5267288508",
+   "filled": true,
+   "roster_ids": [
+    "44241966",
+    "44242170",
+    "44242001",
+    "44241974",
+    "44242005",
+    "44241983",
+    "44242004",
+    "44241981",
+    "44242019",
+    "44241979"
+   ]
+  },
+  {
+   "contest_id": "195999789",
+   "contest_name": "MLB Satellite to $20 NFL Fantasy Football Millionaire (Turbo)",
+   "entry_fee": 1.0,
+   "entry_id": "5267280438",
+   "filled": true,
+   "roster_ids": [
+    "44241968",
+    "44241967",
+    "44241989",
+    "44241973",
+    "44241992",
+    "44241988",
+    "44241978",
+    "44241984",
+    "44241998",
+    "44242011"
+   ]
+  }
+ ],
+ "entries_binding": {
+  "source": "outputs/2026-09-23/DO_NOT_UPLOAD_DKEntries_1835_3g.csv",
+  "source_sha256": "e1ccd336f9b2e263bbf8686b8185aabc18b6abc51e8f5bd1bd87228b11aef8c4",
+  "status": "bound"
+ },
+ "host": {
+  "call_budget_s": 630.0,
+  "declared_ceiling_s": 900.0,
+  "host": "claude_code"
+ },
+ "kind": "delivery",
+ "labels": "deterministic review proxies and labeled priors only; never ROI, win rate, cash rate, or probability",
+ "manifest_row": {
+  "certification": "certified",
+  "contest_ids": [
+   "195997188",
+   "195997458",
+   "195997953",
+   "195999789"
+  ],
+  "contest_names": [
+   "MLB $1 Triple Up [Top 9 Win $3] (Turbo)",
+   "MLB $250 Solo Shot (Turbo)",
+   "MLB $30 Quarter Jukebox [Just $0.25!] (Turbo)",
+   "MLB Satellite to $20 NFL Fantasy Football Millionaire (Turbo)"
+  ],
+  "contest_type": "classic",
+  "delivered_file": "outputs/2026-09-23/DKEntries_1835_3g.csv",
+  "entries": 5,
+  "notes": "",
+  "projection_tier": "enriched",
+  "recorded_utc": "2026-09-23T21:44:52.157188+00:00",
+  "run_id": "20260923T214451Z_e46b953d",
+  "sha256": "e1ccd336f9b2e263bbf8686b8185aabc18b6abc51e8f5bd1bd87228b11aef8c4",
+  "slate_tag": "1835_3g",
+  "status": "candidate",
+  "strategy_state": {
+   "bank_warnings": [],
+   "counts": {
+    "built": 12,
+    "du_relaxation_high_water": 0,
+    "requested": 12
+   },
+   "evidence": "recorded",
+   "state": "relaxed",
+   "warnings": []
+  }
+ },
+ "recorded_utc": "2026-09-23T21:44:52.158887+00:00",
+ "relaxations": {},
+ "run": {
+  "certification": {
+   "allocation_certified": true,
+   "failed_post_export_gates": [],
+   "post_export_gates": {
+    "entry_reconciliation_passed": true,
+    "export_hash_binding_passed": true,
+    "locked_immutability_passed": true,
+    "portfolio_caps_passed": true,
+    "roster_legality_passed": true,
+    "template_preservation_passed": true
+   },
+   "pre_export_passed": true,
+   "selection_certified": true,
+   "workflow_valid": true
+  },
+  "environment": {
+   "lock_file": "requirements.lock",
+   "lock_sha256": "dd7723e54043e8c2644100beba5069959d835258f96e1cf6dc100ea1617ac0d6",
+   "packages": {
+    "numpy": "2.2.6",
+    "pandas": "2.3.3",
+    "scipy": "1.15.3"
+   },
+   "python": "3.11.15"
+  },
+  "inputs": {
+   "DKEntries.csv": {
+    "sha256": "54eac398df10b6bc77eab709462683c658cc1f27bdfb300502047f771484ec21",
+    "size_bytes": 31484,
+    "source_path": "/home/user/mlb-dfs/data/slates/2026-09-23/DKEntries.csv"
+   },
+   "DKSalaries.csv": {
+    "sha256": "ffe02d71bbaa2db30bb74fac6a0c057fa32d6fb2a084b8ebf29c9bc6a5cc1f0b",
+    "size_bytes": 26977,
+    "source_path": "/home/user/mlb-dfs/data/slates/2026-09-23/DKSalaries.csv"
+   }
+  }
+ },
+ "schema_version": 1
+}
