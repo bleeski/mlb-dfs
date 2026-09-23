@@ -137,6 +137,12 @@ LOOSE_CONTROLS = {
     # direct bank for no cluster-limited jobs, so the loose baseline measures
     # the construction it always measured and does not move.
     "max_consensus_cluster_share_pct": 1.0,
+    # R406, 2026-09-23. Sleeves OFF here, for the same reason: they are a
+    # portfolio-shaping choice (Ben's default ON), and the loose replay exists
+    # to measure the front door's construction with the shaping held out of the
+    # way. Off, the loose baseline is byte-identical across R406; the
+    # production replay below runs them and re-freezes.
+    "classic_sleeves": False,
     "max_sp_pair_repetition": 50,
     "max_shared_players": 9,
     "max_candidate_reuse": 20,
@@ -509,9 +515,36 @@ class GoldenProductionReplayTests(unittest.TestCase):
                 max_candidates=_total_max)
             assert (limited.get("report") or {}).get("job_list_exhausted"), (
                 f"the cluster-limited bucket did not exhaust: {limited}")
-            candidates = cache.as_candidates(
+            # R406, 2026-09-23. The sliced door then builds the sleeves (Ben's
+            # default ON): chalk-fails and environment in this cache, salary-
+            # only in a sibling cache, each sized to twice its entries. Mirrored
+            # here with the same request and the same helper. On this two-game
+            # slate the environment sleeve is DROPPED (its top two games are the
+            # whole slate), which the frozen aggregates record.
+            from mlb_engine.allocate.contest_allocator import consensus_cluster_members
+            from mlb_engine.optimize.classic_sleeves import environment_teams_of, tag_sleeves
+            from mlb_engine.pipeline.execution_pipeline import (
+                build_sleeve_jobs, resolve_sleeve_bank_request, sleeve_candidates)
+            _sleeve_entries = [
+                {"entry_id": str(r.entry_id), "contest_id": str(r.contest_id),
+                 "posture": _postures[str(r.contest_id)]["posture"],
+                 "contest_shape": _postures[str(r.contest_id)]["contest_shape"]}
+                for r in _rows]
+            sleeve_request = resolve_sleeve_bank_request(_sleeve_entries, {}, projections)
+            assert sleeve_request["active"], sleeve_request
+            salary_cache = BankCache(Path(tmp) / "bank_salary_only.json")
+            sleeve_jobs = build_sleeve_jobs(
+                cache, projections, sleeve_request,
+                consensus_members=consensus_cluster_members(
+                    cache.as_candidates(None))["member_ids"],
+                time_budget_s=60, salary_cache=salary_cache)
+            candidates = tag_sleeves(cache.as_candidates(
                 projections, requested_n=18,
-                contest_shapes=["satellite", "large_field_gpp"])
+                contest_shapes=["satellite", "large_field_gpp"]),
+                environment_teams_of(sleeve_request))
+            candidates += sleeve_candidates(
+                cache, salary_cache, projections, requested_n=18,
+                contest_shapes=["satellite", "large_field_gpp"], base=candidates)
 
             common = dict(
                 salary_csv=cls.salary_csv, entries_csv=cls.entries_csv,
@@ -577,6 +610,13 @@ class GoldenProductionReplayTests(unittest.TestCase):
                             "cluster_members": limited.get("cluster_members"),
                             "m": limited.get("m"),
                         },
+                        # R406. What each sleeve built, and the one dropped.
+                        "classic_sleeves": {
+                            "expected_entries": sleeve_request["expected_entries"],
+                            "dropped": sleeve_request["dropped"],
+                            "built": {k: v.get("built") for k, v in
+                                      sorted((sleeve_jobs.get("sleeves") or {}).items())},
+                        },
                     },
                     "enrichment": {
                         "xwoba_applied": (pe.get("xwoba") or {}).get("applied"),
@@ -600,6 +640,13 @@ class GoldenProductionReplayTests(unittest.TestCase):
                     } | {"member_ids": [
                         m.get("player_id") for m in
                         ((cert.get("consensus_cluster") or {}).get("members") or [])]},
+                    # R406. How the allocator seated the entries across sleeves,
+                    # and how many fell back.
+                    "classic_sleeves": {
+                        k: (cert.get("classic_sleeves") or {}).get(k)
+                        for k in ("status", "entries_by_sleeve", "candidates_by_sleeve",
+                                  "relaxations")
+                    },
                 },
                 "assignments": summary["assignments"],
             }

@@ -2359,11 +2359,14 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
                 feed: dict, deadline: float) -> tuple[int, dict]:
     from mlb_engine.intake.live_data_adapters import build_slate_pool
     from mlb_engine.optimize.bank_cache import BankCache, extend_bank, pool_signature
+    from mlb_engine.optimize.classic_sleeves import (  # R406
+        environment_teams_of, tag_sleeves)
     # R340. The one derivation of what to ask the bank for, and the two
     # clamps that keep either stack size from being starved of budget.
     from mlb_engine.pipeline.execution_pipeline import (
         resolve_bank_stack_request, resolve_consensus_limited_request,
-        build_consensus_limited_jobs,
+        build_consensus_limited_jobs, resolve_sleeve_bank_request,
+        build_sleeve_jobs, sleeve_candidates, BANK_SLEEVE_BUDGET_SHARE,
         BANK_FIVE_STACK_BUDGET_MIN_SHARE,
         BANK_FIVE_STACK_BUDGET_MAX_SHARE,
     )
@@ -2667,6 +2670,9 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         # resume gate below can read `max_sp_pair_repetition` from it. None when
         # shape resolution failed, which leaves the gate on candidate count.
         _merged_controls = None
+        # R406. The entries the sleeve request is sized from, with each one's
+        # posture and shape, filled below when shape resolution succeeds.
+        _sleeve_entries: list = []
         try:
             from mlb_engine.entries.dk_entries_manager import parse_dk_entry_rows
             from mlb_engine.pipeline.execution_pipeline import (
@@ -2686,6 +2692,12 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
             _merged_controls = _merged_controls_for_build(
                 postures, None, shape_bands=_bands)
             bank_stack_request = resolve_bank_stack_request(_merged_controls)
+            _sleeve_entries = [
+                {"entry_id": str(r.entry_id), "contest_id": str(r.contest_id),
+                 "posture": (postures.get(str(r.contest_id)) or {}).get("posture"),
+                 "contest_shape": (postures.get(str(r.contest_id)) or {}).get(
+                     "contest_shape", "large_field_gpp")}
+                for r in reserved_rows]
         except Exception as exc:  # noqa: BLE001 - both are refinements
             print(f"shape resolution failed, scoring wta only and asking the "
                   f"bank for the default stack size: {exc}", file=sys.stderr)
@@ -2717,10 +2729,20 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
                 _cluster_controls[_ck] = args.controls_override[_ck]
         consensus_request = resolve_consensus_limited_request(
             _cluster_controls, n_entries, _total_max)
-        _ordinary_budget = slice_budget
+        # R406. The sleeves' request, from the same entries and postures. When
+        # active the sleeves run LAST, inside BANK_SLEEVE_BUDGET_SHARE of the
+        # slice budget; the ordinary and limited buckets share the rest.
+        sleeve_request = resolve_sleeve_bank_request(
+            _sleeve_entries,
+            {"classic_sleeves": (args.controls_override or {}).get("classic_sleeves", True)},
+            projections,
+            implied_total_by_team=(f1_report or {}).get("implied_total_by_team"))
+        _bank_budget = (slice_budget * (1.0 - BANK_SLEEVE_BUDGET_SHARE)
+                        if sleeve_request["active"] else slice_budget)
+        _ordinary_budget = _bank_budget
         _ordinary_max = _total_max
         if consensus_request["active"]:
-            _ordinary_budget = slice_budget * (1.0 - float(consensus_request["budget_share"]))
+            _ordinary_budget = _bank_budget * (1.0 - float(consensus_request["budget_share"]))
             _ordinary_max = max(30, _total_max - int(consensus_request["max_candidates"]))
         _started_slices = time.monotonic()
         for _idx, _size in enumerate(_sizes):
@@ -2760,7 +2782,7 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         # buckets is the cluster limit itself.
         consensus_jobs = {"attempted": False, "reason": consensus_request["reason"]}
         if consensus_request["active"]:
-            _left = slice_budget - (time.monotonic() - _started_slices)
+            _left = _bank_budget - (time.monotonic() - _started_slices)
             consensus_jobs = build_consensus_limited_jobs(
                 cache, projections, consensus_request,
                 time_budget_s=max(1.0, _left),
@@ -2790,8 +2812,35 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
             bank_report["consensus_limited_jobs"]["job_list_exhausted"] = consensus_jobs[
                 "report"].get("job_list_exhausted")
         bank_report["budget_floored"] = bank_budget_floored
-        candidates = cache.as_candidates(
-            projections, requested_n=n_entries, contest_shapes=slice_shapes)
+        # R406. The sleeves, last: chalk-fails and environment in this cache
+        # (their own buckets), salary-only in a sibling file, because a
+        # different frame is a different projection digest and would purge
+        # this one. The cluster chalk-fails limits against is the ORDINARY
+        # bucket's, the same one R405's limited jobs used.
+        salary_cache = None
+        sleeve_jobs = {"attempted": False, "reason": "sleeves not requested"}
+        if sleeve_request["active"]:
+            from mlb_engine.allocate.contest_allocator import consensus_cluster_members
+            salary_cache = BankCache(bank_path.with_name(bank_path.stem + "_salary_only.json"))
+            sleeve_jobs = build_sleeve_jobs(
+                cache, projections, sleeve_request,
+                consensus_members=consensus_cluster_members(
+                    cache.as_candidates(None))["member_ids"],
+                time_budget_s=max(1.0, slice_budget - (time.monotonic() - _started_slices)),
+                salary_cache=salary_cache,
+                leverage=leverage,
+                max_opposing_hitters_per_sp=getattr(
+                    args, "max_opposing_hitters_per_sp", None),
+                stack_min=int(_sizes[-1]))
+        bank_report["classic_sleeves_request"] = sleeve_request
+        bank_report["classic_sleeves_jobs"] = sleeve_jobs
+        candidates = tag_sleeves(cache.as_candidates(
+            projections, requested_n=n_entries, contest_shapes=slice_shapes),
+            environment_teams_of(sleeve_request))
+        if salary_cache is not None:
+            candidates += sleeve_candidates(
+                cache, salary_cache, projections, requested_n=n_entries,
+                contest_shapes=slice_shapes, base=candidates)
         # R351 / R115 (CC-36 Batch 1). The gate is thin-by-COUNT **or**
         # thin-by-PAIR-COVERAGE. Counting candidates alone stopped the resume at
         # roughly `n_entries` distinct SP pairs, because R340 makes one pair
@@ -2838,6 +2887,10 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
     postures = parse_postures_arg(getattr(args, "postures", None))
     if postures:
         slate_kwargs["contest_postures"] = postures
+    # R406. The environment sleeve's ranking input for the DIRECT door (the
+    # sliced door ranked its games above, from the same F1 report).
+    if (f1_report or {}).get("implied_total_by_team"):
+        slate_kwargs["sleeve_implied_total_by_team"] = dict(f1_report["implied_total_by_team"])
 
     # The pool report is the evidence behind the lineup gate. Without it run_slate
     # can only say "some players carry a batting order", which is not the same
@@ -3221,6 +3274,16 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
     exposure["consensus_cluster"] = result.get("consensus_cluster")
     print(f"consensus: {format_consensus_cluster_line(exposure['consensus_cluster'])}",
           file=sys.stderr)
+    # R406. The sleeves: what each was asked for (the bank's record, on either
+    # door), how the allocator seated entries across them, what fell back, and
+    # each sleeve's delivered apex and washout proxies.
+    _bank_record = bank_report if bank_report is not None else (result.get("candidate_bank") or {})
+    exposure["classic_sleeves"] = {
+        **dict(result.get("classic_sleeves") or {}),
+        "request": (_bank_record or {}).get("classic_sleeves_request"),
+        "jobs": (_bank_record or {}).get("classic_sleeves_jobs"),
+    }
+    print(f"sleeves: {format_sleeves_line(exposure['classic_sleeves'])}", file=sys.stderr)
     # R247(a). Read before approving, on the same footing as the frontier line.
     # The block itself lives inside the frontier (it is computed where the
     # entered set and the Ceiling column are both in hand); it is echoed here
@@ -5100,6 +5163,25 @@ def format_consensus_cluster_line(cluster: dict | None) -> str:
             f"histogram {hist}; objective median bank {price.get('bank')} / "
             f"delivered below k {price.get('delivered_below_k')} / at k+ "
             f"{price.get('delivered_at_k_or_more')} (review proxy, not a probability)")
+
+
+def format_sleeves_line(block: dict | None) -> str:
+    """R406. One review line: entries per sleeve, the environment games, the
+    fallbacks. Every sleeve is a deterministic construction over labeled priors."""
+    block = dict(block or {})
+    status = block.get("status")
+    if status != "applied":
+        return f"not applied ({status or 'no block'})"
+    totals: dict = {}
+    for per in (block.get("entries_by_sleeve") or {}).values():
+        for sleeve, n in per.items():
+            totals[sleeve] = totals.get(sleeve, 0) + int(n)
+    env = ((block.get("request") or {}).get("environment") or {})
+    games = ", ".join(env.get("games") or []) or "none"
+    return (", ".join(f"{k} {v}" for k, v in totals.items() if v)
+            + f"; environment games {games} (by {env.get('basis')}); "
+            + f"{block.get('relaxations', 0)} entr(ies) fell back to projection "
+            + "(constructions over labeled priors, not probabilities)")
 
 
 def format_degraded_line(degraded: dict | None) -> str:

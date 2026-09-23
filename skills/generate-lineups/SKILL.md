@@ -724,6 +724,36 @@ stderr line, `consensus_cluster_request` in the checkpoint, and
 `tools/qa_portfolio.py`'s `consensus_cluster` washout axis. A decorrelation
 preference over labeled priors; never a win rate, a cash rate, or a probability.
 
+### Classic scenario sleeves (R406, Classic only, ON by default)
+
+Every Classic candidate used to be an argmax of ONE projection, so a systematic
+projection error was shared by every entry. Sleeves build part of the portfolio
+in worlds where the projection is wrong in named ways, and the allocator
+confines each entry to one sleeve through its compatibility mask. The joint
+MILP and every cap still bind across the whole entered set.
+
+| Sleeve | World | Built as |
+| :--- | :--- | :--- |
+| `projection` | today's frame | the ordinary bank (and R405's limited bucket) |
+| `salary_only` | DK salary as the only prior (group points-per-dollar, group median ratios) | its own cache file; scored in its own world |
+| `chalk_fails` | the projection, with at most 1 of R405's consensus cluster per lineup | a limited bucket in the bank |
+| `environment` | the top 2 games by implied total, else by static park run factor | projection lineups stacking those games' teams; restricted jobs only add depth |
+
+- **Weights** (Ben, 2026-09-23): 40/20/20/20; `wta_satellite` and WTA contests
+  30/20/30/20. Largest remainder per contest; a single-entry or cash contest
+  seats `projection` only.
+- **Fallbacks are counted**: a sleeve with no candidate, or fewer distinct
+  lineups than entries in a contest, seats its excess on `projection`. On a
+  two-game slate the environment sleeve is DROPPED (its top two games are the
+  whole slate) and its seats fall back.
+- **Off**: `--controls-override '{"classic_sleeves": false}'`. The T-15 rung
+  opens it; late swap has no sleeve bank, so it seats as before.
+- **Where to read it**: the brief's `exposure.classic_sleeves` (the request,
+  the jobs, entries per sleeve per contest, fallbacks, and each sleeve's
+  delivered apex and washout proxies) and the `sleeves:` stderr line.
+  Constructions over labeled priors; a sleeve that does well in a replay is
+  "supported in the shapes replayed", never a probability or an edge.
+
 ### Caps that scale with input confidence (R407, Classic only)
 
 The brief already reports when the inputs are weak; since R407 the build reads

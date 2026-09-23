@@ -1361,13 +1361,101 @@ def _untouchable_cap_conflicts(
     return lines
 
 
+def _resolve_classic_sleeves(
+    candidates: Sequence[Dict[str, Any]],
+    entries: Sequence[Dict[str, Any]],
+    full_compatible: List[List[bool]],
+    controls: Mapping[str, Any],
+    rosters: Sequence[Tuple[str, ...]],
+) -> Dict[str, Any]:
+    """R406. Apportion entries to sleeves and confine each through the mask.
+
+    Applied only when the bank actually carries sleeve-built candidates (a
+    ``bank_sleeve`` tag): a bank that never built a sleeve is not a sleeve
+    shortfall, so it reports ``no_sleeve_bank`` and changes nothing -- R340's
+    never-asked versus asked-and-could-not. Each entry's declared weights come
+    from its own posture and shape (`classic_sleeves.contest_sleeve_weights`),
+    and the joint MILP and every cap stay in force across all sleeves, because
+    the only change is which candidates an entry may take.
+
+    Every fallback is counted: a sleeve with no candidate, a (contest, sleeve)
+    with fewer distinct compatible lineups than entries (its excess entries go
+    to ``projection``), and an entry left with nothing compatible in its sleeve
+    (unmasked). Mutates ``full_compatible`` in place.
+    """
+    from mlb_engine.optimize import classic_sleeves as cs
+    if controls.get("classic_sleeves") is False:
+        return {"status": "off", "relaxations": 0}
+    cand_sleeves = [set(cs.candidate_sleeves(c)) for c in candidates]
+    if all(x == {cs.SLEEVE_PROJECTION} for x in cand_sleeves):
+        return {"status": "no_sleeve_bank", "relaxations": 0}
+    E, K = len(entries), len(candidates)
+    weights: Dict[str, Dict[str, float]] = {}
+    for entry in entries:
+        cid = str(entry.get("contest_id") or "")
+        weights.setdefault(cid, cs.contest_sleeve_weights(
+            entry.get("posture"), entry.get("contest_shape")))
+    available = sorted(set().union(*cand_sleeves))
+    plan = cs.apportion_entries(entries, weights, available=available)
+    sleeve_of = dict(plan["sleeve_by_entry"])
+    fallbacks = list(plan["fallbacks"])
+    ids = [str(e.get("entry_id") or "") for e in entries]
+    # A (contest, sleeve) needs as many distinct compatible lineups as entries,
+    # or the same-contest duplicate rule cannot seat it.
+    by_group: Dict[Tuple[str, str], List[int]] = defaultdict(list)
+    for e, entry in enumerate(entries):
+        by_group[(str(entry.get("contest_id") or ""), sleeve_of.get(ids[e], cs.SLEEVE_PROJECTION))].append(e)
+    for (cid, sleeve), members in sorted(by_group.items()):
+        if sleeve == cs.SLEEVE_PROJECTION:
+            continue
+        distinct = {tuple(sorted(rosters[k])) for e in members for k in range(K)
+                    if full_compatible[e][k] and sleeve in cand_sleeves[k]}
+        if len(distinct) < len(members):
+            excess = sorted(members, key=lambda e: ids[e])[len(distinct):]
+            for e in excess:
+                sleeve_of[ids[e]] = cs.SLEEVE_PROJECTION
+            fallbacks.append({"contest_id": cid, "sleeve": sleeve, "entries": len(excess),
+                              "reason": f"{len(distinct)} distinct compatible lineup(s) "
+                                        f"for {len(members)} entries"})
+    unmasked: List[str] = []
+    for e in range(E):
+        want = sleeve_of.get(ids[e], cs.SLEEVE_PROJECTION)
+        masked = [full_compatible[e][k] and want in cand_sleeves[k] for k in range(K)]
+        if any(masked):
+            full_compatible[e] = masked
+        elif any(full_compatible[e]):
+            unmasked.append(ids[e])
+    if unmasked:
+        fallbacks.append({"sleeve": "any", "entries": len(unmasked),
+                          "entry_ids": unmasked,
+                          "reason": "no compatible candidate in the entry's sleeve; "
+                                    "left unmasked"})
+    entries_by_sleeve: Dict[str, Dict[str, int]] = {}
+    for e, entry in enumerate(entries):
+        cid = str(entry.get("contest_id") or "")
+        bucket = entries_by_sleeve.setdefault(cid, {x: 0 for x in cs.SLEEVES})
+        bucket[sleeve_of.get(ids[e], cs.SLEEVE_PROJECTION)] += 1
+    return {
+        "status": "applied",
+        "weights_by_contest": weights,
+        "entries_by_sleeve": entries_by_sleeve,
+        "candidates_by_sleeve": dict(sorted(Counter(
+            s for members in cand_sleeves for s in members).items())),
+        "sleeve_by_entry": dict(sorted(sleeve_of.items())),
+        "fallbacks": fallbacks,
+        "relaxations": sum(int(f.get("entries") or 0) for f in fallbacks),
+        "unmasked_entries": unmasked,
+        "_cand_sleeves": cand_sleeves,
+    }
+
+
 def _prefilter_candidates(
     candidates: Sequence[Dict[str, Any]],
     entries: Sequence[Dict[str, Any]],
     compatible: Sequence[Sequence[bool]],
     keep_target: int,
     *,
-    reserve: Optional[Tuple[Sequence[int], int]] = None,
+    reserve: Optional[Any] = None,
 ) -> Tuple[List[int], Dict[str, Any]]:
     """Choose which candidate indices enter the joint MILP.
 
@@ -1487,16 +1575,27 @@ def _prefilter_candidates(
     # is exactly the fill that drops them. The caller sizes the reserve to what
     # the cap needs and passes nothing when the cap cannot bind, so a solve
     # without it keeps the same set it always kept.
-    reserved_kept = 0
-    if reserve:
-        reserve_set = {int(k) for k in reserve[0]}
-        want = max(0, int(reserve[1]))
+    # R406: `reserve` may also be a MAPPING of name -> (indices, want), one per
+    # class that needs its complement kept (R405's low-cluster candidates, each
+    # sleeve's own), each reported under its own name. A single pair is R405's
+    # shape and reads exactly as it did.
+    if reserve and isinstance(reserve, tuple):
+        reserves = {"consensus_low_cluster": reserve}
+    else:
+        reserves = dict(reserve or {})
+    reserved_by_name: Dict[str, int] = {}
+    for name in sorted(reserves):
+        reserve_idx, reserve_want = reserves[name]
+        reserve_set = {int(k) for k in reserve_idx}
+        want = max(0, int(reserve_want))
+        kept_here = 0
         for k in order:
-            if reserved_kept >= want:
+            if kept_here >= want:
                 break
             if k in reserve_set:
                 _take(k)
-                reserved_kept += 1
+                kept_here += 1
+        reserved_by_name[name] = kept_here
 
     covered_stacks = set()
     covered_pairs = set()
@@ -1536,7 +1635,7 @@ def _prefilter_candidates(
         "forced_coverage_kept": forced,
         "selectable_in": len(selectable),
         "per_entry_reserve": PREFILTER_PER_ENTRY_RESERVE,
-        **({"consensus_low_cluster_kept": reserved_kept} if reserve else {}),
+        **{f"{name}_kept": kept for name, kept in sorted(reserved_by_name.items())},
         "distinct_stacks_represented": len(covered_stacks),
         "distinct_sp_pairs_represented": len(covered_pairs),
         "entries_emptied_by_prefilter": len(emptied),
@@ -3128,6 +3227,11 @@ def select_and_assign_entries(
                 "fixed_exposure_rows": fixed_rows,
             }
 
+    # R406. The sleeves' mask, applied before the floor and the prefilter so
+    # both see the compatible set each entry's world allows.
+    sleeve_report = _resolve_classic_sleeves(
+        candidates, entries, full_compatible, controls, all_rosters)
+
     # R37 stage 1. The primary-stack floor is applied HERE: after entry
     # compatibility and the untouchable-row blocking, so the starvation check
     # sees the real compatible set, and before the prefilter, so the prefilter
@@ -3177,9 +3281,23 @@ def select_and_assign_entries(
         if cluster_bound < E:
             low_idx = [k for k, n in enumerate(bank_member_counts) if n < cluster_k]
             cluster_reserve = (low_idx, min(len(low_idx), 2 * (E - cluster_bound)))
+    # R406: each sleeve keeps twice its entries' worth of its own candidates,
+    # for R405's reason -- a sleeve's lineups can score below the projection's,
+    # and a score-ordered fill would drop exactly them.
+    prefilter_reserves: Dict[str, Tuple[List[int], int]] = {}
+    if cluster_reserve is not None:
+        prefilter_reserves["consensus_low_cluster"] = cluster_reserve
+    if sleeve_report.get("status") == "applied":
+        _cs = sleeve_report["_cand_sleeves"]
+        _entries_per_sleeve = Counter(sleeve_report["sleeve_by_entry"].values())
+        for _sleeve, _n in sorted(_entries_per_sleeve.items()):
+            if _sleeve == "projection" or not _n:
+                continue
+            _idx = [k for k in range(len(candidates)) if _sleeve in _cs[k]]
+            prefilter_reserves[f"sleeve_{_sleeve}"] = (_idx, min(len(_idx), 2 * _n))
     kept_idx, prefilter_report = _prefilter_candidates(
         candidates, entries, full_compatible, keep_target,
-        reserve=cluster_reserve,
+        reserve=prefilter_reserves or None,
     )
     if prefilter_report["applied"]:
         candidates = [candidates[k] for k in kept_idx]
@@ -3910,6 +4028,9 @@ def select_and_assign_entries(
             # R405. Known before the solve, so it rides the refusal: a refusal
             # on this cap is read against the bank's low-cluster count.
             "consensus_cluster": dict(cluster_report),
+            # R406. And the sleeves' apportionment, for the same reason.
+            "classic_sleeves": {k: v for k, v in sleeve_report.items()
+                                if not k.startswith("_")},
             # R294(a). The refusal path is where an emptied entry matters most,
             # and it is the one path that carried no `warnings` key at all, so
             # the count lived only inside `solver_report.candidate_prefilter`
@@ -4111,6 +4232,35 @@ def select_and_assign_entries(
         },
     }}
 
+    # R406. Each sleeve's delivered shape, as review proxies: the apex end
+    # (mean and best contest-fit of its delivered lineups) and the washout end
+    # (its most-rostered player's share and its share at k+ of R405's cluster).
+    sleeve_block: Dict[str, Any] = {}
+    if sleeve_report.get("status") in ("applied", "off", "no_sleeve_bank"):
+        public = {k: v for k, v in sleeve_report.items() if not k.startswith("_")}
+        if sleeve_report.get("status") == "applied":
+            by_sleeve: Dict[str, List[int]] = defaultdict(list)
+            sleeve_of = sleeve_report.get("sleeve_by_entry") or {}
+            for e, k in enumerate(chosen_k):
+                by_sleeve[sleeve_of.get(entry_ids[e], "projection")].append(e)
+            delivered: Dict[str, Any] = {}
+            for sleeve, members in sorted(by_sleeve.items()):
+                fits = [raw_scores[(e, chosen_k[e])] for e in members]
+                players = Counter(p for e in members for p in rosters[chosen_k[e]])
+                high = sum(1 for e in members if member_counts[chosen_k[e]] >= cluster_k)
+                delivered[sleeve] = {
+                    "entries": len(members),
+                    "apex_mean_fit": round(sum(fits) / len(fits), 4) if fits else None,
+                    "apex_best_fit": round(max(fits), 4) if fits else None,
+                    "washout_max_player_share": (
+                        round(max(players.values()) / len(members), 4) if players else None),
+                    "at_k_or_more_cluster": high,
+                }
+            public["delivered"] = delivered
+        public["note"] = ("deterministic constructions over labeled priors; review "
+                          "proxies, never a probability or an edge")
+        sleeve_block = {"classic_sleeves": public}
+
     floor_warnings: List[str] = []
     _qr = quota_block.get("five_stack_quota") if quota_block else None
     if _qr:
@@ -4170,6 +4320,7 @@ def select_and_assign_entries(
         **quota_block,
         **reuse_block,
         **cluster_block,
+        **sleeve_block,
         "passed": True,
         "assignments": assignments,
         "selection_certified": True,

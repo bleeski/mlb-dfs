@@ -581,6 +581,8 @@ def execute_portfolio(
             # R405. The allocator's consensus-cluster block, on both return
             # paths for R126's reason.
             "consensus_cluster": allocation.get("consensus_cluster"),
+            # R406, the same.
+            "classic_sleeves": allocation.get("classic_sleeves"),
             "workflow_valid": True,
             "selection_certified": certification["selection_certified"],
             "allocation_certified": certification["allocation_certified"],
@@ -606,6 +608,8 @@ def execute_portfolio(
         "portfolio_frontier": portfolio_frontier,
         # R405, see the deferred branch above.
         "consensus_cluster": allocation.get("consensus_cluster"),
+        # R406, the same.
+        "classic_sleeves": allocation.get("classic_sleeves"),
         "workflow_valid": bool(promotion["passed"]),
         "selection_certified": certification["selection_certified"],
         "allocation_certified": certification["allocation_certified"],
@@ -2176,6 +2180,269 @@ def build_consensus_limited_jobs(
     return {"attempted": True, "cluster_members": members, "m": m,
             "cluster_source_lineups": cluster["source_lineups"],
             "report": report}
+
+
+#: R406. The three non-projection sleeves' combined share of a budgeted bank.
+#: The projection world still gets most of the search: it seats the largest
+#: sleeve, defines R405's cluster, and fills every entry a sleeve cannot.
+BANK_SLEEVE_BUDGET_SHARE = 0.30
+
+
+def resolve_sleeve_bank_request(
+    entry_requirements: Sequence[Mapping[str, Any]],
+    controls: Optional[Mapping[str, Any]],
+    projections: Any = None,
+    *,
+    implied_total_by_team: Optional[Mapping[str, float]] = None,
+) -> Dict[str, Any]:
+    """R406. What to ask the bank for so each sleeve can seat its entries.
+
+    One derivation for every door. Weights come from `classic_sleeves` (Ben's
+    40/20/20/20 and the WTA tilt), the entry counts from the reserved file, and
+    each non-projection sleeve is asked for twice the entries it will seat. The
+    environment sleeve's games are ranked by the implied totals F1 priced, else
+    by the static park run factor F5 itself reads. ``classic_sleeves: False`` in
+    the merged controls (an override, the loose golden) turns it off.
+    """
+    from mlb_engine.optimize import classic_sleeves as cs
+    enabled = (controls or {}).get("classic_sleeves", True) is not False
+    counts: Dict[str, int] = {}
+    weights: Dict[str, Dict[str, float]] = {}
+    for req in entry_requirements or []:
+        cid = str(req.get("contest_id") or "")
+        counts[cid] = counts.get(cid, 0) + 1
+        # The allocator's own source for the same weights (each entry's
+        # posture and shape), so the bank is asked for what the mask will seat.
+        weights.setdefault(cid, cs.contest_sleeve_weights(
+            req.get("posture"), req.get("contest_shape")))
+    expected = cs.expected_entries_by_sleeve(weights, counts)
+    teams_by_game: Dict[str, List[str]] = {}
+    if projections is not None and hasattr(projections, "columns") \
+            and "Game_ID" in projections.columns:
+        for gid, team in zip(projections["Game_ID"].astype(str),
+                             projections["Team"].astype(str)):
+            if gid and gid.lower() not in ("nan", "none", ""):
+                bucket = teams_by_game.setdefault(gid, [])
+                if team not in bucket:
+                    bucket.append(team)
+    environment = cs.rank_environment_games(
+        sorted(teams_by_game), implied_total_by_team=implied_total_by_team,
+        park_run_factor_by_game=cs.static_park_run_factor_by_game(sorted(teams_by_game)),
+        teams_by_game={g: sorted(t) for g, t in teams_by_game.items()})
+    sleeves = {s: {"expected_entries": n, "min_candidates": 2 * n}
+               for s, n in expected.items() if s != cs.SLEEVE_PROJECTION and n > 0}
+    dropped: Dict[str, str] = {}
+    if not environment.get("games"):
+        if sleeves.pop(cs.SLEEVE_ENVIRONMENT, None):
+            dropped[cs.SLEEVE_ENVIRONMENT] = "no game could be ranked (no odds, no park factor)"
+    elif set(environment["games"]) >= set(teams_by_game):
+        # The top games ARE the slate (a two-game slate): the sleeve would be
+        # the projection's own job grid, not a distinct world.
+        if sleeves.pop(cs.SLEEVE_ENVIRONMENT, None):
+            dropped[cs.SLEEVE_ENVIRONMENT] = (
+                f"the top {len(environment['games'])} games are the whole slate, "
+                f"so the sleeve would repeat the projection's job grid")
+    return {
+        "active": bool(enabled and sleeves),
+        "enabled": enabled,
+        "weights_by_contest": weights,
+        "expected_entries": expected,
+        "sleeves": sleeves,
+        "dropped": dropped,
+        "environment": environment,
+        "note": ("deterministic constructions over labeled priors; a sleeve that "
+                 "does well in a replay is supported in the shapes replayed, never "
+                 "a probability or an edge"),
+    }
+
+
+def build_sleeve_jobs(
+    cache: Any,
+    projections: Any,
+    request: Mapping[str, Any],
+    *,
+    consensus_members: Sequence[str],
+    time_budget_s: float,
+    salary_cache: Any = None,
+    max_opposing_hitters_per_sp: Optional[int] = None,
+    **extend_kwargs: Any,
+) -> Dict[str, Any]:
+    """R406. Extend the bank with each active sleeve's jobs, in its own bucket.
+
+    * ``chalk_fails``: the projection frame, at most one of R405's cluster
+      (``consensus_members``, derived by the caller from its ORDINARY bank);
+    * ``environment``: the projection frame, stack jobs only for the chosen
+      games' teams (every player stays legal as a filler);
+    * ``salary_only``: the salary-only COPY of the frame, in ``salary_cache``
+      (a separate file: a different frame is a different projection digest,
+      and sharing a cache would purge the ordinary bucket).
+
+    Each call stops at the sleeve's own candidate need; the budget is split
+    evenly across the sleeves still to run. Search effort only.
+    """
+    from mlb_engine.optimize import classic_sleeves as cs
+    from mlb_engine.optimize.bank_cache import extend_bank
+    import time as _t
+    started = _t.monotonic()
+    report: Dict[str, Any] = {}
+    if not request.get("active"):
+        return {"attempted": False, "reason": "sleeves not requested"}
+    order = [s for s in cs.SLEEVES if s in (request.get("sleeves") or {})]
+    for idx, sleeve in enumerate(order):
+        need = int(request["sleeves"][sleeve]["min_candidates"])
+        left = float(time_budget_s) - (_t.monotonic() - started)
+        budget = max(1.0, left / max(1, len(order) - idx))
+        common = dict(extend_kwargs, time_budget_s=budget,
+                      job_class=cs.SLEEVE_JOB_CLASS[sleeve])
+        if sleeve == cs.SLEEVE_CHALK_FAILS:
+            members = list(consensus_members)
+            if len(members) <= cs.CHALK_FAILS_MAX_MEMBERS:
+                report[sleeve] = {"attempted": False,
+                                  "reason": "the consensus cluster is too small to limit"}
+                continue
+            rep = extend_bank(cache, projections,
+                              max_selected_from=(members, cs.CHALK_FAILS_MAX_MEMBERS),
+                              max_candidates=len(cache) + need,
+                              max_opposing_hitters_per_sp=max_opposing_hitters_per_sp,
+                              **common)
+        elif sleeve == cs.SLEEVE_ENVIRONMENT:
+            teams = list((request.get("environment") or {}).get("teams") or [])
+            # The sleeve seats on projection lineups stacking these teams, so
+            # the jobs are only DEPTH: when the bank already holds enough such
+            # lineups, re-solving the restricted grid (a new bucket, no cache
+            # hits) would return the same lineups and spend the budget.
+            held = _stacked_on_teams(cache, projections, teams)
+            if held >= need:
+                report[sleeve] = {"attempted": False, "need": need, "already_held": held,
+                                  "reason": "the bank already holds enough lineups "
+                                            "stacking the chosen games"}
+                continue
+            rep = extend_bank(cache, projections, stack_teams=teams,
+                              max_candidates=len(cache) + need,
+                              max_opposing_hitters_per_sp=max_opposing_hitters_per_sp,
+                              **common)
+        else:
+            if salary_cache is None:
+                report[sleeve] = {"attempted": False, "reason": "no salary-only cache"}
+                continue
+            frame, transform = cs.salary_only_frame(projections)
+            rep = extend_bank(salary_cache, frame,
+                              max_candidates=len(salary_cache) + need,
+                              max_opposing_hitters_per_sp=max_opposing_hitters_per_sp,
+                              **common)
+            rep = {**rep, "transform": transform}
+        report[sleeve] = {"attempted": True, "need": need,
+                          "built": rep.get("built_this_slice"),
+                          "job_list_exhausted": rep.get("job_list_exhausted"),
+                          "conditions_signature": rep.get("conditions_signature"),
+                          **({"transform": rep["transform"]} if "transform" in rep else {})}
+    return {"attempted": True, "sleeves": report,
+            "elapsed_s": round(_t.monotonic() - started, 3)}
+
+
+
+def _stacked_on_teams(cache: Any, projections: Any, teams: Sequence[str],
+                      min_size: int = 4) -> int:
+    """How many cached lineups carry ``min_size`` or more hitters from one of
+    ``teams`` -- the environment sleeve's membership, counted cheaply off the
+    rosters and the frame's team column."""
+    wanted = {str(t).upper() for t in teams}
+    if not wanted or projections is None or not hasattr(projections, "columns"):
+        return 0
+    team_of = dict(zip(projections["Player_ID"].astype(str),
+                       projections["Team"].astype(str).str.upper()))
+    held = 0
+    for entry in cache.candidates:
+        counts = Counter(team_of.get(str(p)) for p in list(entry.get("roster") or [])[2:])
+        if any(counts.get(t, 0) >= min_size for t in wanted):
+            held += 1
+    return held
+
+def sleeve_candidates(
+    cache: Any,
+    salary_cache: Any,
+    projections: Any,
+    *,
+    requested_n: int,
+    contest_shapes: Optional[Sequence[str]] = None,
+    base: Optional[Sequence[Mapping[str, Any]]] = None,
+) -> List[Dict[str, Any]]:
+    """R406. The sleeve-built candidates, each tagged with its world, scored in
+    its OWN world (the salary-only lineups on the salary-only frame), with ids
+    that cannot collide with the ordinary bank's. ``base`` is the ordinary list
+    already served; rosters it holds are not served twice."""
+    from mlb_engine.optimize import classic_sleeves as cs
+    seen = {tuple(str(p) for p in (c.get("roster_slot_ids") or c.get("player_ids") or []))
+            for c in (base or [])}
+    out: List[Dict[str, Any]] = []
+    sources = []
+    if salary_cache is not None and len(salary_cache):
+        frame, _ = cs.salary_only_frame(projections)
+        sources.append(("sal", salary_cache.as_candidates(
+            frame, requested_n=requested_n, contest_shapes=contest_shapes)))
+    for prefix, rows in sources:
+        for c in rows:
+            roster = tuple(str(p) for p in (c.get("roster_slot_ids") or []))
+            if roster in seen:
+                continue
+            seen.add(roster)
+            c = dict(c)
+            c["candidate_id"] = c["lineup_id"] = f"{prefix}{c['candidate_id']}"
+            out.append(c)
+    return cs.tag_sleeves(out)
+
+
+def _direct_door_sleeves(
+    candidates: Sequence[Mapping[str, Any]],
+    projections: Any,
+    request: Mapping[str, Any],
+    *,
+    requested_n: int,
+    contest_shapes: Optional[Sequence[str]],
+    time_budget_s: float,
+    **extend_kwargs: Any,
+) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    """R406. The direct door's sleeve jobs in throwaway caches, appended to its
+    in-memory candidates with ids that cannot collide and rosters that are not
+    served twice."""
+    import tempfile as _tf
+    from mlb_engine.allocate.contest_allocator import (
+        _candidate_ordered_roster, consensus_cluster_members)
+    from mlb_engine.optimize.bank_cache import BankCache
+    from mlb_engine.optimize.classic_sleeves import environment_teams_of, tag_sleeves
+    env_teams = environment_teams_of(request)
+    out = tag_sleeves([dict(c) for c in candidates], env_teams)
+    seen = set()
+    for c in out:
+        try:
+            seen.add(tuple(sorted(_candidate_ordered_roster(c))))
+        except ValueError:
+            continue
+    leverage = extend_kwargs.pop("leverage", None)
+    with _tf.TemporaryDirectory(prefix="sleeve_bank_") as tmp:
+        cache = BankCache(Path(tmp) / "sleeves.json")
+        salary = BankCache(Path(tmp) / "salary_only.json")
+        jobs = build_sleeve_jobs(
+            cache, projections, request,
+            consensus_members=consensus_cluster_members(out)["member_ids"],
+            time_budget_s=time_budget_s, salary_cache=salary,
+            leverage=leverage, **extend_kwargs)
+        extra = tag_sleeves(cache.as_candidates(
+            projections, requested_n=requested_n, contest_shapes=contest_shapes), env_teams)
+        for c in extra:
+            c["candidate_id"] = c["lineup_id"] = f"slv{c['candidate_id']}"
+        extra += sleeve_candidates(cache, salary, projections, requested_n=requested_n,
+                                   contest_shapes=contest_shapes, base=extra)
+    added = 0
+    for c in extra:
+        sig = tuple(sorted(str(p) for p in (c.get("roster_slot_ids") or [])))
+        if sig in seen:
+            continue
+        seen.add(sig)
+        out.append(c)
+        added += 1
+    jobs = {**jobs, "candidates_added": added}
+    return out, jobs
 
 def _payout_breadth_by_shape_from_csv(archetypes_path: Optional[str]) -> Dict[str, float]:
     """Read the optional payout_breadth column from the archetype CSV, aggregated
@@ -4256,6 +4523,27 @@ def _plan_joint_allocation(
                     if _limited.get("report") is not None:
                         report = {**report, "job_list_exhausted": bool(
                             _limited["report"].get("job_list_exhausted"))}
+                # R406, the plan leg's sleeves, for the same reason: the build's
+                # bank carries them and the mask seats entries on them, so a plan
+                # bank without them would solve a different MILP. Same helper,
+                # same request, a sibling cache for the salary-only frame.
+                _plan_sleeves = resolve_sleeve_bank_request(
+                    entries, controls, bank_projections)
+                _plan_salary_cache = None
+                if _plan_sleeves["active"] and report.get("job_list_exhausted"):
+                    from mlb_engine.allocate.contest_allocator import (
+                        consensus_cluster_members)
+                    _plan_salary_cache = BankCache(_Path(tmp) / "plan_bank_salary.json")
+                    _left = float(budget_s) - (time.monotonic() - started)
+                    verdict["classic_sleeves_jobs"] = build_sleeve_jobs(
+                        cache, bank_projections, _plan_sleeves,
+                        consensus_members=consensus_cluster_members(
+                            cache.as_candidates(None))["member_ids"],
+                        time_budget_s=max(1.0, _left), salary_cache=_plan_salary_cache,
+                        excludes=excl or None, solver_time_limit_s=solver_time_limit_s,
+                        max_opposing_hitters_per_sp=controls.get(
+                            "max_opposing_hitters_per_sp"),
+                        stack_min=_plan_stack_request["bank_stack_min_size"])
                 if not report.get("job_list_exhausted"):
                     built = len(cache.candidates)
                     verdict["bank_source"] = "sliced_plan_bank"
@@ -4268,11 +4556,19 @@ def _plan_joint_allocation(
                         f"bank interaction is unchecked until approve=True."
                     )
                     return verdict
-                candidates = cache.as_candidates(
+                from mlb_engine.optimize.classic_sleeves import (
+                    environment_teams_of, tag_sleeves)
+                candidates = tag_sleeves(cache.as_candidates(
                     bank_projections,
                     requested_n=int(requested_n or max(len(entries), 1)),
                     contest_shapes=list(contest_shapes) if contest_shapes else None,
-                )
+                ), environment_teams_of(_plan_sleeves))
+                if _plan_salary_cache is not None:
+                    candidates += sleeve_candidates(
+                        cache, _plan_salary_cache, bank_projections,
+                        requested_n=int(requested_n or max(len(entries), 1)),
+                        contest_shapes=list(contest_shapes) if contest_shapes else None,
+                        base=candidates)
             verdict["bank_source"] = "sliced_plan_bank"
             verdict["exact_for_this_build"] = False
             bank_note = (
@@ -5221,6 +5517,7 @@ def run_slate(
     leverage: Optional[Mapping[str, Any]] = None,
     input_confidence_facts: Optional[Mapping[str, Any]] = None,
     input_confidence_relax: Optional[str] = None,
+    sleeve_implied_total_by_team: Optional[Mapping[str, float]] = None,
 ) -> Dict[str, Any]:
     """Single front door: raw slate inputs -> certified DKEntries file plus diagnostics.
 
@@ -5320,6 +5617,9 @@ def run_slate(
             "contest_id": str(r.contest_id),
             "contest_name": r.contest_name,
             "contest_shape": posture_by_contest.get(str(r.contest_id), {}).get("contest_shape", "large_field_gpp"),
+            # R406. The allocator reads each entry's sleeve weights off its own
+            # posture and shape (the WTA tilt keys on `wta_satellite`).
+            "posture": posture_by_contest.get(str(r.contest_id), {}).get("posture"),
         }
         for r in reserved
     ]
@@ -5725,8 +6025,30 @@ def run_slate(
             **_leverage_kwargs(leverage),
         )
         candidates = _bank_records_to_candidates(bank.get("candidate_lineups") or [])
+        # R406. The direct door's sleeves, through the SAME helper the sliced
+        # door and the plan leg call, in throwaway caches: the direct bank is
+        # in memory, so its sleeves are too. The cluster chalk-fails limits
+        # against is derived from this door's own unconstrained candidates.
+        sleeve_request = resolve_sleeve_bank_request(
+            entry_requirements, controls, bank_projections,
+            implied_total_by_team=sleeve_implied_total_by_team)
+        sleeve_jobs: Dict[str, Any] = {"attempted": False,
+                                       "reason": "sleeves not requested"}
+        if sleeve_request["active"]:
+            candidates, sleeve_jobs = _direct_door_sleeves(
+                candidates, bank_projections, sleeve_request,
+                requested_n=n, contest_shapes=sorted(shape_counts) or None,
+                time_budget_s=(max(10.0, BANK_SLEEVE_BUDGET_SHARE * float(bank_time_budget_s))
+                               if bank_time_budget_s else 60.0),
+                excludes=bank_excludes or None,
+                solver_time_limit_s=solver_time_limit_s,
+                max_opposing_hitters_per_sp=controls.get("max_opposing_hitters_per_sp"),
+                leverage=leverage)
         bank_diag = {
             "source": "build_diverse_candidate_bank", "mode": mode, "requested_n": n,
+            # R406. What the sleeves were asked for and what they built.
+            "classic_sleeves_request": sleeve_request,
+            "classic_sleeves_jobs": sleeve_jobs,
             # R340. What this bank was ASKED for, carried to the allocator so a
             # floor or quota that finds nothing can say whether the bank was
             # asked and could not, or was never asked at all.

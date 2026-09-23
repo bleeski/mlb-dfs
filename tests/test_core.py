@@ -4040,8 +4040,10 @@ class R293BankOnEveryRungTests(unittest.TestCase):
         ("mlb_engine/pipeline/execution_pipeline.py", "build_diverse_candidate_bank"): (1, 1),
         # R405(c), 2026-09-23: the second is `build_consensus_limited_jobs`,
         # the cluster-limited bucket both the sliced door and the plan leg
-        # call; it forwards the allowance by name.
-        ("mlb_engine/pipeline/execution_pipeline.py", "extend_bank"): (2, 2),
+        # call; it forwards the allowance by name. R406, 2026-09-23: three more
+        # in `build_sleeve_jobs` (chalk-fails, environment, salary-only), each
+        # forwarding it by name.
+        ("mlb_engine/pipeline/execution_pipeline.py", "extend_bank"): (5, 5),
         ("tools/late_swap.py", "extend_bank"): (0, 2),
         ("tools/solver_probe.py", "build_single_lineup"): (0, 1),
         ("tools/solver_probe.py", "build_multi_lineup"): (0, 1),
@@ -29053,3 +29055,275 @@ class ProjectionBackfillGradeTests(unittest.TestCase):
         table = mod.format_grade_table(result)
         self.assertTrue(table.startswith("# observed outcomes"))
         self.assertIn("not a probability", table)
+
+
+class ClassicSleeveTests(unittest.TestCase):
+    """R406 (Session 94, Ben's decisions of 2026-09-23). Classic scenario
+    sleeves: the portfolio is built across worlds where the projection is wrong
+    in named ways -- the projection itself, salary as the only prior,
+    chalk-fails (at most one of R405's cluster), and the top environment games
+    -- and each entry is confined to one sleeve through the allocator's own
+    compatibility mask, so every cap still binds across the whole entered set.
+    """
+
+    @staticmethod
+    def _cs():
+        from mlb_engine.optimize import classic_sleeves
+        return classic_sleeves
+
+    def test_the_salary_only_transform_keeps_no_player_level_factor(self):
+        cs = self._cs()
+        frame = diverse_projection_frame()
+        frame["Base"] = frame["Floor"] * 1.6
+        # Two same-salary hitters the projection separates, one of them with an
+        # extreme ceiling: in the salary world they must be the same player.
+        frame.loc[frame["Player_ID"] == "21001", ["Base", "Ceiling"]] = [20.0, 60.0]
+        before = frame.copy()
+        out, report = cs.salary_only_frame(frame)
+        self.assertTrue(frame.equals(before), "the transform is a copy, never an edit")
+        hitters = out[out["Position"] != "P"]
+        self.assertEqual(hitters[["Base", "Ceiling", "Floor"]].drop_duplicates().shape[0], 1,
+                         "same salary must mean the same Base, Ceiling and Floor")
+        self.assertEqual(set(out["Player_ID"]), set(frame["Player_ID"]), "no player dropped")
+        self.assertEqual(sorted(report["groups"]), ["hitters", "pitchers"])
+
+    def test_largest_remainder_apportionment_and_the_wta_tilt(self):
+        cs = self._cs()
+        self.assertEqual(cs.DEFAULT_WEIGHTS, {"projection": 0.40, "salary_only": 0.20,
+                                              "chalk_fails": 0.20, "environment": 0.20})
+        self.assertEqual(cs.WTA_WEIGHTS, {"projection": 0.30, "salary_only": 0.20,
+                                          "chalk_fails": 0.30, "environment": 0.20})
+        self.assertEqual(cs.largest_remainder(34, cs.DEFAULT_WEIGHTS),
+                         {"projection": 13, "salary_only": 7, "chalk_fails": 7, "environment": 7})
+        # 7 x (0.3, 0.2, 0.3, 0.2): floors 2/1/2/1, the one left goes to the
+        # largest remainder, salary and environment tie at 0.4 and SLEEVES
+        # order breaks it.
+        self.assertEqual(cs.largest_remainder(7, cs.WTA_WEIGHTS),
+                         {"projection": 2, "salary_only": 2, "chalk_fails": 2, "environment": 1})
+        self.assertEqual(cs.weights_for_contest("wta_satellite", "large_field_gpp"), cs.WTA_WEIGHTS)
+        self.assertEqual(cs.weights_for_contest("large_gpp", "large_wta"), cs.WTA_WEIGHTS)
+        self.assertEqual(cs.weights_for_contest("large_gpp", "large_field_gpp"), cs.DEFAULT_WEIGHTS)
+
+    def test_single_entry_and_cash_go_to_projection(self):
+        cs = self._cs()
+        self.assertEqual(cs.contest_sleeve_weights("single_entry", "single_entry_gpp"),
+                         {"projection": 1.0})
+        self.assertEqual(cs.contest_sleeve_weights("cash", "cash"), {"projection": 1.0})
+        reqs = [{"entry_id": "a", "contest_id": "1"},
+                {"entry_id": "b", "contest_id": "2"}, {"entry_id": "c", "contest_id": "2"}]
+        plan = cs.apportion_entries(reqs, {"1": cs.DEFAULT_WEIGHTS,
+                                           "2": {"projection": 1.0}})
+        self.assertEqual(set(plan["sleeve_by_entry"].values()), {"projection"},
+                         "one entry, or a projection-only contest, seats projection")
+
+    def test_environment_game_ranking_and_its_tie_break(self):
+        cs = self._cs()
+        teams = {"A@B": ["A", "B"], "C@D": ["C", "D"], "E@F": ["E", "F"]}
+        ranked = cs.rank_environment_games(
+            teams, implied_total_by_team={"A": 4.0, "B": 4.0, "C": 5.0, "D": 4.5,
+                                          "E": 4.0, "F": 4.0},
+            teams_by_game=teams)
+        self.assertEqual(ranked["basis"], "implied_total")
+        self.assertEqual(ranked["games"], ["C@D", "A@B"], "9.5 first, then the 8.0 tie by id")
+        parks = cs.rank_environment_games(teams, park_run_factor_by_game={
+            "A@B": 1.0, "C@D": 1.2, "E@F": 1.2}, teams_by_game=teams)
+        self.assertEqual((parks["basis"], parks["games"]), ("park_run_factor", ["C@D", "E@F"]))
+        self.assertEqual(cs.static_park_run_factor_by_game(["BOS@NYY"]),
+                         {"BOS@NYY": cs.static_park_run_factor_by_game(["X@NYY"])["X@NYY"]},
+                         "the home venue's factor, from the reference tables F5 reads")
+        # Two games on a two-game slate are the whole slate: the request drops
+        # the sleeve rather than repeat the projection's job grid.
+        frame = diverse_projection_frame()
+        reqs = [{"entry_id": str(i), "contest_id": "9", "posture": "large_gpp",
+                 "contest_shape": "large_field_gpp"} for i in range(10)]
+        implied = {"T1": 4.0, "T2": 4.1, "T3": 5.0, "T4": 4.4}
+        req = epi.resolve_sleeve_bank_request(reqs, {}, frame, implied_total_by_team=implied)
+        self.assertNotIn("environment", req["sleeves"])
+        self.assertIn("whole slate", req["dropped"]["environment"])
+        self.assertEqual(req["expected_entries"], {"projection": 4, "salary_only": 2,
+                                                   "chalk_fails": 2, "environment": 2})
+        off = epi.resolve_sleeve_bank_request(reqs, {"classic_sleeves": False}, frame)
+        self.assertFalse(off["active"])
+
+    def test_chalk_fails_and_environment_jobs_carry_their_constraints(self):
+        cs = self._cs()
+        frame = diverse_projection_frame()
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = bank_cache.BankCache(Path(tmp) / "b.json")
+            salary = bank_cache.BankCache(Path(tmp) / "s.json")
+            bank_cache.extend_bank(cache, frame, time_budget_s=60)
+            n_ordinary = len(cache)
+            members = ca.consensus_cluster_members(cache.as_candidates(None))["member_ids"]
+            request = {"active": True, "environment": {"teams": ["T3", "T4"]},
+                       "sleeves": {"chalk_fails": {"min_candidates": 4},
+                                   "environment": {"min_candidates": 4},
+                                   "salary_only": {"min_candidates": 4}}}
+            jobs = epi.build_sleeve_jobs(cache, frame, request, consensus_members=members,
+                                         time_budget_s=120, salary_cache=salary)
+            self.assertTrue(jobs["sleeves"]["chalk_fails"]["attempted"], jobs)
+            self.assertTrue(jobs["sleeves"]["salary_only"]["attempted"], jobs)
+            # The exhausted ordinary bank already holds lineups stacking T3/T4,
+            # so the restricted grid is skipped rather than re-solved to the
+            # same lineups; a thin bank runs it for depth.
+            env_job = jobs["sleeves"]["environment"]
+            self.assertFalse(env_job["attempted"])
+            self.assertGreaterEqual(env_job["already_held"], 4)
+            thin = bank_cache.BankCache(Path(tmp) / "thin.json")
+            bank_cache.extend_bank(thin, frame, time_budget_s=60, max_candidates=2)
+            thin_jobs = epi.build_sleeve_jobs(
+                thin, frame, {**request, "sleeves": {"environment": {"min_candidates": 4}}},
+                consensus_members=members, time_budget_s=120)
+            self.assertTrue(thin_jobs["sleeves"]["environment"]["attempted"], thin_jobs)
+            self.assertGreater(thin_jobs["sleeves"]["environment"]["built"], 0)
+            thin_env = [c for c in cs.tag_sleeves(thin.as_candidates(frame), ["T3", "T4"])
+                        if c.get("bank_job_class") == "sleeve_environment"]
+            self.assertTrue(thin_env and all(c["primary_stack"] in ("T3", "T4") for c in thin_env))
+            tagged = cs.tag_sleeves(cache.as_candidates(frame), ["T3", "T4"])
+            chalk = [c for c in tagged if c.get("bank_sleeve") == "chalk_fails"]
+            env = [c for c in tagged if "environment" in c["bank_sleeves"]]
+            self.assertTrue(all("projection" in c["bank_sleeves"] for c in env),
+                            "an environment lineup is a projection-world lineup")
+            self.assertFalse(any("environment" in c["bank_sleeves"] for c in chalk))
+            self.assertTrue(chalk and env, (len(chalk), len(env)))
+            for c in chalk:
+                self.assertLessEqual(ca.consensus_member_count(c["player_ids"], members), 1)
+            team_of = dict(zip(frame["Player_ID"].astype(str), frame["Team"].astype(str)))
+            for c in env:
+                self.assertIn(c["primary_stack"], {"T3", "T4"})
+            # Fillers from the other game stay legal: no pool reduction.
+            self.assertTrue(any(team_of[p] in ("T1", "T2") for c in env
+                                for p in c["player_ids"][2:]),
+                            "environment lineups may still roster any team's fillers")
+            sal = epi.sleeve_candidates(cache, salary, frame, requested_n=4)
+            self.assertTrue(sal and all(c["bank_sleeve"] == "salary_only" for c in sal))
+            self.assertTrue(all(c["candidate_id"].startswith("sal") for c in sal),
+                            "salary-only ids cannot collide with the ordinary bank's")
+            self.assertGreater(len(cache), n_ordinary)
+
+    @staticmethod
+    def _bank():
+        """Ten projection lineups (100-i) and three per sleeve (60-i), all distinct."""
+        out = []
+        for i in range(10):
+            out.append({"candidate_id": f"P{i}",
+                        "roster_slot_ids": [f"pa{i}", f"pb{i}"] + [f"ph{i}_{j}" for j in range(7)] + ["star"],
+                        "sp_ids": [f"pa{i}", f"pb{i}"], "primary_stack": "", "objective": 100.0 - i})
+        for sleeve in ("salary_only", "chalk_fails"):
+            for i in range(3):
+                out.append({"candidate_id": f"{sleeve}{i}",
+                            "roster_slot_ids": [f"{sleeve}a{i}", f"{sleeve}b{i}"]
+                            + [f"{sleeve}h{i}_{j}" for j in range(7)] + ["star"],
+                            "sp_ids": [f"{sleeve}a{i}", f"{sleeve}b{i}"], "primary_stack": "",
+                            "objective": 60.0 - i, "bank_sleeve": sleeve})
+        return out
+
+    @staticmethod
+    def _entries(n=5, posture="large_gpp", shape="large_field_gpp"):
+        return [{"entry_id": f"e{i}", "contest_id": "C1", "contest_name": "T",
+                 "contest_shape": shape, "posture": posture} for i in range(n)]
+
+    def test_the_mask_confines_each_entry_to_its_sleeve(self):
+        out = ca.select_and_assign_entries(self._bank(), self._entries(),
+                                           {"max_candidate_reuse": 5})
+        self.assertTrue(out["passed"], out.get("errors"))
+        block = out["classic_sleeves"]
+        self.assertEqual(block["status"], "applied")
+        # 5 x (0.4, 0.2, 0.2, 0.2) = 2/1/1/1; environment has no candidate here
+        # and falls back to projection, counted.
+        self.assertEqual(block["entries_by_sleeve"]["C1"],
+                         {"projection": 3, "salary_only": 1, "chalk_fails": 1, "environment": 0})
+        self.assertEqual(block["relaxations"], 1)
+        by_id = {c["candidate_id"]: c for c in self._bank()}
+        for a in out["assignments"]:
+            want = block["sleeve_by_entry"][a["entry_id"]]
+            self.assertEqual(by_id[a["candidate_id"]].get("bank_sleeve", "projection"), want)
+        self.assertEqual(set(block["delivered"]), {"projection", "salary_only", "chalk_fails"})
+
+    def test_environment_entries_seat_on_projection_lineups_stacking_the_chosen_games(self):
+        """The environment sleeve is a MEMBERSHIP: a projection-world lineup
+        whose primary stack is a chosen game's team may seat an environment
+        entry (and a projection one); nothing else may."""
+        cs = self._cs()
+        bank = self._bank()
+        for c in bank[:4]:
+            c["primary_stack"] = "T3"
+        tagged = cs.tag_sleeves(bank, ["T3", "T4"])
+        out = ca.select_and_assign_entries(tagged, self._entries(), {"max_candidate_reuse": 5})
+        self.assertTrue(out["passed"], out.get("errors"))
+        block = out["classic_sleeves"]
+        self.assertEqual(block["entries_by_sleeve"]["C1"]["environment"], 1)
+        self.assertEqual(block["candidates_by_sleeve"]["environment"], 4)
+        by_id = {c["candidate_id"]: c for c in tagged}
+        for a in out["assignments"]:
+            if block["sleeve_by_entry"][a["entry_id"]] == "environment":
+                self.assertEqual(by_id[a["candidate_id"]]["primary_stack"], "T3")
+
+    def test_caps_still_bind_across_sleeves(self):
+        """`star` is in every candidate of every sleeve: a player cap of 0.4
+        over 5 entries allows 2, so no assignment exists -- the cap is joint
+        across sleeves, not per sleeve, and the refusal says so."""
+        out = ca.select_and_assign_entries(
+            self._bank(), self._entries(),
+            {"max_candidate_reuse": 5, "max_player_exposure_pct": 0.4})
+        self.assertFalse(out["passed"])
+        self.assertEqual(out["classic_sleeves"]["status"], "applied")
+        uncapped_star = ca.select_and_assign_entries(
+            [dict(c, roster_slot_ids=c["roster_slot_ids"][:-1] + [f"x{k}"])
+             for k, c in enumerate(self._bank())],
+            self._entries(), {"max_candidate_reuse": 5, "max_player_exposure_pct": 0.4})
+        self.assertTrue(uncapped_star["passed"], uncapped_star.get("errors"))
+
+    def test_a_bank_without_sleeves_or_with_them_off_changes_nothing(self):
+        plain = [c for c in self._bank() if not c.get("bank_sleeve")]
+        base = ca.select_and_assign_entries(plain, self._entries(), {"max_candidate_reuse": 5})
+        self.assertEqual(base["classic_sleeves"]["status"], "no_sleeve_bank")
+        off = ca.select_and_assign_entries(self._bank(), self._entries(),
+                                           {"max_candidate_reuse": 5, "classic_sleeves": False})
+        self.assertEqual(off["classic_sleeves"]["status"], "off")
+        self.assertTrue(all(a["candidate_id"].startswith("P") for a in off["assignments"]),
+                        "off, the projection lineups win every seat on score")
+
+    def test_a_sleeve_too_thin_for_its_entries_falls_back_and_is_counted(self):
+        # WTA tilt over 10 entries: 3/2/3/2; chalk-fails holds 3 distinct
+        # lineups for its 3 seats, salary-only 3 for 2, environment none.
+        out = ca.select_and_assign_entries(
+            self._bank(), self._entries(10, posture="wta_satellite", shape="large_wta"),
+            {"max_candidate_reuse": 10})
+        self.assertTrue(out["passed"], out.get("errors"))
+        seats = out["classic_sleeves"]["entries_by_sleeve"]["C1"]
+        self.assertEqual(seats, {"projection": 5, "salary_only": 2, "chalk_fails": 3,
+                                 "environment": 0})
+        thin = [b for b in self._bank() if b.get("bank_sleeve") != "chalk_fails"
+                or b["candidate_id"] == "chalk_fails0"]
+        out = ca.select_and_assign_entries(
+            thin, self._entries(10, posture="wta_satellite", shape="large_wta"),
+            {"max_candidate_reuse": 10})
+        self.assertTrue(out["passed"], out.get("errors"))
+        block = out["classic_sleeves"]
+        self.assertEqual(block["entries_by_sleeve"]["C1"]["chalk_fails"], 1)
+        self.assertTrue(any("distinct compatible lineup" in f["reason"] for f in block["fallbacks"]))
+        self.assertEqual(block["relaxations"], 2 + 2)
+
+    def test_every_door_builds_the_sleeves_through_one_helper(self):
+        pipeline = (REPO / "mlb_engine" / "pipeline" / "execution_pipeline.py").read_text(
+            encoding="utf-8")
+        run = pipeline.split("def run_slate(", 1)[1]
+        self.assertIn("candidates, sleeve_jobs = _direct_door_sleeves(", run)
+        plan = pipeline.split("def _plan_joint_allocation(", 1)[1].split("\ndef ", 1)[0]
+        self.assertIn("build_sleeve_jobs(", plan)
+        slate = (REPO / "skills" / "generate-lineups" / "scripts" / "build_slate.py"
+                 ).read_text(encoding="utf-8")
+        self.assertIn("sleeve_jobs = build_sleeve_jobs(", slate)
+        self.assertIn('BankCache(bank_path.with_name(bank_path.stem + "_salary_only.json"))', slate)
+
+    def test_the_brief_line_names_the_sleeves_and_the_fallbacks(self):
+        out = ca.select_and_assign_entries(self._bank(), self._entries(),
+                                           {"max_candidate_reuse": 5})
+        bs = ConsensusClusterCapTests._build_slate()
+        line = bs.format_sleeves_line({**out["classic_sleeves"], "request": {
+            "environment": {"games": ["C@D"], "basis": "implied_total"}}})
+        self.assertIn("projection 3", line)
+        self.assertIn("environment games C@D (by implied_total)", line)
+        self.assertIn("1 entr(ies) fell back to projection", line)
+        self.assertIn("not probabilities", line)
+        self.assertTrue(bs.format_sleeves_line(None).startswith("not applied"))

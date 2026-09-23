@@ -234,7 +234,14 @@ def main() -> int:
         {"max_consensus_cluster_share_pct": max(_cluster_pcts)} if _cluster_pcts else {},
         args.entries)
     consensus_limited_s = int(consensus_request["min_candidates"] or 0) * single_s
-    projected_s = base_bank_s + augmentation_s + consensus_limited_s
+    # R406. The three non-projection sleeves each ask for twice the entries
+    # they seat, at the default multi-entry weights (40/20/20/20); one solve
+    # per lineup, like the term above.
+    from mlb_engine.optimize.classic_sleeves import DEFAULT_WEIGHTS, largest_remainder
+    _seats = largest_remainder(int(args.entries), DEFAULT_WEIGHTS) if args.entries > 1 else {}
+    sleeve_lineups = sum(2 * n for s, n in _seats.items() if s != "projection")
+    sleeves_s = sleeve_lineups * single_s
+    projected_s = base_bank_s + augmentation_s + consensus_limited_s + sleeves_s
     fits = projected_s <= args.budget
 
     report = {
@@ -249,6 +256,8 @@ def main() -> int:
         "projected_augmentation_s": round(augmentation_s, 1),
         "projected_consensus_limited_s": round(consensus_limited_s, 1),
         "consensus_limited_min_candidates": consensus_request["min_candidates"],
+        "projected_sleeves_s": round(sleeves_s, 1),
+        "sleeve_lineups": sleeve_lineups,
         "projected_total_s": round(projected_s, 1),
         "budget_s": args.budget,
         # R290(c) rider. A verdict states the ceiling it was measured against
@@ -272,7 +281,8 @@ def main() -> int:
         print(f"projected: base bank {base_bank_s:.0f}s + augmentation "
               f"{augmentation_s:.0f}s + consensus-limited "
               f"{consensus_limited_s:.0f}s ({consensus_request['min_candidates']} "
-              f"lineups, R405) = {projected_s:.0f}s")
+              f"lineups, R405) + sleeves {sleeves_s:.0f}s ({sleeve_lineups} lineups, "
+              f"R406) = {projected_s:.0f}s")
         print(f"budget {args.budget:.0f}s ({report['budget_source']}) -> "
               f"{'FITS' if fits else 'EXCEEDS'}")
         if not fits:

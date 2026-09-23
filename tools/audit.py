@@ -873,7 +873,8 @@ EXPECTED_SUITE_COUNTS = {
     # R405, 2026-09-23: 1412 -> 1432, the nineteen ConsensusClusterCapTests (definition, row, headroom, vacuous skip, units, merge, BANK-LIMITED, prefilter reserve, both bank doors, no pool cut, late-swap strip) and the swap-strip test in SwapControlsInheritanceTests.
     # R407, 2026-09-23: 1432 -> 1441, the nine ConfidenceScaledCapTests (each fact alone, two severe, Ben's schedule, clean and unassessed, floor wins, override and off-stays-off, deadline relaxes first, run_slate on the vendored slate, the brief's own facts).
     # R408, 2026-09-23: 1441 -> 1447, the six ProjectionBackfillGradeTests (join rate and a starterless side, tie-averaged Spearman and determinism, hand-checked top-decile and tail, nothing pooled, no post-dated input, labels).
-    "tests.test_core": 1447,
+    # R406, 2026-09-23: 1447 -> 1459, the twelve ClassicSleeveTests (salary-only transform, apportionment and the WTA tilt, single-entry and cash, environment ranking and the whole-slate drop, chalk-fails and environment constraints, the mask, environment membership, caps across sleeves, no sleeve bank and off, thin-sleeve fallback, every door, the brief line).
+    "tests.test_core": 1459,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps
