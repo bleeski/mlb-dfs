@@ -456,7 +456,8 @@ class DeadlineGovernor:
         for key, value in opened.items():
             prior, provenance = _prior(key)
             moves.append({"control": key, "before": prior, "after": value,
-                          "provenance": provenance, "reason": reason})
+                          "provenance": provenance, "reason": reason,
+                          "by": rung})
         record = {
             "rung": rung,
             "at_utc": self.now().isoformat().replace("+00:00", "Z"),
