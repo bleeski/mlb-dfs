@@ -26942,11 +26942,15 @@ class DeadlineGovernorWiringTests(unittest.TestCase):
     def test_a_failed_mirror_says_unmirrored_on_the_status(self):
         """R298(b). A failed mirror delivered nothing to outputs/ and the brief
         pointed at runs/ under `status: certified`. The error rides the brief
-        and the status says so, governed or not."""
+        and the status says so, governed or not.
+
+        R393(b), 2026-09-23: exit 0 -> 7. A failed mirror is a later failure
+        after a valid artifact, so the exit says so; status and keys unchanged."""
         failed = {"mirror_error": "OSError: disk full", "manifest_recorded": False,
                   "output_path": str(self._delivered_csv())}
         code, brief, _calls, err = self._run(30, refusal=dict(self._PASSING, **failed))
-        self.assertEqual(code, 0, err[-400:])
+        self.assertEqual(code, 7, err[-400:])
+        self.assertEqual([f["stage"] for f in brief["later_failures"]], ["mirror"])
         self.assertEqual(brief["status"], "certified_unmirrored")
         self.assertEqual(brief["mirror_error"], "OSError: disk full")
         self.assertIs(brief["manifest_recorded"], False)

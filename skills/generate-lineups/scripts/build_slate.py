@@ -17,6 +17,9 @@ Exit codes:
     3   build ran but did not certify (errors printed)
     4   refused before any solve: inputs missing or unreadable, or a flag
         value this build cannot use
+    7   delivered a prior valid artifact after a later failure: the file passed
+        its essential checks, a later stage failed, and the file is presented
+        first under its own label (R393(b))
 
 Every number this prints is a deterministic review proxy or a labeled prior.
 Nothing here is ROI, win rate, cash rate, or a probability claim. Nothing here
@@ -560,6 +563,125 @@ def refusal_stamp(key: str, **extra) -> dict:
 #: which otherwise sees only argv and the exit code. Filled at three points
 #: (the slate tag, the brief, the last refusal stamp) and cleared per call.
 _REFUSAL_CONTEXT: dict = {}
+
+#: R393(b), roadmap Session 08. The last usable artifact this call produced, set
+#: the moment a delivered file has passed its essential checks and PRESENTED
+#: then, before any narrative. `_main_recording_refusals` reads it when anything
+#: after that raises, so a brief or report exception cannot withhold a written
+#: file. Cleared per call.
+_LAST_USABLE: dict = {}
+
+#: R393(b). Exit 7 means "delivered a prior valid artifact after a later
+#: failure": the file passed its essential checks, then something after it
+#: failed (a crashed promotion, a raising brief, a failed mirror or manifest
+#: write). 7 collides with nothing: this script's 0/3/4/10, autobuild's own 5,
+#: preflight's 0/2/3/4, R388(c)'s planned 6, Python's 1 and argparse's 2. The
+#: returns spell it as a literal 7 because autobuild's contract test reads them.
+EXIT_DELIVERED_AFTER_FAILURE = 7
+
+
+class EngineCrashed(RuntimeError):
+    """R297(c). run_slate handed back a crashed run with nothing usable in it.
+
+    The engine ended the run terminal (``blocked``, ``crashed: True``); this
+    keeps the crash a crash here too. A crashed result is not a refusal, so
+    neither R407's relax, the deadline governor nor the refusal path may read
+    it as one, and autobuild sees the off-contract exit it records as a crash.
+    """
+
+
+def raise_on_engine_crash(result: Mapping[str, Any]) -> Mapping[str, Any]:
+    """Raise :class:`EngineCrashed` for a crashed result with no artifact."""
+    if result.get("crashed") and not result.get("last_usable_artifact"):
+        raise EngineCrashed(
+            f"the engine crashed after create_run; run {result.get('run_id')} "
+            f"ended blocked (crashed), not building: "
+            f"{'; '.join(str(e) for e in result.get('errors') or [])}")
+    return result
+
+
+def has_deliverable(result: Mapping[str, Any]) -> bool:
+    """A certified result, or a crashed one that still carries its export."""
+    return bool(result.get("passed")) or bool(result.get("last_usable_artifact"))
+
+
+def later_failures(result: Mapping[str, Any]) -> list:
+    """Every stage that failed AFTER the delivered export existed (R393(b))."""
+    out = []
+    if result.get("crashed") and result.get("last_usable_artifact"):
+        out.append({"stage": "engine_after_certification",
+                    "error": "; ".join(str(e) for e in result.get("errors") or [])})
+    out += [dict(f) for f in result.get("later_failures") or []]
+    if result.get("last_usable_artifact_error"):
+        out.append({"stage": "last_usable_artifact",
+                    "error": result["last_usable_artifact_error"]})
+    if result.get("mirror_error"):
+        out.append({"stage": "mirror", "error": result["mirror_error"]})
+    elif result.get("manifest_recorded") is False:
+        out.append({"stage": "manifest",
+                    "error": "the upload manifest row was not recorded, so the "
+                             "mirror keeps its DO_NOT_UPLOAD_ name"})
+    if result.get("delivered_sha256_error"):
+        out.append({"stage": "delivered_sha256",
+                    "error": result["delivered_sha256_error"]})
+    return out
+
+
+def _present_file(record: Mapping[str, Any]) -> None:
+    cov = record.get("coverage") or {}
+    print(f"FILE  {record.get('path')}  sha256={record.get('sha256')}  "
+          f"label={record.get('label')}  "
+          f"coverage={cov.get('filled')}/{cov.get('reserved')}", file=sys.stderr)
+
+
+def note_last_usable(record: Mapping[str, Any]) -> dict:
+    """Keep the last usable artifact for this call and present it, first."""
+    _LAST_USABLE.clear()
+    _LAST_USABLE.update({k: v for k, v in record.items() if k != "bytes"})
+    _present_file(_LAST_USABLE)
+    return dict(_LAST_USABLE)
+
+
+def _coverage(path) -> dict | None:
+    try:
+        from mlb_engine.entries.dk_entries_manager import entry_coverage
+        return entry_coverage(path)
+    except Exception:  # noqa: BLE001 - a count never withholds the file
+        return None
+
+
+def classic_artifact_record(result: Mapping[str, Any], delivered) -> dict:
+    """The Classic export to present, from the engine's own record (R393(b)).
+
+    The label and essential validity are the engine's, read off the export's
+    own run. The path is the recorded mirror when it holds the same bytes, and
+    otherwise the immutable ``runs/`` export: a mirror that failed, or kept its
+    DO_NOT_UPLOAD_ name, is not the path to hand over.
+    """
+    from mlb_engine.pipeline.execution_pipeline import artifact_label, artifact_record
+    engine = artifact_record(result.get("last_usable_artifact"))
+    if engine:
+        record = dict(engine, run_path=engine.get("path"))
+        mirror = result.get("delivered_path")
+        if mirror and result.get("manifest_recorded") is True and \
+                manifest_sha256(mirror) == engine.get("sha256"):
+            record["path"] = str(mirror)
+        return record
+    # A result with no engine record (its construction failed, and that is a
+    # later failure of its own): the gates the result carries are still that
+    # export's certification.
+    return {
+        "path": str(delivered), "run_path": result.get("output_path"),
+        "sha256": manifest_sha256(delivered),
+        "label": artifact_label(
+            {k: result.get(k) for k in
+             ("workflow_valid", "selection_certified", "allocation_certified")},
+            result.get("certification_label")),
+        "coverage": _coverage(delivered),
+        "essential_valid": {"essential_valid": None,
+                            "basis": "not_recorded_by_engine"},
+        "run_id": result.get("run_id"),
+    }
 
 # R98(2). Which failing feasibility checks name a floor the ENGINE derived from
 # the slate, and which name a number that is merely the minimum clearing THIS
@@ -3224,7 +3346,9 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         # R388(e): the governed re-solve passes the deadline label, so the
         # manifest row records what the brief says rather than `certified`.
         probe_budget, probe_not_after = _probe_limits()
-        return run_slate(
+        # R297(c). A crash with nothing usable leaves here as a crash, so no
+        # caller below can read it as a refusal worth re-solving.
+        return raise_on_engine_crash(run_slate(
             runs_root=str(REPO / "runs"),
             salary_csv=str(salary), entries_csv=str(entries),
             approve=True, requested_n=n_entries,
@@ -3245,13 +3369,13 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
             interaction_probe_budget_s=probe_budget,
             interaction_probe_not_after=probe_not_after,
             **slate_kwargs,
-        )
+        ))
 
     result = _solve(attempt_controls)
     # R407. On a PROVEN-infeasible joint MILP the confidence tightening is the
     # first thing relaxed, once, before the deadline governor or any other
     # control moves; the re-solve's block records the before and the would-be.
-    if (not result.get("passed") and confidence_relax is None
+    if (not has_deliverable(result) and confidence_relax is None
             and (result.get("input_confidence") or {}).get("applied")
             and any("proven infeasible" in str(e) for e in (result.get("errors") or []))):
         confidence_relax = "proven_infeasible"
@@ -3285,7 +3409,9 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
     # clock, and the crude step is reversible while the lock is not.
     from mlb_engine.pipeline import deadline_governor as dg  # noqa: PLC0415
     governor = getattr(args, "_governor", None)
-    while not result.get("passed"):
+    # R393(b). A crashed result that still carries its certified export is a
+    # delivery after a later failure, never a refusal for a rung to re-solve.
+    while not has_deliverable(result):
         payload_class = classic_refusal_class(result, report)
         if not (governor and governor.governs({"refusal_class": payload_class})):
             break
@@ -3326,7 +3452,7 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         result = _solve(attempt_controls, certification_label=dg.DEADLINE_LABEL,
                         control_moves=governor.walked[-1].get("moves"))
 
-    if not result.get("passed"):
+    if not has_deliverable(result):
         for blocker in result.get("contest_identity_blockers") or []:
             print(f"contest identity: {blocker}", file=sys.stderr)
         # R27 (open half): when a pre-export gate fails, its cause prints
@@ -3483,8 +3609,16 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         payload["non_rosterable_arms"] = report.get("non_rosterable_arms") or []
         return 3, payload
 
-    delivered = result.get("delivered_path") or result.get("output_path")
+    delivered = (result.get("delivered_path") or result.get("output_path")
+                 or (result.get("last_usable_artifact") or {}).get("path"))
     checks = verify_classic(salary, Path(delivered))
+    # R393(b). The file is presented the moment it has passed both the engine's
+    # certification and this independent re-read, before any line of narrative
+    # below; anything after this that raises can no longer withhold it
+    # (`_main_recording_refusals` presents it and exits 7).
+    if checks["passed"]:
+        note_last_usable(dict(classic_artifact_record(result, delivered),
+                              contest_type="classic"))
     exposure = portfolio_exposure(salary, Path(delivered))
     # R116. The concentration facts join the exposure block, which is where a
     # reader already goes to ask how concentrated this portfolio is. Two
@@ -3549,6 +3683,10 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         "manifest_recorded": result.get("manifest_recorded"),
         "mirror_error": result.get("mirror_error"),
         "delivered_sha256_error": result.get("delivered_sha256_error"),
+        # R393(b). On every delivered Classic brief, [] and None when nothing
+        # applies, so absence is visible (R237). A non-empty list is exit 7.
+        "later_failures": later_failures(result),
+        "last_usable_artifact": dict(_LAST_USABLE) if checks["passed"] else None,
         "pool_blockers_overridden": hard if (hard and args.ignore_pool_blockers) else [],
         "pool_blockers_soft": soft,
         # R104. The operator's PLR/PO decision is an INPUT to this build, so it is
@@ -3658,7 +3796,14 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
             refusal_failure_kinds=sorted({k["kind"] for k in
                                           checks.get("failure_kinds") or []}),
         ))
-    return (0 if checks["passed"] else 3), brief
+    # R393(b). A stage after the export failed: the file is still the
+    # deliverable, its label is still its own, and the exit says both (7).
+    if checks["passed"] and brief["later_failures"]:
+        print(f"LATER FAILURE: {len(brief['later_failures'])} stage(s) failed after "
+              f"the export was written: "
+              f"{', '.join(f['stage'] for f in brief['later_failures'])}. The file "
+              f"above is the deliverable; exit 7", file=sys.stderr)
+    return ((7 if brief["later_failures"] else 0) if checks["passed"] else 3), brief
 
 
 # --------------------------------------------------------------------------- #
@@ -4628,6 +4773,27 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
               f"and is at {provisional.name}, which names itself rather than "
               f"waiting for preflight to hard-fail it", file=sys.stderr)
     template = sd.verify_template_preserved(str(entries), str(delivered))
+    # R393(b). Presented once every lineup passed the solve's own checks and
+    # the template survived, before any narrative. Showdown is review-grade
+    # by contract, so its label is never upload_ready. When the record failed,
+    # the DO_NOT_UPLOAD_ copy is the only copy, so it is the one presented.
+    showdown_later_failures = (
+        [{"stage": "manifest", "error": manifest_error}] if manifest_error else [])
+    if template.get("passed"):
+        _sd_bytes = Path(delivered).read_bytes()
+        note_last_usable({
+            "path": str(delivered),
+            "sha256": hashlib.sha256(_sd_bytes).hexdigest(),
+            "size_bytes": len(_sd_bytes),
+            "coverage": _coverage(delivered),
+            "label": "review_grade",
+            "essential_valid": {
+                "essential_valid": True,
+                "basis": "showdown_lineup_checks_and_template",
+                "preflight": None},
+            "run_id": None,
+            "contest_type": "showdown",
+        })
 
     if use_ladder:
         cap_count = ladder_meta.get("captain_cap_count")
@@ -4839,6 +5005,9 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         # DO_NOT_UPLOAD_ would send the operator to a file that does not exist.
         "manifest_recorded": not manifest_error,
         "manifest_error": manifest_error,
+        # R393(b), the same two keys the Classic brief carries.
+        "later_failures": showdown_later_failures,
+        "last_usable_artifact": dict(_LAST_USABLE) if template.get("passed") else None,
         "upload_manifest": manifest_repo_relative(
             REPO / "outputs" / args.date / "upload_manifest.json"),
         "showdown_module_version": sd.VERSION,
@@ -5318,7 +5487,8 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
     # no longer the template DK issued, and no label makes that enterable.
     if not template.get("passed"):
         brief.update(refusal_stamp("showdown_template_broken"))
-    return (0 if template.get("passed") else 3), brief
+    return ((7 if showdown_later_failures else 0)
+            if template.get("passed") else 3), brief
 
 
 def inert_factors(factors) -> list:
@@ -6678,24 +6848,35 @@ def _main_recording_refusals() -> int:
     run_id because most refusals happen before `create_run` mints one. It never
     changes the exit code, and a hard kill of the process still writes nothing --
     that limit is real and is not claimed away.
+
+    R393(b). `main()` runs inside a try. Once a delivered file has passed its
+    essential checks (`_LAST_USABLE`), an exception after it -- the brief, the
+    report, a formatter -- no longer exits 1 with the file unpresented: the
+    file is presented first, a minimal brief follows, the record says 7, and
+    the exit is 7. With nothing usable yet, the exception propagates unchanged.
     """
     _REFUSAL_CONTEXT.clear()
-    code = main()
+    _LAST_USABLE.clear()
+    try:
+        code = main()
+    except Exception as exc:  # noqa: BLE001 - R393(b), see the docstring
+        if not _LAST_USABLE:
+            raise
+        code = _deliver_after_exception(exc)
     if code == 0:
         return code
     try:
         from mlb_engine.entries.delivery_record import write_refusal_record
         from mlb_engine.repo_env import today_et
         argv = sys.argv[1:]
-        date = ""
-        for i, arg in enumerate(argv):
-            if arg == "--date" and i + 1 < len(argv):
-                date = argv[i + 1]
-                break
-            if arg.startswith("--date="):
-                date = arg.split("=", 1)[1]
-                break
+        date = _argv_date(argv)
         slate_tag, refusal = refusal_record_facts(dict(_REFUSAL_CONTEXT))
+        if int(code) == 7:
+            # R393(b). The record of a delivery after a later failure names the
+            # file it delivered, so it agrees with what was presented.
+            brief = _REFUSAL_CONTEXT.get("brief") or {}
+            refusal["last_usable_artifact"] = dict(_LAST_USABLE) or None
+            refusal["later_failures"] = list(brief.get("later_failures") or [])
         write_refusal_record(date=date or today_et(), slate_tag=slate_tag,
                              exit_code=int(code),
                              refusal={"argv": argv,
@@ -6704,6 +6885,52 @@ def _main_recording_refusals() -> int:
     except Exception as exc:  # noqa: BLE001 - never change the exit code
         print(f"delivery_record: refusal not recorded ({type(exc).__name__}: {exc})")
     return code
+
+
+def _argv_date(argv) -> str:
+    """The ``--date`` this call was given, or "" when it named none."""
+    for i, arg in enumerate(argv):
+        if arg == "--date" and i + 1 < len(argv):
+            return argv[i + 1]
+        if arg.startswith("--date="):
+            return arg.split("=", 1)[1]
+    return ""
+
+
+def _deliver_after_exception(exc: BaseException) -> int:
+    """R393(b). Present the last usable artifact after a later exception; 7.
+
+    The file line prints before anything else, then the traceback and a
+    minimal brief a supervisor can parse (`delivered_path`, `delivered_sha256`).
+    Never raises: the brief is printed with ``default=str``.
+    """
+    import traceback
+    record = dict(_LAST_USABLE)
+    failure = {"stage": "after_delivery", "error": f"{type(exc).__name__}: {exc}"}
+    _present_file(record)
+    print(f"LATER FAILURE: {failure['error']}. The file above passed its "
+          f"essential checks before this; it is the deliverable, labelled "
+          f"{record.get('label')}; exit 7", file=sys.stderr)
+    traceback.print_exc()
+    prior = _REFUSAL_CONTEXT.get("brief") or {}
+    brief = {
+        "status": "delivered_after_failure",
+        # R296(e): autobuild dates its decision log off `brief['date']` first.
+        "date": prior.get("date") or _argv_date(sys.argv[1:]),
+        "contest_type": record.get("contest_type"),
+        "delivered_path": record.get("path"),
+        "delivered_sha256": record.get("sha256"),
+        "label": record.get("label"),
+        "run_id": record.get("run_id"),
+        "last_usable_artifact": record,
+        "later_failures": [failure],
+        "errors": [failure["error"]],
+    }
+    if prior.get("slate"):
+        brief["slate"] = prior["slate"]
+    _REFUSAL_CONTEXT["brief"] = brief
+    print(json.dumps(brief, indent=1, default=str))
+    return 7
 
 
 def refusal_record_facts(context: Mapping[str, Any]) -> tuple:
@@ -6743,6 +6970,11 @@ REFUSAL_EXIT_NOTES = {
     4: ("refused before any solve: inputs missing or unreadable, a wall, a "
         "units slip, or an unusable argument"),
     5: "supervisor stop: the wall clock or the call budget ran out",
+    # R393(b).
+    7: ("delivered a prior valid artifact after a later failure: the file "
+        "passed its essential checks and a later stage (promotion, the brief, "
+        "a report, the mirror or the manifest) failed; the file is the "
+        "deliverable under its own label"),
     10: "bank thin: resumable, run the same command again to add a slice",
 }
 
