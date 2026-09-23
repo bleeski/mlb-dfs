@@ -1,0 +1,45 @@
+{
+ "code": {
+  "contest_allocator": "v1.12",
+  "execution_pipeline": "v1.17",
+  "git_dirty": true,
+  "git_sha": "ed18ed73f092278749bb0a757a6bda3f86a7206f"
+ },
+ "date": "2026-09-23",
+ "exit_code": 3,
+ "host": {
+  "call_budget_s": 630.0,
+  "declared_ceiling_s": 900.0,
+  "host": "claude_code"
+ },
+ "kind": "refusal",
+ "labels": "a refusal is an observed build outcome, never a claim about the slate",
+ "recorded_utc": "2026-09-23T16:38:32.603416+00:00",
+ "refusal": {
+  "argv": [
+   "--declare-pitcher",
+   "44255403=viable_bulk_or_alt_sp",
+   "--declare-pitcher",
+   "44255405=viable_bulk_or_alt_sp",
+   "--salary",
+   "tools/_scratch_0923/DKSalaries_early.csv",
+   "--entries",
+   "tools/_scratch_0923/DKEntries_early.csv",
+   "--max-seconds",
+   "105",
+   "--deliver-by",
+   "13:05"
+  ],
+  "errors": [
+   "entry-level joint MILP proven infeasible: no single control is arithmetically binding against this bank, so the interaction of the active controls is. Active: max_consensus_cluster_share_pct=0.5, max_pitcher_exposure_pct=0.43, max_player_exposure_pct=0.35, max_primary_stack_exposure_pct=0.35, max_shared_players=8, max_sp_pair_repetition=2, max_team_exposure_pct=0.55"
+  ],
+  "failing_checks": [],
+  "note": "built and refused: the build ran but did not certify, or the pool blocked it",
+  "refusal": "classic_not_certified",
+  "refusal_class": "badly_shaped",
+  "run_id": "20260923T163832Z_dd06fabe",
+  "status": "not_certified"
+ },
+ "schema_version": 1,
+ "slate_tag": "1310_3g"
+}
