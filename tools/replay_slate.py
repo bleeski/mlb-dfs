@@ -34,6 +34,7 @@ import glob
 import json
 import math
 import re
+import sys
 from fractions import Fraction
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
@@ -492,6 +493,375 @@ def lineups_from_csv(path: Path) -> List[Dict[str, Any]]:
     return rows
 
 
+# --------------------------------------------------------------------------- #
+# R408 (Session 96): does the projection order players better than salary?
+# --------------------------------------------------------------------------- #
+#
+# The projection's base is DK's own AvgPointsPerGame and every factor on top is
+# an uncalibrated labeled prior, and nothing measured whether the engine ranks
+# players better than DK's salary does. This mode answers it from the archive,
+# one slate and one side at a time, in OBSERVED outcomes only.
+#
+# Premise, measured 2026-09-23 (dfs-premise, then this tool) rather than taken
+# from the entry: 7 archived Classic slates can be graded (06-03, 07-19
+# afternoon, 07-22 early and night, 07-23, 07-24 main and night; 06-28 has no
+# mined outcomes; three `salary_extracted_*.csv` files are full DK salary files)
+# plus 2 tracked fixture salary files for archived dates (07-29, 07-30), so the
+# honest n is 9 slates, not the 5 the entry estimated. Contests are mapped to a
+# salary file by `field_miner.resolve_salary_file`, never by name overlap: one
+# 07-19 contest name-joins 40/40 against a salary file that is a different slate.
+
+def _engine_on_path() -> None:
+    """The grade mode reads the production intake and frame builder, imported
+    lazily so the replay mode stays standard-library only; run as a script, the
+    repo root has to be importable first."""
+    if str(ROOT) not in sys.path:
+        sys.path.insert(0, str(ROOT))
+
+
+GRADE_LABEL = (
+    "observed outcomes on archived slates, per slate and per side, never pooled; "
+    "never ROI, a win rate, a cash rate, a probability, or an edge"
+)
+#: Tracked DK Classic salary files for archived dates that sit outside
+#: data/archive. Graded with their origin named.
+FIXTURE_SALARY_FILES: Dict[str, Path] = {
+    "2026-07-29": ROOT / "tests" / "fixtures" / "slates" / "DKSalaries_frozen_2026-07-29.csv",
+    "2026-07-30": ROOT / "tests" / "fixtures" / "slates"
+                  / "DKSalaries_1910_6g_frozen_2026-07-30.csv",
+}
+#: engine_base is the production frame's `Base_Projection` (Base x F1..F5).
+PREDICTORS: Tuple[str, ...] = ("engine_base", "ceiling", "salary", "appg")
+
+
+def average_ranks(values: Sequence[float]) -> List[float]:
+    """1-based ranks, ties averaged, deterministic."""
+    order = sorted(range(len(values)), key=lambda i: (values[i], i))
+    ranks = [0.0] * len(values)
+    i = 0
+    while i < len(order):
+        j = i
+        while j + 1 < len(order) and values[order[j + 1]] == values[order[i]]:
+            j += 1
+        mean = (i + j) / 2.0 + 1.0
+        for k in range(i, j + 1):
+            ranks[order[k]] = mean
+        i = j + 1
+    return ranks
+
+
+def spearman(xs: Sequence[float], ys: Sequence[float]) -> Optional[float]:
+    """Tie-averaged Spearman rank correlation; None under two points or a
+    constant side."""
+    n = len(xs)
+    if n < 2 or n != len(ys):
+        return None
+    rx, ry = average_ranks(xs), average_ranks(ys)
+    mx, my = sum(rx) / n, sum(ry) / n
+    cov = sum((a - mx) * (b - my) for a, b in zip(rx, ry))
+    vx = sum((a - mx) ** 2 for a in rx)
+    vy = sum((b - my) ** 2 for b in ry)
+    if vx <= 0 or vy <= 0:
+        return None
+    return round(cov / math.sqrt(vx * vy), 4)
+
+
+def decile_size(n: int) -> int:
+    """How many players "the top 10%" holds: ceil(n / 10), at least one."""
+    return max(1, int(math.ceil(n / 10.0)))
+
+
+def top_ids(values_by_id: Mapping[str, float], k: int) -> List[str]:
+    """The ``k`` largest, ties broken by player id, so the set is deterministic."""
+    return [pid for pid, _ in sorted(values_by_id.items(), key=lambda kv: (-kv[1], kv[0]))[:k]]
+
+
+def p90_value(values: Sequence[int]) -> Optional[int]:
+    """The realized 90th percentile, nearest-rank: the ceil(0.9 n)-th smallest."""
+    if not values:
+        return None
+    ordered = sorted(values)
+    return ordered[max(0, int(math.ceil(0.9 * len(ordered))) - 1)]
+
+
+def grade_side(rows: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
+    """Rank realized points against each predictor over one side of one slate.
+
+    ``rows`` carry ``player_id``, ``realized_cents`` and a value per predictor.
+    Top-decile hits: of the predictor's top ceil(n/10), how many land in the
+    realized top ceil(n/10). Tail hits: of the same predicted set, how many land
+    at or above the realized p90. Observed outcomes; nothing here is pooled
+    across slates or sides.
+    """
+    n = len(rows)
+    if not n:
+        return {"n": 0, "graded": False}
+    realized = {str(r["player_id"]): int(r["realized_cents"]) for r in rows}
+    k = decile_size(n)
+    realized_top = set(top_ids(realized, k))
+    p90 = p90_value(list(realized.values()))
+    out: Dict[str, Any] = {"n": n, "graded": True, "decile_size": k,
+                           "realized_p90": (p90 / 100.0) if p90 is not None else None,
+                           "predictors": {}}
+    ids = sorted(realized)
+    for name in PREDICTORS:
+        values = {str(r["player_id"]): float(r[name]) for r in rows
+                  if r.get(name) is not None}
+        if len(values) != n:
+            out["predictors"][name] = {"graded": False, "reason": "missing values"}
+            continue
+        predicted_top = top_ids(values, k)
+        out["predictors"][name] = {
+            "spearman": spearman([values[i] for i in ids], [realized[i] for i in ids]),
+            "top_decile_hits": sum(1 for pid in predicted_top if pid in realized_top),
+            "tail_hits": sum(1 for pid in predicted_top
+                             if p90 is not None and realized[pid] >= p90),
+        }
+    for metric in ("spearman", "top_decile_hits", "tail_hits"):
+        scored = {name: v[metric] for name, v in out["predictors"].items()
+                  if v.get(metric) is not None}
+        if not scored:
+            continue
+        best = max(scored.values())
+        leaders = sorted(name for name, v in scored.items() if v == best)
+        out.setdefault("leader", {})[metric] = leaders[0] if len(leaders) == 1 \
+            else "tie: " + ", ".join(leaders)
+    base = out["predictors"].get("engine_base") or {}
+    ceil_ = out["predictors"].get("ceiling") or {}
+    if base.get("spearman") is not None and ceil_.get("spearman") is not None:
+        engine = [float(r["engine_base"]) for r in rows]
+        ceiling = [float(r["ceiling"]) for r in rows]
+        out["ceiling_rank_identical_to_engine_base"] = spearman(engine, ceiling) == 1.0
+    return out
+
+
+def classic_salary_files(date_dir: Path) -> List[Path]:
+    """Every Classic DK salary file for one archived date, fixtures included."""
+    found = sorted(list(date_dir.glob("DKSalaries*.csv"))
+                   + list(date_dir.glob("salary_extracted_*.csv")))
+    fixture = FIXTURE_SALARY_FILES.get(date_dir.name)
+    if fixture is not None and fixture.exists():
+        found.append(fixture)
+    out = []
+    for path in found:
+        with path.open(newline="", encoding="utf-8-sig") as handle:
+            rows = list(csv.DictReader(handle))
+        if rows and "Roster Position" in rows[0] and not any(
+                str(r.get("Roster Position") or "").startswith("CPT") for r in rows):
+            out.append(path)
+    return out
+
+
+def slate_groups(date_dir: Path) -> Dict[str, Any]:
+    """Archived Classic contests on one date, grouped by the salary file
+    `field_miner.resolve_salary_file` resolves each to; unresolved named."""
+    _engine_on_path()
+    from mlb_engine.field.field_miner import parse_standings_export, resolve_salary_file
+    salaries = classic_salary_files(date_dir)
+    groups: Dict[str, List[Dict[str, Any]]] = {}
+    unresolved: List[Dict[str, str]] = []
+    if not salaries:
+        return {"groups": {}, "unresolved": [], "salary_files": []}
+    for mined in sorted(date_dir.glob("mined_*.json")):
+        record = json.loads(mined.read_text(encoding="utf-8"))
+        if str(record.get("contest_type") or "").strip().lower() != "classic":
+            continue
+        cid = str(record.get("contest_id"))
+        standings = [p for p in (date_dir / f"contest-standings-{cid}.csv",
+                                 date_dir / f"standings_{cid}.csv") if p.exists()]
+        if not standings:
+            unresolved.append({"contest_id": cid, "reason": "no standings export"})
+            continue
+        resolved = resolve_salary_file(parse_standings_export(str(standings[0])),
+                                       [str(p) for p in salaries])
+        if not resolved.get("path"):
+            unresolved.append({"contest_id": cid, "reason": str(resolved.get("reason"))})
+            continue
+        groups.setdefault(str(resolved["path"]), []).append(record)
+    return {"groups": groups, "unresolved": unresolved,
+            "salary_files": [str(p) for p in salaries]}
+
+
+def projection_frame_for_grade(salary_path: str, slate_date: str) -> Tuple[Any, Dict[str, Any]]:
+    """The production frame, rebuilt from the salary file on DATE-INDEPENDENT
+    factors only.
+
+    R251 (frozen reference inputs) has not landed, and every enrichment input
+    on disk post-dates these slates (Savant fetched 2026-08-30; the frozen test
+    fixtures are 2026-07-25 and 07-16, after the July slates they would grade),
+    so feeding any of them would leak outcomes into the prior. The pool is the
+    production intake (`merge_dk_starting_into_feed` then `build_slate_pool`),
+    with the platoon reference withheld for the same reason: TBD sides take the
+    intake's own top-9-by-APPG fallback. F2 is live only where the salary file
+    carries DK's `Starting` column.
+    """
+    _engine_on_path()
+    from datetime import datetime
+    from mlb_engine.intake.live_data_adapters import (
+        build_slate_pool, merge_dk_starting_into_feed)
+    from mlb_engine.pipeline.execution_pipeline import _assemble_projection_frame
+    feed, merge_report = merge_dk_starting_into_feed(None, salary_path)
+    pool = build_slate_pool(salary_path, feed, platoon_json={},
+                            now=datetime.fromisoformat(f"{slate_date}T12:00:00+00:00"),
+                            stale_platoon_policy="warn")
+    rows = pool["run_slate_kwargs"]["projection_rows"]
+    frame, _ = _assemble_projection_frame(salary_path, rows, "emergency_proxy",
+                                          None, None, None)
+    f2_live = bool(len(frame)) and bool((frame["F2"].astype(float) != 1.0).any())
+    # Measured off the pool, not asserted: "caller_supplied" is the empty
+    # mapping above, None means no TBD side needed one, and anything else is a
+    # file the intake loaded -- which would be a post-dated input.
+    platoon_source = pool.get("platoon_source")
+    live = {
+        "batting_order_F2": f2_live,
+        "dk_starting_column": bool(f2_live),
+        "platoon_reference": platoon_source not in (None, "caller_supplied"),
+        "platoon_source": ("withheld" if platoon_source == "caller_supplied"
+                           else platoon_source),
+        "savant_xwoba_xiso": False,
+        "fangraphs_k_rate": False, "odds_F1": False, "matchup_F4": False,
+        "weather_F5": False, "value_guard": True,
+        "note": ("date-independent factors only (R251 not landed; every stored "
+                 "enrichment input post-dates these slates)"),
+    }
+    return frame, live
+
+
+def grade_slate(salary_path: str, contests: Sequence[Mapping[str, Any]],
+                slate_date: str) -> Dict[str, Any]:
+    """One slate: realized points from its contests' tables, joined to the
+    production frame by the miner's own name normalization."""
+    _engine_on_path()
+    from mlb_engine.field.field_miner import normalize_name
+    frame, live = projection_frame_for_grade(salary_path, slate_date)
+    realized: Dict[str, int] = {}
+    conflicts: set = set()
+    for record in contests:
+        table = record.get("player_table") or []
+        colliding = set(ambiguous_norms(table))
+        conflicts |= colliding
+        for norm, cents in fpts_cents_by_norm(table).items():
+            if norm in colliding:
+                continue
+            if norm in realized and realized[norm] != cents:
+                conflicts.add(norm)
+            realized.setdefault(norm, cents)
+    ids_by_norm: Dict[str, List[str]] = {}
+    for row in frame.itertuples():
+        ids_by_norm.setdefault(normalize_name(row.Name), []).append(str(row.Player_ID))
+    salary_collisions = sorted(n for n, ids in ids_by_norm.items() if len(ids) > 1)
+    sides: Dict[str, List[Dict[str, Any]]] = {"hitters": [], "pitchers": []}
+    pool_by_side = {"hitters": 0, "pitchers": 0}
+    for row in frame.itertuples():
+        side = "pitchers" if str(row.Position) == "P" else "hitters"
+        pool_by_side[side] += 1
+        norm = normalize_name(row.Name)
+        if norm in conflicts or norm in salary_collisions or norm not in realized:
+            continue
+        sides[side].append({
+            "player_id": str(row.Player_ID), "realized_cents": realized[norm],
+            "engine_base": float(row.Base_Projection), "ceiling": float(row.Ceiling),
+            "salary": float(row.Salary), "appg": float(row.AvgPointsPerGame),
+        })
+    graded = {}
+    for side, rows in sides.items():
+        result = grade_side(rows)
+        result["pool"] = pool_by_side[side]
+        result["join_rate"] = (round(len(rows) / pool_by_side[side], 4)
+                               if pool_by_side[side] else None)
+        if not pool_by_side[side]:
+            result["reason"] = ("the pool declares no starting pitcher: no DK "
+                                "Starting column and no lineups feed on this slate"
+                                if side == "pitchers" else "no hitters in the pool")
+        graded[side] = result
+    return {
+        "slate_date": slate_date,
+        "salary_file": str(Path(salary_path).relative_to(ROOT)
+                           if Path(salary_path).is_relative_to(ROOT) else salary_path),
+        "source": ("fixture" if Path(salary_path) in FIXTURE_SALARY_FILES.values()
+                   else "archive"),
+        "contests": sorted(str(r.get("contest_id")) for r in contests),
+        "live_factors": live,
+        "excluded": {"realized_conflicts_or_collisions": sorted(conflicts),
+                     "salary_name_collisions": salary_collisions},
+        "sides": graded,
+    }
+
+
+def grade_projection(dates: Optional[Sequence[str]] = None,
+                     archive: Path = ARCHIVE) -> Dict[str, Any]:
+    """Every gradeable archived Classic slate, one row per slate. Never pooled:
+    the only cross-slate line is a COUNT of slate-sides, labeled as one."""
+    slates: List[Dict[str, Any]] = []
+    unresolved: List[Dict[str, str]] = []
+    wanted = set(dates or [])
+    for date_dir in sorted(p for p in archive.iterdir() if p.is_dir()):
+        if wanted and date_dir.name not in wanted:
+            continue
+        found = slate_groups(date_dir)
+        for item in found["unresolved"]:
+            unresolved.append({"slate_date": date_dir.name, **item})
+        for path, contests in sorted(found["groups"].items()):
+            slates.append(grade_slate(path, contests, date_dir.name))
+    counts: Dict[str, Dict[str, int]] = {}
+    for slate in slates:
+        for side, result in slate["sides"].items():
+            preds = result.get("predictors") or {}
+            eb = (preds.get("engine_base") or {}).get("spearman")
+            sal = (preds.get("salary") or {}).get("spearman")
+            if eb is None or sal is None:
+                continue
+            c = counts.setdefault(side, {"slate_sides": 0, "engine_base_led_salary": 0})
+            c["slate_sides"] += 1
+            c["engine_base_led_salary"] += int(eb > sal)
+    total = sum(c["slate_sides"] for c in counts.values())
+    led = sum(c["engine_base_led_salary"] for c in counts.values())
+    return {
+        "label": GRADE_LABEL,
+        "slates": slates,
+        "slate_count": len(slates),
+        "unresolved_contests": unresolved,
+        "observed_outcome_count": {
+            "by_side": counts,
+            "line": (f"engine Base led salary on Spearman on {led} of {total} "
+                     f"slate-sides (an observed-outcome COUNT, not a pooled "
+                     f"statistic and not a probability)"),
+        },
+        "note": ("n per slate is the pool players DK's tables record as drafted; "
+                 "pitcher n is small (4 to 21) and a slate without DK's Starting "
+                 "column grades no pitcher. The forward grade (R255) is the main "
+                 "instrument; this is the backfill"),
+    }
+
+
+def format_grade_table(result: Mapping[str, Any]) -> str:
+    """The per-slate table: one line per slate-side, the leader per metric."""
+    lines = [f"# {result['label']}", "",
+             "| slate | salary file | side | n | join | Spearman base/ceil/salary/appg "
+             "| top-decile hits | tail hits | leader (rho / top / tail) | live |",
+             "|---|---|---|---|---|---|---|---|---|---|"]
+    for slate in result["slates"]:
+        for side in ("hitters", "pitchers"):
+            r = slate["sides"][side]
+            if not r.get("graded"):
+                lines.append(f"| {slate['slate_date']} | {Path(slate['salary_file']).name} "
+                             f"| {side} | 0 | - | not graded: {r.get('reason')} | | | | |")
+                continue
+            p = r["predictors"]
+            rho = "/".join(str(p[x].get("spearman")) for x in PREDICTORS)
+            top = "/".join(str(p[x].get("top_decile_hits")) for x in PREDICTORS)
+            tail = "/".join(str(p[x].get("tail_hits")) for x in PREDICTORS)
+            lead = r.get("leader") or {}
+            live = "F2" if slate["live_factors"]["batting_order_F2"] else "APPG only"
+            lines.append(
+                f"| {slate['slate_date']} | {Path(slate['salary_file']).name} | {side} "
+                f"| {r['n']} | {r['join_rate']} | {rho} | {top} of {r['decile_size']} "
+                f"| {tail} | {lead.get('spearman')} / {lead.get('top_decile_hits')} / "
+                f"{lead.get('tail_hits')} | {live} |")
+    lines += ["", result["observed_outcome_count"]["line"], "", result["note"]]
+    return "\n".join(lines)
+
+
 def main(argv: Optional[Sequence[str]] = None) -> int:
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -502,8 +872,21 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                    help="re-score every archived Classic entry against DK's own "
                         "recorded points and rank; the acceptance test")
     p.add_argument("--json", type=Path, help="write the full result here")
+    p.add_argument("--grade-projection", action="store_true",
+                   help="R408: rank realized points against the engine's Base, "
+                        "Ceiling, salary and APPG on every archived Classic "
+                        "slate, per slate and per side, observed outcomes only")
+    p.add_argument("--date", action="append",
+                   help="with --grade-projection, grade only this date (repeatable)")
     args = p.parse_args(argv)
 
+    if args.grade_projection:
+        result = grade_projection(args.date)
+        if args.json:
+            args.json.write_text(json.dumps(result, indent=2, default=str) + "\n",
+                                 encoding="utf-8")
+        print(format_grade_table(result))
+        return 0
     if args.self_validate:
         result = self_validate([args.contest] if args.contest else None)
     elif args.contest:

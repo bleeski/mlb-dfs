@@ -28945,3 +28945,111 @@ class ConfidenceScaledCapTests(unittest.TestCase):
         self.assertIn("max_player_exposure_pct 0.4 -> 0.3", line)
         self.assertIn("not a probability", line)
         self.assertTrue(bs.format_input_confidence_line(None).startswith("UNAVAILABLE"))
+
+
+class ProjectionBackfillGradeTests(unittest.TestCase):
+    """R408 (Session 96). `tools/replay_slate.py --grade-projection`: does the
+    projection order players better than salary or APPG, on the archive?
+
+    Observed outcomes only, one slate and one side at a time, never pooled. The
+    premise was measured before building (dfs-premise): 9 gradeable Classic
+    slates (7 in data/archive, 2 tracked fixtures), not the 5 the entry
+    estimated, and contests map to a salary file through
+    `field_miner.resolve_salary_file`, never by name overlap.
+    """
+
+    @staticmethod
+    def _mod():
+        import importlib
+        if str(REPO / "tools") not in sys.path:
+            sys.path.insert(0, str(REPO / "tools"))
+        return importlib.import_module("replay_slate")
+
+    def _grade_0603(self):
+        mod = self._mod()
+        if not (mod.ARCHIVE / "2026-06-03" / "DKSalaries_2026-06-03.csv").exists():
+            self.skipTest("vendored data/archive/2026-06-03 absent")
+        return mod.grade_projection(["2026-06-03"])
+
+    def test_the_join_rate_is_reported_and_a_side_without_starters_says_why(self):
+        result = self._grade_0603()
+        self.assertEqual(result["slate_count"], 1)
+        slate = result["slates"][0]
+        self.assertEqual(slate["contests"], ["191020573", "191020574"])
+        hitters = slate["sides"]["hitters"]
+        self.assertEqual((hitters["pool"], hitters["n"], hitters["join_rate"]),
+                         (36, 30, 0.8333))
+        pitchers = slate["sides"]["pitchers"]
+        self.assertFalse(pitchers["graded"])
+        self.assertIn("no starting pitcher", pitchers["reason"])
+        self.assertTrue(hitters["ceiling_rank_identical_to_engine_base"],
+                        "without a live ceiling multiplier Ceiling is 1.42 x Base")
+
+    def test_the_ranking_is_deterministic_and_the_spearman_is_tie_averaged(self):
+        mod = self._mod()
+        self.assertEqual(mod.spearman([1, 2, 3, 4], [10, 20, 30, 40]), 1.0)
+        self.assertEqual(mod.spearman([1, 2, 3, 4], [40, 30, 20, 10]), -1.0)
+        # Ranks [1.5, 1.5, 3, 4] against [4, 1, 2, 3]: cov 0.5, var 4.5 and 5.
+        # Unaveraged ranks [1, 1, 3, 4] would give 0.0865 here.
+        self.assertEqual(mod.spearman([1, 1, 2, 3], [4, 1, 2, 3]),
+                         round(0.5 / math.sqrt(22.5), 4))
+        self.assertIsNone(mod.spearman([1, 1, 1], [1, 2, 3]))
+        first = json.dumps(self._grade_0603(), sort_keys=True, default=str)
+        second = json.dumps(self._grade_0603(), sort_keys=True, default=str)
+        self.assertEqual(first, second)
+
+    def test_top_decile_and_tail_hits_on_a_hand_checked_toy(self):
+        mod = self._mod()
+        rows = []
+        for i in range(20):
+            rows.append({"player_id": f"p{i:02d}", "realized_cents": i * 100,
+                         "engine_base": float(i), "ceiling": float(i),
+                         "salary": float(19 - i),
+                         "appg": float(19 if i == 0 else (18 if i == 19 else i - 1))})
+        out = mod.grade_side(rows)
+        # k = ceil(20 / 10) = 2; realized top two are p19, p18; p90 is the 18th
+        # smallest value, 17.00.
+        self.assertEqual(out["decile_size"], 2)
+        self.assertEqual([mod.decile_size(n) for n in (1, 5, 10, 21)], [1, 1, 1, 3])
+        self.assertEqual(out["realized_p90"], 17.0)
+        p = out["predictors"]
+        self.assertEqual((p["engine_base"]["top_decile_hits"], p["engine_base"]["tail_hits"]), (2, 2))
+        self.assertEqual((p["salary"]["top_decile_hits"], p["salary"]["tail_hits"]), (0, 0))
+        # appg's top two are p00 (19) and p19 (18): one hit, one tail hit.
+        self.assertEqual((p["appg"]["top_decile_hits"], p["appg"]["tail_hits"]), (1, 1))
+        self.assertEqual(out["leader"]["spearman"], "tie: ceiling, engine_base")
+        self.assertEqual(p["salary"]["spearman"], -1.0)
+
+    def test_nothing_is_pooled_across_slates_or_sides(self):
+        result = self._grade_0603()
+        self.assertFalse({"spearman", "pooled", "overall", "mean_spearman"}
+                         & set(result), "a cross-slate statistic is a pooled number")
+        count = result["observed_outcome_count"]
+        self.assertIn("observed-outcome COUNT, not a pooled statistic", count["line"])
+        self.assertEqual(set(count["by_side"]), {"hitters"})
+        self.assertEqual(count["by_side"]["hitters"]["slate_sides"], 1)
+
+    def test_no_post_dated_input_reaches_the_prior(self):
+        """R251 has not landed and every stored enrichment input post-dates the
+        archived slates, so the frame is rebuilt on date-independent factors,
+        with the platoon reference WITHHELD. Left to its default, the intake
+        loads today's platoon file into a June slate and F2 goes live."""
+        mod = self._mod()
+        result = self._grade_0603()
+        live = result["slates"][0]["live_factors"]
+        self.assertFalse(live["batting_order_F2"])
+        self.assertEqual(live["platoon_source"], "withheld")
+        for key in ("platoon_reference", "savant_xwoba_xiso", "fangraphs_k_rate",
+                    "odds_F1", "matchup_F4", "weather_F5"):
+            self.assertFalse(live[key], key)
+        src = inspect.getsource(mod.slate_groups)
+        self.assertIn("resolve_salary_file(", src, "contests map through the miner's resolver")
+
+    def test_the_labels_are_present_and_the_table_carries_them(self):
+        mod = self._mod()
+        result = self._grade_0603()
+        for phrase in ("observed outcomes", "never pooled", "never ROI", "probability"):
+            self.assertIn(phrase, result["label"])
+        table = mod.format_grade_table(result)
+        self.assertTrue(table.startswith("# observed outcomes"))
+        self.assertIn("not a probability", table)
