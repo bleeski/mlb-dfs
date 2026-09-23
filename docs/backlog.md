@@ -940,6 +940,8 @@ distribution before any weight above minimal.
 
 ### R247. Cap cost is invisible, REMAINDER: the reassignment records a label move and not a proxy delta, and the skill-aware-cap direction is Ben's (P2, XS for (b); (d) is Ben's) | new 2026-08-27, merged from BUILD fragments `2026-08-27_BUILD_player-exposure-cap-is-skill-blind.md` and `2026-08-27_BUILD_showdown_tightened_cap_degrades_bank_tail_uncounted.md`; corroborated by the outside spec ed8 (F-35, F-37). **(a) and (c) CLOSED 2026-09-01**, migrated to CHANGELOG.md
 
+**Rider 2026-09-23 (Ben, post-slate 1905_10g): (d) is answered.** Cap correlated blocks, not only persons, and build it now. It is filed as R405 (roadmap Session 93) with the measurement that shaped it: the cluster on 1905_10g was a nine-bat POOL defined by bank share, not a k-subset, so neither Base rank nor a triple cap finds it. (d) leaves the Session 90 decision pool; (b) stays with Session 64.
+
 **Rider 2026-09-02 (ed10, GF10-D3): (a)'s Showdown reading is thesis-weighted.** On the ladder path `proj_points` is computed on the multiplied `work` frame (`showdown_theses.py:1187-1191` → `showdown.py:550/565`), so the proxy-margin trigger compares a win_big roster (other side's bats at 0.40) against a both_explode roster (1.0) as one scale and flags duel/blowout constructions degraded by construction; the 1905_1g_sd sighting fits that reading. (b)'s proxy delta must be computed on the UNWEIGHTED Base or it inherits the same distortion. R295(b) carries the fix; re-verify (b)'s premise against it before building.
 
 **(a) and (c) shipped 2026-09-01** and left with the entry text that described
@@ -1427,6 +1429,44 @@ checkpoint has both objects in scope roughly 240 lines above.
 
 
 ## Workstream 2 — Strategy controls and the evidence that moves them
+
+### R405. The consensus-cluster cap: cap lineups by how many of the bank's consensus bats they share, not only by person (P1, M) | new 2026-09-23, Ben's answer to R247(d) ("cap correlated blocks instead of persons"), from the 1905_10g post-slate review | Roadmap: Session 93
+
+- **What.** The drawdown half of the dual objective has per-person, per-team, per-game and per-SP-pair ceilings, and nothing that counts how many lineups carry the same prior bet across teams. On 1905_10g (rebuild run `20260922T222901Z_3d5abaff`, delivered after the late swap as sha256 `a65077667789`), nine hitters sat at the 0.35 player cap (11 of 34 each) and filled 99 of 272 hitter slots (36%). Every lineup carried at least 2 of them and 27 carried 3 or more, while the brief read 15 distinct primary stacks and a 29% max team footprint. The cluster is cross-team, so the team, game and stack caps cannot see it. QA's correlated-block axis (worst shared pair and triple, R247(c)) read 4 of 34 on the first build: the lineups share a POOL, not a triple, so a k-subset cap misses it too.
+- **The cap alone is not enough.** The 408-candidate bank carried at least 2 of the nine in every candidate, 3 or more in 396 and 4 or more in 268. An allocator row with nothing low-cluster to choose from would be infeasible, or would choose among 12 candidates.
+- **Definition, measured.** A salary value rank does not find the cluster: the top 9 hitters by Base per $1k hold 2 of the nine, and by Ceiling per $1k hold 5. The top 9 by bank share (the fraction of candidates carrying the player) hold 8. The shares run 69.4% (Acuna), 61.5% (Vargas), 53.9%, 50.2%, 41.2%, 35.5%, 32.1%, 21.3%, 18.6%, 18.4% (Marte), then 9.6%. The cluster is the search's own consensus, so it is defined from the bank.
+- **What the person cap did instead.** Rationing the nine one or two per lineup shut out every ATL, ATH and TEX primary stack (bank objective ranks 1, 2 and 5 of 408) while LAD, COL, SF and LAA (best ranks 161 to 243) took 2 to 4 each.
+- **Fix, three parts, each a valid landing in order.**
+  - (a) Report, on every Classic brief and in `tools/qa_portfolio.py`: the consensus cluster (hitters above a bank-share threshold), the per-lineup member-count histogram, and the share of lineups at k or more. Report-only; no delivered byte moves.
+  - (b) Control: a joint-MILP row in `select_and_assign_entries` capping the share of entries whose candidate carries k or more cluster members. Same shape as R343's team cap: `total` denominator, headroom for fixed rows, a vacuous row skipped, a named binding diagnosis, and S class under R386, so it relaxes under deadline.
+  - (c) Bank: cluster-limited jobs in their own conditions bucket (the R340 pattern), so the allocator has low-cluster candidates to choose from. Never a pool reduction: every player stays legal, and the limit applies to a share of jobs only.
+- **Ben's at plan approval.** The defaults: the bank-share threshold, k, the share, and whether the cap ships on.
+
+### R406. Classic scenario sleeves: build the portfolio across worlds where the projection is wrong in named ways (P1, L) | new 2026-09-23, from Ben's post-slate question "what if all our priors and all conventional wisdom are wrong", 1905_10g review | Roadmap: Session 94
+
+- **What.** Every Classic candidate is an argmax of ONE projection under a different (SP pair, stack team) constraint, so a systematic projection error is shared by every entry. The caps spread persons, not beliefs. Showdown already conditions each entry on a game state (`showdown_theses`, the thesis ladder); Classic has no equivalent.
+- **Fix.** Split the entered set into sleeves, each optimized for ceiling inside its own world, and allocate entries across sleeves by declared weights recorded in the brief:
+  - (1) the build's projection;
+  - (2) salary as the only prior (DK's price as the market's projection);
+  - (3) consensus-fails: R405's cluster penalized in that sleeve's bank jobs;
+  - (4) one environment sleeve per high-total or high-park game, that game's bats boosted.
+
+  A stack like 1905_10g's CWS (best bank rank 21 of 408, zero entries) competes for a lineup inside its own world instead of losing every comparison to the consensus. WTA and satellite entries lean on the contrarian sleeves. Sleeves are deterministic constructions over labeled priors; nothing here is a probability.
+- **Relation to R261/R262.** R262 selects by scenario coverage once R261's predictions grade; this CONSTRUCTS by scenario now and grades nothing. It can ship first, and R262 can later replace its weights with coverage.
+- **Needs.** R405(a) for the consensus definition. The sleeve weights and the environment-game rule are Ben's at plan approval.
+
+### R407. Caps that scale with input confidence (P1, M) | new 2026-09-23, from the 1905_10g post-slate review | Roadmap: Session 95
+
+- **What.** 1905_10g built with no odds (`f1_games_priced: 0`), no handedness (`f4_platoon_applied: 0`), Savant data 23 days old and, on the first build, 12 of 20 sides from a 48.9-day-old platoon file. The brief recorded each fact, and the build concentrated exactly as it would on a clean night: nothing reads a degradation back into the controls.
+- **Fix.** A deterministic confidence tier computed from facts the brief already carries (`enrichment.degraded`, `factors_inert`, `f1_games_priced`, reference ages, `dk_order_coverage`, feed status), mapped by a declared schedule to a tighter `max_player_exposure_pct` and R405's cluster share. The tightened value carries its provenance (`confidence_derived`, in R388(b)'s vocabulary) and is the first thing R386 relaxes under deadline. The brief states the tier, the facts that set it, and the before and after values.
+- **Needs.** R405(b) for the cluster half; the player half stands alone. Coordinates with Session 06 (R388(b) provenance). The schedule is Ben's at plan approval.
+
+### R408. Does the projection order players better than salary? Backfill the grade on the archive (P1, M) | new 2026-09-23, from the 1905_10g post-slate review | Roadmap: Session 96
+
+- **What.** The projection's base is DK's own AvgPointsPerGame, and every factor on top is an uncalibrated labeled prior. No measurement says the engine ranks players better than DK's salary does, yet builds put a third of hitter slots on engine-picked value. R255 grades the skill signal against the salary baseline going forward, one slate at a time; nothing answers the question from the archive already held (235 contests over 14 dates in the 2026-09-14 mine).
+- **Fix.** Through `tools/replay_slate.py` (R384), for each archived Classic slate whose replay inputs are on disk, rank realized FPTS against (a) the engine's projection, (b) salary alone and (c) APPG alone. Report rank correlation plus top-decile and tail (p90+) hit counts per slate, n stated, observed outcomes only. A slate whose reference inputs were not frozen (R251) is graded on (b) and (c) only and says so.
+- **Premise to verify first.** Which archived slates carry salary files and the inputs a replay needs; run `dfs-premise` before building.
+- **Relation.** R255's forward grader and this share metric definitions. Whichever lands first defines them and the other reuses them.
 
 ### R340. CLOSED 2026-09-15 -- SHIPPED as roadmap CC-1, entry migrated to CHANGELOG.md
 

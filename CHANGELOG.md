@@ -2,6 +2,31 @@
 
 What changed in the engine, the tools and the contracts, when, and why.
 
+## 2026-09-23 — R405-R408 filed: the consensus-cluster cap, Classic scenario sleeves, confidence-scaled caps, and the projection-vs-salary backfill (roadmap Sessions 93-96); R247(d) answered
+
+**Scope.**
+- `docs/backlog.md`: R405, R406, R407 and R408 filed at the head of Workstream 2; a rider on R247 recording Ben's answer to (d).
+- `docs/ROADMAP.md`: Sessions 93-96 added to Phase P (93 In Progress, 94-96 Pending); R247(d) removed from Session 90's decision pool; Session 02's SHA backfilled (`9532367`); a Progress Ledger row.
+- No engine, tool, test or skill file changed.
+
+**Why now.** Ben's post-slate review of 1905_10g asked why no lineup stacked CWS, then whether the build honors both halves of the dual objective, and what happens if every prior is wrong. Measured on the rebuild (run `20260922T222901Z_3d5abaff`) and its 408-candidate bank:
+- Nine hitters at the 0.35 player cap filled 99 of 272 hitter slots (36%). Every lineup carried 2 or more of them and 27 carried 3 or more, under a brief that read 15 distinct primary stacks and a 29% max team footprint.
+- Every bank candidate carried 2 or more of the nine, and 396 carried 3 or more. The cluster is visible by bank share (top 9 hold 8 of the nine) and not by value rank (Base per $1k holds 2).
+- The person cap shut out the three best-scoring stack teams (ATL, ATH, TEX: bank ranks 1, 2 and 5) and passed weaker ones through. CWS's best stack ranked 21st of 408 and got no entry.
+
+**What was filed.**
+- **R405** (Session 93): report the bank-consensus cluster, cap the share of entries carrying k or more of it in the joint MILP, and give the bank cluster-limited jobs so the cap has something to choose. This is R247(d)'s "cap correlated blocks", which Ben answered on 2026-09-23.
+- **R406** (Session 94): Classic scenario sleeves, the Classic counterpart to Showdown's thesis ladder, so a projection error is not shared by every entry.
+- **R407** (Session 95): caps that tighten when the brief's own degradation facts say the inputs are weak.
+- **R408** (Session 96): a backfill on the archive of whether the projection ranks players better than salary or APPG, sharing metrics with R255.
+
+**Premise checks.** `grep -n -i "cluster cap\|correlated block\|classic thesis\|salary-only" docs/backlog.md docs/ROADMAP.md`:
+- R247(d) already named the cluster idea as a pending decision.
+- R261/R262 cover scenario PREDICTION and coverage SELECTION, both gated on grading. R406 is construction and does not duplicate them.
+- R255 covers the forward grade. R408 is the backfill.
+- Nothing else matched.
+
+**Verification.** `python tools/plan_status.py --check` exit 0. Gate unchanged by a docs-only commit: `PASS  v2.26.0  41 modules  <N> tests`.
 ## 2026-09-23 — R387: the delivery record's rosters come from the bytes its sha256 names, on all three delivery paths (roadmap Session 02, part a)
 
 **Scope.** Session 02 is one commit carrying three entries (R387, R377, R403); this one lists the whole write set.
