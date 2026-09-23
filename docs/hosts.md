@@ -22,7 +22,7 @@ the things a program cannot probe.
 | **Roles** | DEV, ARCHIVE, BUILD | DEV | BUILD, ARCHIVE |
 | **Shell** | bash | PowerShell | bash |
 | **Call budget** | `repo_env.call_budget_s()`, ~630s | ~900s | 130s inner, ~180s real |
-| **Full gate in one call** | yes, measured ~5 min | yes, ~9 min | no, use the split gate |
+| **Full gate in one call** | yes, 4m45s measured 2026-09-23 | yes, ~9 min | no, use the split gate (`docs/cowork_sandbox.md`) |
 | **`rm`** | works | works | NO: `mv` into `_to_delete/` |
 | **`/tmp`** | persists across calls | use `python`, not bash idioms | per-call |
 | **Dependencies** | `.venv`, installed by the SessionStart hook | pinned `.venv` | vendored `.pylibs/` |

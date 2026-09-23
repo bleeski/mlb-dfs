@@ -6119,6 +6119,17 @@ which is R196's. Filed there, not here.
 
 ## Workstream 6 — Infrastructure, tests, environment, coordination, and docs
 
+### R410. CLOSED 2026-09-23 -- SHIPPED, filed and landed in one commit (roadmap Session 98), entry in CHANGELOG.md
+
+Three statements about the gate described one host as if it were every host:
+the BUILD skill's Session hygiene gave Cowork's split gate as the procedure and
+called the one-call gate unsupported, `/dev-session` gave the Windows time, and
+CLAUDE.md's Hosts bullet a stale cloud time. The time and the split gate now
+live only in `docs/hosts.md` and `docs/cowork_sandbox.md`, and
+`HostProseIsCurrentTests` pins that. Riders fixed in the same commit: the
+`.claude/rules/skills.md` line count, two stale "40 modules", and the Progress
+Ledger's backfill command. Gate and commit: the CHANGELOG entry.
+
 ### R409. CLOSED 2026-09-23 -- SHIPPED, filed and landed in one commit (roadmap Session 97), entry in CHANGELOG.md
 
 The session contract read against Anthropic's prompting guide for the current

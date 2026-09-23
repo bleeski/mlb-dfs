@@ -10660,6 +10660,29 @@ class HostProseIsCurrentTests(unittest.TestCase):
                         "NOT" in line or "not Cowork" in line,
                         f"{rel} still asserts a Cowork-only idiom: {line[:120]}")
 
+    def test_the_gate_is_described_once_per_host_not_per_doc(self):
+        """R410, 2026-09-23. The BUILD skill gave Cowork's split gate as the
+        procedure and called the one-call gate unsupported; `/dev-session` gave
+        the Windows time and CLAUDE.md a stale cloud time. Time and split gate
+        now live in `docs/hosts.md` and `docs/cowork_sandbox.md`."""
+        skill = (self.ROOT / "skills/generate-lineups/SKILL.md").read_text(
+            encoding="utf-8")
+        hygiene = skill.partition("## Session hygiene")[2].split("\n## ")[0]
+        self.assertTrue(hygiene, "SKILL.md lost its ## Session hygiene section")
+        self.assertIn("--run-tests", hygiene)
+        self.assertIn("docs/hosts.md", hygiene)
+        self.assertNotIn("--gate-run", hygiene)
+        self.assertNotIn("not the supported path", hygiene)
+        dev = (self.ROOT / ".claude/skills/dev-session/SKILL.md").read_text(
+            encoding="utf-8")
+        gate_step = next(line for line in dev.splitlines()
+                         if line.startswith("3. Gate:"))
+        self.assertIn("docs/hosts.md", gate_step)
+        self.assertNotRegex(gate_step, r"\d+ minutes")
+        claude = (self.ROOT / "CLAUDE.md").read_text(encoding="utf-8")
+        hosts = claude.partition("## Hosts")[2].split("\n##")[0]
+        self.assertNotRegex(hosts, r"~\d+s\b|\d+ ?min")
+
 
 class ClaimToolTests(unittest.TestCase):
     """R19: the multi-session claim protocol as one command.

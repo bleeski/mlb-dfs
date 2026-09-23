@@ -36,7 +36,7 @@ has been wrong about the mechanism more often than right
 
 ## Evidence
 
-**Gate:** <!-- `PASS  v2.26.0  40 modules  <N> tests`, from the real tree, in full. -->
+**Gate:** <!-- `PASS  v2.26.0  <N> modules  <N> tests`, from the real tree, in full. -->
 
 **Golden histogram:** <!-- unmoved, or before/after plus why a re-freeze was deliberate. -->
 

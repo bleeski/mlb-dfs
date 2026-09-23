@@ -2,6 +2,41 @@
 
 What changed in the engine, the tools and the contracts, when, and why.
 
+## 2026-09-23 — R410: the gate is described once per host. The BUILD skill stops presenting Cowork's split gate as the procedure, and three docs stop carrying a gate time of their own (roadmap Session 98)
+
+**Scope.** `skills/generate-lineups/SKILL.md` (Session hygiene), `.claude/skills/dev-session/SKILL.md` (step 3), `.claude/rules/skills.md`, `.claude/rules/engine.md`, `.github/pull_request_template.md`, `CLAUDE.md` (Hosts), `docs/hosts.md` (the gate row), `docs/ROADMAP.md` (Sizing line, the Progress Ledger's backfill command, Session 98 row, ledger row, Session 97's SHA backfilled to 648f8cf), `docs/backlog.md` (R410 CLOSED stub), `tools/audit.py` (`EXPECTED_SUITE_COUNTS`), `tests/test_core.py` (`HostProseIsCurrentTests` +1), this file.
+
+**Source.** Ben, 2026-09-23, three statements filed against main at 648f8cf. Each was re-verified with grep at HEAD before the edit, and each reproduced.
+
+**What was wrong.**
+
+- `skills/generate-lineups/SKILL.md` "## Session hygiene" gave Cowork's split gate (`--gate-run --gate-budget 130 --gate-ceiling 165`, then "expect PASS v2.26.0, 40 modules, 2129 tests") as the procedure, and said `--run-tests` in one call "is not the supported path here and CLAUDE.md says so". `docs/hosts.md` says one call works in a cloud container and on Windows and only Cowork needs the split gate; CLAUDE.md's Hosts bullet says the gate runs in one call in the cloud. The gate is 42 modules and 2444 tests. The same section also said Ben's Windows Python has no scipy, so `--run-tests` "cannot pass on his host"; `docs/hosts.md` gives Windows a pinned `.venv` and a one-call gate. And it said adding tests means moving "the three docs that quote the expected line (CLAUDE.md, the ledger Quick Card, and this file)"; CLAUDE.md quotes `<N>`, not a count.
+- `.claude/rules/skills.md` said R354 took SKILL.md "from 1,371 to 1,358" as if that were the current size. By `wc -l` at each commit: 1,359 after R354 (5d6acfb), then 1,404, 1,432, 1,450, 1,491, 1,528, 1,556 and 1,586 across seven commits (R360-R362, R369, R344/R372, R386, R405, R407, R406). The rule held for none of them.
+- `.claude/skills/dev-session/SKILL.md` step 3 said the gate takes "about 9 minutes", which is the Windows figure. R409's gate measured 4m45s in a cloud container on 2026-09-23.
+- CLAUDE.md's Hosts bullet said "~230s measured 2026-09-19", against its own "do not restate one here" two lines up and against `docs/hosts.md`'s "~5 min". Ben asked to fix it or leave it with a reason: fixed, because two copies of one host fact disagreeing is what R355 filed `docs/hosts.md` to end.
+- Found by the class grep: `docs/ROADMAP.md`'s Sizing line carried its own gate time, and the PR template and `.claude/rules/engine.md` said "40 modules".
+- Found by the backfill: the Progress Ledger said to backfill with `git log -1 --format=%h --grep=<R-number> origin/main`. For R409 that returns 12c6ab1, the commit; every row in the table records the merge (648f8cf for R409, afb833e for R406, 1e1a01d for R408, 1e3311d for R407).
+
+**What shipped.**
+
+- **Session hygiene** gives `python tools/audit.py --run-tests --terse` and one paragraph: whether it fits one call and how long it takes are host facts, `docs/hosts.md` has the table, `docs/cowork_sandbox.md` has Cowork's split gate. The split-gate mechanics, the backgrounding warning and the Windows claim are gone from the body; `docs/cowork_sandbox.md` already carried the first two in full. The pin paragraph says only the ledger Quick Card quotes the counts and that it is ARCHIVE's to move (`ledger/inbox/2026-09-06_DEV_quick-card-pin-stale.md` already asks ARCHIVE to). SKILL.md is 1,578 lines, down 8.
+- **`.claude/rules/skills.md`** states R354's figure as history, the 1,586 it reached, and the 1,578 after this change. "Do not grow the body" stays.
+- **`/dev-session` step 3, CLAUDE.md's Hosts bullet and the ROADMAP Sizing line** each point at `docs/hosts.md` instead of carrying a time. CLAUDE.md is 17,170 bytes against the 18,000 budget.
+- **`docs/hosts.md`**'s cloud cell reads "4m45s measured 2026-09-23" (R409's gate), and the Cowork cell names `docs/cowork_sandbox.md`.
+- **The ledger backfill command** is two `git log` calls that work in bash and PowerShell: the R-number's non-merge commit, then the last merge on its ancestry path to `origin/main`. It returns the recorded merge for all four of R406-R409.
+- **`HostProseIsCurrentTests.test_the_gate_is_described_once_per_host_not_per_doc`** pins the corrections, not the wording: Session hygiene carries `--run-tests` and `docs/hosts.md` and no `--gate-run` or "not the supported path"; `/dev-session` step 3 carries `docs/hosts.md` and no "N minutes"; CLAUDE.md's Hosts section carries no `~Ns` or "N min". Mutation-checked: each of the three files restored from before the edit turns the test red, and the edited tree is green.
+
+**Kept, each with its reason.**
+
+- `.claude/rules/engine.md` L20 and CLAUDE.md's `## Sandbox` quote the call budget (~630s cloud, 130s Cowork). That is a different fact from the gate's time, both name `repo_env.call_budget_s()` as the authority, and `HostProseIsCurrentTests.test_claude_md_sends_every_budget_question_to_one_resolver` pins the Sandbox section to the resolver.
+- `docs/cowork_sandbox.md` L24 keeps the split-gate command: it is the one home the pointers now name.
+- The ledger Quick Card's stale pin line is ARCHIVE's file; the fragment above already carries it.
+- `docs/greenfield/2026-09-19/` and `tests/test_showdown.py`'s docstring (~230s) are dated records.
+
+**R233 grep**, the class of a gate time or count restated outside the host docs: `git grep -n -i -E 'gate.{0,160}([0-9]+ ?(min|minutes)\b|~[0-9]+s\b)|[0-9]+ modules|--gate-run --gate-budget' -- CLAUDE.md .claude skills .github docs/ROADMAP.md docs/hosts.md docs/cowork_sandbox.md`. At HEAD, 10 hits: `.claude/rules/engine.md:20` (call budget, kept) and `:22`, `.claude/skills/dev-session/SKILL.md:17`, `.github/pull_request_template.md:39`, `CLAUDE.md:69`, `docs/ROADMAP.md:28`, `docs/cowork_sandbox.md:24` (kept), `docs/hosts.md:25`, `skills/generate-lineups/SKILL.md:1495` and `:1496`. After, 5: `engine.md:20` and `cowork_sandbox.md:24` (kept, above), `docs/hosts.md:25` (the home), and the two R410 rows in `docs/ROADMAP.md`, which match on "gate" and "40 modules" as quoted text.
+
+**Gate.** Before: `PASS  v2.26.0  42 modules  2444 tests  5 skipped` (test_core 4 and test_showdown 1 skipped in place, the five R409 recorded). After: `PASS  v2.26.0  42 modules  2445 tests  5 skipped` (the same five; 285s in a cloud container). `tests.test_core` pin 1464 -> 1465. Golden histogram unmoved (no engine path touched).
+
 ## 2026-09-23 — R409: the session contract read against Anthropic's prompting guide for the current Claude model. A finish line, a stop list, a task file that survives compaction, a review pass, and four stale "the push is Ben's" sites (roadmap Session 97)
 
 **Scope.** `CLAUDE.md` (Autonomy, Compaction), `.claude/skills/dev-session/SKILL.md`, `.claude/skills/land/SKILL.md`, `.claude/skills/ship/SKILL.md`, `.claude/agents/dfs-premise.md`, `.claude/hooks/precompact_context.py`, `tools/claim.py`, `tools/audit.py` (one warning string, one comment, `EXPECTED_SUITE_COUNTS`), `tests/test_core.py` (`RepoAgentsAndHookEventsTests` +3, `ClaimToolTests` +2, one stale docstring), `docs/ROADMAP.md` (Session 97 row, ledger row, Session 94's SHA backfilled), `docs/backlog.md` (R409 CLOSED stub), this file.

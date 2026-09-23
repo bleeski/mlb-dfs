@@ -875,7 +875,8 @@ EXPECTED_SUITE_COUNTS = {
     # R408, 2026-09-23: 1441 -> 1447, the six ProjectionBackfillGradeTests (join rate and a starterless side, tie-averaged Spearman and determinism, hand-checked top-decile and tail, nothing pooled, no post-dated input, labels).
     # R406, 2026-09-23: 1447 -> 1459, the twelve ClassicSleeveTests (salary-only transform, apportionment and the WTA tilt, single-entry and cash, environment ranking and the whole-slate drop, chalk-fails and environment constraints, the mask, environment membership, caps across sleeves, no sleeve bank and off, thin-sleeve fallback, every door, the brief line).
     # R409, 2026-09-23: 1459 -> 1464, the three RepoAgentsAndHookEventsTests that pin PreCompact's task-file read (held claim injected verbatim; released claims and an earlier holder's list left out and named; the cap) and the two ClaimToolTests (take/re-take pointer; a re-take moves the earlier holder's list aside).
-    "tests.test_core": 1464,
+    # R410, 2026-09-23: 1464 -> 1465, the one HostProseIsCurrentTests test that pins the gate's time and split gate to the host docs.
+    "tests.test_core": 1465,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps
