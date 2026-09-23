@@ -342,10 +342,13 @@ class Decisions:
                 **{k: v for k, v in self.derived_controls.items() if k not in held}}
 
     def controls_block(self) -> Dict[str, Any]:
+        # R388(b): `never_relax` only when the operator named one, so a run
+        # without the flag writes exactly R214's three fields.
         return {"user_controls": dict(self.user_controls),
                 "derived_controls": dict(self.derived_controls),
                 "effective_controls": dict(self.effective_controls),
-                "never_relax": list(self.never_relax)}
+                **({"never_relax": list(self.never_relax)}
+                   if self.never_relax else {})}
 
     def add(self, attempt: int, action: str, why: str, **extra: Any) -> None:
         rec = {"attempt": attempt, "action": action, "why": why,
