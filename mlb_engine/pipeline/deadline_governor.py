@@ -69,15 +69,18 @@ import datetime as _dt
 import re as _re
 from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
 
-# Mirrors build_slate.REFUSAL_* by value rather than importing them: this module
-# lives in the engine and `build_slate.py` is a skill script with a test
-# forbidding top-level engine imports, so the dependency runs one way only. The
-# strings are the contract between them and `test_the_class_vocabularies_agree`
-# asserts they have not drifted.
-CLASS_ILLEGAL = "illegal"
-CLASS_BADLY_SHAPED = "badly_shaped"
-CLASS_READ_IT = "read_it"
-CLASS_SPLIT = "split"
+# R388(a). The four refusal classes live in `mlb_engine.entries.gate_classes`,
+# the one taxonomy, and this module no longer keeps them by value. The names
+# stay, because the governor's readers use them. `build_slate.py` keeps its own
+# `REFUSAL_*` copy (it loads without the engine) and
+# `test_the_class_vocabularies_agree_with_build_slate` still holds all three
+# in step.
+from mlb_engine.entries.gate_classes import (  # noqa: E402
+    REFUSAL_BADLY_SHAPED as CLASS_BADLY_SHAPED,
+    REFUSAL_ILLEGAL as CLASS_ILLEGAL,
+    REFUSAL_READ_IT as CLASS_READ_IT,
+    REFUSAL_SPLIT as CLASS_SPLIT,
+)
 
 #: The ONLY class a deadline may override. Named as a function rather than a
 #: bare constant so a caller cannot mutate it in place.

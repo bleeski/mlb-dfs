@@ -24743,6 +24743,36 @@ class RefusalClassificationTests(unittest.TestCase):
             set(mod.CLASSIC_GATE_CLASS) - engine_gates, set(),
             "CLASSIC_GATE_CLASS classifies a gate the engine no longer has")
 
+    def test_every_refusal_site_has_a_validity_class(self):
+        """R388(a). The V/S/P half of the same completeness claim: every
+        REFUSAL_SITES key has a delivery-first class beside its refusal class,
+        and none is classified that the table no longer has."""
+        mod = self._module()
+        from mlb_engine.entries.gate_classes import REFUSAL_SITE_VALIDITY
+        self.assertEqual(set(mod.REFUSAL_BY_KEY), set(REFUSAL_SITE_VALIDITY))
+
+    def test_the_moved_table_is_read_lazily(self):
+        """R388(a) moved CLASSIC_GATE_CLASS into the engine. The script must
+        still load without it, so nothing may import `gate_classes` until a
+        refusal is classified. Measured in a FRESH interpreter, because this
+        process has already imported the module."""
+        probe = (
+            "import importlib.util, sys\n"
+            f"spec = importlib.util.spec_from_file_location('bs', {str(self._path())!r})\n"
+            "mod = importlib.util.module_from_spec(spec)\n"
+            "spec.loader.exec_module(mod)\n"
+            "print('mlb_engine.entries.gate_classes' in sys.modules)\n"
+            "print(mod.classic_gate_class('portfolio_caps_passed'))\n"
+            "print('mlb_engine.entries.gate_classes' in sys.modules)\n"
+        )
+        out = subprocess.run([sys.executable, "-c", probe], cwd=str(REPO),
+                             capture_output=True, text=True, timeout=120)
+        self.assertEqual(out.returncode, 0, out.stderr[-800:])
+        lines = out.stdout.strip().splitlines()
+        self.assertEqual(lines[0], "False", "the script imported the taxonomy at load")
+        self.assertEqual(lines[1], "('badly_shaped', 'ben_preference')")
+        self.assertEqual(lines[2], "True")
+
     def test_portfolio_caps_is_badly_shaped_and_roster_legality_is_not(self):
         """The finding this commit exists for. `roster_legality_passed` is
         everything in the validator that is NOT an exposure or overlap error;

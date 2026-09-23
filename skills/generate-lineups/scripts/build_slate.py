@@ -209,8 +209,13 @@ def default_max_seconds() -> float:
 # Two sites are SPLIT: one exit code standing over several distinct failures
 # with different classes. Those carry `klass=REFUSAL_SPLIT` and a sub-map, and
 # the split is the substantive finding of this commit -- see CLASSIC_GATE_CLASS
-# and VERIFY_CLASSIC_FAILURE_CLASS.
+# (now `mlb_engine/entries/gate_classes.py`, R388(a)) and
+# VERIFY_CLASSIC_FAILURE_CLASS. Each site's V/S/P class sits beside it there,
+# in REFUSAL_SITE_VALIDITY, and every key below must have one.
 # --------------------------------------------------------------------------- #
+# The same four strings as `gate_classes.REFUSAL_*`, kept here because the
+# table below is built at import and this script loads without the engine;
+# `test_upload_integrity.GateTaxonomyTests` holds the two in step (R388(a)).
 REFUSAL_ILLEGAL = "illegal"
 REFUSAL_BADLY_SHAPED = "badly_shaped"
 REFUSAL_READ_IT = "read_it"
@@ -373,62 +378,28 @@ REFUSAL_SITES = (
 )
 REFUSAL_BY_KEY = {r["key"]: r for r in REFUSAL_SITES}
 
-# The SPLIT half of `classic_not_certified`, one row per post-export gate, and
-# it is the finding this commit exists for. `roster_legality_passed` is
-# everything in dk_entries_manager's validator that is NOT an exposure or
-# overlap error; `portfolio_caps_passed` is exactly the exposure and overlap
-# errors (player, pitcher, primary-stack, SP-pair, per-game caps and
-# max_shared_players), all of which are Ben's own numbers and every one of
-# which DK accepts. So the single exit that lost 1940_9g cannot distinguish "DK
-# will reject this" from "this is more concentrated than you asked for", and
-# the second is the whole reason the governor exists.
-CLASSIC_GATE_CLASS = {
-    # Pre-export, the nine in dk_entries_manager.PRE_EXPORT_GATES. Seven of
-    # them are READ-IT for one reason: each reports that an INPUT is wrong or
-    # absent -- the salary file's shape, the entry grid, who is starting, a
-    # weather or odds feed, the projection schema. A relaxation ladder relaxes
-    # OUTPUT controls; there is no rung that fixes an input, so the governor
-    # would be pressing past a fact rather than loosening a preference.
-    "salary_gate_passed": (REFUSAL_READ_IT, "input_identity"),
-    "entry_grid_gate_passed": (REFUSAL_READ_IT, "input_identity"),
-    "lineup_gate_passed": (REFUSAL_READ_IT, "input_identity"),
-    "pitcher_audit_gate_passed": (REFUSAL_READ_IT, "input_identity"),
-    "weather_gate_passed": (REFUSAL_READ_IT, "input_identity"),
-    "odds_gate_passed": (REFUSAL_READ_IT, "input_identity"),
-    "projection_schema_gate_passed": (REFUSAL_READ_IT, "input_identity"),
-    "optimizer_gate_passed": (REFUSAL_READ_IT, "provenance"),
-    # The allocator's own verdict on the selection it made under the portfolio
-    # controls, so it is the same family as an outright allocation failure and
-    # it relaxes the same way.
-    "selection_certified": (REFUSAL_BADLY_SHAPED, "ben_preference"),
-    # Post-export, the six in dk_entries_manager.POST_EXPORT_GATES.
-    "template_preservation_passed": (REFUSAL_ILLEGAL, "dk_rule"),
-    "entry_reconciliation_passed": (REFUSAL_ILLEGAL, "dk_rule"),
-    "roster_legality_passed": (REFUSAL_ILLEGAL, "dk_rule"),
-    "locked_immutability_passed": (REFUSAL_ILLEGAL, "dk_rule"),
-    # Not a DK rule and not a preference: the file may be perfectly legal while
-    # the record that binds a sha256 to it is broken. Delivering a file whose
-    # hash does not bind is what the money-boundary items forbid, and every
-    # brief states a sha256 Ben checks at upload, so this refuses -- but it
-    # refuses because the RECORD failed, which is a different sentence from
-    # "the lineups are wrong" and an operator under a clock needs the
-    # difference.
-    "export_hash_binding_passed": (REFUSAL_READ_IT, "provenance"),
-    "portfolio_caps_passed": (REFUSAL_BADLY_SHAPED, "ben_preference"),
-}
-CLASSIC_ALLOCATION_FAILED_CLASS = (REFUSAL_BADLY_SHAPED, "ben_preference")
-CLASSIC_CONTEST_IDENTITY_CLASS = (REFUSAL_READ_IT, "input_identity")
-# A gate this table has never classified is READ-IT, and the default is a
-# safety property rather than a convenience: the governor never passes what it
-# has not been told about. It should never fire --
-# `test_every_workflow_gate_is_classified` asserts every name in both gate
-# tuples has a row above, so a gate added to the engine without a row here
-# fails the suite instead of silently becoming relaxable.
-CLASSIC_GATE_CLASS_DEFAULT = (REFUSAL_READ_IT, "unclassified")
+# R388(a). The Classic gate table, its default and the allocation and
+# contest-identity classes moved to `mlb_engine/entries/gate_classes.py`, beside
+# each gate's V/S/P class, with their values unchanged. This script must load
+# without the engine on its path (`test_the_script_still_loads_without_the_
+# engine_on_the_path`), so it reads them lazily: the functions below import at
+# call time, and the module-level names resolve through `__getattr__` for any
+# reader that still asks this module for them.
+_GATE_CLASS_NAMES = ("CLASSIC_GATE_CLASS", "CLASSIC_GATE_CLASS_DEFAULT",
+                     "CLASSIC_ALLOCATION_FAILED_CLASS",
+                     "CLASSIC_CONTEST_IDENTITY_CLASS")
+
+
+def __getattr__(name: str):
+    if name in _GATE_CLASS_NAMES:
+        from mlb_engine.entries import gate_classes
+        return getattr(gate_classes, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def classic_gate_class(name: str) -> tuple:
-    return CLASSIC_GATE_CLASS.get(name, CLASSIC_GATE_CLASS_DEFAULT)
+    from mlb_engine.entries.gate_classes import classic_gate_class as _lookup
+    return _lookup(name)
 
 
 def classic_refusal_class(result, report) -> str:
@@ -440,6 +411,9 @@ def classic_refusal_class(result, report) -> str:
     act on a class different from the one the artifact reports -- which is this
     repo's named failure shape (two readers of one fact sharing no definition).
     """
+    from mlb_engine.entries.gate_classes import (
+        CLASSIC_ALLOCATION_FAILED_CLASS, CLASSIC_CONTEST_IDENTITY_CLASS,
+    )
     detail = gate_failure_detail(result, report) or {}
     if detail.get("contest_identity_blockers") or result.get(
             "contest_identity_blockers"):
@@ -3173,6 +3147,9 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         payload["refusal_class"] = classic_refusal_class(result, report)
         if detail.get("contest_identity_blockers") or result.get(
                 "contest_identity_blockers"):
+            from mlb_engine.entries.gate_classes import (
+                CLASSIC_CONTEST_IDENTITY_CLASS,
+            )
             payload["refusal_class_contest_identity"] = (
                 CLASSIC_CONTEST_IDENTITY_CLASS[0])
         if governor is not None:
