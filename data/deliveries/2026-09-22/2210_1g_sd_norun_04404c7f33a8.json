@@ -1,0 +1,131 @@
+{
+ "code": {
+  "contest_allocator": "v1.12",
+  "execution_pipeline": "v1.17",
+  "git_dirty": false,
+  "git_sha": "9532367aef97848f9c6a06589d1bebda0d263163"
+ },
+ "controls": {
+  "max_cpt_exposure_pct": 0.25,
+  "max_cpt_per_contest": 2,
+  "max_player_exposure_pct": 0.5,
+  "max_shared_players": 4
+ },
+ "date": "2026-09-22",
+ "egress": "egress: statsapi unreachable, odds unreachable, savant unreachable, mlb-lineups unreachable, fangraphs unreachable (curl), open-meteo unreachable",
+ "egress_source": "session_start 2026-09-23T01:38:38+00:00",
+ "entries": [
+  {
+   "contest_id": "195924720",
+   "contest_name": "MLB Showdown $1 Triple Up [Top 9 Win $3] (SD @ LAD)",
+   "entry_fee": 1.0,
+   "entry_id": "5266754004",
+   "filled": true,
+   "roster_ids": [
+    "44234571",
+    "44234484",
+    "44234486",
+    "44234492",
+    "44234493",
+    "44234506"
+   ]
+  },
+  {
+   "contest_id": "195964359",
+   "contest_name": "MLB Showdown $50 Quarter Jukebox [Just $0.25!] (SD @ LAD)",
+   "entry_fee": 0.25,
+   "entry_id": "5266753978",
+   "filled": true,
+   "roster_ids": [
+    "44234573",
+    "44234476",
+    "44234486",
+    "44234487",
+    "44234492",
+    "44234493"
+   ]
+  },
+  {
+   "contest_id": "195964359",
+   "contest_name": "MLB Showdown $50 Quarter Jukebox [Just $0.25!] (SD @ LAD)",
+   "entry_fee": 0.25,
+   "entry_id": "5266757421",
+   "filled": true,
+   "roster_ids": [
+    "44234570",
+    "44234477",
+    "44234487",
+    "44234491",
+    "44234494",
+    "44234568"
+   ]
+  },
+  {
+   "contest_id": "195965243",
+   "contest_name": "MLB Showdown $400 Solo Shot (SD @ LAD)",
+   "entry_fee": 1.0,
+   "entry_id": "5266757439",
+   "filled": true,
+   "roster_ids": [
+    "44234572",
+    "44234475",
+    "44234488",
+    "44234490",
+    "44234491",
+    "44234568"
+   ]
+  }
+ ],
+ "entries_binding": {
+  "source": "outputs/2026-09-22/DO_NOT_UPLOAD_DKEntries_showdown_2210_1g_sd.csv",
+  "source_sha256": "04404c7f33a8412f0bfbc9bd8544ce2ffaee55d0d0e9ac7f1931cbe7aad230fb",
+  "status": "bound"
+ },
+ "host": {
+  "call_budget_s": 630.0,
+  "declared_ceiling_s": 900.0,
+  "host": "claude_code"
+ },
+ "kind": "delivery",
+ "labels": "deterministic review proxies and labeled priors only; never ROI, win rate, cash rate, or probability",
+ "manifest_row": {
+  "certification": "review_grade",
+  "contest_ids": [
+   "195924720",
+   "195964359",
+   "195965243"
+  ],
+  "contest_names": [
+   "MLB Showdown $1 Triple Up [Top 9 Win $3] (SD @ LAD)",
+   "MLB Showdown $400 Solo Shot (SD @ LAD)",
+   "MLB Showdown $50 Quarter Jukebox [Just $0.25!] (SD @ LAD)"
+  ],
+  "contest_type": "showdown",
+  "delivered_file": "outputs/2026-09-22/DKEntries_showdown_2210_1g_sd.csv",
+  "entries": 4,
+  "notes": "Showdown ships review-grade; it does not pass the three certification gates. See CLAUDE.md.",
+  "projection_tier": "unknown",
+  "recorded_utc": "2026-09-23T01:39:09.145936+00:00",
+  "run_id": null,
+  "sha256": "04404c7f33a8412f0bfbc9bd8544ce2ffaee55d0d0e9ac7f1931cbe7aad230fb",
+  "slate_tag": "2210_1g_sd",
+  "status": "candidate",
+  "strategy_state": {
+   "counts": {},
+   "state": "unknown"
+  }
+ },
+ "recorded_utc": "2026-09-23T01:39:09.147124+00:00",
+ "relaxations": {
+  "both_relaxed": 0,
+  "captain_cap_relaxed": 0,
+  "captain_contest_cap_relaxed": 0,
+  "captain_lock_relaxed": 0,
+  "contest_cap_relaxed": 0,
+  "cpt_cap_relaxed": 0,
+  "overlap_relaxed": 0,
+  "player_relaxed": 0
+ },
+ "run": {},
+ "schema_version": 1
+}
