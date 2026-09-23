@@ -1,0 +1,163 @@
+{
+ "code": {
+  "contest_allocator": "v1.12",
+  "execution_pipeline": "v1.17",
+  "git_dirty": true,
+  "git_sha": "ed18ed73f092278749bb0a757a6bda3f86a7206f"
+ },
+ "controls": {
+  "max_cpt_exposure_pct": 0.25,
+  "max_cpt_per_contest": 2,
+  "max_player_exposure_pct": 0.5,
+  "max_shared_players": 4
+ },
+ "date": "2026-09-23",
+ "egress": "egress: statsapi unreachable, odds unreachable, savant unreachable, mlb-lineups unreachable, fangraphs unreachable (curl), open-meteo unreachable",
+ "egress_source": "session_start 2026-09-23T16:39:13+00:00",
+ "entries": [
+  {
+   "contest_id": "195960691",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (WSH @ DET)",
+   "entry_fee": 0.1,
+   "entry_id": "5267078169",
+   "filled": true,
+   "roster_ids": [
+    "44245819",
+    "44245725",
+    "44245726",
+    "44245733",
+    "44245734",
+    "44245817"
+   ]
+  },
+  {
+   "contest_id": "195960691",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (WSH @ DET)",
+   "entry_fee": 0.1,
+   "entry_id": "5267078185",
+   "filled": true,
+   "roster_ids": [
+    "44245822",
+    "44245726",
+    "44245728",
+    "44245733",
+    "44245734",
+    "44245735"
+   ]
+  },
+  {
+   "contest_id": "195960700",
+   "contest_name": "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (WSH @ DET)",
+   "entry_fee": 1.0,
+   "entry_id": "5267078277",
+   "filled": true,
+   "roster_ids": [
+    "44245823",
+    "44245722",
+    "44245725",
+    "44245732",
+    "44245733",
+    "44245744"
+   ]
+  },
+  {
+   "contest_id": "195973010",
+   "contest_name": "MLB Showdown $100 Quarter Jukebox [Just $0.25!]  (WSH @ DET)",
+   "entry_fee": 0.25,
+   "entry_id": "5267078190",
+   "filled": true,
+   "roster_ids": [
+    "44245825",
+    "44245723",
+    "44245724",
+    "44245732",
+    "44245734",
+    "44245741"
+   ]
+  },
+  {
+   "contest_id": "195973010",
+   "contest_name": "MLB Showdown $100 Quarter Jukebox [Just $0.25!]  (WSH @ DET)",
+   "entry_fee": 0.25,
+   "entry_id": "5267078199",
+   "filled": true,
+   "roster_ids": [
+    "44245908",
+    "44245723",
+    "44245724",
+    "44245728",
+    "44245731",
+    "44245735"
+   ]
+  },
+  {
+   "contest_id": "195973107",
+   "contest_name": "MLB Showdown $350 Solo Shot (WSH @ DET)",
+   "entry_fee": 1.0,
+   "entry_id": "5267078285",
+   "filled": true,
+   "roster_ids": [
+    "44245820",
+    "44245722",
+    "44245724",
+    "44245732",
+    "44245741",
+    "44245811"
+   ]
+  }
+ ],
+ "entries_binding": {
+  "source": "outputs/2026-09-23/DO_NOT_UPLOAD_DKEntries_showdown_1310_1g_sd.csv",
+  "source_sha256": "6ecfacaa85d7cb24b2ba5efb136f0794798b39bfe7402842ae2c598fd1a94256",
+  "status": "bound"
+ },
+ "host": {
+  "call_budget_s": 630.0,
+  "declared_ceiling_s": 900.0,
+  "host": "claude_code"
+ },
+ "kind": "delivery",
+ "labels": "deterministic review proxies and labeled priors only; never ROI, win rate, cash rate, or probability",
+ "manifest_row": {
+  "certification": "review_grade",
+  "contest_ids": [
+   "195960691",
+   "195960700",
+   "195973010",
+   "195973107"
+  ],
+  "contest_names": [
+   "MLB Showdown $100 Dime Time [Just $0.10!] (WSH @ DET)",
+   "MLB Showdown $100 Quarter Jukebox [Just $0.25!]  (WSH @ DET)",
+   "MLB Showdown $350 Solo Shot (WSH @ DET)",
+   "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (WSH @ DET)"
+  ],
+  "contest_type": "showdown",
+  "delivered_file": "outputs/2026-09-23/DKEntries_showdown_1310_1g_sd.csv",
+  "entries": 6,
+  "notes": "Showdown ships review-grade; it does not pass the three certification gates. See CLAUDE.md.",
+  "projection_tier": "unknown",
+  "recorded_utc": "2026-09-23T16:42:54.608370+00:00",
+  "run_id": null,
+  "sha256": "6ecfacaa85d7cb24b2ba5efb136f0794798b39bfe7402842ae2c598fd1a94256",
+  "slate_tag": "1310_1g_sd",
+  "status": "candidate",
+  "strategy_state": {
+   "counts": {},
+   "state": "unknown"
+  }
+ },
+ "recorded_utc": "2026-09-23T16:42:54.609765+00:00",
+ "relaxations": {
+  "both_relaxed": 0,
+  "captain_cap_relaxed": 0,
+  "captain_contest_cap_relaxed": 0,
+  "captain_lock_relaxed": 0,
+  "contest_cap_relaxed": 0,
+  "cpt_cap_relaxed": 0,
+  "overlap_relaxed": 0,
+  "player_relaxed": 0
+ },
+ "run": {},
+ "schema_version": 1
+}
