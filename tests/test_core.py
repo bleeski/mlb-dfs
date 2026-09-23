@@ -23094,11 +23094,15 @@ class FiveStackQuotaLadderTests(unittest.TestCase):
         recursive = [n for n in _ast.walk(fn)
                      if isinstance(n, _ast.Call)
                      and getattr(n.func, "id", "") == "select_and_assign_entries"]
-        self.assertEqual(len(recursive), 4,
+        # R207 grew it to five: the interaction probe's solve, which relaxes
+        # nothing either and must see the refused solve's own ladder states,
+        # or it would probe a model the refusal was not about.
+        self.assertEqual(len(recursive), 5,
                          "three relaxation ladders plus R326's full-bank retry: "
                          "engine-default reuse cap, five-stack quota, primary-"
                          "stack floor, and the retry that widens the SEARCH "
-                         "before any of them moves a STRATEGY control")
+                         "before any of them moves a STRATEGY control; plus "
+                         "R207's interaction probe")
         for call in recursive:
             passed = {kw.arg for kw in call.keywords}
             for state in ("_floor_state", "_reuse_state", "_quota_state"):
@@ -27172,7 +27176,12 @@ class AllocatorTruthTests(unittest.TestCase):
         the three rungs, read the other way round: a PROVEN infeasibility is a
         fact about the bank that a wider bank can answer, while a TIME LIMIT
         means the model was already too big for the clock and re-solving on more
-        candidates is the wrong direction."""
+        candidates is the wrong direction.
+
+        R207 made it five: the interaction probe's solve. It is guarded on the
+        same two conjuncts, and it runs with `_probe=True`, which is what keeps
+        it from climbing a ladder or probing again; the second assertion block
+        below pins that, so the fifth call cannot turn into a sixth path."""
         source = (REPO / "mlb_engine" / "allocate" / "contest_allocator.py").read_text(
             encoding="utf-8")
         tree = ast.parse(source)
@@ -27182,8 +27191,18 @@ class AllocatorTruthTests(unittest.TestCase):
         reentries = [n for n in ast.walk(func)
                      if isinstance(n, ast.Return) and isinstance(n.value, ast.Call)
                      and getattr(n.value.func, "id", "") == "select_and_assign_entries"]
-        self.assertEqual(len(reentries), 4,
-                         f"expected four re-entries, found {len(reentries)}")
+        self.assertEqual(len(reentries), 5,
+                         f"expected four ladder re-entries and the probe's solve, "
+                         f"found {len(reentries)}")
+        probing = [n for n in reentries
+                   if any(k.arg == "_probe" and getattr(k.value, "value", None) is True
+                          for k in n.value.keywords)]
+        self.assertEqual(len(probing), 1, "the probe's solve must run in probe mode")
+        ladder_guards = [n for n in ast.walk(func) if isinstance(n, ast.If)
+                         and "not _probe" in ast.unparse(n.test)
+                         and "proven_infeasible" in ast.unparse(n.test)]
+        self.assertEqual(len(ladder_guards), 5,
+                         "every ladder re-entry and the probe itself skip probe mode")
         guards = [n for n in ast.walk(func)
                   if isinstance(n, ast.If)
                   and any(isinstance(b, ast.Return) and isinstance(b.value, ast.Call)
@@ -27194,7 +27213,7 @@ class AllocatorTruthTests(unittest.TestCase):
             test = ast.unparse(node.test)
             if "proven_infeasible" in test and "not slate_blocked" in test:
                 guarded += 1
-        self.assertEqual(guarded, 4,
+        self.assertEqual(guarded, 5,
                          "a re-entry is not guarded on both conjuncts")
         # And the verdict it reads is computed from the failing checks, not
         # inlined per guard, so the three cannot disagree.

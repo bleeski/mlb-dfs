@@ -345,6 +345,9 @@ def execute_portfolio(
     # R29(2): hold the promotion until the caller has decided the run is a
     # delivery. See :func:`promote_deferred_run`.
     defer_promotion: bool = False,
+    # R207. Arms the allocator's interaction probe on the one refusal it
+    # answers; None runs nothing (every caller but run_slate's build path).
+    interaction_probe_budget_s: Optional[float] = None,
 ) -> Dict[str, Any]:
     """Execute the canonical entry-level portfolio workflow."""
     controls = dict(portfolio_controls or {})
@@ -390,14 +393,20 @@ def execute_portfolio(
     allocation = select_and_assign_entries(
         candidates, entry_requirements, controls, bank_report=bank_diagnostics,
         fixed_exposure=fixed_exposure, feasibility_inputs=feasibility_inputs,
-        feasibility_checks=feasibility_checks)
+        feasibility_checks=feasibility_checks,
+        interaction_probe_budget_s=interaction_probe_budget_s)
     if not allocation.get("passed"):
         diagnostics = {
             "run_id": run["run_id"], "mode": mode, "allocation": allocation,
             "diagnostic_source_file": "", "diagnostic_source_sha256": "",
             "workflow_valid": False,
         }
-        return _blocked_result(run, allocation.get("errors", ["allocation failed"]), diagnostics)
+        blocked = _blocked_result(run, allocation.get("errors", ["allocation failed"]), diagnostics)
+        # R207. The probe rides the result as well as diagnostics.json, because
+        # the refusal a caller prints is built from the result; only when it ran.
+        if allocation.get("interaction_probe") is not None:
+            blocked["interaction_probe"] = allocation["interaction_probe"]
+        return blocked
 
     bank_coverage = _bank_coverage(projections, candidates) if compute_bank_coverage else None
 
@@ -4372,6 +4381,26 @@ def _slate_feasibility(
     return info
 
 
+def _typed_remedy(ok: bool, control: str, to: Any, *, count: Optional[int] = None,
+                  alternative: Optional[str] = None) -> Dict[str, Any]:
+    """R207. The remedy a failing check names, as data beside its sentence.
+
+    ``{"remedy_typed": {"control", "op", "to"[, "count"][, "alternative"]}}``
+    on a FAILING check and nothing on a passing one, so every passing check and
+    every remedy string stays byte-identical. The sentence was the only form,
+    and `tools/autobuild.py` read it back with a regex; this is the number the
+    sentence already prints, typed once where it is computed.
+    """
+    if ok or to is None:
+        return {}
+    typed: Dict[str, Any] = {"control": control, "op": ">=", "to": to}
+    if count is not None:
+        typed["count"] = int(count)
+    if alternative:
+        typed["alternative"] = alternative
+    return {"remedy_typed": typed}
+
+
 def _feasibility_report(feas: Mapping[str, Any], controls: Mapping[str, Any]) -> Dict[str, Any]:
     """Advisory pre-solve feasibility of the resolved controls against the slate.
 
@@ -4407,7 +4436,10 @@ def _feasibility_report(feas: Mapping[str, Any], controls: Mapping[str, Any]) ->
                       f"SP set to >= {need_pairs} pairs (have {n_pairs})")
             report["binding_constraints"].append(f"SP-pair capacity infeasible: {detail}; {remedy}")
             report["passed"] = False
-        report["checks"].append({"name": "sp_pair_capacity", "passed": ok, "detail": detail, "remedy": remedy})
+        report["checks"].append({"name": "sp_pair_capacity", "passed": ok, "detail": detail, "remedy": remedy,
+                                 **_typed_remedy(ok, "max_sp_pair_repetition", need_cap if not ok else None,
+                                                 alternative=(f"widen the viable SP set to >= {need_pairs} pairs"
+                                                              if not ok else None))})
 
     if entries > 1 and shared is not None:
         inherent = int(max_stack) + (2 if (rep or 1) >= 2 else 0)
@@ -4419,7 +4451,8 @@ def _feasibility_report(feas: Mapping[str, Any], controls: Mapping[str, Any]) ->
             remedy = f"raise max_shared_players to >= {inherent}"
             report["binding_constraints"].append(f"max_shared_players below inherent floor: {detail}; {remedy}")
             report["passed"] = False
-        report["checks"].append({"name": "shared_players_floor", "passed": ok, "detail": detail, "remedy": remedy})
+        report["checks"].append({"name": "shared_players_floor", "passed": ok, "detail": detail, "remedy": remedy,
+                                 **_typed_remedy(ok, "max_shared_players", inherent)})
 
     # v1.9 pct-cap capacity checks, mirroring the allocator's _cap_count.
     #
@@ -4480,7 +4513,9 @@ def _feasibility_report(feas: Mapping[str, Any], controls: Mapping[str, Any]) ->
                 remedy = f"raise {key} to >= {min(1.0, need / entries):.3f} (cap {need})"
                 report["binding_constraints"].append(f"{check_name} infeasible: {detail}; {remedy}")
                 report["passed"] = False
-            report["checks"].append({"name": check_name, "passed": ok, "detail": detail, "remedy": remedy})
+            report["checks"].append({"name": check_name, "passed": ok, "detail": detail, "remedy": remedy,
+                                     **(_typed_remedy(ok, key, round(min(1.0, need / entries), 3),
+                                                      count=need) if not ok else {})})
 
         # R405. The arithmetic half only (see `_slate_feasibility`): the check
         # fails when the legal pool cannot seat a lineup below k members of a
@@ -4510,7 +4545,8 @@ def _feasibility_report(feas: Mapping[str, Any], controls: Mapping[str, Any]) ->
                     report["passed"] = False
                 report["checks"].append({"name": "consensus_cluster_capacity",
                                          "passed": ok, "detail": detail,
-                                         "remedy": remedy})
+                                         "remedy": remedy,
+                                         **_typed_remedy(ok, "max_consensus_cluster_share_pct", 1.0)})
 
         player_pct = controls.get("max_player_exposure_pct")
         floor_player = feas.get("floor_player_exposure_count")
@@ -4527,7 +4563,11 @@ def _feasibility_report(feas: Mapping[str, Any], controls: Mapping[str, Any]) ->
                     report["binding_constraints"].append(f"player_exposure_floor infeasible: {detail}; {remedy}")
                     report["passed"] = False
                 report["checks"].append({"name": "player_exposure_floor", "passed": ok,
-                                         "detail": detail, "remedy": remedy})
+                                         "detail": detail, "remedy": remedy,
+                                         **_typed_remedy(
+                                             ok, "max_player_exposure_pct",
+                                             round(min(1.0, int(floor_player) / entries), 3),
+                                             count=int(floor_player))})
 
     largest = feas.get("largest_contest_entries") or 0
     report["checks"].append({
@@ -5698,6 +5738,11 @@ def run_slate(
     # existing caller's build exactly.
     never_relax_controls: Iterable[str] = (),
     control_moves: Optional[Sequence[Mapping[str, Any]]] = None,
+    # R207. Seconds the allocator may spend, on a proven-infeasible refusal
+    # whose errors can only name "the interaction of the active controls",
+    # re-solving once per active control with that control dropped. None
+    # (every existing caller) runs nothing.
+    interaction_probe_budget_s: Optional[float] = None,
 ) -> Dict[str, Any]:
     """Single front door: raw slate inputs -> certified DKEntries file plus diagnostics.
 
@@ -6343,6 +6388,7 @@ def run_slate(
             list(caller_bank_warnings or [])
             + list(((bank_diag or {}).get("relaxations") or {}).get("warnings") or [])),
         compute_bank_coverage=not light_satellite,
+        interaction_probe_budget_s=interaction_probe_budget_s,
     )
     result.update({
         "approved": True,
