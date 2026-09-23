@@ -220,7 +220,21 @@ def main() -> int:
             if game_of.get(sps[i]) != game_of.get(sps[j]):
                 cross_game_pairs += 1
     augmentation_s = cross_game_pairs * single_s
-    projected_s = base_bank_s + augmentation_s
+    # R405(c). The cluster-limited jobs every multi-entry posture now asks for:
+    # at least (1 - pct) x E x 2 lineups, each one solve, at the loosest posture
+    # default below 1.0 (0.50 on every multi-entry posture today). Counted
+    # rather than left out, because a probe that omits a phase the build runs
+    # says FITS about a different build.
+    from mlb_engine.pipeline.execution_pipeline import (
+        STRATEGY_DEFAULTS, resolve_consensus_limited_request)
+    _cluster_pcts = [v["controls"].get("max_consensus_cluster_share_pct")
+                     for v in STRATEGY_DEFAULTS.values()]
+    _cluster_pcts = [float(x) for x in _cluster_pcts if x is not None and float(x) < 1.0]
+    consensus_request = resolve_consensus_limited_request(
+        {"max_consensus_cluster_share_pct": max(_cluster_pcts)} if _cluster_pcts else {},
+        args.entries)
+    consensus_limited_s = int(consensus_request["min_candidates"] or 0) * single_s
+    projected_s = base_bank_s + augmentation_s + consensus_limited_s
     fits = projected_s <= args.budget
 
     report = {
@@ -233,6 +247,8 @@ def main() -> int:
         "multi_lineup_probe": {"n": probe_n, "built": built, "seconds": round(multi_s, 2)},
         "projected_base_bank_s": round(base_bank_s, 1),
         "projected_augmentation_s": round(augmentation_s, 1),
+        "projected_consensus_limited_s": round(consensus_limited_s, 1),
+        "consensus_limited_min_candidates": consensus_request["min_candidates"],
         "projected_total_s": round(projected_s, 1),
         "budget_s": args.budget,
         # R290(c) rider. A verdict states the ceiling it was measured against
@@ -254,7 +270,9 @@ def main() -> int:
         print(f"one lineup {single_s:.2f}s | {probe_n}-lineup probe {multi_s:.2f}s "
               f"({built} built)")
         print(f"projected: base bank {base_bank_s:.0f}s + augmentation "
-              f"{augmentation_s:.0f}s = {projected_s:.0f}s")
+              f"{augmentation_s:.0f}s + consensus-limited "
+              f"{consensus_limited_s:.0f}s ({consensus_request['min_candidates']} "
+              f"lineups, R405) = {projected_s:.0f}s")
         print(f"budget {args.budget:.0f}s ({report['budget_source']}) -> "
               f"{'FITS' if fits else 'EXCEEDS'}")
         if not fits:

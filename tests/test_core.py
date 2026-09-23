@@ -4038,7 +4038,10 @@ class R293BankOnEveryRungTests(unittest.TestCase):
         ("mlb_engine/optimize/optimizer_v3.py", "build_candidate_lineup_bank"): (0, 1),
         ("mlb_engine/optimize/optimizer_v3.py", "build_single_lineup"): (0, 4),
         ("mlb_engine/pipeline/execution_pipeline.py", "build_diverse_candidate_bank"): (1, 1),
-        ("mlb_engine/pipeline/execution_pipeline.py", "extend_bank"): (1, 1),
+        # R405(c), 2026-09-23: the second is `build_consensus_limited_jobs`,
+        # the cluster-limited bucket both the sliced door and the plan leg
+        # call; it forwards the allowance by name.
+        ("mlb_engine/pipeline/execution_pipeline.py", "extend_bank"): (2, 2),
         ("tools/late_swap.py", "extend_bank"): (0, 2),
         ("tools/solver_probe.py", "build_single_lineup"): (0, 1),
         ("tools/solver_probe.py", "build_multi_lineup"): (0, 1),
@@ -12419,13 +12422,25 @@ class SwapControlsInheritanceTests(unittest.TestCase):
                                "posture_source": "test"}
                 for i, p in enumerate(postures)}
 
+    @classmethod
+    def _enforced(cls, controls):
+        """The build's controls as the swap ENFORCES them. R405: the swap
+        derives the consensus-cluster cap like every other control and then
+        strips it (`late_swap.SWAP_UNENFORCED_CONTROLS`), the item's one
+        declined door, so "the swap inherits the build's caps" is asserted
+        against the build's controls minus exactly those keys -- and
+        `test_the_swap_strips_the_cluster_cap_and_says_so` pins that the strip
+        is exactly that set and is reported."""
+        stripped = set(cls._late_swap().SWAP_UNENFORCED_CONTROLS)
+        return {k: v for k, v in dict(controls).items() if k not in stripped}
+
     def test_a_single_posture_yields_exactly_that_postures_controls(self):
         ls = self._late_swap()
         for posture, spec in epi.STRATEGY_DEFAULTS.items():
             if not spec["controls"]:
                 continue
             derived = ls.resolve_swap_controls(self._postures(posture), None, None)
-            self.assertEqual(derived, dict(spec["controls"]),
+            self.assertEqual(derived, self._enforced(spec["controls"]),
                              f"{posture}: the swap must not assert its own caps")
 
     def test_the_derivation_is_the_builds_own_function(self):
@@ -12433,7 +12448,7 @@ class SwapControlsInheritanceTests(unittest.TestCase):
         ls = self._late_swap()
         postures = self._postures("large_gpp", "mme", "wta_satellite")
         self.assertEqual(ls.resolve_swap_controls(postures, None, None),
-                         epi._merged_controls_for_build(postures, None))
+                         self._enforced(epi._merged_controls_for_build(postures, None)))
 
     def test_the_old_flat_cap_of_one_is_gone_for_every_multi_entry_posture(self):
         for posture in ("large_gpp", "mme", "small_gpp", "wta_satellite"):
@@ -12454,7 +12469,7 @@ class SwapControlsInheritanceTests(unittest.TestCase):
             self._postures("single_entry"), None, None)
         self.assertEqual(derived["max_sp_pair_repetition"], 1)
         self.assertEqual(derived,
-                         dict(epi.STRATEGY_DEFAULTS["single_entry"]["controls"]))
+                         self._enforced(epi.STRATEGY_DEFAULTS["single_entry"]["controls"]))
 
     def test_a_cash_only_file_enforces_no_cap_and_matches_the_build(self):
         """The other counterexample. cash carries no exposure CAP, so a
@@ -12535,8 +12550,8 @@ class SwapControlsInheritanceTests(unittest.TestCase):
             derived = ls.resolve_swap_controls(
                 postures, None, None,
                 requirements=requirements, projections=projections)
-        self.assertEqual(derived, expected)
-        unfloored = epi._merged_controls_for_build(postures, None)
+        self.assertEqual(derived, self._enforced(expected))
+        unfloored = self._enforced(epi._merged_controls_for_build(postures, None))
         self.assertTrue(
             floors, "the fixture must actually trip a floor or this proves nothing")
         self.assertNotEqual(
@@ -12547,7 +12562,31 @@ class SwapControlsInheritanceTests(unittest.TestCase):
         ls = self._late_swap()
         postures = self._postures("large_gpp")
         self.assertEqual(ls.resolve_swap_controls(postures, None, None),
-                         epi._merged_controls_for_build(postures, None))
+                         self._enforced(epi._merged_controls_for_build(postures, None)))
+
+    def test_the_swap_strips_the_cluster_cap_and_says_so(self):
+        """R405. The build carries the cap (0.50 on large_gpp); the swap
+        derives it, removes exactly the two cluster keys, reports what it
+        removed, and strips an operator's typed value too -- enforcing it would
+        bind against a swap bank with no cluster-limited jobs."""
+        ls = self._late_swap()
+        postures = self._postures("large_gpp")
+        build = epi._merged_controls_for_build(postures, None)
+        self.assertEqual(build["max_consensus_cluster_share_pct"], 0.5)
+        stripped = {}
+        derived = ls.resolve_swap_controls(
+            postures, {"consensus_cluster_min_members": 2}, None,
+            stripped_out=stripped)
+        self.assertEqual(set(ls.SWAP_UNENFORCED_CONTROLS),
+                         {"max_consensus_cluster_share_pct",
+                          "consensus_cluster_min_members"})
+        self.assertNotIn("max_consensus_cluster_share_pct", derived)
+        self.assertNotIn("consensus_cluster_min_members", derived)
+        self.assertEqual(stripped, {"max_consensus_cluster_share_pct": 0.5,
+                                    "consensus_cluster_min_members": 2})
+        text = (Path(__file__).resolve().parents[1] / "tools" / "late_swap.py").read_text(
+            encoding="utf-8")
+        self.assertIn("consensus-cluster cap NOT enforced on a late swap", text)
 
 
 class SwapFailureClassificationTests(unittest.TestCase):
@@ -28257,3 +28296,476 @@ class ReplaySlateTests(unittest.TestCase):
         # and it still says where the copy came from
         mod = self._mod()
         self.assertIn("simulation.py", mod.SETTLE_ORACLE_ORIGIN)
+
+
+class ConsensusClusterCapTests(unittest.TestCase):
+    """R405 (Session 93, Ben's decisions of 2026-09-23). The consensus-cluster
+    cap: cap how many entries carry k or more of the BANK's consensus hitters.
+
+    On 1905_10g nine hitters sat at the 0.35 person cap and filled 36% of
+    hitter slots, every lineup carried two of them and 27 of 34 carried three or
+    more, while the brief read 15 distinct primary stacks and a 29% max team
+    footprint. The cluster is cross-team and a POOL rather than a triple, so the
+    team, game and stack caps and a k-subset cap all miss it. Mirrors R343's
+    TeamFootprintCapTests / WashoutCapFeasibilityFloorTests /
+    WashoutControlReportingTests.
+    """
+
+    CLUSTER = ["c0", "c1", "c2", "c3"]
+
+    @classmethod
+    def _bank(cls, n_consensus=10, n_limited=5, tag_limited=True):
+        """Ten consensus lineups carrying all four cluster bats plus four unique
+        fillers each (10% share, below the 15% threshold), scoring 100-i; and
+        five low-cluster lineups carrying one member, scoring 80-i."""
+        out = []
+        for i in range(n_consensus):
+            out.append({"candidate_id": f"K{i}",
+                        "roster_slot_ids": [f"ka{i}", f"kb{i}"] + cls.CLUSTER
+                        + [f"kf{i}_{j}" for j in range(4)],
+                        "sp_ids": [f"ka{i}", f"kb{i}"], "primary_stack": "",
+                        "primary_stack_size": 0, "objective": 100.0 - i})
+        for i in range(n_limited):
+            cand = {"candidate_id": f"L{i}",
+                    "roster_slot_ids": [f"la{i}", f"lb{i}", "c0"]
+                    + [f"lf{i}_{j}" for j in range(7)],
+                    "sp_ids": [f"la{i}", f"lb{i}"], "primary_stack": "",
+                    "primary_stack_size": 0, "objective": 80.0 - i}
+            if tag_limited:
+                cand["bank_job_class"] = ca.CONSENSUS_LIMITED_JOB_CLASS
+            out.append(cand)
+        return out
+
+    @staticmethod
+    def _entries(n=4):
+        return [{"entry_id": f"e{i}", "contest_id": "C1", "contest_name": "T",
+                 "contest_shape": "large_field_gpp"} for i in range(n)]
+
+    @staticmethod
+    def _build_slate():
+        import importlib.util
+        path = REPO / "skills" / "generate-lineups" / "scripts" / "build_slate.py"
+        spec = importlib.util.spec_from_file_location("bs_r405", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    @staticmethod
+    def _source(*parts):
+        return (REPO.joinpath(*parts)).read_text(encoding="utf-8")
+
+    # --- (a) the definition ------------------------------------------------- #
+
+    def test_the_cluster_is_bank_share_ordered_and_truncated_at_twelve(self):
+        """Share descending, player id breaking ties, the 15% threshold
+        inclusive, and at most twelve members. Twenty distinct lineups; player
+        pNN appears in the first N of them."""
+        # `pZ` holds the most lineups and the LAST id, so an id-ordered list
+        # would truncate it away; `pA`/`pB` tie and the id breaks it.
+        counts = {"pZ": 11, "pA": 10, "pB": 10, "pC": 9, "pD": 8, "pE": 8,
+                  "pF": 7, "pG": 6, "pH": 6, "pI": 5, "pJ": 5, "pK": 4,
+                  "pL": 4, "pM": 3, "pN": 3, "pO": 2}
+        # Spread each player over the least-full lineups so every roster stays
+        # a legal ten (two arms, eight hitters), then pad with unique fillers
+        # that each sit at 1/20 = 5%, below the threshold.
+        hitters = [[] for _ in range(20)]
+        for pid, n in sorted(counts.items()):
+            for i in sorted(range(20), key=lambda j: (len(hitters[j]), j))[:n]:
+                hitters[i].append(pid)
+        cands = []
+        for i in range(20):
+            pad = [f"u{i}_{j}" for j in range(8 - len(hitters[i]))]
+            cands.append({"roster_slot_ids": [f"a{i}", f"b{i}"] + hitters[i] + pad,
+                          "sp_ids": [f"a{i}", f"b{i}"]})
+        cl = ca.consensus_cluster_members(cands)
+        self.assertEqual(ca.CONSENSUS_CLUSTER_MIN_BANK_SHARE, 0.15)
+        self.assertEqual(ca.CONSENSUS_CLUSTER_MAX_MEMBERS, 12)
+        self.assertEqual(cl["source_lineups"], 20)
+        # pM and pN sit at exactly 3/20 = 15% and would qualify; the twelve cap
+        # stops the list at pK. pO (10%) never qualifies.
+        self.assertEqual(cl["member_ids"],
+                         ["pZ", "pA", "pB", "pC", "pD", "pE", "pF", "pG",
+                          "pH", "pI", "pJ", "pK"])
+        self.assertEqual(cl["members"][1], {"player_id": "pA", "lineups": 10,
+                                            "share": 0.5})
+        wider = ca.consensus_cluster_members(cands, max_members=20)
+        self.assertIn("pN", wider["member_ids"])       # 15% is inclusive
+        self.assertNotIn("pO", wider["member_ids"])
+        # Pitchers are never members: every arm here is in exactly one lineup,
+        # but even a shared arm is excluded by construction.
+        self.assertFalse(any(m.startswith(("a", "b")) for m in wider["member_ids"]))
+
+    def test_share_is_over_distinct_lineups_and_limited_jobs_are_not_the_source(self):
+        bank = self._bank()
+        dup = dict(bank[0], candidate_id="K0dup")      # same roster, new object
+        cl = ca.consensus_cluster_members(bank + [dup])
+        self.assertEqual(cl["source_lineups"], 10, "a duplicate roster is one lineup")
+        self.assertEqual(cl["source"], "unconstrained_bank_jobs")
+        self.assertEqual(cl["limited_candidates_excluded_from_source"], 5)
+        self.assertEqual(cl["member_ids"], self.CLUSTER)
+        # Untagged, the five limited lineups ARE the search and dilute c1-c3 to
+        # 10/15 while c0 stays at 15/15 -- the tag is what keeps the definition
+        # the one the limit was derived from.
+        untagged = ca.consensus_cluster_members(self._bank(tag_limited=False))
+        self.assertEqual(untagged["source_lineups"], 15)
+        self.assertEqual(untagged["members"][0]["player_id"], "c0")
+        self.assertEqual(untagged["members"][0]["share"], 1.0)
+        # Nothing untagged at all: fall back to everything, and say so.
+        only_limited = [c for c in bank if c.get("bank_job_class")]
+        self.assertEqual(ca.consensus_cluster_members(only_limited)["source"],
+                         "all_candidates")
+
+    # --- (b) the row -------------------------------------------------------- #
+
+    def _count_high(self, out, k=3):
+        by_id = {c["candidate_id"]: c for c in self._bank()}
+        return sum(1 for a in out["assignments"]
+                   if ca.consensus_member_count(
+                       by_id[a["candidate_id"]]["roster_slot_ids"], self.CLUSTER) >= k)
+
+    def test_the_cap_binds_on_the_delivered_set_with_the_count_it_reports(self):
+        loose = ca.select_and_assign_entries(
+            self._bank(), self._entries(), {"max_candidate_reuse": 4})
+        self.assertTrue(loose["passed"], loose.get("errors"))
+        self.assertEqual(self._count_high(loose), 4, "uncapped, every entry takes the consensus")
+        self.assertEqual(loose["consensus_cluster"]["status"], "not_requested")
+
+        capped = ca.select_and_assign_entries(
+            self._bank(), self._entries(),
+            {"max_candidate_reuse": 4, "max_consensus_cluster_share_pct": 0.5})
+        self.assertTrue(capped["passed"], capped.get("errors"))
+        block = capped["consensus_cluster"]
+        self.assertEqual(self._count_high(capped), 2)      # floor(0.5 * 4)
+        self.assertEqual(block["count"], 2)
+        self.assertEqual(block["status"], "applied")
+        self.assertTrue(block["row_added"])
+        self.assertEqual(block["min_members_k"], 3)
+        self.assertEqual(block["delivered_at_k_or_more"], 2)
+        self.assertEqual(block["delivered_share_at_k_or_more"], 0.5)
+        self.assertEqual(block["delivered_member_count_histogram"], {"1": 2, "4": 2})
+        self.assertEqual(capped["direct_constraints"]["max_consensus_cluster_count"], 2)
+        # The price, in the build's own objective, bank and delivered side by side.
+        price = block["objective_median"]
+        self.assertEqual(price["delivered_at_k_or_more"], 99.5)
+        self.assertEqual(price["delivered_below_k"], 79.5)
+        self.assertIn("never a probability", block["note"])
+
+    def test_untouchable_rows_spend_the_headroom_and_an_overspend_refuses(self):
+        high_roster = ["xa", "xb"] + self.CLUSTER + ["xf1", "xf2", "xf3", "xf4"]
+        fixed = {"row_count": 2, "rosters": [tuple(high_roster), tuple(high_roster)],
+                 "player_counts": {}, "pitcher_counts": {},
+                 "primary_stack_counts": {}, "sp_pair_counts": {}}
+        # total = 4 + 2 = 6, cap floor(0.5 * 6) = 3, two already spent: 1 left.
+        out = ca.select_and_assign_entries(
+            self._bank(), self._entries(),
+            {"max_candidate_reuse": 4, "max_consensus_cluster_share_pct": 0.5},
+            fixed_exposure=fixed)
+        self.assertTrue(out["passed"], out.get("errors"))
+        self.assertEqual(out["consensus_cluster"]["headroom"], 1)
+        self.assertEqual(out["consensus_cluster"]["fixed_rows_at_k_or_more"], 2)
+        self.assertEqual(self._count_high(out), 1)
+        # Three untouchable rows at k+ against a cap of floor(0.34 * 7) = 2: no
+        # assignment can fix what the frozen rows already hold.
+        over = dict(fixed, row_count=3, rosters=[tuple(high_roster)] * 3)
+        refused = ca.select_and_assign_entries(
+            self._bank(), self._entries(),
+            {"max_candidate_reuse": 4, "max_consensus_cluster_share_pct": 0.34},
+            fixed_exposure=over)
+        self.assertFalse(refused["passed"])
+        self.assertEqual(refused.get("refusal"), "untouchable_rows_exceed_cap")
+        self.assertTrue(any("max_consensus_cluster_share_pct" in e
+                            for e in refused["errors"]), refused["errors"])
+
+    def test_a_cap_that_cannot_bind_adds_no_row_and_moves_nothing(self):
+        """The R343 vacuous-row guard: a bound at or above E is the same
+        feasible set, and adding the row anyway moves scipy's branch order."""
+        base = ca.select_and_assign_entries(
+            self._bank(), self._entries(), {"max_candidate_reuse": 4})
+        opened = ca.select_and_assign_entries(
+            self._bank(), self._entries(),
+            {"max_candidate_reuse": 4, "max_consensus_cluster_share_pct": 1.0})
+        self.assertEqual(opened["consensus_cluster"]["status"], "vacuous")
+        self.assertFalse(opened["consensus_cluster"]["row_added"])
+        self.assertEqual([a["candidate_id"] for a in opened["assignments"]],
+                         [a["candidate_id"] for a in base["assignments"]])
+
+    def test_the_units_gate_refuses_fifty_at_both_boundaries(self):
+        self.assertIn("max_consensus_cluster_share_pct",
+                      self._build_slate().FRACTION_CONTROL_KEYS)
+        with self.assertRaises(ValueError):
+            epi._merged_controls_for_build(
+                {"1": {"posture": "large_gpp"}},
+                {"max_consensus_cluster_share_pct": 50})
+        with self.assertRaises(ValueError):
+            ca.select_and_assign_entries(
+                self._bank(), self._entries(),
+                {"max_consensus_cluster_share_pct": 50})
+        ok = epi._merged_controls_for_build(
+            {"1": {"posture": "large_gpp"}}, {"max_consensus_cluster_share_pct": "0.4"})
+        self.assertEqual(ok["max_consensus_cluster_share_pct"], 0.4)
+
+    def test_postures_carry_bens_defaults_and_merge_by_min(self):
+        defaults = {k: v["controls"].get("max_consensus_cluster_share_pct")
+                    for k, v in epi.STRATEGY_DEFAULTS.items()}
+        self.assertEqual(defaults, {"single_entry": 1.0, "wta_satellite": 0.5,
+                                    "small_gpp": 0.5, "large_gpp": 0.5,
+                                    "mme": 0.5, "cash": None})
+        mixed = epi._merged_controls_for_build(
+            {"1": {"posture": "single_entry"}, "2": {"posture": "wta_satellite"}}, None)
+        self.assertEqual(mixed["max_consensus_cluster_share_pct"], 0.5)
+        alone = epi._merged_controls_for_build({"1": {"posture": "single_entry"}}, None)
+        self.assertEqual(alone["max_consensus_cluster_share_pct"], 1.0)
+        cash = epi._merged_controls_for_build({"1": {"posture": "cash"}}, None)
+        self.assertNotIn("max_consensus_cluster_share_pct", cash)
+        # k is an integer MIN beside the repetition caps; absent from every
+        # posture, so the engine default (3) applies unless an operator types one.
+        self.assertIn("consensus_cluster_min_members",
+                      inspect.getsource(epi._merged_controls_for_build))
+        self.assertEqual(ca._consensus_cluster_min_members({}), 3)
+        self.assertEqual(ca._consensus_cluster_min_members(
+            {"consensus_cluster_min_members": 2}), 2)
+
+    def test_a_bank_without_low_cluster_lineups_refuses_bank_limited(self):
+        consensus_only = self._bank(n_limited=0)
+        out = ca.select_and_assign_entries(
+            consensus_only, self._entries(),
+            {"max_candidate_reuse": 4, "max_consensus_cluster_share_pct": 0.5})
+        self.assertFalse(out["passed"])
+        first = out["errors"][0]
+        self.assertIn("max_consensus_cluster_share_pct", first)
+        self.assertIn("BANK-LIMITED", first)
+        self.assertIn("so 2 need a lineup carrying fewer", first)
+        self.assertIn("R405(c)", first)
+        self.assertEqual(out["consensus_cluster"]["bank_candidates_below_k"], 0)
+
+    def test_the_prefilter_keeps_what_the_cap_needs(self):
+        """A bank larger than the keep target whose low-cluster lineups score
+        LOWEST: a score-ordered fill drops every one of them, so the reserve is
+        what lets the restricted solve satisfy the cap without a full-bank
+        retry."""
+        bank = self._bank(n_consensus=60, n_limited=6)
+        entries = self._entries(6)
+        out = ca.select_and_assign_entries(
+            bank, entries,
+            {"max_candidate_reuse": 6, "max_consensus_cluster_share_pct": 0.5,
+             "candidate_prefilter_target": 12})
+        self.assertTrue(out["passed"], out.get("errors"))
+        report = out["allocation_solver_report"]
+        self.assertTrue(report["candidate_prefilter"]["applied"])
+        self.assertEqual(report["search_scope"], "restricted")
+        self.assertFalse(report["full_bank_retry"]["triggered"])
+        # need = E - cap = 6 - 3 = 3, reserve 2 x 3 = 6 of the 6 available.
+        self.assertEqual(report["candidate_prefilter"]["consensus_low_cluster_kept"], 6)
+        self.assertEqual(out["consensus_cluster"]["delivered_at_k_or_more"], 3)
+        # And with no cap nothing is reserved: the key is absent.
+        plain = ca.select_and_assign_entries(
+            bank, entries, {"max_candidate_reuse": 6, "candidate_prefilter_target": 12})
+        self.assertNotIn("consensus_low_cluster_kept",
+                         plain["allocation_solver_report"]["candidate_prefilter"])
+
+    # --- (c) the bank ------------------------------------------------------- #
+
+    @staticmethod
+    def _hitters(lineup_df):
+        return [str(p) for p, pos in zip(lineup_df["Player_ID"], lineup_df["Position"])
+                if str(pos) != "P"]
+
+    def test_max_selected_from_bounds_the_lineup_and_removes_nobody(self):
+        frame = diverse_projection_frame()
+        free, _ = opt.build_single_lineup(frame, target="ceiling")
+        consensus = self._hitters(free)
+        limited, _ = opt.build_single_lineup(
+            frame, target="ceiling", max_selected_from=(consensus, 2))
+        self.assertIsNotNone(limited)
+        self.assertLessEqual(len(set(self._hitters(limited)) & set(consensus)), 2)
+        # Every member stays LEGAL: lock one and the limited job still solves
+        # and rosters it. A limit on how many together, never a removal.
+        for member in consensus:
+            locked, _ = opt.build_single_lineup(
+                frame, target="ceiling", locks=[member],
+                max_selected_from=(consensus, 2))
+            self.assertIsNotNone(locked, member)
+            self.assertIn(member, set(locked["Player_ID"].astype(str)))
+        with self.assertRaises(ValueError):
+            opt.build_single_lineup(frame, target="ceiling",
+                                    max_selected_from=(consensus, 0))
+
+    def test_the_sliced_door_builds_limited_jobs_in_their_own_bucket(self):
+        frame = diverse_projection_frame()
+        self.assertEqual(
+            bank_cache.conditions_signature(frame, [], 4, 5),
+            bank_cache.conditions_signature(frame, [], 4, 5, max_selected_from=None),
+            "an ordinary signature must keep meaning what it meant on disk")
+        self.assertNotEqual(
+            bank_cache.conditions_signature(frame, [], 4, 5),
+            bank_cache.conditions_signature(frame, [], 4, 5,
+                                            max_selected_from=(["21001"], 1)))
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = bank_cache.BankCache(Path(tmp) / "bank.json")
+            ordinary = bank_cache.extend_bank(cache, frame, time_budget_s=60)
+            self.assertTrue(ordinary["job_list_exhausted"])
+            n_ordinary = len(cache)
+            request = epi.resolve_consensus_limited_request(
+                {"max_consensus_cluster_share_pct": 0.5}, 8, 96)
+            limited = epi.build_consensus_limited_jobs(
+                cache, frame, request, time_budget_s=60, max_candidates=96)
+            self.assertTrue(limited["attempted"], limited)
+            rep = limited["report"]
+            self.assertNotEqual(rep["conditions_signature"],
+                                ordinary["conditions_signature"])
+            self.assertEqual(rep["job_class"], ca.CONSENSUS_LIMITED_JOB_CLASS)
+            self.assertEqual(rep["max_selected_from"]["m"], 2)
+            members = set(limited["cluster_members"])
+            tagged = [c for c in cache.as_candidates(frame)
+                      if c.get("bank_job_class") == ca.CONSENSUS_LIMITED_JOB_CLASS]
+            self.assertEqual(len(tagged), len(cache) - n_ordinary)
+            self.assertGreater(len(tagged), 0)
+            for c in tagged:
+                self.assertLessEqual(
+                    ca.consensus_member_count(c["player_ids"], members), 2, c)
+            # The tag survives a save and a reload (the resumed-slice case).
+            cache.save()
+            reloaded = bank_cache.BankCache(Path(tmp) / "bank.json")
+            self.assertEqual(
+                sum(1 for c in reloaded.as_candidates(None)
+                    if c.get("bank_job_class")), len(tagged))
+            # Every player in the pool is still in the frame every job solved.
+            self.assertEqual(len(frame), len(diverse_projection_frame()))
+
+    def test_the_direct_door_builds_limited_jobs(self):
+        frame = diverse_projection_frame()
+        request = epi.resolve_consensus_limited_request(
+            {"max_consensus_cluster_share_pct": 0.5}, 8)
+        bank = opt.build_diverse_candidate_bank(
+            frame, requested_n=8, time_budget_s=120,
+            consensus_limited_jobs=request)
+        phase = bank["diversity_augmentation"]["consensus_limited"]
+        self.assertTrue(phase["requested"])
+        self.assertTrue(phase["attempted"], phase)
+        self.assertGreater(phase["appended"], 0, phase)
+        members = set(phase["cluster_members"])
+        tagged = [c for c in bank["candidate_lineups"] if c.get("bank_job_class")]
+        self.assertEqual(len(tagged), phase["appended"])
+        for c in tagged:
+            self.assertLessEqual(ca.consensus_member_count(c["player_ids"], members), 2)
+        # Off by default: the same call without the request runs no Phase 3.
+        plain = opt.build_diverse_candidate_bank(frame, requested_n=8, time_budget_s=120)
+        self.assertFalse(plain["diversity_augmentation"]["consensus_limited"]["requested"])
+        self.assertFalse(any(c.get("bank_job_class") for c in plain["candidate_lineups"]))
+
+    def test_every_door_asks_through_the_one_derivation(self):
+        """R340's lesson: three doors, and the one the entry does not name is
+        the plan leg. Pinned on the call sites, because what goes wrong is the
+        argument list."""
+        pipeline = self._source("mlb_engine", "pipeline", "execution_pipeline.py")
+        direct = pipeline.split("bank = build_diverse_candidate_bank(", 1)[1].split(
+            "\n        )", 1)[0]
+        self.assertIn("consensus_limited_jobs=consensus_request", direct)
+        plan = pipeline.split("def _plan_joint_allocation(", 1)[1].split("\ndef ", 1)[0]
+        self.assertIn("build_consensus_limited_jobs(", plan)
+        self.assertIn("resolve_consensus_limited_request(", plan)
+        slate = self._source("skills", "generate-lineups", "scripts", "build_slate.py")
+        self.assertIn("consensus_jobs = build_consensus_limited_jobs(", slate)
+        self.assertIn("resolve_consensus_limited_request(", slate)
+
+    def test_the_request_sizes_itself_to_cover_the_cap(self):
+        for controls in ({}, {"max_consensus_cluster_share_pct": 1.0},
+                         {"max_consensus_cluster_share_pct": None}):
+            self.assertFalse(epi.resolve_consensus_limited_request(controls, 34)["active"])
+        self.assertFalse(epi.resolve_consensus_limited_request(
+            {"max_consensus_cluster_share_pct": 0.5}, 1)["active"], "one entry")
+        req = epi.resolve_consensus_limited_request(
+            {"max_consensus_cluster_share_pct": 0.5}, 34, 408)
+        self.assertTrue(req["active"])
+        self.assertEqual(req["m"], 2)
+        self.assertEqual(req["min_candidates"], 34)     # (1 - 0.5) x 34 x 2
+        self.assertEqual(req["budget_share"], 0.25)      # 34/408 clamped up
+        self.assertEqual(req["max_candidates"], 102)
+        wide = epi.resolve_consensus_limited_request(
+            {"max_consensus_cluster_share_pct": 0.1}, 60, 60)
+        self.assertEqual(wide["budget_share"], 0.5)      # clamped down
+
+    # --- the class members R343's enumeration taught us to check ------------ #
+
+    def test_the_control_lists_and_the_deadline_rung_carry_it(self):
+        from mlb_engine.pipeline import deadline_governor
+        key = "max_consensus_cluster_share_pct"
+        self.assertIn(key, ca.STRATEGY_CAP_CONTROLS)
+        self.assertIn(key, ca.CHECKED_CONTROLS)
+        self.assertNotIn(key, ca.LADDER_RELAXED_CONTROLS)
+        self.assertFalse(ca.CHECKED_CONTROLS & ca.LADDER_RELAXED_CONTROLS)
+        self.assertEqual(deadline_governor.OPEN_CONTROL_VALUES[key], 1.0)
+        line = ca.compose_infeasibility_errors(
+            [], {key: 0.5, "max_player_exposure_pct": 0.4}, "")[0]
+        self.assertIn(f"{key}=0.5", line)
+
+    def test_the_arithmetic_floor_makes_a_tiny_pool_inert(self):
+        frame = diverse_projection_frame()       # 32 hitters: room below k
+        reqs = _entry_reqs(4)
+        postures = {"900": {"posture": "large_gpp"}}
+        roomy = epi._slate_feasibility(postures, reqs, frame)
+        self.assertEqual(roomy["legal_hitter_count"], 32)
+        self.assertIsNone(roomy["floor_consensus_cluster_share_pct"])
+        tiny = frame[(frame["Position"] == "P") | (frame["Team"].isin(["T1", "T2"]))]
+        feas = epi._slate_feasibility(postures, reqs, tiny)
+        self.assertEqual(feas["legal_hitter_count"], 16)       # 16 - 12 < 6
+        self.assertEqual(feas["floor_consensus_cluster_share_pct"], 1.0)
+        floors = epi.feasibility_floors_from(feas)
+        merged = epi._merged_controls_for_build(postures, None, feasibility_floors=floors)
+        self.assertEqual(merged["max_consensus_cluster_share_pct"], 1.0)
+        check = [c for c in epi._feasibility_report(feas, {
+            "max_consensus_cluster_share_pct": 0.5})["checks"]
+            if c["name"] == "consensus_cluster_capacity"][0]
+        self.assertFalse(check["passed"])
+        self.assertIn("raise max_consensus_cluster_share_pct", check["remedy"])
+
+    def test_the_brief_line_and_the_qa_axis_report_it(self):
+        out = ca.select_and_assign_entries(
+            self._bank(), self._entries(),
+            {"max_candidate_reuse": 4, "max_consensus_cluster_share_pct": 0.5})
+        block = out["consensus_cluster"]
+        line = self._build_slate().format_consensus_cluster_line(block)
+        self.assertIn("4 member(s) at >= 15% bank share", line)
+        self.assertIn("2/4 entries carry 3+", line)
+        self.assertIn("cap 2 of 4 (applied)", line)
+        self.assertIn("not a probability", line)
+        self.assertTrue(self._build_slate().format_consensus_cluster_line(None)
+                        .startswith("UNAVAILABLE"))
+        import importlib
+        if str(REPO / "tools") not in sys.path:
+            sys.path.insert(0, str(REPO / "tools"))
+        qa = importlib.import_module("qa_portfolio")
+        sal = {f"c{i}": {"TeamAbbrev": "AAA", "Position": "OF",
+                         "Game Info": "AAA@BBB x", "Name": f"c{i}"} for i in range(4)}
+        sal.update({f"f{i}": {"TeamAbbrev": "BBB", "Position": "OF",
+                              "Game Info": "AAA@BBB x", "Name": f"f{i}"} for i in range(8)})
+        hdr = ["Entry ID", "Contest Name", "Contest ID", "Entry Fee",
+               "P", "P", "C", "1B", "2B", "3B", "SS", "OF", "OF", "OF"]
+        body = [["1", "T", "C1", "$1", "", "", "c0", "c1", "c2", "f0", "f1", "f2", "f3", "f4"],
+                ["2", "T", "C1", "$1", "", "", "c0", "f0", "f1", "f2", "f3", "f4", "f5", "f6"]]
+        brief = {"exposure": {"consensus_cluster": block}}
+        lines = qa.section_frontier(sal, hdr, body,
+                                    consensus_cluster=qa.consensus_cluster_from_brief(brief))
+        text = "\n".join(lines)
+        self.assertIn("washout axis 'consensus_cluster'", text)
+        self.assertIn("at 1/2", text)
+        self.assertIn("max_consensus_cluster_share_pct", text)
+        bare = "\n".join(qa.section_frontier(sal, hdr, body))
+        self.assertIn("'consensus_cluster': not computed", bare)
+
+    def test_late_swap_strips_the_key_rather_than_enforcing_it(self):
+        """The declined door (rider on R284): a swap bank holds no limited
+        jobs, so the swap derives the cap, removes it, and reports it."""
+        ls = SwapControlsInheritanceTests._late_swap()
+        stripped = {}
+        derived = ls.resolve_swap_controls(
+            {"900": {"posture": "wta_satellite"}}, None, None, stripped_out=stripped)
+        self.assertNotIn("max_consensus_cluster_share_pct", derived)
+        self.assertEqual(stripped, {"max_consensus_cluster_share_pct": 0.5})
+        self.assertIn("parent build", ls.consensus_cluster_summary.__doc__ + self._source(
+            "tools", "late_swap.py"))
+
+    def test_the_run_record_carries_the_block_on_both_return_paths(self):
+        src = self._source("mlb_engine", "pipeline", "execution_pipeline.py")
+        body = src.split("def execute_portfolio(", 1)[1].split("\ndef ", 1)[0]
+        self.assertEqual(body.count('"consensus_cluster": allocation.get("consensus_cluster")'), 2)

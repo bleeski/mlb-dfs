@@ -132,6 +132,11 @@ LOOSE_CONTROLS = {
     # item moves nothing except where a cap is actually asked for -- the
     # production replay below runs the posture default and DOES move.
     "max_team_exposure_pct": 1.0,
+    # R405, 2026-09-23, for the same reason as the team cap above: the loose
+    # replay holds the caps out of the way. Opened here, the cap also asks the
+    # direct bank for no cluster-limited jobs, so the loose baseline measures
+    # the construction it always measured and does not move.
+    "max_consensus_cluster_share_pct": 1.0,
     "max_sp_pair_repetition": 50,
     "max_shared_players": 9,
     "max_candidate_reuse": 20,
@@ -394,16 +399,19 @@ class GoldenProductionReplayTests(unittest.TestCase):
     the same frozen enrichment fixtures:
 
     1. PURE: explicit production postures (the Quick Card forbids trusting
-       name inference), zero overrides. Today's engine PROVES this grid
-       jointly infeasible: R5's satellite caps against a 4-game bank fail on
-       control interaction, not on any single cap, and the checkpoint's
-       pool-keyed feasibility arithmetic cannot see it (floors key on pool
-       counts; the interaction lives in the bank). That verdict, error text
-       included, is frozen. If caps, floors, the allocator, or the bank
+       name inference), zero overrides. Until 2026-09-23 the engine PROVED
+       this grid jointly infeasible: R5's satellite caps against the 30-
+       candidate bank failed on control interaction, not on any single cap,
+       and the checkpoint's pool-keyed feasibility arithmetic could not see it
+       (floors key on pool counts; the interaction lives in the bank). R405(c)
+       added the cluster-limited bucket production now builds, the bank grew
+       to 58 distinct lineups, and the same grid CERTIFIES -- bank growth doing
+       what R98(2) says it does first. Whichever verdict the grid gets, error
+       text included, is frozen. If caps, floors, the allocator, or the bank
        builder change behavior, this baseline moves and says so. The
-       checkpoint-green-then-build-infeasible disagreement is a real
-       thin-slate landmine and is filed on the backlog (R28), not papered
-       over here.
+       checkpoint-green-then-build-infeasible disagreement stays pinned as an
+       AGREEMENT between the plan and the build (R28), whichever way the grid
+       resolves.
 
     2. CERTIFIED: the same run plus the minimal recorded operator action the
        thin-slate contract prescribes ("explicit overrides win", surfaced in
@@ -477,6 +485,30 @@ class GoldenProductionReplayTests(unittest.TestCase):
             assert report["job_list_exhausted"], (
                 "the sliced bank build did not exhaust its job list inside the "
                 f"budget; freezing a partial bank would freeze noise: {report}")
+            # R405(c), 2026-09-23. The production sliced door now builds a
+            # cluster-limited bucket after the ordinary one whenever the merged
+            # posture controls carry a consensus cap below 1.0, and these
+            # postures do (0.50). The bank here mirrors that door -- the same
+            # derivation, the same candidate ceiling build_slate uses -- because
+            # a production gate over a bank production no longer builds would
+            # freeze a question no build asks. Exhaustion is asserted for the
+            # reason above.
+            from mlb_engine.pipeline.execution_pipeline import (
+                _merged_controls_for_build, _resolve_contest_postures,
+                build_consensus_limited_jobs, resolve_consensus_limited_request)
+            from mlb_engine.entries.dk_entries_manager import parse_dk_entry_rows
+            _rows = parse_dk_entry_rows(str(cls.entries_csv))
+            _postures = _resolve_contest_postures(_rows, PRODUCTION_POSTURES, None)
+            _n = len(_rows)
+            _total_max = max(_n * 12, 60)
+            consensus_request = resolve_consensus_limited_request(
+                _merged_controls_for_build(_postures, None), _n, _total_max)
+            assert consensus_request["active"], consensus_request
+            limited = build_consensus_limited_jobs(
+                cache, projections, consensus_request, time_budget_s=60,
+                max_candidates=_total_max)
+            assert (limited.get("report") or {}).get("job_list_exhausted"), (
+                f"the cluster-limited bucket did not exhaust: {limited}")
             candidates = cache.as_candidates(
                 projections, requested_n=18,
                 contest_shapes=["satellite", "large_field_gpp"])
@@ -537,6 +569,14 @@ class GoldenProductionReplayTests(unittest.TestCase):
                         "candidates": len(candidates),
                         "jobs_total": report["jobs_total"],
                         "conditions_signature": report["conditions_signature"],
+                        # R405(c). The limited bucket, beside the ordinary one.
+                        "consensus_limited": {
+                            "built": limited["report"].get("built_this_slice"),
+                            "conditions_signature":
+                                limited["report"].get("conditions_signature"),
+                            "cluster_members": limited.get("cluster_members"),
+                            "m": limited.get("m"),
+                        },
                     },
                     "enrichment": {
                         "xwoba_applied": (pe.get("xwoba") or {}).get("applied"),
@@ -548,6 +588,18 @@ class GoldenProductionReplayTests(unittest.TestCase):
                     "entry_count": summary["entry_count"],
                     "exposure_summary": summary["exposure_summary"],
                     "sp_pair_distribution": summary["sp_pair_distribution"],
+                    # R405. The cap's realized shape is frozen with the rest, so
+                    # a drift in who the consensus is or how many entries carry
+                    # it names this layer rather than surfacing as moved rows.
+                    "consensus_cluster": {
+                        k: (cert.get("consensus_cluster") or {}).get(k)
+                        for k in ("status", "count", "min_members_k",
+                                  "source_lineups",
+                                  "delivered_member_count_histogram",
+                                  "delivered_at_k_or_more")
+                    } | {"member_ids": [
+                        m.get("player_id") for m in
+                        ((cert.get("consensus_cluster") or {}).get("members") or [])]},
                 },
                 "assignments": summary["assignments"],
             }
@@ -619,12 +671,23 @@ class GoldenProductionReplayTests(unittest.TestCase):
         Before R28(1) this grid was checkpoint-green and approve-infeasible.
         The plan solves the build's own candidates here, so agreement is exact
         and any divergence is a real regression, not fixture noise.
+
+        R405(c), 2026-09-23: this asserted the refusal VALUE as well, which was
+        a property of the 30-candidate bank rather than of the agreement. With
+        the cluster-limited bucket the bank holds 58 distinct lineups and the
+        pure grid certifies, so the test now pins both directions of the one
+        thing it exists for: a refusal the plan predicts with the same sentence,
+        or a certification the plan predicts as `would_certify`. The frozen
+        `pure_verdict` in the baseline still pins which of the two it is.
         """
         joint = self.pure_plan_joint
+        if self.pure_result["passed"]:
+            self.assertEqual(joint.get("verdict"), "would_certify",
+                             f"the PURE build certified while the plan said: {joint}")
+            self.assertEqual(joint.get("errors"), [])
+            return
         self.assertEqual(joint.get("verdict"), "proven_infeasible",
                          f"the plan no longer predicts the PURE grid's refusal: {joint}")
-        self.assertFalse(self.pure_result["passed"],
-                         "the PURE build passed while the plan predicted refusal")
         self.assertEqual(
             joint.get("errors"), self.pure_result["errors"],
             "the plan's proven-infeasible text drifted from the error the build "

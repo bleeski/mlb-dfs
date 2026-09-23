@@ -687,6 +687,43 @@ computed and read by nobody before R333.
 These are deterministic portfolio-shape controls. No archive number prices a
 team footprint; neither cap is a win rate, a cash rate, or a probability.
 
+### The consensus-cluster cap (R405, Classic only, ON by posture default)
+
+The team, game and stack caps cannot see a CROSS-TEAM pool of bats the search
+keeps choosing. On 1905_10g nine hitters sat at the 0.35 person cap and filled
+36% of hitter slots; 27 of 34 lineups carried three or more of them while the
+brief read 15 distinct primary stacks.
+
+- **The cluster** is the BANK's consensus: every hitter in 15% or more of the
+  distinct lineups the unconstrained search built, most-shared first, at most
+  twelve. Derived by the allocator from the bank it receives, so every door
+  agrees; cluster-limited bank jobs are excluded from the definition.
+- **The cap**, `max_consensus_cluster_share_pct`, bounds the share of entries
+  whose lineup carries k or more members (`consensus_cluster_min_members`,
+  default 3). Ben's defaults (2026-09-23): 0.50 on `wta_satellite`,
+  `large_gpp`, `small_gpp`, `mme`; 1.0 on `single_entry`; `cash` none. MIN wins
+  across a mixed entered set. A fraction, through the units gate.
+- **The bank** gets cluster-limited jobs on all three doors (sliced, direct,
+  plan leg): the ordinary bank holds almost nothing below k (6 of 408 on
+  1905_10g, 0 of 30 on the vendored 2026-06-03 slate), so without them the cap
+  refuses BANK-LIMITED. Those jobs solve with at most k - 1 cluster members
+  together; every player stays legal in every job. Search effort, never a pool
+  cut.
+- **Deadline and swap.** S class under R386: the T-15 rung opens it. Late swap
+  strips it and prints the parent's cluster beside the swapped file's (the
+  swap's bank has no limited jobs; enforcement is a rider on R284).
+
+```bash
+python skills/generate-lineups/scripts/build_slate.py ...     --controls-override '{"max_consensus_cluster_share_pct": 1.0}'   # off for one build
+```
+
+Where to read it: the brief's `exposure.consensus_cluster` (members and shares,
+the delivered member-count histogram, the share at k or more, and the
+`objective_median` price, bank and delivered side by side), the `consensus:`
+stderr line, `consensus_cluster_request` in the checkpoint, and
+`tools/qa_portfolio.py`'s `consensus_cluster` washout axis. A decorrelation
+preference over labeled priors; never a win rate, a cash rate, or a probability.
+
 ### Projection enrichment (this is what makes the build more than APPG)
 
 The build applies six deterministic priors: the xwOBA Base correction, xISO
