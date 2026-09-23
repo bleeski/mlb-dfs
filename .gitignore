@@ -117,6 +117,10 @@ _to_delete/
 claims/*
 !claims/.gitkeep
 
+# R377. The session-start hook's egress reading, which the delivery record reads
+# instead of probing the network at delivery. A fact about one container.
+.session/
+
 # BUILD byproduct cache (lineups_from_paste); untracked by design (R-merge 2026-08-04)
 data/reference/paste_cache/
 

@@ -97,10 +97,31 @@ def _posix(path: str | Path) -> str:
     return str(repo_relative(path)).replace("\\", "/")
 
 
-def record_name(slate_tag: str, run_id: Optional[str]) -> str:
-    tag = "".join(c if (c.isalnum() or c in "-_") else "_"
-                  for c in str(slate_tag or "untagged"))
-    return f"{tag}_{run_id or 'norun'}.json"
+def _safe_tag(slate_tag: str) -> str:
+    return "".join(c if (c.isalnum() or c in "-_") else "_"
+                   for c in str(slate_tag or "untagged"))
+
+
+def record_name(slate_tag: str, run_id: Optional[str],
+                sha256: Optional[str] = None) -> str:
+    """``<tag>_<run_id>.json``, or ``<tag>_norun_<sha12>.json`` without a run.
+
+    R403(b). A run-less delivery (every Showdown build, a hand repair) was keyed
+    ``<tag>_norun.json``, so on 1905_10g the 18:23 repair and the 19:05 hand late
+    swap wrote the same file and the first record was lost. The key is now the
+    delivered bytes' sha256 prefix rather than a UTC stamp, because the manifest
+    already treats "the same bytes recorded twice" as one delivery
+    (``record_delivery``'s early branch re-mirrors it): a sha key keeps that one
+    record, and a clock key would split it into two. With no sha either, the
+    clock is the only identity left.
+    """
+    tag = _safe_tag(slate_tag)
+    if run_id:
+        return f"{tag}_{run_id}.json"
+    digest = str(sha256 or "").strip().lower()
+    if digest:
+        return f"{tag}_norun_{digest[:12]}.json"
+    return f"{tag}_norun_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.json"
 
 
 def code_identity() -> Dict[str, Any]:
@@ -233,33 +254,90 @@ def _carries_a_secret(text: str) -> Optional[str]:
     return None
 
 
+def bound_entries(source: Path, expected_sha256: Optional[str]) -> tuple:
+    """``(entries, binding)``: the rosters, only if they are the recorded bytes.
+
+    R387. The record's rosters were parsed from ``delivered_file``, which is
+    ``dest``, while the manifest row's sha256 was taken from the provisional
+    file that ``deliver`` promotes onto ``dest`` only AFTER recording. So a
+    first build recorded no rosters and a rebuild recorded the previous build's
+    rosters beside the new build's sha256 (1915_1g_sd, v2's hash over v1's six
+    lineups). The rosters are now read from the bytes the hash was taken from,
+    and hashed again here, so the two halves of one record describe one file.
+
+    A mismatch withholds the rosters rather than writing a record that
+    contradicts itself: ``binding`` names both hashes and the delivery is
+    untouched, because a record is bookkeeping (P, R386) and never a reason to
+    withhold a file.
+    """
+    expected = str(expected_sha256 or "").strip().lower()
+    binding: Dict[str, Any] = {"source": _posix(source)}
+    if not source.is_file():
+        binding["status"] = "source_absent"
+        return [], binding
+    actual = sha256_file(source)
+    binding["source_sha256"] = actual
+    if not expected:
+        # Nothing to bind against: the row itself carries no hash, which
+        # `record_delivery` writes only when the source was already missing.
+        binding["status"] = "unverified_no_row_sha256"
+        return entry_rows(source), binding
+    if actual != expected:
+        binding["status"] = "sha256_mismatch"
+        binding["expected_sha256"] = expected
+        print(f"delivery_record: rosters NOT recorded; {source.name} hashes "
+              f"{actual[:12]} and the manifest row says {expected[:12]}")
+        return [], binding
+    binding["status"] = "bound"
+    return entry_rows(source), binding
+
+
 def write_delivery_record(*, date: str, manifest_row: Mapping[str, Any],
                           run_id: Optional[str] = None,
                           controls: Optional[Mapping[str, Any]] = None,
                           relaxations: Optional[Mapping[str, Any]] = None,
                           egress: str = "",
                           root: Optional[Path] = None,
-                          extra: Optional[Mapping[str, Any]] = None
+                          extra: Optional[Mapping[str, Any]] = None,
+                          entries_source: Optional[str | Path] = None,
                           ) -> Optional[Path]:
-    """Write one delivery record. Returns its path, or None. Never raises."""
+    """Write one delivery record. Returns its path, or None. Never raises.
+
+    ``entries_source`` is the file holding the recorded bytes when that is not
+    yet ``delivered_file`` (R387): ``record_delivery`` passes its
+    ``hash_source``, the provisional file, on all three delivery paths.
+    """
     try:
         base = deliveries_dir(root) / str(date)
         resolved_run = run_id or manifest_row.get("run_id")
-        delivered = (Path(root) if root is not None else _artifact_root()) / str(
-            manifest_row.get("delivered_file") or "")
+        artifact_root = Path(root) if root is not None else _artifact_root()
+        source = (Path(entries_source) if entries_source is not None
+                  else artifact_root / str(manifest_row.get("delivered_file") or ""))
+        entries, binding = bound_entries(source, manifest_row.get("sha256"))
+        egress_text, egress_source = str(egress or ""), "caller"
+        if not egress_text:
+            # R377. Never measured here: a delivery is the worst place for a
+            # network call. The session-start hook's reading, or a named absence.
+            from mlb_engine.repo_env import read_session_egress
+            cached = read_session_egress(artifact_root)
+            egress_text = str((cached or {}).get("line") or "")
+            egress_source = (f"session_start {cached.get('measured_utc')}"
+                             if egress_text else "not_measured")
         record = {
             "schema_version": SCHEMA_VERSION,
             "kind": "delivery",
             "date": str(date),
             "recorded_utc": datetime.now(timezone.utc).isoformat(),
             "manifest_row": {k: v for k, v in manifest_row.items()},
-            "entries": entry_rows(delivered) if delivered.exists() else [],
+            "entries": entries,
+            "entries_binding": binding,
             "run": run_inputs(resolved_run, root=root),
             "code": code_identity(),
             "host": host_identity(),
             "controls": dict(controls or {}),
             "relaxations": dict(relaxations or {}),
-            "egress": str(egress or ""),
+            "egress": egress_text,
+            "egress_source": egress_source,
             "labels": ("deterministic review proxies and labeled priors only; "
                        "never ROI, win rate, cash rate, or probability"),
         }
@@ -269,7 +347,7 @@ def write_delivery_record(*, date: str, manifest_row: Mapping[str, Any],
             manifest_row.get("delivered_file") or "")
         return _write(base,
                       record_name(str(manifest_row.get("slate_tag") or ""),
-                                  resolved_run),
+                                  resolved_run, manifest_row.get("sha256")),
                       record)
     except Exception as exc:  # noqa: BLE001 - bookkeeping never fails a delivery
         print(f"delivery_record: not written ({type(exc).__name__}: {exc})")
@@ -302,8 +380,8 @@ def write_refusal_record(*, date: str, slate_tag: str, exit_code: int,
             "labels": ("a refusal is an observed build outcome, never a claim "
                        "about the slate"),
         }
-        tag = record_name(str(slate_tag or ""), None).removesuffix("_norun.json")
-        return _write(deliveries_dir(root) / str(date), f"{tag}_{stamp}.json", record)
+        return _write(deliveries_dir(root) / str(date),
+                      f"{_safe_tag(str(slate_tag or ''))}_{stamp}.json", record)
     except Exception as exc:  # noqa: BLE001
         print(f"delivery_record: refusal not written ({type(exc).__name__}: {exc})")
         return None

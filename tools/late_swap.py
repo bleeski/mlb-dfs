@@ -72,7 +72,7 @@ from mlb_engine.entries.upload_manifest import (  # noqa: E402
 )
 from mlb_engine.pipeline.execution_pipeline import (  # noqa: E402
     _assemble_projection_frame, _merged_controls_for_build, _slate_feasibility,
-    derive_roster_id_maps,
+    controls_for_report, derive_roster_id_maps,
     resolve_shape_bands, slate_game_count,
     _resolve_contest_postures, _slate_tag, feasibility_floors_from,
     promote_deferred_run, run_late_swap, unresolved_contest_blockers,
@@ -926,6 +926,11 @@ def main() -> int:
                            else "not_certified"),
             projection_tier="proxy",  # the swap assembles emergency-proxy projections
             notes=f"late swap; parent {args.parent_entries}",
+            # R377. The controls the joint solve ran under, and the one thing a
+            # swap relaxes on its own authority: a downgrade taken anyway.
+            controls=controls_for_report(
+                {k: v for k, v in controls.items() if k != "time_limit"}),
+            relaxations={"downgrades_accepted": len(downgraded)},
         )
         delivered_sha = str(record.get("sha256") or "")
         # R96(4): the swap had no salary staging at all, so a late-swapped slate

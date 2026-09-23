@@ -175,9 +175,18 @@ def egress() -> str:
     try:
         sys.path.insert(0, str(ROOT / "tools"))
         import env_probe  # noqa: PLC0415 - deliberately lazy; the hook is stdlib
-        return env_probe.egress_line()
+        line = env_probe.egress_line()
     except Exception as exc:  # noqa: BLE001
         return f"egress: not measured ({type(exc).__name__})"
+    try:
+        # R377. Kept for the delivery record, which must never probe the
+        # network itself. `repo_env` is stdlib-only, like this hook.
+        sys.path.insert(0, str(ROOT))
+        from mlb_engine.repo_env import write_session_egress  # noqa: PLC0415
+        write_session_egress(line, ROOT)
+    except Exception:  # noqa: BLE001 - the line still prints
+        pass
+    return line
 
 
 def locks() -> str:

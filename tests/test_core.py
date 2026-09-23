@@ -10214,6 +10214,136 @@ print(json.dumps({{"sha256_len": len(row.get("sha256") or ""),
             self.assertEqual(got["status"], "candidate")
 
 
+class RefusalRecordTagTests(unittest.TestCase):
+    """R403. A refusal record names its slate and its reason; run-less
+    deliveries keep one record each.
+
+    On 1905_10g eleven refusals were recorded `untagged_<utc>.json` with argv
+    and an exit note only, while each refusal brief beside them carried
+    `slate.tag` and the error text: the wrapper at `__main__` saw argv and the
+    exit code and nothing else. And the 18:23 repair and the 19:05 hand late
+    swap both wrote `1905_10g_norun.json`, so the first record was lost.
+    """
+
+    ARCHIVE = Path(__file__).resolve().parents[1] / "data" / "archive" / "2026-06-03"
+
+    @staticmethod
+    def _module():
+        import importlib.util
+        path = (Path(__file__).resolve().parents[1] / "skills" / "generate-lineups"
+                / "scripts" / "build_slate.py")
+        spec = importlib.util.spec_from_file_location("build_slate_r403", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def test_a_real_refusal_records_the_slate_tag_main_computed(self):
+        """The real script, the real wrapper: a Classic build handed the
+        Showdown-only `--projections` refuses (exit 4) after the salary file is
+        read and before anything is staged."""
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            for name in ("DKSalaries_2026-06-03.csv", "DKEntries_2026-06-03.csv"):
+                shutil.copy(self.ARCHIVE / name, tmp / name)
+            (tmp / "p.csv").write_text("x\n", encoding="utf-8")
+            repo = Path(__file__).resolve().parents[1]
+            env = dict(os.environ, MLB_DFS_ARTIFACT_ROOT=str(tmp), PYTHONHASHSEED="0")
+            proc = subprocess.run(
+                [sys.executable, str(repo / "skills" / "generate-lineups" /
+                                     "scripts" / "build_slate.py"),
+                 "--date", "2026-06-03",
+                 "--salary", str(tmp / "DKSalaries_2026-06-03.csv"),
+                 "--entries", str(tmp / "DKEntries_2026-06-03.csv"),
+                 "--projections", str(tmp / "p.csv")],
+                cwd=str(repo), capture_output=True, text=True, timeout=300, env=env)
+            self.assertEqual(proc.returncode, 4, proc.stdout[-1500:] + proc.stderr[-1500:])
+            records = sorted((tmp / "data" / "deliveries" / "2026-06-03").glob("*.json"))
+            self.assertEqual(len(records), 1, proc.stderr[-1500:])
+            rec = json.loads(records[0].read_text(encoding="utf-8"))
+            self.assertEqual(rec["kind"], "refusal")
+            self.assertEqual(rec["slate_tag"], "1840_2g")
+            self.assertTrue(records[0].name.startswith("1840_2g_"), records[0].name)
+            for key in ("refusal_class", "errors", "failing_checks"):
+                self.assertIn(key, rec["refusal"])
+
+    def test_a_refusal_brief_gives_its_tag_class_errors_and_failing_checks(self):
+        """The `classic_not_certified` payload, which `main()` writes as the
+        brief with `slate.tag` added: the shape every 1905_10g refusal had."""
+        mod = self._module()
+        brief = {
+            "status": "not_certified", "refusal": "classic_not_certified",
+            "refusal_class": "badly_shaped", "run_id": "20260922T213233Z_ab12cd34",
+            "errors": [f"joint allocation infeasible: constraint {i}" for i in range(5)],
+            "feasibility": {"passed": False, "checks": [
+                {"name": "shared_players_floor", "passed": False,
+                 "detail": "floor 5 > cap 4", "remedy": "max_shared_players=5"},
+                {"name": "sp_pair_capacity", "passed": True, "detail": "ok"},
+            ]},
+            "slate": {"tag": "1905_10g", "games": 10},
+        }
+        tag, facts = mod.refusal_record_facts(
+            {"slate_tag": "ignored_when_the_brief_names_one", "brief": brief})
+        self.assertEqual(tag, "1905_10g")
+        self.assertEqual(facts["refusal_class"], "badly_shaped")
+        self.assertEqual(facts["refusal"], "classic_not_certified")
+        self.assertEqual(facts["errors"], brief["errors"][:3])
+        self.assertEqual(facts["failing_checks"], [
+            {"name": "shared_players_floor", "detail": "floor 5 > cap 4",
+             "remedy": "max_shared_players=5"}])
+        self.assertEqual(facts["run_id"], brief["run_id"])
+
+    def test_an_empty_brief_refusal_takes_the_stamp_and_the_signature_tag(self):
+        """Most refusal sites `return N, {}`; the stamp is what they printed."""
+        mod = self._module()
+        mod._REFUSAL_CONTEXT.clear()
+        mod._REFUSAL_CONTEXT["slate_tag"] = "1915_1g_sd"
+        mod.refusal_stamp("showdown_bank_short")
+        tag, facts = mod.refusal_record_facts(dict(mod._REFUSAL_CONTEXT))
+        self.assertEqual(tag, "1915_1g_sd")
+        self.assertEqual(facts["refusal"], "showdown_bank_short")
+        self.assertEqual(facts["refusal_class"],
+                         mod.REFUSAL_BY_KEY["showdown_bank_short"]["klass"])
+        self.assertEqual((facts["errors"], facts["failing_checks"]), ([], []))
+
+    def test_main_hands_its_refusal_brief_to_the_wrapper(self):
+        """A pin, not a run: the only refusal with a brief is a full Classic
+        solve that fails certification, too slow for this suite. The hand-off
+        must sit inside `if brief:` in `main()`, where `slate.tag` is added."""
+        src = (Path(__file__).resolve().parents[1] / "skills" / "generate-lineups"
+               / "scripts" / "build_slate.py").read_text(encoding="utf-8")
+        body = src[src.index("\ndef main() -> int:"):src.index("\ndef _main_recording_refusals")]
+        block = body[body.index("\n    if brief:\n"):]
+        self.assertIn('_REFUSAL_CONTEXT["brief"] = brief', block[:400])
+        self.assertIn('brief["slate"] = {"tag": signature["tag"]', block)
+
+    def test_two_run_less_deliveries_write_two_records_and_the_same_bytes_one(self):
+        """R403(b). Keyed on the delivered sha256, the way the manifest already
+        treats the same bytes recorded twice as one delivery."""
+        from mlb_engine.entries import upload_manifest as um
+        from mlb_engine.entries.delivery_record import read_records
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            original = um.REPO_ROOT
+            um.REPO_ROOT = root
+            try:
+                out = root / "outputs" / "2026-09-22"
+                out.mkdir(parents=True)
+                shas = []
+                for body in ("repair 18:23\n", "late swap 19:05\n", "late swap 19:05\n"):
+                    row = um.deliver(
+                        date="2026-09-22", dest=out / "DKEntries_1905_10g.csv",
+                        write=lambda p, b=body: Path(p).write_text(b, encoding="utf-8"),
+                        contest_type="classic", slate_tag="1905_10g", run_id=None,
+                        status="candidate", certification="review_grade")["record"]
+                    shas.append(row["sha256"])
+                names = sorted(Path(r["_path"]).name
+                               for r in read_records(root=root, date="2026-09-22"))
+            finally:
+                um.REPO_ROOT = original
+        self.assertEqual(names, sorted({f"1905_10g_norun_{s[:12]}.json" for s in shas}))
+        self.assertEqual(len(names), 2)
+
+
 class SolverProbeExitContractTests(unittest.TestCase):
     """R364, 2026-09-19. The probe crashed where its contract says it refuses.
 
