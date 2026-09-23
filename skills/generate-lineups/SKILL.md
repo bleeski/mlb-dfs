@@ -111,7 +111,7 @@ delivery, release it: `python tools/claim.py release slate_<date>_<tag>`.
 Never edit the ledger or the backlog from a build session; drop a
 fragment in ledger/inbox/ or docs/backlog_inbox/ instead.
 
-## Preflight: one call, always, even inside T-20
+## Preflight: one call, always, at any clock
 
 A fresh sandbox has no scipy, and `scipy.optimize.milp` is the only solver the
 optimizer will use. Without it there is no build at all, so this is not a slow
@@ -314,7 +314,9 @@ the contest-identity blockers: four of those gates are DK rules, one
 (`portfolio_caps_passed`) is purely Ben's exposure and overlap numbers, every
 one of which DK accepts. And `verify_classic`'s "blank slot" was one string
 over two facts — a PARTIALLY filled row, which DK rejects, and an ALL-blank
-reserved row, which DK simply does not enter. The brief now carries
+reserved row, which is unresolved coverage rather than an illegal roster (F-2,
+Ben 2026-09-22: DK accepts a partial file only with those rows removed, not
+left blank; R401, Session 22, builds that form). The brief now carries
 `failure_kinds` and `delivery_blocked`; `delivery_blocked: false` with
 `passed: false` means the file on disk is legal for every row that is filled
 and only the blank rows are stopping it.
@@ -322,6 +324,38 @@ and only the blank rows are stopping it.
 Exit `4` is deliberately outside all of this and stays a refusal at every
 clock: nothing was solved, so there is no verdict to retry and no shape to
 relax. A deadline does not conjure a salary file.
+
+### Under a deadline: V is a wall, S relaxes, P is recorded (R386)
+
+Ben, 2026-09-22: a legal file before the deadline outranks optional research,
+simulation and quality gates. CLAUDE.md's Autonomy section is the contract and
+MLB_Classic.md §2 defines the three classes; this is what they mean at the
+keyboard. Inside T-30:
+
+- **V is a wall at every clock**: IDs, salaries, eligibility, slots, the cap,
+  entry mapping, template structure, locks, the delivered bytes.
+  `refusal_class: illegal` is V.
+- **S is yours to relax without asking**: exposure, stacks, overlap, reuse,
+  anti-correlation, ownership. Record every move with its before and after
+  value. `badly_shaped` is S. One S control never relaxes: distinct lineups
+  within a contest (F-3; DK accepts a repeat, Ben never wants one).
+- **P is yours to record**: optional feeds, degraded models, bookkeeping, the
+  gate, the solver probe, QA, simulation. It never alone withholds a V-valid
+  file. Skip the gate and the solver probe; `env_probe` still runs, because
+  without scipy there is no file at all.
+- **`read_it` is Mixed** until R388 splits it (Session 05). The engine treats
+  it as a wall, so read the gate it names before deciding which class it is.
+- **An S or P failure ships review-grade.** It never removes the file and
+  never makes it upload-ready.
+- **`--force` on the preflight stays Ben's at every clock.** The preflight
+  does not yet tell a bookkeeping failure from a byte mismatch (R388(c),
+  Session 13), so a file whose only preflight failures you judge P is
+  presented review-grade with each failure quoted, and Ben decides at upload.
+- **On an authorized repair, `late_swap.py --accept-downgrade` is your call.**
+  Label the file review-grade.
+
+Outside T-30, an S or P failure is still Ben's question. The deadline is first
+lock minus 5 minutes, because Ben's upload takes 5 (F-1).
 
 ### `--deliver-by`: a clock inside the build
 
@@ -332,20 +366,26 @@ the ladder it walked in `brief.deadline`. One crude step, not a stepwise walk,
 because CLAUDE.md's T-15 rung measured the alternative: five careful control
 changes cost 1940_9g five two-minute calls and produced no file.
 
-Use it whenever you are inside a lock window. It is opt-in and a build without
-it is byte-identical to before, so there is no reason to hold it back.
+Pass it on every build, set to the first lock: every build is deadline-aware
+(F-4, Ben 2026-09-22). It is still opt-in in code and a build without it is
+byte-identical to before, so there is no reason to hold it back; Sessions
+15-17 make it the default.
 
 The ladder is fixed and has two rungs:
 
 1. `open_controls` — every portfolio control to its open value at once.
    Overlap opens to roster size **minus one**, never roster size: two lineups
    sharing every slot are the same lineup, and two identical entries in one
-   contest are a DK rejection.
+   contest are what Ben never wants (F-3: DK accepts them; distinct lineups
+   per contest is the one S control that never relaxes).
 2. `accept_blank_rows` — deliver the rows the bank filled, leave the rest
    blank. **Showdown only.** On Classic the engine passes
    `require_all_reserved_filled=True` at both validator calls, so a short bank
    fails inside the engine before any caller can label it; the refusal stands
-   and stderr says so.
+   and stderr says so. A rung-2 file still carries its blank rows, and F-2
+   (Ben, 2026-09-22) says DK accepts a partial file only with unresolved rows
+   removed, so name the blank Entry IDs when you present it. R401 (Session
+   22) builds the removed-rows form.
 
 What it never does, and none of this is negotiable: it never reaches an
 `illegal` or `read_it` refusal, never reduces the legal player pool, never
@@ -1392,9 +1432,10 @@ suite, but read the state word the audit prints before touching a pin. Only
 coverage, they name the precondition to stage, and lowering a pin to meet them
 retires the tests for good.
 
-Skip the test suite under deadline pressure. Inside T-20, go straight to the
-build. The preflight is the one part that is never skipped: it costs about 9
-seconds, and a fresh sandbox with no scipy produces no build at all.
+Inside T-30, skip the gate and the solver probe and go straight to the build
+(R386): they measure engineering health, not the file. `env_probe` is the one
+part that is never skipped: it costs about 9 seconds, and a fresh sandbox with
+no scipy produces no build at all.
 
 ## Verifying a file you did not just build
 

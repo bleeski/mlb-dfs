@@ -2,6 +2,56 @@
 
 What changed in the engine, the tools and the contracts, when, and why.
 
+## 2026-09-22 — R386: the delivery-first contract. Under deadline the session relaxes S and records P, V stays a wall, and a BUILD inside T-30 skips the gate and the probe (roadmap Session 01)
+
+**Scope.**
+- `CLAUDE.md`: Autonomy heading; the Repair bullet (`--accept-downgrade`); a new "Delivery first" paragraph; "Ben's, not the session's" rewritten; Session start step 3; the T-schedule's T-30 rung. 15,695 → 16,945 bytes, 97 → 99 lines (budget 18,000 / 200).
+- `MLB_Classic.md` §2: the duplicate-roster line (F-3), the greedy/manual line split, and a new subsection "Delivery first: V, S and P" carrying the classes, F-1..F-4 and the R125(b)(c) decision.
+- `skills/generate-lineups/SKILL.md`: a new "Under a deadline" subsection ahead of `--deliver-by`; `--deliver-by` on every build (F-4); the overlap rung's duplicate-entry sentence (F-3); the blank-row sentence and the rung-2 note (F-2); the env-probe heading; the hygiene T-30 line.
+- `docs/backlog.md`: R386 collapsed to a CLOSED stub; R125 heading and a rider.
+- `docs/ROADMAP.md`: Session 00's SHA backfilled (786e73d); Session 01 Complete; NEXT → Session 02; ledger row; the Quick start line now names the NEXT block instead of a fixed number; Session 06's row carries the DG comment fix.
+- `CHANGELOG.md`: this entry. No engine code, no tests, no pins.
+
+**What was wrong.** Ben's 2026-09-22 instruction puts a legal, accessible file before the deadline ahead of optional research, simulation and quality gates. The contract still said otherwise in three places:
+- CLAUDE.md's "Ben's, not the session's" reserved any strategy change without a dead player, and "anything ... leaving a gate failing", for Ben. The audit (DD-05, §5) found 14 autobuild stop sites and one silent exit where that sentence, not DK, was the wall.
+- Session start ran the full gate and the solver probe before every BUILD, spending the live window on engineering health.
+- The skill stated two DK rules Ben's answers contradict. It called two identical entries in one contest "a DK rejection" (F-3: DK accepts them; Ben never wants them) and said DK "simply does not enter" an all-blank row (F-2: DK takes a partial file only with unresolved rows removed).
+
+**What shipped.**
+- **V, S and P** are defined in MLB_Classic.md §2. V (IDs, salaries, eligibility, slots, cap, entry mapping, template, locks, delivered bytes) is never faked or relaxed. S (exposure, stacks, overlap, reuse, anti-correlation, ownership, spend and bank targets) relaxes under deadline unless a never-relax instruction applies. P (optional feeds, degraded models, bookkeeping, the gate and probe, QA, simulation) is recorded and never alone withholds a V-valid file. A Mixed check is split; a failure the session cannot place is V. An S or P failure ships review-grade and never removes the file. "Upload-ready" is unchanged.
+- **CLAUDE.md** gives the session S relaxation and P recording inside T-30. Ben keeps, at any clock, a V failure, anything needing `--force`, a pool reduction, the crosswalk refusal and the labels. Outside a deadline he also keeps strategy changes and S or P gates left failing. autobuild is named as still pre-R386, so its S and P stops under deadline are the session's to clear and only a V stop is a real question.
+- **Inside T-30** a BUILD skips `GATE` and `tools/solver_probe.py`. `env_probe` still runs: without scipy there is no file.
+- **`--accept-downgrade`** on an authorized repair is the session's call, and the file ships review-grade.
+- **F-1..F-4** are recorded in MLB_Classic.md §2 and summarized in CLAUDE.md. F-4 in practice: the skill says pass `--deliver-by <first lock>` on every build until Sessions 15-17 make it the default. The flag already exists and changes no delivered byte before T-6.
+- **R125(b)(c) decided.** (b) A labelled default posture ships review-grade only; contest identity stays V (R392, Session 21). (c) Classic S controls relax autonomously under deadline, never-relax held, every move counted (R391, Session 19). The fixed four-step order is retired, because audit §8 mandates no universal order and T-15 still opens every binding control at once.
+- **One reconciliation.** MLB_Classic.md said "greedy/manual fallback ... must remain `DO_NOT_UPLOAD`", which contradicted CLAUDE.md's T-6 hand-build and R272 repair. It now separates the allocator's greedy fallback (still `DO_NOT_UPLOAD`) from a hand-built file (review-grade, ships when `verify_export.py` and `preflight_upload.py` exit 0).
+
+**Judgment calls, stated so Ben can overrule them.**
+- "Under deadline" means inside T-30. The instruction did not define it. T-30 aligns it with the gate skip, gives one window, and leaves the T-schedule rungs to order the moves inside it.
+- `--force` stays Ben's. The preflight cannot yet tell a bookkeeping failure from a byte mismatch (the audit classes the manifest checks Mixed V/P; R388(c), Session 13, splits them). A file whose only preflight failures the session judges P is presented review-grade with each failure quoted, which the skill's exit-2 row already allows, and Ben decides at upload.
+
+**Left for the sessions that build the code.** Principles only, per the row. Three code-side copies of the corrected claims remain:
+- `deadline_governor.py` L101-108 calls a same-contest duplicate "a DK rejection". Session 06's row now carries the fix.
+- `build_slate.py` L295 and L1283, and the `test_core.py` L24394 docstring, say DK "simply does not enter" a blank row. These belong to Session 22 (R401, the removed-rows form).
+
+**The migrated register entry (R386, filed 2026-09-22 by R385).**
+- **What.** CLAUDE.md's "Ben's, not the session's" paragraph reserves any strategy change without a dead player and "anything ... leaving a gate failing" for Ben. The session-start protocol runs the full gate and the solver probe before every BUILD. Ben's 2026-09-22 instruction: on-time delivery of a legal, accessible file outranks optional research, simulation and quality gates.
+- **Why.** An S- or P-class stop at T-10 costs the slate. The audit found 14 autobuild stop sites and one silent exit where the instruction, not the platform, was the wall.
+- **Fix.** Principles only (the procedure lands with the code that performs it): define V/S/P in MLB_Classic.md; the session relaxes S and records P under deadline, and V stays a wall; inside T-30 a BUILD session skips the gate and the probe; `--accept-downgrade` on an authorized repair is the session's; record F-1..F-4 (docs/ROADMAP.md); record Ben's instruction as the decision halves of R125(b)(c).
+- **Acceptance.** `RootContractBudgetTests` and `PreflightContractDocumentation` stay green; CLAUDE.md stays at or under 18,000 bytes.
+
+**Verification.**
+- `UT test_core.RootContractBudgetTests`: 3 tests OK.
+- `python -m pytest tests/test_upload_integrity.py -k PreflightContractDocumentation -q`: 3 passed.
+- `/land` step 4 prose pins (`ChangelogDebt or AuditSkipHonesty or ClaimTool or EnvLock or SkillCacheDrift or RootContractBudget`): 45 passed.
+- `LINT`: exit 0.
+- Fixture evals: 7 PASS, eval 5 (`adversarial-multi-ticket-satellite`) FAIL on `/large_wta/`. That is the standing red R181 owns, and it fails identically in a clean worktree at 786e73d.
+
+**Gate.**
+- Before: `PASS  v2.26.0  41 modules  2380 tests  5 skipped`.
+- After: `PASS  v2.26.0  41 modules  2380 tests  5 skipped` (unchanged).
+- No pin moved; golden histogram unmoved; no engine logic touched. The five skips are the standing host conditions.
+
 ## 2026-09-22 — R385: one roadmap. `docs/ROADMAP.md` becomes the only queue, `docs/backlog.md` becomes the R-entry register, and the 2026-09-22 deadline-delivery audit is triaged into it (R386-R404 filed)
 
 **Scope.**

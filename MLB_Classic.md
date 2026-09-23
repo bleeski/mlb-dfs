@@ -69,11 +69,29 @@ Create legal DraftKings MLB Classic lineups that match the contest shape and, fo
 - Missing salary-row players are unrosterable; never substitute by name.
 - Locked players remain in their exact DraftKings slots.
 - Teams whose games have locked cannot be introduced into newly rebuilt slots.
-- Same-contest duplicate rosters are forbidden. Cross-contest reuse is allowed when strategically justified.
-- Greedy/manual fallback is diagnostic-only and must remain `DO_NOT_UPLOAD`.
+- Same-contest duplicate rosters are forbidden: Ben's never-relax rule, not a DK rule (F-3 below). Cross-contest reuse is allowed when strategically justified.
+- The allocator's greedy fallback is diagnostic-only and must remain `DO_NOT_UPLOAD`. A hand-built or hand-repaired file is review-grade and ships only when `tools/verify_export.py` and `tools/preflight_upload.py` both exit 0 on its bytes (CLAUDE.md T-schedule and Autonomy, R272).
 - Upload-ready output requires `workflow_valid=True`, `selection_certified=True`, and `allocation_certified=True` when joint allocation is used.
 - Late swap mutates only explicitly authorized Entry IDs (§11).
 - A player absent from the late-swap status map is never treated as unlocked (§11).
+
+### Delivery first: V, S and P (Ben, 2026-09-22; R386)
+
+A legal, accessible file before the effective deadline outranks optional research, weather and odds lookups, simulation, and quality gates. The first file is a valid one; everything after it improves that file or leaves it alone. Every check is exactly one of three classes. A Mixed check is split into its facts and never disabled wholesale, and a failure that cannot be placed is V. The per-gate inventory is `docs/2026-09-22_deadline_delivery_qa.md` §3; the code taxonomy lands with R388 (`docs/ROADMAP.md` Session 05).
+
+- **V, submission validity or authority.** Player IDs, salaries, eligibility, slots, the $50,000 cap, entry mapping, template structure, locked and unauthorized selections, and the exact delivered bytes. Verified or repaired from authoritative inputs; never faked and never relaxed, at any clock.
+- **S, strategic preference.** Exposure, stacks, overlap, candidate reuse, anti-correlation, ownership and leverage, salary-spend and bank targets. Under deadline the session relaxes them without asking, unless a current explicit never-relax instruction applies, and records every move with its before and after value.
+- **P, process, model confidence, bookkeeping, research completeness.** Optional feeds, degraded models, provenance sidecars, the test gate and solver probe, strategic QA, simulation. Recorded truthfully, and never alone a reason to withhold an independently V-valid file.
+
+An S or P failure changes the label to review-grade; it never removes the file. "Upload-ready" keeps its meaning: a certified Classic export with `workflow_valid`, `selection_certified` and `allocation_certified` all passing. Under deadline means inside T-30 (CLAUDE.md T-schedule); outside it, an S or P failure is still Ben's to decide.
+
+**Ben's facts, 2026-09-22** (`docs/ROADMAP.md`, "Facts Ben answered").
+- **F-1.** Ben's upload takes 5 minutes, so the effective deadline is first lock minus 5 minutes (T-5).
+- **F-2.** DK accepts a partial DKEntries file only when the unresolved rows are removed. Blank rows are not the partial form. Partial salvage (R401, Session 22) will drop unresolved rows and report their Entry IDs as unresolved coverage, not invalidity.
+- **F-3.** DK accepts one lineup in two entries of one contest; Ben never wants it. Distinct lineups per contest is an S control with operator never-relax authority, kept under every deadline. The engine already enforces it; only its stated authority changes.
+- **F-4.** Deadline-aware delivery applies to every build, not only with `--deliver-by`. This retires R290's promise that no delivered byte changes without the flag. Sessions 15-17 make it the default; until then a build is deadline-aware only when `--deliver-by` is passed.
+
+**R125(b) and (c) are decided; the code is not built.** Ben's delivery-first instruction is the decision both halves waited on. (b) A known Entry ID and contest whose name matches no posture may take a stated default posture, recorded in the brief and review-grade only; contest identity stays a V gate. R392 builds it (Session 21). (c) Classic S controls relax autonomously under deadline, never-relax controls held and every move counted in the brief. R391 builds it (Session 19). The fixed four-step order R125(c) proposed is retired: the audit's bounded-recovery contract (§8) takes the smallest useful recovery that can finish and mandates no universal order, and CLAUDE.md's T-15 rung still opens every binding control at once.
 
 ## 3. Phase 0: choose the correct operating mode
 
