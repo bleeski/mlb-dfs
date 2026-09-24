@@ -34,3 +34,13 @@ answer), so none of them reached `--odds`. The build shipped with
 Savant expected stats at 24.9 days). This is a host or config gap, not an
 engine bug. It should go in `docs/hosts.md` so a BUILD session stops
 hunting for a source after the first two blocks.
+
+Resolved in-slate by R236's paste route. `www.actionnetwork.com` was also a
+403 CONNECT from this container, which blocks the pre-installed Chromium as
+well, so the browser is no workaround here. Ben pasted the page's table at
+13:23. `odds_from_paste.py` priced 4 of 4 games (book recorded as
+`actionnetwork_page` because the paste named no book). The rebuild
+certified at 13:25 with `f1_games_priced: 4`, and `input_confidence`
+dropped to `degraded` (Savant only). New sha256 d3c39609...0dea supersedes
+f031b666. Lesson for the skill: at a blocked odds host, ask Ben for the
+paste at once rather than trying other sites.
