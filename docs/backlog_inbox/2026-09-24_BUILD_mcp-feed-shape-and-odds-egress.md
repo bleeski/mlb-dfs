@@ -44,3 +44,26 @@ certified at 13:25 with `f1_games_priced: 4`, and `input_confidence`
 dropped to `degraded` (Savant only). New sha256 d3c39609...0dea supersedes
 f031b666. Lesson for the skill: at a blocked odds host, ask Ben for the
 paste at once rather than trying other sites.
+
+**3. Pitcher projections never see the market.** Every SP row in run
+20260924T172527Z_8eba2f47 has F1 = F4 = F5 = 1.0. `projection_builder.py:660`
+says the opposing total is priced "elsewhere", but nothing on the pitcher rows
+moved, so the note there reads as a double-count guard with no primary count
+behind it. The result: Tanner Gordon (at Coors against ARI's 5.33 implied,
++163) and Tyler Phillips (against CHC's 3.87, +178) projected identically
+(Base 8.03 vs 8.05, Ceiling 11.06 vs 11.03), and Gordon won on $700 of
+salary. Proposed for DEV: price the opponent's implied total and the win
+share into SP rows, and verify the "elsewhere" claim before building on it.
+
+**4. There is no engine lever for "one lineup in a named contrarian stack."**
+Ben's 2026-09-23 fragment was reapplied here: "what if our priors are wrong,"
+as one entry carrying a MIA secondary stack (MIA was 0/12 at 3.13 implied).
+The R406 sleeves seated no MIA stack. I hand-solved entry 5267953193 with
+`optimizer_v3.build_single_lineup` (MIA >= 3 locked, CWS 4 primary), enforced
+the portfolio caps by hand, and recorded it through `record_delivery`
+(review_grade, refinement=True). The result: sha256 d98252ad, verify_export
+and preflight both exit 0, and the consensus cluster at 5/12 against the
+build's 0.40 cap (S, relaxed inside T-30 and recorded). Proposed for DEV: a
+`--stack-sleeve '{"entries":1,"team":"MIA","min":3,"role":"secondary"}'`
+alongside `--captain-sleeve`, so this runs through certification rather than
+around it.

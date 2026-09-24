@@ -3,30 +3,9 @@
   "contest_allocator": "v1.12",
   "execution_pipeline": "v1.17",
   "git_dirty": false,
-  "git_sha": "29145b6ab7e87ef33a2396d74fbbd98c4b8dd0bc"
+  "git_sha": "a9688e4c1fa69fb67965a05632b220f2d54e42d3"
  },
- "controls": {
-  "five_stack_min_size": 5,
-  "max_consensus_cluster_share_pct": 0.4,
-  "max_pitcher_exposure_pct": 0.43,
-  "max_player_exposure_pct": 0.35,
-  "max_primary_stack_exposure_pct": 0.35,
-  "max_shared_players": 6,
-  "max_sp_pair_repetition": 1,
-  "max_team_exposure_pct": 0.55,
-  "min_five_stack_share_pct": 0.0,
-  "player_game_by_id": {
-   "distinct_values": 4,
-   "players_mapped": 80,
-   "wired": true
-  },
-  "player_team_by_id": {
-   "distinct_values": 8,
-   "players_mapped": 80,
-   "wired": true
-  },
-  "primary_stack_min_size": 4
- },
+ "controls": {},
  "date": "2026-09-24",
  "egress": "egress: statsapi unreachable, odds unreachable, savant unreachable, mlb-lineups unreachable, fangraphs unreachable (curl), open-meteo unreachable",
  "egress_source": "session_start 2026-09-24T17:14:31+00:00",
@@ -209,15 +188,15 @@
    "entry_id": "5267953193",
    "filled": true,
    "roster_ids": [
-    "44261255",
     "44261000",
-    "44261009",
-    "44261033",
-    "44261090",
+    "44261003",
+    "44261080",
+    "44261020",
+    "44261076",
     "44261012",
-    "44261007",
-    "44261040",
-    "44261067",
+    "44261035",
+    "44261011",
+    "44261027",
     "44261045"
    ]
   },
@@ -261,8 +240,8 @@
   }
  ],
  "entries_binding": {
-  "source": "outputs/2026-09-24/DO_NOT_UPLOAD_DKEntries_1410_4g.csv",
-  "source_sha256": "d3c39609fa70f90fafefa5feea0744a3a57f8d7fd0707f84f9f5f5a021480dea",
+  "source": "outputs/2026-09-24/DKEntries_1410_4g_mia.csv",
+  "source_sha256": "d98252adc6548a8fc4bb1115bab6325079abd381267a1c3f6dd9b81fdb828979",
   "status": "bound"
  },
  "host": {
@@ -273,7 +252,7 @@
  "kind": "delivery",
  "labels": "deterministic review proxies and labeled priors only; never ROI, win rate, cash rate, or probability",
  "manifest_row": {
-  "certification": "certified",
+  "certification": "review_grade",
   "contest_ids": [
    "195995357",
    "195995365",
@@ -283,39 +262,26 @@
    "195996455",
    "196016370"
   ],
-  "contest_names": [
-   "MLB $1 Double Up (Early)",
-   "MLB $100 Dime Time [Just $0.10!] (Early)",
-   "MLB $1K Quarter Jukebox [Just $0.25!]  (Early)",
-   "MLB $300 Solo Shot (Early)",
-   "MLB 40x Micro Booster [Top 5 Win $10] (Early)",
-   "MLB Satellite to $20 NFL Fantasy Football Millionaire (Early)",
-   "MLB Satellite to 9-29 $20 Postseason Opener (Early)"
-  ],
+  "contest_names": [],
   "contest_type": "classic",
-  "delivered_file": "outputs/2026-09-24/DKEntries_1410_4g.csv",
+  "delivered_file": "outputs/2026-09-24/DKEntries_1410_4g_mia.csv",
   "entries": 12,
-  "notes": "",
+  "notes": "Ben 2026-09-24 13:31 ET: devote one lineup to 'what if our priors are wrong' with a MIA secondary stack. Parent d3c39609 (certified). Entry 5267953193 (Quarter Jukebox) re-solved by optimizer_v3.build_single_lineup on the parent run's projections: MIA>=3 locked (top-6 order trios), CWS4 primary, SP pair Thornton/Rocker; portfolio caps enforced by hand (player 0.35, pitcher 0.43, primary stack 0.35, sp_pair_repetition 1). Hand-inserted entry, never certified: review-grade.",
   "projection_tier": "enriched",
-  "recorded_utc": "2026-09-24T17:25:28.024463+00:00",
+  "recorded_utc": "2026-09-24T17:35:50.815640+00:00",
   "run_id": "20260924T172527Z_8eba2f47",
-  "sha256": "d3c39609fa70f90fafefa5feea0744a3a57f8d7fd0707f84f9f5f5a021480dea",
+  "sha256": "d98252adc6548a8fc4bb1115bab6325079abd381267a1c3f6dd9b81fdb828979",
   "slate_tag": "1410_4g",
   "status": "candidate",
   "strategy_state": {
-   "bank_warnings": [],
-   "counts": {
-    "built": 24,
-    "du_relaxation_high_water": 0,
-    "requested": 24
-   },
-   "evidence": "recorded",
-   "state": "relaxed",
-   "warnings": []
+   "counts": {},
+   "state": "unknown"
   }
  },
- "recorded_utc": "2026-09-24T17:25:28.026629+00:00",
- "relaxations": {},
+ "recorded_utc": "2026-09-24T17:35:51.095164+00:00",
+ "relaxations": {
+  "hand_inserted_entries": 1
+ },
  "run": {
   "certification": {
    "allocation_certified": true,
