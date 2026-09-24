@@ -862,7 +862,7 @@ def format_typed_remedy(remedy) -> str:
         how = {"raise_cap": f"; stopped at its {remedy.get('cap')}-candidate cap, "
                             f"raise --bank-max-candidates",
                "at_ceiling": f"; at its {remedy.get('cap')}-candidate ceiling, "
-                             f"re-running adds nothing"}.get(remedy.get("lever"), "")
+                             f"re-running cannot grow it"}.get(remedy.get("lever"), "")
         return (f"grow the bank ({remedy.get('jobs_attempted')} of "
                 f"{remedy.get('jobs_total')} jobs attempted{how})")
     if remedy.get("kind") in ("no_single_control", "undetermined"):
@@ -1076,9 +1076,8 @@ def _merge_bank_slice_reports(reports: list) -> dict:
          "max_candidates": r.get("max_candidates")}
         for r in reports
     ]
-    # R415. The last slice's `stop_reason` is not the bank's: a five-stack slice
-    # stopped at its cap share while the four-stack slice ran out of clock is a
-    # bank the cap bound. So the reason is resolved over every slice.
+    # R415. The last slice's `stop_reason` is not the bank's, and neither is a
+    # share-capped slice's: see `bank_stop_reason`.
     merged.pop("stop_reason", None)
     merged["bank_stop_reason"] = bank_stop_reason(reports)
     return merged
@@ -1096,8 +1095,10 @@ def resolve_bank_cap(n_entries: int, explicit: Optional[int] = None,
                      budget_s: Optional[float] = None) -> dict:
     """R415. The sliced bank's candidate cap and where it came from.
 
-    ``explicit`` is ``--bank-max-candidates``, honored as given; otherwise the
-    host default from ``repo_env.bank_max_candidates``. Both carry the host
+    ``explicit`` is ``--bank-max-candidates``, honored as given and recorded
+    ``operator_flag`` whoever passed it (autobuild's decision log says when it
+    was the supervisor); otherwise the host default from
+    ``repo_env.bank_max_candidates``. Both carry the host
     facts behind the default, so a brief that says ``candidate_cap`` also says
     which number bound and what raising it would cost.
     """
@@ -1125,12 +1126,27 @@ BANK_STOP_REASON_ORDER = ("candidate_cap", "time_budget", "jobs_retryable",
 
 
 def bank_stop_reason(reports: list) -> Optional[str]:
-    """The bank-level stop reason over the slices that share the cap.
+    """The bank-level stop reason over the slices that share one cache.
 
-    None when no slice reported one (a report from before R415, or no slices),
-    which callers read as "unknown", never as exhausted.
+    Each slice's cap counts the WHOLE cache, and the five-stack slice and the
+    ordinary slices beside a consensus bucket carry a SHARE of the bank's cap.
+    So a slice reading ``candidate_cap`` means the bank's cap bound only when
+    the cache reached the largest cap of any slice still holding unanswered
+    jobs; below it, the slice with the full cap stopped for its own reason and
+    a re-run grows the bank. None when no slice reported a reason (a report
+    from before R415, or no slices), which callers read as unknown.
     """
     seen = {r.get("stop_reason") for r in reports if r.get("stop_reason")}
+    if "candidate_cap" in seen:
+        open_caps = [int(r["max_candidates"]) for r in reports
+                     if r.get("max_candidates") is not None
+                     and not r.get("job_list_exhausted")]
+        total = max((int(r.get("total_candidates") or 0) for r in reports), default=0)
+        if not open_caps or total >= max(open_caps):
+            return "candidate_cap"
+        seen.discard("candidate_cap")
+        if not seen:
+            return "candidate_cap"
     for reason in BANK_STOP_REASON_ORDER:
         if reason in seen:
             return reason
@@ -1186,12 +1202,12 @@ def bank_growth_lever(bank_report: Mapping[str, Any] | None) -> dict:
     if cap_block.get("at_ceiling"):
         return {"stop_reason": reason, "lever": "at_ceiling", "cap": cap,
                 "text": f"The bank is at its {cap}-candidate ceiling ({source}), so "
-                        f"re-running adds nothing. Past it a refusal's full-bank "
+                        f"re-running cannot grow it. Past it a refusal's full-bank "
                         f"retry was measured beyond the allocator's 30s limit; the "
                         f"remedies below are the ones left."}
     return {"stop_reason": reason, "lever": "raise_cap", "cap": cap,
             "text": f"The bank stopped at its {cap}-candidate cap ({source}), so "
-                    f"re-running the same command adds nothing: raise "
+                    f"re-running the same command cannot grow it past the cap: raise "
                     f"--bank-max-candidates (autobuild doubles it, up to "
                     f"{cap_block.get('full_solve_ceiling') or 'the ceiling'})."}
 
@@ -3314,7 +3330,7 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
                 and not bank_report["job_list_exhausted"]):
             print(f"BANK AT ITS CAP: {len(cache)} candidates against a "
                   f"{_total_max}-candidate cap ({_bank_cap['source']}); "
-                  f"re-running the same command adds nothing, so this build "
+                  f"re-running the same command cannot grow it past the cap, so this build "
                   f"solves on the bank it has. Raise --bank-max-candidates to "
                   f"grow it (R415).", file=sys.stderr)
         if bank_resume_warranted(bank_report, _thin_by_count or _thin_by_pairs):

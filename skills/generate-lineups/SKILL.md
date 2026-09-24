@@ -1032,8 +1032,8 @@ lock.
 this file is the whole answer; run it rather than diagnosing an import error.
 
 **On exit 10 the bank is thin, not wrong.** Run the identical command again; each
-pass adds to it. When `solve.bank_stop_reason` is `candidate_cap`, a re-run adds
-nothing: raise `--bank-max-candidates` (R415). Shrink the bank, never the pool.
+pass adds to it. When `solve.bank_stop_reason` is `candidate_cap`, a re-run cannot
+grow it past the cap: raise `--bank-max-candidates` (R415). Shrink the bank, never the pool.
 
 ## Where the files come from
 

@@ -1236,11 +1236,18 @@ def _infeasibility_remedies(
         # R415. A bank that stopped at its candidate cap does not grow on a
         # re-run: the next slice breaks before its first job. Say which lever.
         cap = (bank_report or {}).get("bank_cap") or {}
-        if (bank_report or {}).get("bank_stop_reason") == "candidate_cap":
+        if ((bank_report or {}).get("bank_stop_reason") == "candidate_cap"
+                and cap.get("at_ceiling")):
+            lever = (
+                f"It is at its {cap.get('value')}-candidate ceiling "
+                f"({cap.get('source') or 'cap'}), so re-running cannot grow it; past "
+                f"it a full-bank retry was measured beyond this solve's 30s limit."
+            )
+        elif (bank_report or {}).get("bank_stop_reason") == "candidate_cap":
             lever = (
                 f"It stopped at its {cap.get('value')}-candidate cap "
                 f"({cap.get('source') or 'cap'}), so re-running the same command "
-                f"adds nothing: raise --bank-max-candidates."
+                f"cannot grow it past the cap: raise --bank-max-candidates."
             )
         else:
             lever = ("Re-run the same build command; it exits 10 and resumes into "

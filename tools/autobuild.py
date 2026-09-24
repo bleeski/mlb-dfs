@@ -692,6 +692,9 @@ def main() -> int:
                 bank_max_candidates=dec.bank_max_candidates)
     elif getattr(a, "_resumed_bank_max_candidates", None):
         dec.bank_max_candidates = int(a._resumed_bank_max_candidates)
+        dec.add(0, "resumed_bank_max_candidates",
+                "restored from the resumed run's log; the cap its last attempt "
+                "forwarded", bank_max_candidates=dec.bank_max_candidates)
     dec.user_controls = dict(user_controls)
     if user_controls:
         dec.add(0, "operator_controls",
@@ -955,9 +958,18 @@ def main() -> int:
                     gate_asserted=GATE_IMPLIED_BY_POOL_OVERRIDE)
             continue
 
-        # A refusal. Grow the bank before touching any control.
+        # A refusal. Grow the bank before touching any control, unless a
+        # SLATE-LEVEL check failed: that is arithmetic no bank growth clears
+        # (R286, SKILL.md), so the floor below goes first. R415 review: once
+        # the refusal brief's bank became readable, growth ran ahead of a
+        # failing floor and could spend every attempt re-running.
         bank = refusal_bank_report(brief)
-        if bank.get("job_list_exhausted") is False:
+        slate_failed = any(
+            c.get("passed") is False
+            for c in (((brief.get("feasibility") or {}).get("checks")) or []))
+        if slate_failed:
+            pass
+        elif bank.get("job_list_exhausted") is False:
             if bank.get("bank_stop_reason") == "candidate_cap":
                 # R415. A re-run cannot grow a bank that stopped at its cap, so
                 # the lever is the cap itself. Search effort: CLAUDE.md
@@ -967,7 +979,8 @@ def main() -> int:
                     dec.bank_max_candidates = raised["to"]
                     dec.add(attempt, "raise_bank_cap",
                             "refusal against a bank that stopped at its candidate "
-                            "cap; re-running the same command adds nothing, so "
+                            "cap; re-running the same command cannot grow it past "
+                            "the cap, so "
                             "the cap is raised. Search effort, not strategy "
                             "(CLAUDE.md delegates growing the bank)",
                             jobs_attempted=bank.get("jobs_attempted"),

@@ -955,6 +955,12 @@ def extend_bank(
     # `job_list_exhausted` alone cannot tell them apart; it reads False for both.
     stopped_by: Optional[str] = None
     for pair, team in jobs:
+        # The cap binds only on a job that would run: an answered job is
+        # skipped first, so a fully answered list re-run at its cap still reads
+        # exhausted rather than capped (R415 review).
+        key = _job_key(pair, team, lock_sig, conditions_sig)
+        if key in cache.attempted:
+            continue
         if max_candidates is not None and len(cache) >= max_candidates:
             exhausted = False
             stopped_by = "candidate_cap"
@@ -964,9 +970,6 @@ def extend_bank(
             exhausted = False
             stopped_by = "time_budget"
             break
-        key = _job_key(pair, team, lock_sig, conditions_sig)
-        if key in cache.attempted:
-            continue
         attempted_now += 1
         attempt_started = time.monotonic()
         status = _new_solver_status()

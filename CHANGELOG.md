@@ -108,11 +108,24 @@ What the table says:
   - AB L417/L1089 and BS L3722 are comments.
 
 **Tests.**
-- Fourteen new tests: nine `BankCapGrowthTests` and five `AutobuildBankCapTests`.
-- Nineteen hand mutations each went red, and each was restored byte for byte: the scaling, the 12 floor, the ceiling clamp, the override, the flag door, the cap stop, the merge, the exit-10 gate, both lever texts, the refusal read, the raise, its clamp, the resume, the forward, the direct-door branch, its once-only guard, its BANK-LIMITED test, and the refusal's door key.
+- Seventeen new tests: eleven `BankCapGrowthTests` and six `AutobuildBankCapTests`.
+- Twenty-three hand mutations each went red, and each was restored byte for byte: the scaling, the 12 floor, the ceiling clamp, the override, the flag door, the cap stop, the merge (twice), the exit-10 gate, both lever texts, the allocator's ceiling text, the refusal read, the raise, its clamp, the resume, the forward, the direct-door branch, its once-only guard, its BANK-LIMITED test, the refusal's door key, the cap check's order, and the slate-check order.
 - R374's regex test pins the new source and the Cowork identity.
 - The golden replay calls `bank_max_candidates(n, budget_s=130)`, which is the same 216 at 18 entries, so it stays host-independent. It passes 9/9 against its frozen baseline, and the histogram did not move.
-- `test_core` pin: 1589 -> 1603. Gate: `PASS  v2.26.0  43 modules  2606 tests  5 skipped  {test_core 1603/1603 (4 skipped) skipped_in_place; test_showdown 337/337 (1 skipped) skipped_in_place}  [tests.test_core ran its pinned 1603 but 4 were SKIPPED, so the count proves nothing about coverage.; tests.test_showdown ran its pinned 337 but 1 were SKIPPED, so the count proves nothing about coverage.]` (the five skips are the absent optional files every host lacks).
+- `test_core` pin: 1589 -> 1606. Gate: `PASS  v2.26.0  43 modules  2609 tests  5 skipped  {test_core 1606/1606 (4 skipped) skipped_in_place; test_showdown 337/337 (1 skipped) skipped_in_place}  [tests.test_core ran its pinned 1606 but 4 were SKIPPED, so the count proves nothing about coverage.; tests.test_showdown ran its pinned 337 but 1 were SKIPPED, so the count proves nothing about coverage.]` (the five skips are the absent optional files every host lacks).
+
+**The review.** A read-only general-purpose subagent reviewed the diff; the Skill tool's security hook fails under `/bin/sh` on this host. It reproduced five findings, and all five are fixed with a test each.
+1. *Blocking: the merge called a share-capped slice a capped bank.* Every slice's cap counts the whole cache, and the five-stack slice and the ordinary slices beside a consensus bucket carry a share of the cap. So `candidate_cap` from a share slice, beside a full-cap slice that ran out of clock, suppressed exit 10 and said "re-running adds nothing" on a bank that grew +5 on the re-run. `bank_stop_reason` now reports `candidate_cap` only when the cache reached the largest cap of any slice with unanswered jobs. The test that pinned the wrong combination is corrected, and the reproduction runs through the real `extend_bank`.
+2. *Blocking: autobuild grew the bank ahead of a failing slate check.* Once the refusal's bank became readable, a failing `shared_players_floor` against a clock-bound partial bank re-ran the identical command until `--max-attempts` ran out, and the floor was never applied. That breaks R286's order and SKILL.md's "fix it first". A failing slate-level check now goes before any bank growth.
+3. *Blocking: a new test read the ambient host.* `bank_max_candidates(32, env={})` detects Windows from `os.name` on Ben's machine and answers 1,536. It now names `HOST_UNKNOWN`, and the class passes with `detect_host` forced to Windows.
+4. *The allocator had no at-ceiling wording.* At `bank_cap.at_ceiling` its sentence still said "raise --bank-max-candidates". It now says the bank is at its ceiling.
+5. *A fully answered list re-run at its cap read capped.* The cap break ran before the answered-job skip, so the list read `candidate_cap` with 16/16 answered. The cap now binds only on a job that would run. The `exhausted = False` half predates R415.
+
+Also from the review:
+- "Re-running adds nothing" is now "cannot grow it past the cap", because the relative-cap sleeves can still add a few, as the verification showed (+20).
+- `resolve_bank_cap` documents that `operator_flag` means the flag was present, whoever passed it.
+- A `--resume` that restores the cap now logs `resumed_bank_max_candidates`.
+- `data/agent_runs/2026-09-24/` is this session's hook-written subagent record. Earlier sessions committed theirs as `record:` commits; it rides this one.
 
 **Found and filed.**
 - R416 (Session 103): on the direct door, R407's confidence re-solve rebuilds `run_slate`'s auto-bank with a second full window, because `run_bank_budget` is computed once before the first `_solve`. The 06-28 fixture at the default 600s ran past 17 minutes before I killed it. At autobuild's 105s it ran 219s standalone, and under autobuild it died at 195s with no brief. It is the direct-door blocker for 10+ game slates.
