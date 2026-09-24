@@ -3827,6 +3827,19 @@ for anything retrospective; forward-going, the snapshots are the record.
   - It happened on 2026-09-24 when this session ran the 06-03 fixture beside the 06-28 one.
   - Fix: hand `run_slate` the tagged staged copy, or refuse a second same-date Classic build while one holds the slate.
 
+### R419. autobuild never presents a file an exit-3 brief delivered, and its timeout stops ignore a live baseline (P1, S) | new 2026-09-24, found by Session 11's plan review | Roadmap: Session 106
+
+- **What.** Since R389(b) every Classic build delivers a baseline before research. A refusal after it keeps exit 3, so autobuild still grows the bank, and the brief carries the delivered file under `baseline` (`current: true`). R388(d)'s UNCERTIFIED file rides the same way under `review_grade_export`.
+  - autobuild reads a delivered file only on exit 7 (`autobuild.py` `last_usable_artifact`, about L910).
+  - An attempt budget spent on exit 3, and `build_timed_out` or an off-contract stop (about L849-880), end with no file named, though the baseline sits live in the manifest.
+- **Fix.** On every stop, read the latest brief's `baseline` (or `review_grade_export`) and present the current file with its sha256 and label. A stop after a kill reads `upload_manifest.current_deliveries` for the slate.
+- **Acceptance.** An autobuild run whose attempts all refuse after a baseline ends naming the baseline file and its sha.
+
+### R420. `run_evals.py`'s repo-surface guard omits the tracked `data/deliveries/` (P2, XS) | new 2026-09-24, found by Session 11's plan review | Roadmap: Session 107
+
+- **What.** `RepoSurfaceGuard.ROOTS` is `("data/slates", "outputs")` (`skills/generate-lineups/evals/run_evals.py` L219). Every eval build writes delivery and refusal records under `data/deliveries/<date>/`, which is tracked, and every session since R369 has removed them by hand.
+- **Fix.** Add `data/deliveries` to `ROOTS`, and pin it with the guard's own test.
+
 ### R416. CLOSED 2026-09-24 -- SHIPPED, roadmap Session 103, entry in CHANGELOG.md
 
 On the direct door every re-solve rebuilt `run_slate`'s auto-bank with the window's whole budget, because `build_slate` computed the budget once and `run_slate` kept no bank. On 06-28 11g that was 220s against `--max-seconds 105` and 1,216s against 600.
@@ -5362,24 +5375,23 @@ Principles only, no engine code. V, S and P are defined in `MLB_Classic.md` §2 
 - **(d) landed (Session 09).** `dk_entries_manager.classify_export_failures` places every failing check, and `execute_portfolio` gives an S/P-only, essential-valid refusal a `review_grade_export`; `run_slate` mirrors it as `DKEntries_<tag>_UNCERTIFIED_<run>.csv`, labelled `review_grade_uncertified`. (c) is what lets it place MIXED gates: until the validator splits their facts, a MIXED gate with a V fact (weather, lineup, pitcher audit, projection schema, roster legality, hash binding) is unplaced and so V, and its refusal stays `DO_NOT_UPLOAD_`.
 - **Boundary.** "Upload-ready" keeps CLAUDE.md's meaning. A failed flag is never set true.
 
-### R389. No entry-mapped baseline exists before research, the bank and joint allocation (Package B, baseline half) (P0, M across three sessions) | new 2026-09-22, audit DD-01; (a) SHIPPED 2026-09-24 as roadmap Session 10, migrated to CHANGELOG.md | Roadmap: (b) Session 11, (c) 12
+### R389. No entry-mapped baseline exists before research, the bank and joint allocation (Package B, baseline half) (P0, M across three sessions) | new 2026-09-22, audit DD-01; (a) SHIPPED 2026-09-24 as roadmap Session 10, (b) SHIPPED 2026-09-24 as roadmap Session 11, both migrated to CHANGELOG.md | Roadmap: (c) Session 12
 
-- **What.** `run_classic` resolves reference data, venues, odds, weather, enrichment and leverage before any solve, discards its timing probe's lineup (BS L3160), and first writes a file inside `execute_portfolio` (reproduced on 06-03 at b14a946, Session 10). `run_showdown` has no early publication either.
-- **(a) landed (Session 10).** `mlb_engine/pipeline/baseline.py` is the core. It writes nothing (measured by a Python-level audit hook). `build_baseline(salary_csv, frame, entries_csv= | requirements=, deadline= | budget_s=, max_opposing_hitters_per_sp=, target_distinct=)` returns a frozen `BaselineResult`:
-  - the probe as candidate #1, an in-memory grid (`_MemoryBankCache` + one `extend_bank`), and distinct fill solves;
-  - `assignments` per contest, distinct by player set, skipping a contest's held lineups;
-  - a typed short count (`status`, `stop_reason`, `required`, `target`, `distinct`, `short`, `target_met`, `uncovered`, `by_contest`);
-  - `allocator_candidates(frame, requested_n, contest_shapes)`, the payload for `run_slate(candidates_override=...)`.
+- **What.** `run_showdown` has no early publication: its first file is the thesis ladder's (BS `run_showdown`). Classic's half landed in Sessions 10 and 11.
+- **What (c) inherits from (b).** It reuses these, and does not redefine them:
+  - `upload_manifest.BASELINE_LINEAGE`. Supersession keys on `(contest_type, slate_tag, lineage)`, so a Showdown baseline row needs no new key.
+  - `_BASELINE` and `publish_baseline`'s contract: presented and kept in `_LAST_USABLE` only after an exact-bytes re-read, never inside a solve's result.
+  - The rule that the last `FILE` line is the current file.
 
-  `unenriched_frame` is the one unenriched emergency_proxy frame, and `run_classic`'s ValueError branch calls it. `construction_label` is never a certification value: `upload_manifest.passed_its_gates` reads an unknown label as passing.
-- **(b) Classic, baseline first.**
-  - `run_classic` calls the core after the pool-blocker refusals (`build_slate.py` L2986-3003, `n_entries` at L3014) and before `resolve_reference_data` (L3016), on `unenriched_frame` from the pool's `projection_rows`, with the build's `--max-opposing-hitters-per-sp`.
-  - The probe at L3160 is the one to retire. The core's `probe.wall_s` is a timing proxy on the unenriched frame, not the enriched `single_s`, so measure before swapping one for the other.
-  - Export, validate on exact bytes, and publish under the baseline's own name and manifest lineage.
-  - Distinct-fill lineups share up to nine players and the postures cap `max_shared_players` at 5-6, so allocation needs never-relax-aware open controls or `target_distinct` spares.
-  - Rider: `build_single_lineup` has no gap parameter (`milp` gets `time_limit` and `disp` only). If a big-slate baseline measures solve time that a gap would buy back, add the knob with PROBE; Session 10 found no need on 06-28 11g (about 0.4s a grid solve).
-- **(c) Showdown, before the ladder.**
-- **Acceptance.** A crash after the baseline delivers the baseline, and the baseline is essential-valid on its exact bytes.
+  Showdown always ships review-grade, so it needs no new label, but its row should carry the baseline lineage so the thesis file supersedes nothing Ben holds.
+- **(c) Showdown, before the ladder.** After pool pricing and before the thesis ladder, `run_showdown` writes a baseline:
+  - one thesis-free solve per incomplete reserved row;
+  - complete rows preserved;
+  - the both-team rule enforced;
+  - validated, and published review-grade under its own name in the baseline lineage.
+
+  The ladder can replace it only with a validated file.
+- **Acceptance.** A crash after the Showdown baseline delivers it; the ladder's file supersedes nothing Ben holds; the baseline passes the Showdown template check on its exact bytes.
 
 ### R390. A thin sliced bank returns exit 10 before the deadline governor or any recovery is consulted (P0, S) | new 2026-09-22, audit DD-03 | Roadmap: Session 18
 

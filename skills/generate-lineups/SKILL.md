@@ -251,7 +251,7 @@ to `outputs/<date>/build_brief.json`.
 Exit codes: `0` certified, `10` partial progress saved (run the exact same command
 again, it resumes), `3` built but did not certify, `4` a precondition was never
 met (inputs missing, solver missing, or the slate's first lock already passed), `7`
-the file passed its checks and a later stage failed: hand over the `FILE` line's file.
+the file passed its checks and a later stage failed: hand over the last `FILE` line's file.
 
 An exit of `10` is normal on a big slate: the clock stopped the bank, it persists,
 so run it again. A bank stopped at its CAP never exits 10; see below (R415).
@@ -348,6 +348,8 @@ keyboard. Inside T-30:
   it as a wall, so read the gate it names before deciding which class it is.
 - **An S or P failure ships review-grade, never upload-ready.** An S/P-only
   refusal lands `UNCERTIFIED` in `outputs/`: `references/review_grade.md`.
+- **Every Classic build ships a baseline first** (`DKEntries_<tag>_BASELINE_<run>.csv`,
+  review-grade), and the last `FILE` line is the current file: `references/baseline.md`.
 - **`--force` on the preflight stays Ben's at every clock.** The preflight
   does not yet tell a bookkeeping failure from a byte mismatch (R388(c),
   Session 13), so a file whose only preflight failures you judge P is
