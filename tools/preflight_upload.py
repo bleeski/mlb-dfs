@@ -172,6 +172,13 @@ REVIEW_GRADE_REASONS = {
     "review_grade_uncertified": (
         "The build failed only S or P gates and every V gate passed on these "
         "bytes, so it ships review-grade and uncertified (R388(d))."),
+    # R389(b). Mirrors `upload_manifest.BASELINE_LABEL`.
+    "review_grade_baseline": (
+        "This is the baseline every Classic build publishes before research "
+        "(or a late swap of one): built on the unenriched frame with every "
+        "portfolio cap opened and odds and weather assumed, so it ships "
+        "review-grade (R389(b)); the build's enhanced file, when there is one, "
+        "carries its own label from its own gates."),
 }
 CLASSIC_MAX_HITTERS_PER_TEAM = 5
 CLASSIC_MIN_GAMES = 2
@@ -1595,8 +1602,16 @@ def check_manifest(entries_path: Path, entries: Sequence[EntryRow],
                   if run_id else
                   " The record carries no run_id, so there is no run to re-promote "
                   "from; rebuild rather than waiving the manifest")
+        if match.get("retired_by") and not match.get("superseded_by"):
+            # R389(b). A late swap retired it: the swapped file is the entry's
+            # delivery, and re-promoting this one would put two live rows back.
+            remedy = (" A late swap refined the entry since; upload the swapped "
+                      "file, not this one")
+        # R389(b). A late swap RETIRES the other lineages' rows (`retired_by`)
+        # rather than naming itself their successor.
         rep.fail(f"manifest marks this file superseded by "
-                 f"{match.get('superseded_by')}; do not upload it.{remedy}")
+                 f"{match.get('superseded_by') or match.get('retired_by')}; "
+                 f"do not upload it.{remedy}")
     # R275(a). See the note on the entries guard above: the empty case is the
     # writer's own default, not a legacy shape.
     recorded = {str(c) for c in (match.get("contest_ids") or [])}

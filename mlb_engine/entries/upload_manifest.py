@@ -105,6 +105,34 @@ UNCERTIFIED_LABEL = "review_grade_uncertified"
 #: Labels whose file did NOT pass its own gates; every other label did.
 GATES_FAILED_LABELS = frozenset({UNCERTIFIED_LABEL, "not_certified"})
 
+# R389(b). The baseline: the entry-mapped file every Classic build publishes
+# before research, on the unenriched frame with every portfolio cap opened to
+# the deadline rung's values. It is recorded only when its gates passed, so
+# `passed_its_gates` reading this label as passing is true; it is never
+# certified and never upload-ready (odds and weather are assumed by
+# construction, and the caps were opened before any refusal).
+BASELINE_LABEL = "review_grade_baseline"
+#: R389(b). A delivery's lineage: which build's file the row is. Supersession,
+#: the same-bytes merge and the UNCERTIFIED backstop stay inside one lineage,
+#: so the enhanced file never supersedes a baseline Ben may already hold. The
+#: empty string is every row written before R389(b), and every non-baseline
+#: delivery; the field is written only when it is not empty.
+BASELINE_LINEAGE = "baseline"
+LINEAGE_VALUES = ("", BASELINE_LINEAGE)
+
+
+def _valid_lineage(lineage: object) -> str:
+    """The closed lineage vocabulary; anything else raises (R34's rule)."""
+    text = str(lineage or "").strip()
+    if text not in LINEAGE_VALUES:
+        raise ValueError(f"lineage {text!r} is not one of {list(LINEAGE_VALUES)}")
+    return text
+
+
+def row_lineage(row: Mapping[str, Any]) -> str:
+    """A row's lineage; a row written before R389(b) has none and reads ''."""
+    return str((row or {}).get("lineage") or "")
+
 
 def passed_its_gates(certification: Any) -> bool:
     """True for a row whose file passed its own gates: `certified`, or a
@@ -115,14 +143,18 @@ def passed_its_gates(certification: Any) -> bool:
 
 
 def live_gates_passing_row(date: str, contest_type: str,
-                           slate_tag: str = "") -> Optional[Dict[str, Any]]:
+                           slate_tag: str = "", lineage: str = ""
+                           ) -> Optional[Dict[str, Any]]:
     """R388(d). The newest live row for this slate whose file passed its
     gates, or None. An UNCERTIFIED file is never mirrored over one: the live
-    file stays the delivery, and refinements go through late swap."""
-    key = (str(contest_type).lower(), str(slate_tag or ""))
+    file stays the delivery, and refinements go through late swap.
+
+    R389(b). Within one lineage: a live baseline never withholds an enhanced
+    UNCERTIFIED file, because the two never supersede each other."""
+    key = (str(contest_type).lower(), str(slate_tag or ""), _valid_lineage(lineage))
     manifest = read_manifest(date)
     live = [row for row in manifest.get("deliveries") or []
-            if (row.get("contest_type"), row.get("slate_tag")) == key
+            if (row.get("contest_type"), row.get("slate_tag"), row_lineage(row)) == key
             and row.get("status") != "superseded"
             and passed_its_gates(row.get("certification"))]
     return dict(live[-1]) if live else None
@@ -309,12 +341,22 @@ def record_delivery(
     egress: str = "",
     failing_gates: Optional[Sequence[str]] = None,
     refinement: bool = False,
+    lineage: str = "",
 ) -> Dict[str, Any]:
     """Append one delivery record and supersede any prior record for the same slate.
 
     Supersession is keyed on (contest_type, slate_tag), which is the identity of
     the thing being delivered. A second Classic build for the same draftgroup
     replaces the first; a Showdown build for a different game does not touch it.
+
+    R389(b). And on ``lineage``: the baseline a build publishes before research
+    and the enhanced file after it are both live, so recording the second never
+    supersedes the first, and a baseline Ben already holds stays preflight-clean.
+    A ``refinement`` (late swap) records in its parent's lineage, supersedes its
+    parent there (the ``superseded_by`` chain `verify_export` walks), and
+    RETIRES every other lineage's live row for the slate (`retired_by`, never
+    ``superseded_by``, which would name a false parent): after a swap no
+    pre-swap file answers "which file do I upload".
 
     R96(2). ``hash_source`` lets the row name the path the file is ABOUT to wear
     while the hash is taken from the provisional file that holds those bytes now.
@@ -379,7 +421,15 @@ def record_delivery(
         # R388(d). The gates an UNCERTIFIED file failed, so preflight's note
         # and the delivery record can name them.
         record["failing_gates"] = sorted({str(g) for g in failing_gates})
-    key = (record["contest_type"], record["slate_tag"])
+    lineage = _valid_lineage(lineage)
+    if lineage:
+        # R389(b). Written only when set, so every other row is unchanged.
+        record["lineage"] = lineage
+    key = (record["contest_type"], record["slate_tag"], lineage)
+
+    def _key(row: Mapping[str, Any]) -> tuple:
+        return (row.get("contest_type"), row.get("slate_tag"), row_lineage(row))
+
     if record["certification"] == UNCERTIFIED_LABEL and not refinement:
         # R388(d), the backstop behind the mirror's own check: a BUILD that
         # failed its gates never supersedes, or merges into, one that passed
@@ -388,7 +438,7 @@ def record_delivery(
         # it refines the file Ben entered, which may be an UNCERTIFIED one a
         # later certified build superseded, and its row is that entry's.
         passing = [p for p in manifest["deliveries"]
-                   if (p.get("contest_type"), p.get("slate_tag")) == key
+                   if _key(p) == key
                    and p.get("status") != "superseded"
                    and passed_its_gates(p.get("certification"))]
         if passing:
@@ -397,8 +447,22 @@ def record_delivery(
                 f"live {passing[-1].get('certification')!r} row "
                 f"{passing[-1].get('delivered_file')} for slate {key[1]!r}; that "
                 f"file stays the delivery")
+    # R389(b). A refinement retires every OTHER lineage's live row for the
+    # slate. Collected before the loop so the same-bytes return below cannot
+    # skip it.
+    retired = ([p for p in manifest["deliveries"]
+                if (p.get("contest_type"), p.get("slate_tag")) == key[:2]
+                and row_lineage(p) != lineage
+                and p.get("status") != "superseded"] if refinement else [])
+
+    def _retire() -> None:
+        for other in retired:
+            other["status"] = "superseded"
+            other["retired_by"] = record["delivered_file"]
+            other["retired_utc"] = record["recorded_utc"]
+
     for prior in manifest["deliveries"]:
-        if (prior.get("contest_type"), prior.get("slate_tag")) != key:
+        if _key(prior) != key:
             continue
         if prior.get("status") == "superseded":
             continue
@@ -409,6 +473,7 @@ def record_delivery(
             # later label for the same bytes must not inherit it.
             if "failing_gates" not in record:
                 prior.pop("failing_gates", None)
+            _retire()
             _write(manifest_path(date), manifest)
             _mirror_to_delivery_record(date, prior, controls, relaxations, egress,
                                        entries_source=source)
@@ -416,6 +481,7 @@ def record_delivery(
         prior["status"] = "superseded"
         prior["superseded_by"] = record["delivered_file"]
         prior["superseded_utc"] = record["recorded_utc"]
+    _retire()
     manifest["deliveries"].append(record)
     _write(manifest_path(date), manifest)
     _mirror_to_delivery_record(date, record, controls, relaxations, egress,

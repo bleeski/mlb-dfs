@@ -19,7 +19,10 @@ Exit codes:
         value this build cannot use
     7   delivered a prior valid artifact after a later failure: the file passed
         its essential checks, a later stage failed, and the file is presented
-        first under its own label (R393(b))
+        first under its own label (R393(b)). Since R389(b) every Classic build
+        publishes a baseline before research, so a crash in research or the
+        enhanced solve is a 7 with the baseline presented. A refusal after the
+        baseline keeps 3 or 10 and carries it under `baseline`.
 
 Every number this prints is a deterministic review proxy or a labeled prior.
 Nothing here is ROI, win rate, cash rate, or a probability claim. Nothing here
@@ -571,6 +574,11 @@ _REFUSAL_CONTEXT: dict = {}
 #: file. Cleared per call.
 _LAST_USABLE: dict = {}
 
+#: R389(b), roadmap Session 11. What this call's baseline did: published,
+#: short, refused or errored, with its path and sha when it shipped. Every
+#: Classic brief and payload after the call carries it. Cleared per call.
+_BASELINE: dict = {}
+
 #: R393(b). Exit 7 means "delivered a prior valid artifact after a later
 #: failure": the file passed its essential checks, then something after it
 #: failed (a crashed promotion, a raising brief, a failed mirror or manifest
@@ -753,6 +761,244 @@ def _fallback_artifact_record(result: Mapping[str, Any], delivered,
     if failure:
         record["record_error"] = failure
     return record
+
+def publish_baseline(args, salary: Path, entries: Path, pool: Mapping[str, Any],
+                     n_entries: int, deadline: float,
+                     attempt_controls: Mapping[str, Any], never_relax) -> dict:
+    """R389(b), roadmap Session 11. Publish the baseline before any research.
+
+    EP `run_baseline` builds the core's entry-mapped candidates on the
+    unenriched frame and exports them through `run_slate` under
+    `review_grade_baseline`, as ``DKEntries_<tag>_BASELINE_<run_id>.csv`` in
+    their own manifest lineage. Here the file is re-read by `verify_classic`
+    (the certified path's independent read) and must be essential-valid on its
+    exact bytes under that label; then a brief bound to its sha256 is written
+    beside it (preflight and verify_export find declared pitchers only through
+    such a brief), and it is PRESENTED and kept in `_LAST_USABLE`, so any later
+    exception exits 7 with it (Session 08's contract). It never enters a
+    `run_slate` result's ``last_usable_artifact``, so `has_deliverable`, R407's
+    re-solve and the deadline governor read only the enhanced solves.
+
+    Never raises and never stops the build: a short core, an allocator
+    refusal, a failed re-read or any exception is a named record in
+    `_BASELINE`, and enhancement runs exactly as it did before R389(b).
+    """
+    _BASELINE.clear()
+    block: dict = {"status": "error", "date": args.date, "lineage": "baseline"}
+
+    def _done() -> dict:
+        _BASELINE.update(block)
+        return dict(_BASELINE)
+
+    try:
+        from mlb_engine.entries.upload_manifest import BASELINE_LABEL
+        from mlb_engine.pipeline.execution_pipeline import run_baseline
+        out = run_baseline(
+            runs_root=str(REPO / "runs"), salary_csv=salary, entries_csv=entries,
+            pool=pool, requested_n=n_entries, deadline=deadline,
+            attempt_controls=attempt_controls, never_relax=never_relax,
+            contest_postures=parse_postures_arg(getattr(args, "postures", None)) or None,
+            assume_gates=parse_assume_gates_arg(getattr(args, "assume_gates", None)),
+            max_opposing_hitters_per_sp=getattr(args, "max_opposing_hitters_per_sp", None))
+        block.update({k: out[k] for k in ("core", "window", "controls") if k in out})
+        if out.get("status") == "short":
+            core = out.get("core") or {}
+            block["status"] = "short"
+            block["note"] = ("the core did not cover every reserved row inside its "
+                             "window, so no baseline file was written; F-2's "
+                             "removed-rows form is R401 (Session 22)")
+            print(f"BASELINE SHORT: {core.get('uncovered')} reserved row(s) "
+                  f"uncovered ({core.get('stop_reason')}); no baseline file, the "
+                  f"build continues", file=sys.stderr)
+            return _done()
+        result = out.get("result") or {}
+        block["run_id"] = result.get("run_id")
+        if not has_deliverable(result):
+            block["status"] = "crashed" if result.get("crashed") else "refused"
+            block["errors"] = [str(e) for e in (result.get("errors") or [])][:5]
+            block["failing_checks"] = [
+                {k: c.get(k) for k in ("name", "detail", "remedy")}
+                for c in ((result.get("feasibility") or {}).get("checks") or [])
+                if isinstance(c, Mapping) and c.get("passed") is False]
+            export = result.get("review_grade_export")
+            if isinstance(export, Mapping) and export.get("not_mirrored"):
+                block["not_published"] = export["not_mirrored"].get("why")
+            print(f"BASELINE REFUSED: {'; '.join(block['errors'][:2]) or 'no file'}; "
+                  f"no baseline file, the build continues", file=sys.stderr)
+            return _done()
+        delivered = (result.get("delivered_path")
+                     or (result.get("last_usable_artifact") or {}).get("path"))
+        # A mirror that recorded a row leaves a file in outputs/ whatever
+        # happens next, so the record names it until it is presented.
+        if result.get("manifest_recorded") and result.get("delivered_path"):
+            block["recorded_file"] = str(result["delivered_path"])
+        record = classic_artifact_record(result, delivered)
+        # The re-read is of the file that will be PRESENTED: the recorded
+        # mirror when it holds the engine's bytes, else the runs/ export.
+        checks = verify_classic(Path(salary), Path(record.get("path") or delivered))
+        essential = (record.get("essential_valid") or {}).get("essential_valid")
+        if not checks.get("passed") or record.get("label") != BASELINE_LABEL \
+                or essential is not True:
+            block["status"] = "not_presented"
+            block["why"] = {"verify_classic": list(checks.get("failures") or [])[:5],
+                            "label": record.get("label"), "essential_valid": essential}
+            if block.get("recorded_file"):
+                block["do_not_upload"] = (
+                    "a manifest row exists for this file, but it failed the "
+                    "checks above and was never presented; do not upload it")
+            print(f"BASELINE NOT PRESENTED: {block['why']}", file=sys.stderr)
+            return _done()
+        block.update({
+            "status": "delivered", "date": args.date, "path": record.get("path"),
+            "run_path": record.get("run_path"), "sha256": record.get("sha256"),
+            "label": record.get("label"), "coverage": record.get("coverage"),
+            "essential_valid": record.get("essential_valid"),
+            "manifest_recorded": result.get("manifest_recorded"),
+            "published_utc": dt.datetime.now(dt.timezone.utc).isoformat(),
+        })
+        block.pop("recorded_file", None)
+        # Presented the moment it passed, so nothing after this can leave a
+        # checked file unpresented; every later step is its own guarded fact.
+        note_last_usable(dict(record, contest_type="classic", date=args.date,
+                              lineage="baseline"))
+        print(f"BASELINE delivered before research: {block['label']}, "
+              f"{(block['coverage'] or {}).get('filled')}/"
+              f"{(block['coverage'] or {}).get('reserved')} rows, review-grade and "
+              f"never certified; enhancement follows", file=sys.stderr)
+        # Its own later failures (a mirror or manifest that failed leaves the
+        # runs/ export, which has no manifest row), as Session 08 names them.
+        try:
+            block["later_failures"] = later_failures(result)
+        except Exception as exc:  # noqa: BLE001
+            block["later_failures"] = [{"stage": "later_failures",
+                                        "error": f"{type(exc).__name__}: {exc}"}]
+        if result.get("mirror_reused_row"):
+            block["reused_row"] = result["mirror_reused_row"]
+        _where = Path(str(block.get("path") or ""))
+        if _where.parent.parent.name == "outputs":
+            # Where its manifest row lives, so a brief can name an earlier
+            # live delivery for the same slate (`baseline_brief_block`).
+            try:
+                from mlb_engine.pipeline.execution_pipeline import _slate_tag
+                block["manifest_date"] = _where.parent.name
+                block["slate_tag"] = _slate_tag(salary)
+            except Exception as exc:  # noqa: BLE001
+                block["slate_tag_error"] = f"{type(exc).__name__}: {exc}"
+        block["brief"] = _write_baseline_brief(args, salary, block)
+    except Exception as exc:  # noqa: BLE001 - a baseline never costs the build
+        if block.get("status") != "delivered":
+            block["status"] = "error"
+        block["error"] = f"{type(exc).__name__}: {exc}"
+        print(f"BASELINE ERROR: {block['error']}; "
+              + ("the baseline above is still the delivered file"
+                 if block.get("status") == "delivered" else
+                 "no baseline presented"
+                 + (f" (a row names {block['recorded_file']}; do not upload it)"
+                    if block.get("recorded_file") else ""))
+              + "; the build continues", file=sys.stderr)
+    return _done()
+
+
+def _write_baseline_brief(args, salary: Path, block: Mapping[str, Any]) -> dict:
+    """R389(b). ``build_brief_<tag>_BASELINE_<run>.json`` beside the baseline,
+    bound to its sha256: `preflight_upload` and `verify_export` read declared
+    pitchers only from a sibling brief carrying the file's sha, so without it
+    a declared arm the feed does not list would fail the baseline as absent.
+    Only a file under ``outputs/`` gets one (``runs/`` is immutable). Never
+    raises."""
+    path = Path(str(block.get("path") or ""))
+    try:
+        if not path.name or path.parent.parent.name != "outputs":
+            return {"written": False, "why": "the baseline is not under outputs/"}
+        signature = slate_signature(Path(salary))
+        brief = {
+            "status": "baseline_delivered",
+            "contest_type": "classic",
+            "date": args.date,
+            "lineage": "baseline",
+            "delivered_path": str(path),
+            "delivered_sha256": block.get("sha256"),
+            "label": block.get("label"),
+            "run_id": block.get("run_id"),
+            "declared_pitchers": parse_declared_pitchers(args.declare_pitcher),
+            "slate": {"tag": signature["tag"], "games": len(signature["games"]),
+                      "first_lock_local": signature["first_lock"]},
+            "baseline": {k: v for k, v in block.items() if k != "brief"},
+            "labels": ("deterministic review proxies and labeled priors only; "
+                       "never ROI, win rate, cash rate, or probability"),
+        }
+        stem = path.stem[len("DKEntries_"):] if path.stem.startswith("DKEntries_") \
+            else path.stem
+        dest = path.with_name(f"build_brief_{stem}.json")
+        tmp = dest.with_name(f".{dest.name}.tmp")
+        tmp.write_text(json.dumps(brief, indent=1, default=str), encoding="utf-8")
+        os.replace(tmp, dest)
+        return {"written": True, "path": str(dest)}
+    except Exception as exc:  # noqa: BLE001
+        return {"written": False, "why": f"{type(exc).__name__}: {exc}"}
+
+
+def baseline_brief_block() -> dict:
+    """R389(b). The baseline block for a brief or payload, with ``current``:
+    the baseline is this call's current file when no enhanced file that
+    passed its gates was presented after it (`note_last_usable` overwrites
+    `_LAST_USABLE` when one is). An enhanced UNCERTIFIED file never outranks
+    it (R388(d): a gates-failed file never outranks a gates-passing one), and
+    neither does an enhanced file that failed its re-read (`verify_failed`).
+
+    ``live_delivery`` names an EARLIER build's live gates-passing enhanced row
+    for the slate: one recorded before this call's baseline, never this call's
+    own rows, so a file this call just refused is never offered as the answer.
+    """
+    if not _BASELINE:
+        return {}
+    out = dict(_BASELINE)
+    out["current"] = bool(out.get("status") == "delivered"
+                          and _LAST_USABLE.get("lineage") == "baseline")
+    live = _earlier_live_delivery(out) if out["current"] else None
+    if live:
+        out["live_delivery"] = live
+    return out
+
+
+def _earlier_live_delivery(block: Mapping[str, Any]) -> dict | None:
+    """R389(b). The newest live enhanced row for the slate that passed its
+    gates and was recorded before this call's baseline was published; None
+    otherwise. Never raises: a brief field."""
+    if not (block.get("manifest_date") and block.get("published_utc")):
+        return None
+    try:
+        from mlb_engine.entries.upload_manifest import live_gates_passing_row
+        live = live_gates_passing_row(block["manifest_date"], "classic",
+                                      block.get("slate_tag") or "")
+    except Exception:  # noqa: BLE001
+        return None
+    if not live or str(live.get("recorded_utc") or "") >= str(block["published_utc"]):
+        return None
+    return {"delivered_file": live.get("delivered_file"),
+            "certification": live.get("certification"),
+            "sha256": live.get("sha256"), "run_id": live.get("run_id"),
+            "recorded_utc": live.get("recorded_utc"),
+            "note": ("an earlier build's file for this slate passed its gates and "
+                     "its row is still live; this baseline was built on THIS "
+                     "call's inputs, so it is current when the inputs changed "
+                     "(lineups, scratches) and the earlier file is the "
+                     "better-shaped choice when they did not")}
+
+
+def present_baseline_as_current(reason: str) -> None:
+    """R389(b). Re-present the baseline as the last FILE line when it is the
+    current file on a path that delivered nothing better."""
+    if _BASELINE.get("status") == "delivered" and _LAST_USABLE.get("lineage") == "baseline":
+        _present_file(_LAST_USABLE)
+        print(f"  BASELINE is the current file: {reason}. Review-grade, never "
+              f"certified; preflight it before upload", file=sys.stderr)
+        live = _earlier_live_delivery(_BASELINE)
+        if live:
+            print(f"  an earlier build's {live['certification']} file is still "
+                  f"live for this slate: {live['delivered_file']} "
+                  f"sha256={live['sha256']}; {live['note']}", file=sys.stderr)
+
 
 # R98(2). Which failing feasibility checks name a floor the ENGINE derived from
 # the slate, and which name a number that is merely the minimum clearing THIS
@@ -3018,6 +3264,52 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
 
     n_entries = args.entries or count_reserved(entries)
 
+    # R246. Resolved before any bank is built, so a missing prediction file
+    # costs the read and not the solve. The column goes on THIS frame for the
+    # sliced path; run_slate reassembles its own and attaches it there.
+    # R389(b): and before the baseline, because it only validates the
+    # operator's own prediction file (no research, no network), so exit 4 keeps
+    # meaning "refused before any solve".
+    try:
+        leverage, leverage_brief = resolve_leverage(
+            args, salary, str(slate_signature(salary).get("tag") or ""))
+    except (OSError, ValueError) as exc:
+        print(json.dumps({"status": "leverage_unresolved", "date": args.date,
+                              "error": str(exc)},
+                         indent=1))
+        return 4, {}
+
+    # R288. The allowance rides portfolio_controls, not just the bank
+    # parameter, because the EXPORT validator grades the delivered file
+    # against `controls` and would otherwise reject a raised build with a
+    # line that reads like a DK rule. That is the fifth member of the class
+    # and it is the one that made the control unusable end to end. Merged
+    # under any explicit --controls-override, so an operator who sets the key
+    # both ways gets their own value rather than the flag's. R389(b): defined
+    # here, once, because the baseline opens its controls on top of it.
+    attempt_controls = {
+        **({"max_opposing_hitters_per_sp":
+            int(args.max_opposing_hitters_per_sp)}
+           if getattr(args, "max_opposing_hitters_per_sp", None) is not None
+           else {}),
+        **(args.controls_override or {}),
+    }
+
+    # R388(b). F-3 on every build, plus the operator's --never-relax (main
+    # resolved and validated it before staging). A direct caller that never
+    # went through main still holds F-3.
+    from mlb_engine.pipeline import deadline_governor as _dg_nr  # noqa: PLC0415
+    never_relax = frozenset(getattr(args, "_never_relax", None)
+                            or _dg_nr.DEFAULT_NEVER_RELAX)
+
+    # R389(b), roadmap Session 11. Baseline first: an entry-mapped file,
+    # exported, re-read on its exact bytes and presented BEFORE any research,
+    # so a crash anywhere below still delivers it (exit 7). It never stops the
+    # build: short, refused or errored, it is a named record and enhancement
+    # runs exactly as before.
+    publish_baseline(args, salary, entries, pool, n_entries, deadline,
+                     attempt_controls, never_relax)
+
     reference = resolve_reference_data(args)
     f4_by_player_id, f4_report = build_f4_map(pool, reference["savant_pitching"])
     if f4_report.get("warning"):
@@ -3132,17 +3424,6 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
     # matters: an infrastructure limit may reduce search effort, never the legal
     # player set, because trimming the pool is a strategy change that is invisible
     # in the certified output.
-    # R246. Resolved before any bank is built, so a missing prediction file
-    # costs the read and not the solve. The column goes on THIS frame for the
-    # sliced path; run_slate reassembles its own and attaches it there.
-    try:
-        leverage, leverage_brief = resolve_leverage(
-            args, salary, str(slate_signature(salary).get("tag") or ""))
-    except (OSError, ValueError) as exc:
-        print(json.dumps({"status": "leverage_unresolved", "date": args.date,
-                              "error": str(exc)},
-                         indent=1))
-        return 4, {}
     # The ENGINE's own attach, not a second copy. A first cut inlined it here
     # and a mutation disabling the branch SURVIVED: with no
     # `Projected_Ownership_Pct` column the solver's reader falls back to a flat
@@ -3419,7 +3700,9 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
                   f"solves on the bank it has. Raise --bank-max-candidates to "
                   f"grow it (R415).", file=sys.stderr)
         if bank_resume_warranted(bank_report, _thin_by_count or _thin_by_pairs):
+            present_baseline_as_current("the sliced bank is thin and resumable")
             print(json.dumps({
+                **({"baseline": baseline_brief_block()} if _BASELINE else {}),
                 "status": "partial",
                 **refusal_stamp("bank_thin_partial"),
                 "date": args.date,
@@ -3431,7 +3714,7 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
                 "thin_by": ([k for k, v in (("candidates", _thin_by_count),
                                             ("sp_pair_coverage", _thin_by_pairs)) if v]),
                 "note": "bank still thin; run the same command again to add a slice",
-            }, indent=1))
+            }, indent=1, default=str))
             return 10, {}
 
     slate_kwargs = dict(kwargs)
@@ -3555,21 +3838,6 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
     # (R393(b)) and the refusal record keep what the solves spent.
     _REFUSAL_CONTEXT["solves"] = solves
 
-    # R288. The allowance rides portfolio_controls, not just the bank
-    # parameter, because the EXPORT validator grades the delivered file
-    # against `controls` and would otherwise reject a raised build with a
-    # line that reads like a DK rule. That is the fifth member of the class
-    # and it is the one that made the control unusable end to end. Merged
-    # under any explicit --controls-override, so an operator who sets the key
-    # both ways gets their own value rather than the flag's.
-    attempt_controls = {
-        **({"max_opposing_hitters_per_sp":
-            int(args.max_opposing_hitters_per_sp)}
-           if getattr(args, "max_opposing_hitters_per_sp", None) is not None
-           else {}),
-        **(args.controls_override or {}),
-    }
-
     # R407. The facts the tier is computed from, read once off the blocks the
     # brief prints. Inside T-30 the confidence tightening is the FIRST thing
     # relaxed (R386), before anything else moves, and the block records it.
@@ -3581,13 +3849,6 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
     _minutes = clock.get("minutes_to_deadline")
     confidence_relax = ("deadline_t30" if isinstance(_minutes, (int, float))
                         and _minutes < 30 else None)
-
-    # R388(b). F-3 on every build, plus the operator's --never-relax (main
-    # resolved and validated it before staging). A direct caller that never
-    # went through main still holds F-3.
-    from mlb_engine.pipeline import deadline_governor as _dg_nr  # noqa: PLC0415
-    never_relax = frozenset(getattr(args, "_never_relax", None)
-                            or _dg_nr.DEFAULT_NEVER_RELAX)
 
     # R207. Whether R407's tightening can still be relaxed on a refusal: then
     # the refusal re-solves at once, and the probe waits for that re-solve.
@@ -3783,6 +4044,10 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
                          else latest_review_grade.get("export"))
         review_record = (present_review_grade(review_export, salary)
                          if review_export else None)
+        # R389(b). The baseline passed its gates, so it outranks an enhanced
+        # UNCERTIFIED file (R388(d)): it is re-presented LAST, before the gate
+        # narrative, and the last FILE line is the current file.
+        present_baseline_as_current("the enhanced build refused")
         for blocker in result.get("contest_identity_blockers") or []:
             print(f"contest identity: {blocker}", file=sys.stderr)
         # R27 (open half): when a pre-export gate fails, its cause prints
@@ -3811,6 +4076,8 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
             payload["review_grade_export"] = review_record
         elif isinstance(result.get("review_grade_withheld"), dict):
             payload["review_grade_withheld"] = result["review_grade_withheld"]
+        if _BASELINE:
+            payload["baseline"] = baseline_brief_block()
         # R290(c). The split, resolved here rather than left to the reader. The
         # stamp above says SPLIT; these three keys say which way it split on
         # THIS refusal, gate by gate, so the operator sees "portfolio_caps:
@@ -3979,6 +4246,10 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
                 {"stage": "artifact_record", "error": _failure})
             _record = _fallback_artifact_record(result, delivered, _failure)
         note_last_usable(dict(_record, contest_type="classic", date=args.date))
+    else:
+        # R389(b). The enhanced file failed the independent re-read
+        # (`verify_failed`, exit 3), so the baseline stays the current file.
+        present_baseline_as_current("the enhanced file failed its independent re-read")
     exposure = portfolio_exposure(salary, Path(delivered))
     # R116. The concentration facts join the exposure block, which is where a
     # reader already goes to ask how concentrated this portfolio is. Two
@@ -4135,6 +4406,10 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         # after, as run_slate applied them.
         "input_confidence": result.get("input_confidence"),
     }
+    # R389(b). The baseline published before research, and whether it is still
+    # the current file (it is when the enhanced file failed its re-read).
+    if _BASELINE:
+        brief["baseline"] = baseline_brief_block()
     # R290(c) step 2. On a DELIVERED Classic file the deadline block records
     # whether a rung moved this build, and the LABEL is what changes -- never
     # the gates, which stay exactly as strict as they were. `upload_ready` is
@@ -7260,6 +7535,7 @@ def _main_recording_refusals() -> int:
     """
     _REFUSAL_CONTEXT.clear()
     _LAST_USABLE.clear()
+    _BASELINE.clear()
     try:
         code = main()
     except Exception as exc:  # noqa: BLE001 - R393(b), see the docstring
@@ -7280,6 +7556,12 @@ def _main_recording_refusals() -> int:
             brief = _REFUSAL_CONTEXT.get("brief") or {}
             refusal["last_usable_artifact"] = dict(_LAST_USABLE) or None
             refusal["later_failures"] = list(brief.get("later_failures") or [])
+        elif _LAST_USABLE:
+            # R389(b). A refusal (3 or 10) after a file was presented, the
+            # Classic baseline being the everyday case, names that file.
+            refusal["last_usable_artifact"] = dict(_LAST_USABLE)
+        if _BASELINE:
+            refusal["baseline"] = baseline_brief_block()
         write_refusal_record(date=date or today_et(), slate_tag=slate_tag,
                              exit_code=int(code),
                              refusal={"argv": argv,
@@ -7329,6 +7611,10 @@ def _deliver_after_exception(exc: BaseException) -> int:
         "later_failures": [failure],
         "errors": [failure["error"]],
     }
+    # R389(b). A crash after the baseline shipped delivers the baseline; the
+    # block says what it is and that it is current.
+    if _BASELINE:
+        brief["baseline"] = baseline_brief_block()
     if prior.get("slate"):
         brief["slate"] = prior["slate"]
     # R416. The solves' clock, recorded as each one landed, survives the raise.
@@ -7389,8 +7675,9 @@ REFUSAL_EXIT_NOTES = {
     5: "supervisor stop: the wall clock or the call budget ran out",
     # R393(b).
     7: ("delivered a prior valid artifact after a later failure: the file "
-        "passed its essential checks and a later stage (promotion, the brief, "
-        "a report, the mirror or the manifest) failed; the file is the "
+        "passed its essential checks and a later stage (research or the "
+        "enhanced solve after the R389(b) baseline, promotion, the brief, a "
+        "report, the mirror or the manifest) failed; the file is the "
         "deliverable under its own label"),
     10: "bank thin: resumable, run the same command again to add a slice",
 }

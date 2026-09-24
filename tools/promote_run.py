@@ -233,10 +233,30 @@ def run(args: argparse.Namespace) -> int:
     prior_cert = str((prior_row or {}).get("certification") or "")
     if workflow_valid and prior_cert.startswith("review_grade"):
         certification = prior_cert
+    # R389(b). With no row left (outputs/ lost, another host), the run's own
+    # metadata still names a governed or baseline label (`run_slate` writes
+    # `certification_label` there, R268(a)), and a re-promotion never upgrades
+    # it to `certified`. The row's lineage, else the run's, rides along, so a
+    # re-promoted baseline supersedes baselines and never the enhanced file.
+    run_meta = run_manifest.get("metadata") or {}
+    meta_label = str(run_meta.get("certification_label") or "")
+    if workflow_valid and certification == "certified" and \
+            meta_label.startswith("review_grade"):
+        certification = meta_label
+    lineage = str((prior_row or {}).get("lineage")
+                  or run_meta.get("delivery_lineage") or "")
     prior_record = prior_delivery_record(run_id, date) or {}
 
     facts = entries_facts(source)
     out_dir = outputs_root / date
+    if args.canonical and lineage:
+        # R389(b). `--canonical` is the enhanced file's name: writing a
+        # baseline there would overwrite a file Ben may hold while its row
+        # stays live under the old sha. A baseline re-promotes under its
+        # run-scoped name.
+        return _refuse(f"run {run_id} is a {lineage} delivery; --canonical would "
+                       f"write it over the enhanced file's name. Re-promote it "
+                       f"without --canonical (run-scoped name) or name a --dest")
     if args.dest:
         dest = Path(args.dest)
     elif args.canonical:
@@ -303,6 +323,7 @@ def run(args: argparse.Namespace) -> int:
             notes=notes,
             controls=prior_record.get("controls") or None,
             relaxations=prior_record.get("relaxations") or None,
+            **({"lineage": lineage} if lineage else {}),
         )
     except CorruptManifestError as exc:
         return _refuse(str(exc))

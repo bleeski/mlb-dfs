@@ -4,6 +4,7 @@ import ast
 import contextlib
 import csv
 import re
+import hashlib
 import inspect
 import io
 import datetime as dtmod
@@ -27125,6 +27126,9 @@ class DeadlineGovernorWiringTests(unittest.TestCase):
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
         mod.REPO = self.root
+        # R389(b). This harness fakes `run_slate` for the enhanced solves, and
+        # the baseline's own call is ClassicBaselineFirstTests' subject.
+        mod.publish_baseline = lambda *_a, **_k: {}
 
         calls = []
         # R388(e). The label each solve was handed, beside its controls.
@@ -27409,6 +27413,9 @@ class DirectDoorResolveBankTests(unittest.TestCase):
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
         mod.REPO = self.root
+        # R389(b). This harness fakes `run_slate` for the enhanced solves, and
+        # the baseline's own call is ClassicBaselineFirstTests' subject.
+        mod.publish_baseline = lambda *_a, **_k: {}
         self.mod = mod
 
         def fake_run_slate(**kw):
@@ -28011,6 +28018,9 @@ class LastUsableArtifactTests(unittest.TestCase):
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
         mod.REPO = self.root
+        # R389(b). This harness fakes `run_slate` for the enhanced solves, and
+        # the baseline's own call is ClassicBaselineFirstTests' subject.
+        mod.publish_baseline = lambda *_a, **_k: {}
         delivered = self._delivered_csv()
         passing = dict(DeadlineGovernorWiringTests._PASSING,
                        delivered_path=str(delivered), manifest_recorded=True,
@@ -28583,9 +28593,9 @@ class DeliveryLabelAgreementTests(unittest.TestCase):
             "late_swap_tool", REPO / "tools" / "late_swap.py")
         ls = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(ls)
-        from mlb_engine.entries.upload_manifest import UNCERTIFIED_LABEL
+        from mlb_engine.entries.upload_manifest import BASELINE_LABEL, UNCERTIFIED_LABEL
         for label in ("review_grade", dg.DEADLINE_LABEL, ls.DOWNGRADE_LABEL,
-                      UNCERTIFIED_LABEL):
+                      UNCERTIFIED_LABEL, BASELINE_LABEL):
             self.assertIn(label, REVIEW_GRADE_REASONS)
 
 
@@ -33598,6 +33608,9 @@ class BaselineCoreTests(unittest.TestCase):
             / "build_slate.py")
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
+        # R389(b). This harness fakes `run_slate` for the enhanced solves, and
+        # the baseline's own call is ClassicBaselineFirstTests' subject.
+        mod.publish_baseline = lambda *_a, **_k: {}
         seen = {"assemble": [], "probe_frame": None}
         real_assemble = epi._assemble_projection_frame
         real_single = opt.build_single_lineup
@@ -34240,3 +34253,863 @@ print(json.dumps(out, sort_keys=True))
         self.assertIsNone(re.search(r"\b(ROI|win.rate|cash.rate|edge|probabilit)",
                                     r.note, re.IGNORECASE))
         self.assertEqual(r.as_dict()["construction_label"], r.construction_label)
+
+
+class ClassicBaselineFirstTests(unittest.TestCase):
+    """R389(b), roadmap Session 11: baseline-first Classic.
+
+    `run_classic` publishes the core's entry-mapped baseline BEFORE any
+    research: exported through `run_slate`, re-read on its exact bytes,
+    presented and kept in `_LAST_USABLE`, under `review_grade_baseline`, as
+    ``DKEntries_<tag>_BASELINE_<run>.csv`` in its own manifest lineage.
+
+    Driven on the vendored 2026-06-03 slate (2 games, 18 reserved rows, three
+    contests) through the real exit door: `_main_recording_refusals` with
+    `main` swapped for the `run_classic` call (LastUsableArtifactTests'
+    pattern). Every write lands in a temp root (`mod.REPO` and
+    `upload_manifest.REPO_ROOT`); research reads a temp copy of the vendored
+    reference data. Faked only: the injected crashes and, where the test is
+    about presentation and not the enhanced engine, the enhanced `run_slate`
+    (the baseline's own call always runs for real).
+
+    Reproduced first at 88aacc6: a crash after research (then in
+    `resolve_leverage`, and at `run_slate` entry) exited 1 with no file.
+    """
+
+    _SALARY = REPO / "data" / "archive" / "2026-06-03" / "DKSalaries_2026-06-03.csv"
+    _ENTRIES = REPO / "data" / "archive" / "2026-06-03" / "DKEntries_2026-06-03.csv"
+    _DECLARED = ["43205901", "43206001", "43206000", "43205902",
+                 "43206010", "43206009", "43206002", "43206013"]
+    _AS_OF = "2026-06-03T12:00:00-04:00"
+    _OPEN = {"max_player_exposure_pct": 1.0, "max_pitcher_exposure_pct": 1.0,
+             "max_primary_stack_exposure_pct": 1.0, "max_team_exposure_pct": 1.0,
+             "max_consensus_cluster_share_pct": 1.0, "max_sp_pair_repetition": 999,
+             "max_shared_players": 9}
+    _REFUSAL = {"passed": False, "run_id": "enhanced_r1", "workflow_valid": False,
+                "errors": ["failed post-export gate: portfolio_caps_passed"],
+                "feasibility": {"passed": False, "checks": []}}
+
+    @classmethod
+    def setUpClass(cls):
+        import shutil
+        cls._tmp = tempfile.TemporaryDirectory()
+        cls.base = Path(cls._tmp.name)
+        cls.reference = cls.base / "reference"
+        shutil.copytree(REPO / "data" / "reference", cls.reference)
+        cls._full_build = None
+
+    @classmethod
+    def _full(cls):
+        """Fact 2 and fact 3 share one real build, made on first use: the
+        baseline, then an enhanced file that certifies because its caps are
+        opened by --controls-override (about 25s here, most of it the bank)."""
+        if cls._full_build is None:
+            cls._full_build = cls._build_in(cls.base / "full",
+                                            controls_override=dict(cls._OPEN))
+        return cls._full_build
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._tmp.cleanup()
+
+    # -- the harness ------------------------------------------------------ #
+
+    @classmethod
+    def _module(cls):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "build_slate_r389b", REPO / "skills" / "generate-lineups" / "scripts"
+            / "build_slate.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    @classmethod
+    def _args(cls, **overrides):
+        base = dict(
+            date="2026-06-03", entries=None, controls_override=None,
+            projections=None, lineups=None, odds=None, postures=None,
+            deliver_by=None, _governor=None, max_seconds=300.0,
+            declare_pitcher=list(cls._DECLARED), ignore_pool_blockers=True,
+            assume_gates="lineup_gate_passed", rotowire=False, enrichment=True,
+            reference_dir=str(cls.reference), reference_max_age_days=14.0,
+            past_slate_replay=True, leverage=None,
+            max_opposing_hitters_per_sp=None, ownership_pred=None,
+            feed_max_age_minutes=90.0, bundle=None, tbd_fallback=None,
+            brief=None, bank_max_candidates=None)
+        base.update(overrides)
+        return types.SimpleNamespace(**base)
+
+    @classmethod
+    def _build_in(cls, root, *, patches=(), fake_enhanced=None, via_exit_door=True,
+                  **arg_overrides):
+        """One build in ``root``. Returns a dict: code, brief, err, out, mod,
+        calls (every run_slate kwargs), root. ``fake_enhanced`` is a list of
+        results the ENHANCED run_slate calls return in turn; the baseline's
+        call always runs for real."""
+        import shutil
+        from mlb_engine.entries import upload_manifest as um
+        root = Path(root)
+        (root / "slate").mkdir(parents=True, exist_ok=True)
+        shutil.copy(cls._SALARY, root / "slate" / "DKSalaries.csv")
+        mod = cls._module()
+        mod.REPO = root
+        args = cls._args(**arg_overrides)
+        calls: list = []
+        stash: dict = {}
+        real_run_slate = epi.run_slate
+
+        def spy_run_slate(**kw):
+            calls.append(dict(kw))
+            if fake_enhanced is not None and not kw.get("delivery_lineage"):
+                enhanced = [c for c in calls if not c.get("delivery_lineage")]
+                return dict(fake_enhanced[min(len(enhanced), len(fake_enhanced)) - 1])
+            return real_run_slate(**kw)
+
+        def main():
+            code, brief = mod.run_classic(
+                args, root / "slate", cls._SALARY, cls._ENTRIES, {"games": []},
+                time.monotonic() + float(args.max_seconds))
+            stash["brief"] = brief
+            return code
+
+        out, err = io.StringIO(), io.StringIO()
+        env = {k: v for k, v in os.environ.items() if k != "THE_ODDS_API_KEY"}
+        with contextlib.ExitStack() as stack:
+            stack.enter_context(unittest.mock.patch.dict(os.environ, env, clear=True))
+            stack.enter_context(unittest.mock.patch.object(um, "REPO_ROOT", root))
+            stack.enter_context(unittest.mock.patch.object(epi, "run_slate", spy_run_slate))
+            stack.enter_context(unittest.mock.patch.object(mod, "main", main))
+            stack.enter_context(unittest.mock.patch.object(
+                sys, "argv", ["build_slate.py", "--date", "2026-06-03"]))
+            for target, name, value in patches:
+                stack.enter_context(unittest.mock.patch.object(
+                    mod if target == "mod" else target, name, value))
+            stack.enter_context(contextlib.redirect_stdout(out))
+            stack.enter_context(contextlib.redirect_stderr(err))
+            if via_exit_door:
+                code = mod._main_recording_refusals()
+            else:
+                try:
+                    code = main()
+                except Exception as exc:  # noqa: BLE001
+                    code = exc
+        text = out.getvalue()
+        brief = stash.get("brief")
+        if brief is None and "{" in text:
+            brief = json.loads(text[text.rfind("\n{") + 1 if "\n{" in text else text.find("{"):])
+        return {"code": code, "brief": brief or {}, "err": err.getvalue(),
+                "out": text, "mod": mod, "calls": calls, "root": root}
+
+    @staticmethod
+    def _rows(root):
+        path = Path(root) / "outputs" / "2026-06-03" / "upload_manifest.json"
+        return json.loads(path.read_text(encoding="utf-8"))["deliveries"]
+
+    @staticmethod
+    def _file_lines(err):
+        return [line for line in err.splitlines() if line.startswith("FILE  ")]
+
+    def _preflight(self, path, *extra):
+        from tools import preflight_upload
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+            code = preflight_upload.main([
+                "--entries", str(path), "--salary", str(self._SALARY),
+                "--json", "--as-of", self._AS_OF, *extra])
+        return code, json.loads(out.getvalue())
+
+    @staticmethod
+    def _crash(message):
+        def boom(*_a, **_k):
+            raise RuntimeError(message)
+        return boom
+
+    # -- the row's three facts -------------------------------------------- #
+
+    def test_a_crash_after_the_baseline_delivers_the_baseline(self):
+        """Fact 1. A crash in research, and at the enhanced solve's entry, exits
+        7 with the baseline presented first and last; at 88aacc6 both exited 1
+        with no file."""
+        for label, patches, fake in (
+                ("research", [("mod", "resolve_reference_data",
+                               self._crash("injected in resolve_reference_data"))], None),
+                ("enhanced run_slate entry", [], "raise")):
+            with self.subTest(crash=label):
+                root = Path(tempfile.mkdtemp(dir=self.base))
+                if fake == "raise":
+                    real = epi.run_slate
+
+                    def raising(**kw):
+                        if kw.get("delivery_lineage"):
+                            return real(**kw)
+                        raise RuntimeError("injected at run_slate entry")
+                    patches = [(epi, "run_slate", raising)]
+                    build = self._build_in(root, patches=patches)
+                else:
+                    build = self._build_in(root, patches=patches)
+                self.assertEqual(build["code"], 7, build["err"][-800:])
+                files = self._file_lines(build["err"])
+                self.assertGreaterEqual(len(files), 2)
+                self.assertIn("_BASELINE_", files[0])
+                self.assertIn("_BASELINE_", files[-1])
+                self.assertLess(build["err"].index(files[-1]),
+                                build["err"].index("LATER FAILURE"))
+                brief = build["brief"]
+                self.assertEqual(brief["status"], "delivered_after_failure")
+                path = Path(brief["delivered_path"])
+                self.assertIn("_BASELINE_", path.name)
+                self.assertEqual(brief["delivered_sha256"],
+                                 hashlib.sha256(path.read_bytes()).hexdigest())
+                self.assertEqual(brief["label"], "review_grade_baseline")
+                self.assertTrue(brief["baseline"]["current"])
+                records = sorted((root / "data" / "deliveries").rglob("*.json"))
+                refusal = [json.loads(p.read_text()) for p in records]
+                refusal = [r for r in refusal if r.get("kind") == "refusal"]
+                self.assertEqual(refusal[-1]["exit_code"], 7)
+                self.assertEqual(refusal[-1]["refusal"]["last_usable_artifact"]["sha256"],
+                                 brief["delivered_sha256"])
+
+    def test_the_enhanced_file_supersedes_nothing_ben_holds(self):
+        """Fact 2. The enhanced delivery records after the baseline, and the
+        baseline row stays live in its own lineage; preflight passes on both
+        files' exact bytes after both are recorded."""
+        full = self._full()
+        self.assertEqual(full["code"], 0, full["err"][-800:])
+        rows = self._rows(full["root"])
+        baseline = [r for r in rows if r.get("lineage") == "baseline"]
+        enhanced = [r for r in rows if not r.get("lineage")]
+        self.assertEqual(len(baseline), 1)
+        self.assertEqual(len(enhanced), 1)
+        self.assertLess(rows.index(baseline[0]), rows.index(enhanced[0]),
+                        "the baseline must record before the enhanced file")
+        self.assertNotEqual(baseline[0]["status"], "superseded")
+        self.assertNotIn("superseded_by", baseline[0])
+        self.assertEqual(baseline[0]["certification"], "review_grade_baseline")
+        self.assertEqual(enhanced[0]["certification"], "certified")
+        root = full["root"]
+        b_path = root / baseline[0]["delivered_file"]
+        e_path = root / enhanced[0]["delivered_file"]
+        self.assertNotEqual(b_path, e_path)
+        with unittest.mock.patch.object(
+                __import__("mlb_engine.entries.upload_manifest",
+                           fromlist=["REPO_ROOT"]), "REPO_ROOT", root):
+            b_code, b_rep = self._preflight(b_path)
+            e_code, e_rep = self._preflight(e_path)
+        self.assertEqual((b_code, b_rep["verdict"]), (0, "review_ready"), b_rep["failures"])
+        self.assertIn("R389(b)", b_rep["verdict_note"])
+        self.assertEqual((e_code, e_rep["verdict"]), (0, "upload_ready"), e_rep["failures"])
+        # [B2] Declared pitchers reach preflight through the brief bound to
+        # the baseline's own sha, beside the file.
+        self.assertIn(f"build_brief_{b_path.stem[len('DKEntries_'):]}.json",
+                      b_rep["info"]["declared_pitchers_source"])
+        brief = full["brief"]
+        self.assertFalse(brief["baseline"]["current"])
+        self.assertIn("_BASELINE_", self._file_lines(full["err"])[0])
+        self.assertNotIn("_BASELINE_", self._file_lines(full["err"])[-1])
+
+    def test_the_baseline_is_essential_valid_on_its_exact_bytes(self):
+        """Fact 3. The presented bytes are the recorded bytes and the run's
+        immutable export; every V post-export gate passed on them; the
+        independent re-read passes; 18 of 18 rows; no lineup twice in a
+        contest (F-3)."""
+        block = self._full()["brief"]["baseline"]
+        self.assertEqual(block["status"], "delivered")
+        path = Path(block["path"])
+        data = path.read_bytes()
+        sha = hashlib.sha256(data).hexdigest()
+        self.assertEqual(block["sha256"], sha)
+        row = [r for r in self._rows(self._full()["root"]) if r.get("lineage")][0]
+        self.assertEqual(row["sha256"], sha)
+        run_export = Path(block["run_path"])
+        self.assertEqual(run_export.name, "DKEntries.csv")
+        self.assertEqual(run_export.parent.name, "final")
+        self.assertEqual(hashlib.sha256(run_export.read_bytes()).hexdigest(), sha)
+        json.dumps(block)  # main() writes the brief without default=str
+        self.assertEqual(block["later_failures"], [])
+        essential = block["essential_valid"]
+        self.assertIs(essential["essential_valid"], True)
+        self.assertEqual(essential["failed"], [])
+        self.assertIs(essential["bytes_match_record"], True)
+        self.assertEqual(block["coverage"], {"reserved": 18, "filled": 18})
+        verdict = self._full()["mod"].verify_classic(self._SALARY, path)
+        self.assertTrue(verdict["passed"], verdict["failures"])
+        by_contest = defaultdict(list)
+        for entry in parse_dk_entry_rows(str(path)):
+            by_contest[entry.contest_id].append(entry.lineup_signature)
+        self.assertEqual(sum(len(v) for v in by_contest.values()), 18)
+        for cid, sigs in by_contest.items():
+            self.assertEqual(len(sigs), len(set(sigs)), f"a lineup twice in {cid}")
+
+    # -- where it runs and what it is handed -------------------------------- #
+
+    def test_the_baseline_runs_after_leverage_and_before_research(self):
+        order: list = []
+        mod_calls = {}
+
+        def tracer(name, real):
+            def wrapped(*a, **k):
+                order.append(name)
+                return real(*a, **k)
+            return wrapped
+        mod = self._module()
+        mod_calls["resolve_leverage"] = mod.resolve_leverage
+        mod_calls["publish_baseline"] = mod.publish_baseline
+        stop = self._crash("stop after the first research call")
+        build = self._build_in(
+            Path(tempfile.mkdtemp(dir=self.base)), via_exit_door=False,
+            patches=[("mod", "resolve_leverage", tracer("leverage", mod.resolve_leverage)),
+                     (epi, "run_baseline", tracer("baseline", epi.run_baseline)),
+                     ("mod", "resolve_reference_data",
+                      lambda *a, **k: (order.append("research"), stop())[1])])
+        self.assertIsInstance(build["code"], RuntimeError)
+        self.assertEqual(order, ["leverage", "baseline", "research"])
+
+    def test_the_baseline_call_is_approved_unenriched_labelled_and_opened(self):
+        never = {"distinct_lineups_per_contest", "max_player_exposure_pct"}
+        cores: list = []
+        from mlb_engine.pipeline import baseline as bl
+        real_core = bl.build_baseline
+
+        def core_spy(*a, **k):
+            cores.append(dict(k))
+            return real_core(*a, **k)
+        build = self._build_in(
+            Path(tempfile.mkdtemp(dir=self.base)), via_exit_door=False,
+            fake_enhanced=[self._REFUSAL],
+            controls_override={"max_player_exposure_pct": 0.9},
+            max_opposing_hitters_per_sp=1, _never_relax=never,
+            patches=[(bl, "build_baseline", core_spy),
+                     ("mod", "resolve_reference_data",
+                      self._crash("stop before research"))])
+        baseline_calls = [c for c in build["calls"] if c.get("delivery_lineage")]
+        self.assertEqual(len(baseline_calls), 1, build["err"][-600:])
+        kw = baseline_calls[0]
+        self.assertIs(kw["approve"], True)
+        self.assertIs(kw["light_satellite"], True)
+        self.assertTrue(kw["candidates_override"])
+        for key in ("savant_batting_csv", "savant_pitching_csv", "fangraphs_pitching_csv",
+                    "f4_by_player_id", "f1_by_player_id", "f5_by_player_id"):
+            self.assertIsNone(kw[key], key)
+        for key in ("leverage", "weather_game_caps", "input_confidence_facts",
+                    "sleeve_implied_total_by_team"):
+            self.assertNotIn(key, kw)
+        self.assertEqual(kw["certification_label"], "review_grade_baseline")
+        self.assertEqual(kw["delivery_lineage"], "baseline")
+        self.assertEqual(set(kw["never_relax_controls"]), never)
+        controls = kw["portfolio_controls_override"]
+        self.assertEqual(controls["max_player_exposure_pct"], 0.9, "never-relax held")
+        self.assertEqual(controls["max_shared_players"], 9)
+        self.assertEqual(controls["max_opposing_hitters_per_sp"], 1)
+        self.assertEqual(cores[0]["max_opposing_hitters_per_sp"], 1)
+        moves = {m["control"]: m for m in kw["control_moves"]}
+        self.assertNotIn("max_player_exposure_pct", moves)
+        self.assertEqual(moves["max_shared_players"]["by"], "baseline")
+        self.assertIn("odds_gate_passed", kw["assume_gates"])
+        self.assertIn("weather_gate_passed", kw["assume_gates"])
+        self.assertIn("lineup_gate_passed", kw["assume_gates"])
+        self.assertEqual(kw["source_metadata"]["pool_report"]["kept"],
+                         len(kw["projection_rows"]))
+
+    def test_the_engine_s_baseline_call_carries_the_allowance_and_approves(self):
+        """BuildContractCheckpointTests pins build_slate to one approve=True
+        run_slate call; the baseline's call lives in EP `run_baseline`, and is
+        pinned here the same way: approve=True, and the controls the export
+        validator grades carry the allowance."""
+        tree = ast.parse((REPO / "mlb_engine" / "pipeline"
+                          / "execution_pipeline.py").read_text(encoding="utf-8"))
+        fn = next(n for n in ast.walk(tree)
+                  if isinstance(n, ast.FunctionDef) and n.name == "run_baseline")
+        calls = [n for n in ast.walk(fn) if isinstance(n, ast.Call)
+                 and getattr(n.func, "id", None) == "run_slate"]
+        self.assertEqual(len(calls), 1)
+        kws = {kw.arg: kw.value for kw in calls[0].keywords}
+        self.assertIs(kws["approve"].value, True)
+        self.assertIn("portfolio_controls_override", kws)
+        build_calls = [n for n in ast.walk(fn) if isinstance(n, ast.Call)
+                       and getattr(n.func, "attr", None) == "build_baseline"]
+        self.assertIn("max_opposing_hitters_per_sp",
+                      [kw.arg for kw in build_calls[0].keywords])
+
+    def test_the_window_is_a_share_of_the_build_s_own_deadline(self):
+        from mlb_engine.pipeline import baseline as bl
+        seen: list = []
+        real_core = bl.build_baseline
+
+        def core_spy(*a, **k):
+            seen.append((time.monotonic(), k["deadline"]))
+            return real_core(*a, **k)
+        t0 = time.monotonic()
+        self._build_in(Path(tempfile.mkdtemp(dir=self.base)), via_exit_door=False,
+                       max_seconds=200.0, fake_enhanced=[self._REFUSAL],
+                       patches=[(bl, "build_baseline", core_spy),
+                                ("mod", "resolve_reference_data",
+                                 self._crash("stop before research"))])
+        called_at, window_end = seen[0]
+        left = (t0 + 200.0) - called_at
+        self.assertAlmostEqual(window_end - called_at, bl.BASELINE_WINDOW_SHARE * left,
+                               delta=2.0)
+        self.assertLess(window_end - called_at, 0.5 * left)
+
+    # -- when the baseline cannot ship, the build goes on -------------------- #
+
+    def _continues(self, build):
+        """The build reached research after the baseline step."""
+        self.assertIsInstance(build["code"], RuntimeError)
+        self.assertIn("stop at research", str(build["code"]))
+        outputs = build["root"] / "outputs" / "2026-06-03"
+        files = sorted(outputs.glob("DKEntries*BASELINE*.csv")) if outputs.exists() else []
+        self.assertEqual(files, [])
+        return build["mod"]._BASELINE
+
+    def test_a_short_baseline_ships_no_file_and_the_build_continues(self):
+        from mlb_engine.pipeline import baseline as bl
+        build = self._build_in(
+            Path(tempfile.mkdtemp(dir=self.base)), via_exit_door=False,
+            patches=[(bl, "BASELINE_WINDOW_SHARE", 0.0),
+                     ("mod", "resolve_reference_data", self._crash("stop at research"))])
+        block = self._continues(build)
+        self.assertEqual(block["status"], "short")
+        self.assertEqual(block["core"]["uncovered"], 18)
+        self.assertFalse([c for c in build["calls"] if c.get("delivery_lineage")])
+        self.assertIn("BASELINE SHORT", build["err"])
+
+    def test_a_refused_baseline_is_named_and_the_build_continues(self):
+        """A --never-relax cap the covering set cannot meet: the allocator
+        refuses, nothing is published, and the refusal is named."""
+        build = self._build_in(
+            Path(tempfile.mkdtemp(dir=self.base)), via_exit_door=False,
+            controls_override={"max_player_exposure_pct": 0.1},
+            _never_relax={"distinct_lineups_per_contest", "max_player_exposure_pct"},
+            patches=[("mod", "resolve_reference_data", self._crash("stop at research"))])
+        block = self._continues(build)
+        self.assertEqual(block["status"], "refused", block)
+        self.assertTrue(block["errors"])
+        self.assertEqual(build["mod"]._LAST_USABLE, {})
+
+    def test_a_raising_baseline_is_an_error_record_and_the_build_continues(self):
+        from mlb_engine.pipeline import baseline as bl
+        build = self._build_in(
+            Path(tempfile.mkdtemp(dir=self.base)), via_exit_door=False,
+            patches=[(bl, "every_row_requirements",
+                      self._crash("a caller error inside the core")),
+                     ("mod", "resolve_reference_data", self._crash("stop at research"))])
+        block = self._continues(build)
+        self.assertEqual(block["status"], "error")
+        self.assertIn("a caller error inside the core", block["error"])
+
+    # -- has_deliverable, the governor, the refusal and the rerun ------------ #
+
+    def test_the_governor_still_walks_with_the_baseline_in_last_usable(self):
+        from mlb_engine.pipeline import deadline_governor as dg
+        governor = dg.DeadlineGovernor(datetime.now(timezone.utc) + timedelta(minutes=2))
+        build = self._build_in(
+            Path(tempfile.mkdtemp(dir=self.base)), deliver_by="set", _governor=governor,
+            fake_enhanced=[self._REFUSAL, self._REFUSAL])
+        self.assertEqual(build["mod"]._BASELINE["status"], "delivered")
+        self.assertEqual(build["mod"]._LAST_USABLE.get("lineage"), "baseline")
+        enhanced = [c for c in build["calls"] if not c.get("delivery_lineage")]
+        self.assertEqual(len(enhanced), 2, build["err"][-800:])
+        self.assertIsNone(enhanced[0]["certification_label"])
+        self.assertEqual(enhanced[1]["certification_label"], dg.DEADLINE_LABEL)
+        self.assertEqual(build["code"], 3)
+
+    def test_a_refusal_keeps_exit_3_and_presents_the_baseline_as_current(self):
+        build = self._build_in(Path(tempfile.mkdtemp(dir=self.base)),
+                               fake_enhanced=[self._REFUSAL])
+        self.assertEqual(build["code"], 3, build["err"][-800:])
+        payload = build["brief"]
+        self.assertEqual(payload["status"], "not_certified")
+        self.assertTrue(payload["baseline"]["current"])
+        files = self._file_lines(build["err"])
+        self.assertIn("_BASELINE_", files[-1])
+        self.assertIn(Path(payload["baseline"]["path"]).name, files[-1])
+        # Re-presented AFTER the enhanced solve, not merely left over from the
+        # baseline's own presentation: the last FILE line is the current file.
+        err = build["err"]
+        last = err.rindex(files[-1])
+        self.assertGreater(last, err.index("SOLVE 1"))
+        # ...and before the refusal's gate narrative (the fake refusal fails
+        # `portfolio_caps_passed`; the earlier "gate assumed" lines are not it).
+        self.assertLess(last, err.index("gate portfolio_caps_passed"))
+        self.assertIn("BASELINE is the current file", err[last:])
+        records = [json.loads(p.read_text()) for p in
+                   sorted((build["root"] / "data" / "deliveries").rglob("*.json"))]
+        refusal = [r for r in records if r.get("kind") == "refusal"][-1]
+        self.assertEqual(refusal["exit_code"], 3)
+        self.assertEqual(refusal["refusal"]["last_usable_artifact"]["sha256"],
+                         payload["baseline"]["sha256"])
+        self.assertEqual(refusal["refusal"]["baseline"]["status"], "delivered")
+
+    def test_a_rerun_with_the_same_bytes_reuses_the_baseline_row(self):
+        root = Path(tempfile.mkdtemp(dir=self.base))
+        first = self._build_in(root, fake_enhanced=[self._REFUSAL])
+        second = self._build_in(root, fake_enhanced=[self._REFUSAL])
+        self.assertEqual((first["code"], second["code"]), (3, 3))
+        rows = [r for r in self._rows(root) if r.get("lineage") == "baseline"]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(len(sorted((root / "outputs" / "2026-06-03").glob(
+            "DKEntries*BASELINE*.csv"))), 1)
+        self.assertEqual(second["brief"]["baseline"]["reused_row"]["delivered_file"],
+                         rows[0]["delivered_file"])
+        deliveries = [json.loads(p.read_text()) for p in
+                      sorted((root / "data" / "deliveries").rglob("*.json"))]
+        self.assertEqual(len([d for d in deliveries if d.get("kind") == "delivery"
+                              and d["manifest_row"].get("lineage") == "baseline"]), 1)
+
+    def test_the_baseline_row_reads_relaxed_with_its_opened_controls(self):
+        # No override: every one of the rung's nine controls moved.
+        root = Path(tempfile.mkdtemp(dir=self.base))
+        self._build_in(root, fake_enhanced=[self._REFUSAL])
+        row = [r for r in self._rows(root) if r.get("lineage")][0]
+        self.assertEqual(row["strategy_state"]["state"], "relaxed")
+        self.assertEqual(row["strategy_state"]["counts"]["controls_opened"], 9)
+        self.assertIn("baseline (R389(b))", row["notes"])
+        # The full build typed seven of them at their open value already:
+        # only the game scalar and the sleeve mask moved.
+        row = [r for r in self._rows(self._full()["root"]) if r.get("lineage")][0]
+        self.assertEqual(row["strategy_state"]["counts"]["controls_opened"], 2)
+
+    # -- the manifest's lineage ---------------------------------------------- #
+
+    def _um_root(self):
+        from mlb_engine.entries import upload_manifest as um
+        root = Path(tempfile.mkdtemp(dir=self.base))
+        patcher = unittest.mock.patch.object(um, "REPO_ROOT", root)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        return um, root
+
+    def _record(self, um, root, name, body, **kw):
+        path = root / "outputs" / "2026-06-03" / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(body, encoding="utf-8")
+        with contextlib.redirect_stdout(io.StringIO()):
+            return um.record_delivery(date="2026-06-03", delivered_file=path,
+                                      contest_type="classic", slate_tag="1840_2g",
+                                      contest_ids=["1"], entries=1, **kw)
+
+    def test_supersession_stays_inside_a_lineage(self):
+        um, root = self._um_root()
+        self._record(um, root, "b1.csv", "one", certification=um.BASELINE_LABEL,
+                     lineage="baseline")
+        self._record(um, root, "e1.csv", "two", certification="certified")
+        self._record(um, root, "e2.csv", "three", certification="certified")
+        rows = um.read_manifest("2026-06-03")["deliveries"]
+        status = {Path(r["delivered_file"]).name: r["status"] for r in rows}
+        self.assertEqual(status, {"b1.csv": "candidate", "e1.csv": "superseded",
+                                  "e2.csv": "candidate"})
+        self._record(um, root, "b2.csv", "four", certification=um.BASELINE_LABEL,
+                     lineage="baseline")
+        rows = um.read_manifest("2026-06-03")["deliveries"]
+        status = {Path(r["delivered_file"]).name: r["status"] for r in rows}
+        self.assertEqual(status["b1.csv"], "superseded")
+        self.assertEqual(status["e2.csv"], "candidate")
+        self.assertNotIn("lineage", [r for r in rows
+                                     if r["delivered_file"].endswith("e2.csv")][0])
+
+    def test_identical_bytes_in_two_lineages_are_two_live_rows(self):
+        um, root = self._um_root()
+        self._record(um, root, "b.csv", "same", certification=um.BASELINE_LABEL,
+                     lineage="baseline")
+        self._record(um, root, "e.csv", "same", certification="certified")
+        rows = um.read_manifest("2026-06-03")["deliveries"]
+        self.assertEqual([r["status"] for r in rows], ["candidate", "candidate"])
+        self.assertEqual([Path(r["delivered_file"]).name for r in rows], ["b.csv", "e.csv"])
+
+    def test_a_live_baseline_never_withholds_an_enhanced_uncertified_file(self):
+        um, root = self._um_root()
+        self._record(um, root, "b.csv", "base", certification=um.BASELINE_LABEL,
+                     lineage="baseline")
+        self.assertIsNone(um.live_gates_passing_row("2026-06-03", "classic", "1840_2g"))
+        self.assertEqual(um.live_gates_passing_row(
+            "2026-06-03", "classic", "1840_2g", lineage="baseline")["certification"],
+            um.BASELINE_LABEL)
+        row = self._record(um, root, "u.csv", "unc", certification=um.UNCERTIFIED_LABEL)
+        self.assertEqual(row["status"], "candidate")
+
+    def test_a_refinement_retires_other_lineages_and_chains_its_parent(self):
+        um, root = self._um_root()
+        self._record(um, root, "b.csv", "base", certification=um.BASELINE_LABEL,
+                     lineage="baseline")
+        self._record(um, root, "e.csv", "enh", certification="certified")
+        self._record(um, root, "s.csv", "swap", certification=um.BASELINE_LABEL,
+                     lineage="baseline", refinement=True)
+        rows = {Path(r["delivered_file"]).name: r
+                for r in um.read_manifest("2026-06-03")["deliveries"]}
+        self.assertEqual(rows["b.csv"]["status"], "superseded")
+        self.assertTrue(rows["b.csv"]["superseded_by"].endswith("s.csv"))
+        self.assertEqual(rows["e.csv"]["status"], "superseded")
+        self.assertNotIn("superseded_by", rows["e.csv"])
+        self.assertTrue(rows["e.csv"]["retired_by"].endswith("s.csv"))
+        self.assertEqual(um.current_deliveries("2026-06-03")[0]["delivered_file"],
+                         rows["s.csv"]["delivered_file"])
+        # A refinement recording the same bytes as a live row still retires.
+        um2, root2 = self._um_root()
+        self._record(um2, root2, "b.csv", "base", certification=um2.BASELINE_LABEL,
+                     lineage="baseline")
+        self._record(um2, root2, "e.csv", "enh", certification="certified")
+        self._record(um2, root2, "e.csv", "enh", certification="certified",
+                     refinement=True)
+        rows = {Path(r["delivered_file"]).name: r
+                for r in um2.read_manifest("2026-06-03")["deliveries"]}
+        self.assertEqual(rows["b.csv"]["status"], "superseded")
+
+    def test_an_unknown_lineage_is_refused(self):
+        um, root = self._um_root()
+        with self.assertRaisesRegex(ValueError, "lineage"):
+            self._record(um, root, "x.csv", "x", lineage="enhanced")
+        with self.assertRaisesRegex(ValueError, "lineage"):
+            um.live_gates_passing_row("2026-06-03", "classic", "t", lineage="nope")
+
+    def test_run_slate_refuses_a_bad_lineage_before_any_work(self):
+        from mlb_engine.entries.upload_manifest import BASELINE_LABEL
+        common = dict(runs_root="/nonexistent/runs", salary_csv="/nonexistent/s.csv",
+                      entries_csv="/nonexistent/e.csv", approve=True)
+        for kw, pattern in (
+                ({"delivery_lineage": "enhanced", "candidates_override": [{}],
+                  "certification_label": BASELINE_LABEL}, "only lineage"),
+                ({"delivery_lineage": "baseline", "certification_label": BASELINE_LABEL},
+                 "candidates_override"),
+                ({"delivery_lineage": "baseline", "candidates_override": [{}],
+                  "certification_label": "review_grade_deadline_build"}, "records")):
+            with self.subTest(kw=sorted(kw)), self.assertRaisesRegex(ValueError, pattern):
+                run_slate(**common, **kw)
+
+    # -- the tools that read or write the rows -------------------------------- #
+
+    def test_preflight_names_the_retiring_file_on_a_retired_row(self):
+        from tools.preflight_upload import check_manifest, Report
+        um, root = self._um_root()
+        self._record(um, root, "b.csv", "base", certification=um.BASELINE_LABEL,
+                     lineage="baseline")
+        self._record(um, root, "s.csv", "swap", certification="certified",
+                     refinement=True)
+        rep = Report()
+        path = root / "outputs" / "2026-06-03" / "b.csv"
+        entry = types.SimpleNamespace(contest_id="1")
+        check_manifest(path, [entry], um.manifest_path("2026-06-03"), rep, delivered=True)
+        superseded = [f for f in rep.failures if "superseded by" in f]
+        self.assertTrue(superseded, rep.failures)
+        self.assertIn("s.csv", superseded[0])
+        self.assertNotIn("None", superseded[0])
+        # Re-promoting a retired row would put two live rows back.
+        self.assertIn("upload the swapped file", superseded[0])
+        self.assertNotIn("promote_run", superseded[0])
+
+    def test_a_late_swap_records_in_its_parent_s_lineage(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "late_swap_tool_r389b", REPO / "tools" / "late_swap.py")
+        ls = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(ls)
+        self.assertEqual(ls.parent_delivery_lineage(
+            {"manifest": {"metadata": {"delivery_lineage": "baseline"}}}, "2026-06-03"),
+            "baseline")
+        um, root = self._um_root()
+        self._record(um, root, "b.csv", "base", certification=um.BASELINE_LABEL,
+                     lineage="baseline")
+        sha = hashlib.sha256(b"base").hexdigest()
+        self.assertEqual(ls.parent_delivery_lineage(
+            {"manifest": {}, "parent_export_sha256": sha}, "2026-06-03"), "baseline")
+        self.assertEqual(ls.parent_delivery_lineage(
+            {"manifest": {}, "parent_export_sha256": "0" * 64}, "2026-06-03"), "")
+        self.assertEqual(ls.parent_delivery_lineage(None, "2026-06-03"), "")
+        source = (REPO / "tools" / "late_swap.py").read_text(encoding="utf-8")
+        call = source[source.index("record = record_delivery("):]
+        self.assertIn("lineage=parent_delivery_lineage(swap_parent, args.date)",
+                      call[:call.index("\n        )")])
+
+    def test_a_re_promoted_baseline_keeps_its_label_and_lineage(self):
+        """With its outputs row gone, the run's own metadata names the label and
+        the lineage; a re-promotion never upgrades a baseline to certified."""
+        import shutil
+        from tools import promote_run
+        um, root = self._um_root()
+        block = self._full()["brief"]["baseline"]
+        run_id = block["run_id"]
+        shutil.copytree(self._full()["root"] / "runs" / run_id, root / "runs" / run_id)
+        args = promote_run.build_parser().parse_args(
+            ["--run-id", run_id, "--repo-root", str(root), "--date", "2026-06-03",
+             "--tag", "1840_2g"])
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(promote_run.run(args), 0)
+        row = um.read_manifest("2026-06-03")["deliveries"][-1]
+        self.assertEqual(row["certification"], "review_grade_baseline")
+        self.assertEqual(row["lineage"], "baseline")
+
+    def test_outcome_review_files_the_baseline_s_review_beside_the_enhanced(self):
+        from tools import outcome_review
+        root = Path(tempfile.mkdtemp(dir=self.base))
+        record = {"manifest_row": {"slate_tag": "1840_2g", "contest_type": "classic",
+                                   "lineage": "baseline", "sha256": "s"},
+                  "entries": [], "date": "2026-06-03"}
+        review = outcome_review.review_record(record, root)
+        self.assertEqual(review["lineage"], "baseline")
+        base = outcome_review.write_fragment(review, root)
+        plain = dict(review)
+        plain.pop("lineage")
+        enhanced = outcome_review.write_fragment(plain, root)
+        self.assertEqual(base.name, "2026-06-03_outcome_1840_2g_baseline.md")
+        self.assertEqual(enhanced.name, "2026-06-03_outcome_1840_2g.md")
+
+    def test_a_baseline_that_fails_its_re_read_is_named_and_never_presented(self):
+        """The file is presented only when `verify_classic` re-reads it clean,
+        the engine calls it essential-valid, and it carries the baseline label."""
+        stop = ("mod", "resolve_reference_data", self._crash("stop at research"))
+        cases = (
+            ("re-read", [("mod", "verify_classic",
+                          lambda *_a, **_k: {"passed": False, "failures": ["x"]})]),
+            ("essential", [("mod", "classic_artifact_record",
+                            lambda _result, delivered: {
+                                "label": "review_grade_baseline",
+                                "essential_valid": {"essential_valid": False},
+                                "path": str(delivered), "sha256": "s"})]),
+            ("label", [("mod", "classic_artifact_record",
+                        lambda _result, delivered: {
+                            "label": "upload_ready",
+                            "essential_valid": {"essential_valid": True},
+                            "path": str(delivered), "sha256": "s"})]))
+        for name, patches in cases:
+            with self.subTest(case=name):
+                build = self._build_in(Path(tempfile.mkdtemp(dir=self.base)),
+                                       via_exit_door=False, patches=[*patches, stop])
+                self.assertIn("stop at research", str(build["code"]))
+                block = build["mod"]._BASELINE
+                self.assertEqual(block["status"], "not_presented")
+                self.assertEqual(build["mod"]._LAST_USABLE, {})
+                self.assertFalse(self._file_lines(build["err"]))
+                # The mirror recorded a row before the checks refused the file,
+                # so the record names it and says not to upload it.
+                self.assertIn("_BASELINE_", block["recorded_file"])
+                self.assertIn("do not upload", block["do_not_upload"])
+
+    def test_an_s_p_only_baseline_refusal_is_never_published(self):
+        from mlb_engine.pipeline.execution_pipeline import mirror_review_grade
+        export = {"label": "review_grade_uncertified", "path": "/nonexistent/x.csv"}
+        result = {"passed": False, "delivery_lineage": "baseline",
+                  "review_grade_export": export}
+        self.assertIsNone(mirror_review_grade(result, self._SALARY))
+        self.assertFalse(export["manifest_recorded"])
+        self.assertIn("R389(b)", export["not_mirrored"]["why"])
+
+    def test_a_filled_entries_file_is_rebuilt_whole_as_run_slate_does(self):
+        """A re-downloaded DKEntries file with every row filled: `run_slate`
+        refills every row, so the baseline covers every row too, never
+        `nothing_to_fill`."""
+        from mlb_engine.pipeline import baseline as bl
+        from mlb_engine.intake.live_data_adapters import build_slate_pool
+        filled = Path(self._full()["brief"]["baseline"]["path"])
+        reqs = bl.every_row_requirements(filled)
+        self.assertEqual(sum(len(v) for v in reqs.values()), 18)
+        pool = build_slate_pool(str(self._SALARY), {"games": []},
+                                declared_pitchers={p: "declared_probable_sp"
+                                                   for p in self._DECLARED},
+                                stale_platoon_policy="warn")
+        seen: list = []
+        with unittest.mock.patch.object(epi, "run_slate",
+                                        lambda **kw: seen.append(kw) or {"passed": False}):
+            out = epi.run_baseline(
+                runs_root=str(self.base / "unused"), salary_csv=self._SALARY,
+                entries_csv=filled, pool=pool, requested_n=18,
+                deadline=time.monotonic() + 120.0)
+        self.assertEqual(out["status"], "allocated", out["core"])
+        self.assertEqual(out["core"]["required"], 7)
+        self.assertEqual(len(seen), 1)
+
+    def test_an_earlier_live_certified_row_is_named_over_this_baseline(self):
+        """A rebuild whose enhanced solve refuses: this run's baseline is its
+        current file, and an earlier run's certified row for the slate, still
+        live, is named under `live_delivery` as the delivery."""
+        from mlb_engine.entries import upload_manifest as um
+        root = Path(tempfile.mkdtemp(dir=self.base))
+        earlier = root / "outputs" / "2026-06-03" / "DKEntries_1840_2g.csv"
+        earlier.parent.mkdir(parents=True)
+        earlier.write_text("an earlier certified build", encoding="utf-8")
+        with unittest.mock.patch.object(um, "REPO_ROOT", root), \
+                contextlib.redirect_stdout(io.StringIO()):
+            um.record_delivery(date="2026-06-03", delivered_file=earlier,
+                               contest_type="classic", slate_tag="1840_2g",
+                               contest_ids=["1"], entries=1, certification="certified")
+        build = self._build_in(root, fake_enhanced=[self._REFUSAL])
+        block = build["brief"]["baseline"]
+        self.assertTrue(block["current"])
+        self.assertTrue(block["live_delivery"]["delivered_file"].endswith(earlier.name))
+        self.assertEqual(block["live_delivery"]["certification"], "certified")
+        self.assertIn("an earlier build's certified file is still live", build["err"])
+        again = self._build_in(Path(tempfile.mkdtemp(dir=self.base)),
+                               fake_enhanced=[self._REFUSAL])
+        self.assertNotIn("live_delivery", again["brief"]["baseline"])
+
+    def test_the_build_output_never_claims_upload_ready(self):
+        """Eval 0's forbidden claim, held here too: the baseline's lines negate
+        the label ("never certified"), because a regex cannot read a negation
+        and `upload-ready` is reserved for a certified export."""
+        pattern = re.compile(r"upload[- ]ready(?! after)", re.IGNORECASE)
+        refused = self._build_in(Path(tempfile.mkdtemp(dir=self.base)),
+                                 fake_enhanced=[self._REFUSAL])
+        for name, build in (("full", self._full()), ("refused", refused)):
+            with self.subTest(build=name):
+                text = build["err"] + build["out"]
+                self.assertIn("BASELINE", text)
+                self.assertIsNone(pattern.search(text), pattern.search(text)
+                                  and text[max(0, pattern.search(text).start() - 120):
+                                           pattern.search(text).end() + 40])
+
+    def test_an_enhanced_file_that_fails_its_re_read_leaves_the_baseline_current(self):
+        """The diff review's blocker. The enhanced solve certifies and records
+        its own row in THIS call, then fails `verify_classic` (exit 3,
+        `verify_failed`): the baseline stays current and is re-presented, and
+        this call's own failed file is never named as an earlier delivery."""
+        from mlb_engine.entries import upload_manifest as um
+        root = Path(tempfile.mkdtemp(dir=self.base))
+        real_run_slate = epi.run_slate
+        enhanced = root / "outputs" / "2026-06-03" / "DKEntries_1840_2g.csv"
+
+        def run_slate_spy(**kw):
+            if kw.get("delivery_lineage"):
+                return real_run_slate(**kw)
+            baseline = next((root / "outputs" / "2026-06-03").glob("DKEntries*BASELINE*.csv"))
+            enhanced.write_bytes(baseline.read_bytes())
+            um.record_delivery(date="2026-06-03", delivered_file=enhanced,
+                               contest_type="classic", slate_tag="1840_2g",
+                               contest_ids=["191020573"], entries=18,
+                               run_id="enhanced_this_call", certification="certified")
+            return {"passed": True, "run_id": "enhanced_this_call",
+                    "workflow_valid": True, "selection_certified": True,
+                    "allocation_certified": True, "delivered_path": str(enhanced),
+                    "manifest_recorded": True}
+        mod_probe = self._module()
+        real_verify = mod_probe.verify_classic
+
+        def verify(salary, path):
+            if "_BASELINE_" in Path(path).name:
+                return real_verify(salary, path)
+            return {"passed": False, "failures": ["injected: the enhanced re-read failed"]}
+        build = self._build_in(root, patches=[(epi, "run_slate", run_slate_spy),
+                                              ("mod", "verify_classic", verify)])
+        self.assertEqual(build["code"], 3, build["err"][-800:])
+        block = build["brief"]["baseline"]
+        self.assertTrue(block["current"])
+        self.assertNotIn("live_delivery", block)
+        err = build["err"]
+        files = self._file_lines(err)
+        self.assertIn("_BASELINE_", files[-1])
+        self.assertGreater(err.rindex(files[-1]), err.index("SOLVE 1"))
+        self.assertIn("failed its independent re-read", err)
+        self.assertNotIn("an earlier build's", err)
+
+    def test_a_baseline_run_is_never_re_promoted_under_the_enhanced_name(self):
+        import shutil
+        from tools import promote_run
+        um, root = self._um_root()
+        run_id = self._full()["brief"]["baseline"]["run_id"]
+        shutil.copytree(self._full()["root"] / "runs" / run_id, root / "runs" / run_id)
+        args = promote_run.build_parser().parse_args(
+            ["--run-id", run_id, "--repo-root", str(root), "--date", "2026-06-03",
+             "--tag", "1840_2g", "--canonical"])
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            self.assertEqual(promote_run.run(args), 2)
+        self.assertIn("--canonical would write it over the enhanced file", out.getvalue())
+        self.assertFalse((root / "outputs" / "2026-06-03" / "DKEntries_1840_2g.csv").exists())

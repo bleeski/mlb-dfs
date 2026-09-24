@@ -2,6 +2,235 @@
 
 What changed in the engine, the tools and the contracts, when, and why.
 
+## 2026-09-24 — R389(b): baseline-first Classic. `run_classic` publishes an entry-mapped `review_grade_baseline` file in its own manifest lineage before any research, re-read on its exact bytes, so a crash after it delivers it (roadmap Session 11)
+
+**Scope.**
+- `mlb_engine/entries/upload_manifest.py`:
+  - `BASELINE_LABEL`, `BASELINE_LINEAGE`, `LINEAGE_VALUES`, `_valid_lineage` and `row_lineage`;
+  - `record_delivery(lineage=)`: supersession, the same-bytes merge and the UNCERTIFIED backstop key on `(contest_type, slate_tag, lineage)`, and a `refinement` retires every other lineage's live row (`retired_by`);
+  - `live_gates_passing_row(lineage=)`.
+- `mlb_engine/pipeline/execution_pipeline.py`:
+  - `run_baseline` (new) and `BASELINE_ASSUMED_GATES`;
+  - `run_slate(delivery_lineage=)` with its refusals before any work, and `delivery_lineage` in run metadata and on the result;
+  - `baseline_dest_name` and `_live_lineage_row_for_bytes` (new);
+  - `mirror_to_outputs`, `_deliver_mirror` and `_mirror_notes` made lineage-aware, and `mirror_review_grade` publishing no baseline;
+  - `manifest_strategy_state` counting `control_provenance.moved`;
+  - the `EngineCrashed` docstring.
+- `mlb_engine/pipeline/baseline.py`: `BASELINE_WINDOW_SHARE`, `every_row_requirements`, `BaselineResult.summary`, and the module docstring.
+- `skills/generate-lineups/scripts/build_slate.py`:
+  - `_BASELINE`, `publish_baseline`, `_write_baseline_brief`, `baseline_brief_block`, `_earlier_live_delivery` and `present_baseline_as_current` (new);
+  - `run_classic`: `resolve_leverage`, `attempt_controls` and `never_relax` moved above the new call; the `baseline` block on the refusal payload, the delivered brief and the exit-10 JSON; the baseline re-presented on a refusal, a thin sliced bank and a `verify_failed` enhanced file;
+  - `_main_recording_refusals`: the refusal record carries `_LAST_USABLE` and the block;
+  - `_deliver_after_exception`, `REFUSAL_EXIT_NOTES[7]` and the module docstring.
+- `tools/preflight_upload.py`: the `review_grade_baseline` reason, and the superseded message's `retired_by` fallback.
+- `tools/late_swap.py`: `parent_delivery_lineage`, and the swap records in its parent's lineage.
+- `tools/promote_run.py`: it keeps the run metadata's review-grade label, and the lineage.
+- `tools/outcome_review.py`: the review carries a lineage, and the fragment name its suffix.
+- `skills/generate-lineups/references/baseline.md` (new), `skills/generate-lineups/SKILL.md` (+2 lines, and "the last `FILE` line"), `.claude/rules/skills.md` (the line count, and the script door's note that the baseline's approved call is EP's).
+- `tests/test_core.py`:
+  - `ClassicBaselineFirstTests` (new);
+  - a `publish_baseline` stub in four `run_classic` harnesses;
+  - the preflight label loop;
+  - `import hashlib`.
+- `tools/audit.py` (the test_core pin), `docs/backlog.md` (R389 rewritten to (c); R419 and R420 filed), `docs/ROADMAP.md` (Session 11 Complete, NEXT Session 12, Sessions 106-107, the ledger row, Session 10 backfilled as 88aacc6), `CHANGELOG.md`.
+- Not committed: this session's hook-written `data/agent_runs/` record.
+
+**What was wrong, reproduced at 88aacc6.** The reproduction ran in a detached scratch worktree (`MLB_DFS_ROOT` pointed there, `PYTHONHASHSEED=0`, `TZ=America/New_York date` in every call) through the real exit door (`_main_recording_refusals`).
+- Setup: the vendored 2026-06-03 slate; the build's own lineups fetch failing (egress is closed here, and a supplied empty feed is refused as another slate's); the eight top-salary P-eligible arms declared; `--ignore-pool-blockers --assume-gates lineup_gate_passed`, because BAL has no declared arm.
+- **A crash after research exited 1 with no file.** `resolve_leverage` raising: uncaught, 0 files under `outputs/` and `runs/`. At `run_slate` entry: uncaught, 0 files.
+- **A clean build refused.** Exit 3, `entry-level joint MILP proven infeasible` on the control interaction, and no file at all.
+
+**Premise corrections.** A `dfs-premise` run checked the entry, and I re-ran its sharpest greps.
+- **The brief's line numbers were right.** The entry's own and the roadmap row's were 5 stale.
+- **The row's two halves could not both hold through one door.** On a pass, `run_slate(candidates_override=)` always mirrors to `DKEntries_<tag>.csv` under `("classic", tag)` (EP L6989, UM L382), so:
+  - the enhanced mirror would have overwritten the baseline's bytes;
+  - its row would have superseded the baseline's (preflight fails a superseded row, PF L1598);
+  - a live gates-passing baseline would have withheld an enhanced UNCERTIFIED mirror.
+- **Distinct fill vs `max_shared_players`, measured.** The core's covering set is refused under the posture caps: on 06-03, primary-stack exposure, SP-pair repetition and the consensus cluster. It certifies all three gates with the deadline rung's open values: 06-03 in 0.13s (18/18), 06-28 blanked in 0.77s (38/38). So controls open and no `target_distinct` spares are needed.
+- **The probe stays.** The enriched `single_s` measured 0.111s and 0.117s (06-03) and 0.182s and 0.177s (06-28). The core's `probe.wall_s` measured 0.24-0.26s and 0.69s: 2-4x slower (first-solve warm-up, a different frame, no ownership column). Feeding it to `projected_direct` would push builds to the sliced door. After this change the enriched probe measured 0.115s (06-03) and 0.222s (06-28).
+- **The gap-knob rider is declined.** A grid solve took about 0.15s on 11 games, and at 150 entries the grid built 150 lineups in 18.4s.
+
+**The plan and its review.** The plan went to a read-only Plan agent before any code. It found five blockers, each re-checked in the tree and designed in:
+1. **Two AST pins require exactly one `run_slate(` call in `build_slate.py`** (`BuildContractCheckpointTests`, `R288OpposingHitterControlTests`). The baseline's engine half lives in EP `run_baseline`, where production builds already enter. Both pins stay true and unedited, and a new pin holds the baseline's own call to `approve=True` with the allowance.
+2. **Preflight finds declared pitchers only through a sibling brief carrying the file's sha** (PF L2107-2170, `verify_export` too). The baseline writes `build_brief_<tag>_BASELINE_<run>.json` beside itself.
+3. **Exit 4 must keep meaning "before any solve".** `resolve_leverage` only validates the operator's own prediction file, so it moved above the baseline. The "after research" crash injection moved to `resolve_reference_data`, a departure from the brief, approved.
+4. **A baseline exception must never cost the build.** `publish_baseline` records `error` and the build continues.
+5. **Late swap and lineage.** A swap records in its parent's lineage, and a refinement retires the others (`retired_by`, not `superseded_by`, so `verify_export`'s parent chain stays true).
+
+Its should-fixes taken:
+- every reserved row, as `run_slate` refills every row;
+- identical bytes reuse the live baseline row;
+- `strategy_state` reads `relaxed`;
+- the current-file rule spelled out, including an earlier live certified row (`live_delivery`);
+- `outcome_review`'s fragment name;
+- `promote_run`'s label and lineage;
+- the docs and the harness stub placement;
+- `light_satellite`, and `THE_ODDS_API_KEY` unset in the tests.
+
+One departure from its should-fix 4: the allocator's joint-MILP `time_limit` is NOT bounded by the baseline's window. Passed through the override, it would read `operator_relaxable` in `control_provenance`, a false label. The allocation keeps the allocator's own 30s limit; measured, 0.13s (06-03), 0.5-0.8s (06-28) and 4.5s at 150 entries.
+
+**What shipped.**
+- *The engine half* (EP `run_baseline`):
+  - the core on `unenriched_frame` over every reserved row (`every_row_requirements`), inside `BASELINE_WINDOW_SHARE` (0.25) of the time left at the call, with the build's anti-correlation allowance;
+  - a short core returns without a `run_slate` call;
+  - otherwise `run_slate(approve=True, light_satellite=True, candidates_override=core.allocator_candidates(...))` with the six enrichment inputs None, no leverage, weather caps, sleeve ranking or input confidence, `--postures`, the pool's kwargs, `source_metadata={"pool_report": ...}` and `assume_gates` = odds and weather plus the operator's;
+  - the controls are `merge_open_controls(attempt_controls, OPEN_CONTROL_VALUES, never_relax=)`, and every move is recorded as `control_moves` (`by: "baseline"`) so `control_provenance` never calls them the operator's;
+  - the label is `review_grade_baseline` and the lineage `baseline`.
+- *Gates.*
+  - **Evidenced:** salary, entry grid, lineup (the pool report), pitcher audit, projection schema, optimizer, `selection_certified`, the allocation gates, and every post-export gate on the bytes.
+  - **Assumed by construction:** odds and weather, named in `assumed_gates`.
+  - **Not certified.** A baseline that passes every gate is still labelled `review_grade_baseline`: two gates are assumed by construction, every cap was opened before any refusal, and it is built on the construction-proxy frame. `passed_its_gates` reads the label as passing, and that is true, because the row exists only when its file passed its gates (`manifest_certification` records `not_certified` on any failing gate). Preflight says `review_ready`, exit 0, with its own reason.
+- *The script half* (BS `publish_baseline`):
+  - it is called after `n_entries`, the `--leverage` check and the hoisted `attempt_controls` and `never_relax` (one definition each), before `resolve_reference_data`;
+  - the file must pass `verify_classic` on its mirrored bytes, be essential-valid, and carry the baseline label; then the sha-bound brief is written, and the file is presented (`FILE` line) and kept in `_LAST_USABLE`;
+  - `has_deliverable` still reads only the solve's own result, so R407's re-solve and the governor's rung are untouched;
+  - short, refused, crashed, not-presented and error outcomes are named records under `baseline.status`, and the build runs as before.
+- *Exits and the current file.*
+  - An exception after the baseline (research, the probe, `EngineCrashed`, the brief) exits 7 with the baseline, and the minimal brief carries the block.
+  - Refusals keep 3 and 10, so autobuild still grows the bank or resumes. The payload carries the block, the baseline is re-presented as the last `FILE` line (after any UNCERTIFIED line, before the gate narrative), and the refusal record names it.
+  - Current order: an enhanced file that passed its gates, then the baseline, then an enhanced UNCERTIFIED file (R388(d): a gates-failed file never outranks a gates-passing one). An earlier run's live certified row is named under `baseline.live_delivery`.
+- *The manifest* (UM):
+  - the key is `(contest_type, slate_tag, lineage)`, and a row gets `lineage` only when it has one, so every existing row is byte-identical;
+  - `live_gates_passing_row(lineage=)`;
+  - a refinement retires other lineages (both record paths);
+  - an unknown lineage raises.
+- *Mirror* (EP): `DKEntries_<tag>_BASELINE_<run_id>.csv`; reuse of a live baseline row with the same bytes; the baseline note on the row; no S/P-only baseline is ever published; `control_provenance.moved` counted in `strategy_state` (a deadline-governed row also reads `relaxed` now, which is true).
+- *Tools that read or write the slate's rows.*
+  - **`late_swap.py`** records a swap in its parent's lineage (`parent_delivery_lineage`: the run's metadata first, else the row), so the swap supersedes its true parent and `verify_export`'s chain walks to it.
+  - **`promote_run.py`** keeps the row's lineage, else the run's. With no row left, it keeps the run metadata's review-grade label instead of re-deriving `certified`; that also fixes a deadline run re-promoted without its row. It refuses `--canonical` for a baseline run, whose canonical name is the enhanced file's.
+  - **`preflight_upload.py`**: the reason text; a retired row names its retiring swap and tells Ben to upload the swapped file, since re-promoting would put two live rows back.
+  - **`outcome_review.py`** files a baseline's review under `<date>_outcome_<tag>_baseline.md`, so it never overwrites the entered file's review.
+- *Behaviour changes outside the baseline, each deliberate:*
+  - a deadline-governed row's `strategy_state` now reads `relaxed` with `controls_opened` (the rung's moves were invisible to it);
+  - `promote_run` keeps a deadline label from run metadata;
+  - a refusal record carries `last_usable_artifact` whenever a file was presented before the refusal;
+  - a rerun whose baseline bytes changed supersedes the earlier baseline inside its lineage even when its enhanced solve refuses;
+  - every Classic build spends the baseline's time (measured below) before research.
+
+**R233, every site that records a delivery.** `grep -rn "record_delivery(\|[^_a-z]deliver(" --include=*.py mlb_engine tools skills`, `mlb_engine/production/` excluded:
+- EP L7491, `_deliver_mirror`, through:
+  - `mirror_to_outputs`: certified, deadline and baseline, and it passes the lineage;
+  - `mirror_review_grade`: UNCERTIFIED; a baseline never reaches it, so `""` is right.
+- UM L568: `deliver`'s own call.
+- `tools/late_swap.py` L1224: its parent's lineage.
+- `tools/promote_run.py` L301: the row's lineage, else the run's.
+- BS L5338: Showdown's writer. It stays in the default lineage, since its contest type already keys it apart; R389(c) is Session 12's.
+
+**Readers of the slate key, and what two live rows per slate do to each.**
+- **Keyed, changed:** `record_delivery`, `live_gates_passing_row` (EP `mirror_review_grade`; BS `_earlier_live_delivery`) and `_live_lineage_row_for_bytes`.
+- **By sha plus name, unchanged:** `preflight_upload.match_manifest_record` and `recorded_delivery_row`. `verify_export`'s parent chain reads `superseded_by`, which a retirement never writes.
+- **Scoped to the slate, unchanged:**
+  - `current_deliveries` and `verify_manifest`, which now list both files. That is R419's input.
+  - `field_miner` (live deliveries first; it tries each) and `awaiting_standings` (set unions).
+  - `delivery_record.record_name` (tag plus run id, so the baseline's record is its own file).
+  - `retro.find_brief` (its tagged glob never matches the baseline's brief; its last-resort fallback can).
+- **Fixed:** `outcome_review` (the fragment name). Its pending count now includes the baseline's record.
+
+**R233, every reader of `has_deliverable` and `_LAST_USABLE`.** `grep -rn "has_deliverable(\|_LAST_USABLE" --include=*.py mlb_engine tools skills`:
+- `has_deliverable` is called only on `run_slate` results: the `_solve` outcome, R407's re-solve, the governor loop, the refusal block, and `publish_baseline`'s own check of the baseline's result. It never reads `_LAST_USABLE`.
+- `_LAST_USABLE` is:
+  - written by `note_last_usable` (the baseline, the certified enhanced file, Showdown);
+  - read by `baseline_brief_block` and `present_baseline_as_current`;
+  - read by the delivered Classic brief (only when its re-read passed) and the Showdown brief;
+  - read by `_main_recording_refusals` (the exception path, the exit-7 record, and now every refusal record) and `_deliver_after_exception`.
+
+**R233, every `run_slate(candidates_override=` caller.** `grep -rn "candidates_override=" --include=*.py mlb_engine tools skills`:
+- BS L3856, `_solve`: the sliced bank, or None on the direct door.
+- EP `run_baseline`: the core's payload, the one new caller.
+- EP L6613: `_plan_joint_allocation`'s argument inside `run_slate`, not a caller.
+
+**The diff review.** A read-only general-purpose subagent reviewed the diff, in place of `/code-review`, whose security hook fails under /bin/sh here.
+
+Two blockers, both fixed:
+1. **A false `live_delivery` on `verify_failed`.** The enhanced file certified in the engine, recorded a live `certified` row, then failed BS's independent re-read. The brief named THIS call's failed file as "an earlier build's file … it stays the delivery". Now `live_delivery` counts only rows recorded before this call's baseline (`published_utc`), and `verify_failed` re-presents the baseline as current. Pinned by a test whose enhanced fake records its own certified row in-call.
+2. **The CHANGELOG entry was missing.** This is it.
+
+Should-fixes taken, each with a test and a red mutation:
+- **One answer to "which file is current".** The baseline stays this call's current file, because it was built on this call's inputs. The earlier live row is named with the reason to prefer it when the inputs did not change, and it is no longer called the delivery that outranks the baseline.
+- **Presentation order.** The baseline is presented the moment its checks pass. A row recorded but never presented is named (`recorded_file`, `do_not_upload`).
+- **Later failures.** The baseline's own later failures ride its block.
+- **The re-read reads what it presents.** The presented path is the one `verify_classic` re-reads.
+- **No-op moves.** A control the operator already typed at its open value is no move.
+- **`promote_run --canonical`** refuses a baseline run.
+- **A retired row's preflight remedy** no longer suggests re-promotion.
+- **The exit-10 JSON** prints with `default=str`, and the brief block is pinned JSON-serializable.
+- **The governor test** now asserts the baseline was delivered.
+- **The documented changes** are recorded above, and `references/baseline.md` has the `verify_failed` and exit-7 rows.
+
+Two review points kept as they are, each stated:
+- The late-swap lineage test pins the call text beside a unit test of `parent_delivery_lineage`, because driving `late_swap.main` to its record needs a full swap setup (the R414 test notes the same limit).
+- The allocation's own MILP limit is not bounded by the share (above). Measured at autobuild's 21s attempt on 06-28, the baseline still shipped: 3.1s of a 5.1s share, plus 0.5s to allocate.
+
+**Tests.** `ClassicBaselineFirstTests`, 31, about 45s on this container.
+- **The harness.** The tests drive the real `run_classic` on the vendored 06-03 slate through the real exit door (`_main_recording_refusals` with `main` swapped for the `run_classic` call). `mod.REPO` and `upload_manifest.REPO_ROOT` point at a temp root, research reads a temp copy of the vendored reference data, and `THE_ODDS_API_KEY` is unset.
+- **What is faked:** only the injected crashes, a `verify_classic` or artifact-record failure where the test is about that check, and the ENHANCED `run_slate` where the test is about presentation. The baseline's own call always runs for real. One shared real build (the baseline, then an enhanced file certifying with caps opened by `--controls-override`) is made on first use.
+- **The row's three facts, one test each:**
+  - a crash in `resolve_reference_data`, and at the enhanced `run_slate` entry, exits 7 with the baseline first and last among the FILE lines;
+  - the enhanced file supersedes nothing Ben holds: two live rows in two lineages, and `preflight_upload` passes on both files' exact bytes after both are recorded (the baseline `review_ready` with its reason and declared pitchers from its own brief; the enhanced `upload_ready`);
+  - the baseline is essential-valid on its exact bytes: its sha equals the row's, the presented one and `runs/<id>/final`'s; `failed []`; `verify_classic` passes; 18/18 rows; F-3; the block is JSON-serializable.
+- **The rest:**
+  - the call order (leverage, then baseline, then research);
+  - the baseline call's kwargs, and a never-relax cap held;
+  - the engine call's AST pin;
+  - the window share;
+  - short, refused, raising and not-presented baselines, with the recorded file named;
+  - the governor still walking;
+  - exit 3 re-presenting the baseline after `SOLVE 1`;
+  - rerun reuse;
+  - `strategy_state` (9 moves, and 2 when seven were typed);
+  - the UM lineage units;
+  - `run_slate`'s refusals;
+  - preflight's retired-row message;
+  - `late_swap`'s parent lineage;
+  - `promote_run`'s label and lineage, and its `--canonical` refusal;
+  - `outcome_review`'s fragment;
+  - the S/P-only refusal;
+  - a filled entries file rebuilt whole;
+  - an earlier live row named;
+  - a `verify_failed` enhanced file;
+  - no upload-ready claim in the output.
+- **Existing harnesses.** Four harnesses that fake `run_slate` for the enhanced solves stub `publish_baseline`: `DeadlineGovernorWiringTests._run` (also borrowed by LastUsable, TypedRefusal, ReviewGrade and DirectDoor tests), `DirectDoorResolveBankTests._run`, LastUsable's exit-door test and BaselineCoreTests' frame-helper harness. The preflight label loop gains the new label.
+
+**Mutations.** 55, by `tools/_scratch_s11/mutate.py`: each applied alone, the named tests run, the file restored byte for byte with a sha check (a SIGTERM handler restores too), and a `--check` mode that finds stale anchors. All 55 went red on the final code.
+- Two needed a second pass:
+  - "leverage after the baseline" SURVIVED because the mutation itself was wrong: it re-inserted the call after the leverage block, so the order never changed. With the leverage block moved below the call it went red.
+  - "refusal does not re-present the baseline" SURVIVED because the test anchored on `err.index("gate ")`, which found the earlier "gate assumed (not checked)" lines, so the baseline's first presentation already satisfied it: a test passing for the wrong reason. The test now requires the last FILE line after `SOLVE 1` and before the refusal's own `gate portfolio_caps_passed` line, and the mutation went red.
+- The first harness run was killed mid-mutation (a 30-minute call limit). It left `build_slate.py` mutated at one line, which was restored and verified against the pre-run sha list before anything else ran; hence the SIGTERM handler.
+
+**End to end** (the scratch worktree, the final diff applied, `TZ=America/New_York date` in every call):
+- **Crashes:**
+  - `resolve_leverage` raising: exit 1 and 0 files, correct now, because it precedes the baseline and any solve;
+  - `resolve_reference_data` raising: exit 7, the baseline presented, `delivered_sha256` `5271481d…`;
+  - the enhanced `run_slate` entry raising: exit 7, the same file.
+- **Default caps on 06-03:** the baseline (18/18, sha `5271481d…`, the same as the pre-build measurement), then the enhanced solve refuses: exit 3, the baseline re-presented as current, preflight exit 0 `review_ready` with the baseline brief supplying the declared pitchers. A second identical run reused the row: one BASELINE file, one baseline delivery record.
+- **Opened caps on 06-03:** baseline, then enhanced certified, exit 0. The enhanced sha is `72999ebf…`, byte-identical to the same build before this change. Preflight after both are recorded: baseline exit 0 `review_ready`, enhanced exit 0 `upload_ready`. The baseline row reads `relaxed`.
+- **06-28 blanked (11 games, 38 rows), `--max-seconds 200`:** the core took 3.27s (probe 0.49s, grid 2.73s, 21 distinct) and allocation 0.53s, inside a 49.8s share. The enhanced build certified (its bank overran by 4.7s, R417(b)'s sleeves, unchanged).
+- **06-28 at autobuild's 21s attempt:** the baseline shipped in 3.1s plus 0.5s of a 5.1s share, and the sliced bank then exited 10 with the baseline re-presented as current.
+- **150 entries** (06-28, one contest): the core took 18.9s (150 grid lineups) and allocation 4.5s, 150/150 rows, inside a 150s share.
+
+**Evals.** `run_evals.py` ran in the worktree: 6 of 8, the two R411 names (2 and 5), as on main; eval 2 still certifies (exit 0 where 3 is expected) and did not flip to 10. The first run was 5 of 8. Eval 0 failed on its forbidden-claim pattern `upload[- ]ready(?! after)`, which matched the new lines' own negation "never upload-ready". They now say "never certified", and a unit test holds the same pattern against the baseline builds' output. The worktree's leftover `data/deliveries/` records are R420.
+
+**Verification.**
+- `UT test_core.ClassicBaselineFirstTests`: 31 OK.
+- GOLD: `tests.test_golden_replay` 9 OK, `tests/golden/` untouched (`15d915b5…`, `424dd0f4…`), and the consensus-cluster histogram `{1: 6, 2: 3, 4: 4, 5: 1, 6: 4}` over 18 entries is unmoved.
+- PROBE: `python tools/solver_probe.py --date 2026-06-03 --salary data/archive/2026-06-03/DKSalaries_2026-06-03.csv` prints FITS on a degenerate pool, `pool 36 players, 0 SP, 0 cross-game pairs`, because `data/slates/2026-06-03` is absent in a cloud clone.
+- The neighbours: 271 OK (the brief's list, `BuildContractCheckpointTests`, `R288OpposingHitterControlTests`, `RefusalClassificationTests`, `TypedRefusalTests`, `ControlProvenanceTests`, `DeadlineGovernorCliTests`, `LateSwapReviewParentTests` and GOLD).
+- LINT exit 0.
+
+**Gate.** Before: `PASS  v2.26.0  44 modules  2690 tests  5 skipped` (this session's start, at 88aacc6). After: `PASS  v2.26.0  44 modules  2721 tests  5 skipped  {test_core 1717/1717 (4 skipped) skipped_in_place; test_showdown 337/337 (1 skipped) skipped_in_place}  [tests.test_core ran its pinned 1717 but 4 were SKIPPED, so the count proves nothing about coverage.; tests.test_showdown ran its pinned 337 but 1 were SKIPPED, so the count proves nothing about coverage.]` (the same five absent-file skips; 5.4 min on this container).
+- The first full run was red on one test: `LostWindowExitCodeTests.test_every_refusal_payload_carries_the_slate_date` scans `build_slate.py` for any dict literal with a `status` key and no `date`, and found the baseline block's two. The block now carries the slate date, and the second run is the line above.
+- Pin: `tests.test_core` 1686 -> 1717.
+- No new module.
+
+**The migrated register text (R389(b), filed 2026-09-22 and rewritten by Session 10).** "(b) Classic, baseline first.
+- `run_classic` calls the core after the pool-blocker refusals (`build_slate.py` L2986-3003, `n_entries` at L3014) and before `resolve_reference_data` (L3016), on `unenriched_frame` from the pool's `projection_rows`, with the build's `--max-opposing-hitters-per-sp`.
+- The probe at L3160 is the one to retire. The core's `probe.wall_s` is a timing proxy on the unenriched frame, not the enriched `single_s`, so measure before swapping one for the other.
+- Export, validate on exact bytes, and publish under the baseline's own name and manifest lineage.
+- Distinct-fill lineups share up to nine players and the postures cap `max_shared_players` at 5-6, so allocation needs never-relax-aware open controls or `target_distinct` spares.
+- Rider: `build_single_lineup` has no gap parameter (`milp` gets `time_limit` and `disp` only). If a big-slate baseline measures solve time that a gap would buy back, add the knob with PROBE; Session 10 found no need on 06-28 11g (about 0.4s a grid solve).
+
+Acceptance. A crash after the baseline delivers the baseline, and the baseline is essential-valid on its exact bytes."
+
 ## 2026-09-24 — R389(a): the baseline core. An entry-mapped, per-contest-distinct Classic candidate set built on the unenriched frame, before research, the bank and joint allocation, written nowhere and not wired into any build yet (roadmap Session 10)
 
 **Scope.**

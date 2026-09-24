@@ -73,7 +73,7 @@ from mlb_engine.entries.dk_entries_manager import (  # noqa: E402
 )
 from mlb_engine.optimize.bank_cache import BankCache, extend_bank, pool_signature  # noqa: E402
 from mlb_engine.entries.upload_manifest import (  # noqa: E402
-    UNCERTIFIED_LABEL, record_delivery, recorded_delivery_row,
+    UNCERTIFIED_LABEL, record_delivery, recorded_delivery_row, row_lineage,
     stage_salary_for_delivery, unrecorded_name,
 )
 from mlb_engine.swap.late_swap_manager import (  # noqa: E402
@@ -150,6 +150,29 @@ def swap_certification(result: dict, downgraded: list, parent_label=None) -> str
     if label.startswith("review_grade"):
         return label
     return "certified"
+
+
+def parent_delivery_lineage(parent: dict | None, date: str) -> str:
+    """R389(b). The manifest lineage a swap records in: its parent's.
+
+    The run's own metadata first (`run_slate` writes `delivery_lineage` on a
+    baseline run), then the ``outputs/<date>/`` row for the parent's bytes. So
+    the swap supersedes its true parent (the ``superseded_by`` chain
+    `verify_export` walks for locked slots), and `record_delivery`'s
+    refinement retires every other lineage's live row. No parent, or one with
+    neither, is the default lineage.
+    """
+    if not parent:
+        return ""
+    meta = str(((parent.get("manifest") or {}).get("metadata") or {}).get(
+        "delivery_lineage") or "")
+    if meta:
+        return meta
+    try:
+        row = recorded_delivery_row(date, str(parent.get("parent_export_sha256") or ""))
+    except Exception:  # noqa: BLE001 - a missing manifest is the default lineage
+        row = None
+    return row_lineage(row) if row else ""
 
 
 def parent_delivery_label(parent: dict, date: str) -> tuple:
@@ -1218,6 +1241,9 @@ def main() -> int:
             # R388(d). A swap refines the file Ben entered, so an UNCERTIFIED
             # refinement records even over a later passing build's row.
             refinement=True,
+            # R389(b). In the parent's lineage, so a swap off the baseline
+            # supersedes the baseline and not the enhanced file.
+            lineage=parent_delivery_lineage(swap_parent, args.date),
         )
         delivered_sha = str(record.get("sha256") or "")
         # R96(4): the swap had no salary staging at all, so a late-swapped slate

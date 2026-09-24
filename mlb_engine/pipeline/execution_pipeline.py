@@ -604,7 +604,9 @@ class EngineCrashed(RuntimeError):
     keeps the crash a crash rather than reading the blocked result as a
     refusal: build_slate's deadline governor would re-solve it, and late_swap
     would print "late swap did not pass" and exit 3, both the crash-wearing-a-
-    refusal shape R296(d) was filed against. Raised, it exits 1 as it did.
+    refusal shape R296(d) was filed against. Raised, it exits 1 as it did,
+    unless build_slate had already presented the R389(b) baseline, in which
+    case `_main_recording_refusals` delivers that file and exits 7.
     """
 
 
@@ -6138,6 +6140,12 @@ def run_slate(
     # is every existing caller's build exactly.
     auto_bank_out: Optional[Dict[str, Any]] = None,
     reuse_auto_bank: Optional[Mapping[str, Any]] = None,
+    # R389(b). Which build's file this is. "baseline" is the entry-mapped file
+    # `run_baseline` publishes before research: it names the mirror
+    # `DKEntries_<tag>_BASELINE_<run_id>.csv` and records it in its own
+    # manifest lineage, so the enhanced delivery never supersedes it. None is
+    # every existing caller's build exactly.
+    delivery_lineage: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Single front door: raw slate inputs -> certified DKEntries file plus diagnostics.
 
@@ -6192,6 +6200,22 @@ def run_slate(
     if reuse_auto_bank is not None and not (reuse_auto_bank.get("candidates")):
         raise ValueError("reuse_auto_bank carries no candidates; pass the dict "
                          "an earlier call filled through auto_bank_out")
+    # R389(b). Refused before any work: the baseline lineage is one build's
+    # file, built on the core's candidates and labelled as such, and nothing
+    # else may wear its name or its manifest key.
+    if delivery_lineage is not None:
+        from mlb_engine.entries.upload_manifest import (
+            BASELINE_LABEL, BASELINE_LINEAGE,
+        )
+        if delivery_lineage != BASELINE_LINEAGE:
+            raise ValueError(f"delivery_lineage={delivery_lineage!r}: the only "
+                             f"lineage a build may name is {BASELINE_LINEAGE!r}")
+        if candidates_override is None:
+            raise ValueError("delivery_lineage='baseline' needs candidates_override: "
+                             "the baseline solves on the core's candidates, never a bank")
+        if certification_label != BASELINE_LABEL:
+            raise ValueError(f"delivery_lineage='baseline' records {BASELINE_LABEL!r}, "
+                             f"not {certification_label!r}")
     # R388(b). Refused before any work too: a misspelled never-relax holds
     # nothing and says nothing. The same resolver build_slate's flag uses, so
     # the two doors accept the same names; F-3 is in the set on every build.
@@ -6816,6 +6840,10 @@ def run_slate(
                   # swap off this run reads it without an outputs/ row.
                   **({"certification_label": str(certification_label)}
                      if certification_label else {}),
+                  # R389(b). The run knows it is a baseline, so a late swap or
+                  # a re-promotion off it keeps the lineage and the label.
+                  **({"delivery_lineage": str(delivery_lineage)}
+                     if delivery_lineage else {}),
                   },
         # R388(d). A cap breach on a never-relax control is never review-grade.
         never_relax=never_relax,
@@ -6918,6 +6946,10 @@ def run_slate(
              "error": f"{type(exc).__name__}: {exc}"})
         print(f"RUN_SLATE REPORT FIELDS FAILED  {type(exc).__name__}: {exc}; "
               f"the export is unaffected", file=sys.stderr)
+    # R389(b). Set outside the guarded report fields: the mirror reads it to
+    # pick the baseline's name and manifest lineage.
+    if delivery_lineage:
+        result["delivery_lineage"] = str(delivery_lineage)
     # R393(b). When the report fields failed, the manifest row the mirror would
     # record reads a result missing its label and its contests, so nothing is
     # published from it: build_slate presents the immutable runs/ export.
@@ -6950,6 +6982,131 @@ def run_slate(
                   f"brief cannot state the sha256 Ben checks at upload",
                   file=sys.stderr)
     return result
+
+
+#: R389(b). The two gates the baseline cannot evidence, by construction: it
+#: runs before the odds and weather reads, so it has no F1 or F5 map to check.
+#: Assumed and named in the run's `assumed_gates`, never passed silently.
+BASELINE_ASSUMED_GATES = ("odds_gate_passed", "weather_gate_passed")
+
+
+def run_baseline(
+    *,
+    runs_root: str | Path,
+    salary_csv: str | Path,
+    entries_csv: str | Path,
+    pool: Mapping[str, Any],
+    requested_n: int,
+    deadline: float,
+    attempt_controls: Optional[Mapping[str, Any]] = None,
+    never_relax: Iterable[str] = (),
+    contest_postures: Optional[Mapping[str, Any]] = None,
+    assume_gates: Sequence[str] = (),
+    max_opposing_hitters_per_sp: Optional[int] = None,
+    clock: Any = time.monotonic,
+) -> Dict[str, Any]:
+    """R389(b), roadmap Session 11. The baseline's engine half: the core's
+    entry-mapped candidates, allocated and exported through `run_slate`.
+
+    Called by `run_classic` after the pool-blocker refusals and before any
+    research. The frame is `baseline.unenriched_frame` on the pool's
+    projection rows and platoon order; the core covers EVERY reserved row
+    (`every_row_requirements`, because `run_slate` refills every row) within
+    `BASELINE_WINDOW_SHARE` of the time left before ``deadline`` (a
+    ``time.monotonic()`` end); the build's anti-correlation allowance reaches
+    every solve. A short core returns without a `run_slate` call.
+
+    Allocation is `run_slate(approve=True, candidates_override=...)` with every
+    enrichment input None, no leverage, no weather caps, no input confidence
+    (all research), and the caller's controls opened to the deadline rung's
+    values by `merge_open_controls`, never-relax-aware. F-3 stays held by the
+    allocator's per-contest signature row and DKM's validator. The opened
+    values reach the record as ``control_moves`` (``by: "baseline"``), so
+    `control_provenance` never calls them the operator's, and as a relaxation
+    count in ``bank_diagnostics``, so the manifest row's `strategy_state` reads
+    ``relaxed``. The file is labelled `BASELINE_LABEL`, named by
+    `baseline_dest_name`, and recorded in its own manifest lineage.
+
+    Returns ``{"status": "short" | "allocated", "core", "window", "controls",
+    "result"}``. Raises only what `build_baseline` raises for a caller error
+    or what `run_slate` raises before any work; the caller decides that a
+    baseline failure never costs the build.
+    """
+    from mlb_engine.entries.upload_manifest import BASELINE_LABEL, BASELINE_LINEAGE
+    from mlb_engine.pipeline import baseline as bl
+    from mlb_engine.pipeline import deadline_governor as dg
+
+    kwargs = dict(pool.get("run_slate_kwargs") or {})
+    started = clock()
+    left = max(0.0, float(deadline) - started)
+    window_end = started + bl.BASELINE_WINDOW_SHARE * left
+    frame, _enrichment = bl.unenriched_frame(
+        salary_csv, kwargs.get("projection_rows"),
+        projected_order_by_player_id=kwargs.get("platoon_order_by_player_id"))
+    core = bl.build_baseline(
+        salary_csv, frame, requirements=bl.every_row_requirements(entries_csv),
+        deadline=window_end,
+        max_opposing_hitters_per_sp=max_opposing_hitters_per_sp, clock=clock)
+    out: Dict[str, Any] = {
+        "core": core.summary(),
+        "window": {"share": bl.BASELINE_WINDOW_SHARE,
+                   "left_at_call_s": round(left, 1),
+                   "window_s": round(window_end - started, 1),
+                   "core_s": round(clock() - started, 2)},
+    }
+    if core.status != "covered" or core.stop_reason == "nothing_to_fill":
+        out["status"] = "short"
+        return out
+
+    held = frozenset(dg.DEFAULT_NEVER_RELAX | set(never_relax or ()))
+    before = dict(attempt_controls or {})
+    controls = dg.merge_open_controls(before, dg.OPEN_CONTROL_VALUES, never_relax=held)
+    reason = ("R389(b) baseline: every portfolio cap opened to the deadline "
+              "rung's value before research, never-relax held")
+    moves = [{"control": key, "before": before.get(key), "after": value,
+              "provenance": (dg.control_provenance_of(key, typed=before,
+                                                      never_relax=held)
+                             if key in before else None),
+              "reason": reason, "by": "baseline"}
+             for key, value in dg.OPEN_CONTROL_VALUES.items()
+             # A control the operator already typed at its open value did not
+             # move, so it is no relaxation and no row.
+             if key not in held and not (key in before and before[key] == value)]
+    out["controls"] = {
+        "opened": {m["control"]: m["after"] for m in moves},
+        "held": sorted(k for k in dg.OPEN_CONTROL_VALUES if k in held),
+        "never_relax": sorted(held),
+    }
+    assumed = list(BASELINE_ASSUMED_GATES) + [
+        g for g in (assume_gates or ()) if g not in BASELINE_ASSUMED_GATES]
+    alloc_started = clock()
+    result = run_slate(
+        runs_root=runs_root, salary_csv=str(salary_csv), entries_csv=str(entries_csv),
+        approve=True, light_satellite=True, requested_n=int(requested_n),
+        candidates_override=core.allocator_candidates(frame, int(requested_n)),
+        savant_batting_csv=None, savant_pitching_csv=None,
+        fangraphs_pitching_csv=None, f4_by_player_id=None,
+        f1_by_player_id=None, f5_by_player_id=None,
+        portfolio_controls_override=controls or None,
+        certification_label=BASELINE_LABEL, delivery_lineage=BASELINE_LINEAGE,
+        never_relax_controls=sorted(held), control_moves=moves,
+        assume_gates=assumed, contest_postures=contest_postures,
+        source_metadata={"pool_report": pool.get("pool_report")},
+        metadata={"bank_diagnostics": {
+            "source": "baseline_core",
+            "baseline_core": out["core"],
+            "relaxations": {
+                "baseline_opened_controls": len(moves),
+                "warnings": [f"baseline opened {m['control']} "
+                             f"{m['before']} -> {m['after']}" for m in moves],
+            },
+        }},
+        **kwargs,
+    )
+    out["window"]["allocation_s"] = round(clock() - alloc_started, 2)
+    out["status"] = "allocated"
+    out["result"] = result
+    return out
 
 
 def mirror_to_outputs(result: Mapping[str, Any], salary_csv: Any) -> Optional[str]:
@@ -6986,8 +7143,26 @@ def mirror_to_outputs(result: Mapping[str, Any], salary_csv: Any) -> Optional[st
         # file while both briefs went on citing the same path.
         tag = _slate_tag(salary_csv)
         stem = source.stem
-        dest = dest_dir / (f"{stem}_{tag}{source.suffix}" if tag and not stem.endswith(tag)
-                           else source.name)
+        lineage = str(result.get("delivery_lineage") or "")
+        if lineage:
+            # R389(b). The baseline's own name, beside the enhanced file rather
+            # than over it. A rerun that rebuilt the same bytes (an autobuild
+            # retry, a resume) reuses the live row and its file: one delivery,
+            # no second row or delivery record, no orphaned name.
+            reused = _live_lineage_row_for_bytes(slate_date, tag, lineage, source)
+            if reused is not None:
+                if isinstance(result, dict):
+                    result["manifest_recorded"] = True
+                    result["mirror_reused_row"] = {
+                        "delivered_file": reused.get("delivered_file"),
+                        "run_id": reused.get("run_id"),
+                        "note": "these bytes are already the live baseline row's; "
+                                "that row and its file are the delivery"}
+                return str(artifact_root / str(reused.get("delivered_file")))
+            dest = dest_dir / baseline_dest_name(tag, str(result.get("run_id") or ""))
+        else:
+            dest = dest_dir / (f"{stem}_{tag}{source.suffix}" if tag and not stem.endswith(tag)
+                               else source.name)
         # R96(2). Was: write dest, then try to record, and on failure print
         # loudly and leave the file wearing its uploadable name. R3(a) had
         # already made that failure loud; what it could not fix is that the
@@ -6995,7 +7170,8 @@ def mirror_to_outputs(result: Mapping[str, Any], salary_csv: Any) -> Optional[st
         # ARCHIVE, awaiting_standings, the next session -- saw a normal delivery.
         # The order is now write-provisional, record, promote, so an unrecorded
         # file is named DO_NOT_UPLOAD_* and says so without being asked.
-        outcome = _deliver_mirror(slate_date, dest, source, result, tag, salary_csv)
+        outcome = _deliver_mirror(slate_date, dest, source, result, tag, salary_csv,
+                                  lineage=lineage)
         if isinstance(result, dict):
             result["manifest_recorded"] = bool(outcome["recorded"])
             result["staged_salary"] = outcome.get("staged_salary")
@@ -7021,6 +7197,42 @@ def mirror_to_outputs(result: Mapping[str, Any], salary_csv: Any) -> Optional[st
               f"runs/<run_id>/final/ and nothing was delivered to outputs/",
               file=sys.stderr)
         return None
+
+
+def baseline_dest_name(slate_tag: str, run_id: str) -> str:
+    """R389(b). ``DKEntries_<tag>_BASELINE_<run_id>.csv``: the baseline's own
+    name, so the enhanced mirror (``DKEntries_<tag>.csv``) never overwrites the
+    file Ben may already hold. Built like `uncertified_dest_name`."""
+    tag = str(slate_tag or "").strip()
+    return (f"DKEntries_{tag}_BASELINE_{run_id}.csv" if tag
+            else f"DKEntries_BASELINE_{run_id}.csv")
+
+
+def _live_lineage_row_for_bytes(slate_date: str, tag: str, lineage: str,
+                                source: Path) -> Optional[Dict[str, Any]]:
+    """R389(b). The live row in this slate's ``lineage`` that already records
+    ``source``'s exact bytes, under the baseline label, at a file that still
+    holds them; else None."""
+    from mlb_engine.entries.upload_manifest import (
+        BASELINE_LABEL, REPO_ROOT as artifact_root, read_manifest, row_lineage,
+        sha256_file as um_sha256,
+    )
+    digest = um_sha256(source)
+    for row in reversed(read_manifest(slate_date).get("deliveries") or []):
+        if (row.get("contest_type"), row.get("slate_tag"), row_lineage(row)) != (
+                "classic", str(tag or ""), lineage):
+            continue
+        if row.get("status") == "superseded" or row.get("sha256") != digest:
+            continue
+        if row.get("certification") != BASELINE_LABEL:
+            continue
+        path = artifact_root / str(row.get("delivered_file") or "")
+        try:
+            if path.is_file() and um_sha256(path) == digest:
+                return dict(row)
+        except OSError:
+            continue
+    return None
 
 
 def uncertified_dest_name(slate_tag: str, run_id: str) -> str:
@@ -7049,6 +7261,16 @@ def mirror_review_grade(result: MutableMapping[str, Any], salary_csv: Any) -> Op
     """
     export = result.get("review_grade_export")
     if not isinstance(export, dict) or result.get("passed"):
+        return None
+    if result.get("delivery_lineage"):
+        # R389(b). A baseline ships only when every gate passed; an S/P-only
+        # baseline refusal is named, never published, and the enhanced build
+        # keeps its own UNCERTIFIED path.
+        export["manifest_recorded"] = False
+        export["not_mirrored"] = {
+            "why": ("a baseline is published only when every gate passes "
+                    "(R389(b)); this one failed S or P gates, so it stays in "
+                    "runs/ and the enhanced build keeps its own review-grade path")}
         return None
     try:
         from mlb_engine.intake.slate_intake_manager import (
@@ -7217,6 +7439,16 @@ def manifest_strategy_state(result: Mapping[str, Any]) -> Dict[str, Any]:
         steps = block.get("relaxations")
         if isinstance(steps, int) and not isinstance(steps, bool) and steps:
             counts[ladder] = max(counts.get(ladder, 0), steps)
+    # R389(b). Controls a deadline rung or the baseline OPENED (R388(b)'s
+    # `control_moves`, on the result as `control_provenance.moved`) are
+    # relaxations too. They arrive through the override, so no bank or ladder
+    # block above counts them, and a baseline with every cap opened read
+    # `clean`. Only a non-empty list is evidence, so a build without moves
+    # reads exactly as it did.
+    moved = list((result.get("control_provenance") or {}).get("moved") or [])
+    if moved:
+        saw_evidence = True
+        counts["controls_opened"] = len(moved)
     seen: set = set()
     relax_warnings = [w for w in relax_warnings if not (w in seen or seen.add(w))]
     if counts or relax_warnings:
@@ -7237,7 +7469,8 @@ def manifest_strategy_state(result: Mapping[str, Any]) -> Dict[str, Any]:
 def _deliver_mirror(slate_date: str, dest: Path, source: Path,
                     result: Mapping[str, Any], tag: str,
                     salary_csv: Any,
-                    failing_gates: Optional[Sequence[str]] = None) -> Dict[str, Any]:
+                    failing_gates: Optional[Sequence[str]] = None,
+                    lineage: str = "") -> Dict[str, Any]:
     """Mirror the promoted export through the R96(2) record-or-self-label door.
 
     One manifest record per delivery, so T-5 never has to guess which file, and
@@ -7280,6 +7513,8 @@ def _deliver_mirror(slate_date: str, dest: Path, source: Path,
         # R388(d). Only an UNCERTIFIED mirror names failing gates.
         failing_gates=failing_gates,
         notes=_mirror_notes(result),
+        # R389(b). Passed only when set, so every other row is unchanged.
+        **({"lineage": lineage} if lineage else {}),
     )
 
 
@@ -7287,6 +7522,11 @@ def _mirror_notes(result: Mapping[str, Any]) -> str:
     """R388(d). A governed attempt that still failed S/P gates records the
     lower label, UNCERTIFIED, and says here that a deadline rung moved it."""
     label = result.get("certification_label")
+    if result.get("delivery_lineage"):
+        # R389(b). What the baseline is, on its own row.
+        return ("baseline (R389(b)): built before research on the unenriched "
+                "frame, every portfolio cap opened to the deadline rung's value "
+                "(never-relax held); review-grade, never certified")
     if label and not result.get("workflow_valid"):
         return f"deadline rung: {label}; the gates still failed, so the row is uncertified"
     return ""

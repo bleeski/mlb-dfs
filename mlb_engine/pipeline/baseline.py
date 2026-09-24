@@ -16,8 +16,10 @@ WHAT IT IS AND IS NOT
 ---------------------
 A pure function. It reads the salary file, the entries file and the frame it
 is handed, and it writes nothing: no file, no directory, no lock, no cache
-(measured by a Python-level audit hook, which cannot see C-level writes). It is not wired into any
-build yet; Session 11 (R389(b)) calls it from `run_classic` and exports it.
+(measured by a Python-level audit hook, which cannot see C-level writes).
+Since R389(b) (Session 11) `execution_pipeline.run_baseline` calls it from
+`run_classic`, before any research, and exports what it built through
+`run_slate`; this module still writes nothing itself.
 
 What it returns is a CONSTRUCTION PROXY: lineups legal under the solver's
 rules on the frame it was given (the unenriched emergency_proxy frame, in
@@ -95,6 +97,15 @@ STOP_REASONS = ("covered", "nothing_to_fill", "time_budget", "solve_time_limit",
 
 #: The frame columns every solve reads. A frame without them is a caller error.
 FRAME_COLUMNS = ("Player_ID", "Position", "Team", "Game_ID", "Salary", "Ceiling")
+
+#: R389(b). The share of `run_classic`'s window left at the call that the
+#: baseline's search may spend: a fraction of the build's own deadline, never
+#: a number of seconds. Measured on this container it spent 0.4s of a 600s
+#: window on 06-03 and 3.7s on 06-28 blanked (11 games), so the share binds only
+#: a pathological slate, and the deadline itself is never moved: enhancement
+#: keeps everything the baseline did not spend. Session 15's frozen Deadline
+#: replaces the arithmetic, not the share.
+BASELINE_WINDOW_SHARE = 0.25
 
 
 # --------------------------------------------------------------------------- #
@@ -206,6 +217,27 @@ def requirements_from_entries(entries_csv) -> Tuple[ContestRequirement, ...]:
         ContestRequirement(cid, tuple(v["fillable"]), tuple(v["held"]),
                            tuple(v["partial"]))
         for cid, v in by_contest.items()])
+
+
+def every_row_requirements(entries_csv) -> Dict[str, Tuple[str, ...]]:
+    """R389(b). ``{contest_id: (entry_id, ...)}`` with EVERY reserved row
+    fillable, the shape ``build_baseline(requirements=)`` takes.
+
+    `run_slate` refills every reserved row on an initial build, complete and
+    partial ones included, so a baseline that held complete rows or skipped
+    partial ones (``requirements_from_entries``, the core's own reading) would
+    come up short or read ``nothing_to_fill`` on a re-downloaded DKEntries
+    file that `run_slate` rebuilds whole. A file whose rows are not Classic's
+    ten slots is a caller error, as there.
+    """
+    by_contest: Dict[str, list] = {}
+    for row in parse_dk_entry_rows(str(entries_csv)):
+        if len(row.roster_cells) != ROSTER_SIZE:
+            raise ValueError(
+                f"{entries_csv}: Entry ID {row.entry_id} has {len(row.roster_cells)} "
+                f"roster slots, not Classic's {ROSTER_SIZE}")
+        by_contest.setdefault(str(row.contest_id), []).append(str(row.entry_id))
+    return {cid: tuple(ids) for cid, ids in by_contest.items()}
 
 
 def _ids(values, what: str) -> Tuple[str, ...]:
@@ -322,6 +354,27 @@ class BaselineResult:
 
     def as_dict(self) -> Dict[str, Any]:
         return asdict(self)
+
+    def summary(self) -> Dict[str, Any]:
+        """R389(b). The typed count and timings for a brief, without the
+        rosters: what was built, how far it got, and why it stopped."""
+        return {
+            "construction_label": self.construction_label,
+            "status": self.status,
+            "stop_reason": self.stop_reason,
+            "required": self.required,
+            "target": self.target,
+            "distinct": self.distinct,
+            "short": self.short,
+            "target_met": self.target_met,
+            "uncovered": len(self.uncovered),
+            "by_contest": [asdict(c) for c in self.by_contest],
+            "sources": {src: sum(1 for c in self.candidates if c.source == src)
+                        for src in sorted({c.source for c in self.candidates})},
+            "timings": dict(self.timings),
+            "probe_wall_s": (self.probe or {}).get("wall_s"),
+            "version": self.version,
+        }
 
     def allocator_candidates(self, projections, requested_n: int,
                              contest_shapes: Optional[Sequence[str]] = None

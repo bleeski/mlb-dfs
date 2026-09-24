@@ -375,6 +375,10 @@ def review_record(record: Mapping[str, Any], root: Path) -> Dict[str, Any]:
         "delivered_file": manifest_row.get("delivered_file"),
         "delivered_sha256": manifest_row.get("sha256"),
         "certification": manifest_row.get("certification"),
+        # R389(b). A baseline row's lineage, only when it has one, so its
+        # review files beside the enhanced file's rather than over it.
+        **({"lineage": str(manifest_row["lineage"])}
+           if manifest_row.get("lineage") else {}),
         "record_path": str(record.get("_path") or ""),
         "reviewed_utc": datetime.now(timezone.utc).isoformat(),
         "contests": contests,
@@ -494,6 +498,10 @@ def write_fragment(review: Mapping[str, Any], root: Path) -> Optional[Path]:
     fragment rather than a double count in the one file the R10 gate reads.
     """
     tag = str(review.get("slate_tag") or "untagged") or "untagged"
+    # R389(b). The baseline and the enhanced file are both live deliveries of
+    # one slate; one fragment each, so neither review overwrites the other.
+    if review.get("lineage"):
+        tag = f"{tag}_{review['lineage']}"
     safe = "".join(c if (c.isalnum() or c in "-_") else "_" for c in tag)
     dest = root / "ledger" / "inbox" / f"{review.get('date')}_outcome_{safe}.md"
     try:
