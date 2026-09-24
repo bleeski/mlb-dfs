@@ -2,6 +2,307 @@
 
 What changed in the engine, the tools and the contracts, when, and why.
 
+## 2026-09-24 — R388(d): the review-grade lifecycle. A Classic refusal whose every failing gate is S or P, on bytes that are essential-valid, still delivers its file, UNCERTIFIED, and nothing about the refusal itself changes (roadmap Session 09, with R124(a) and R268)
+
+**Scope** (the whole block; R124(a) and R268 below share it):
+- `mlb_engine/entries/dk_entries_manager.py`: `classify_export_failures`, `PORTFOLIO_CAP_ERROR_CONTROLS`, `REVIEW_GRADE_BASIS`, and the validator's additive `portfolio_errors` key.
+- `mlb_engine/entries/upload_manifest.py`: `UNCERTIFIED_LABEL`, `GATES_FAILED_LABELS`, `passed_its_gates`, `live_gates_passing_row`, `recorded_delivery_row`, `record_delivery(failing_gates=, refinement=)`, the UNCERTIFIED backstop, and a same-bytes merge that drops `failing_gates`.
+- `mlb_engine/pipeline/execution_pipeline.py`:
+  - `recorded_controls`, `_controls_record`, `parent_realized_controls`, `_review_grade_fields`;
+  - `execute_portfolio`: its `never_relax=` keyword, the early-errors verdict, and `portfolio_controls` in diagnostics;
+  - `run_slate`: never-relax passed down, the governed label in run metadata, and the mirror call;
+  - `uncertified_dest_name`, `mirror_review_grade`, `_deliver_mirror(failing_gates=)`, `_mirror_notes`, and `manifest_certification`'s branch;
+  - `run_late_swap` resolving through `resolve_parent_run`, with `parent_run_id` and `parent_resolution` on its lineage. `_parent_export_sha256`, now dead, is removed.
+- `mlb_engine/swap/late_swap_manager.py`: `ParentLineageError`, `PARENT_KINDS`, `resolve_parent_run`.
+- `tools/late_swap.py`: the docstring; `swap_certification(parent_label=)`, `parent_delivery_label`, `inherit_swap_controls`; `--rederive-controls`; the parent check before the bank; the inherited-controls line; the labelled record.
+- `tools/preflight_upload.py`: the `review_grade_uncertified` reason and the failing gates in the note.
+- `skills/generate-lineups/scripts/build_slate.py`: `present_review_grade`, the export carried across solves, the refusal payload's two keys, `refusal_record_facts`, and one `later_failures` note.
+- `skills/generate-lineups/SKILL.md`: two lines replaced in place, still 1,581 lines.
+- `skills/generate-lineups/references/review_grade.md` (new) and `references/late_swap.md`.
+- `tests/test_core.py`: `ReviewGradeExportTests` (new, 21) and `LateSwapReviewParentTests` (new, 16). Two pins moved or widened: `DeliveryLabelAgreementTests`' `swap_certification` call text, and its reason-table test now includes the new label.
+- `tests/test_upload_integrity.py`: `GateAssumptionVersusOverrideTests` +1.
+- `tools/audit.py` (two pins), `docs/backlog.md`, `docs/ROADMAP.md`, `CHANGELOG.md`.
+
+**What was wrong, reproduced at 2e579cb** in a detached worktree through the real `run_slate(approve=True)`:
+- With `odds_gate_passed` left unassumed (a P gate) the result was:
+  - `passed=False`, errors `["Missing pre-export gate: odds_gate_passed"]`;
+  - run `blocked`, the file only at `runs/<id>/candidate/DO_NOT_UPLOAD_DKEntries.csv`, `outputs/` empty.
+- Preflight on that candidate said `review_ready`, exit 0. No manifest sat beside it, and preflight never reads the `DO_NOT_UPLOAD_` prefix (`grep -c DO_NOT_UPLOAD tools/preflight_upload.py`: 0).
+- The same happened with weather unassumed (a MIXED gate).
+
+**Premise corrections** (three `dfs-premise` runs, sharpest greps re-run):
+- **Stale citations.** The candidate is written at EP L634; "EP L309-500" and R124's "L387" are stale. `promote_run` is BSM L398-411.
+- **The golden pin.** Golden `pure_verdict` is `{"passed": true, "errors": []}`, a certification since R405, so no golden pin freezes a refused result. The refused `errors[]` text is pinned by other tests; it is byte-identical here and tested.
+- **Where the mirror lives.** `execute_portfolio` never writes `outputs/`: the mirror is `run_slate`'s. The verdict lands in `execute_portfolio` and the mirror in `run_slate`.
+- **Reachable failures.** On `run_slate` the S or P failures reachable with a file on disk are odds, optimizer and portfolio caps, plus `selection_certified` (MIXED S/P).
+- **`allocation_method`.** Off the allowlist it has no production producer with a file (`grep -rn "assign_lineups_to_contests(" mlb_engine tools skills`: no caller), so its change is classification plus a synthetic test.
+
+**The rule** (`classify_export_failures`, pure). Review-grade needs every failing check placed S or P, AND the candidate essential-valid on its own bytes (Session 08's `derive_essential_validity`, MIXED post gates required whole). The placement:
+- **P, placed:** `odds_gate_passed`, `optimizer_gate_passed`, `allocation_method`. For `allocation_method` the V revalidation is the post-export V facts, checked on the bytes.
+- **S, placed:** `portfolio_caps_passed`.
+  - It is placed per validator `portfolio_errors` entry, mapped by prefix to its control or controls.
+  - A control in the build's never-relax set blocks.
+  - `game ` maps to both `max_game_exposure_pct` and `max_game_exposure_pct_by_game`: the merge folds the never-relax-able scalar into the dict, and the validator only says "game G".
+  - An unmapped prefix is V.
+- **`selection_certified`:** a MIXED gate with no V fact, so whichever fact failed, it is not V.
+- **MIXED with a V fact, unplaced, so V:** lineup, pitcher audit, weather, projection schema, allocation certified, roster legality, hash binding, and the aggregates. The engine emits one boolean per MIXED gate; the split is R388(c), Session 13.
+- **V:** salary, entry grid, template, reconciliation, locked slots and delta, and `caller_assertion:*`. A name never classified is V.
+- **Attribution is total.** A candidate-validation error is S only when the validator put it in `portfolio_errors`. Anything in the refusal no row claims is V. This catches the two "entries file ..." errors (no reserved IDs; an embedded pool from another draftgroup), which share the overlap check's prefix and sit in neither the roster nor the cap list.
+
+**What shipped.**
+- **`execute_portfolio`, early-errors path, initial builds only.**
+  - The verdict adds `review_grade_export` (label, candidate path and sha256, coverage, `failing_gates`, per-failure placement, the essential block, all-False certification) or `review_grade_withheld` (each blocking check and why), on the result and in diagnostics.json.
+  - `passed=False`, `errors[]`, `workflow_valid=False` and the `blocked` run are exactly as before.
+  - The candidate stays in `candidate/`: nothing reaches `final/`, `promote_run` is never called, and the pointer never moves.
+  - It is deliberately NOT `last_usable_artifact`. `has_deliverable` reads that key, so it would stop the deadline governor from walking to a gates-passing rung and read as exit 7's crash-after-certification. The Session 08 comment that promised it is corrected.
+  - The verdict runs in its own try: a raise records `review_grade_error` and leaves the refusal untouched. A refused swap run never gets a verdict, so it can never become a review-grade parent.
+- **`run_slate` mirror (`mirror_review_grade`).**
+  - It sends the candidate through the same `deliver` door to `outputs/<date>/DKEntries_<tag>_UNCERTIFIED_<run_id>.csv`. The name is built by hand, because the source stem is `DO_NOT_UPLOAD_DKEntries` and `unrecorded_name` keeps a prefix.
+  - The manifest row is `review_grade_uncertified` with `failing_gates`; the tracked delivery record mirrors it.
+  - Top-level `delivered_path` stays None, so no caller reads a refused build as delivered.
+  - It is never mirrored over a live row whose file passed its gates (`live_gates_passing_row`). The design review measured why: a rebuild where only odds dropped is byte-identical, and `record_delivery`'s same-bytes merge would have rewritten the certified row. `record_delivery` refuses such a row as a backstop.
+  - A governed attempt that still failed S/P gates records the lower label and says so in its notes. Every other row's notes stay `""`.
+- **Preflight.** A new reason for the label, and the note names the failing gates. The verdict stays `review_ready`, exit 0, never `upload_ready`; `--force` and the upload stay Ben's.
+- **`build_slate`.**
+  - The refusal re-reads the UNCERTIFIED file with `verify_classic` and, on a clean read, prints its `FILE` line before the narrative.
+  - `review_grade_export` (or `review_grade_withheld`) rides the payload and the refusal record.
+  - The latest export is carried across the up-to-three solves, so a later V refusal still names the live file.
+  - Exit 3 is unchanged, so autobuild still retries toward certification outside a deadline.
+- **Unchanged:** `verify_export` checks bytes, reads no certification, and says "upload-ready" nowhere.
+
+**R233, the class.** `grep -rn "DO_NOT_UPLOAD" --include=*.py mlb_engine tools skills`, every site classified:
+- **The gate-failed candidate:** EP L758, its only writer. It keeps the name; the UNCERTIFIED mirror is a copy.
+- **"No manifest row yet" (R96(2)), untouched:** UM L70/81/84 (`UNRECORDED_PREFIX`), L334/386/468/473/505/563; EP L6997-7042 (the mirror comments); LS L1153; BS L619/709. The new mirror inherits this meaning through `deliver`.
+- **The Showdown staging copy:** `optimize/showdown.py` L1663/1716; BS L5094/5152/5386.
+- **Readers:** `tools/awaiting_standings.py` L454 (skips the prefix); BS L286 (the refusal's why text); BS L654 (`present_review_grade` never presents a file still at the prefix); DKM L1475, the `populate_dk_entries_template` wrapper, which has no caller (`grep -rn "populate_dk_entries_template(" mlb_engine tools skills`: its definition only).
+- **Not the filename:** `tools/dfs.py` L196-335 (a `RELEASE_DECISION` string) and `slate_intake_manager.py` L1207 (a summary sentence).
+- **Off the build path:** `mlb_engine/production/` (R302's strangler).
+
+**Tests.** `ReviewGradeExportTests`, 21:
+- through the real `run_slate`: a P-only refusal byte-identical and delivered UNCERTIFIED; preflight on it; the MIXED control; a certified build unchanged with its controls recorded; never over a certified row (same bytes); certified supersedes UNCERTIFIED; the backstop;
+- classifier units for every class; the wrong-draftgroup errors off the real validator; cap breaches with and without never-relax, the game scalar included; an unclaimed string;
+- through `execute_portfolio` with only the allocator faked: an S cap breach and its never-relax twin; an off-allowlist method and a V failure beside it; `selection_certified` False; a raising verdict; bytes that do not bind;
+- through `run_classic`: the file named, presented, carried across a later V refusal, and not presented when the re-read fails.
+
+`GateAssumptionVersusOverrideTests` +1: a refused assumption stays V. Mutations: 41 across the block by `tools/_scratch_s09/mutate.py`, each applied alone, run, and restored byte-identical (sha-checked). All 41 went red. This part's 27 are:
+- the verdict never computed, or computed on every mode;
+- essential validity ignored;
+- the "entries" errors counted as caps;
+- never-relax ignored;
+- `game` mapped only to the dict;
+- the unattributed check off;
+- MIXED-with-V placed;
+- an unclassified or a V gate shipping;
+- no `portfolio_errors` key;
+- the mirror not called, or called over a passing row;
+- the backstop off;
+- the label branch off;
+- `failing_gates` not recorded;
+- the preflight reason or its gates note missing;
+- controls not recorded;
+- numpy scalars stringified;
+- the brief never presenting;
+- the re-read ignored;
+- no carry across solves;
+- the refusal record omitting the file;
+- the same-bytes merge keeping `failing_gates`;
+- an unpromoted `DO_NOT_UPLOAD_` name presented;
+- the swap's `refinement` exemption off.
+
+**End to end** (the scratch worktree, `MLB_DFS_ROOT` pointed at it, a tonight-dated copy of the fixture slate, `TZ=America/New_York date` in every call):
+- `run_slate` with odds unassumed gave:
+  - `passed False`, errors `['Missing pre-export gate: odds_gate_passed']`;
+  - `outputs/2026-09-24/DKEntries_2305_2g_UNCERTIFIED_20260924T133428Z_b03a6cb9.csv`, sha256 `0431ac3555b4c122290050f72689ac7cf09f51943572cb63e71a54461e977719`;
+  - no `final/DKEntries.csv` and no pointer.
+- Preflight: exit 0, `review_ready`, no failures, note "... ships review-grade and uncertified (R388(d)). Failing gates: odds_gate_passed."
+- The same run with weather unassumed still stays `DO_NOT_UPLOAD_`.
+- The late swap off it is in R268's entry below.
+
+**Evals.** `run_evals.py`, run in the scratch worktree so its tracked `data/deliveries/` records never touched this tree: 6 of 8. The two failures are the R411 names (2 and 5), as on main. Eval 2's failure is a build that CERTIFIED (`status == 'certified', wanted 'not_certified'`), a path this change leaves byte-identical.
+
+**Review.** Two read-only agents, in place of `/land`'s `/code-review`, whose security hook fails under /bin/sh in the cloud container.
+
+*The plan, before any code:* five blockers, each re-checked in the tree and designed out:
+- the "entries file ..." V errors were unattributed by the prefix split;
+- the manifest's same-bytes merge would have rewritten a certified row;
+- a never-relax on the game scalar would have been missed;
+- three pinned tests would have broken (a `controls_for_report` call count, the `swap_certification` call text, the tampered-parent order).
+
+It also made nine should-fix points, all folded in.
+
+*The diff:* one blocker and six should-fix, all fixed before this commit, each with a test and a red mutation:
+- **Blocking.** `run_slate` writes a governed attempt's deadline label into the run metadata even when the attempt refuses. `parent_delivery_label` took the first review-grade label, so a swap off a governed UNCERTIFIED parent would have recorded `review_grade_deadline_build`, a gates-passing label, and dropped `failing_gates`. UNCERTIFIED named by any source now wins.
+- The same-bytes merge left an UNCERTIFIED row's `failing_gates` on the certified row that replaced it. It is dropped now.
+- The tracked-record label source never matched, because a delivery record keeps its run id at `manifest_row.run_id`. It reads both now.
+- `present_review_grade` could present a row recorded beside a name never promoted (`DO_NOT_UPLOAD_`). It names it and does not present it, as Session 08's certified path does.
+- The tool tests ran `late_swap.py` against this tree's `runs/`, and the dry run left a bank cache there. They run a copy in a temp skeleton now, and the two files it wrote were removed.
+- The backstop would have refused a swap of an uploaded UNCERTIFIED file once a later certified build was live. A swap records with `refinement=True`: it refines the file Ben entered.
+- The reason-table pin did not cover the new label. It does now.
+
+Nits fixed:
+- gates come from the row too, so a second-generation swap keeps them;
+- `_parent_kind`'s reason covers a refused swap and a crash;
+- the no-match error names the CLI flag;
+- two sentences in `review_grade.md`;
+- the export record says its bytes are bound as `candidate_export`;
+- a failed write's hash no longer overwrites its error;
+- the row reader returns the row, not the string "None";
+- the Session 09 row names its real label and write set.
+
+Kept: the leftover UNCERTIFIED-named copy of bytes a later certified build reproduced exactly still matches the certified row by sha, so preflight calls those bytes `upload_ready`. The bytes are certified; only the name disagrees, and deliveries are never deleted.
+
+**Gate.** Before: `PASS  v2.26.0  43 modules  2618 tests  5 skipped` (this session's start, at 2e579cb). After: `PASS  v2.26.0  43 modules  2656 tests  5 skipped  {test_core 1652/1652 (4 skipped) skipped_in_place; test_showdown 337/337 (1 skipped) skipped_in_place}  [tests.test_core ran its pinned 1652 but 4 were SKIPPED, so the count proves nothing about coverage.; tests.test_showdown ran its pinned 337 but 1 were SKIPPED, so the count proves nothing about coverage.]` (the same five absent-file skips; no new module). The first full run was red on four late-swap tests, fixed as R268's entry says. Pins:
+- `tests.test_core` 1615 -> 1652;
+- `tests.test_upload_integrity` 413 -> 414.
+
+GOLD: `tests.test_golden_replay` 9 OK, `tests/golden/` untouched (`15d915b5…`, `424dd0f4…`), and the consensus-cluster histogram `{1: 6, 2: 3, 4: 4, 5: 1, 6: 4}` over 18 entries is unmoved. PROBE not required: no bank, allocator or optimizer code changed. Verification command: 45 tests OK. LINT exit 0.
+
+**The migrated register text (R388(d), filed 2026-09-22).** "- **(d) Review-grade lifecycle.** When every failure is S or P, `execute_portfolio` mirrors the candidate as `DKEntries_<tag>_UNCERTIFIED_<run>.csv` with certification `review_grade`. `passed=False` and `errors[]` stay verbatim for the golden pins; nothing reaches `final/`; there is no promote."
+
+## 2026-09-24 — R124(a): the mirror-and-rename half. A legal-but-uncertified Classic file is named in `outputs/` and in the refusal, never hidden behind `DO_NOT_UPLOAD_` (roadmap Session 09, with R388(d))
+
+**Scope.** In R388(d)'s entry above.
+
+**What was wrong.** On 1810_3g, runs 4, 5 and 6 each wrote a file `verify_export` passed clean, and it sat at the candidate path while the session reported "no certified file". Verified at 2e579cb:
+- the refusal payload named no path (`grep 'payload\["run_dir"\]\|"diagnostics_path":' build_slate.py`: 0);
+- `mirror_to_outputs` returned None unless the run passed;
+- `usable_artifact` read only the `dk_export` role.
+
+**Premise corrections.**
+- **The trigger.** The entry's trigger ("the export passes `verify_export`") is replaced by R388(d)'s gate taxonomy. `verify_export` cannot see template preservation, reconciliation, hash binding or F-3, so the entry's own falsifier fired.
+- **The prefix has three meanings.** "Reserve `DO_NOT_UPLOAD_` for files that fail `verify_export`" is unscoped. The prefix also means "no manifest row yet" (R96(2)) and the Showdown staging copy, and those stay (R388(d)'s R233 list).
+- **The acceptance clause.** "Preflight still refuses it" was superseded by R386 and R388(e): every label but `certified` is `review_ready`, exit 0. An unrecorded copy under `outputs/` still hard-fails.
+
+**What shipped.** In R388(d)'s entry:
+- the UNCERTIFIED mirror;
+- `review_grade_export` on the result and in the refusal payload, with the `FILE` line;
+- the refusal record's copy of it.
+
+**Declined here and kept open with rows** (Ben's scope for this session): (b) `--deliver-always` moves to Session 21 as its fourth unit, and (c) R89's single-pass blocker rider moves to Session 67 beside R89.
+
+**Tests and gate.** In R388(d)'s entry.
+
+## 2026-09-24 — R268: a late swap finds its parent by the file's bytes and inherits what the parent shipped, so neither `--allow-parent-mismatch` nor a hand-restated cap is the reflex any more (roadmap Session 09, with R388(d))
+
+**Scope.** In R388(d)'s entry above.
+
+**What was wrong, reproduced at 2e579cb** at `run_late_swap`. Each case gave:
+- (i) a review-grade parent: `FileNotFoundError: no promoted parent run found`, or with any prior promotion `ValueError: late swap parent mismatch ...`;
+- (ii) A promoted, then B promoted, a swap off A: the same ValueError;
+- (iii) a parent that shipped `max_player_exposure_pct` 1.0 and a swap at 0.5 with 2 of 3 rows frozen: "player 10001 already appears in 2 of the 2 row(s) this solve cannot change, against a whole-file cap of 1 at 3 complete rows".
+
+**Premise corrections** (the `dfs-premise` run, re-reproduced):
+- **The pointer.** It is one global file, `runs/latest_valid_run.json`. `tools/promote_run.py` never moves it (`grep -c 'latest_valid_run\|LATEST_POINTER\|promote_run(\|pointer' tools/promote_run.py`: 0).
+- **The docstring's claim.** `late_swap.py`'s R29(2) docstring ("needs no `--allow-parent-mismatch`") held only after a downgrade refusal.
+- **The check's timing.** The check ran inside `run_late_swap`, after `late_swap.py` had spent its bank budget, and a mismatch was an unguarded ValueError (exit 1, traceback).
+- **The control source.** R268(a)'s "inherit from its diagnostics" had no source: diagnostics.json recorded no controls (0 hits in the EP L700-747 dict). The swap's floors came from the mutable rows only.
+- **Found while building: a dead line.** `late_swap.py`'s R405 "consensus cluster, parent build" line read `result["parent_run_id"]`, which no swap result carried, so it always read nothing. It now names the parent.
+
+**What shipped.**
+- **(b) `late_swap_manager.resolve_parent_run`.**
+  - With a pointer, its run is loaded and its bundle verified first (a tampered pointer run still raises RuntimeError; `test_tampered_parent_blocks_late_swap` is unedited), and a matching export is its child.
+  - Otherwise every `runs_root/*/manifest.json`, newest first (an unreadable one is skipped and counted), is matched by the file's sha256 against a promoted run's export, a certified-unpromoted run's export (deferred, or crashed after certification: R393(b)'s exit-7 case no longer needs the flag, and its note says so), or a blocked run's candidate carrying a matching `review_grade_export`. The strongest kind wins, then the newest run.
+  - A V-failing candidate is refused by name. The chosen run's bundle is verified too.
+  - A file matching no run is still the hard error (`ParentLineageError`, a ValueError). `--allow-parent-mismatch` then takes the latest promoted run as before, and with no pointer that is still `FileNotFoundError`.
+  - The lineage records `parent_resolution`, `latest_promoted_run_id` and `parent_run_id`.
+  - `late_swap.py` resolves after its cheap input refusals (geometry, feed, contest identity) and before the pool, any bank slice or the solve, and refuses a no-match at exit 3, not a traceback; `--dry-run` warns and continues. The first cut ran the check straight after geometry, and the first full gate went red on four tests that pin the feed and posture refusals coming first (`LateSwapIdentityTests` x2, `SwapAndProbeLostWindowTests` x2); the check moved, and those four pass unedited.
+- **(a) Controls.** diagnostics.json records the controls a run solved under (`recorded_controls`: id maps dropped, numbers kept as numbers).
+  - `late_swap.py` inherits them by default (`inherit_swap_controls`): id maps are re-derived from the swap's frame, the parent's `time_limit` is dropped, `--controls-override` applies on top, and the consensus-cluster cap is still stripped. It prints "INHERITED".
+  - `--rederive-controls` runs `resolve_swap_controls` unchanged, whose print is the pinned one. A parent recorded before this change carries no controls and is re-derived, and says so.
+- **Labels.** A swap under inherited controls would have laundered a deadline rung's opened caps into `certified`. `swap_certification(result, downgraded, parent_label)` never records a label better than the parent's:
+  - failing gates give `not_certified`;
+  - an UNCERTIFIED parent gives UNCERTIFIED;
+  - an accepted downgrade gives the downgrade label;
+  - any other review-grade parent gives its label;
+  - otherwise `certified`.
+
+  `parent_delivery_label` reads, in order:
+  1. the run manifest's `certification_label`, which `run_slate` now writes when governed, so the label is in `runs/` itself;
+  2. its `review_grade_export`;
+  3. the `outputs/` row for the bytes;
+  4. the tracked delivery record.
+
+  Any review-grade label wins. An inherited UNCERTIFIED label carries the parent's `failing_gates` onto the swap row.
+- **Stated, not changed.** An S-failing UNCERTIFIED parent swaps only when the authorized rows hold the excess. A swap whose own failures are S or P is refused and not mirrored; that is a rider on R414, Session 101.
+
+**R233, the class of late-swap parent checks.** `grep -rn "load_latest_valid_parent_run\|resolve_parent_run\|_assert_parent_lineage\|allow_parent_mismatch\|current_matches_parent_export" --include=*.py mlb_engine tools skills`:
+- the resolver (LSM L307-407) and its docstring pointer to the old loader (LSM L14, L248, kept for compatibility, now uncalled in production);
+- `run_late_swap`'s call and `_assert_parent_lineage`, which still enforces the match (EP L1048-1119);
+- `late_swap.py`'s flag, its help, the early check and the engine call (L26, L80, L847-859, L998, L1059).
+
+`tools/repair_entry.py` and LSM have no other lineage check. A repaired file matches no run and still needs the flag. That is the hard error Ben kept.
+
+**Tests.** `LateSwapReviewParentTests`, 16:
+- the parents: review-grade with no flag and no pointer; review-grade past an unrelated promotion; superseded promoted; certified-unpromoted;
+- the refusals: no match still raises; a V candidate refused by name; a tampered review-grade parent fails integrity;
+- controls and labels: inheritance, with (iii) passing and refusing at 0.5; a pre-R268 parent; the label table; a deadline label read from the run with no `outputs/` row; an UNCERTIFIED parent's gates; a governed parent that still failed is UNCERTIFIED, not deadline; a downgrade label read from the tracked record alone;
+- the tool, copied into a temp skeleton so it reads its own `runs/`: refuses before the bank; a dry run warns.
+
+Mutations (14 of the block's 41, all red):
+- no enumeration;
+- any candidate a parent;
+- the chosen parent unverified;
+- promoted outranked;
+- `parent_run_id` off;
+- the UNCERTIFIED parent ignored;
+- a review-grade parent ignored;
+- the run-manifest label source off;
+- `run_slate` recording no label;
+- the inherited `time_limit` kept;
+- the tool skipping the early check;
+- a dry run blocking;
+- UNCERTIFIED not outranking a deadline label;
+- the tracked record matched on its top-level `run_id` only.
+
+**End to end** (the scratch worktree, after R388(d)'s build):
+- The real `tools/late_swap.py --date 2026-09-24 ... --parent-entries outputs/2026-09-24/DKEntries_2305_2g_UNCERTIFIED_20260924T133428Z_b03a6cb9.csv --budget 20 --solver-budget 15`, with no `--allow-parent-mismatch`, exited 0. It printed:
+  - `parent: run 20260924T133428Z_b03a6cb9 (review_grade; latest promoted None)`;
+  - `portfolio controls INHERITED from parent run 20260924T133428Z_b03a6cb9 (R268(a))`;
+  - `gates: workflow_valid=True selection=True allocation=True`;
+  - `parent label: review_grade_uncertified (from review_grade_export)`;
+  - `wrote outputs/2026-09-24/DKEntries_lateswap_2305_2g_07f6af90.csv`, sha256 `ee14893a1d137c4c9925ac2ecffb5f760ecff8989b2902ca02f6b9c02ae253c7`.
+- The swap's row is `review_grade_uncertified` with `failing_gates ['odds_gate_passed']`; the parent's row reads `superseded`.
+- Preflight on the swapped file: exit 0, `review_ready`.
+- The three repro cases re-run: (i) and (ii) pass with no flag; (iii) inherits 1.0 and passes, and still refuses at a re-derived 0.5.
+
+**The migrated register text (R268, filed 2026-08-29).**
+
+### R268. Two shipped fixes whose SYMPTOM never closed, both on the swap path, both of which taught the operator to switch a protection off (P1, S) | new 2026-08-29, merged from BUILD fragment `2026-08-29_BUILD_late-swap-repair-gaps-and-autonomy.md` §C(2) and §C(4); both verified in tree
+
+**What.** Two halves, filed as one number because the class is the finding.
+
+**(a) R29(3) unified control resolution and the swap still derives tighter than
+the parent shipped.** On `1305_12g` the parent shipped
+`max_player_exposure_pct=0.55` (an R157 rescue value, re-derived from that
+slate's structural floors); the swap derived 0.50 and refused with *"player
+43965130 already appears in 16 of the 29 row(s) this solve cannot change,
+against a whole-file cap of 15."* **When most rows are frozen, a cap derived
+tighter than the parent's is unsatisfiable by construction** — the frozen rows
+already breach it and no legal swap can unbreach them. R29(3)'s "one function
+both the build and the swap resolve controls through" is in CHANGELOG.md and is
+real; what it did not do is make the swap INHERIT the parent run's realized
+`portfolio_controls`. It re-resolves from postures, and a posture default is not
+what shipped. Fix: inherit the parent run's `portfolio_controls` from its
+diagnostics by default, print that it did, and require a flag to re-derive.
+
+**(b) R29(2) deferred promotion and `--allow-parent-mismatch` is still needed on
+every invocation.** `tools/late_swap.py:845-853` carries R29(2)'s own comment
+saying the workaround "was `--allow-parent-mismatch` on every later call, which
+is switching off the R20(c) protection because a bug taught the operator to
+distrust it." The 08-29 slate needed the flag on every call anyway, for a
+different reason: once any later run is promoted, the parent a given file
+actually came from is no longer the promoted one, **which is the normal state
+during a repair sequence.** The flag became reflexive again. Fix: accept a
+parent matching ANY run in the manifest, and reserve the hard error for a file
+matching none.
+
+**Why one number.** Both are fixes that landed, were correct about their
+mechanism, and left the operator's workaround in place — so both read as closed
+on this board while still costing calls in the field. That is the reading worth
+keeping, and it is lost if these are two entries. The check the class implies:
+**a fix that eliminates a documented workaround is not done until the workaround
+stops being typed.** Neither of these was verified that way.
+
 ## 2026-09-24 — R416: on the direct door a re-solve solves on the first solve's bank. `run_slate` hands its auto-bank back and takes one in, a solve that builds takes its budget from the window left at that call, and the brief records what each solve spent (roadmap Session 103)
 
 **Scope.**

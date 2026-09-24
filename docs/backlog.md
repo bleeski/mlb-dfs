@@ -4822,41 +4822,9 @@ scratch, but the fact that if one happens there is no legal repair.
   "legal replacement" -- two answers to that question, one at build time and one
   at repair time, is R167/R159's class waiting to happen.
 
-### R268. Two shipped fixes whose SYMPTOM never closed, both on the swap path, both of which taught the operator to switch a protection off (P1, S) | new 2026-08-29, merged from BUILD fragment `2026-08-29_BUILD_late-swap-repair-gaps-and-autonomy.md` §C(2) and §C(4); both verified in tree
+### R268. CLOSED 2026-09-24 -- (a) and (b) SHIPPED as roadmap Session 09, entry migrated to CHANGELOG.md
 
-**What.** Two halves, filed as one number because the class is the finding.
-
-**(a) R29(3) unified control resolution and the swap still derives tighter than
-the parent shipped.** On `1305_12g` the parent shipped
-`max_player_exposure_pct=0.55` (an R157 rescue value, re-derived from that
-slate's structural floors); the swap derived 0.50 and refused with *"player
-43965130 already appears in 16 of the 29 row(s) this solve cannot change,
-against a whole-file cap of 15."* **When most rows are frozen, a cap derived
-tighter than the parent's is unsatisfiable by construction** — the frozen rows
-already breach it and no legal swap can unbreach them. R29(3)'s "one function
-both the build and the swap resolve controls through" is in CHANGELOG.md and is
-real; what it did not do is make the swap INHERIT the parent run's realized
-`portfolio_controls`. It re-resolves from postures, and a posture default is not
-what shipped. Fix: inherit the parent run's `portfolio_controls` from its
-diagnostics by default, print that it did, and require a flag to re-derive.
-
-**(b) R29(2) deferred promotion and `--allow-parent-mismatch` is still needed on
-every invocation.** `tools/late_swap.py:845-853` carries R29(2)'s own comment
-saying the workaround "was `--allow-parent-mismatch` on every later call, which
-is switching off the R20(c) protection because a bug taught the operator to
-distrust it." The 08-29 slate needed the flag on every call anyway, for a
-different reason: once any later run is promoted, the parent a given file
-actually came from is no longer the promoted one, **which is the normal state
-during a repair sequence.** The flag became reflexive again. Fix: accept a
-parent matching ANY run in the manifest, and reserve the hard error for a file
-matching none.
-
-**Why one number.** Both are fixes that landed, were correct about their
-mechanism, and left the operator's workaround in place — so both read as closed
-on this board while still costing calls in the field. That is the reading worth
-keeping, and it is lost if these are two entries. The check the class implies:
-**a fix that eliminates a documented workaround is not done until the workaround
-stops being typed.** Neither of these was verified that way.
+A late swap finds its parent by the file's own bytes (`late_swap_manager.resolve_parent_run`): the verified pointer run, then any promoted, certified-unpromoted or review-grade run, and a file matching none is still the hard error. `late_swap.py` resolves it before any bank slice and inherits the controls the parent recorded in its diagnostics (`portfolio_controls`, new); `--rederive-controls` re-derives them. A swap's label is never better than its parent's.
 
 ### R141. Late-swap leverage pass: post-lock, report-only (P2, S) | new 2026-08-16, from the leverage ideation fragment
 
@@ -5377,6 +5345,7 @@ supervisor takes this class; noted on its entry via this number.
 
 - **What.** `tools/late_swap.py` writes the swapped file under its `DO_NOT_UPLOAD_` name (L987 at Session 08's landing), then runs `promote_deferred_run` (L997; `promote_run` can raise, a sqlite lock timeout) and two unguarded consensus-summary prints (L1014-1019) before `record_delivery` (L1024). A raise in any of them exits 1 with the file unrecorded under that name and, past promotion, the pointer already moved. A failed record exits 0 with the file still under `DO_NOT_UPLOAD_`. The path and sha print last, after the narrative, and `__main__` calls `main()` with no refusal record. `run_late_swap`'s `last_usable_artifact` label reads the run's certification and cannot know LS's `review_grade_downgrade_accepted`. (Session 08 already keeps an engine crash a crash here: `raise_on_engine_crash` runs before the first `passed` read, so a crashed swap run exits 1, not "did not pass" at 3.)
 - **Fix.** Session 08's contract on LS: present the file first; a later exception or a failed record exits 7 with the file under its own label (the downgrade label when one was accepted); `__main__` exits through a recording door. LS was outside Session 08's target list, so this was filed rather than widened.
+- **Rider 2026-09-24 (Session 09, R388(d)).** A swap whose own failures are all S or P is refused (exit 3) and not mirrored: `_review_grade_fields` runs on initial builds only, so a refused swap run is never a review-grade parent. The refused swap leaves the parent delivery live, so it is not a washout. Mirroring it UNCERTIFIED needs the swap's never-relax set, which `run_late_swap` does not pass yet. It is the same door as this entry's.
 
 ### R386. CLOSED 2026-09-22 -- SHIPPED as roadmap Session 01, entry migrated to CHANGELOG.md
 
@@ -5386,11 +5355,11 @@ Principles only, no engine code. V, S and P are defined in `MLB_Classic.md` §2 
 
 `record_delivery` now hands its hash source (the provisional file inside `deliver`) through `_mirror_to_delivery_record` to `write_delivery_record(entries_source=...)` on both return paths, so a record's rosters are parsed from the bytes its sha256 names on all three writers. `bound_entries` re-hashes the parsed file and writes rosters only on a match; a mismatch records `entries: []` with both hashes in `entries_binding` and never withholds the delivery. Pinned by `test_upload_integrity.DeliveryRecordBytesTests`. Gate: see the CHANGELOG entry.
 
-### R388. Usability, strategy and process are one certification: split them (Package A of the 2026-09-22 audit) (P0, M across four sessions) | new 2026-09-22, audit DD-04, DD-08, DD-09 and §3; (e) SHIPPED 2026-09-23 as roadmap Session 03 (a), (a) SHIPPED 2026-09-23 as roadmap Session 05, (b) SHIPPED 2026-09-23 as roadmap Session 06, all migrated to CHANGELOG.md | Roadmap: (c) Session 13, (d) 09
+### R388. Usability, strategy and process are one certification: split them (Package A of the 2026-09-22 audit) (P0, M across four sessions) | new 2026-09-22, audit DD-04, DD-08, DD-09 and §3; (e) SHIPPED 2026-09-23 as roadmap Session 03 (a), (a) SHIPPED 2026-09-23 as roadmap Session 05, (b) SHIPPED 2026-09-23 as roadmap Session 06, (d) SHIPPED 2026-09-24 as roadmap Session 09, all migrated to CHANGELOG.md | Roadmap: (c) Session 13
 
 - **(a) and (b) landed (Sessions 05 and 06).** `mlb_engine/entries/gate_classes.py` is the taxonomy (`gate_validity`, `refusal_site_validity`, `evidence_state`, `describe`) and, since (b), the control provenance vocabulary and `FACT_AUTHORITY`; (c) and (d) read it rather than keep their own. Its V/S/P lookups raise on an unclassified name. A resolved control's provenance is `run_slate`'s `control_provenance`, and `deadline_governor.resolve_never_relax` is the never-relax set.
 - **(c) Essential verdict.** Preflight tags its 49 `rep.fail` sites and emits `essential_valid`. A bookkeeping-only failure (`preflight_upload.py:1496-1588`) gets exit 6 instead of 2.
-- **(d) Review-grade lifecycle.** When every failure is S or P, `execute_portfolio` mirrors the candidate as `DKEntries_<tag>_UNCERTIFIED_<run>.csv` with certification `review_grade`. `passed=False` and `errors[]` stay verbatim for the golden pins; nothing reaches `final/`; there is no promote.
+- **(d) landed (Session 09).** `dk_entries_manager.classify_export_failures` places every failing check, and `execute_portfolio` gives an S/P-only, essential-valid refusal a `review_grade_export`; `run_slate` mirrors it as `DKEntries_<tag>_UNCERTIFIED_<run>.csv`, labelled `review_grade_uncertified`. (c) is what lets it place MIXED gates: until the validator splits their facts, a MIXED gate with a V fact (weather, lineup, pitcher audit, projection schema, roster legality, hash binding) is unplaced and so V, and its refusal stays `DO_NOT_UPLOAD_`.
 - **Boundary.** "Upload-ready" keeps CLAUDE.md's meaning. A failed flag is never set true.
 
 ### R389. No entry-mapped baseline exists before research, the bank and joint allocation (Package B, baseline half) (P0, M across three sessions) | new 2026-09-22, audit DD-01 | Roadmap: (a) Session 10, (b) 11, (c) 12
@@ -5741,7 +5710,10 @@ Every line-number claim was verified against the tree before ruling, because thi
   under an archival move the audit missed, downgrade to a doc note. FOSS:
   stdlib. Owner: none. Rollback: drop the check.
 
-### R124. Guaranteed delivery: a legal-but-uncertified file is mirrored and named, never hidden behind `DO_NOT_UPLOAD_` (P1, M; the mirror+rename half is S and lands alone) | new 2026-08-14, merged from BUILD fragment `2026-08-14_BUILD_delivery-guarantee-autonomy-enrichment.md`
+### R124. Guaranteed delivery: a legal-but-uncertified file is mirrored and named, never hidden behind `DO_NOT_UPLOAD_` (P1, M) | new 2026-08-14, merged from BUILD fragment `2026-08-14_BUILD_delivery-guarantee-autonomy-enrichment.md`; (a) the mirror+rename half SHIPPED 2026-09-24 as roadmap Session 09, migrated to CHANGELOG.md | Roadmap: (b) Session 21, (c) 67
+
+- **(a) landed (Session 09, with R388(d)).** An S/P-only refusal is mirrored to `outputs/<date>/` as `DKEntries_<tag>_UNCERTIFIED_<run>.csv` and named in the refusal payload. The trigger is the gate taxonomy, not `verify_export`: `verify_export` cannot see template preservation, reconciliation, hash binding or F-3, so the entry's own falsifier fired. `DO_NOT_UPLOAD_` keeps its two other meanings, "no manifest row yet" (R96(2)) and the Showdown staging copy. The acceptance clause "preflight still refuses it" was superseded by R386 and R388(e): preflight says `review_ready`, exit 0, never `upload_ready`.
+- **Open: (b) `--deliver-always`** (Session 21) and **(c) R89's single-pass blocker rider** (Session 67), as filed below.
 
 - **What:** on 1810_3g, six build attempts failed a DIFFERENT gate each,
   serially (~40s per round trip); runs 4, 5 and 6 each wrote a file

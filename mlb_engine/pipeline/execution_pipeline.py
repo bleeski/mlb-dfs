@@ -182,6 +182,7 @@ from mlb_engine.contest_shapes import (
     satellite_shape_for, validate_shape,
 )
 from mlb_engine.entries.dk_entries_manager import (
+    classify_export_failures,
     derive_essential_validity, derive_workflow_certification, entry_coverage,
     fixed_portfolio_exposure,
     reconcile_entries_against_assignments,
@@ -190,7 +191,7 @@ from mlb_engine.entries.dk_entries_manager import (
 )
 from mlb_engine.swap.late_swap_manager import (
     PlayerLineupStatus, build_entry_requirements, late_swap_certification,
-    load_latest_valid_parent_run, validate_late_swap_delta,
+    resolve_parent_run, validate_late_swap_delta,
 )
 
 VERSION = "v1.17"
@@ -316,9 +317,12 @@ def _blocked_result(run: Dict[str, Any], errors: Sequence[str], diagnostics: Dic
 # R393(b), roadmap Session 08: the last usable artifact. A run result carries the
 # best current essential-valid export it produced -- bytes, sha256, coverage,
 # label, path -- so a failure AFTER that export exists (a crashed promotion, a
-# raising brief, a failed mirror) can still hand it back. Session 08 attaches one
-# only to an export that certified; Session 09 widens that to review-grade
-# exports whose failing gates are all S or P, through this same object.
+# raising brief, a failed mirror) can still hand it back. Only an export that
+# certified carries one. R388(d) (Session 09) gives a review-grade export, whose
+# failing gates are all S or P, its OWN key, `review_grade_export`, and
+# deliberately not this one: `has_deliverable` reads this key, so it would stop
+# the deadline governor from walking to a gates-passing rung and read as exit
+# 7's crash-after-certification.
 UPLOAD_READY_LABEL = "upload_ready"
 REVIEW_GRADE_LABEL = "review_grade"
 _CERTIFICATION_GATES = ("workflow_valid", "selection_certified", "allocation_certified")
@@ -387,6 +391,123 @@ def artifact_record(artifact: Optional[Mapping[str, Any]]) -> Optional[Dict[str,
     if not artifact:
         return None
     return {k: v for k, v in artifact.items() if k != "bytes"}
+
+
+def recorded_controls(controls: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
+    """R268(a). The portfolio controls a run solved and validated under, as its
+    diagnostics.json records them for a later late swap to inherit.
+
+    The id maps are dropped, not summarised: a swap re-derives them from its
+    own frame. Numbers stay numbers (a numpy scalar becomes its Python value,
+    where `_json_safe` would make it a string), and keys are sorted.
+    """
+    def plain(value: Any) -> Any:
+        if isinstance(value, Mapping):
+            return {str(k): plain(v) for k, v in sorted(value.items(), key=lambda kv: str(kv[0]))}
+        if isinstance(value, (set, frozenset)):
+            return sorted((plain(v) for v in value), key=str)
+        if isinstance(value, (list, tuple)):
+            return [plain(v) for v in value]
+        if value is None or isinstance(value, (bool, int, float, str)):
+            return value
+        item = getattr(value, "item", None)
+        if callable(item):
+            try:
+                out = item()
+            except Exception:  # noqa: BLE001
+                out = None
+            if isinstance(out, (bool, int, float, str)):
+                return out
+        return str(value)
+
+    return {str(k): plain(v) for k, v in sorted((controls or {}).items(), key=lambda kv: str(kv[0]))
+            if k not in CONTROL_ID_MAP_KEYS}
+
+
+def _controls_record(controls: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
+    """`recorded_controls` for a diagnostics dict, guarded: recording what a
+    build ran under must never cost the build its file."""
+    try:
+        return {"portfolio_controls": recorded_controls(controls)}
+    except Exception as exc:  # noqa: BLE001
+        return {"portfolio_controls_error": f"{type(exc).__name__}: {exc}"}
+
+
+def parent_realized_controls(run_dir: str | Path) -> Optional[Dict[str, Any]]:
+    """R268(a). The controls a run recorded, or None for a run recorded before
+    R268 (or one whose record failed), which a swap must re-derive."""
+    path = Path(run_dir) / "final" / "diagnostics.json"
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    controls = payload.get("portfolio_controls")
+    return dict(controls) if isinstance(controls, Mapping) else None
+
+
+def _review_grade_fields(
+    *, mode: str, run_id: str, candidate_path: Path, candidate_sha256: str,
+    registered_sha256: str, pre: Mapping[str, Any], template: Mapping[str, Any],
+    reconciliation: Mapping[str, Any], candidate_validation: Mapping[str, Any],
+    delta: Mapping[str, Any], never_relax: Iterable[str],
+) -> Dict[str, Any]:
+    """R388(d). The early-errors refusal's review-grade verdict, as result keys.
+
+    ``review_grade_export`` when every failing check is S or P
+    (`classify_export_failures`) AND the candidate is essential-valid on its
+    own bytes (Session 08's `derive_essential_validity`); otherwise
+    ``review_grade_withheld`` naming what blocked it. Initial builds only: a
+    refused swap is never a review-grade parent. Never raises; a failure is
+    ``review_grade_error`` and the refusal stands exactly as it was.
+    """
+    if mode != "initial_build":
+        return {}
+    try:
+        from mlb_engine.entries.upload_manifest import UNCERTIFIED_LABEL
+        verdict = classify_export_failures(
+            pre=pre, template=template, reconciliation=reconciliation,
+            candidate_validation=candidate_validation, delta=delta,
+            never_relax=never_relax)
+        essential = derive_essential_validity({
+            "template_preservation_passed": template.get("passed") is True,
+            "entry_reconciliation_passed": reconciliation.get("passed") is True,
+            "roster_legality_passed": candidate_validation.get("roster_legality_passed") is True,
+            "portfolio_caps_passed": candidate_validation.get("portfolio_caps_passed") is True,
+            "locked_immutability_passed": (
+                candidate_validation.get("locked_immutability_passed") is True
+                and delta.get("passed") is True),
+            "export_hash_binding_passed": bool(candidate_sha256)
+            and candidate_sha256 == registered_sha256,
+        })
+        rows = [{k: row[k] for k in ("gate", "class", "counts_as", "reason",
+                                     "controls", "never_relax_held") if k in row}
+                for row in verdict["failures"]]
+        if verdict["review_grade"] and essential["essential_valid"]:
+            return {"review_grade_export": {
+                "label": UNCERTIFIED_LABEL,
+                "path": str(candidate_path),
+                "sha256": candidate_sha256,
+                "coverage": entry_coverage(candidate_path),
+                "failing_gates": verdict["failing_gates"],
+                "failures": rows,
+                "essential_valid": essential,
+                "certification": {k: False for k in _CERTIFICATION_GATES},
+                "run_id": run_id,
+                "basis": verdict["basis"],
+                "note": ("every failing gate is S or P and every V gate passed "
+                         "on these bytes: legal, NOT certified, never "
+                         "upload-ready (R388(d)). Not a declared dk_export: "
+                         "its bytes are bound as the run's candidate_export"),
+            }}
+        return {"review_grade_withheld": {
+            "failing_gates": verdict["failing_gates"],
+            "blocking": [{k: row[k] for k in ("gate", "counts_as", "reason",
+                                              "never_relax_held") if k in row}
+                         for row in verdict["blocking"]],
+            "essential_failed": list(essential["failed"]),
+        }}
+    except Exception as exc:  # noqa: BLE001 - a verdict must never cost the refusal
+        return {"review_grade_error": f"{type(exc).__name__}: {exc}"}
 
 
 def _attachable(artifact: Optional[Mapping[str, Any]]) -> bool:
@@ -541,6 +662,9 @@ def execute_portfolio(
     # answers; None runs nothing (every caller but run_slate's build path).
     interaction_probe_budget_s: Optional[float] = None,
     interaction_probe_not_after: Optional[float] = None,
+    # R388(d). The build's never-relax set: a portfolio-cap breach on one of
+    # these is never review-grade. Empty for every caller but run_slate.
+    never_relax: Iterable[str] = (),
 ) -> Dict[str, Any]:
     """Execute the canonical entry-level portfolio workflow."""
     controls = dict(portfolio_controls or {})
@@ -642,7 +766,7 @@ def execute_portfolio(
                 "workflow_valid": False,
             }
             return _blocked_result(run, write_result["errors"], diagnostics)
-        register_artifact(run_dir, candidate_path, "candidate_export")
+        candidate_record = register_artifact(run_dir, candidate_path, "candidate_export")
 
         mutable_ids = [str(req["entry_id"]) for req in entry_requirements]
         locked_slots = {
@@ -669,6 +793,18 @@ def execute_portfolio(
 
         early_errors = pre["errors"] + template["errors"] + reconciliation["errors"] + candidate_validation["errors"] + delta["errors"]
         if early_errors:
+            candidate_sha = sha256_file(candidate_path)
+            # R388(d). Whether this legal-looking refusal may ship review-grade:
+            # every failing check S or P and the bytes essential-valid. The
+            # refusal itself -- passed, errors[], the blocked run -- is
+            # unchanged either way; the verdict only adds keys.
+            review = _review_grade_fields(
+                mode=mode, run_id=run["run_id"], candidate_path=candidate_path,
+                candidate_sha256=candidate_sha,
+                registered_sha256=str((candidate_record or {}).get("sha256") or ""),
+                pre=pre, template=template, reconciliation=reconciliation,
+                candidate_validation=candidate_validation, delta=delta,
+                never_relax=never_relax)
             diagnostics = {
                 "run_id": run["run_id"], "mode": mode, "allocation": allocation,
                 "pre_export": pre, "template_preservation": template,
@@ -676,11 +812,13 @@ def execute_portfolio(
                 "late_swap_delta": delta,
                 "bank_coverage": bank_coverage,
                 "diagnostic_source_file": str(candidate_path.relative_to(run_dir)),
-                "diagnostic_source_sha256": sha256_file(candidate_path),
+                "diagnostic_source_sha256": candidate_sha,
                 "assignment_sha256": assignment_record["sha256"],
                 "workflow_valid": False,
+                **_controls_record(controls),
+                **review,
             }
-            return _blocked_result(run, early_errors, diagnostics)
+            return {**_blocked_result(run, early_errors, diagnostics), **review}
 
         final_export = run_dir / "final" / "DKEntries.csv"
         shutil.copy2(candidate_path, final_export)
@@ -745,6 +883,8 @@ def execute_portfolio(
             "status": "certified" if certification.get("workflow_valid") else "blocked",
             "export_declared": True,
             "hash_binding_applicable": True,
+            # R268(a). What a later swap inherits by default.
+            **_controls_record(controls),
             **certification,
         }
         diagnostic_path = run_dir / "final" / "diagnostics.json"
@@ -905,13 +1045,6 @@ def run_initial_build(**kwargs: Any) -> Dict[str, Any]:
     return execute_portfolio(**kwargs)
 
 
-def _parent_export_sha256(parent: Mapping[str, Any]) -> str:
-    for record in (parent.get("manifest", {}).get("artifacts", {}) or {}).values():
-        if record.get("role") == "dk_export":
-            return str(record.get("sha256") or "")
-    return ""
-
-
 def _assert_parent_lineage(lineage: Mapping[str, Any],
                            allow_parent_mismatch: bool) -> None:
     """R20(c): a swap that does not descend from the promoted export blocks.
@@ -951,7 +1084,12 @@ def run_late_swap(
     allow_parent_mismatch: bool = False,
     **kwargs: Any,
 ) -> Dict[str, Any]:
-    """Execute a late swap against the verified latest promoted parent run.
+    """Execute a late swap against the run the entries file came from.
+
+    R268(b): the parent is resolved by the file's own bytes
+    (`resolve_parent_run`): the verified latest promoted run when it matches,
+    else any promoted, certified-unpromoted or review-grade run whose export
+    matches. A file matching no run raises unless ``allow_parent_mismatch``.
 
     ``authorized_entry_ids`` restricts mutability to exactly those Entry IDs.
     None means every reserved Entry ID in the file is explicitly authorized.
@@ -963,14 +1101,20 @@ def run_late_swap(
     DataFrame, confirmed lineups are refreshed through the shared projection
     builder (spec section 11 step 5) before the joint solve.
     """
-    parent = load_latest_valid_parent_run(runs_root)
+    parent = resolve_parent_run(runs_root, current_entries_csv,
+                                allow_parent_mismatch=allow_parent_mismatch)
     parent_id = parent["manifest"]["run_id"]
-    parent_export_hash = _parent_export_sha256(parent)
-    current_hash = sha256_file(current_entries_csv)
     lineage_metadata = {
-        "parent_export_sha256": parent_export_hash,
-        "current_entries_sha256": current_hash,
-        "current_matches_parent_export": bool(parent_export_hash) and parent_export_hash == current_hash,
+        "parent_export_sha256": parent["parent_export_sha256"],
+        "current_entries_sha256": parent["current_entries_sha256"],
+        "current_matches_parent_export": bool(parent["current_matches_parent_export"]),
+        # R268(b). Which kind of run the file matched, and what the pointer
+        # named, so a parent that is not the latest promotion is on the record.
+        "parent_resolution": parent["parent_resolution"],
+        "latest_promoted_run_id": parent.get("latest_promoted_run_id"),
+        # On the result, too: late_swap.py's R405 parent-cluster line reads
+        # `result["parent_run_id"]`, which no result carried, so it read None.
+        "parent_run_id": parent_id,
     }
     _assert_parent_lineage(lineage_metadata, allow_parent_mismatch)
 
@@ -6668,7 +6812,13 @@ def run_slate(
                   "assumed_gates": assumed,
                   "overridden_gates": overridden_gates,
                   "caller_asserted_gates": caller_asserted,
+                  # R268(a). The governed label in the run itself, so a late
+                  # swap off this run reads it without an outputs/ row.
+                  **({"certification_label": str(certification_label)}
+                     if certification_label else {}),
                   },
+        # R388(d). A cap breach on a never-relax control is never review-grade.
+        never_relax=never_relax,
         # When candidates were handed in, run_slate did not build the bank and
         # has nothing to say about how they were produced. The caller does, so
         # the caller's record wins rather than being overwritten with the word
@@ -6778,6 +6928,10 @@ def run_slate(
                                     "row was recorded from an incomplete result")
     else:
         result["delivered_path"] = mirror_to_outputs(result, salary_csv)
+        # R388(d)/R124(a). A refusal whose only failing gates are S or P
+        # still delivers its legal file, UNCERTIFIED and named in its own key.
+        if not result.get("passed") and isinstance(result.get("review_grade_export"), dict):
+            mirror_review_grade(result, salary_csv)
     # Repo-relative alongside the absolute path: every recorded delivered_path in
     # outputs/2026-07-25/ pointed at a session mount that no longer exists.
     if result.get("delivered_path"):
@@ -6866,6 +7020,88 @@ def mirror_to_outputs(result: Mapping[str, Any], salary_csv: Any) -> Optional[st
         print(f"MIRROR FAILED  {type(exc).__name__}: {exc}; the export stays in "
               f"runs/<run_id>/final/ and nothing was delivered to outputs/",
               file=sys.stderr)
+        return None
+
+
+def uncertified_dest_name(slate_tag: str, run_id: str) -> str:
+    """R124(a). ``DKEntries_<tag>_UNCERTIFIED_<run_id>.csv``, built by hand: the
+    source stem is ``DO_NOT_UPLOAD_DKEntries`` and `unrecorded_name` keeps an
+    existing prefix, so deriving it from the candidate would name the file
+    unrecorded forever."""
+    tag = str(slate_tag or "").strip()
+    return (f"DKEntries_{tag}_UNCERTIFIED_{run_id}.csv" if tag
+            else f"DKEntries_UNCERTIFIED_{run_id}.csv")
+
+
+def mirror_review_grade(result: MutableMapping[str, Any], salary_csv: Any) -> Optional[str]:
+    """R388(d) / R124(a). Deliver a review-grade export to ``outputs/<date>/``.
+
+    The candidate is legal and uncertified: every gate it failed is S or P
+    and every V gate passed on its bytes (`_review_grade_fields`). It goes
+    through the same record-or-self-label door as a certified mirror
+    (`deliver`), so until its manifest row lands it wears the DO_NOT_UPLOAD_
+    name, which keeps meaning "no row". It is never copied to ``final/``,
+    never promoted, and never mirrored over a live row whose file passed its
+    gates: that file stays the delivery, and refinements go through late swap.
+    What happened is written into ``result["review_grade_export"]``; the
+    top-level ``delivered_path`` stays None, so no caller reads a refused
+    build as delivered. Never raises.
+    """
+    export = result.get("review_grade_export")
+    if not isinstance(export, dict) or result.get("passed"):
+        return None
+    try:
+        from mlb_engine.intake.slate_intake_manager import (
+            parse_dk_salary_csv, parse_game_info_datetime,
+        )
+        from mlb_engine.entries.upload_manifest import (
+            REPO_ROOT as artifact_root, live_gates_passing_row, repo_relative,
+            sha256_file as um_sha256,
+        )
+
+        slate_date = None
+        for sp in parse_dk_salary_csv(str(salary_csv)):
+            parsed = parse_game_info_datetime(sp.game_info)
+            if parsed is not None:
+                slate_date = parsed.date().isoformat()
+                break
+        if slate_date is None:
+            export["mirror_error"] = "no game date in the salary file"
+            return None
+        tag = _slate_tag(salary_csv)
+        live = live_gates_passing_row(slate_date, "classic", tag)
+        if live is not None:
+            export["manifest_recorded"] = False
+            export["not_mirrored"] = {
+                "live_delivery": live.get("delivered_file"),
+                "certification": live.get("certification"),
+                "sha256": live.get("sha256"),
+                "why": ("a live delivery for this slate passed its gates, and a "
+                        "file that failed its own never replaces it; it stays "
+                        "the delivery (refinements go through late swap)"),
+            }
+            return None
+        dest = artifact_root / "outputs" / slate_date / uncertified_dest_name(
+            tag, str(result.get("run_id") or ""))
+        outcome = _deliver_mirror(slate_date, dest, Path(export["path"]), result,
+                                  tag, salary_csv,
+                                  failing_gates=export.get("failing_gates"))
+        export["manifest_recorded"] = bool(outcome["recorded"])
+        export["delivered_path"] = str(outcome["path"])
+        export["delivered_path_repo"] = repo_relative(outcome["path"])
+        if outcome["error"]:
+            export["manifest_error"] = str(outcome["error"])
+            print(f"MANIFEST NOT RECORDED  {outcome['error']}")
+        try:
+            export["delivered_sha256"] = um_sha256(outcome["path"])
+        except OSError as exc:  # a failed write leaves no file to hash
+            export["delivered_sha256_error"] = f"{type(exc).__name__}: {exc}"
+        return str(outcome["path"])
+    except Exception as exc:  # noqa: BLE001 - a mirror never changes the refusal
+        export["manifest_recorded"] = False
+        export["mirror_error"] = f"{type(exc).__name__}: {exc}"
+        print(f"UNCERTIFIED MIRROR FAILED  {type(exc).__name__}: {exc}; the file "
+              f"stays at {export.get('path')}", file=sys.stderr)
         return None
 
 
@@ -7000,7 +7236,8 @@ def manifest_strategy_state(result: Mapping[str, Any]) -> Dict[str, Any]:
 
 def _deliver_mirror(slate_date: str, dest: Path, source: Path,
                     result: Mapping[str, Any], tag: str,
-                    salary_csv: Any) -> Dict[str, Any]:
+                    salary_csv: Any,
+                    failing_gates: Optional[Sequence[str]] = None) -> Dict[str, Any]:
     """Mirror the promoted export through the R96(2) record-or-self-label door.
 
     One manifest record per delivery, so T-5 never has to guess which file, and
@@ -7040,7 +7277,19 @@ def _deliver_mirror(slate_date: str, dest: Path, source: Path,
         # R377. The controls the build solved under, after any deadline opening
         # and R407's tier: `run_slate` sets this before it calls the mirror.
         controls=result.get("merged_controls"),
+        # R388(d). Only an UNCERTIFIED mirror names failing gates.
+        failing_gates=failing_gates,
+        notes=_mirror_notes(result),
     )
+
+
+def _mirror_notes(result: Mapping[str, Any]) -> str:
+    """R388(d). A governed attempt that still failed S/P gates records the
+    lower label, UNCERTIFIED, and says here that a deadline rung moved it."""
+    label = result.get("certification_label")
+    if label and not result.get("workflow_valid"):
+        return f"deadline rung: {label}; the gates still failed, so the row is uncertified"
+    return ""
 
 
 def manifest_certification(result: Mapping[str, Any]) -> str:
@@ -7052,5 +7301,11 @@ def manifest_certification(result: Mapping[str, Any]) -> str:
     label wins over a passing gate; a failing gate wins over any label.
     """
     if not result.get("workflow_valid"):
+        # R388(d). A refusal whose failing gates were all S or P carries its
+        # legal file under `review_grade_export`; any other failing gate is
+        # still not_certified. Never a certified label either way.
+        if isinstance(result.get("review_grade_export"), Mapping):
+            from mlb_engine.entries.upload_manifest import UNCERTIFIED_LABEL
+            return UNCERTIFIED_LABEL
         return "not_certified"
     return str(result.get("certification_label") or "certified")

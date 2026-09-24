@@ -97,6 +97,48 @@ def is_unrecorded_name(path: str | Path) -> bool:
     return Path(path).name.startswith(UNRECORDED_PREFIX)
 
 
+# R388(d). The label a Classic export earns when every gate it failed is S or
+# P and every V gate passed on its bytes: legal, NOT certified, never
+# upload-ready. Its own label rather than bare `review_grade`, whose preflight
+# reason is Showdown's (R388(e) set one label per cause).
+UNCERTIFIED_LABEL = "review_grade_uncertified"
+#: Labels whose file did NOT pass its own gates; every other label did.
+GATES_FAILED_LABELS = frozenset({UNCERTIFIED_LABEL, "not_certified"})
+
+
+def passed_its_gates(certification: Any) -> bool:
+    """True for a row whose file passed its own gates: `certified`, or a
+    review-grade label a deadline rung or an accepted downgrade set (R388(e)).
+    An unknown label counts as passing, the direction that never lets an
+    UNCERTIFIED file replace it."""
+    return str(certification or "") not in GATES_FAILED_LABELS
+
+
+def live_gates_passing_row(date: str, contest_type: str,
+                           slate_tag: str = "") -> Optional[Dict[str, Any]]:
+    """R388(d). The newest live row for this slate whose file passed its
+    gates, or None. An UNCERTIFIED file is never mirrored over one: the live
+    file stays the delivery, and refinements go through late swap."""
+    key = (str(contest_type).lower(), str(slate_tag or ""))
+    manifest = read_manifest(date)
+    live = [row for row in manifest.get("deliveries") or []
+            if (row.get("contest_type"), row.get("slate_tag")) == key
+            and row.get("status") != "superseded"
+            and passed_its_gates(row.get("certification"))]
+    return dict(live[-1]) if live else None
+
+
+def recorded_delivery_row(date: str, sha256: str) -> Optional[Dict[str, Any]]:
+    """R268(a). The newest row for these exact bytes, any status, or None. A
+    late swap reads its parent's label and failing gates here, because a
+    downgrade label lives on the row, not in the run."""
+    if not sha256:
+        return None
+    rows = [row for row in read_manifest(date).get("deliveries") or []
+            if row.get("sha256") == sha256]
+    return dict(rows[-1]) if rows else None
+
+
 def sha256_file(path: str | Path) -> str:
     digest = hashlib.sha256()
     with Path(path).open("rb") as handle:
@@ -265,6 +307,8 @@ def record_delivery(
     controls: Optional[Mapping[str, Any]] = None,
     relaxations: Optional[Mapping[str, Any]] = None,
     egress: str = "",
+    failing_gates: Optional[Sequence[str]] = None,
+    refinement: bool = False,
 ) -> Dict[str, Any]:
     """Append one delivery record and supersede any prior record for the same slate.
 
@@ -331,7 +375,28 @@ def record_delivery(
     }
     if re_promoted_from:
         record["re_promoted_from"] = str(re_promoted_from)
+    if failing_gates:
+        # R388(d). The gates an UNCERTIFIED file failed, so preflight's note
+        # and the delivery record can name them.
+        record["failing_gates"] = sorted({str(g) for g in failing_gates})
     key = (record["contest_type"], record["slate_tag"])
+    if record["certification"] == UNCERTIFIED_LABEL and not refinement:
+        # R388(d), the backstop behind the mirror's own check: a BUILD that
+        # failed its gates never supersedes, or merges into, one that passed
+        # them. `deliver` catches this, so the file keeps its DO_NOT_UPLOAD_
+        # name and the error says why. A late swap (``refinement``) is exempt:
+        # it refines the file Ben entered, which may be an UNCERTIFIED one a
+        # later certified build superseded, and its row is that entry's.
+        passing = [p for p in manifest["deliveries"]
+                   if (p.get("contest_type"), p.get("slate_tag")) == key
+                   and p.get("status") != "superseded"
+                   and passed_its_gates(p.get("certification"))]
+        if passing:
+            raise ValueError(
+                f"refusing to record an {UNCERTIFIED_LABEL} delivery over the "
+                f"live {passing[-1].get('certification')!r} row "
+                f"{passing[-1].get('delivered_file')} for slate {key[1]!r}; that "
+                f"file stays the delivery")
     for prior in manifest["deliveries"]:
         if (prior.get("contest_type"), prior.get("slate_tag")) != key:
             continue
@@ -340,6 +405,10 @@ def record_delivery(
         if prior.get("sha256") and prior["sha256"] == record["sha256"]:
             # The same bytes recorded twice is one delivery, not two.
             prior.update(record)
+            # R388(d). `failing_gates` is set only on an UNCERTIFIED row, so a
+            # later label for the same bytes must not inherit it.
+            if "failing_gates" not in record:
+                prior.pop("failing_gates", None)
             _write(manifest_path(date), manifest)
             _mirror_to_delivery_record(date, prior, controls, relaxations, egress,
                                        entries_source=source)
