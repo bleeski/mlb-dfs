@@ -5985,6 +5985,15 @@ def run_slate(
     # solves cannot run past the caller's deadline.
     interaction_probe_budget_s: Optional[float] = None,
     interaction_probe_not_after: Optional[float] = None,
+    # R416. The direct door's auto-bank, handed back and reused. A caller that
+    # passes `auto_bank_out` gets the bank this call built (the exact candidates
+    # the allocator saw, sleeves included, and their record) written into it; a
+    # later call that passes that dict as `reuse_auto_bank` builds no bank and
+    # solves on it. build_slate re-solves on a refusal, and each re-solve used
+    # to rebuild the bank with a fresh full window. Both default to None, which
+    # is every existing caller's build exactly.
+    auto_bank_out: Optional[Dict[str, Any]] = None,
+    reuse_auto_bank: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Single front door: raw slate inputs -> certified DKEntries file plus diagnostics.
 
@@ -6032,6 +6041,13 @@ def run_slate(
         raise ValueError(
             f"certification_label={certification_label!r}: only a review_grade* "
             f"label may be passed; certification comes from the gates")
+    # R416. Two banks for one solve is a caller error, not a precedence rule.
+    if reuse_auto_bank is not None and candidates_override is not None:
+        raise ValueError("reuse_auto_bank and candidates_override are exclusive: "
+                         "pass the bank this solve should use once")
+    if reuse_auto_bank is not None and not (reuse_auto_bank.get("candidates")):
+        raise ValueError("reuse_auto_bank carries no candidates; pass the dict "
+                         "an earlier call filled through auto_bank_out")
     # R388(b). Refused before any work too: a misspelled never-relax holds
     # nothing and says nothing. The same resolver build_slate's flag uses, so
     # the two doors accept the same names; F-3 is in the set on every build.
@@ -6426,7 +6442,9 @@ def run_slate(
             projections, entry_requirements, controls,
             budget_s=(PLAN_SOLVE_BUDGET_S if plan_solve_budget_s is None
                       else float(plan_solve_budget_s)),
-            candidates_override=candidates_override,
+            candidates_override=(
+                candidates_override if reuse_auto_bank is None
+                else [dict(c) for c in reuse_auto_bank["candidates"]]),
             excluded_player_ids=[str(x) for x in (excluded_player_ids or [])],
             requested_n=int(requested_n or max(len(entry_requirements), 1)),
             contest_shapes=sorted(shape_counts_plan) or None,
@@ -6446,6 +6464,24 @@ def run_slate(
     if candidates_override is not None:
         candidates = list(candidates_override)
         bank_diag: Dict[str, Any] = {"source": "candidates_override", "candidate_count": len(candidates)}
+    elif reuse_auto_bank is not None:
+        # R416. An earlier call's auto-bank, solved on again. Its record comes
+        # with it rather than the override stub, so `candidate_bank`,
+        # diagnostics.json and the manifest's relaxation verdict describe the
+        # bank these candidates came from. The allocator copies what it reads;
+        # a shallow copy keeps this call from sharing the earlier call's dicts.
+        candidates = [dict(c) for c in reuse_auto_bank["candidates"]]
+        bank_diag = {
+            **dict(reuse_auto_bank.get("bank_diagnostics") or {}),
+            "candidate_count": len(candidates),
+            "reused_auto_bank": {
+                "time_budget_s": reuse_auto_bank.get("time_budget_s"),
+                "elapsed_s": reuse_auto_bank.get("elapsed_s"),
+                "note": ("built by an earlier call of this build, under that "
+                         "call's merged controls and sleeve request; this call "
+                         "built no bank"),
+            },
+        }
     else:
         shape_counts: Dict[str, int] = {}
         for req in entry_requirements:
@@ -6501,6 +6537,7 @@ def run_slate(
         # asked for what it needs (R246's lesson about the path the clock picks).
         consensus_request = resolve_consensus_limited_request(
             controls, len(entry_requirements))
+        _bank_started = time.monotonic()
         bank = build_diverse_candidate_bank(
             bank_projections, requested_n=n, mode=mode, target="ceiling",
             contest_shapes=sorted(shape_counts) or None,
@@ -6532,6 +6569,7 @@ def run_slate(
             **_leverage_kwargs(leverage),
         )
         candidates = _bank_records_to_candidates(bank.get("candidate_lineups") or [])
+        _bank_elapsed = time.monotonic() - _bank_started
         # R406. The direct door's sleeves, through the SAME helper the sliced
         # door and the plan leg call, in throwaway caches: the direct bank is
         # in memory, so its sleeves are too. The cluster chalk-fails limits
@@ -6541,6 +6579,7 @@ def run_slate(
             implied_total_by_team=sleeve_implied_total_by_team)
         sleeve_jobs: Dict[str, Any] = {"attempted": False,
                                        "reason": "sleeves not requested"}
+        _sleeves_started = time.monotonic()
         if sleeve_request["active"]:
             candidates, sleeve_jobs = _direct_door_sleeves(
                 candidates, bank_projections, sleeve_request,
@@ -6581,6 +6620,19 @@ def run_slate(
             "sp_pair_coverage_validation": bank.get("sp_pair_coverage_validation"),
             "budget": bank.get("budget"),
         }
+        # R416. Handed back so a re-solve can use this bank instead of building
+        # another with a fresh window. The list is the one the allocator gets
+        # below; the timings are this call's, so a reader can tell a bank that
+        # ran its budget from one that finished early.
+        if auto_bank_out is not None:
+            auto_bank_out.update({
+                "candidates": [dict(c) for c in candidates],
+                "bank_diagnostics": dict(bank_diag),
+                "time_budget_s": bank_time_budget_s,
+                "bank_elapsed_s": round(_bank_elapsed, 2),
+                "sleeves_elapsed_s": round(time.monotonic() - _sleeves_started, 2),
+                "elapsed_s": round(time.monotonic() - _bank_started, 2),
+            })
 
     if apply_script_routing and fill_depth_plan is not None:
         routing = emit_contest_routing(fill_depth_plan, candidates, entry_requirements)

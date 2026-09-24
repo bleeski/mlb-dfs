@@ -1165,21 +1165,52 @@ def bank_resume_warranted(bank_report: Mapping[str, Any], thin: bool) -> bool:
     return bank_report.get("bank_stop_reason") != "candidate_cap"
 
 
-def resolve_bank_budget(computed_s: float, *, label: str) -> tuple[float, bool]:
-    """Return ``(budget_s, floored)`` and SAY SO when the floor wins (R98(1))."""
+def resolve_bank_budget(computed_s: float, *, label: str,
+                        door: str = "sliced") -> tuple[float, bool]:
+    """Return ``(budget_s, floored)`` and SAY SO when the floor wins (R98(1)).
+
+    ``door`` picks the remedy the notice names (R416): only the sliced bank
+    persists, so only there does a re-run grow it."""
     floored = float(computed_s) < BANK_BUDGET_FLOOR_S
     budget = max(float(computed_s), BANK_BUDGET_FLOOR_S)
     if floored:
+        # R416. The direct door's auto-bank does not persist, so "re-run and
+        # resume" is the sliced door's remedy only (R415 found the same).
+        remedy = ("grow the bank (re-run; the build exits 10 and resumes) or "
+                  "raise --max-seconds" if door == "sliced"
+                  else "raise --max-seconds, or pass --bank-max-candidates to "
+                       "build the persistent sliced bank (R415); this door's "
+                       "bank is rebuilt on every run and a re-run cannot grow it")
         print(
             f"BANK BUDGET FLOORED ({label}): {float(computed_s):.1f}s remained of "
             f"--max-seconds after reserve, so the {BANK_BUDGET_FLOOR_S:g}s engine "
             f"floor applies. This bank is bounded by a constant, not by the window "
-            f"you asked for. If the build then refuses, grow the bank (re-run; the "
-            f"build exits 10 and resumes) or raise --max-seconds -- do not relax "
+            f"you asked for. If the build then refuses, {remedy} -- do not relax "
             f"portfolio controls against a bank this size.",
             file=sys.stderr,
         )
     return budget, floored
+
+
+def format_solve_row(row: Mapping[str, Any]) -> str:
+    """R416. One solve's clock, as the line printed the moment it returns.
+
+    Printed rather than only recorded because the failure this exists for is a
+    process killed at its wall, which writes no brief: the lines already on
+    stderr are then the only record of which solve spent the window.
+    """
+    def _s(value):
+        return "-" if value is None else f"{value}s"
+    spent = ""
+    if row.get("bank") in ("built", "not_built"):
+        spent = (f", budget {_s(row.get('bank_budget_s'))}"
+                 + (" FLOORED" if row.get("bank_budget_floored") else "")
+                 + f", bank {_s(row.get('bank_elapsed_s'))}"
+                 f" + sleeves {_s(row.get('sleeves_elapsed_s'))}")
+    return (f"{row.get('call')} ({row.get('reason')}): bank {row.get('bank')}{spent}"
+            f", {row.get('candidates')} candidates, wall {_s(row.get('wall_s'))}"
+            f", {_s(row.get('left_at_start_s'))} -> {_s(row.get('left_at_end_s'))}"
+            f" left of --max-seconds, {row.get('outcome')}")
 
 
 def bank_growth_lever(bank_report: Mapping[str, Any] | None) -> dict:
@@ -3447,17 +3478,28 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
     # strategy; this makes a wrong estimate degrade to a smaller bank instead of
     # a killed process that leaves nothing behind. R98(1): and when the bound is
     # the floor rather than the remaining window, say so. On the sliced path
-    # `candidates` are already in hand and run_slate never builds a bank, so this
-    # value governs only the direct path -- which is why the floor that matters
-    # is reported per strategy below rather than as one merged flag.
-    if strategy == "direct":
-        run_bank_budget, bank_budget_floored = resolve_bank_budget(
-            deadline - time.monotonic() - 6.0, label="run_slate auto-bank")
-    else:
-        # Inert on the sliced path: candidates were handed in, so run_slate
-        # builds no bank and a floor notice here would be noise about a budget
-        # nothing spends.
-        run_bank_budget = max(deadline - time.monotonic() - 6.0, BANK_BUDGET_FLOOR_S)
+    # `candidates` are already in hand and run_slate never builds a bank. The
+    # direct door's sleeves still get their share ON TOP of this budget
+    # (measured about 10s on 06-28 11g); that is R417(b), not this bound.
+    #
+    # R416. The budget is taken from the deadline when a solve BUILDS a bank,
+    # not once before the first solve, and a re-solve on the direct door
+    # reuses the first solve's bank rather than building another. It used to be
+    # computed here, once, and handed to all three solves: on 06-28 (11 games)
+    # R407's re-solve rebuilt the bank with the whole window again, 220s
+    # against --max-seconds 105 and 1,216s against 600, and under autobuild the
+    # child was killed at its wall with no brief. Reuse is legal because
+    # nothing either re-solve relaxes widens what the bank should hold: R407's
+    # consensus share only lowers the bank's ask (`ceil((1 - pct) x n x 2)`),
+    # the governor opens caps only the allocator reads, turns the consensus
+    # ask and the sleeves off, and the bank ignores `max_sp_pair_repetition`.
+    # Every candidate is a legal lineup on the same pool; the sliced door has
+    # always re-solved on one bank.
+    auto_bank: dict = {}
+    solves: list = []
+    # R416. On the record as each solve lands, so an exception after a delivery
+    # (R393(b)) and the refusal record keep what the solves spent.
+    _REFUSAL_CONTEXT["solves"] = solves
 
     # R288. The allowance rides portfolio_controls, not just the bank
     # parameter, because the EXPORT validator grades the delivered file
@@ -3509,7 +3551,7 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
             confidence_may_relax=_tier_tightens and confidence_relax is None)
 
     def _solve(controls: dict, certification_label: str | None = None,
-               control_moves: list | None = None):
+               control_moves: list | None = None, reason: str = "initial"):
         # R290(c) step 2. Extracted so the deadline governor can re-solve with
         # the controls open WITHOUT a second copy of this call. A governor that
         # re-solves through a duplicated invocation is R267's dependency
@@ -3518,30 +3560,73 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         # R388(e): the governed re-solve passes the deadline label, so the
         # manifest row records what the brief says rather than `certified`.
         probe_budget, probe_not_after = _probe_limits()
-        # R297(c). A crash with nothing usable leaves here as a crash, so no
-        # caller below can read it as a refusal worth re-solving.
-        return raise_on_engine_crash(run_slate(
-            runs_root=str(REPO / "runs"),
-            salary_csv=str(salary), entries_csv=str(entries),
-            approve=True, requested_n=n_entries,
-            candidates_override=candidates,
-            # Same enrichment inputs the probe frame used. run_slate reassembles
-            # the frame internally, so passing anything less here would build the
-            # bank on enriched projections and then certify against unenriched
-            # ones.
-            **enrich_kwargs,
-            bank_time_budget_s=run_bank_budget,
-            portfolio_controls_override=dict(controls) or None,
-            leverage=leverage or None,
-            input_confidence_facts=confidence_facts,
-            input_confidence_relax=confidence_relax,
-            certification_label=certification_label,
-            never_relax_controls=sorted(never_relax),
-            control_moves=control_moves,
-            interaction_probe_budget_s=probe_budget,
-            interaction_probe_not_after=probe_not_after,
-            **slate_kwargs,
-        ))
+        started_at = time.monotonic()
+        # R416. Only a direct-door solve with no bank in hand builds one, and
+        # its budget is what is left of the window NOW.
+        reuse = auto_bank if (strategy == "direct" and auto_bank.get("candidates")) else None
+        builds = strategy == "direct" and reuse is None
+        budget, floored = (resolve_bank_budget(
+            deadline - started_at - 6.0,
+            label=f"run_slate auto-bank, solve {len(solves) + 1}", door="direct")
+            if builds else (None, False))
+        bank_out: dict | None = {} if builds else None
+        row = {"call": len(solves) + 1, "reason": reason,
+               "bank": ("built" if builds else "reused" if reuse is not None
+                        else "sliced_bank"),
+               "bank_budget_s": round(budget, 1) if budget is not None else None,
+               "bank_budget_floored": floored,
+               "left_at_start_s": round(deadline - started_at, 1)}
+        outcome = "raised"
+        try:
+            # R297(c). A crash with nothing usable leaves here as a crash, so no
+            # caller below can read it as a refusal worth re-solving.
+            out = raise_on_engine_crash(run_slate(
+                runs_root=str(REPO / "runs"),
+                salary_csv=str(salary), entries_csv=str(entries),
+                approve=True, requested_n=n_entries,
+                candidates_override=candidates,
+                # Same enrichment inputs the probe frame used. run_slate
+                # reassembles the frame internally, so passing anything less
+                # here would build the bank on enriched projections and then
+                # certify against unenriched ones.
+                **enrich_kwargs,
+                bank_time_budget_s=budget,
+                auto_bank_out=bank_out,
+                reuse_auto_bank=reuse,
+                portfolio_controls_override=dict(controls) or None,
+                leverage=leverage or None,
+                input_confidence_facts=confidence_facts,
+                input_confidence_relax=confidence_relax,
+                certification_label=certification_label,
+                never_relax_controls=sorted(never_relax),
+                control_moves=control_moves,
+                interaction_probe_budget_s=probe_budget,
+                interaction_probe_not_after=probe_not_after,
+                **slate_kwargs,
+            ))
+            outcome = "delivered" if has_deliverable(out) else "refused"
+            return out
+        finally:
+            ended_at = time.monotonic()
+            if bank_out and bank_out.get("candidates"):
+                auto_bank.update(bank_out)
+            elif builds:
+                # R416. Handed a budget, but run_slate returned before its bank
+                # (a contest-identity or exclusion refusal, or a raise).
+                row["bank"] = "not_built"
+            _held = bank_out if bank_out else (reuse or {})
+            row.update({
+                "bank_elapsed_s": (bank_out or {}).get("bank_elapsed_s"),
+                "sleeves_elapsed_s": (bank_out or {}).get("sleeves_elapsed_s"),
+                "candidates": (len(_held.get("candidates") or [])
+                               if _held else (len(candidates) if candidates is not None
+                                              else None)),
+                "wall_s": round(ended_at - started_at, 1),
+                "left_at_end_s": round(deadline - ended_at, 1),
+                "outcome": outcome,
+            })
+            solves.append(row)
+            print(f"SOLVE {format_solve_row(row)}", file=sys.stderr, flush=True)
 
     result = _solve(attempt_controls)
     # R407. On a PROVEN-infeasible joint MILP the confidence tightening is the
@@ -3554,7 +3639,7 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         print("input confidence: the joint MILP proved infeasible with the "
               "confidence tightening applied; relaxing it first and re-solving "
               "(R407)", file=sys.stderr)
-        result = _solve(attempt_controls)
+        result = _solve(attempt_controls, reason="input_confidence_relax")
     print(f"input confidence: "
           f"{format_input_confidence_line(result.get('input_confidence'))}",
           file=sys.stderr)
@@ -3622,7 +3707,13 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
               + f" This file will be labelled {dg.DEADLINE_LABEL} and never "
               f"certified.", file=sys.stderr)
         result = _solve(attempt_controls, certification_label=dg.DEADLINE_LABEL,
-                        control_moves=governor.walked[-1].get("moves"))
+                        control_moves=governor.walked[-1].get("moves"),
+                        reason="deadline_rung")
+
+    # R416. Any solve's floor, not only the first's: each solve that builds a
+    # bank resolves its own budget now.
+    bank_budget_floored = bool(bank_budget_floored or any(
+        row.get("bank_budget_floored") for row in solves))
 
     if not has_deliverable(result):
         for blocker in result.get("contest_identity_blockers") or []:
@@ -3739,7 +3830,7 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         if (bank_report is None
                 and any("BANK-LIMITED" in str(e) for e in (result.get("errors") or []))):
             print("BANK: this refusal is BANK-LIMITED on the direct door, whose "
-                  "auto-bank is rebuilt on every call and cannot grow; pass "
+                  "auto-bank is rebuilt on every run and cannot grow; pass "
                   "--bank-max-candidates to build the persistent sliced bank "
                   "(R415).", file=sys.stderr)
         if bank_report is not None:
@@ -3778,6 +3869,9 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         # door's auto-bank does not persist, so a re-run cannot grow it; the
         # sliced door (--bank-max-candidates selects it) can.
         payload["solve_strategy"] = strategy
+        # R416. Each solve's bank budget, bank time and wall, so a refusal
+        # says whether the window went to one slow solve or to re-solves.
+        payload["solves"] = [dict(row) for row in solves]
         payload["run_id"] = result.get("run_id")
         payload["gates"] = {
             "workflow_valid": result.get("workflow_valid"),
@@ -3849,6 +3943,12 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         "request": (_bank_record or {}).get("classic_sleeves_request"),
         "jobs": (_bank_record or {}).get("classic_sleeves_jobs"),
     }
+    # R416. A reused bank's request is the solve that BUILT it, under that
+    # solve's controls; a governed re-solve that turned the sleeves off still
+    # shows it, so the block says whose request it is.
+    if (_bank_record or {}).get("reused_auto_bank"):
+        exposure["classic_sleeves"]["request_from"] = (
+            "the first solve's bank, reused by this solve (R416)")
     print(f"sleeves: {format_sleeves_line(exposure['classic_sleeves'])}", file=sys.stderr)
     # R247(a). Read before approving, on the same footing as the frontier line.
     # The block itself lives inside the frontier (it is computed where the
@@ -3930,6 +4030,9 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
             "bank_cap": _bank_cap,
             "bank_stop_reason": (bank_report or {}).get("bank_stop_reason"),
             "bank": bank_report,
+            # R416. One row per solve: the bank it built, reused or was handed,
+            # that bank's budget and time, and the window left either side.
+            "solves": [dict(row) for row in solves],
         },
         "slate_clock": {
             "first_lock_game_id": clock.get("first_lock_game_id"),
@@ -7157,6 +7260,9 @@ def _deliver_after_exception(exc: BaseException) -> int:
     }
     if prior.get("slate"):
         brief["slate"] = prior["slate"]
+    # R416. The solves' clock, recorded as each one landed, survives the raise.
+    if _REFUSAL_CONTEXT.get("solves"):
+        brief["solves"] = [dict(row) for row in _REFUSAL_CONTEXT["solves"]]
     _REFUSAL_CONTEXT["brief"] = brief
     print(json.dumps(brief, indent=1, default=str))
     return 7
@@ -7186,6 +7292,12 @@ def refusal_record_facts(context: Mapping[str, Any]) -> tuple:
         "failing_checks": failing,
         "run_id": brief.get("run_id"),
     }
+    # R416. What each solve spent, when any ran: the record is read after the
+    # terminal is gone, and "which solve took the window" is its question.
+    solves = (brief.get("solves") or (brief.get("solve") or {}).get("solves")
+              or context.get("solves"))
+    if solves:
+        facts["solves"] = [dict(row) for row in solves]
     return tag, facts
 
 

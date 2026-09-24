@@ -21011,7 +21011,7 @@ class AutobuildBankCapTests(unittest.TestCase):
         self.assertEqual([self._cap_of(c) for c in cmds], [None, None])
 
     def test_a_bank_limited_refusal_on_the_direct_door_takes_the_sliced_bank(self):
-        """The direct door's auto-bank is rebuilt on every call, so re-running
+        """The direct door's auto-bank is rebuilt on every run, so re-running
         a BANK-LIMITED refusal there repeats it. Measured 2026-09-24 on the
         06-28 11g fixture at autobuild's 105s: 32 of 220 viable SP pairs."""
         from mlb_engine import repo_env
@@ -27351,6 +27351,304 @@ class DeadlineGovernorWiringTests(unittest.TestCase):
         from mlb_engine.pipeline import deadline_governor as dg
         _code, governed, _calls, _err = self._run(2, second_result=dict(self._PASSING, **failed))
         self.assertEqual(governed["status"], f"{dg.DEADLINE_LABEL}_unmirrored")
+
+
+class DirectDoorResolveBankTests(unittest.TestCase):
+    """R416. On the direct door a re-solve solves on the first solve's bank and
+    gets no second bank budget, and the brief says what each solve spent.
+
+    The 06-28 fixture (11 games, 38 entries) ran 220s against --max-seconds
+    105 and 1,216s against 600, because R407's re-solve rebuilt run_slate's
+    auto-bank with the window's whole budget again; under autobuild the child
+    died at its wall with no brief. These drive `run_classic` with the real
+    pool build and only `run_slate` faked, as DeadlineGovernorWiringTests
+    does, so the budget, the reuse and the record are the production path."""
+
+    _SALARY = DeadlineGovernorWiringTests._SALARY
+    _CANDIDATES = [{"candidate_id": "c1", "ceiling": 1.0},
+                   {"candidate_id": "c2", "ceiling": 0.9}]
+    _INFEASIBLE = {
+        "passed": False, "run_id": "r1", "workflow_valid": False,
+        "errors": ["entry-level joint MILP proven infeasible: "
+                   "max_sp_pair_repetition: 1 distinct SP pairs x cap 1 = 1 < 2 entries"],
+        "feasibility": {"passed": True, "checks": []},
+        "input_confidence": {"applied": True, "tier": "severe"},
+    }
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.kw = []
+
+    def _future_salary(self):
+        """The frozen fixture re-dated to tomorrow, so the build is outside T-30
+        and R407's proven-infeasible re-solve is the one that fires."""
+        tomorrow = (datetime.now(ZoneInfo("America/New_York"))
+                    + timedelta(days=1)).strftime("%m/%d/%Y")
+        text = self._SALARY.read_text(encoding="utf-8-sig").replace(
+            "07/29/2026", tomorrow)
+        path = self.root / "DKSalaries_future.csv"
+        path.write_text(text, encoding="utf-8")
+        return path
+
+    def _run(self, results, *, fill_bank=True, governed_minutes=None,
+             salary=None, max_seconds=60.0):
+        import importlib.util
+        import shutil
+        import time as _time
+        from mlb_engine.pipeline import deadline_governor as dg
+
+        spec = importlib.util.spec_from_file_location(
+            "build_slate_r416", REPO / "skills" / "generate-lineups"
+            / "scripts" / "build_slate.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        mod.REPO = self.root
+        self.mod = mod
+
+        def fake_run_slate(**kw):
+            self.kw.append(dict(kw))
+            out = kw.get("auto_bank_out")
+            if fill_bank and out is not None:
+                out.update({"candidates": [dict(c) for c in self._CANDIDATES],
+                            "bank_diagnostics": {"source": "build_diverse_candidate_bank"},
+                            "time_budget_s": kw.get("bank_time_budget_s"),
+                            "bank_elapsed_s": 1.25, "sleeves_elapsed_s": 0.5,
+                            "elapsed_s": 1.75})
+            _time.sleep(0.02)
+            return dict(results[min(len(self.kw), len(results)) - 1])
+
+        governor = (dg.DeadlineGovernor(datetime.now(timezone.utc)
+                                        + timedelta(minutes=governed_minutes))
+                    if governed_minutes is not None else None)
+        salary = salary or self._SALARY
+        args = types.SimpleNamespace(
+            date="2026-07-29", entries=2, controls_override=None,
+            projections=None, lineups=None, odds=None, postures=None,
+            deliver_by="set" if governor else None, _governor=governor,
+            max_seconds=max_seconds, declare_pitcher=None,
+            ignore_pool_blockers=True, assume_gates=None, rotowire=False,
+            enrichment=False, reference_dir=None, reference_max_age_days=14.0,
+            past_slate_replay=True, leverage=None,
+            max_opposing_hitters_per_sp=None, ownership_pred=None,
+            feed_max_age_minutes=90.0, bundle=None, tbd_fallback=None,
+            brief=None)
+        slate_dir = self.root / "slate"
+        slate_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy(salary, slate_dir / "DKSalaries.csv")
+        wiring = DeadlineGovernorWiringTests()
+        wiring.root = self.root
+        original = epi.run_slate
+        epi.run_slate = fake_run_slate
+        out, err = io.StringIO(), io.StringIO()
+        self.deadline = _time.monotonic() + max_seconds
+        try:
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                code, brief = mod.run_classic(
+                    args, slate_dir, salary, wiring._entries_csv(),
+                    {"games": []}, self.deadline)
+        finally:
+            epi.run_slate = original
+        return code, brief, err.getvalue()
+
+    def _delivered(self):
+        wiring = DeadlineGovernorWiringTests()
+        wiring.root = self.root
+        return {"passed": True, "run_id": "r2", "workflow_valid": True,
+                "selection_certified": True, "allocation_certified": True,
+                "delivered_path": str(wiring._delivered_csv())}
+
+    def test_the_r407_re_solve_reuses_the_bank_and_gets_no_second_budget(self):
+        code, brief, err = self._run([self._INFEASIBLE, self._INFEASIBLE],
+                                     salary=self._future_salary())
+        self.assertEqual(len(self.kw), 2, f"R407 did not re-solve: {err[-600:]}")
+        self.assertEqual(brief["solve_strategy"], "direct")
+        first, second = self.kw
+        self.assertIsNotNone(first["bank_time_budget_s"])
+        self.assertLessEqual(first["bank_time_budget_s"], 60.0 - 6.0)
+        self.assertIsNone(first["reuse_auto_bank"])
+        self.assertIsNone(second["bank_time_budget_s"],
+                          "the re-solve was handed a second bank budget")
+        self.assertIsNone(second["auto_bank_out"])
+        self.assertEqual(second["reuse_auto_bank"]["candidates"], self._CANDIDATES)
+        self.assertEqual(second["input_confidence_relax"], "proven_infeasible")
+
+    def test_the_calls_together_stay_inside_the_window(self):
+        """Only a solve that builds a bank is handed a budget, so the budgets
+        the calls receive sum to at most the window less the reserve."""
+        self._run([self._INFEASIBLE, self._INFEASIBLE], salary=self._future_salary(),
+                  max_seconds=40.0)
+        handed = [kw["bank_time_budget_s"] for kw in self.kw
+                  if kw["bank_time_budget_s"] is not None]
+        self.assertEqual(len(handed), 1, handed)
+        self.assertLessEqual(sum(handed), 40.0 - 6.0)
+
+    def test_the_governed_re_solve_solves_on_the_first_bank(self):
+        """R386's delivery-first path gets the bank solve 1 built, not a 5s floor."""
+        refusal = DeadlineGovernorWiringTests._REFUSAL
+        delivered = {**self._delivered(), "candidate_bank": {
+            "classic_sleeves_request": {"active": True},
+            "reused_auto_bank": {"note": "built by an earlier call"}}}
+        code, brief, err = self._run([refusal, delivered], governed_minutes=2)
+        self.assertEqual(code, 0, err[-600:])
+        # The reused bank's sleeve request is solve 1's, and the block says so.
+        self.assertIn("first solve", brief["exposure"]["classic_sleeves"]["request_from"])
+        self.assertEqual(len(self.kw), 2)
+        second = self.kw[1]
+        self.assertEqual(second["certification_label"], "review_grade_deadline_build")
+        self.assertTrue(second["reuse_auto_bank"]["candidates"])
+        self.assertIsNone(second["bank_time_budget_s"])
+        rows = brief["solve"]["solves"]
+        self.assertEqual([(r["call"], r["reason"], r["bank"]) for r in rows],
+                         [(1, "initial", "built"), (2, "deadline_rung", "reused")])
+        self.assertEqual(rows[1]["candidates"], 2)
+        self.assertEqual(rows[1]["outcome"], "delivered")
+
+    def test_a_re_solve_with_no_bank_to_reuse_builds_on_what_is_left(self):
+        """When solve 1 returned before its bank, the re-solve builds, and its
+        budget is the window left at THAT call, not solve 1's again."""
+        refusal = DeadlineGovernorWiringTests._REFUSAL
+        code, brief, err = self._run([refusal, self._delivered()], fill_bank=False,
+                                     governed_minutes=2)
+        self.assertEqual(len(self.kw), 2)
+        first, second = self.kw
+        self.assertIsNone(second["reuse_auto_bank"])
+        self.assertIsNotNone(second["bank_time_budget_s"])
+        self.assertLess(second["bank_time_budget_s"], first["bank_time_budget_s"])
+        # Handed a budget, but no bank came back: the row does not say "built".
+        self.assertEqual([r["bank"] for r in brief["solve"]["solves"]],
+                         ["not_built", "not_built"])
+
+    def test_the_refusal_brief_and_record_carry_each_solve(self):
+        code, brief, err = self._run([self._INFEASIBLE, self._INFEASIBLE],
+                                     salary=self._future_salary())
+        self.assertEqual(code, 3)
+        rows = brief["solves"]
+        self.assertEqual([r["bank"] for r in rows], ["built", "reused"])
+        self.assertEqual(rows[0]["bank_budget_s"],
+                         round(self.kw[0]["bank_time_budget_s"], 1))
+        self.assertEqual(rows[0]["bank_elapsed_s"], 1.25)
+        self.assertEqual(rows[0]["sleeves_elapsed_s"], 0.5)
+        self.assertIsNone(rows[1]["bank_budget_s"])
+        self.assertEqual(rows[1]["reason"], "input_confidence_relax")
+        for row in rows:
+            self.assertGreaterEqual(row["wall_s"], 0.0)
+            self.assertGreaterEqual(row["left_at_start_s"], row["left_at_end_s"])
+        self.assertIn("SOLVE 1 (initial): bank built", err)
+        self.assertIn("SOLVE 2 (input_confidence_relax): bank reused", err)
+        _tag, facts = self.mod.refusal_record_facts({"brief": brief})
+        self.assertEqual(facts["solves"], rows)
+        # Written as each solve lands, so the exit-7 brief and a record built
+        # from context alone keep them.
+        self.assertEqual(self.mod._REFUSAL_CONTEXT["solves"], rows)
+        _tag, facts = self.mod.refusal_record_facts(
+            {"solves": self.mod._REFUSAL_CONTEXT["solves"]})
+        self.assertEqual(facts["solves"], rows)
+
+    def test_a_raise_after_delivery_keeps_the_solves(self):
+        """R393(b)'s exit-7 brief is built from module state, not run_classic's
+        locals, so the rows are written there as each solve lands."""
+        mod = self._module()
+        mod._REFUSAL_CONTEXT.clear()
+        mod._LAST_USABLE.clear()
+        mod._LAST_USABLE.update({"path": "x.csv", "sha256": "0" * 64,
+                                 "label": "certified", "date": "2026-07-29"})
+        mod._REFUSAL_CONTEXT["solves"] = [{"call": 1, "bank": "built"}]
+        with contextlib.redirect_stdout(io.StringIO()), \
+                contextlib.redirect_stderr(io.StringIO()):
+            try:
+                raise RuntimeError("formatter")
+            except RuntimeError as exc:
+                self.assertEqual(mod._deliver_after_exception(exc), 7)
+        self.assertEqual(mod._REFUSAL_CONTEXT["brief"]["solves"],
+                         [{"call": 1, "bank": "built"}])
+
+    def test_the_direct_floor_notice_names_the_direct_remedy(self):
+        mod = self._module()
+        with contextlib.redirect_stderr(io.StringIO()) as err:
+            mod.resolve_bank_budget(-2.0, label="sliced bank", door="direct")
+        printed = err.getvalue()
+        self.assertIn("--bank-max-candidates", printed)
+        self.assertNotIn("exits 10 and resumes", printed)
+
+    @staticmethod
+    def _module():
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "build_slate_r416_unit", REPO / "skills" / "generate-lineups"
+            / "scripts" / "build_slate.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+
+class RunSlateAutoBankReuseTests(unittest.TestCase):
+    """R416, the engine half. `run_slate` hands back the auto-bank it built, and
+    a later call that passes it builds no bank, solves on it, and carries its
+    record in `candidate_bank` (so the manifest's relaxation verdict reads the
+    real bank, not the override stub)."""
+
+    CONTROLS = {**RunSlateFrontDoorTests.LOOSE, "classic_sleeves": False}
+
+    def test_the_bank_is_handed_back_and_reused_without_a_second_build(self):
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            salary = root / "salary.csv"; ids = write_salary(salary)
+            entries = root / "DKEntries.csv"; write_entries(entries)
+            r1, r2 = legal_rosters(ids)
+            cands = [candidate("A", r1, 100), candidate("B", r2, 99, "CCC")]
+            proj = projection_frame(ids)
+            relaxations = {"overlap_relaxed_slots": 1, "warnings": ["overlap relaxed"]}
+
+            def _bank(*args, **kwargs):
+                return {"candidate_lineups": [dict(c) for c in cands],
+                        "relaxations": relaxations, "budget": {"exhausted": False}}
+
+            def _no_bank(*args, **kwargs):
+                raise AssertionError("a reused solve built a second bank")
+
+            common = dict(salary_csv=salary, entries_csv=entries,
+                          projections_override=proj, approve=True,
+                          portfolio_controls_override=self.CONTROLS,
+                          assume_gates=RunSlateFrontDoorTests.UNEVIDENCED)
+            handed = {}
+            with mock.patch.object(opt, "build_diverse_candidate_bank", _bank):
+                first = run_slate(runs_root=root / "a", bank_time_budget_s=30.0,
+                                  auto_bank_out=handed, **common)
+            self.assertTrue(first["passed"], first.get("errors"))
+            self.assertEqual([c["candidate_id"] for c in handed["candidates"]],
+                             ["A", "B"])
+            self.assertEqual(handed["time_budget_s"], 30.0)
+            for key in ("bank_elapsed_s", "sleeves_elapsed_s", "elapsed_s"):
+                self.assertIsInstance(handed[key], float)
+            self.assertEqual(handed["bank_diagnostics"]["relaxations"], relaxations)
+
+            with mock.patch.object(opt, "build_diverse_candidate_bank", _no_bank):
+                second = run_slate(runs_root=root / "b", reuse_auto_bank=handed,
+                                   **common)
+            self.assertTrue(second["passed"], second.get("errors"))
+            bank = second["candidate_bank"]
+            self.assertEqual(bank["source"], "build_diverse_candidate_bank")
+            self.assertEqual(bank["candidate_count"], 2)
+            self.assertEqual(bank["relaxations"], relaxations)
+            self.assertEqual(bank["reused_auto_bank"]["time_budget_s"], 30.0)
+            # The same bank and controls give the same file.
+            body = lambda r: Path(r["output_path"]).read_text(encoding="utf-8")
+            self.assertEqual(body(first), body(second))
+
+    def test_a_reused_bank_and_an_override_together_are_refused(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            salary = root / "salary.csv"; ids = write_salary(salary)
+            entries = root / "DKEntries.csv"; write_entries(entries)
+            cands = [candidate("A", legal_rosters(ids)[0], 100)]
+            with self.assertRaises(ValueError):
+                run_slate(runs_root=root / "runs", salary_csv=salary,
+                          entries_csv=entries, projections_override=projection_frame(ids),
+                          candidates_override=cands,
+                          reuse_auto_bank={"candidates": cands}, approve=True)
 
 
 class LastUsableArtifactTests(unittest.TestCase):
