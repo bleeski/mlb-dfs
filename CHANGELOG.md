@@ -2,6 +2,138 @@
 
 What changed in the engine, the tools and the contracts, when, and why.
 
+## 2026-09-24 — R416: on the direct door a re-solve solves on the first solve's bank. `run_slate` hands its auto-bank back and takes one in, a solve that builds takes its budget from the window left at that call, and the brief records what each solve spent (roadmap Session 103)
+
+**Scope.**
+- `mlb_engine/pipeline/execution_pipeline.py`, in `run_slate`:
+  - the new kwargs `auto_bank_out` and `reuse_auto_bank`, and their exclusivity refusals;
+  - the reuse branch, which carries the bank's own record plus `reused_auto_bank`;
+  - the bank and sleeve timers and the handback;
+  - the plan leg reading a reused bank.
+- `skills/generate-lineups/scripts/build_slate.py`:
+  - `_solve` resolves its budget per call, reuses the bank, keeps a `solves` row per call and prints it as `SOLVE n:`;
+  - `format_solve_row`;
+  - `solve.solves` on the brief, `solves` on the refusal, in `refusal_record_facts` and in `_deliver_after_exception`;
+  - `solve.bank_budget_floored` reads any solve;
+  - `resolve_bank_budget` takes `door=` and its remedy names that door;
+  - a solve handed a budget that got no bank back reads `not_built`;
+  - the sleeves block says whose request a reused bank carries (`request_from`);
+  - the direct door's `BANK:` line says "every run";
+  - the once-only `run_bank_budget` is gone.
+- `tools/autobuild.py`: a comment only ("every run").
+- Tests: `tests/test_core.py` (`DirectDoorResolveBankTests`, `RunSlateAutoBankReuseTests`, and a docstring's "every run"), and the pin in `tools/audit.py`.
+- Board: `docs/backlog.md` (R416 CLOSED; R417, R418 filed) and `docs/ROADMAP.md` (Session 103 Complete; Sessions 104 and 105; ledger row; Session 102 backfilled as 0bbd936).
+- Not committed: this session's hook-written `data/agent_runs/2026-09-24/` record, which names the serving model.
+
+**What was wrong, verified at 0bbd936.** A `dfs-premise` run checked it; I re-ran its greps and then measured.
+- `run_bank_budget` was computed once, before the first `_solve` (BS L3454). All three `_solve` calls passed it: the first, R407's re-solve and the deadline governor's.
+- On the direct door `candidates` is None, so every `run_slate` call built a new auto-bank. `run_slate` kept its bank in a local and handed nothing back, so `build_slate` had nothing to reuse without an engine change.
+- The premise run also found two things the entry did not name:
+  - the direct door's sleeves get `max(10, 0.30 x budget)` on top of the bank's budget;
+  - the governor does not relax anti-correlation, as the entry had said.
+
+**Measured before choosing the fix.**
+- Slate: archived 06-28, 11 games, 38 entries. Entries blanked, a confirmed feed synthesized, dates moved to 2026-09-25.
+- Run in a detached worktree with timing prints, on this cloud container (630s call budget), with `PYTHONHASHSEED=0`.
+
+| window | solve 1 | R407 re-solve | wall | result |
+|---|---|---|---|---|
+| 105s | budget 97.0s; bank 97.4s (31 of 76 base lineups); sleeves 9.5s; wall 107.8s; deadline passed by 4.7s | budget 97.0s again; bank rebuilt in 97.2s; wall 108.1s | 220.1s | exit 3, BANK-LIMITED, 26 of 220 SP pairs |
+| 600s | budget 593.1s; bank 595.7s (76 of 76); sleeves 9.7s; wall 607.1s; deadline passed by 8.0s | budget 593.1s again; bank rebuilt in 596.2s; wall 607.4s | 1,215.7s | certified, 615.5s past the deadline; a live 630s call would have been killed first |
+
+- The bank stays within one in-flight solve of its own budget: +0.4s at 97s, +2.6s and +4.8s at 593s. So the overrun is the re-solves, not a second defect in the bank.
+- `projected_direct` put 60-73s on the 11-game bank, which took 580s for 76 base lineups; that is the direct door's cost model, filed as R417(a). On 06-03 (2 games) it projected 25.8s against a measured 20.1s, and the build certified in 22.7s.
+
+**The decision: reuse, with recompute as the guard.** Recomputing the budget per call alone gives the 105s re-solve a floored 5s bank, and that refuses; the first solve's bank is the better one to solve on. Reuse is legal because nothing either re-solve relaxes widens what the bank should hold:
+- R407 relaxes `max_player_exposure_pct`, which only the allocator reads, and `max_consensus_cluster_share_pct`. The bank's ask for the consensus share is `ceil((1 - pct) x n x 2)`: 54 at the tightened 0.3, 38 at the relaxed 0.5, over the same cluster. The first bank asked for more than the relaxed one would.
+- The governor opens caps only the allocator reads, sets the consensus share to 1.0 (no ask), and sets `classic_sleeves: False`, and the allocator then ignores sleeve tags. `max_sp_pair_repetition` reaches the bank call, but the bank ignores it (`bank_constraint_scope='selection'`).
+- Every reused candidate is a legal lineup on the same pool and projections, and the pool is never touched. The sliced door has always re-solved on one bank.
+
+The alternative I dropped was moving the direct door's sleeves inside the budget (the sliced door's 70/30 split). Both measured banks were clock-bound and the sleeves used about 10s of their 30% share, so the split would cut every budgeted direct build's base bank by 30% to recover about 10s. That is R417(b).
+
+**What shipped.**
+- *The handback.*
+  - With `auto_bank_out`, `run_slate`'s direct door writes into it: the exact post-sleeve candidates the allocator saw, `bank_diag`, the budget, and the bank, sleeve and total seconds.
+  - With `reuse_auto_bank`, it builds no bank. It solves on a shallow copy (the allocator copies what it reads) and carries the bank's own record plus `reused_auto_bank` in `candidate_bank`, in `diagnostics.json`, and in the manifest's relaxation verdict. So a reused solve's record describes its real bank, not the override stub; the review found that stub would have read "clean" on a relaxed bank.
+  - Passing it beside `candidates_override`, or with no candidates, is a `ValueError`.
+  - Both kwargs default to None, and only `build_slate` passes a bank budget, so every other caller is unchanged.
+- *The re-solves.*
+  - On the direct door, solve 1 passes `auto_bank_out` and every later solve passes `reuse_auto_bank`.
+  - A solve with nothing to reuse (solve 1 returned before its bank) builds with the budget left at that call, and a floor is announced for the call that hit it.
+  - The governed re-solve, R386's delivery-first path, gets solve 1's bank. It does not get a 5s floor.
+- *The record.* Each solve is a row with:
+  - call and reason;
+  - bank (`built`, `reused`, `sliced_bank`, or `not_built` when a solve handed a budget got no bank back);
+  - `bank_budget_s` and whether it was floored;
+  - `bank_elapsed_s` and `sleeves_elapsed_s`;
+  - candidates;
+  - the window left at start and end, wall, and outcome.
+
+  The rows go to `solve.solves` on the brief, to `solves` on the refusal and in its record, and to the exit-7 brief through `_REFUSAL_CONTEXT`, where they are written as each solve lands. Each row also prints as `SOLVE n: ...` the moment the call returns, because the failure this exists for is a killed process, which writes no brief. `solve.bank_budget_floored` is now true if any solve was floored. The direct door's floor notice no longer says "re-run; exits 10", which is the sliced door's remedy.
+- *Determinism.* A re-solve is now a deterministic function of solve 1's bank, where before it was a second clock-bound build. No digest, key or `VERSION` changed.
+
+**Verified end to end** (the worktree synced to this change, no timing patch):
+- `--max-seconds 105`: **110.5s**, inside the window plus the 30s reserve.
+  - The direct door. `SOLVE 1 (initial): bank built, budget 97.4s, bank 97.52s + sleeves 9.7s, 89 candidates, wall 108.0s`, then `SOLVE 2 (input_confidence_relax): bank reused, 89 candidates, wall 0.7s`.
+  - Exit 3, BANK-LIMITED (26 of 220 SP pairs), with a brief.
+- `--max-seconds 600`: **610.8s**, certified, inside the 630s call budget; before this change it was 1,215.7s.
+  - `SOLVE 1: bank built, budget 593.1s, bank 595.55s + sleeves 11.04s, 170 candidates, wall 608.2s`, then R407's `SOLVE 2: bank reused, 170 candidates, wall 1.5s, delivered`.
+  - sha256 `284fb934d595a933d8f756c6836d05e26878299e4be58efe616c0a3847c71123`.
+  - The reused bank certified under the relaxed controls, where the rebuild had done the same 608s later.
+- autobuild on the same fixture (`--passthrough=--no-rotowire --call-budget-seconds 0 --stop-after-minutes 25`):
+  1. Attempt 1 took the direct door, refused BANK-LIMITED about 110s in, inside its 195s child wall, with no `build_timed_out`. It recorded `raise_bank_cap` with `from_door: direct`, to 1,536 (`host_default`): R415's direct-door switch, firing live for the first time.
+  2. Attempt 2 took the sliced door: 408 candidates plus sleeves, so 444 to the allocator, 208 distinct SP pairs, `bank_stop_reason: time_budget`, one solve. It certified in 88.5s and delivered `DKEntries_1335_11g.csv`, sha256 `6ca5e22cf188587360e054dfa4461b0888524ce708fd1e3f43948645c45e7ad5`.
+
+  `preflight_upload.py` on it: `PASS 38 classic entries, all hard checks clean`. It is a re-dated archived fixture, not an upload.
+
+**R233, every site that hands `run_slate` a bank budget or a bank to reuse.**
+- `grep -rn "bank_time_budget_s=\|reuse_auto_bank=\|auto_bank_out=" --include=*.py mlb_engine skills tools` returns three lines, all in the one `run_slate` call in `build_slate`'s `_solve` (L3593-3595).
+- `grep -n "_solve(" build_slate.py` returns the definition plus three calls (L3631, L3642, L3709), and all three go through that one call.
+- `tools/benchmark_engine.py` and `tools/stage_slate.py` call `run_slate` with no bank budget, so they are unchanged.
+- Showdown's governor loop rebuilds its bank on its re-solve too (`run_showdown`, `continue`), but it has no bank time budget, so it cannot hand a second window; it was not measured here and is named, not fixed.
+
+**Tests.**
+- Nine new: seven `DirectDoorResolveBankTests`, which drive `run_classic` with the real pool build and a faked `run_slate`; and two `RunSlateAutoBankReuseTests`, which use the real `run_slate` with the bank builder patched, raising on the reused call.
+- Seventeen hand mutations each went red and were restored byte for byte:
+  - re-solves build;
+  - no reuse;
+  - the budget computed once;
+  - the refusal, brief, record and exit-7 rows each dropped;
+  - no `SOLVE` line;
+  - the floor notice's single remedy;
+  - no handback;
+  - the reuse branch removed;
+  - the stub record;
+  - the exclusivity refusal removed;
+  - and, from the review, the `not_built` label, `request_from`, the rows written into `_REFUSAL_CONTEXT`, and the remedy chosen by label.
+- The golden replay passes no bank budget and is unmoved.
+- `test_core` pin: 1606 -> 1615. Gate: `PASS  v2.26.0  43 modules  2618 tests  5 skipped  {test_core 1615/1615 (4 skipped) skipped_in_place; test_showdown 337/337 (1 skipped) skipped_in_place}  [tests.test_core ran its pinned 1615 but 4 were SKIPPED, so the count proves nothing about coverage.; tests.test_showdown ran its pinned 337 but 1 were SKIPPED, so the count proves nothing about coverage.]`. The five skips are the absent optional files every host lacks.
+
+**The review.** A read-only general-purpose subagent reviewed the diff; `/code-review`'s security hook fails under `/bin/sh` on this host. A design-stage review, before any code, had already moved the reuse into `run_slate`. Without that, the manifest's relaxation verdict would have read the override stub as "clean", and `metadata=` would have collided with the sliced door's `slate_kwargs`. It also dropped the sleeve split.
+
+The diff review found nothing blocking. It confirmed:
+- the sliced door's `bank_time_budget_s=None` changes nothing;
+- the allocator's decisions never read the reused request fields, only report text does;
+- no consumer pins the refusal's key set.
+
+Its six non-blocking findings are all fixed:
+1. A solve that got no bank back reads `not_built`.
+2. The sleeves block names whose request it shows.
+3. A test asserts the rows land in `_REFUSAL_CONTEXT`.
+4. Two "every call" texts now say "every run".
+5. The remedy takes `door=` instead of parsing the label.
+6. An empty sliced list counts 0.
+
+Items 1-3 and 5 each have a mutation that went red.
+
+**Found and filed.**
+- R417 (Session 104), the direct door's wall clock:
+  - (a) `projected_direct` under-counts an 11-game bank about 8x. Its "same model as solver_probe" comment is false.
+  - (b) The sleeves' budget sits on top of the bank's.
+- R418 (Session 105):
+  - (a) Every direct-door brief says `anti_correlation.applied_source: unobserved`, because it reads `result["bank_diagnostics"]`, which no result carries. Pre-existing; measured on the certified 06-03 brief.
+  - (b) A same-date build overwrites `data/slates/<date>/DKSalaries.csv` under a running one. It happened here: my concurrent 06-03 run crashed the first 600s reproduction's re-solve with `KeyError: 'Player_ID'`, exit 1, no brief. I re-ran it alone for the table above.
+
 ## 2026-09-24 — R415: the Classic candidate bank is growable on every host. The sliced bank's cap comes from the host's call budget, `--bank-max-candidates` overrides it, `bank_stop_reason` says whether the cap or the clock stopped the bank, and autobuild raises a capped refusal's cap (roadmap Session 102; R204's ceiling wording)
 
 **Scope.**

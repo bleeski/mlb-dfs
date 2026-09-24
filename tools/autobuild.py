@@ -1005,8 +1005,9 @@ def main() -> int:
               and dec.bank_max_candidates is None
               and any("BANK-LIMITED" in str(e) for e in (brief.get("errors") or []))):
             # R415. The direct door's auto-bank is rebuilt from scratch on every
-            # call, so a BANK-LIMITED refusal there has no growth lever unless
-            # the next attempt takes the sliced door, whose cache persists and
+            # run (R416 reuses it across one run's re-solves), so a BANK-LIMITED
+            # refusal there has no growth lever unless the next attempt takes
+            # the sliced door, whose cache persists and
             # resumes. The cap is this host's default; search effort.
             cap = bank_max_candidates(max(1, int(brief.get("entries") or 1)))
             dec.bank_max_candidates = cap

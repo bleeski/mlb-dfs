@@ -3799,26 +3799,45 @@ for anything retrospective; forward-going, the snapshots are the record.
 
 ## Workstream 4 — Solver, allocator, swap, and brief truth
 
-### R416. On the direct door, R407's confidence re-solve rebuilds `run_slate`'s auto-bank with a second full window, and one 11-game build ran past 17 minutes against `--max-seconds 600` (P1, V) | new 2026-09-24, found measuring R415 on the archived 2026-06-28 11g slate, cloud container
+### R417. The direct door's wall clock is not the window's: `projected_direct` under-counts a 10+ game bank about 8x, and the sleeves' budget sits on top of the bank's (P2, V) | new 2026-09-24, found measuring R416 on the archived 2026-06-28 11g slate, cloud container
 
-- **What:** with the default `--max-seconds` (600s on a 630s host), `build_slate.py` chose the DIRECT door for the 06-28 fixture (38 entries), because `projected_direct <= remaining`.
-  - The first `run_slate` call built its own auto-bank (`build_diverse_candidate_bank`, 220 candidates after sleeves) for about 10 minutes: the build started at 01:33Z and its run directory appeared at 01:43Z.
-  - Its joint MILP proved infeasible, and R407 relaxed the confidence tightening and called `_solve` again.
-  - That second call rebuilt the auto-bank from scratch. py-spy put it in `build_diverse_candidate_bank` -> `build_single_lineup` at 18 CPU-minutes, and the build was killed.
-- **Mechanism, read from the code and from one run:**
-  - `run_bank_budget` is computed ONCE, before the first `_solve` (`build_slate.py`, `max(deadline - now - 6.0, BANK_BUDGET_FLOOR_S)`), and every `_solve` passes it. So each re-solve's bank gets the whole window again.
-  - `candidates_override` is None on the direct door, so each call builds a new bank.
-  - `projected_direct` did not predict a 10-minute bank.
-- **Second reading, the same day:**
-  - At `--max-seconds 105`, autobuild's per-attempt window, the same slate took the direct door, fired the R407 re-solve, and ran 219s, twice its window.
-  - Under autobuild the child was killed at its 195s wall with no brief, so no lever could act on the refusal. That includes R415's direct-door switch.
-  - This is the direct-door blocker for 10+ game slates under autobuild.
-- **Unverified:** whether the first bank ran its full budget or overran it.
-- **Fix, for DEV to verify first:**
-  - Recompute the bank budget from the deadline inside `_solve`.
-  - Or reuse the first call's candidates on the R407 re-solve, which is the same slate under the same projections.
-  - And check `projected_direct` against a measured direct bank on a 10+ game slate.
-- **Related:** R415 made a BANK-LIMITED refusal on this door switch autobuild to the sliced bank. That fixes the growth lever, not the clock.
+- **(a) The cost model.** `build_slate.py`'s `projected_direct` is `single_s x bank_size x (1 + (growth - 1) / 2) + cross_pairs x single_s`, fed by one warm `build_single_lineup` call.
+  - 06-28 (11 games, 38 entries, 220 cross-game SP pairs): single_s 0.07-0.09s, projected 60-73s. Measured: the base bank built 76 of 76 lineups in 580s, and 31 of 76 in a 97s budget.
+  - 06-03 (2 games, 18 entries): projected 25.8s, measured 20.1s. The model holds on small slates.
+  - Its comment says "Same model as tools/solver_probe.py", which is false. The probe times a 5-lineup build and adds the consensus-limited and sleeve terms (`solver_probe.py` L202-244), and the filer's probe put about 508s on this slate.
+  - The effect: an 11-game slate takes the direct door at autobuild's 105s and refuses BANK-LIMITED (26 of 220 pairs). Since R416 that refusal writes a brief inside the window, and R415 moves autobuild to the sliced door. The cost is one attempt, not the window.
+- **(b) The sleeves.** The direct door's sleeves get `max(10, BANK_SLEEVE_BUDGET_SHARE x budget)` ON TOP of the bank's budget (`execution_pipeline.py`, the `_direct_door_sleeves` call).
+  - They are need-bounded: measured at 9.5-10.8s against caps of 29-178s.
+  - But the auto-bank can run up to 1.3x its budget by construction.
+  - The sliced door's 70/30 split was considered and dropped for R416. Both measured banks were clock-bound, so the split would cut every budgeted direct build's base bank by 30% to recover about 10s.
+- **Fix, for DEV to measure first:**
+  - Feed `projected_direct` from the probe's measurement (a 5-lineup build, plus the consensus and sleeve terms), or route a slate with more than N cross-game pairs to the sliced door. Choose N from a measured slate.
+  - Size the sleeves' allowance from their need (entries x the sleeve multiple x per-lineup cost), carved out of the bank's budget.
+- **Related:** R416 (shipped), R415's direct-door switch, R204's cost-curve half (Session 16).
+
+### R418. Two record defects found measuring R416: the direct door's `anti_correlation` block reads a key no result carries, and a same-date build overwrites the staged salary file under a running one (P2, P) | new 2026-09-24, cloud container
+
+- **(a)** `anti_correlation_brief_block` reads the direct door's measurement from `result["bank_diagnostics"]["anti_correlation"]` (`build_slate.py`). No `run_slate` result carries `bank_diagnostics`: it goes only to `diagnostics.json`. The auto-bank's record is `result["candidate_bank"]`.
+  - So every direct-door brief says `applied_source: unobserved` and `solves_observed: 0`. Measured on the certified 06-03 brief.
+  - R293's "measured from the bank's own solves" never reads the direct door's solves.
+  - Fix: read `candidate_bank`, and pin it with a real `run_slate` direct build.
+- **(b)** `data/slates/<date>/DKSalaries.csv` is keyed on date alone. A second draftgroup's build moves the prior one aside and stages over the bare name (`build_slate.py`, the `_stage` hand-over). That assumes builds run one after another.
+  - A concurrent build of another same-date slate in the same tree overwrites the file under the running build.
+  - The running build's next `run_slate` re-reads it, matches no player, and crashes in `_assemble_projection_frame` (`KeyError: 'Player_ID'`, exit 1, no brief).
+  - It happened on 2026-09-24 when this session ran the 06-03 fixture beside the 06-28 one.
+  - Fix: hand `run_slate` the tagged staged copy, or refuse a second same-date Classic build while one holds the slate.
+
+### R416. CLOSED 2026-09-24 -- SHIPPED, roadmap Session 103, entry in CHANGELOG.md
+
+On the direct door every re-solve rebuilt `run_slate`'s auto-bank with the window's whole budget, because `build_slate` computed the budget once and `run_slate` kept no bank. On 06-28 11g that was 220s against `--max-seconds 105` and 1,216s against 600.
+
+What shipped:
+- `run_slate` hands its auto-bank back (`auto_bank_out`) and solves on a handed-back one (`reuse_auto_bank`), with the bank's own record.
+- `build_slate`'s R407 and deadline re-solves reuse solve 1's bank.
+- A solve that builds takes its budget from the window left at that call.
+- `solve.solves` and the refusal's `solves` record each solve's bank budget, bank time, and wall time.
+
+At 105s the fixture now ends in 110.5s. The cost model and the sleeves' on-top budget are R417.
 
 ### R415. CLOSED 2026-09-24 -- SHIPPED, filed and landed in one commit (roadmap Session 102), entry in CHANGELOG.md
 
