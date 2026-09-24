@@ -2,6 +2,296 @@
 
 What changed in the engine, the tools and the contracts, when, and why.
 
+## 2026-09-24 — R389(a): the baseline core. An entry-mapped, per-contest-distinct Classic candidate set built on the unenriched frame, before research, the bank and joint allocation, written nowhere and not wired into any build yet (roadmap Session 10)
+
+**Scope.**
+- `mlb_engine/pipeline/baseline.py` (new):
+  - `unenriched_frame`;
+  - `_MemoryBankCache`;
+  - `ContestRequirement` and `requirements_from_entries`;
+  - `lineup_signature`;
+  - `build_baseline`, with its frozen result types (`BaselineResult`, `BaselineCandidate`, `EntryAssignment`, `ContestCoverage`) and `BaselineResult.allocator_candidates`;
+  - `CONSTRUCTION_LABEL`, `CONSTRUCTION_NOTE` and `STOP_REASONS`.
+- `skills/generate-lineups/scripts/build_slate.py`: `run_classic`'s ValueError branch calls `unenriched_frame`, imported with `run_classic`'s other engine imports, never at the top. Nothing else changed.
+- `tests/test_core.py`: `BaselineCoreTests` (new, 34), and two `EXPECTED_CENSUS` rows in `R293BankOnEveryRungTests`.
+- `tools/audit.py` (the test_core pin), `docs/backlog.md` (R389 rewritten to (b) and (c)), `docs/ROADMAP.md` (Session 10 Complete, its departures recorded, Session 11's line numbers corrected, NEXT Session 11, the ledger row, Session 09 backfilled as b14a946), `CHANGELOG.md`.
+- Not touched: `execution_pipeline.py` (the row listed it; found unneeded), `optimizer_v3.py`, `bank_cache.py`, `skills/generate-lineups/SKILL.md` (the baseline procedure lands with Session 11).
+- Not committed: this session's hook-written `data/agent_runs/2026-09-24/` record.
+
+**What was wrong, reproduced at b14a946.** The reproduction ran in a detached scratch worktree, with `MLB_DFS_ROOT` pointed there and `PYTHONHASHSEED=0`. It drove the real `run_classic` on the vendored 2026-06-03 slate, with an empty feed and the eight top-salary SPs declared, and replaced only `run_slate`, by an injected crash.
+- **Research first, then nothing.** Stage order:
+  1. `resolve_reference_data`
+  2. `build_f4_map`
+  3. `resolve_slate_venues`
+  4. `load_odds_packet`
+  5. `build_f1_map`
+  6. `build_f5_map`
+  7. the enriched `_assemble_projection_frame`
+  8. `resolve_leverage`
+  9. the probe
+  10. `run_slate`
+
+  At `run_slate` entry, `runs/` and `outputs/` held no file, and `candidates_override` was None (the direct door). The crash left zero new files. `grep -rn "write_candidate_from_template(\|select_and_assign_entries(" mlb_engine skills tools --include=*.py` puts the only Classic entries writer and the only build-path allocation inside `execute_portfolio` (EP L717, L759). The one other allocator call is `_plan_joint_allocation` (EP L5168), which runs only at `approve=False`.
+- **The probe is thrown away.** BS L3160, `build_single_lineup(projections, target="ceiling")`, is an `ast.Expr`, so its return value is discarded. It returned a full lineup (objective 166.05) that went nowhere; it exists to time `single_s`.
+- **The two frames are one frame only without enrichment.**
+  - Site 1 is BS L3079, the enriched attempt: Savant CSVs, FanGraphs, F4 and F5. Full-frame sha `158281b4…`, digest `cafd864cd8a76ae6`.
+  - Site 2 is the ValueError branch at L3104. Sha `bf71e63a…`, digest `62934c5e80100b17`.
+  - Site 1's call with every enrichment input None gives `bf71e63a…`, byte-identical to site 2 (`DataFrame.equals` True).
+  - So the shared helper is site 2's call shape, and the enriched attempt stays an explicit call.
+
+**Premise corrections.** A `dfs-premise` run checked the entry and I re-ran its sharpest greps.
+- **No in-memory BankCache exists.**
+  - `BankCache(None)` raises `TypeError: expected str, bytes or os.PathLike object, not NoneType`.
+  - `extend_bank` calls `cache.save()` unconditionally (BC L1068), which writes JSON through a tmp file plus a `.lock.sqlite3` sibling.
+  - The tree's existing stand-in is a TemporaryDirectory-backed cache (EP L2818, L5066).
+- **No gap limit exists.** `grep -rn mip_rel_gap --include=*.py` finds `mlb_engine/production/optimizer.py:106` only. `build_single_lineup`'s `milp` call passes `time_limit` and `disp`.
+- **The row's two sites differ in seven arguments.** The unenriched call shape also sits at `tools/solver_probe.py:181` and `tools/late_swap.py:882`.
+- **Stale citations.** The row's "L2483-2486", "L2535-2541" and "BC L778" are stale by about 620 lines. The tombstone is `drop_stale_jobs` (BC L214), and L778 is `extend_bank`'s docstring.
+- **Essential validity is out of reach here.** It is a verdict on exported bytes (`derive_essential_validity`, DKM L1251). A core that exports nothing cannot claim R389's acceptance; Session 11 does.
+
+**What shipped.**
+- *The frame.* `unenriched_frame(salary_csv, projection_rows, *, projected_order_by_player_id=None)` is exactly the ValueError branch's `_assemble_projection_frame(str(salary_csv), rows, "emergency_proxy", None, None, None, projected_order_by_player_id=...)`. The pipeline module is imported inside the function, so a test's patch still intercepts it and Session 11's EP can import this module without a cycle. After the BS edit the reproduction's shas are unchanged: site 1 `158281b4…`, site 2 `bf71e63a…`.
+- *The core.* `build_baseline(salary_csv, frame, *, entries_csv= | requirements=, deadline= | budget_s=, max_opposing_hitters_per_sp=, target_distinct=, clock=)`.
+  - **Caller errors raise; solver outcomes never do.** Each of these raises `ValueError`:
+    - passing both inputs or neither;
+    - a negative anti-correlation allowance;
+    - a frame missing a column every solve reads (`FRAME_COLUMNS`);
+    - a frame carrying a Player_ID the salary file does not list;
+    - a contest named twice once stringified;
+    - an Entry ID in two contests, or both fillable and partial;
+    - a bare string where IDs belong;
+    - a non-string held signature;
+    - an entries file that is not Classic's ten slots.
+  - **The window.** `deadline` is a `time.monotonic()` end, the unit `run_classic` holds. `budget_s` is seconds from now. With neither, the window is `repo_env.call_budget_s()`. No literal. `timings.window_source` names which one won.
+    - Every solve's limit is `resolve_solver_time_limit(None, remaining)`.
+    - The core skips the grid and the fill when the time left is not more than its slowest solve so far. So it overruns by at most one solve's limit plus its model build, and a spent window solves nothing.
+  - **Candidate #1 is the probe.** It is BS L3160's call shape, with the window's limit and the build's anti-correlation value.
+    - It records status, optimality, `mip_gap`, the solver's `elapsed_s` and the probe's `wall_s`.
+    - `wall_s` is labelled a timing proxy on the unenriched frame. It is not `run_classic`'s `single_s`, which is timed on the enriched frame with ownership attached.
+    - A raising or empty probe is recorded, and the grid supplies #1.
+    - A probe proven infeasible also skips the fill, because every fill solve is the same problem with more rows.
+  - **Then one grid pass in an in-memory bank.**
+    - `_MemoryBankCache` calls `super().__init__(os.devnull)` and then sets `path = None`. It overrides `_load` and `save` as no-ops and makes `_save_locked` raise. Those are the only three `BankCache` methods besides `__init__` that read `self.path` (an AST test pins that).
+    - It never sees the shared `runs/bank_cache_<date>_<sig>.json`, so it cannot read that file, write it, or tombstone its jobs.
+    - One `extend_bank(..., max_candidates=target + held, max_opposing_hitters_per_sp=...)` call with the default 4-5 stack gives breadth first over SP pair x stack team, not near-clones.
+  - **Then distinct fill** while any contest is short: `overlap_reference=` every held roster, `max_overlap = ROSTER_SIZE - 1`.
+    - Each solve differs from every held lineup by at least one player. This is exact: OPT L1149-1150 caps a player at one slot, and the overlap row sums his slot variables.
+    - It stops on `covered`, `time_budget`, `solve_time_limit`, `search_exhausted` (proven infeasible), `solver_unanswered` or `solver_error`.
+  - **Distinct means the player set.** Candidates dedupe on sorted IDs (`lineup_signature`, the form `DKEntryRow.lineup_signature` uses), not on BankCache's ordered roster: two slot orders of one set are one lineup for F-3.
+  - **The entry map.** Per contest, fillable rows take candidates in order and skip any lineup that contest already holds in a complete row.
+    - One lineup is never twice in one contest (F-3, never relaxed).
+    - One lineup may fill two contests.
+    - A partial row is named and never filled; it is late swap's.
+    - Contests and entries sort by `(len, id)`, so input order cannot move the result.
+  - **Never a player cut.** The frame is never filtered, copied or narrowed. Every solve gets the caller's frame object, and the only removal site stays `_drop_excluded_rows`.
+  - **Salary backstop.** Every candidate must be ten distinct IDs, all in `parse_dk_salary_csv`. A malformed roster is counted (`pool.malformed_rosters`). An off-salary roster is counted (`pool.salary_id_misses`) and added to the overlap rows so the next solve differs from it. With the frame checked against the salary file up front, only a faulty solver reaches it.
+- *The result.* `BaselineResult` is frozen, holds tuples, and has `as_dict()`.
+  - **Label.** `construction_label = "baseline_construction_proxy"`, documented as never a certification value, because `upload_manifest.passed_its_gates` reads an unknown label as passing.
+  - **Note.** Legal under the solver's rules on this frame; a construction proxy, not a projection claim; not certified, not upload-ready, not the essential-validity verdict. Fill lineups are near-duplicates by construction.
+  - **The typed short count.** `status` (`covered` or `short`, which is about rows), `stop_reason` (why the search ended; `covered` means rows and target), `required` (fillable rows of the largest contest), `target`, `distinct`, `short` (the largest per-contest count left), `target_met`, `uncovered` (every `(contest_id, entry_id)` left) and `by_contest`. An uncovered row is never in `assignments`, so there is never a blank row.
+  - **Candidates.** Each carries its roster in DK slot order, signature, objective, source (`probe`, `grid` or `distinct_fill`), `max_shared_with_earlier`, and its solver record.
+    - The solver record is None for a grid lineup: BankCache keeps no per-solve status, and inventing one would be a false label.
+    - The grid's aggregate counts ride in `grid`.
+  - **`pool`.** Frame rows, rows not excluded, and the `projection_digest` in and after.
+  - **The payload.** `allocator_candidates(frame, requested_n, contest_shapes=None)` shapes it through a fresh `_MemoryBankCache.as_candidates`, with empty job keys that `drop_stale_jobs` cannot purge. So `bank<i>` is candidate `i`, and `bank0` is the probe. Session 11 hands it to `run_slate(candidates_override=...)`.
+- *What it writes.* Nothing: no file, no directory, no lock, no cache. That is measured at the Python level by an audit-hook test.
+
+**Two departures from the row,** both recorded in the row:
+- EP needed no edit.
+- There is no gap limit to set. A gap knob would change the certified solve path's signature, and on 06-28's 11 games a grid solve took about 0.4s. It rides R389(b) as a rider, "add it with PROBE if a big-slate baseline measures a need".
+
+**R233, every site that builds an emergency_proxy frame.** `grep -rn "_assemble_projection_frame(" --include=*.py mlb_engine tools skills`:
+- `mlb_engine/pipeline/baseline.py:117`: the helper.
+- BS L3084: the enriched attempt (Savant, FanGraphs, F4, F1, F5). It stays an explicit call.
+- BS's ValueError branch now calls the helper.
+- EP L6219: `run_slate`'s own assembly. It passes `source_metadata` and the enrichment inputs, so it is not this call shape. Session 11's "one frame" also needs `source_metadata` None.
+- `tools/solver_probe.py:181` and `tools/late_swap.py:882`: the helper's exact shape. Left alone because they are outside this row's write set. `late_swap.py` is LS's.
+- `tools/replay_slate.py:708` and `tools/benchmark_engine.py:224/229`: emergency_proxy with no order map, not this shape. `benchmark_engine` imports production.
+- `tools/stack_shape_probe.py:126`: emergency_proxy with the Savant files.
+
+**R233, every `BankCache` construction.** `grep -rn "BankCache(" --include=*.py mlb_engine tools skills`:
+- `baseline.py` L336 and L544: `_MemoryBankCache()`, the only file-less caches.
+- EP L2818/L2819: the sleeves and the salary-only sleeve.
+- EP L5066/L5124: the plan leg's bank and its salary-only sibling. All four sit in a TemporaryDirectory, so they write to disk and are deleted.
+- BS L3199: the shared sliced bank, `runs/bank_cache_<date>_<sig>.json`.
+- BS L3375: its salary-only sibling.
+- `tools/late_swap.py:895`: the swap's cache.
+
+None of the file-backed sites changed.
+
+**Tests.** `BaselineCoreTests`, 34 of them, about 35s on this container. `setUpClass` shares the 06-03 run and the fill run.
+- **The frame helper:**
+  - byte-identical to the direct call with a non-empty order map;
+  - `run_classic` with the enriched attempt forced to raise builds its frame through the helper (spied), and the probe's frame equals the direct unenriched call;
+  - it hands the helper a non-empty projected order;
+  - the enriched attempt never reaches the helper.
+- **Distinct per contest:**
+  - every reserved row of 06-03 covered (7/7/4, 18 assignments), each roster ten salary IDs, no player set twice in a contest;
+  - two slot orders of one player set are one lineup (a grid faked to return the probe with OF1/OF2 swapped admits no grid candidate);
+  - a held lineup is never reassigned in its own contest but fills another;
+  - a partial row is named and never filled;
+  - a reversed requirements mapping gives the CSV result;
+  - both or neither input raises;
+  - a contest named twice (`1` and `"1"`), an entry in two contests or both fillable and partial, a string of entries and a tuple held signature each raise;
+  - a held signature in any ID order still blocks its contest;
+  - a Showdown entries file is refused;
+  - a frame carrying an ID the salary file does not list, or missing `Ceiling`, raises.
+- **The probe:**
+  - candidate #1 equals an independent `build_single_lineup(frame, target="ceiling")`, and a grid lineup carries no solver record;
+  - a raising probe is recorded and the grid supplies #1;
+  - a pool with no pitchers returns `short`, `search_exhausted`, 0 distinct, 18 uncovered, one solver call and no raise.
+- **The short count:**
+  - a solver wrapper ends the window once the probe returns, whatever the number of clock reads. The result is `distinct 1`, `short 6`, 3 full assignments and 15 uncovered, with the grid never attempted.
+  - an expired deadline makes zero calls on either solver reference;
+  - one filled row with `target_distinct=5` and a window ending after the probe reads `covered`, `target_met` False, `stop_reason` `time_budget`, and `window_source` names `budget_s`;
+  - a probe returning a duplicated ID is counted malformed and never admitted.
+- **The fill:**
+  - twelve rows on the 4-SP pool, whose grid runs out at 7, are covered by `distinct_fill` lineups, all distinct, with `max_shared_with_earlier` measured against every earlier candidate;
+  - a fill roster made off-salary once is counted, and the next fill solve's overlap rows carry it;
+  - a fill solve that times out on its own 30s limit, with the window still open, stops `solve_time_limit`;
+  - a grid that raises after building keeps the lineups it built.
+- **Never a player cut:** spies on the core's and the grid's `build_single_lineup` see, on every probe, grid and fill solve, the input frame's digest and full Player_ID set, with no `excludes`. The digest is unchanged afterwards.
+- **Anti-correlation:** a value of 1 reaches every solve, and -1 raises.
+- **Nothing written:** an AST guard checks every `BankCache` method that reads `self.path` is overridden. A subprocess then runs the core with:
+  - `PYTHONDONTWRITEBYTECODE=1`;
+  - the working directory and `TMPDIR` set to empty temp dirs;
+  - an audit hook installed before the frame is built. It records write-flag `open`, `os.replace`/`rename`/`remove`/`mkdir`/`rmdir`, `shutil.rmtree`, `tempfile.mkstemp`/`mkdtemp` and `sqlite3.connect`.
+
+  The watch set also covers `subprocess.Popen`, `os.system`, `os.posix_spawn`, `os.truncate`, `os.link`, `os.symlink`, `os.chmod` and `os.utime`. It records zero events, and both dirs stay empty. A control in the same process, a file-backed `extend_bank`, is caught, so the hook is not blind.
+- **Determinism:** two subprocesses, at `PYTHONHASHSEED` 0 and 12345, one covering the probe-and-grid run and one the fill run, print byte-identical candidates and assignments.
+- **Window, backstop, payload, labels:**
+  - the window defaults to a patched `repo_env.call_budget_s` (77.5);
+  - an off-salary ID is dropped, counted, and its row stays uncovered;
+  - the payload is `bank<i>` for candidate `i` in BankCache's shape, and `requested_n` reaches scoring;
+  - the payload raises rather than drift off `candidate_index`;
+  - the label is no certification value, and the note says what it is and carries no ROI, win-rate, edge or probability wording.
+
+**Mutations.** 42, by `tools/_scratch_s10/mutate.py`, each applied alone, the named tests run, and the file restored byte-identical (sha-checked). All 42 went red.
+
+The first 26:
+- the helper drops the order map;
+- BS back on the direct call;
+- the probe never admitted;
+- dedupe on the ordered roster;
+- the signature by set iteration (red on both seeds and on the held test);
+- the entry map ignores held lineups;
+- partial rows filled;
+- entries keep the caller's order;
+- the fill never runs;
+- the fill without its overlap rows;
+- the lowest-ceiling hitter cut before solving;
+- the grid drops the anti-correlation value;
+- no validation of a negative allowance;
+- the probe ignores a spent window;
+- the grid ignores a spent window;
+- the grid on a file-backed BankCache;
+- `_load` not overridden;
+- the salary backstop off;
+- a literal window;
+- the payload drops `requested_n`;
+- the note loses "not certified";
+- a proven-infeasible probe does not skip the fill;
+- `max_shared_with_earlier` not measured;
+- a raising probe propagates;
+- `short` counts every uncovered row;
+- either input accepted silently.
+
+The review's 16:
+- a contest named twice accepted;
+- an entry in two contests accepted;
+- a string of entries read per character;
+- held signatures not canonicalized;
+- a non-string held signature accepted;
+- a Showdown file accepted;
+- a frame off the salary file accepted;
+- a frame missing columns accepted;
+- `target_met` always true;
+- the window source not named;
+- a malformed roster admitted;
+- a rejected roster left out of the overlap rows;
+- a solve's own limit read as the window;
+- the grid admit back inside the try;
+- the payload guard off;
+- BS drops the order map.
+
+One SURVIVED on the first run: "a string of entries read per character". The test's `{"1": "5001"}` repeats the `0`, so the duplicate-entry check refused it in the string check's place. The case is now `"5901"`, with the message pinned, and it goes red.
+
+The first 26 were re-run against the revised code with the new 16, all red.
+
+**End to end.** The scratch worktree, `MLB_DFS_ROOT` pointed at it, `PYTHONHASHSEED=0`, `TZ=America/New_York date` in every call, the window from `repo_env.call_budget_s()` (630s here).
+- **06-03 through the real intake door.** `build_slate_pool` with an empty feed and the eight declared SPs, then `unenriched_frame` (0.25s, 44 rows). The core returned `covered`: 7/7/4, 18 assignments, 8 distinct (the probe plus 7 grid lineups, the grid stopped at its candidate cap), no player set twice in a contest.
+  - Run 1: 1.26s (probe 0.70s, grid 0.54s).
+  - Run 2: 0.98s.
+  - After the review fixes: 1.23s and 1.01s.
+  - Both runs had fingerprint `9664b7afa595edd7`.
+- **06-28, 11 games, 242 rows.**
+  - As archived, every row is complete: `nothing_to_fill`, all 38 rows held across 5 contests, no solve, 0.08s.
+  - Blanked in a copy: `covered`, all five contests (5, 8, 4, 20, 1), 38 assignments, 21 distinct (the probe plus 20 grid lineups, 21 of 19,360 jobs attempted). Run 1 took 10.56s (probe 2.13s, grid 8.29s) and run 2 10.39s, both with fingerprint `cc94b45172fb622d`. After the review fixes: 10.24s and 9.71s, same fingerprint.
+- In both slates the digest in equals the digest after, the rows not excluded equal the frame rows, and there were no salary misses.
+- `repro_s10.py` re-run after the last edit: site 1 `158281b4…` and site 2 `bf71e63a…`, both unchanged.
+
+**The review.**
+*The plan, before any code:* a read-only Plan agent found three blockers, each re-checked in the tree:
+- `R293BankOnEveryRungTests`' census would go red on the new solve calls, and every call must name `max_opposing_hitters_per_sp=`;
+- BS may not grow a top-level engine import;
+- grid candidates have no per-solve status to report.
+
+It also made thirteen should-fix points, all folded in. Among them:
+- the class kept near 30s;
+- the audit hook's flags, bytecode and control;
+- two seeds rather than one;
+- the core skipping on a spent window itself;
+- the cap at target plus held;
+- `wall_s` rather than a claim that it is `single_s`;
+- `requested_n`;
+- a backstop test;
+- `construction_label`, never a certification value;
+- `max_shared_with_earlier` and `target_distinct` for Session 11;
+- validating the allowance;
+- recording the departures;
+- the R233 classes.
+
+*The diff:* a read-only general-purpose subagent, in place of `/land`'s `/code-review`, whose security hook fails under /bin/sh in the cloud container. It found two blockers, and both are fixed:
+- **The CHANGELOG entry was missing.** This is it.
+- **An F-3 hole.** `requirements={1: ["11"], "1": ["12"]}` normalized to two contests "1", and one lineup was assigned twice in contest "1" with status `covered`. A contest named twice after `str()` now raises, and so does an Entry ID in two contests or both fillable and partial.
+
+All six should-fix points are fixed, each with a test and a red mutation:
+1. `target_met` is on the result, and `stop_reason`'s meaning is documented.
+2. A frame the salary file does not describe raises up front. Measured before the fix: 24 solves in 24.1s, all rejected.
+3. The rejected-roster overlap path is tested.
+4. A raising grid keeps what it built.
+5. `solve_time_limit` is tested.
+6. The `run_classic` helper test asserts the projected order is handed over.
+
+Nits taken:
+- the unused import removed;
+- ten distinct IDs checked;
+- held signatures canonicalized and typed;
+- string values refused;
+- a Showdown file refused;
+- the frame's columns checked;
+- the removal-site, "legal" and Python-level wording;
+- `rows_not_excluded`;
+- `window_source` naming the winner;
+- the BS import hoisted from the `except` handler into `run_classic`'s function-local block, so a broken module fails every build and not only the degraded one;
+- the wider audit-hook watch set;
+- the payload's length guard;
+- the register's lost "What." line and blank line;
+- the shallow freeze documented.
+
+Kept: `STOP_REASONS` keeps `solver_unanswered` on the defensive path the reviewer found unreachable with a real solver.
+
+**Gate.** Before: `PASS  v2.26.0  43 modules  2656 tests  5 skipped` (this session's start, at b14a946). After: `PASS  v2.26.0  44 modules  2690 tests  5 skipped  {test_core 1686/1686 (4 skipped) skipped_in_place; test_showdown 337/337 (1 skipped) skipped_in_place}  [tests.test_core ran its pinned 1686 but 4 were SKIPPED, so the count proves nothing about coverage.; tests.test_showdown ran its pinned 337 but 1 were SKIPPED, so the count proves nothing about coverage.]` (the same five absent-file skips; 10.5 min on this container)
+- Pin: `tests.test_core` 1652 -> 1686.
+- The module count moves 43 -> 44 on its own, for `baseline.py`.
+- GOLD: `tests.test_golden_replay` 9 OK, `tests/golden/` untouched (`15d915b5…`, `424dd0f4…`), and the consensus-cluster histogram `{1: 6, 2: 3, 4: 4, 5: 1, 6: 4}` over 18 entries is unmoved.
+- PROBE not required: no bank, allocator or optimizer code changed.
+- Verification command (`UT test_core.BaselineCoreTests`): 34 tests OK.
+- Before the gate, the neighbours: `BaselineCoreTests`, `R293BankOnEveryRungTests`, `BuildSlateScriptTests`, `TestDataDependenciesAreVendoredOrGuardedTests`, `RunSlateFrontDoorTests`, `DirectDoorResolveBankTests`, `RunSlateAutoBankReuseTests`, `BankCapGrowthTests` and `DeadlineGovernorWiringTests`, 93 tests OK; `tests/test_greenfield_regressions.py` 37 passed.
+- LINT exit 0.
+
+**The migrated register text (R389(a), filed 2026-09-22).** "(a) A pure baseline core: the unenriched frame (`_assemble_projection_frame(..., "emergency_proxy", None, None, None, ...)`, the `:2483-2486` ValueError path), the probe lineup as candidate #1, and distinct MILP solves under time/gap limits (never a pool cut) in an in-memory BankCache (`bank_cache.py:778` tombstones on a digest change)."
+
 ## 2026-09-24 — R388(d): the review-grade lifecycle. A Classic refusal whose every failing gate is S or P, on bytes that are essential-valid, still delivers its file, UNCERTIFIED, and nothing about the refusal itself changes (roadmap Session 09, with R124(a) and R268)
 
 **Scope** (the whole block; R124(a) and R268 below share it):

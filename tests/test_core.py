@@ -4044,6 +4044,10 @@ class R293BankOnEveryRungTests(unittest.TestCase):
         # in `build_sleeve_jobs` (chalk-fails, environment, salary-only), each
         # forwarding it by name.
         ("mlb_engine/pipeline/execution_pipeline.py", "extend_bank"): (5, 5),
+        # R389(a), 2026-09-24: the baseline core's probe and distinct-fill
+        # solves, and its one in-memory grid pass; each forwards it by name.
+        ("mlb_engine/pipeline/baseline.py", "build_single_lineup"): (2, 2),
+        ("mlb_engine/pipeline/baseline.py", "extend_bank"): (1, 1),
         ("tools/late_swap.py", "extend_bank"): (0, 2),
         ("tools/solver_probe.py", "build_single_lineup"): (0, 1),
         ("tools/solver_probe.py", "build_multi_lineup"): (0, 1),
@@ -33482,3 +33486,757 @@ class LateSwapReviewParentTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls._runs_existed = (REPO / "runs" / "bank_cache_2026-07-29_2356399e2d.json").exists()
+
+
+class BaselineCoreTests(unittest.TestCase):
+    """R389(a). The baseline core: an entry-mapped, per-contest-distinct
+    candidate set built on the unenriched frame, before research, the bank and
+    joint allocation, and written nowhere.
+
+    Reproduced at b14a946 on the vendored 2026-06-03 slate: `run_classic`
+    reached `run_slate` with no file on disk and no entry-mapped candidate, and
+    its timing probe's lineup was a discarded expression statement. These drive
+    the pure core on the same slate; nothing here is wired into a build yet
+    (Session 11)."""
+
+    _SALARY = REPO / "data" / "archive" / "2026-06-03" / "DKSalaries_2026-06-03.csv"
+    _ENTRIES = REPO / "data" / "archive" / "2026-06-03" / "DKEntries_2026-06-03.csv"
+    _BUDGET = 120.0
+    _WRITE_FLAGS = os.O_WRONLY | os.O_RDWR | os.O_APPEND | os.O_CREAT | os.O_TRUNC
+
+    @classmethod
+    def _rows(cls, sp_per_team):
+        """The golden replay's rule (APPG hitters, the top SPs per team by
+        salary), with the SP count as a parameter so a pool can be made small
+        enough for the grid to run out."""
+        with cls._SALARY.open(encoding="utf-8-sig", newline="") as fh:
+            salary = list(csv.DictReader(fh))
+        rows, sps = [], defaultdict(list)
+        for r in salary:
+            try:
+                base = float(r["AvgPointsPerGame"])
+            except (TypeError, ValueError):
+                continue
+            if base <= 0 or r["Position"] == "RP":
+                continue
+            if r["Position"] == "SP":
+                sps[r["TeamAbbrev"]].append((-int(r["Salary"]), r["ID"], base))
+            else:
+                rows.append({"Player_ID": r["ID"], "Base": base})
+        for team in sorted(sps):
+            for _neg, pid, base in sorted(sps[team])[:sp_per_team]:
+                rows.append({"Player_ID": pid, "Base": base})
+        return rows
+
+    @staticmethod
+    def _sha(frame):
+        import hashlib
+        from mlb_engine.optimize.bank_cache import _projection_bytes
+        h = hashlib.sha256()
+        h.update(json.dumps([list(map(str, frame.columns)), [str(i) for i in frame.index],
+                             [str(t) for t in frame.dtypes]]).encode())
+        h.update(_projection_bytes(frame))
+        return h.hexdigest()
+
+    @classmethod
+    def setUpClass(cls):
+        from mlb_engine.optimize import bank_cache as bc
+        from mlb_engine.pipeline import baseline as bl
+        cls.bl, cls.bc = bl, bc
+        cls.frame8, _ = bl.unenriched_frame(cls._SALARY, cls._rows(2))
+        cls.frame4, _ = bl.unenriched_frame(cls._SALARY, cls._rows(1))
+        cls.main = bl.build_baseline(cls._SALARY, cls.frame8, entries_csv=cls._ENTRIES,
+                                     budget_s=cls._BUDGET)
+        # The fill run: twelve rows on the 4-SP pool, whose grid runs out at 7,
+        # under spies on every solve the core reaches, directly or through the
+        # grid, with a non-default anti-correlation allowance.
+        cls.fill_calls = []
+
+        def spy(where, real):
+            def inner(projections_df, *a, **k):
+                cls.fill_calls.append({
+                    "where": where,
+                    "digest": bc.projection_digest(projections_df),
+                    "ids": frozenset(projections_df["Player_ID"].astype(str)),
+                    "excludes": k.get("excludes"),
+                    "overlap": k.get("overlap_reference") is not None,
+                    "anti": k.get("max_opposing_hitters_per_sp")})
+                return real(projections_df, *a, **k)
+            return inner
+
+        cls.fill_digest = bc.projection_digest(cls.frame4)
+        with unittest.mock.patch.object(bl, "build_single_lineup",
+                                        spy("core", bl.build_single_lineup)), \
+                unittest.mock.patch.object(bc, "build_single_lineup",
+                                           spy("grid", bc.build_single_lineup)):
+            cls.fill = bl.build_baseline(
+                cls._SALARY, cls.frame4,
+                requirements={"1": [str(5000 + i) for i in range(12)]},
+                budget_s=cls._BUDGET, max_opposing_hitters_per_sp=1)
+
+    # --- the shared frame helper ------------------------------------------- #
+
+    def test_the_helper_is_the_valueerror_branch_frame_byte_for_byte(self):
+        rows = self._rows(2)
+        hitters = [r["Player_ID"] for r in rows][:9]
+        order = {pid: i + 1 for i, pid in enumerate(hitters)}
+        helper, _ = self.bl.unenriched_frame(self._SALARY, rows,
+                                             projected_order_by_player_id=order)
+        direct, _ = epi._assemble_projection_frame(
+            str(self._SALARY), rows, "emergency_proxy", None, None, None,
+            projected_order_by_player_id=order)
+        self.assertEqual(self._sha(helper), self._sha(direct))
+        self.assertTrue(helper.equals(direct))
+        # Not vacuous: the order map moves the frame, so a helper that dropped
+        # it would differ here.
+        self.assertNotEqual(self._sha(helper), self._sha(self.frame8))
+
+    def _run_classic(self, *, fail_enriched):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "build_slate_r389", REPO / "skills" / "generate-lineups" / "scripts"
+            / "build_slate.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        seen = {"assemble": [], "probe_frame": None}
+        real_assemble = epi._assemble_projection_frame
+        real_single = opt.build_single_lineup
+
+        def assemble(*a, **k):
+            seen["assemble"].append(a[3] is not None)
+            if fail_enriched and len(seen["assemble"]) == 1:
+                raise ValueError("forced zero-match guard (R389 test)")
+            return real_assemble(*a, **k)
+
+        def single(projections_df, *a, **k):
+            seen["probe_frame"] = projections_df
+            return real_single(projections_df, *a, **k)
+
+        class Stop(Exception):
+            pass
+
+        def fake_run_slate(**kw):
+            raise Stop()
+
+        declared = ["43205901", "43206001", "43206000", "43205902",
+                    "43206010", "43206009", "43206002", "43206013"]
+        args = types.SimpleNamespace(
+            date="2026-06-03", entries=None, controls_override=None,
+            projections=None, lineups=None, odds=None, postures=None,
+            deliver_by=None, _governor=None, max_seconds=120.0,
+            declare_pitcher=declared, ignore_pool_blockers=True, assume_gates=None,
+            rotowire=False, enrichment=True, reference_dir=None,
+            reference_max_age_days=14.0, past_slate_replay=True, leverage=None,
+            max_opposing_hitters_per_sp=None, ownership_pred=None,
+            feed_max_age_minutes=90.0, bundle=None, tbd_fallback=None, brief=None,
+            bank_max_candidates=None)
+        with tempfile.TemporaryDirectory() as tmp:
+            slate_dir = Path(tmp) / "slate"
+            slate_dir.mkdir()
+            import shutil
+            shutil.copy(self._SALARY, slate_dir / "DKSalaries.csv")
+            with unittest.mock.patch.object(epi, "_assemble_projection_frame", assemble), \
+                    unittest.mock.patch.object(opt, "build_single_lineup", single), \
+                    unittest.mock.patch.object(epi, "run_slate", fake_run_slate), \
+                    unittest.mock.patch.object(
+                        self.bl, "unenriched_frame",
+                        wraps=self.bl.unenriched_frame) as helper, \
+                    contextlib.redirect_stderr(io.StringIO()), \
+                    contextlib.redirect_stdout(io.StringIO()):
+                with self.assertRaises(Stop):
+                    mod.run_classic(args, slate_dir, self._SALARY, self._ENTRIES,
+                                    {"games": []}, time.monotonic() + 120.0)
+        return seen, helper
+
+    def test_run_classic_builds_its_degraded_frame_through_the_helper(self):
+        seen, helper = self._run_classic(fail_enriched=True)
+        self.assertEqual(helper.call_count, 1)
+        self.assertTrue(helper.call_args.kwargs.get("projected_order_by_player_id"),
+                        "run_classic must hand the helper the pool's projected order")
+        self.assertEqual(seen["assemble"], [True, False],
+                         "the enriched attempt, then the helper's unenriched call")
+        pool = helper.call_args
+        direct, _ = epi._assemble_projection_frame(
+            str(self._SALARY), pool.args[1], "emergency_proxy", None, None, None,
+            projected_order_by_player_id=pool.kwargs.get("projected_order_by_player_id"))
+        self.assertEqual(self._sha(seen["probe_frame"]), self._sha(direct))
+
+    def test_run_classic_enriched_attempt_does_not_reach_the_helper(self):
+        seen, helper = self._run_classic(fail_enriched=False)
+        self.assertEqual(helper.call_count, 0)
+        self.assertEqual(seen["assemble"], [True])
+
+    # --- distinct per contest ---------------------------------------------- #
+
+    def test_every_reserved_row_is_covered_and_no_contest_holds_a_lineup_twice(self):
+        r = self.main
+        self.assertEqual((r.status, r.stop_reason), ("covered", "covered"))
+        self.assertEqual((r.required, r.short, len(r.uncovered)), (7, 0, 0))
+        self.assertEqual(len(r.assignments), 18)
+        self.assertEqual(sorted((c.contest_id, c.fillable, c.filled) for c in r.by_contest),
+                         [("191020573", 7, 7), ("191020574", 7, 7), ("191047506", 4, 4)])
+        with self._SALARY.open(encoding="utf-8-sig", newline="") as fh:
+            salary_ids = {row["ID"] for row in csv.DictReader(fh)}
+        by_contest = defaultdict(list)
+        for a in r.assignments:
+            cand = r.candidates[a.candidate_index]
+            self.assertEqual(len(cand.roster), 10)
+            self.assertTrue(set(cand.roster) <= salary_ids)
+            by_contest[a.contest_id].append(frozenset(cand.roster))
+        for cid, sets in by_contest.items():
+            self.assertEqual(len(sets), len(set(sets)), f"a lineup twice in {cid}")
+        self.assertEqual(len({c.signature for c in r.candidates}), r.distinct)
+
+    def _held_and_partial(self):
+        if not hasattr(type(self), "_held_result"):
+            probe = self.main.candidates[0].roster
+            with self._ENTRIES.open(encoding="utf-8-sig", newline="") as fh:
+                rows = list(csv.reader(fh))
+            done = set()
+            for row in rows[1:]:
+                if not row or not row[0].strip().isdigit():
+                    continue
+                if row[2] == "191020573" and "held" not in done:
+                    row[4:14] = list(probe)
+                    done.add("held")
+                elif row[2] == "191047506" and "partial" not in done:
+                    row[4:7] = list(probe[:3])
+                    done.add("partial")
+            tmp = tempfile.TemporaryDirectory()
+            type(self).addClassCleanup(tmp.cleanup)
+            path = Path(tmp.name) / "DKEntries.csv"
+            with path.open("w", encoding="utf-8", newline="") as fh:
+                csv.writer(fh).writerows(rows)
+            type(self)._held_tmp = tmp
+            type(self)._held_result = self.bl.build_baseline(
+                self._SALARY, self.frame8, entries_csv=path, budget_s=self._BUDGET)
+        return type(self)._held_result
+
+    def test_a_held_lineup_is_never_assigned_again_in_its_own_contest(self):
+        r = self._held_and_partial()
+        probe_sig = self.main.candidates[0].signature
+        self.assertEqual(r.candidates[0].signature, probe_sig)
+        held = [a for a in r.assignments if a.contest_id == "191020573"]
+        self.assertEqual(len(held), 6)
+        self.assertNotIn(0, {a.candidate_index for a in held})
+        other = [a for a in r.assignments if a.contest_id == "191020574"]
+        self.assertIn(0, {a.candidate_index for a in other},
+                      "a lineup held in one contest may still fill another")
+        cov = {c.contest_id: c for c in r.by_contest}
+        self.assertEqual((cov["191020573"].held, cov["191020573"].filled), (1, 6))
+
+    def test_a_partial_row_is_named_and_never_filled(self):
+        r = self._held_and_partial()
+        cov = {c.contest_id: c for c in r.by_contest}
+        self.assertEqual((cov["191047506"].partial, cov["191047506"].fillable,
+                          cov["191047506"].filled), (1, 3, 3))
+        filled = {a.entry_id for a in r.assignments} | {e for _c, e in r.uncovered}
+        req = {q.contest_id: q for q in self.bl.requirements_from_entries(
+            Path(type(self)._held_tmp.name) / "DKEntries.csv")}
+        self.assertEqual(len(req["191047506"].partial_entry_ids), 1)
+        self.assertNotIn(req["191047506"].partial_entry_ids[0], filled)
+
+    def test_a_requirements_mapping_gives_the_csv_result(self):
+        req = {q.contest_id: list(reversed(q.fillable_entry_ids))
+               for q in self.bl.requirements_from_entries(self._ENTRIES)}
+        r = self.bl.build_baseline(self._SALARY, self.frame8, requirements=req,
+                                   budget_s=self._BUDGET)
+        self.assertEqual([c.signature for c in r.candidates],
+                         [c.signature for c in self.main.candidates])
+        self.assertEqual(r.assignments, self.main.assignments)
+
+    def test_both_or_neither_input_is_a_caller_error(self):
+        with self.assertRaises(ValueError):
+            self.bl.build_baseline(self._SALARY, self.frame8, budget_s=1.0)
+        with self.assertRaises(ValueError):
+            self.bl.build_baseline(self._SALARY, self.frame8, entries_csv=self._ENTRIES,
+                                   requirements={"1": ["2"]}, budget_s=1.0)
+
+    def test_two_slot_orders_of_one_player_set_are_one_lineup(self):
+        """F-3 is about the lineup. BankCache keys on the ordered roster (late
+        swap needs slot variants), so a grid job that returns the probe's ten
+        players with two OF slots swapped is a new cache entry and the same
+        lineup; the core must not map both into one contest."""
+        probe, objective = opt.build_single_lineup(self.frame8, target="ceiling")
+        swapped = probe.copy()
+        slots = swapped["Assigned_Slot"].tolist()
+        i, j = slots.index("OF1"), slots.index("OF2")
+        slots[i], slots[j] = slots[j], slots[i]
+        swapped["Assigned_Slot"] = slots
+        self.assertNotEqual(self.bc.ordered_roster(swapped), self.bc.ordered_roster(probe))
+
+        def variant(*a, **k):
+            return swapped.copy(), objective
+
+        with unittest.mock.patch.object(self.bc, "build_single_lineup", variant):
+            r = self.bl.build_baseline(self._SALARY, self.frame8,
+                                       requirements={"1": ["1", "2"]},
+                                       budget_s=self._BUDGET)
+        self.assertEqual(r.status, "covered")
+        self.assertNotIn("grid", {c.source for c in r.candidates})
+        self.assertEqual(len({frozenset(c.roster) for c in r.candidates}), r.distinct)
+
+    def test_a_contest_named_twice_is_a_caller_error(self):
+        """F-3. `1` and `"1"` are one contest once stringified; assigned as
+        two, one lineup would land twice in it."""
+        bad = ({1: ["11"], "1": ["12"]},
+               {"1": ["11"], "2": ["11"]},
+               {"1": "5901"},
+               (self.bl.ContestRequirement("1", ("11",), (), ("11",)),),
+               (self.bl.ContestRequirement("1", ("11",), ("a|b",)),
+                self.bl.ContestRequirement("1", ("12",))),
+               (self.bl.ContestRequirement("1", ("11",), (("a", "b"),)),))
+        for req in bad:
+            with self.subTest(req=req), self.assertRaises(ValueError):
+                self.bl.build_baseline(self._SALARY, self.frame8, requirements=req,
+                                       budget_s=1.0)
+        # Each character of "5901" is distinct, so only the string check can
+        # refuse it (the first cut used "5001", whose repeated 0 tripped the
+        # duplicate-entry check instead and hid a removed string check).
+        with self.assertRaisesRegex(ValueError, "not the string"):
+            self.bl.build_baseline(self._SALARY, self.frame8,
+                                   requirements={"1": "5901"}, budget_s=1.0)
+
+    def test_a_held_signature_matches_whatever_its_order(self):
+        probe = self.main.candidates[0]
+        held = "|".join(reversed(sorted(probe.roster)))
+        req = (self.bl.ContestRequirement("1", ("11", "12"), (held,)),
+               self.bl.ContestRequirement("2", ("21",)))
+        r = self.bl.build_baseline(self._SALARY, self.frame8, requirements=req,
+                                   budget_s=self._BUDGET)
+        self.assertEqual(r.candidates[0].signature, probe.signature)
+        self.assertNotIn(0, {a.candidate_index for a in r.assignments if a.contest_id == "1"})
+        self.assertIn(0, {a.candidate_index for a in r.assignments if a.contest_id == "2"})
+
+    def test_a_showdown_entries_file_is_refused(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "DKEntries.csv"
+            path.write_text("Entry ID,Contest Name,Contest ID,Entry Fee,CPT,UTIL,UTIL,"
+                            "UTIL,UTIL,UTIL\n5001,SD,77,$1,,,,,,\n", encoding="utf-8")
+            with self.assertRaises(ValueError):
+                self.bl.requirements_from_entries(path)
+
+    def test_a_frame_the_salary_file_does_not_describe_is_a_caller_error(self):
+        stranger = self.frame8.copy()
+        stranger.loc[stranger.index[0], "Player_ID"] = "99999999"
+        with self.assertRaises(ValueError):
+            self.bl.build_baseline(self._SALARY, stranger, entries_csv=self._ENTRIES,
+                                   budget_s=1.0)
+        with self.assertRaises(ValueError):
+            self.bl.build_baseline(self._SALARY, self.frame8.drop(columns=["Ceiling"]),
+                                   entries_csv=self._ENTRIES, budget_s=1.0)
+
+    # --- the probe ----------------------------------------------------------- #
+
+    def test_candidate_one_is_the_probe(self):
+        first = self.main.candidates[0]
+        self.assertEqual((first.index, first.source), (0, "probe"))
+        lineup, objective = opt.build_single_lineup(self.frame8, target="ceiling")
+        self.assertEqual(first.roster, self.bc.ordered_roster(lineup))
+        self.assertAlmostEqual(first.objective, float(objective), places=6)
+        self.assertEqual(first.solver["status"], "optimal")
+        self.assertTrue(self.main.probe["admitted"])
+        self.assertIsNone(self.main.candidates[1].solver,
+                          "a grid lineup carries no per-solve status to report")
+
+    def test_a_raising_probe_is_recorded_and_the_grid_supplies_candidate_one(self):
+        real = self.bl.build_single_lineup
+        calls = []
+
+        def once(*a, **k):
+            calls.append(1)
+            if len(calls) == 1:
+                raise RuntimeError("probe blew up")
+            return real(*a, **k)
+
+        with unittest.mock.patch.object(self.bl, "build_single_lineup", once):
+            r = self.bl.build_baseline(self._SALARY, self.frame8,
+                                       entries_csv=self._ENTRIES, budget_s=self._BUDGET)
+        self.assertIn("probe blew up", r.probe["error"])
+        self.assertFalse(r.probe["admitted"])
+        self.assertEqual(r.candidates[0].source, "grid")
+        self.assertEqual(r.status, "covered")
+
+    def test_a_pool_with_no_pitchers_is_short_and_never_raises(self):
+        calls = []
+        real = self.bl.build_single_lineup
+
+        def count(*a, **k):
+            calls.append(1)
+            return real(*a, **k)
+
+        no_arms = self.frame8[self.frame8["Position"] != "P"]
+        with unittest.mock.patch.object(self.bl, "build_single_lineup", count):
+            r = self.bl.build_baseline(self._SALARY, no_arms, entries_csv=self._ENTRIES,
+                                       budget_s=self._BUDGET)
+        self.assertEqual((r.status, r.stop_reason, r.distinct, r.short),
+                         ("short", "search_exhausted", 0, 7))
+        self.assertEqual((len(r.assignments), len(r.uncovered)), (0, 18))
+        self.assertTrue(r.probe["proven_infeasible"])
+        self.assertEqual(len(calls), 1, "the fill cannot beat a proven-infeasible probe")
+
+    # --- the typed short count --------------------------------------------- #
+
+    def test_a_window_that_ends_after_the_probe_returns_a_short_count(self):
+        ended = []
+        real = self.bl.build_single_lineup
+
+        def probe_then_end(*a, **k):
+            out = real(*a, **k)
+            ended.append(True)
+            return out
+
+        clock = lambda: 1.0e9 if ended else 0.0  # noqa: E731
+        with unittest.mock.patch.object(self.bl, "build_single_lineup", probe_then_end):
+            r = self.bl.build_baseline(self._SALARY, self.frame8,
+                                       entries_csv=self._ENTRIES, budget_s=100.0,
+                                       clock=clock)
+        self.assertEqual((r.status, r.stop_reason), ("short", "time_budget"))
+        self.assertEqual((r.required, r.distinct, r.short), (7, 1, 6))
+        self.assertFalse(r.grid["attempted"])
+        self.assertEqual(len(r.assignments), 3)
+        self.assertEqual(len(r.uncovered), 15)
+        for a in r.assignments:
+            self.assertEqual(len(r.candidates[a.candidate_index].roster), 10)
+        self.assertEqual({a.entry_id for a in r.assignments} & {e for _c, e in r.uncovered},
+                         set())
+
+    def test_an_expired_deadline_solves_nothing(self):
+        calls = []
+
+        def never(*a, **k):
+            calls.append(1)
+            raise AssertionError("no solve after the window")
+
+        with unittest.mock.patch.object(self.bl, "build_single_lineup", never), \
+                unittest.mock.patch.object(self.bc, "build_single_lineup", never):
+            r = self.bl.build_baseline(self._SALARY, self.frame8,
+                                       entries_csv=self._ENTRIES,
+                                       deadline=time.monotonic() - 1.0)
+        self.assertEqual(calls, [])
+        self.assertEqual((r.status, r.stop_reason, r.distinct, r.short),
+                         ("short", "time_budget", 0, 7))
+
+    def test_covered_rows_with_a_missed_target_say_so(self):
+        ended = []
+        real = self.bl.build_single_lineup
+
+        def probe_then_end(*a, **k):
+            out = real(*a, **k)
+            ended.append(True)
+            return out
+
+        clock = lambda: 1.0e9 if ended else 0.0  # noqa: E731
+        with unittest.mock.patch.object(self.bl, "build_single_lineup", probe_then_end):
+            r = self.bl.build_baseline(self._SALARY, self.frame8,
+                                       requirements={"1": ["11"]}, budget_s=100.0,
+                                       deadline=500.0, target_distinct=5, clock=clock)
+        self.assertEqual((r.status, r.short, r.distinct, r.target), ("covered", 0, 1, 5))
+        self.assertFalse(r.target_met)
+        self.assertEqual(r.stop_reason, "time_budget")
+        self.assertEqual(r.timings["window_source"], "budget_s")
+        self.assertTrue(self.main.target_met)
+
+    def test_a_malformed_roster_is_never_a_candidate(self):
+        ended = []
+        real = self.bl.build_single_lineup
+
+        def doubled(*a, **k):
+            lineup, objective = real(*a, **k)
+            lineup = lineup.copy()
+            col = lineup.columns.get_loc("Player_ID")
+            lineup.iloc[1, col] = lineup.iloc[0, col]
+            ended.append(True)
+            return lineup, objective
+
+        clock = lambda: 1.0e9 if ended else 0.0  # noqa: E731
+        with unittest.mock.patch.object(self.bl, "build_single_lineup", doubled):
+            r = self.bl.build_baseline(self._SALARY, self.frame8,
+                                       requirements={"1": ["7"]}, budget_s=100.0,
+                                       clock=clock)
+        self.assertEqual(r.pool["malformed_rosters"], 1)
+        self.assertEqual((r.distinct, r.short), (0, 1))
+
+    # --- the distinct fill --------------------------------------------------- #
+
+    def test_the_distinct_fill_covers_what_the_grid_cannot(self):
+        r = self.fill
+        self.assertEqual((r.status, r.stop_reason, r.distinct), ("covered", "covered", 12))
+        self.assertTrue(r.grid["job_list_exhausted"])
+        sources = Counter(c.source for c in r.candidates)
+        self.assertGreater(sources["distinct_fill"], 0)
+        self.assertEqual(len({c.signature for c in r.candidates}), 12)
+        for c in r.candidates[1:]:
+            self.assertLessEqual(c.max_shared_with_earlier, 9)
+            prior = [set(p.roster) for p in r.candidates[:c.index]]
+            self.assertEqual(c.max_shared_with_earlier,
+                             max(len(set(c.roster) & p) for p in prior))
+        for c in r.candidates:
+            if c.source == "distinct_fill":
+                self.assertIsNotNone(c.solver)
+
+    def _fill_with(self, wrapper, n=10):
+        with unittest.mock.patch.object(self.bl, "build_single_lineup", wrapper):
+            return self.bl.build_baseline(
+                self._SALARY, self.frame4,
+                requirements={"1": [str(6000 + i) for i in range(n)]},
+                budget_s=self._BUDGET)
+
+    def test_a_rejected_fill_roster_joins_the_overlap_rows(self):
+        real = self.bl.build_single_lineup
+        seen = {"rejected": None, "next_reference": None}
+
+        def once_off_salary(*a, **k):
+            lineup, objective = real(*a, **k)
+            if k.get("overlap_reference") is None or lineup is None:
+                return lineup, objective
+            if seen["rejected"] is None:
+                lineup = lineup.copy()
+                lineup.iloc[0, lineup.columns.get_loc("Player_ID")] = "99999999"
+                seen["rejected"] = self.bc.ordered_roster(lineup)
+            elif seen["next_reference"] is None:
+                seen["next_reference"] = [tuple(x) for x in k["overlap_reference"]]
+            return lineup, objective
+
+        r = self._fill_with(once_off_salary)
+        self.assertEqual(r.status, "covered")
+        self.assertEqual(r.pool["salary_id_misses"], 1)
+        self.assertIn(tuple(seen["rejected"]), seen["next_reference"])
+
+    def test_a_timed_out_fill_solve_names_its_own_limit(self):
+        real = self.bl.build_single_lineup
+
+        def time_out(*a, **k):
+            if k.get("overlap_reference") is None:
+                return real(*a, **k)
+            k["status_out"].update(timed_out=True, status="time_limit")
+            return None, None
+
+        r = self._fill_with(time_out)
+        self.assertEqual((r.status, r.stop_reason), ("short", "solve_time_limit"))
+
+    def test_a_raising_grid_keeps_what_it_built(self):
+        real = self.bl.extend_bank
+
+        def build_then_raise(cache, frame, **k):
+            real(cache, frame, **dict(k, max_candidates=2))
+            raise RuntimeError("grid report blew up")
+
+        with unittest.mock.patch.object(self.bl, "extend_bank", build_then_raise):
+            r = self.bl.build_baseline(self._SALARY, self.frame8,
+                                       entries_csv=self._ENTRIES, budget_s=self._BUDGET)
+        self.assertIn("grid report blew up", r.grid["error"])
+        grid = [c for c in r.candidates if c.source == "grid"]
+        self.assertTrue(grid)
+        self.assertLess(grid[0].index, next(
+            (c.index for c in r.candidates if c.source == "distinct_fill"), 10 ** 6))
+
+    # --- never a player cut -------------------------------------------------- #
+
+    def test_every_solve_sees_the_whole_frame(self):
+        calls = self.fill_calls
+        self.assertEqual({c["where"] for c in calls}, {"core", "grid"})
+        self.assertTrue(any(c["overlap"] for c in calls), "the fill phase ran")
+        full = frozenset(self.frame4["Player_ID"].astype(str))
+        for c in calls:
+            self.assertEqual(c["digest"], self.fill_digest)
+            self.assertEqual(c["ids"], full)
+            self.assertIsNone(c["excludes"])
+        self.assertEqual(self.fill.pool["projection_digest_in"],
+                         self.fill.pool["projection_digest_after"])
+        self.assertEqual(self.fill.pool["rows_not_excluded"], len(self.frame4))
+
+    def test_the_anti_correlation_allowance_reaches_every_solve(self):
+        self.assertTrue(self.fill_calls)
+        self.assertEqual({c["anti"] for c in self.fill_calls}, {1})
+        with self.assertRaises(ValueError):
+            self.bl.build_baseline(self._SALARY, self.frame8, entries_csv=self._ENTRIES,
+                                   budget_s=1.0, max_opposing_hitters_per_sp=-1)
+
+    # --- the in-memory bank -------------------------------------------------- #
+
+    def test_every_bank_cache_method_that_reads_its_path_is_overridden(self):
+        tree = ast.parse((REPO / "mlb_engine" / "optimize" / "bank_cache.py")
+                         .read_text(encoding="utf-8"))
+        cls = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == "BankCache")
+        readers = sorted(
+            fn.name for fn in cls.body if isinstance(fn, ast.FunctionDef)
+            and any(isinstance(n, ast.Attribute) and n.attr == "path"
+                    and isinstance(n.value, ast.Name) and n.value.id == "self"
+                    for n in ast.walk(fn)))
+        self.assertTrue(readers)
+        mem = self.bl._MemoryBankCache
+        self.assertEqual([m for m in readers if m not in mem.__dict__], [])
+        cache = mem()
+        self.assertIsNone(cache.path)
+        self.assertIsNone(cache.save())
+        with self.assertRaises(RuntimeError):
+            cache._save_locked()
+
+    _NO_WRITE_SCRIPT = r"""
+import json, os, sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+import tests.test_core as tc
+from mlb_engine.pipeline import baseline as bl
+from mlb_engine.optimize import bank_cache as bc
+rows = tc.BaselineCoreTests._rows(2)
+flags = int(sys.argv[2])
+watch = {"os.replace", "os.rename", "os.remove", "os.mkdir", "os.rmdir",
+         "shutil.rmtree", "tempfile.mkstemp", "tempfile.mkdtemp", "sqlite3.connect",
+         "subprocess.Popen", "os.system", "os.posix_spawn", "os.truncate",
+         "os.link", "os.symlink", "os.chmod", "os.utime"}
+events = []
+def hook(event, args):
+    if event == "open":
+        mode = args[1] if len(args) > 1 else None
+        fl = args[2] if len(args) > 2 else 0
+        if (isinstance(mode, str) and any(ch in mode for ch in "wax+")) or (fl or 0) & flags:
+            events.append([event, str(args[0])])
+    elif event in watch:
+        events.append([event, str(args[0]) if args else ""])
+sys.addaudithook(hook)
+frame, _ = bl.unenriched_frame(tc.BaselineCoreTests._SALARY, rows)
+r = bl.build_baseline(tc.BaselineCoreTests._SALARY, frame,
+                      entries_csv=tc.BaselineCoreTests._ENTRIES, budget_s=120.0)
+payload = r.allocator_candidates(frame, requested_n=18)
+core = list(events)
+del events[:]
+control = bc.BankCache(Path(sys.argv[3]) / "control" / "bank.json")
+bc.extend_bank(control, frame, time_budget_s=30.0, max_candidates=1)
+print(json.dumps({"core": core, "control": len(events), "status": r.status,
+                  "payload": len(payload)}))
+"""
+
+    def test_the_core_writes_nothing(self):
+        with tempfile.TemporaryDirectory() as cwd, tempfile.TemporaryDirectory() as tmpdir, \
+                tempfile.TemporaryDirectory() as control:
+            env = dict(os.environ, PYTHONHASHSEED="0", PYTHONDONTWRITEBYTECODE="1",
+                       TMPDIR=tmpdir, MLB_DFS_ARTIFACT_ROOT=tmpdir)
+            out = subprocess.run(
+                [sys.executable, "-c", self._NO_WRITE_SCRIPT, str(REPO),
+                 str(self._WRITE_FLAGS), control],
+                capture_output=True, text=True, cwd=cwd, env=env, timeout=300)
+            self.assertEqual(out.returncode, 0, out.stderr[-1500:])
+            report = json.loads(out.stdout.strip().splitlines()[-1])
+            self.assertEqual(report["core"], [])
+            self.assertEqual(report["status"], "covered")
+            self.assertEqual(os.listdir(cwd), [])
+            self.assertEqual(os.listdir(tmpdir), [])
+            self.assertGreater(report["control"], 0,
+                               "the hook saw no write from a file-backed bank, so it is blind")
+
+    # --- determinism --------------------------------------------------------- #
+
+    _DETERMINISM_SCRIPT = r"""
+import json, sys
+sys.path.insert(0, sys.argv[1])
+import tests.test_core as tc
+from mlb_engine.pipeline import baseline as bl
+T = tc.BaselineCoreTests
+out = {}
+for name, sp, kw in (("csv", 2, {"entries_csv": T._ENTRIES}),
+                     ("fill", 1, {"requirements": {"1": [str(5000 + i) for i in range(10)]}})):
+    frame, _ = bl.unenriched_frame(T._SALARY, T._rows(sp))
+    r = bl.build_baseline(T._SALARY, frame, budget_s=240.0, **kw)
+    out[name] = {"status": r.status,
+                 "candidates": [[c.index, list(c.roster), c.signature, repr(c.objective),
+                                 c.source, c.max_shared_with_earlier] for c in r.candidates],
+                 "assignments": [[a.contest_id, a.entry_id, a.candidate_index]
+                                 for a in r.assignments]}
+print(json.dumps(out, sort_keys=True))
+"""
+
+    def test_the_same_candidates_under_two_hash_seeds(self):
+        procs = []
+        for seed in ("0", "12345"):
+            env = dict(os.environ, PYTHONHASHSEED=seed, PYTHONDONTWRITEBYTECODE="1")
+            procs.append(subprocess.Popen(
+                [sys.executable, "-c", self._DETERMINISM_SCRIPT, str(REPO)],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                cwd=str(REPO), env=env))
+        outs = []
+        for p in procs:
+            stdout, stderr = p.communicate(timeout=600)
+            self.assertEqual(p.returncode, 0, stderr[-1500:])
+            outs.append(stdout.strip().splitlines()[-1])
+        self.assertEqual(outs[0], outs[1])
+        report = json.loads(outs[0])
+        self.assertEqual(report["csv"]["status"], "covered")
+        self.assertIn("distinct_fill", {c[4] for c in report["fill"]["candidates"]})
+
+    # --- window, backstop, payload, labels ---------------------------------- #
+
+    def test_the_window_defaults_to_the_host_call_budget(self):
+        from mlb_engine import repo_env
+        with unittest.mock.patch.object(repo_env, "call_budget_s", return_value=77.5):
+            r = self.bl.build_baseline(self._SALARY, self.frame8,
+                                       requirements={"1": []})
+        self.assertEqual(r.stop_reason, "nothing_to_fill")
+        self.assertEqual((r.timings["window_s"], r.timings["window_source"]),
+                         (77.5, "repo_env.call_budget_s"))
+
+    def test_an_off_salary_id_is_dropped_and_its_row_stays_uncovered(self):
+        ended = []
+        real = self.bl.build_single_lineup
+
+        def off_salary(*a, **k):
+            lineup, objective = real(*a, **k)
+            lineup = lineup.copy()
+            lineup.iloc[0, lineup.columns.get_loc("Player_ID")] = "99999999"
+            ended.append(True)
+            return lineup, objective
+
+        clock = lambda: 1.0e9 if ended else 0.0  # noqa: E731
+        with unittest.mock.patch.object(self.bl, "build_single_lineup", off_salary):
+            r = self.bl.build_baseline(self._SALARY, self.frame8,
+                                       requirements={"1": ["7"]}, budget_s=100.0,
+                                       clock=clock)
+        self.assertEqual(r.pool["salary_id_misses"], 1)
+        self.assertFalse(r.probe["admitted"])
+        self.assertEqual((r.distinct, r.short, r.uncovered), (0, 1, (("1", "7"),)))
+
+    def test_the_allocator_payload_keeps_the_probe_first_in_bank_cache_shape(self):
+        seen = []
+        real = opt.score_lineup_candidate
+
+        def score(*a, **k):
+            seen.append(k.get("requested_n"))
+            return real(*a, **k)
+
+        with unittest.mock.patch.object(opt, "score_lineup_candidate", score):
+            payload = self.main.allocator_candidates(self.frame8, requested_n=18)
+        self.assertEqual(len(payload), self.main.distinct)
+        for i, (row, cand) in enumerate(zip(payload, self.main.candidates)):
+            self.assertEqual(row["candidate_id"], f"bank{i}")
+            self.assertEqual(tuple(row["roster_slot_ids"]), cand.roster)
+            self.assertIn("primary_stack_size", row)
+            self.assertIn("contest_fit_score", row)
+        self.assertEqual(payload[0]["roster_slot_ids"], list(self.main.candidates[0].roster))
+        self.assertEqual(set(seen), {18})
+
+    def test_the_payload_refuses_to_drift_off_candidate_index(self):
+        real_add = self.bl._MemoryBankCache.add
+
+        def drop_second(cache, roster, objective, job="", job_class=None):
+            if len(cache) == 1:
+                return False
+            return real_add(cache, roster, objective, job=job, job_class=job_class)
+
+        with unittest.mock.patch.object(self.bl._MemoryBankCache, "add", drop_second):
+            with self.assertRaises(RuntimeError):
+                self.main.allocator_candidates(self.frame8, requested_n=18)
+
+    def test_the_labels_are_truthful(self):
+        from mlb_engine.entries import upload_manifest as um
+        r = self.main
+        self.assertEqual(r.construction_label, "baseline_construction_proxy")
+        self.assertNotIn(r.construction_label, {"certified", "upload_ready", "review_grade",
+                                                um.UNCERTIFIED_LABEL})
+        self.assertFalse(hasattr(r, "certification"))
+        for phrase in ("construction proxy", "not a projection claim", "not certified",
+                       "not upload-ready", "near-duplicates"):
+            self.assertIn(phrase, r.note)
+        self.assertIsNone(re.search(r"\b(ROI|win.rate|cash.rate|edge|probabilit)",
+                                    r.note, re.IGNORECASE))
+        self.assertEqual(r.as_dict()["construction_label"], r.construction_label)

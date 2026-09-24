@@ -2911,6 +2911,11 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
     from mlb_engine.pipeline.execution_pipeline import (
         _assemble_projection_frame, apply_leverage_ownership, run_slate,
     )
+    # R389(a). The one unenriched emergency_proxy frame, shared with the
+    # baseline core so the two cannot drift apart. Imported here, with the rest
+    # of run_classic's engine, so a broken module fails every build and not only
+    # the degraded one.
+    from mlb_engine.pipeline.baseline import unenriched_frame
 
     # The stale-platoon condition prints as SOFT below, and CLAUDE.md's build
     # contract says it prints and the build ships; inheriting the engine's
@@ -3101,8 +3106,8 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         f4_by_player_id = {}
         f1_by_player_id = {}
         f5_by_player_id = {}
-        projections, enrichment = _assemble_projection_frame(
-            str(salary), kwargs["projection_rows"], "emergency_proxy", None, None, None,
+        projections, enrichment = unenriched_frame(
+            salary, kwargs["projection_rows"],
             projected_order_by_player_id=kwargs.get("platoon_order_by_player_id"),
         )
 
