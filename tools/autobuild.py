@@ -94,7 +94,9 @@ if _PYLIBS.is_dir() and str(_PYLIBS) not in sys.path:
 
 # Safe at module level only because the sys.path insert above already ran; see
 # the R296(e) note there for what happens when it has not.
-from mlb_engine.repo_env import call_budget_s, call_budget_source  # noqa: E402
+from mlb_engine.repo_env import (  # noqa: E402
+    BANK_FULL_SOLVE_CEILING, bank_max_candidates, call_budget_s, call_budget_source,
+)
 
 BUILD = REPO / "skills" / "generate-lineups" / "scripts" / "build_slate.py"
 ASSERTED = REPO / "tools" / "build_asserted.py"
@@ -365,6 +367,10 @@ class Decisions:
         self.never_relax: List[str] = []
         # R345. The operator's --declare-pitcher values, verbatim and in order.
         self.declared_pitchers: List[str] = []
+        # R415. The sliced bank's cap as this supervisor forwards it: the
+        # operator's --bank-max-candidates, then each raise_bank_cap decision.
+        # None forwards nothing and build_slate takes the host default.
+        self.bank_max_candidates: Optional[int] = None
         # R296(f). The log was durable only at terminal exits, so an outer kill
         # -- the Cowork call ceiling, a Ctrl-C, the sandbox dying -- lost every
         # decision taken up to that point. R212 and R169(a) each fixed one
@@ -400,6 +406,38 @@ class Decisions:
         print(f"[autobuild {attempt}] {action}: {why}", file=sys.stderr)
         if self._writer is not None:
             self._writer()
+
+
+def refusal_bank_report(brief: Dict[str, Any]) -> Dict[str, Any]:
+    """The bank facts a build's brief carries, wherever it carries them.
+
+    R415. A certified brief keeps them under ``solve.bank``; the exit-3 refusal
+    brief keeps them under ``bank_exploration`` and has no ``solve`` at all, so
+    the refusal branch below read an empty dict on every real refusal and its
+    grow_bank never fired outside a test that faked ``solve.bank``.
+    """
+    bank = ((brief.get("solve") or {}).get("bank")) or {}
+    return dict(bank or brief.get("bank_exploration") or {})
+
+
+def next_bank_cap(bank: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """R415. The raise a candidate-capped refusal earns, or None at the ceiling.
+
+    Doubling, clamped to the measured full-solve ceiling: past it a refusal's
+    full-bank retry was measured beyond the allocator's 30s limit, so growth
+    there is Ben's call through --bank-max-candidates, not this supervisor's.
+    """
+    cap_block = bank.get("bank_cap") or {}
+    try:
+        current = int(cap_block.get("value") or bank.get("max_candidates"))
+    except (TypeError, ValueError):
+        return None
+    ceiling = int(cap_block.get("full_solve_ceiling") or BANK_FULL_SOLVE_CEILING)
+    raised = min(current * 2, ceiling)
+    if raised <= current:
+        return None
+    return {"from": current, "to": raised, "ceiling": ceiling,
+            "from_source": cap_block.get("source")}
 
 
 def parse_brief(stdout: str) -> Dict[str, Any]:
@@ -498,6 +536,17 @@ def main() -> int:
                          "--passthrough is lifted out and forwarded with these. "
                          "On --resume with none passed, the run's recorded "
                          "declarations are restored; passing any replaces them.")
+    # R415. Forwarded as build_slate's --bank-max-candidates. This supervisor
+    # doubles it (to the measured ceiling) when a refusal's bank stopped at it.
+    ap.add_argument("--bank-max-candidates", dest="bank_max_candidates",
+                    type=int, default=None, metavar="N",
+                    help="the sliced bank's starting candidate cap, forwarded to "
+                         "build_slate (default: its host default). When a "
+                         "refusal's bank reads bank_stop_reason candidate_cap, "
+                         "this supervisor doubles the cap up to "
+                         f"{BANK_FULL_SOLVE_CEILING} and records raise_bank_cap: "
+                         "search effort, not strategy. On --resume with none "
+                         "passed, the run's last cap is restored.")
     # R388(b). Forwarded to build_slate, which validates the names and holds
     # them at the governor's rung and the pipeline's floors, and read here too,
     # because this supervisor applies structural floors of its own.
@@ -552,10 +601,12 @@ def main() -> int:
     a._resumed_ignore_pool = False
     a._resumed_never_relax = []
     a._resumed_declarations = []
+    a._resumed_bank_max_candidates = None
     if a.resume:
         resumed = _resume_state(dec, a.salary)
         a._resumed_never_relax = list(resumed.get("never_relax") or [])
         a._resumed_declarations = list(resumed.get("declare_pitcher") or [])
+        a._resumed_bank_max_candidates = resumed.get("bank_max_candidates")
         if resumed["attempts_done"]:
             a._resumed_attempts = resumed["attempts_done"]
             a._resumed_ignore_pool = resumed["ignore_pool"]
@@ -626,6 +677,24 @@ def main() -> int:
                 "--passthrough; no structural floor this supervisor applies "
                 "lands on one of these controls",
                 never_relax=list(dec.never_relax))
+    # R415. An operator cap is an input, recorded as one; a resumed run keeps
+    # the last cap it raised to unless this call names one.
+    if a.bank_max_candidates is not None:
+        if a.bank_max_candidates < 1:
+            dec.add(0, "stop", "--bank-max-candidates must be a positive integer",
+                    bank_max_candidates=a.bank_max_candidates)
+            _write(dec, {}, salary=a.salary)
+            return 4
+        dec.bank_max_candidates = int(a.bank_max_candidates)
+        dec.add(0, "operator_bank_max_candidates",
+                "an operator input, forwarded to build_slate as "
+                "--bank-max-candidates; the sliced bank's starting cap",
+                bank_max_candidates=dec.bank_max_candidates)
+    elif getattr(a, "_resumed_bank_max_candidates", None):
+        dec.bank_max_candidates = int(a._resumed_bank_max_candidates)
+        dec.add(0, "resumed_bank_max_candidates",
+                "restored from the resumed run's log; the cap its last attempt "
+                "forwarded", bank_max_candidates=dec.bank_max_candidates)
     dec.user_controls = dict(user_controls)
     if user_controls:
         dec.add(0, "operator_controls",
@@ -758,6 +827,8 @@ def main() -> int:
                 cmd += [flag, val]
         if dec.never_relax:
             cmd += ["--never-relax", ",".join(dec.never_relax)]
+        if dec.bank_max_candidates is not None:
+            cmd += ["--bank-max-candidates", str(dec.bank_max_candidates)]
         for declared in dec.declared_pitchers:
             cmd += ["--declare-pitcher", declared]
         effective = dec.effective_controls
@@ -887,14 +958,64 @@ def main() -> int:
                     gate_asserted=GATE_IMPLIED_BY_POOL_OVERRIDE)
             continue
 
-        # A refusal. Grow the bank before touching any control.
-        bank = (brief.get("solve", {}) or {}).get("bank", {}) or {}
-        if bank.get("job_list_exhausted") is False:
-            dec.add(attempt, "grow_bank",
-                    "refusal against a partial bank; the engine's first remedy is "
-                    "always to grow it, never to relax a control",
-                    jobs_attempted=bank.get("jobs_attempted"),
-                    jobs_total=bank.get("jobs_total"))
+        # A refusal. Grow the bank before touching any control, unless a
+        # SLATE-LEVEL check failed: that is arithmetic no bank growth clears
+        # (R286, SKILL.md), so the floor below goes first. R415 review: once
+        # the refusal brief's bank became readable, growth ran ahead of a
+        # failing floor and could spend every attempt re-running.
+        bank = refusal_bank_report(brief)
+        slate_failed = any(
+            c.get("passed") is False
+            for c in (((brief.get("feasibility") or {}).get("checks")) or []))
+        if slate_failed:
+            pass
+        elif bank.get("job_list_exhausted") is False:
+            if bank.get("bank_stop_reason") == "candidate_cap":
+                # R415. A re-run cannot grow a bank that stopped at its cap, so
+                # the lever is the cap itself. Search effort: CLAUDE.md
+                # delegates growing the bank, and the legal pool is untouched.
+                raised = next_bank_cap(bank)
+                if raised is not None:
+                    dec.bank_max_candidates = raised["to"]
+                    dec.add(attempt, "raise_bank_cap",
+                            "refusal against a bank that stopped at its candidate "
+                            "cap; re-running the same command cannot grow it past "
+                            "the cap, so "
+                            "the cap is raised. Search effort, not strategy "
+                            "(CLAUDE.md delegates growing the bank)",
+                            jobs_attempted=bank.get("jobs_attempted"),
+                            jobs_total=bank.get("jobs_total"), **raised)
+                    continue
+                dec.add(attempt, "bank_at_ceiling",
+                        "refusal against a bank at its measured full-solve "
+                        "ceiling; growing it further is Ben's call through "
+                        "--bank-max-candidates, so the remedies below apply",
+                        jobs_attempted=bank.get("jobs_attempted"),
+                        jobs_total=bank.get("jobs_total"),
+                        bank_cap=bank.get("bank_cap"))
+            else:
+                dec.add(attempt, "grow_bank",
+                        "refusal against a partial bank; the engine's first remedy is "
+                        "always to grow it, never to relax a control",
+                        jobs_attempted=bank.get("jobs_attempted"),
+                        jobs_total=bank.get("jobs_total"),
+                        bank_stop_reason=bank.get("bank_stop_reason"))
+                continue
+        elif (brief.get("solve_strategy") == "direct"
+              and dec.bank_max_candidates is None
+              and any("BANK-LIMITED" in str(e) for e in (brief.get("errors") or []))):
+            # R415. The direct door's auto-bank is rebuilt from scratch on every
+            # call, so a BANK-LIMITED refusal there has no growth lever unless
+            # the next attempt takes the sliced door, whose cache persists and
+            # resumes. The cap is this host's default; search effort.
+            cap = bank_max_candidates(max(1, int(brief.get("entries") or 1)))
+            dec.bank_max_candidates = cap
+            dec.add(attempt, "raise_bank_cap",
+                    "BANK-LIMITED refusal on the direct door, whose auto-bank "
+                    "does not persist or grow; the next attempt takes the "
+                    "sliced bank at this host's default cap. Search effort, "
+                    "not strategy (CLAUDE.md delegates growing the bank)",
+                    from_door="direct", to=cap, source="host_default")
             continue
 
         checks = ((brief.get("feasibility") or {}).get("checks")) or []
@@ -1038,6 +1159,10 @@ def _resume_state(dec: "Decisions", salary: Optional[str]) -> Dict[str, Any]:
     declared = (payload.get("operator_inputs") or {}).get("declare_pitcher") or []
     if isinstance(declared, list):
         out["declare_pitcher"] = [str(x) for x in declared]
+    # R415. The last cap this run forwarded, raised or the operator's.
+    cap = payload.get("bank_max_candidates")
+    if isinstance(cap, int) and cap > 0:
+        out["bank_max_candidates"] = cap
     # The prior log is the run's history, so keep it rather than starting a new
     # file: the flush rewrites the whole document and a resumed run that dropped
     # the earlier attempts would make the artifact say the floors appeared from
@@ -1119,6 +1244,10 @@ def _write(dec: Decisions, brief: Dict[str, Any],
                         **({"operator_inputs": {
                             "declare_pitcher": list(dec.declared_pitchers)}}
                            if dec.declared_pitchers else {}),
+                        # R415. The cap the next attempt forwards, so --resume
+                        # does not fall back to a cap a refusal already outgrew.
+                        **({"bank_max_candidates": dec.bank_max_candidates}
+                           if dec.bank_max_candidates is not None else {}),
                         "labels": "deterministic review proxies and labeled priors "
                                   "only; never ROI, win rate, cash rate, or "
                                   "probability"}, indent=1),

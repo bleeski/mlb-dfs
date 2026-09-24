@@ -20714,6 +20714,366 @@ class BankSliceReportMergeTests(unittest.TestCase):
                          "size the bank actually holds")
 
 
+class BankCapGrowthTests(unittest.TestCase):
+    """R415. The Classic sliced bank's cap comes from the host, the operator can
+    raise it, and the brief says whether the cap or the clock stopped the bank.
+
+    On 2026-09-23 1905_10g every build stopped at exactly 384 = 32 * 12 with 6%
+    of the job list attempted, on a 630s host, and re-running added nothing:
+    `extend_bank` breaks when the WHOLE cache reaches the cap, and both that
+    break and the clock break read `job_list_exhausted: False`, so every
+    grow-the-bank remedy prescribed a re-run that could not grow it.
+    """
+
+    @staticmethod
+    def _build_slate():
+        import importlib.util
+        path = (Path(__file__).resolve().parents[1] / "skills"
+                / "generate-lineups" / "scripts" / "build_slate.py")
+        spec = importlib.util.spec_from_file_location("_bs_r415", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    # ---- the cap scales with the host profile ----------------------------
+
+    def test_the_cap_scales_with_the_call_budget_and_cowork_keeps_twelve(self):
+        from mlb_engine import repo_env
+        cloud = {"BASH_DEFAULT_TIMEOUT_MS": "900000"}
+        self.assertEqual(repo_env.bank_max_candidates(32, host=repo_env.HOST_COWORK, env={}),
+                         384, "Cowork's 130s must keep the pre-R415 max(n * 12, 60)")
+        self.assertEqual(repo_env.bank_max_candidates(32, host=repo_env.HOST_UNKNOWN, env={}),
+                         384, "a host that states nothing is Cowork's conservative value")
+        per_cloud = repo_env.bank_candidates_per_entry(host=repo_env.HOST_CLAUDE_CODE, env=cloud)
+        self.assertAlmostEqual(per_cloud, 12 * 630.0 / 130.0, places=6)
+        self.assertEqual(repo_env.bank_max_candidates(18, host=repo_env.HOST_CLAUDE_CODE, env=cloud),
+                         int(18 * 12 * 630.0 / 130.0))
+        self.assertEqual(repo_env.bank_max_candidates(18, host=repo_env.HOST_WINDOWS, env={}),
+                         int(18 * 12 * 540.0 / 130.0))
+        profile = repo_env.host_profile(host=repo_env.HOST_CLAUDE_CODE, env=cloud)
+        self.assertEqual(profile["bank_candidates_per_entry"], round(per_cloud, 2))
+        self.assertEqual(profile["bank_full_solve_ceiling"], repo_env.BANK_FULL_SOLVE_CEILING)
+
+    def test_cowork_never_grows_on_an_ambient_ceiling_and_the_bounds_hold(self):
+        from mlb_engine import repo_env
+        ambient = {"BASH_DEFAULT_TIMEOUT_MS": "900000"}
+        self.assertEqual(
+            repo_env.bank_max_candidates(32, host=repo_env.HOST_COWORK, env=ambient), 384,
+            "a stated Cowork host takes its profile budget, never the shell's ceiling")
+        self.assertEqual(repo_env.bank_max_candidates(1000, budget_s=630.0),
+                         repo_env.BANK_FULL_SOLVE_CEILING)
+        self.assertEqual(repo_env.bank_max_candidates(1, budget_s=130.0), 60)
+        self.assertEqual(repo_env.bank_max_candidates(32, budget_s=60.0), 384,
+                         "a budget under Cowork's is bounded by its clock, not shrunk")
+
+    # ---- the override is honored and recorded ----------------------------
+
+    def test_the_operator_cap_is_honored_and_recorded_with_its_source(self):
+        bs = self._build_slate()
+        chosen = bs.resolve_bank_cap(32, explicit=900, budget_s=130.0)
+        self.assertEqual(chosen["value"], 900)
+        self.assertEqual(chosen["source"], "operator_flag")
+        self.assertEqual(chosen["host_default"], 384)
+        default = bs.resolve_bank_cap(32, budget_s=630.0)
+        self.assertEqual(default["source"], "host_default")
+        self.assertEqual(default["value"], 1536)
+        self.assertTrue(default["at_ceiling"])
+        with self.assertRaises(Exception):
+            bs._positive_int("0")
+
+    def test_the_flag_reaches_the_sliced_door_and_the_brief(self):
+        """Source pins for the two wirings a unit call cannot reach: the flag
+        selects the sliced door, and the brief carries the cap and the reason."""
+        path = (Path(__file__).resolve().parents[1] / "skills"
+                / "generate-lineups" / "scripts" / "build_slate.py")
+        src = path.read_text(encoding="utf-8")
+        self.assertIn('"--bank-max-candidates", dest="bank_max_candidates"', src)
+        self.assertIn('if projected_direct > remaining or getattr(args, "bank_max_candidates", None):', src)
+        self.assertIn('n_entries, getattr(args, "bank_max_candidates", None))', src)
+        self.assertIn('"bank_stop_reason": (bank_report or {}).get("bank_stop_reason"),', src)
+        self.assertIn('"bank_cap": _bank_cap,', src)
+        self.assertIn('payload["solve_strategy"] = strategy', src,
+                      "the refusal brief must say which door built its bank")
+
+    # ---- bank_stop_reason -------------------------------------------------
+
+    def test_stop_reason_reads_candidate_cap_when_the_cap_binds(self):
+        frame = diverse_projection_frame()
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = bank_cache.BankCache(Path(tmp) / "bank.json")
+            capped = bank_cache.extend_bank(cache, frame, time_budget_s=30, max_candidates=3)
+            self.assertEqual(capped["stop_reason"], "candidate_cap")
+            self.assertEqual(capped["max_candidates"], 3)
+            self.assertFalse(capped["job_list_exhausted"])
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = bank_cache.BankCache(Path(tmp) / "bank.json")
+            clock = bank_cache.extend_bank(cache, frame, time_budget_s=0.0)
+            self.assertEqual(clock["stop_reason"], "time_budget")
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = bank_cache.BankCache(Path(tmp) / "bank.json")
+            done = bank_cache.extend_bank(cache, frame, time_budget_s=60)
+            self.assertTrue(done["job_list_exhausted"])
+            self.assertEqual(done["stop_reason"], "job_list_exhausted")
+            self.assertIsNone(done["max_candidates"])
+
+    def test_the_bank_reason_is_resolved_over_every_slice(self):
+        """A share-capped slice (the five-stack slice, or the ordinary slices
+        beside a consensus bucket) reading candidate_cap is not a capped bank:
+        the slice carrying the full cap stopped for its own reason."""
+        bs = self._build_slate()
+        share_capped = bs._merge_bank_slice_reports([
+            {"stop_reason": "candidate_cap", "job_list_exhausted": False,
+             "max_candidates": 96, "total_candidates": 96, "stack_min_requested": 5},
+            {"stop_reason": "time_budget", "job_list_exhausted": False,
+             "max_candidates": 384, "total_candidates": 200, "stack_min_requested": 4},
+        ])
+        self.assertEqual(share_capped["bank_stop_reason"], "time_budget")
+        self.assertNotIn("stop_reason", share_capped, "the last slice's reason is not the bank's")
+        self.assertEqual([s["stop_reason"] for s in share_capped["slices"]],
+                         ["candidate_cap", "time_budget"])
+        full = bs._merge_bank_slice_reports([
+            {"stop_reason": "time_budget", "job_list_exhausted": False,
+             "max_candidates": 288, "total_candidates": 250, "stack_min_requested": 4},
+            {"stop_reason": "candidate_cap", "job_list_exhausted": False,
+             "max_candidates": 384, "total_candidates": 384, "stack_min_requested": 4},
+        ])
+        self.assertEqual(full["bank_stop_reason"], "candidate_cap")
+        one = bs._merge_bank_slice_reports([{"stop_reason": "job_list_exhausted",
+                                             "job_list_exhausted": True}])
+        self.assertEqual(one["bank_stop_reason"], "job_list_exhausted")
+        self.assertIsNone(bs.bank_stop_reason([{"job_list_exhausted": False}]))
+
+    # ---- growth -----------------------------------------------------------
+
+    def test_a_rerun_at_the_same_cap_adds_nothing_and_a_raised_cap_grows(self):
+        frame = diverse_projection_frame()
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "bank.json"
+            first = bank_cache.extend_bank(bank_cache.BankCache(path), frame,
+                                           time_budget_s=30, max_candidates=3)
+            self.assertEqual(first["total_candidates"], 3)
+            same = bank_cache.extend_bank(bank_cache.BankCache(path), frame,
+                                          time_budget_s=30, max_candidates=3)
+            self.assertEqual(same["built_this_slice"], 0)
+            self.assertEqual(same["stop_reason"], "candidate_cap")
+            raised = bank_cache.extend_bank(bank_cache.BankCache(path), frame,
+                                            time_budget_s=30, max_candidates=6)
+            self.assertGreater(raised["built_this_slice"], 0)
+            self.assertGreater(raised["total_candidates"], 3)
+            self.assertEqual(raised["total_candidates"], 6)
+
+    def test_a_share_capped_slice_does_not_stop_a_bank_that_still_grows(self):
+        """The review's reproduction, through the real `extend_bank`: a small
+        first slice stops at its cap, the full-cap slice runs out of clock, and
+        re-running the same command grows the bank. The bank must say so."""
+        bs = self._build_slate()
+        frame = diverse_projection_frame()
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "bank.json"
+            share = bank_cache.extend_bank(bank_cache.BankCache(path), frame,
+                                           time_budget_s=30, max_candidates=3, stack_min=5)
+            full = bank_cache.extend_bank(bank_cache.BankCache(path), frame,
+                                          time_budget_s=0.0, max_candidates=10)
+            self.assertEqual((share["stop_reason"], full["stop_reason"]),
+                             ("candidate_cap", "time_budget"))
+            merged = bs._merge_bank_slice_reports([share, full])
+            self.assertEqual(merged["bank_stop_reason"], "time_budget")
+            self.assertTrue(bs.bank_resume_warranted(merged, True))
+            again = bank_cache.extend_bank(bank_cache.BankCache(path), frame,
+                                           time_budget_s=30, max_candidates=10)
+            self.assertGreater(again["built_this_slice"], 0)
+
+    def test_an_answered_list_rerun_at_its_cap_reads_exhausted(self):
+        frame = diverse_projection_frame()
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "bank.json"
+            walked = bank_cache.extend_bank(bank_cache.BankCache(path), frame, time_budget_s=60)
+            self.assertTrue(walked["job_list_exhausted"])
+            again = bank_cache.extend_bank(bank_cache.BankCache(path), frame, time_budget_s=60,
+                                           max_candidates=walked["total_candidates"])
+            self.assertEqual(again["stop_reason"], "job_list_exhausted")
+            self.assertTrue(again["job_list_exhausted"])
+
+    def test_exit_10_is_not_a_loop_at_the_cap(self):
+        bs = self._build_slate()
+        at_cap = {"job_list_exhausted": False, "bank_stop_reason": "candidate_cap"}
+        on_clock = {"job_list_exhausted": False, "bank_stop_reason": "time_budget"}
+        self.assertFalse(bs.bank_resume_warranted(at_cap, True),
+                         "a re-run of a capped bank breaks before its first job")
+        self.assertTrue(bs.bank_resume_warranted(on_clock, True))
+        self.assertFalse(bs.bank_resume_warranted(on_clock, False))
+        self.assertFalse(bs.bank_resume_warranted({"job_list_exhausted": True}, True))
+
+    def test_every_grow_remedy_names_the_lever_the_stop_reason_implies(self):
+        bs = self._build_slate()
+        cap = {"value": 384, "source": "host_default", "full_solve_ceiling": 1536,
+               "at_ceiling": False}
+        capped = {"job_list_exhausted": False, "jobs_attempted": 440, "jobs_total": 7200,
+                  "bank_stop_reason": "candidate_cap", "bank_cap": cap}
+        self.assertEqual(bs.bank_growth_lever(capped)["lever"], "raise_cap")
+        hint = bs.infeasibility_hint({}, capped)
+        self.assertIn("raise --bank-max-candidates", hint)
+        self.assertNotIn("Re-run the SAME command", hint)
+        at_ceiling = dict(capped, bank_cap=dict(cap, value=1536, at_ceiling=True))
+        self.assertEqual(bs.bank_growth_lever(at_ceiling)["lever"], "at_ceiling")
+        ceiling_lines = ca._infeasibility_remedies(at_ceiling, [])
+        self.assertTrue(any("1536-candidate ceiling" in line for line in ceiling_lines),
+                        ceiling_lines)
+        self.assertFalse(any("raise --bank-max-candidates" in line for line in ceiling_lines))
+        timed = dict(capped, bank_stop_reason="time_budget")
+        self.assertIn("Re-run the SAME command", bs.infeasibility_hint({}, timed))
+        lines = ca._infeasibility_remedies(capped, [])
+        self.assertTrue(any("raise --bank-max-candidates" in line for line in lines), lines)
+        self.assertFalse(any("Re-run the same build command" in line for line in lines), lines)
+        self.assertTrue(any("Re-run the same build command" in line
+                            for line in ca._infeasibility_remedies(timed, [])))
+
+
+class AutobuildBankCapTests(unittest.TestCase):
+    """R415. autobuild raises a capped bank's cap on a refusal, as search effort.
+
+    Also pins the refusal-path read: the exit-3 brief carries its bank facts in
+    `bank_exploration` and has no `solve`, so the pre-R415 read of `solve.bank`
+    was empty on every real refusal and its grow_bank never fired.
+    """
+
+    def setUp(self):
+        import importlib
+        self.ab = importlib.import_module("tools.autobuild")
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.salary = (REPO / "tests" / "fixtures" / "slates"
+                       / "DKSalaries_frozen_2026-07-29.csv")
+
+    def _run(self, side_effect, extra_argv=()):
+        cmds = []
+
+        def fake_run(cmd, **kwargs):
+            cmds.append(list(cmd))
+            return side_effect(len(cmds), cmd, kwargs)
+
+        argv = ["autobuild.py", "--salary", str(self.salary),
+                "--entries", str(self.salary), *extra_argv]
+        root = Path(self.tmp.name)
+        with unittest.mock.patch.object(self.ab, "REPO", root), \
+                unittest.mock.patch.object(self.ab.subprocess, "run", fake_run), \
+                unittest.mock.patch.object(sys, "argv", argv), \
+                unittest.mock.patch.object(self.ab, "assert_classification_in_sync",
+                                           lambda: None):
+            code = self.ab.main()
+        payload = {}
+        for path in sorted(root.glob("outputs/*/autobuild_decisions.json")):
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        return code, payload.get("decisions") or [], cmds, payload
+
+    @staticmethod
+    def _refusal(stop_reason, cap=384):
+        return types.SimpleNamespace(returncode=3, stderr="", stdout=json.dumps({
+            "status": "not_certified", "date": "2026-07-29",
+            "bank_exploration": {
+                "job_list_exhausted": False, "jobs_attempted": 440, "jobs_total": 7200,
+                "bank_stop_reason": stop_reason,
+                "bank_cap": {"value": cap, "source": "host_default",
+                             "full_solve_ceiling": 1536}}}))
+
+    @staticmethod
+    def _cap_of(cmd):
+        return int(cmd[cmd.index("--bank-max-candidates") + 1]) \
+            if "--bank-max-candidates" in cmd else None
+
+    def test_a_capped_refusal_raises_the_cap_and_records_it(self):
+        code, records, cmds, payload = self._run(
+            lambda n, cmd, kw: self._refusal("candidate_cap", cap=384 * 2 ** (n - 1)),
+            extra_argv=["--max-attempts", "3"])
+        raises = [r for r in records if r["action"] == "raise_bank_cap"]
+        self.assertEqual([(r["from"], r["to"]) for r in raises], [(384, 768), (768, 1536)])
+        self.assertIn("search effort", raises[0]["why"].lower())
+        self.assertEqual([self._cap_of(c) for c in cmds], [None, 768, 1536])
+        self.assertEqual(payload.get("bank_max_candidates"), 1536)
+
+    def test_at_the_ceiling_it_stops_raising_and_says_so(self):
+        code, records, cmds, _ = self._run(
+            lambda n, cmd, kw: self._refusal("candidate_cap", cap=1536),
+            extra_argv=["--max-attempts", "2"])
+        actions = [r["action"] for r in records]
+        self.assertNotIn("raise_bank_cap", actions)
+        self.assertIn("bank_at_ceiling", actions)
+        self.assertEqual(len(cmds), 1, "a bank at its ceiling is not retried as growth")
+
+    def test_a_clock_bound_refusal_still_grows_by_rerun_from_the_refusal_brief(self):
+        code, records, cmds, _ = self._run(
+            lambda n, cmd, kw: self._refusal("time_budget"),
+            extra_argv=["--max-attempts", "2"])
+        self.assertIn("grow_bank", [r["action"] for r in records],
+                      "the refusal brief's bank_exploration was not read")
+        self.assertNotIn("raise_bank_cap", [r["action"] for r in records])
+        self.assertEqual(len(cmds), 2)
+        self.assertEqual([self._cap_of(c) for c in cmds], [None, None])
+
+    def test_a_bank_limited_refusal_on_the_direct_door_takes_the_sliced_bank(self):
+        """The direct door's auto-bank is rebuilt on every call, so re-running
+        a BANK-LIMITED refusal there repeats it. Measured 2026-09-24 on the
+        06-28 11g fixture at autobuild's 105s: 32 of 220 viable SP pairs."""
+        from mlb_engine import repo_env
+        errors = ["entry-level joint MILP proven infeasible: max_sp_pair_repetition: "
+                  "32 distinct SP pairs x cap 1 = 32 < 38 entries -- BANK-LIMITED: "
+                  "feasibility.inputs.viable_sp_pairs says the slate itself has 220 "
+                  "viable SP pairs; this bank sampled only 32, so grow the bank "
+                  "before relaxing this cap"]
+
+        def direct(n, cmd, kw):
+            return types.SimpleNamespace(returncode=3, stderr="", stdout=json.dumps({
+                "status": "not_certified", "date": "2026-07-29", "entries": 38,
+                "solve_strategy": "direct", "errors": errors}))
+        code, records, cmds, _ = self._run(direct, extra_argv=["--max-attempts", "2"])
+        raises = [r for r in records if r["action"] == "raise_bank_cap"]
+        self.assertEqual(len(raises), 1, "the door switch is taken once, not per attempt")
+        self.assertEqual(raises[0]["from_door"], "direct")
+        self.assertEqual(raises[0]["to"], repo_env.bank_max_candidates(38))
+        self.assertEqual([self._cap_of(c) for c in cmds],
+                         [None, repo_env.bank_max_candidates(38)])
+
+        def not_bank_limited(n, cmd, kw):
+            return types.SimpleNamespace(returncode=3, stderr="", stdout=json.dumps({
+                "status": "not_certified", "date": "2026-07-29", "entries": 38,
+                "solve_strategy": "direct", "errors": ["max_team_exposure_pct binds"]}))
+        _, records, cmds, _ = self._run(not_bank_limited, extra_argv=["--max-attempts", "2"])
+        self.assertNotIn("raise_bank_cap", [r["action"] for r in records])
+
+    def test_a_failing_slate_check_goes_before_bank_growth(self):
+        """R286's order: a failing SLATE-LEVEL check is arithmetic no bank
+        clears. With the refusal's bank readable, growth used to run first and
+        could spend every attempt re-running without applying the floor."""
+        brief = {"status": "not_certified", "date": "2026-07-29",
+                 "bank_exploration": {"job_list_exhausted": False,
+                                      "jobs_attempted": 440, "jobs_total": 7200,
+                                      "bank_stop_reason": "time_budget"},
+                 "feasibility": {"checks": [
+                     {"name": "shared_players_floor", "passed": False,
+                      "remedy": "raise max_shared_players to >= 7"}]}}
+        code, records, cmds, _ = self._run(
+            lambda n, cmd, kw: types.SimpleNamespace(
+                returncode=3, stderr="", stdout=json.dumps(brief)),
+            extra_argv=["--max-attempts", "2"])
+        actions = [r["action"] for r in records]
+        self.assertEqual(actions[0], "apply_structural_floor", actions)
+        self.assertNotIn("grow_bank", actions[:1])
+        self.assertIn("--controls-override", cmds[1])
+
+    def test_the_operator_cap_is_forwarded_recorded_and_resumed(self):
+        code, records, cmds, payload = self._run(
+            lambda n, cmd, kw: self._refusal("candidate_cap", cap=500),
+            extra_argv=["--max-attempts", "1", "--bank-max-candidates", "500"])
+        self.assertEqual(self._cap_of(cmds[0]), 500)
+        self.assertIn("operator_bank_max_candidates", [r["action"] for r in records])
+        self.assertEqual(payload.get("bank_max_candidates"), 1000)
+        _, _, resumed_cmds, _ = self._run(
+            lambda n, cmd, kw: self._refusal("candidate_cap", cap=1000),
+            extra_argv=["--max-attempts", "2", "--resume"])
+        self.assertEqual(self._cap_of(resumed_cmds[0]), 1000,
+                         "--resume fell back to a cap the refusal had outgrown")
+
+
 class PytestTempRootObstructionTests(unittest.TestCase):
     """R348: a host whose pytest temp root is unusable must not read as a red tree.
 

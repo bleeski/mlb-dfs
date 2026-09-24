@@ -93,8 +93,8 @@ control that, dropped alone, restores feasibility, and its smallest step.
 `feasibility.checks` entry is arithmetic about the SLATE: no bank growth can
 clear it, so fix it first. A `BANK-LEVEL` line in `errors[]` is arithmetic about
 the candidates this slice happened to build, and growing the bank is the right
-first move against it. The refusal now labels which is which; do not treat them
-as the same lever.
+first move against it (`bank_stop_reason`: re-run on `time_budget`, raise the cap
+on `candidate_cap`). The refusal labels which is which; they are not one lever.
 
 ## Multi-session check, before anything else
 
@@ -181,12 +181,12 @@ Every `dec.add` is flushed to disk immediately, so a killed call leaves the
 decisions it had already taken rather than nothing.
 
 It runs `build_slate.py` in a loop and takes the decisions a human was taking
-by hand: grow the bank on exit 10, apply a feasibility remedy the engine named
-and classified structural, override a pool blocker whose shape is classified
-benign and assert `lineup_gate_passed` on that same evidence. It stops on
-anything it cannot classify, and every decision lands in
-`outputs/<date>/autobuild_decisions.json`. Exit 0 certified, 3 refused with
-reasons, 4 bad input, 5 out of time, 7 delivered after a later failure.
+by hand: grow the bank on exit 10, raise its cap when a refusal says the cap
+stopped it (R415), apply a feasibility remedy the engine named and classified
+structural, override a pool blocker classified benign and assert
+`lineup_gate_passed` on that same evidence. It stops on anything it cannot
+classify, and every decision lands in `outputs/<date>/autobuild_decisions.json`.
+Exit 0 certified, 3 refused, 4 bad input, 5 out of time, 7 delivered after a later failure.
 
 A stop is a real question, not a formality: an exposure cap has no engine-named
 floor, and a team matching under 5 of 9 salary hitters is a crosswalk failure,
@@ -253,8 +253,8 @@ again, it resumes), `3` built but did not certify, `4` a precondition was never
 met (inputs missing, solver missing, or the slate's first lock already passed), `7`
 the file passed its checks and a later stage failed: hand over the `FILE` line's file.
 
-An exit of `10` is normal on a big slate, not a failure. The bank persists between
-runs. Just run it again.
+An exit of `10` is normal on a big slate: the clock stopped the bank, it persists,
+so run it again. A bank stopped at its CAP never exits 10; see below (R415).
 
 Three refusals happen before anything is staged, so they cost one line and leave
 no byproducts (R28):
@@ -1031,9 +1031,9 @@ lock.
 **Dependencies do not persist between sessions.** The preflight at the top of
 this file is the whole answer; run it rather than diagnosing an import error.
 
-**On exit 10 the bank is thin, not wrong.** Use the exit-10 resume and run the
-identical command again; the bank persists between invocations and each pass adds
-to it. Shrink the bank, never the pool.
+**On exit 10 the bank is thin, not wrong.** Run the identical command again; each
+pass adds to it. When `solve.bank_stop_reason` is `candidate_cap`, a re-run cannot
+grow it past the cap: raise `--bank-max-candidates` (R415). Shrink the bank, never the pool.
 
 ## Where the files come from
 

@@ -520,9 +520,11 @@ def test_the_candidate_bank_cap_does_not_govern_the_bank_most_builds_deliver():
     `DEFAULT_CANDIDATE_BANK_CAP` clamps `resolve_candidate_bank_size`, and only
     the AUTO bank path consults that resolver. The SLICED path -- the one
     `build_slate.py` delivers from, and `execution_pipeline.py`'s own comment
-    calls "most of them" -- sizes its bank `max(n_entries * 12, 60)` and hands
-    it to `extend_bank`, which reads neither the resolver nor the cap. So
-    "raise the cap" is not a question about the bank most builds draw from.
+    calls "most of them" -- sizes its bank from `repo_env.bank_max_candidates`
+    (R415; `max(n_entries * 12, 60)` before it, which is still the value at
+    Cowork's 130s) and hands it to `extend_bank`, which reads neither the
+    resolver nor the cap. So "raise the cap" is not a question about the bank
+    most builds draw from.
     """
     import re
     from pathlib import Path
@@ -538,8 +540,11 @@ def test_the_candidate_bank_cap_does_not_govern_the_bank_most_builds_deliver():
 
     build_slate = (root / "skills" / "generate-lineups" / "scripts" / "build_slate.py").read_text(
         encoding="utf-8")
-    assert re.search(r"max\(\s*n_entries\s*\*\s*12\s*,\s*60\s*\)", build_slate), \
+    assert re.search(r"_total_max = int\(_bank_cap\[\"value\"\]\)", build_slate), \
         "the sliced path's bank size moved; re-measure before trusting this finding"
+    from mlb_engine import repo_env
+    repo_env_src = (root / "mlb_engine" / "repo_env.py").read_text(encoding="utf-8")
+    assert "resolve_candidate_bank_size" not in repo_env_src
 
     # The cap first binds at 75 reserved entries and not before.
     assert resolve_candidate_bank_size(74) == 148
@@ -548,6 +553,8 @@ def test_the_candidate_bank_cap_does_not_govern_the_bank_most_builds_deliver():
     # At every realistic entry count the delivering path already asks for more
     # than the capped auto path resolves to.
     for n in (5, 10, 18, 20, 50):
+        assert repo_env.bank_max_candidates(
+            n, budget_s=repo_env.BANK_REFERENCE_BUDGET_S) == max(n * 12, 60)
         assert max(n * 12, 60) > resolve_candidate_bank_size(n)
 
 

@@ -949,17 +949,27 @@ def extend_bank(
     raised_examples: List[str] = []
     unanswered_by_status: Dict[str, int] = {}
     exhausted = True
+    # R415. WHICH limit ended the walk, because the two breaks below call for
+    # different levers: a bank stopped at its candidate cap does not grow when
+    # the same command is re-run, and one stopped at its time budget does.
+    # `job_list_exhausted` alone cannot tell them apart; it reads False for both.
+    stopped_by: Optional[str] = None
     for pair, team in jobs:
+        # The cap binds only on a job that would run: an answered job is
+        # skipped first, so a fully answered list re-run at its cap still reads
+        # exhausted rather than capped (R415 review).
+        key = _job_key(pair, team, lock_sig, conditions_sig)
+        if key in cache.attempted:
+            continue
         if max_candidates is not None and len(cache) >= max_candidates:
             exhausted = False
+            stopped_by = "candidate_cap"
             break
         remaining = time_budget_s - (time.monotonic() - started)
         if remaining <= worst:
             exhausted = False
+            stopped_by = "time_budget"
             break
-        key = _job_key(pair, team, lock_sig, conditions_sig)
-        if key in cache.attempted:
-            continue
         attempted_now += 1
         attempt_started = time.monotonic()
         status = _new_solver_status()
@@ -1064,6 +1074,7 @@ def extend_bank(
     live_buckets = cache.live_buckets()
     this_bucket = sum(1 for c in cache.candidates
                       if _key_conditions(c.get("job")) == conditions_sig)
+    job_list_exhausted = exhausted and done_here == len(jobs)
     return {
         "version": VERSION,
         "built_this_slice": built,
@@ -1075,7 +1086,14 @@ def extend_bank(
         "total_candidates": len(cache),
         "jobs_total": len(jobs),
         "jobs_attempted": done_here,
-        "job_list_exhausted": exhausted and done_here == len(jobs),
+        "job_list_exhausted": job_list_exhausted,
+        # R415. `candidate_cap` or `time_budget` when one of them broke the
+        # walk; `job_list_exhausted` when every job is answered; and
+        # `jobs_retryable` when the walk reached the end of the list but some
+        # jobs raised, timed out or went unanswered, which a re-run retries.
+        "stop_reason": stopped_by or (
+            "job_list_exhausted" if job_list_exhausted else "jobs_retryable"),
+        "max_candidates": int(max_candidates) if max_candidates is not None else None,
         "elapsed_s": round(time.monotonic() - started, 3),
         "time_budget_s": float(time_budget_s),
         "lock_signature": lock_sig,
