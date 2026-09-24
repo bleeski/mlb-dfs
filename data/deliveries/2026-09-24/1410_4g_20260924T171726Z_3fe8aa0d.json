@@ -1,0 +1,359 @@
+{
+ "code": {
+  "contest_allocator": "v1.12",
+  "execution_pipeline": "v1.17",
+  "git_dirty": true,
+  "git_sha": "88aacc65f6df6e9a3a5fed0a2c936f940936e8ee"
+ },
+ "controls": {
+  "five_stack_min_size": 5,
+  "max_consensus_cluster_share_pct": 0.5,
+  "max_pitcher_exposure_pct": 0.43,
+  "max_player_exposure_pct": 0.4,
+  "max_primary_stack_exposure_pct": 0.35,
+  "max_shared_players": 6,
+  "max_sp_pair_repetition": 1,
+  "max_team_exposure_pct": 0.55,
+  "min_five_stack_share_pct": 0.0,
+  "player_game_by_id": {
+   "distinct_values": 4,
+   "players_mapped": 80,
+   "wired": true
+  },
+  "player_team_by_id": {
+   "distinct_values": 8,
+   "players_mapped": 80,
+   "wired": true
+  },
+  "primary_stack_min_size": 4
+ },
+ "date": "2026-09-24",
+ "egress": "egress: statsapi unreachable, odds unreachable, savant unreachable, mlb-lineups unreachable, fangraphs unreachable (curl), open-meteo unreachable",
+ "egress_source": "session_start 2026-09-24T17:14:31+00:00",
+ "entries": [
+  {
+   "contest_id": "195995357",
+   "contest_name": "MLB $1 Double Up (Early)",
+   "entry_fee": 1.0,
+   "entry_id": "5267953703",
+   "filled": true,
+   "roster_ids": [
+    "44261255",
+    "44261003",
+    "44261080",
+    "44261020",
+    "44261046",
+    "44261012",
+    "44261035",
+    "44261045",
+    "44261027",
+    "44261006"
+   ]
+  },
+  {
+   "contest_id": "195995365",
+   "contest_name": "MLB 40x Micro Booster [Top 5 Win $10] (Early)",
+   "entry_fee": 0.25,
+   "entry_id": "5267964494",
+   "filled": true,
+   "roster_ids": [
+    "44261195",
+    "44261001",
+    "44261080",
+    "44261020",
+    "44261116",
+    "44261012",
+    "44261025",
+    "44261066",
+    "44261008",
+    "44261040"
+   ]
+  },
+  {
+   "contest_id": "195995365",
+   "contest_name": "MLB 40x Micro Booster [Top 5 Win $10] (Early)",
+   "entry_fee": 0.25,
+   "entry_id": "5267964529",
+   "filled": true,
+   "roster_ids": [
+    "44261001",
+    "44261003",
+    "44261009",
+    "44261075",
+    "44261046",
+    "44261059",
+    "44261051",
+    "44261027",
+    "44261006",
+    "44261082"
+   ]
+  },
+  {
+   "contest_id": "195995372",
+   "contest_name": "MLB $100 Dime Time [Just $0.10!] (Early)",
+   "entry_fee": 0.1,
+   "entry_id": "5267959906",
+   "filled": true,
+   "roster_ids": [
+    "44261001",
+    "44261004",
+    "44261080",
+    "44261020",
+    "44261015",
+    "44261012",
+    "44261035",
+    "44261086",
+    "44261045",
+    "44261008"
+   ]
+  },
+  {
+   "contest_id": "195995372",
+   "contest_name": "MLB $100 Dime Time [Just $0.10!] (Early)",
+   "entry_fee": 0.1,
+   "entry_id": "5267959985",
+   "filled": true,
+   "roster_ids": [
+    "44261195",
+    "44261000",
+    "44261080",
+    "44261024",
+    "44261052",
+    "44261030",
+    "44261039",
+    "44261027",
+    "44261031",
+    "44261010"
+   ]
+  },
+  {
+   "contest_id": "195995392",
+   "contest_name": "MLB Satellite to 9-29 $20 Postseason Opener (Early)",
+   "entry_fee": 0.25,
+   "entry_id": "5267954327",
+   "filled": true,
+   "roster_ids": [
+    "44261002",
+    "44261000",
+    "44261019",
+    "44261116",
+    "44261094",
+    "44261050",
+    "44261035",
+    "44261006",
+    "44261045",
+    "44261008"
+   ]
+  },
+  {
+   "contest_id": "195995392",
+   "contest_name": "MLB Satellite to 9-29 $20 Postseason Opener (Early)",
+   "entry_fee": 0.25,
+   "entry_id": "5267954347",
+   "filled": true,
+   "roster_ids": [
+    "44260999",
+    "44261195",
+    "44261019",
+    "44261033",
+    "44261116",
+    "44261030",
+    "44261023",
+    "44261069",
+    "44261040",
+    "44261011"
+   ]
+  },
+  {
+   "contest_id": "195995418",
+   "contest_name": "MLB Satellite to $20 NFL Fantasy Football Millionaire (Early)",
+   "entry_fee": 0.25,
+   "entry_id": "5267960768",
+   "filled": true,
+   "roster_ids": [
+    "44261002",
+    "44261003",
+    "44261022",
+    "44261033",
+    "44261090",
+    "44261059",
+    "44261007",
+    "44261045",
+    "44261088",
+    "44261006"
+   ]
+  },
+  {
+   "contest_id": "195995418",
+   "contest_name": "MLB Satellite to $20 NFL Fantasy Football Millionaire (Early)",
+   "entry_fee": 0.25,
+   "entry_id": "5267964413",
+   "filled": true,
+   "roster_ids": [
+    "44260999",
+    "44261000",
+    "44261022",
+    "44261012",
+    "44261116",
+    "44261043",
+    "44261007",
+    "44261040",
+    "44261027",
+    "44261086"
+   ]
+  },
+  {
+   "contest_id": "195996455",
+   "contest_name": "MLB $1K Quarter Jukebox [Just $0.25!]  (Early)",
+   "entry_fee": 0.25,
+   "entry_id": "5267953193",
+   "filled": true,
+   "roster_ids": [
+    "44261195",
+    "44261002",
+    "44261019",
+    "44261081",
+    "44261015",
+    "44261059",
+    "44261025",
+    "44261066",
+    "44261011",
+    "44261040"
+   ]
+  },
+  {
+   "contest_id": "195996455",
+   "contest_name": "MLB $1K Quarter Jukebox [Just $0.25!]  (Early)",
+   "entry_fee": 0.25,
+   "entry_id": "5267960028",
+   "filled": true,
+   "roster_ids": [
+    "44260999",
+    "44261002",
+    "44261048",
+    "44261033",
+    "44261015",
+    "44261050",
+    "44261007",
+    "44261126",
+    "44261008",
+    "44261069"
+   ]
+  },
+  {
+   "contest_id": "196016370",
+   "contest_name": "MLB $300 Solo Shot (Early)",
+   "entry_fee": 1.0,
+   "entry_id": "5267960138",
+   "filled": true,
+   "roster_ids": [
+    "44260999",
+    "44261003",
+    "44261095",
+    "44261033",
+    "44261015",
+    "44261059",
+    "44261007",
+    "44261066",
+    "44261011",
+    "44261053"
+   ]
+  }
+ ],
+ "entries_binding": {
+  "source": "outputs/2026-09-24/DO_NOT_UPLOAD_DKEntries_1410_4g.csv",
+  "source_sha256": "f031b6669a16182261798101f6d6d40482099ccd8e947d162095906a66f33984",
+  "status": "bound"
+ },
+ "host": {
+  "call_budget_s": 630.0,
+  "declared_ceiling_s": 900.0,
+  "host": "claude_code"
+ },
+ "kind": "delivery",
+ "labels": "deterministic review proxies and labeled priors only; never ROI, win rate, cash rate, or probability",
+ "manifest_row": {
+  "certification": "certified",
+  "contest_ids": [
+   "195995357",
+   "195995365",
+   "195995372",
+   "195995392",
+   "195995418",
+   "195996455",
+   "196016370"
+  ],
+  "contest_names": [
+   "MLB $1 Double Up (Early)",
+   "MLB $100 Dime Time [Just $0.10!] (Early)",
+   "MLB $1K Quarter Jukebox [Just $0.25!]  (Early)",
+   "MLB $300 Solo Shot (Early)",
+   "MLB 40x Micro Booster [Top 5 Win $10] (Early)",
+   "MLB Satellite to $20 NFL Fantasy Football Millionaire (Early)",
+   "MLB Satellite to 9-29 $20 Postseason Opener (Early)"
+  ],
+  "contest_type": "classic",
+  "delivered_file": "outputs/2026-09-24/DKEntries_1410_4g.csv",
+  "entries": 12,
+  "notes": "",
+  "projection_tier": "enriched",
+  "recorded_utc": "2026-09-24T17:17:26.717015+00:00",
+  "run_id": "20260924T171726Z_3fe8aa0d",
+  "sha256": "f031b6669a16182261798101f6d6d40482099ccd8e947d162095906a66f33984",
+  "slate_tag": "1410_4g",
+  "status": "candidate",
+  "strategy_state": {
+   "bank_warnings": [],
+   "counts": {
+    "built": 24,
+    "du_relaxation_high_water": 0,
+    "requested": 24
+   },
+   "evidence": "recorded",
+   "state": "relaxed",
+   "warnings": []
+  }
+ },
+ "recorded_utc": "2026-09-24T17:17:26.719210+00:00",
+ "relaxations": {},
+ "run": {
+  "certification": {
+   "allocation_certified": true,
+   "failed_post_export_gates": [],
+   "post_export_gates": {
+    "entry_reconciliation_passed": true,
+    "export_hash_binding_passed": true,
+    "locked_immutability_passed": true,
+    "portfolio_caps_passed": true,
+    "roster_legality_passed": true,
+    "template_preservation_passed": true
+   },
+   "pre_export_passed": true,
+   "selection_certified": true,
+   "workflow_valid": true
+  },
+  "environment": {
+   "lock_file": "requirements.lock",
+   "lock_sha256": "dd7723e54043e8c2644100beba5069959d835258f96e1cf6dc100ea1617ac0d6",
+   "packages": {
+    "numpy": "2.2.6",
+    "pandas": "2.3.3",
+    "scipy": "1.15.3"
+   },
+   "python": "3.11.15"
+  },
+  "inputs": {
+   "DKEntries.csv": {
+    "sha256": "748f21b112876457d2270607ddb8fc9917d3bff2af02c8ad2e5f63d275c57eef",
+    "size_bytes": 43984,
+    "source_path": "/home/user/mlb-dfs/data/slates/2026-09-24/DKEntries.csv"
+   },
+   "DKSalaries.csv": {
+    "sha256": "2d68578891c3a64adcc0d731689e04c8e8237c773b0162fc19ae3ab1aed605f1",
+    "size_bytes": 37520,
+    "source_path": "/home/user/mlb-dfs/data/slates/2026-09-24/DKSalaries.csv"
+   }
+  }
+ },
+ "schema_version": 1
+}
