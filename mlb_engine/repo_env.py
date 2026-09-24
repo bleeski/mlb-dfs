@@ -354,7 +354,59 @@ def host_profile(host: Optional[str] = None,
     profile["host"] = resolved
     profile["call_budget_s"] = call_budget_s(host=resolved, env=environ)
     profile["declared_ceiling_s"] = declared_ceiling_s(env=environ)
+    # R415. Resolved from the budget above, so the two cannot disagree.
+    profile["bank_candidates_per_entry"] = round(bank_candidates_per_entry(
+        budget_s=profile["call_budget_s"]), 2)
+    profile["bank_full_solve_ceiling"] = BANK_FULL_SOLVE_CEILING
     return profile
+
+
+# ---------------------------------------------------------------------------
+# The Classic sliced bank's candidate cap (R415, 2026-09-24)
+# ---------------------------------------------------------------------------
+# build_slate.py sized the sliced bank `max(n_entries * 12, 60)` on every host.
+# On Cowork's 130s the TIME budget binds before that, so "re-run and the bank
+# grows" held there; on a 630s container the CAP bound first (1905_10g: 384 of
+# 7,200 jobs, four builds, zero growth), and growing the bank had no lever.
+#
+# So the per-entry figure scales with the call budget against Cowork's, and a
+# 130s host keeps exactly the old 12. Measured on the archived 2026-06-28 11g
+# slate (38 entries, 630s container, sliced door): the bank costs a linear
+# ~0.165s per candidate, so every host spends the same share of its budget on
+# it. The ceiling is the largest bank whose FULL-bank joint MILP (the R326
+# retry a refusal runs) proved optimal inside the allocator's 30s limit: 1,572
+# candidates in 19.8s; 3,052 hit the limit at gap 3.2%. The certify-path solve
+# never binds, because the prefilter hands it at most 6 per entry.
+BANK_CANDIDATES_PER_ENTRY_REFERENCE = 12
+BANK_MIN_CANDIDATES = 60
+BANK_REFERENCE_BUDGET_S = float(HOST_PROFILES[HOST_COWORK]["call_budget_s"])
+BANK_FULL_SOLVE_CEILING = 1536
+
+
+def bank_candidates_per_entry(budget_s: Optional[float] = None,
+                              host: Optional[str] = None,
+                              env: Optional[Dict[str, str]] = None) -> float:
+    """Candidates per reserved entry the sliced bank may hold on this host.
+
+    Twelve at Cowork's 130s, scaled linearly with ``call_budget_s`` above it
+    and never below twelve: a smaller budget is already bounded by its clock.
+    """
+    budget = call_budget_s(explicit=budget_s, host=host, env=env)
+    return BANK_CANDIDATES_PER_ENTRY_REFERENCE * max(
+        1.0, budget / BANK_REFERENCE_BUDGET_S)
+
+
+def bank_max_candidates(n_entries: int, budget_s: Optional[float] = None,
+                        host: Optional[str] = None,
+                        env: Optional[Dict[str, str]] = None) -> int:
+    """The sliced bank's host-default candidate cap for ``n_entries``.
+
+    Floored at 60 as before, and clamped to ``BANK_FULL_SOLVE_CEILING``. Pass
+    ``budget_s`` for a host-independent answer (the golden replay does).
+    """
+    per_entry = bank_candidates_per_entry(budget_s=budget_s, host=host, env=env)
+    return max(BANK_MIN_CANDIDATES,
+               min(int(int(n_entries) * per_entry), BANK_FULL_SOLVE_CEILING))
 
 
 def call_budget_source(explicit: Optional[float] = None,

@@ -26,7 +26,7 @@ Every diagnostic, prior, screen, plan, and scan is a deterministic review proxy 
 
 ## Autonomy (Ben, 2026-08-16 and 2026-09-22; R157, R272, R288, R386)
 Use your judgment to override, relax, and constrain without asking, then poke holes in the result. Ask only for a fact only Ben has. A progress report is not a stop: when the next step needs nothing from Ben, take it and put the status note in the same message. Delegated:
-- Grow the bank, always: search effort, not strategy, and the first remedy for every refusal against an unexhausted job list.
+- Grow the bank, always: search effort, not strategy, and the first remedy for every refusal against an unexhausted job list. `bank_stop_reason` names the lever: re-run on `time_budget`, raise `--bank-max-candidates` on `candidate_cap` (R415).
 - Apply a feasibility remedy the engine named in `STRUCTURAL_FEASIBILITY_CHECKS`, to the named value.
 - Override a pool blocker you classified benign AND assert `lineup_gate_passed` on the same evidence; both or neither (R133).
 - Choose postures, stack plans, the frontier position, and `--max-opposing-hitters-per-sp` (a convention, not a DK rule; R288). Record the value and reason in the brief.

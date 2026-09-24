@@ -2,6 +2,131 @@
 
 What changed in the engine, the tools and the contracts, when, and why.
 
+## 2026-09-24 — R415: the Classic candidate bank is growable on every host. The sliced bank's cap comes from the host's call budget, `--bank-max-candidates` overrides it, `bank_stop_reason` says whether the cap or the clock stopped the bank, and autobuild raises a capped refusal's cap (roadmap Session 102; R204's ceiling wording)
+
+**Scope.**
+- `mlb_engine/repo_env.py`: `bank_candidates_per_entry`, `bank_max_candidates`, `BANK_CANDIDATES_PER_ENTRY_REFERENCE`, `BANK_MIN_CANDIDATES`, `BANK_REFERENCE_BUDGET_S`, `BANK_FULL_SOLVE_CEILING`, and two fields on `host_profile()`.
+- `mlb_engine/optimize/bank_cache.py`: `extend_bank` reports `stop_reason` and `max_candidates`.
+- `skills/generate-lineups/scripts/build_slate.py`:
+  - `--bank-max-candidates`, `_positive_int`, `resolve_bank_cap`, `BANK_STOP_REASON_ORDER`, `bank_stop_reason`, `bank_resume_warranted`, `bank_growth_lever`;
+  - the merge's `bank_stop_reason` and a per-slice `stop_reason`;
+  - `bank_cap`, `candidates_to_allocator` and `strategy_reason` on the brief;
+  - the refusal's `bank_exploration` fields and `solve_strategy`;
+  - the direct-door BANK line, the typed remedy, and `infeasibility_hint`.
+- `mlb_engine/allocate/contest_allocator.py`: the grow-the-bank sentence only.
+- `tools/autobuild.py`: `refusal_bank_report`, `next_bank_cap`, `--bank-max-candidates`, `raise_bank_cap`, `bank_at_ceiling`, the direct-door switch, and the resume state.
+- `tools/late_swap.py`: the bank line prints `stopped:`.
+- Tests: `tests/test_core.py` (`BankCapGrowthTests`, `AutobuildBankCapTests`), `tests/test_golden_replay.py`, `tests/test_greenfield_regressions.py`, and the pin in `tools/audit.py`.
+- Docs: `skills/generate-lineups/SKILL.md`, `CLAUDE.md` (the Grow-the-bank line), `docs/hosts.md`, `docs/backlog.md`, `docs/ROADMAP.md`.
+- The retired fragment `docs/backlog_inbox/2026-09-23_BUILD_bank-cap-12-per-entry.md`.
+- `data/agent_runs/2026-09-24/`.
+
+**What was wrong, verified at a9de1d0.** A `dfs-premise` run checked the fragment; I re-ran its sharpest greps by hand.
+- `build_slate.py` L3045 set `_total_max = max(n_entries * 12, 60)`. It was the only writer, and no flag, `controls_override` key, host field or env var reached it.
+- `extend_bank` broke on `len(cache) >= max_candidates` (L953), and `len` counts the whole cache. So once a cache reached the cap, a re-run broke before its first job.
+- The cap break and the clock break both set `job_list_exhausted: False`, and nothing told them apart. Five places prescribed a re-run that could not grow a capped bank:
+  - exit 10;
+  - the typed `grow_bank` remedy;
+  - `infeasibility_hint`;
+  - the allocator's "FIRST REMEDY, grow the bank ... Re-run the same build command";
+  - autobuild's grow_bank.
+- On a pair-thin capped bank, exit 10 was a loop.
+- 1905_10g, 2026-09-23: four builds stopped at exactly 384 = 32 x 12 with about 440 of 7,200 jobs attempted, on a 630s host.
+- The fragment was unscoped in two places:
+  - The R406 sleeves are relative caps (`len(cache) + need`), so they can still add candidates on a re-run.
+  - The fragment's bank seconds are the last slice's `elapsed_s`, not the bank's.
+- This is the open ceiling half of R204 (Session 16).
+
+**Measured before choosing the default.**
+- Slate: archived 2026-06-28, 11 games, 38 entries in 5 contests. Entries blanked, a confirmed feed synthesized from the salary file, dates shifted to tomorrow.
+- Run in a scratch worktree on this cloud container (630s budget), with the sliced door forced, the default 600s window, and `PYTHONHASHSEED=0`. Every build certified.
+- The last three columns are deterministic review proxies from `tools/qa_portfolio.py`, not outcome estimates.
+
+| cap | bank wall | candidates | certify-path joint MILP (prefilter kept) | full-bank joint MILP (R326 retry path) | apex mean | washout proxy | distinct stacks |
+|---|---|---|---|---|---|---|---|
+| 384 | 67.9s | 404 | 3.0s optimal (289) | 3.0s optimal (420) | 161.71 | 34% (SP) | 17 |
+| 768 | 130.5s | 788 | 1.8s optimal (310) | 6.1s optimal (804) | 162.01 | 34% (SP) | 17 |
+| 1,536 | 252.4s | 1,556 | 4.8s optimal (320) | 19.8s optimal (1,572) | 162.01 | 34% (SP) | 17 |
+| 3,000 | 419.6s, time-bound at 2,564 | 2,564 | 13.1s optimal (324) | 37.1s, time_limit at gap 3.2% (3,052) | 162.43 | 42% (game) | 17 |
+
+What the table says:
+- The bank costs a linear ~0.165s per candidate. A 600s window binds at about 2,550.
+- The certify-path MILP never binds, because the prefilter keeps about 6 per entry.
+- The full-bank solve a refusal's R326 retry runs proves optimality at 1,572 and stops finishing inside its 30s limit by 3,052. **1,536 is the largest measured bank that finishes, and it is the ceiling.**
+- The proxies plateau from 768, and the washout proxy is worse at 2,564. A bigger bank buys refusal-remedy headroom, not apex.
+
+**What shipped.**
+- *The cap.* `repo_env.bank_max_candidates(n)` is `max(60, min(int(n x 12 x max(1, budget/130)), 1536))`.
+  - The 12 and the 60 are the old literals.
+  - The 130 is the Cowork profile's budget, so Cowork and unknown hosts keep exactly `max(n * 12, 60)` up to 128 entries (384 at 32). A budget under 130 keeps 12, because its clock already binds.
+  - A 630s container gets 58.15 per entry, which reaches 1,536 at 27 entries. The 1905_10g build goes 384 -> 1,536.
+  - Windows' 540s profile gets 49.85 per entry.
+  - At 129+ entries Cowork's default is now 1,536, not 12n. Its clock bound far below that on every measured slate.
+- *Every bank stop has a reason.* `extend_bank` reports `stop_reason`:
+  - `candidate_cap` or `time_budget` when that break fired;
+  - `job_list_exhausted`;
+  - `jobs_retryable` when the walk reached the list's end with raised, timed-out or unanswered jobs, which a re-run retries. It is a fourth value because folding it into the other three would mislabel it.
+
+  The merge resolves `bank_stop_reason` over the ordinary and consensus slices in that order of precedence. The brief carries `solve.bank_stop_reason`, `solve.bank_cap` (value, source, host default, host, call budget, per-entry figure, ceiling, at_ceiling), `solve.strategy_reason`, and `candidates_to_allocator` beside `total_candidates` and `jobs_attempted/jobs_total`. The refusal's `bank_exploration` carries the same three facts.
+- *The override is a flag, not a `controls_override` key.* That dict is the portfolio controls `run_slate` merges and records as S-class strategy in `control_provenance`, while this is search effort. Autobuild's "supervisor-owned flags win" rule then covers it with no R214 merge.
+  - `--bank-max-candidates N` is a positive int, honored as given, recorded as `operator_flag`.
+  - Naming it selects the sliced door, the only one whose bank it sizes.
+- *No exit-10 loop.* `bank_resume_warranted` refuses exit 10 when the slices stopped at the cap. The build solves on the bank it has and prints `BANK AT ITS CAP`.
+- *Every grow remedy names its lever* (`bank_growth_lever`): re-run on the clock, raise `--bank-max-candidates` at the cap, "at its ceiling" at 1,536. That covers the typed remedy, its `REMEDY:` line, `infeasibility_hint`, and the allocator's sentence, whose clock branch is byte-identical to before.
+- *autobuild.*
+  - It reads a refusal's bank from `solve.bank`, then `bank_exploration` (`refusal_bank_report`). The exit-3 refusal brief has no `solve`, so the refusal-path grow_bank read `{}` on every real refusal and never fired outside a test that faked `solve.bank`. That was a dead branch in production, found building this.
+  - A capped refusal records `raise_bank_cap` (from, to, source), doubling to the ceiling. At the ceiling it records `bank_at_ceiling` and falls through to the structural checks.
+  - A clock-bound refusal stays `grow_bank`.
+  - `--bank-max-candidates` is forwarded and recorded as `operator_bank_max_candidates`. The cap persists in the decision log and `--resume` restores it.
+- *The direct door.* At autobuild's 105s the 06-28 fixture took the direct door and refused BANK-LIMITED: 32 sampled SP pairs of 220 viable. That door's auto-bank is rebuilt on every call and cannot grow.
+  - The refusal now records `solve_strategy`.
+  - build_slate prints a `BANK:` line naming the flag.
+  - autobuild moves the next attempt to the sliced bank at the host default, once, recorded as `raise_bank_cap` with `from_door: direct`.
+  - Not yet observed end to end. Live on this fixture, autobuild's first attempt was killed at its 195s child wall before it wrote a brief, so there was nothing to act on. That is R416; the switch is pinned by `AutobuildBankCapTests`.
+- *Late swap is unchanged in kind.* It has no candidate cap; its 398-of-3,240 stop on 1905_10g was its `--budget 30.0` clock. Its bank line now prints `stopped: <reason>`.
+- *Showdown is unchanged.* It sizes its bank at `n_entries` (`showdown.py`) and shares no cap.
+- *Determinism.* The cap enters no digest or key and `VERSION` is unchanged, so existing caches load and resume. The job order is unchanged and a cap truncates it in order.
+
+**Verified on the real code** (the same fixture, worktree synced, no measurement patch):
+- `--bank-max-candidates 384`: `bank_stop_reason: candidate_cap`, cap 384 from `operator_flag`, host default 1,536, `strategy_reason: operator --bank-max-candidates`. Certified.
+- The same command again: 0 built in both slices, `candidate_cap`, and the sleeves added 20, as the premise run predicted.
+- `--bank-max-candidates 768`: +152 and +192, total 768. Certified.
+
+**R233, every site that prints a grow-the-bank remedy.** `grep -rnEi "grow the bank|GROW THE BANK|grow_bank" --include=*.py --include=*.md mlb_engine skills tools CLAUDE.md` returns 21 lines in six files.
+- Changed to name the lever:
+  - CA L1249;
+  - BS L847/861/866 (the typed remedy and its formatter);
+  - BS L1141/1161/1222 (`bank_growth_lever`, `infeasibility_hint`);
+  - AB L931/958/984;
+  - SKILL.md L184;
+  - CLAUDE.md L29.
+- Kept, with the reason:
+  - CA L813/L847 are the BANK-LIMITED findings. They state that the slate has more than the bank sampled, and the remedy line beside them names the lever.
+  - CA L3418 is a late-swap pin finding.
+  - CA L9 is the module docstring.
+  - late_swap L378 and SKILL.md L1433 name `--budget`, which is late swap's real lever.
+  - AB L417/L1089 and BS L3722 are comments.
+
+**Tests.**
+- Fourteen new tests: nine `BankCapGrowthTests` and five `AutobuildBankCapTests`.
+- Nineteen hand mutations each went red, and each was restored byte for byte: the scaling, the 12 floor, the ceiling clamp, the override, the flag door, the cap stop, the merge, the exit-10 gate, both lever texts, the refusal read, the raise, its clamp, the resume, the forward, the direct-door branch, its once-only guard, its BANK-LIMITED test, and the refusal's door key.
+- R374's regex test pins the new source and the Cowork identity.
+- The golden replay calls `bank_max_candidates(n, budget_s=130)`, which is the same 216 at 18 entries, so it stays host-independent. It passes 9/9 against its frozen baseline, and the histogram did not move.
+- `test_core` pin: 1589 -> 1603. Gate: `PASS  v2.26.0  43 modules  2606 tests  5 skipped  {test_core 1603/1603 (4 skipped) skipped_in_place; test_showdown 337/337 (1 skipped) skipped_in_place}  [tests.test_core ran its pinned 1603 but 4 were SKIPPED, so the count proves nothing about coverage.; tests.test_showdown ran its pinned 337 but 1 were SKIPPED, so the count proves nothing about coverage.]` (the five skips are the absent optional files every host lacks).
+
+**Found and filed.**
+- R416 (Session 103): on the direct door, R407's confidence re-solve rebuilds `run_slate`'s auto-bank with a second full window, because `run_bank_budget` is computed once before the first `_solve`. The 06-28 fixture at the default 600s ran past 17 minutes before I killed it. At autobuild's 105s it ran 219s standalone, and under autobuild it died at 195s with no brief. It is the direct-door blocker for 10+ game slates.
+- R204's remaining half (the last slice's solve time beside its coverage) stays in Session 16.
+- Named, not fixed: the constants still sized for Cowork's 130s:
+  - `extend_bank`'s `time_budget_s=30.0` default;
+  - `optimizer_v3.SOLVER_TIME_LIMIT_S=30.0`;
+  - the allocator's `time_limit` 30 (L1929, L3028, L3879);
+  - `late_swap --budget 30.0`;
+  - autobuild's `PER_BUILD_FLOOR_S=20` and divisor 6 (105s per attempt here);
+  - build_slate's `UNRESOLVED_MAX_SECONDS_S=100.0`, `BANK_BUDGET_FLOOR_S=5.0` and `remaining - 8.0`;
+  - the direct-door sleeve budget (`max(10.0, …)`, else 60.0);
+  - `DEFAULT_CANDIDATE_BANK_CAP=150`.
+
 ## 2026-09-23 — R393(b): the last usable artifact. A run result carries its best essential-valid export, build_slate presents the file before any narrative, and exit 7 means "delivered a prior valid artifact after a later failure" (roadmap Session 08, with R297(c))
 
 **Scope.** `mlb_engine/pipeline/execution_pipeline.py` (`artifact_label`, `usable_artifact`, `artifact_record`, `_attachable`, `last_usable_artifact` on both certified returns and popped from a refused deferred promotion, `run_slate`'s guarded report-field tail, its skipped mirror when that tail failed and the artifact's `certification_label`, `mirror_to_outputs`'s `manifest_error`), `mlb_engine/entries/dk_entries_manager.py` (`POST_EXPORT_GATES`, `essential_post_export_gates`, `derive_essential_validity`, `entry_coverage`), `mlb_engine/pipeline/build_state_manager.py` (`read_run_manifest`), `skills/generate-lineups/scripts/build_slate.py` (`_LAST_USABLE`, `EXIT_DELIVERED_AFTER_FAILURE`, `has_deliverable`, `later_failures`, `note_last_usable`, `classic_artifact_record`, `_fallback_artifact_record`, `_deliver_after_exception`, `_argv_date`, exit 7 in `run_classic`, `run_showdown` and `_main_recording_refusals`, `REFUSAL_EXIT_NOTES[7]`, the module docstring), `tools/autobuild.py` (`BUILD_SLATE_CONTRACT_CODES`, the code-7 branch, the final return, the docstring), `tools/build_asserted.py` (its exit door), `skills/generate-lineups/SKILL.md` (both exit sentences, +1 line), `.claude/rules/skills.md` (that line count), `tests/test_core.py` (`LastUsableArtifactTests` 29, `SupervisorLostWindowTests` +2, the AST contract test reads `_deliver_after_exception`, R298(b)'s mirror test 0 -> 7), `tools/audit.py` (one pin, two moves), `docs/backlog.md` (R393's (b) rider, R414 filed, a rider on R401), `docs/ROADMAP.md` (row 08 Complete, NEXT Session 09, the Session 101 row, the ledger row, Sessions 07 and 100 backfilled), `CHANGELOG.md`.

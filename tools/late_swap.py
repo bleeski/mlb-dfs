@@ -765,9 +765,12 @@ def main() -> int:
     # locked players need candidates built against those exact pins and against the
     # excluded-new-teams rule, or the allocator reports "no compatible candidate".
     report = extend_bank(cache, projections, time_budget_s=_slice_budget())
+    # R415. Why the slice stopped. Late swap has no candidate cap, so this reads
+    # time_budget (raise --budget; the cache resumes) or the list's end.
     print(f"bank after the general slice: {report['total_candidates']} candidates "
           f"(+{report['built_this_slice']} this slice, "
-          f"{report['jobs_attempted']}/{report['jobs_total']} jobs)")
+          f"{report['jobs_attempted']}/{report['jobs_total']} jobs, "
+          f"stopped: {report.get('stop_reason')})")
     if report["superseded_jobs_dropped"]:
         # R101: post-split this can only mean the PROJECTIONS moved since the
         # cache was written, or the file predates the conditions index. Either

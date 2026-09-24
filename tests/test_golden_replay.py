@@ -506,7 +506,11 @@ class GoldenProductionReplayTests(unittest.TestCase):
             _rows = parse_dk_entry_rows(str(cls.entries_csv))
             _postures = _resolve_contest_postures(_rows, PRODUCTION_POSTURES, None)
             _n = len(_rows)
-            _total_max = max(_n * 12, 60)
+            # R415. build_slate's cap now comes from the host; the golden pins
+            # Cowork's 130s budget so it is the same on every host, and that is
+            # exactly the `max(_n * 12, 60)` this line used to spell out.
+            from mlb_engine.repo_env import BANK_REFERENCE_BUDGET_S, bank_max_candidates
+            _total_max = bank_max_candidates(_n, budget_s=BANK_REFERENCE_BUDGET_S)
             consensus_request = resolve_consensus_limited_request(
                 _merged_controls_for_build(_postures, None), _n, _total_max)
             assert consensus_request["active"], consensus_request

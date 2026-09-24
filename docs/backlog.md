@@ -3799,6 +3799,41 @@ for anything retrospective; forward-going, the snapshots are the record.
 
 ## Workstream 4 — Solver, allocator, swap, and brief truth
 
+### R416. On the direct door, R407's confidence re-solve rebuilds `run_slate`'s auto-bank with a second full window, and one 11-game build ran past 17 minutes against `--max-seconds 600` (P1, V) | new 2026-09-24, found measuring R415 on the archived 2026-06-28 11g slate, cloud container
+
+- **What:** with the default `--max-seconds` (600s on a 630s host), `build_slate.py` chose the DIRECT door for the 06-28 fixture (38 entries), because `projected_direct <= remaining`.
+  - The first `run_slate` call built its own auto-bank (`build_diverse_candidate_bank`, 220 candidates after sleeves) for about 10 minutes: the build started at 01:33Z and its run directory appeared at 01:43Z.
+  - Its joint MILP proved infeasible, and R407 relaxed the confidence tightening and called `_solve` again.
+  - That second call rebuilt the auto-bank from scratch. py-spy put it in `build_diverse_candidate_bank` -> `build_single_lineup` at 18 CPU-minutes, and the build was killed.
+- **Mechanism, read from the code and from one run:**
+  - `run_bank_budget` is computed ONCE, before the first `_solve` (`build_slate.py`, `max(deadline - now - 6.0, BANK_BUDGET_FLOOR_S)`), and every `_solve` passes it. So each re-solve's bank gets the whole window again.
+  - `candidates_override` is None on the direct door, so each call builds a new bank.
+  - `projected_direct` did not predict a 10-minute bank.
+- **Second reading, the same day:**
+  - At `--max-seconds 105`, autobuild's per-attempt window, the same slate took the direct door, fired the R407 re-solve, and ran 219s, twice its window.
+  - Under autobuild the child was killed at its 195s wall with no brief, so no lever could act on the refusal. That includes R415's direct-door switch.
+  - This is the direct-door blocker for 10+ game slates under autobuild.
+- **Unverified:** whether the first bank ran its full budget or overran it.
+- **Fix, for DEV to verify first:**
+  - Recompute the bank budget from the deadline inside `_solve`.
+  - Or reuse the first call's candidates on the R407 re-solve, which is the same slate under the same projections.
+  - And check `projected_direct` against a measured direct bank on a 10+ game slate.
+- **Related:** R415 made a BANK-LIMITED refusal on this door switch autobuild to the sliced bank. That fixes the growth lever, not the clock.
+
+### R415. CLOSED 2026-09-24 -- SHIPPED, filed and landed in one commit (roadmap Session 102), entry in CHANGELOG.md
+
+The Classic sliced bank's cap was the literal `max(n_entries * 12, 60)`, and `extend_bank` stopped when the whole cache reached it. A re-run could not grow a capped bank. The cap break and the clock break both read `job_list_exhausted: False`, so every grow-the-bank remedy prescribed a re-run that added nothing. On 1905_10g a 630s host stopped at exactly 384 = 32 x 12, four times.
+
+What shipped:
+- The cap now comes from `repo_env.bank_max_candidates`: 12 per entry at Cowork's 130s, scaled with the call budget, clamped to a measured full-solve ceiling of 1,536.
+- `--bank-max-candidates` overrides it, recorded with its source.
+- `bank_stop_reason` is on the brief.
+- Exit 10 no longer loops at the cap.
+- autobuild raises the cap on a capped refusal, and reads the refusal brief's `bank_exploration`: its refusal-path grow_bank had been dead in production.
+- A BANK-LIMITED refusal on the direct door switches to the sliced bank.
+
+Measured on the archived 06-28 11g slate before the default was chosen. Gate: see the CHANGELOG entry.
+
 ### R345. CLOSED 2026-09-23 -- SHIPPED as roadmap Session 07 (c), entry migrated to CHANGELOG.md
 
 `--declare-pitcher` already reached the build through `--passthrough`; the gap
@@ -5120,6 +5155,12 @@ before supervisor-owned flags. `autobuild.py` had zero tests and has seven.
   open.
 
 ### R204. "Grow the bank" is unbounded advice against a solve cost that is not, and the diffuse-infeasibility message names no set (P2, S) | new 2026-08-23, merged from BUILD fragment `2026-08-19_BUILD_pitchhand-missing-and-bank-solve-ceiling.md` item 2; measured on the 1835_9g slate
+
+**Rider 2026-09-24 (R415, Session 102): the "bank at its ceiling" wording SHIPPED.**
+- A capped bank now reads `bank_stop_reason: candidate_cap`, and every grow-the-bank site names the lever: re-run on `time_budget`, raise `--bank-max-candidates` on `candidate_cap`, "at its ceiling" at the measured 1,536. The sites are the allocator's line, `infeasibility_hint`, the typed remedy and SKILL.md.
+- autobuild stops raising at that ceiling and falls through to the control remedies.
+- The ceiling is the largest bank whose full-bank joint MILP proved optimal inside the allocator's 30s: 1,572 in 19.8s on 06-28 11g. At 3,052 it hit the limit at gap 3.2%.
+- Open: pricing the curve for the caller (the last slice's solve time beside its coverage), Session 16 (b).
 
 **Rider 2026-09-23 (Session 07): the naming half SHIPPED with R207.** On the interaction refusal the probe names the single controls that restore feasibility, and each failing check's remedy is typed (`remedy_typed`); see R207's CHANGELOG entry. Open: the ceiling half, Session 16.
 
