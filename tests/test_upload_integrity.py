@@ -5278,6 +5278,32 @@ class GateAssumptionVersusOverrideTests(unittest.TestCase):
         self.assertIn('"gates_assumption_refused": gates_assumption_refused', src)
         self.assertIn("resolve_gate_assertions(", src)
 
+    def test_a_refused_assumption_is_never_reclassified_into_review_grade(self):
+        """R388(d). The review-grade lifecycle reads the gates AFTER this
+        resolver, so it cannot widen what an assumption does: a refused
+        assumption against a derived-False V gate still fails as V and blocks
+        the file, while an honoured assumption is simply a passing gate."""
+        from mlb_engine.pipeline import execution_pipeline as epi
+        from mlb_engine.entries.dk_entries_manager import (
+            classify_export_failures, validate_upload_ready_gates)
+        defaults = {"salary_gate_passed": False, "entry_grid_gate_passed": True,
+                    "lineup_gate_passed": True, "pitcher_audit_gate_passed": True,
+                    "weather_gate_passed": True, "odds_gate_passed": None,
+                    "projection_schema_gate_passed": True,
+                    "optimizer_gate_passed": True, "selection_certified": True}
+        gates, assumed, _over, refused = epi.resolve_gate_assertions(
+            defaults, {}, ["salary_gate_passed", "odds_gate_passed"], defaults, {})
+        self.assertEqual([r["gate"] for r in refused], ["salary_gate_passed"])
+        self.assertEqual(assumed, ["odds_gate_passed"])
+        pre = validate_upload_ready_gates(gates, allocation_required=False)
+        ok = {"passed": True, "errors": []}
+        verdict = classify_export_failures(
+            pre=pre, template=ok, reconciliation=ok,
+            candidate_validation={"errors": [], "portfolio_errors": []}, delta=ok)
+        self.assertEqual(verdict["failing_gates"], ["salary_gate_passed"])
+        self.assertFalse(verdict["review_grade"])
+        self.assertEqual(verdict["blocking"][0]["counts_as"], "V")
+
 
 class IgnorePoolBlockersIsHonestTests(unittest.TestCase):
     """R133(4), the other half. The flag is documented as "build anyway and have

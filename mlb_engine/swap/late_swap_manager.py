@@ -17,11 +17,14 @@ v1.3 fail-closed changes:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
-from mlb_engine.pipeline.build_state_manager import get_latest_promoted_run, verify_run_bundle
+from mlb_engine.pipeline.build_state_manager import (
+    get_latest_promoted_run, read_run_manifest, sha256_file, verify_run_bundle,
+)
 from mlb_engine.entries.dk_entries_manager import ROSTER_SLOTS, parse_dk_entry_rows
 
 VERSION = "v1.4"
@@ -260,6 +263,150 @@ def load_latest_valid_parent_run(runs_root: str | Path) -> Dict[str, Any]:
         )
     latest["verification"] = verification
     return latest
+
+
+class ParentLineageError(ValueError):
+    """R268(b). The entries file matches no run's export under the runs root."""
+
+
+#: R268(b). The runs a late swap may take as its parent, strongest first. A
+#: file matching several is attributed to the strongest, then the newest.
+PARENT_KINDS = ("latest_promoted", "promoted", "certified_unpromoted", "review_grade")
+
+
+def _export_sha(manifest: Mapping[str, Any], role: str) -> str:
+    for record in (manifest.get("artifacts") or {}).values():
+        if record.get("role") == role:
+            return str(record.get("sha256") or "")
+    return ""
+
+
+def _parent_kind(run_dir: Path, manifest: Mapping[str, Any], sha: str) -> Tuple[Optional[str], str]:
+    """(kind, why-not) for one run against the file's sha256."""
+    if sha and _export_sha(manifest, "dk_export") == sha:
+        if manifest.get("status") == "promoted":
+            return "promoted", ""
+        if (manifest.get("certification") or {}).get("workflow_valid") is True:
+            return "certified_unpromoted", ""
+        return None, f"run {manifest.get('run_id')}'s export did not certify"
+    if sha and _export_sha(manifest, "candidate_export") == sha:
+        try:
+            diagnostics = json.loads((Path(run_dir) / "final" / "diagnostics.json")
+                                     .read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            diagnostics = {}
+        export = diagnostics.get("review_grade_export")
+        if isinstance(export, Mapping) and export.get("sha256") == sha:
+            return "review_grade", ""
+        return None, (f"run {manifest.get('run_id')}'s candidate is not a review-grade "
+                      f"export (it failed a V gate or an unplaced check, or the run "
+                      f"was a refused swap or crashed), so it is not a parent")
+    return None, ""
+
+
+def resolve_parent_run(runs_root: str | Path, entries_csv: str | Path, *,
+                       allow_parent_mismatch: bool = False) -> Dict[str, Any]:
+    """R268(b). The run the entries file came from, by its exact bytes.
+
+    The latest-run pointer is one global file, so once any later run is
+    promoted -- the normal state during a repair sequence, or on a day with two
+    slates -- it no longer names the parent of a file already delivered, and
+    `--allow-parent-mismatch` became reflexive. The order is:
+
+    1. With a pointer, its run is loaded and its whole bundle verified first,
+       exactly as `load_latest_valid_parent_run` does (a tampered pointer run
+       raises RuntimeError), and a file matching its export is its child.
+    2. Otherwise every ``runs_root/*/manifest.json`` is read, newest first, and
+       the file is matched by sha256 against a promoted run's export, a
+       certified-but-unpromoted run's export (a deferred or crashed-after-
+       certification run), or a blocked run's candidate that recorded a
+       ``review_grade_export`` (R388(d)). A V-failing candidate is never a
+       parent. The chosen run's bundle is verified too.
+    3. A file matching no run is the hard error, `ParentLineageError`, unless
+       ``allow_parent_mismatch``: then the latest promoted run is the parent,
+       as before, and the mismatch is on the record.
+
+    Returns the parent dict ``load_latest_valid_parent_run`` returned, plus
+    ``parent_resolution`` (one of `PARENT_KINDS`, or ``mismatch_allowed``),
+    ``parent_export_sha256``, ``current_entries_sha256``,
+    ``current_matches_parent_export``, ``latest_promoted_run_id`` and
+    ``runs_checked``.
+    """
+    root = Path(runs_root)
+    sha = sha256_file(entries_csv)
+    latest = get_latest_promoted_run(root)
+    latest_id = None
+    if latest is not None:
+        latest_id = latest["manifest"].get("run_id")
+        verification = verify_run_bundle(latest["run_dir"])
+        if not verification["passed"]:
+            raise RuntimeError(
+                f"promoted parent run {latest_id} failed integrity "
+                f"verification: {verification['errors']}"
+            )
+        latest["verification"] = verification
+        if _export_sha(latest["manifest"], "dk_export") == sha:
+            return {**latest, "parent_resolution": "latest_promoted",
+                    "parent_export_sha256": sha, "current_entries_sha256": sha,
+                    "current_matches_parent_export": True,
+                    "latest_promoted_run_id": latest_id, "runs_checked": 1}
+
+    found: Dict[str, Dict[str, Any]] = {}
+    refused: List[str] = []
+    checked = unreadable = 0
+    dirs = sorted((p for p in root.iterdir() if p.is_dir()), key=lambda p: p.name,
+                  reverse=True) if root.is_dir() else []
+    for run_dir in dirs:
+        if not (run_dir / "manifest.json").exists():
+            continue
+        try:
+            manifest = read_run_manifest(run_dir)
+        except Exception:  # noqa: BLE001 - one unreadable run never hides the rest
+            unreadable += 1
+            continue
+        checked += 1
+        if latest_id and manifest.get("run_id") == latest_id:
+            continue
+        kind, why = _parent_kind(run_dir, manifest, sha)
+        if kind and kind not in found:
+            found[kind] = {"run_dir": str(run_dir), "manifest": manifest}
+        elif why:
+            refused.append(why)
+    for kind in PARENT_KINDS:
+        if kind in found:
+            parent = found[kind]
+            verification = verify_run_bundle(parent["run_dir"])
+            if not verification["passed"]:
+                raise RuntimeError(
+                    f"parent run {parent['manifest'].get('run_id')} ({kind}) failed "
+                    f"integrity verification: {verification['errors']}")
+            return {**parent, "verification": verification,
+                    "parent_resolution": kind, "parent_export_sha256": sha,
+                    "current_entries_sha256": sha,
+                    "current_matches_parent_export": True,
+                    "latest_promoted_run_id": latest_id,
+                    "runs_checked": checked}
+
+    if allow_parent_mismatch:
+        if latest is None:
+            raise FileNotFoundError(
+                f"no promoted parent run found, and the entries file matches no "
+                f"run's export under {root} ({checked} checked)")
+        return {**latest, "parent_resolution": "mismatch_allowed",
+                "parent_export_sha256": _export_sha(latest["manifest"], "dk_export"),
+                "current_entries_sha256": sha,
+                "current_matches_parent_export": False,
+                "latest_promoted_run_id": latest_id, "runs_checked": checked}
+    detail = "; ".join(sorted(set(refused)))
+    raise ParentLineageError(
+        f"late swap parent mismatch: the entries file matches no run's export "
+        f"under {root} ({checked} run(s) checked"
+        + (f", {unreadable} unreadable" if unreadable else "") + ")"
+        + (f"; {detail}" if detail else "")
+        + ". A hand-edited, repaired or re-downloaded file matches none. "
+        "Re-resolve the parent, or pass allow_parent_mismatch=True "
+        "(--allow-parent-mismatch on tools/late_swap.py) after reviewing the "
+        "lineage")
 
 
 def build_entry_requirements(

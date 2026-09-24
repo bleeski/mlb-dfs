@@ -9,9 +9,14 @@ Once a game starts, its players are locked. A rebuild would happily move them,
 producing a file DraftKings rejects. The swap path freezes what has locked and
 reoptimizes only what has not, against the file Ben already uploaded.
 
-The parent is the delivered export, normally `runs/<run_id>/final/DKEntries.csv`.
-The engine verifies the parent hash, so pass the real delivered file rather than a
-copy you edited.
+The parent is the delivered export: the `outputs/<date>/` file Ben uploaded, or
+`runs/<run_id>/final/DKEntries.csv`, which holds the same bytes. The engine finds
+the run by the file's sha256 (R268(b)), so pass the real delivered file rather than
+a copy you edited. The run can be the latest promotion, an earlier one, a certified
+run that never promoted, or an UNCERTIFIED build (`review_grade.md`). A file matching
+no run is refused at exit 3 before any bank slice; `--allow-parent-mismatch` is for
+that case alone. The swap inherits the portfolio controls its parent recorded
+(R268(a)), and `--rederive-controls` re-derives them from postures and floors.
 
 ## The command
 

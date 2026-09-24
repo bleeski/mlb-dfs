@@ -28565,7 +28565,8 @@ class DeliveryLabelAgreementTests(unittest.TestCase):
         self.assertEqual(ls.swap_certification({}, ["5001"]), "not_certified")
         source = (REPO / "tools" / "late_swap.py").read_text(encoding="utf-8")
         call = source[source.index("record = record_delivery("):]
-        self.assertIn("certification=swap_certification(result, downgraded)",
+        # R268(a): the parent's label bounds the swap's (`parent_label`).
+        self.assertIn("certification=swap_certification(result, downgraded, parent_label)",
                       call[:call.index("\n        )")])
 
     def test_preflight_names_a_reason_for_every_review_grade_label_written(self):
@@ -28578,7 +28579,9 @@ class DeliveryLabelAgreementTests(unittest.TestCase):
             "late_swap_tool", REPO / "tools" / "late_swap.py")
         ls = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(ls)
-        for label in ("review_grade", dg.DEADLINE_LABEL, ls.DOWNGRADE_LABEL):
+        from mlb_engine.entries.upload_manifest import UNCERTIFIED_LABEL
+        for label in ("review_grade", dg.DEADLINE_LABEL, ls.DOWNGRADE_LABEL,
+                      UNCERTIFIED_LABEL):
             self.assertIn(label, REVIEW_GRADE_REASONS)
 
 
@@ -32780,3 +32783,702 @@ class ClassicSleeveTests(unittest.TestCase):
         self.assertIn("1 entr(ies) fell back to projection", line)
         self.assertIn("not probabilities", line)
         self.assertTrue(bs.format_sleeves_line(None).startswith("not applied"))
+
+
+class ReviewGradeExportTests(unittest.TestCase):
+    """R388(d) + R124(a), roadmap Session 09: the review-grade lifecycle.
+
+    A Classic build whose only failing gates are S or P wrote a legal file and
+    then hid it at `runs/<id>/candidate/DO_NOT_UPLOAD_DKEntries.csv`, with
+    nothing in `outputs/`. Reproduced at 2e579cb through the real run_slate
+    with `odds_gate_passed` unassumed. The refusal itself must not move
+    (`passed`, `errors[]`, the blocked run), the file must never reach
+    `final/` or the pointer, and "upload-ready" stays the certified export's.
+    """
+
+    ODDS_ERRORS = ["Missing pre-export gate: odds_gate_passed"]
+
+    def setUp(self):
+        from mlb_engine.entries import upload_manifest as um
+        self.um = um
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self._original_root = um.REPO_ROOT
+        um.REPO_ROOT = self.root
+        self.addCleanup(self._restore)
+
+    def _restore(self):
+        self.um.REPO_ROOT = self._original_root
+        self.tmp.cleanup()
+
+    def _build(self, unassumed=(), label=None):
+        """DeliveryLabelAgreementTests' fixture: one reserved entry, one legal
+        five-stack, a salary file preflight passes clean. ``unassumed`` names
+        the gates this build leaves to evidence it does not have."""
+        from tests.test_upload_integrity import (
+            CLASSIC_HEADER, blank_classic_entry, write_classic_salary)
+        from tests.test_upload_integrity import write_entries as write_rows
+        salary = self.root / "DKSalaries.csv"
+        lineup = write_classic_salary(salary)
+        entries = self.root / "DKEntries.csv"
+        write_rows(entries, CLASSIC_HEADER,
+                   [blank_classic_entry("5001", "900", name="Test WTA")])
+        projections = pd.DataFrame([{
+            "Player_ID": sp.player_id, "Name": sp.name, "Team": sp.team,
+            "Opponent": sp.opponent, "Position": sp.raw["Roster Position"],
+            "Salary": sp.salary, "Game_ID": sp.game_id,
+            "Floor": 12.0 if "P" in sp.positions else 5.0,
+            "Ceiling": 25.0 if "P" in sp.positions else 12.0,
+            "Excluded": False, "Locked": False,
+        } for sp in parse_dk_salary_csv(str(salary))])
+        assume = [g for g in RunSlateFrontDoorTests.UNEVIDENCED if g not in unassumed]
+        with contextlib.redirect_stdout(io.StringIO()), \
+                contextlib.redirect_stderr(io.StringIO()):
+            result = run_slate(
+                runs_root=self.root / "runs", salary_csv=salary,
+                entries_csv=entries, projections_override=projections,
+                candidates_override=[candidate("A", lineup, 100)],
+                portfolio_controls_override=dict(RunSlateFrontDoorTests.LOOSE),
+                approve=True, assume_gates=assume, certification_label=label)
+        return salary, result
+
+    def _rows(self, date):
+        path = self.root / "outputs" / date / "upload_manifest.json"
+        return json.loads(path.read_text(encoding="utf-8"))["deliveries"]
+
+    def _preflight(self, salary, path):
+        from tests.test_upload_integrity import FIXTURE_AS_OF_BEFORE_FIRST_PITCH
+        from tools import preflight_upload
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+            code = preflight_upload.main([
+                "--entries", str(path), "--salary", str(salary),
+                "--json", "--as-of", FIXTURE_AS_OF_BEFORE_FIRST_PITCH])
+        return code, json.loads(out.getvalue())
+
+    # -- the refusal is unchanged; the file is delivered UNCERTIFIED -------- #
+
+    def test_a_p_only_refusal_is_byte_identical_and_delivers_uncertified(self):
+        _salary, result = self._build(unassumed=("odds_gate_passed",))
+        self.assertIs(result["passed"], False)
+        self.assertIs(result["workflow_valid"], False)
+        self.assertEqual(result["errors"], self.ODDS_ERRORS)
+        self.assertIsNone(result["delivered_path"])
+        self.assertNotIn("last_usable_artifact", result)
+        export = result["review_grade_export"]
+        self.assertEqual(export["label"], "review_grade_uncertified")
+        self.assertEqual(export["failing_gates"], ["odds_gate_passed"])
+        self.assertTrue(export["manifest_recorded"], export.get("manifest_error"))
+        delivered = Path(export["delivered_path"])
+        run_dir = Path(result["run_dir"])
+        self.assertEqual(delivered.parent.parent, self.root / "outputs")
+        self.assertEqual(delivered.name,
+                         f"DKEntries_1905_2g_UNCERTIFIED_{result['run_id']}.csv")
+        candidate_file = run_dir / "candidate" / "DO_NOT_UPLOAD_DKEntries.csv"
+        self.assertEqual(delivered.read_bytes(), candidate_file.read_bytes())
+        self.assertEqual(export["delivered_sha256"], sha256_file(delivered))
+        self.assertEqual(export["sha256"], sha256_file(candidate_file))
+        # Nothing reached final/, nothing was promoted, the run is blocked.
+        self.assertFalse((run_dir / "final" / "DKEntries.csv").exists())
+        self.assertFalse((self.root / "runs" / "latest_valid_run.json").exists())
+        manifest = json.loads((run_dir / "manifest.json").read_text())
+        self.assertEqual(manifest["status"], "blocked")
+        self.assertFalse(manifest["certification"]["workflow_valid"])
+        row = self._rows(delivered.parent.name)[-1]
+        self.assertEqual(row["certification"], "review_grade_uncertified")
+        self.assertEqual(row["failing_gates"], ["odds_gate_passed"])
+        from mlb_engine.entries.delivery_record import read_records
+        record = [r for r in read_records(date=delivered.parent.name)
+                  if r.get("kind") == "delivery"][-1]
+        self.assertEqual(record["manifest_row"]["certification"], "review_grade_uncertified")
+
+    def test_preflight_says_review_ready_and_names_the_gates_never_upload_ready(self):
+        salary, result = self._build(unassumed=("odds_gate_passed",))
+        code, verdict = self._preflight(salary, result["review_grade_export"]["delivered_path"])
+        self.assertEqual(code, 0, verdict.get("failures"))
+        self.assertEqual(verdict["verdict"], "review_ready")
+        self.assertNotEqual(verdict["verdict"], "upload_ready")
+        self.assertIn("R388(d)", verdict["verdict_note"])
+        self.assertIn("Failing gates: odds_gate_passed", verdict["verdict_note"])
+        self.assertNotIn("Showdown", verdict["verdict_note"])
+        date = Path(result["review_grade_export"]["delivered_path"]).parent.name
+        self.assertEqual(self._rows(date)[-1]["status"], "candidate")
+
+    def test_a_mixed_gate_with_a_v_fact_stays_do_not_upload(self):
+        """Weather is MIXED with a V fact (a known postponement); the engine
+        cannot say which fact failed, and unplaced is V."""
+        _salary, result = self._build(unassumed=("weather_gate_passed",))
+        self.assertEqual(result["errors"], ["Missing pre-export gate: weather_gate_passed"])
+        self.assertNotIn("review_grade_export", result)
+        withheld = result["review_grade_withheld"]
+        self.assertEqual([b["gate"] for b in withheld["blocking"]], ["weather_gate_passed"])
+        self.assertIn("unplaced is V", withheld["blocking"][0]["reason"])
+        self.assertFalse(list((self.root / "outputs").rglob("DKEntries*.csv")))
+
+    def test_a_certified_build_is_unchanged_and_records_its_controls(self):
+        _salary, result = self._build()
+        self.assertTrue(result["passed"], result.get("errors"))
+        self.assertNotIn("review_grade_export", result)
+        self.assertNotIn("review_grade_withheld", result)
+        diag = json.loads(Path(result["diagnostics_path"]).read_text())
+        self.assertEqual(diag["portfolio_controls"]["max_player_exposure_pct"], 1.0)
+        self.assertNotIn("player_team_by_id", diag["portfolio_controls"])
+        row = self._rows(Path(result["delivered_path"]).parent.name)[-1]
+        self.assertNotIn("failing_gates", row)
+        self.assertEqual(row["notes"], "")
+
+    def test_recorded_controls_keep_numbers_and_drop_the_id_maps(self):
+        import numpy as np
+        out = epi.recorded_controls({"b": np.int64(3), "a": np.float64(0.5),
+                                     "player_team_by_id": {"1": "AAA"},
+                                     "max_game_exposure_pct_by_game": {"9": 0.4}})
+        self.assertEqual(out, {"a": 0.5, "b": 3, "max_game_exposure_pct_by_game": {"9": 0.4}})
+        self.assertIsInstance(out["b"], int)
+
+    # -- never over a gates-passing delivery ------------------------------- #
+
+    def test_an_uncertified_build_is_never_mirrored_over_a_certified_one(self):
+        """The same bytes, too: only odds dropped, so the UNCERTIFIED rebuild
+        is byte-identical and `record_delivery`'s same-bytes merge would have
+        rewritten the certified row."""
+        _salary, certified = self._build()
+        date = Path(certified["delivered_path"]).parent.name
+        before = self._rows(date)
+        _salary, refused = self._build(unassumed=("odds_gate_passed",))
+        export = refused["review_grade_export"]
+        self.assertFalse(export["manifest_recorded"])
+        self.assertEqual(export["not_mirrored"]["certification"], "certified")
+        self.assertEqual(export["not_mirrored"]["live_delivery"],
+                         before[-1]["delivered_file"])
+        self.assertEqual(self._rows(date), before, "the certified row moved")
+        self.assertEqual(export["sha256"], before[-1]["sha256"],
+                         "the fixture no longer exercises the same-bytes case")
+
+    def test_a_certified_build_supersedes_an_uncertified_one(self):
+        _salary, refused = self._build(unassumed=("odds_gate_passed",))
+        date = Path(refused["review_grade_export"]["delivered_path"]).parent.name
+        _salary, certified = self._build()
+        rows = self._rows(date)
+        self.assertTrue(certified["passed"])
+        live = [r for r in rows if r.get("status") != "superseded"]
+        self.assertEqual([r["certification"] for r in live], ["certified"])
+        # The same bytes merge into one row, which must not keep the
+        # UNCERTIFIED row's gates beside a certified label.
+        self.assertNotIn("failing_gates", live[0])
+
+    def test_the_manifest_refuses_an_uncertified_row_over_a_passing_one(self):
+        _salary, certified = self._build()
+        date = Path(certified["delivered_path"]).parent.name
+        with self.assertRaisesRegex(ValueError, "stays the delivery"):
+            self.um.record_delivery(
+                date=date, delivered_file=self.root / "x.csv", contest_type="classic",
+                slate_tag="1905_2g", certification="review_grade_uncertified")
+        # A late swap refines the file Ben entered, which may be an UNCERTIFIED
+        # one a later certified build superseded: its row records, and is live.
+        swapped = self.root / "outputs" / date / "DKEntries_lateswap_1905_2g_x.csv"
+        write_entries(swapped)
+        row = self.um.record_delivery(
+            date=date, delivered_file=swapped, contest_type="classic",
+            slate_tag="1905_2g", certification="review_grade_uncertified",
+            refinement=True)
+        self.assertEqual(row["certification"], "review_grade_uncertified")
+        live = [r for r in self._rows(date) if r.get("status") != "superseded"]
+        self.assertEqual([r["delivered_file"] for r in live], [row["delivered_file"]])
+
+    # -- the classifier ---------------------------------------------------- #
+
+    @staticmethod
+    def _classify(pre=None, validation=None, never_relax=()):
+        from mlb_engine.entries.dk_entries_manager import classify_export_failures
+        ok = {"passed": True, "errors": []}
+        pre = pre or {"missing_gates": [], "failed_gates": [], "errors": []}
+        validation = validation or {"errors": [], "portfolio_errors": []}
+        return classify_export_failures(pre=pre, template=ok, reconciliation=ok,
+                                        candidate_validation=validation, delta=ok,
+                                        never_relax=never_relax)
+
+    def test_each_s_or_p_gate_is_placed_and_each_v_gate_blocks(self):
+        for name, ships in (("odds_gate_passed", True), ("optimizer_gate_passed", True),
+                            ("allocation_method", True), ("selection_certified", True),
+                            ("salary_gate_passed", False), ("lineup_gate_passed", False),
+                            ("allocation_certified", False),
+                            ("caller_assertion:workflow_valid", False),
+                            ("a_gate_nobody_classified", False)):
+            verdict = self._classify(pre={"missing_gates": [], "failed_gates": [name],
+                                          "errors": [f"Failed pre-export gate: {name}"]})
+            self.assertIs(verdict["review_grade"], ships, name)
+
+    def test_the_wrong_draftgroup_errors_are_v_not_caps(self):
+        """Both share the overlap check's "entries " prefix and sit in neither
+        the roster nor the cap list; only `portfolio_errors` membership is S."""
+        from mlb_engine.entries.dk_entries_manager import validate_dk_entries_file
+        empty = self.root / "empty.csv"
+        empty.write_text("Entry ID,Contest Name,Contest ID,Entry Fee,P,P,C,1B,2B,3B,SS,OF,OF,OF\n",
+                         encoding="utf-8")
+        real = validate_dk_entries_file(empty)
+        self.assertIn("entries file contains no reserved Entry IDs", real["errors"])
+        self.assertEqual(real["portfolio_errors"], [])
+        for error in ("entries file contains no reserved Entry IDs",
+                      "entries file's embedded player pool overlaps the salary file "
+                      "at 0.0% (0/40); below 80% means these are different draftgroups"):
+            verdict = self._classify(validation={"errors": [error], "portfolio_errors": [],
+                                                 "roster_legality_passed": True})
+            self.assertFalse(verdict["review_grade"], error)
+            self.assertEqual(verdict["blocking"][0]["counts_as"], "V")
+
+    def test_a_cap_breach_ships_unless_its_control_never_relaxes(self):
+        cap = {"errors": ["game 777 exposure 3>2"], "portfolio_errors": ["game 777 exposure 3>2"],
+               "roster_legality_passed": True}
+        self.assertTrue(self._classify(validation=cap)["review_grade"])
+        # The scalar is what `--never-relax` accepts; the validator only says "game G".
+        held = self._classify(validation=cap, never_relax={"max_game_exposure_pct"})
+        self.assertFalse(held["review_grade"])
+        self.assertEqual(held["blocking"][0]["never_relax_held"], ["max_game_exposure_pct"])
+        odd = {"errors": ["widget 1 over"], "portfolio_errors": ["widget 1 over"]}
+        self.assertFalse(self._classify(validation=odd)["review_grade"])
+
+    def test_an_error_no_check_claims_is_v(self):
+        verdict = self._classify(pre={"missing_gates": ["odds_gate_passed"], "failed_gates": [],
+                                      "errors": ["Missing pre-export gate: odds_gate_passed",
+                                                 "something nobody wrote down"]})
+        self.assertFalse(verdict["review_grade"])
+        self.assertEqual(verdict["blocking"][0]["gate"], "unattributed")
+
+    # -- through execute_portfolio, with the allocator faked --------------- #
+
+    GATES = {g: True for g in ("salary_gate_passed", "entry_grid_gate_passed",
+                               "lineup_gate_passed", "pitcher_audit_gate_passed",
+                               "weather_gate_passed", "odds_gate_passed",
+                               "projection_schema_gate_passed", "optimizer_gate_passed")}
+
+    def _execute(self, controls, patch=None, gates=None, never_relax=()):
+        salary = self.root / "salary.csv"
+        ids = write_salary(salary)
+        entries = self.root / "DKEntries.csv"
+        write_entries(entries)
+        r1, r2 = legal_rosters(ids)
+        real = ca.select_and_assign_entries
+
+        def loose(cands, reqs, ctl, **kw):
+            out = real(cands, reqs, {**ctl, "max_pitcher_exposure_pct": 1.0,
+                                     "max_player_exposure_pct": 1.0}, **kw)
+            return {**out, **(patch or {})}
+        reqs = [{"entry_id": "5001", "contest_id": "900", "contest_name": "Test WTA",
+                 "contest_shape": "large_wta"},
+                {"entry_id": "5002", "contest_id": "900", "contest_name": "Test WTA",
+                 "contest_shape": "large_wta"}]
+        with unittest.mock.patch.object(epi, "select_and_assign_entries", loose):
+            return run_initial_build(
+                runs_root=self.root / "runs", salary_csv=salary, entries_csv=entries,
+                projections=projection_frame(ids),
+                candidates=[candidate("A", r1, 100), candidate("B", r2, 99, "CCC")],
+                entry_requirements=reqs, workflow_gates=gates or self.GATES,
+                portfolio_controls=controls, never_relax=never_relax)
+
+    def test_an_s_cap_breach_is_review_grade_and_a_never_relax_one_is_not(self):
+        """Both lineups roster the same two SPs: a 0.5 pitcher cap (one of two
+        rows) is breached on the exact file, and DK takes it."""
+        controls = {**pipeline_controls(), "max_pitcher_exposure_pct": 0.5}
+        result = self._execute(controls)
+        self.assertFalse(result["passed"])
+        self.assertTrue(all(e.startswith("pitcher ") for e in result["errors"]), result["errors"])
+        self.assertEqual(result["review_grade_export"]["failing_gates"], ["portfolio_caps_passed"])
+        held = self._execute(controls, never_relax=("max_pitcher_exposure_pct",))
+        self.assertNotIn("review_grade_export", held)
+        self.assertEqual(held["review_grade_withheld"]["blocking"][0]["never_relax_held"],
+                         ["max_pitcher_exposure_pct"])
+
+    def test_an_off_allowlist_method_is_p_and_a_v_failure_beside_it_blocks(self):
+        result = self._execute(pipeline_controls(), patch={"allocation_method": "greedy_fallback"})
+        self.assertEqual(result["errors"], ["Failed pre-export gate: allocation_method"])
+        self.assertEqual(result["review_grade_export"]["failing_gates"], ["allocation_method"])
+        # V revalidation: every V post-export fact passed on the bytes.
+        self.assertTrue(result["review_grade_export"]["essential_valid"]["essential_valid"])
+        blocked = self._execute(pipeline_controls(), patch={"allocation_method": "greedy_fallback"},
+                                gates={**self.GATES, "salary_gate_passed": False})
+        self.assertNotIn("review_grade_export", blocked)
+
+    def test_selection_certified_false_is_not_v(self):
+        result = self._execute(pipeline_controls(), patch={"selection_certified": False})
+        self.assertEqual(result["review_grade_export"]["failing_gates"], ["selection_certified"])
+
+    def test_a_raising_verdict_leaves_the_refusal_exactly_as_it_was(self):
+        with unittest.mock.patch.object(epi, "classify_export_failures",
+                                        side_effect=RuntimeError("boom")):
+            result = self._execute(pipeline_controls(), patch={"selection_certified": False})
+        self.assertEqual(result["errors"], ["Failed pre-export gate: selection_certified"])
+        self.assertIs(result["passed"], False)
+        self.assertEqual(result["review_grade_error"], "RuntimeError: boom")
+        self.assertNotIn("crashed", result)
+
+    def test_an_export_whose_bytes_do_not_bind_is_withheld(self):
+        """Session 08's essential validity is the second half of the rule: an
+        S/P-only verdict on bytes that do not hash to the registered record is
+        withheld, because delivered byte identity is V."""
+        path = self.root / "c.csv"
+        write_entries(path)
+        ok = {"passed": True, "errors": []}
+        valid = {"errors": [], "portfolio_errors": [], "roster_legality_passed": True,
+                 "portfolio_caps_passed": True, "locked_immutability_passed": True}
+        pre = {"missing_gates": ["odds_gate_passed"], "failed_gates": [],
+               "errors": ["Missing pre-export gate: odds_gate_passed"]}
+        common = dict(mode="initial_build", run_id="r", candidate_path=path,
+                      candidate_sha256="a" * 64, pre=pre, template=ok,
+                      reconciliation=ok, candidate_validation=valid, delta=ok,
+                      never_relax=())
+        self.assertIn("review_grade_export",
+                      epi._review_grade_fields(registered_sha256="a" * 64, **common))
+        withheld = epi._review_grade_fields(registered_sha256="b" * 64, **common)
+        self.assertEqual(withheld["review_grade_withheld"]["essential_failed"],
+                         ["export_hash_binding_passed"])
+
+    def test_a_refused_swap_run_never_carries_a_review_grade_export(self):
+        self.assertEqual(epi._review_grade_fields(
+            mode="late_swap", run_id="r", candidate_path=self.root / "x",
+            candidate_sha256="", registered_sha256="", pre={}, template={},
+            reconciliation={}, candidate_validation={}, delta={}, never_relax=()), {})
+
+    # -- build_slate names and presents the file --------------------------- #
+
+    def test_the_refusal_brief_names_and_presents_the_file(self):
+        wiring = DeadlineGovernorWiringTests("test_an_illegal_refusal_is_never_governed")
+        wiring.setUp()
+        self.addCleanup(wiring.doCleanups)
+        delivered = wiring._delivered_csv()
+        export = {"label": "review_grade_uncertified", "path": "runs/r1/candidate/x.csv",
+                  "sha256": sha256_file(delivered), "delivered_path": str(delivered),
+                  "delivered_sha256": sha256_file(delivered), "manifest_recorded": True,
+                  "failing_gates": ["portfolio_caps_passed"],
+                  "coverage": {"reserved": 2, "filled": 2}}
+        refusal = dict(DeadlineGovernorWiringTests._REFUSAL, review_grade_export=export,
+                       workflow_gate_evidence={"portfolio_caps_passed": "caps evidence"})
+        code, brief, _calls, err = wiring._run(30, refusal=refusal)
+        self.assertEqual(code, 3)
+        self.assertEqual(brief["status"], "not_certified")
+        self.assertTrue(brief["review_grade_export"]["presented"])
+        self.assertEqual(brief["review_grade_export"]["path"], str(delivered))
+        self.assertIn(f"FILE  {delivered}", err)
+        self.assertIn("gate portfolio_caps_passed: caps evidence", err)
+        self.assertLess(err.index("FILE  "), err.index("gate portfolio_caps_passed"))
+        bs = RefusalClassificationTests._module()
+        _tag, facts = bs.refusal_record_facts({"brief": brief})
+        self.assertEqual(facts["review_grade_export"]["path"], str(delivered))
+
+    def test_a_later_v_refusal_still_names_the_earlier_uncertified_file(self):
+        wiring = DeadlineGovernorWiringTests("test_an_illegal_refusal_is_never_governed")
+        wiring.setUp()
+        self.addCleanup(wiring.doCleanups)
+        delivered = wiring._delivered_csv()
+        export = {"label": "review_grade_uncertified", "path": "p", "sha256": "s",
+                  "delivered_path": str(delivered), "delivered_sha256": sha256_file(delivered),
+                  "manifest_recorded": True, "failing_gates": ["portfolio_caps_passed"]}
+        first = dict(DeadlineGovernorWiringTests._REFUSAL, review_grade_export=export)
+        second = {"passed": False, "run_id": "r2", "workflow_valid": False,
+                  "errors": ["failed post-export gate: roster_legality_passed"],
+                  "feasibility": {"passed": False, "checks": []}}
+        code, brief, calls, _err = wiring._run(2, refusal=first, second_result=second)
+        self.assertEqual(len(calls), 2, "the governor did not re-solve")
+        self.assertEqual(code, 3)
+        self.assertEqual(brief["review_grade_export"]["path"], str(delivered))
+
+    def test_a_file_that_fails_the_re_read_is_not_presented(self):
+        bs = RefusalClassificationTests._module()
+        bad = self.root / "bad.csv"
+        bad.write_text("Entry ID,Contest Name,Contest ID,Entry Fee,P,P,C,1B,2B,3B,SS,OF,OF,OF\n"
+                       "5001,T,900,$1,1,,,,,,,,,\n", encoding="utf-8")
+        salary = DeadlineGovernorWiringTests._SALARY
+        with contextlib.redirect_stderr(io.StringIO()) as err:
+            record = bs.present_review_grade(
+                {"delivered_path": str(bad), "manifest_recorded": True, "label": "x"}, salary)
+        self.assertFalse(record["presented"])
+        self.assertNotIn("FILE  ", err.getvalue())
+        with contextlib.redirect_stderr(io.StringIO()):
+            withheld = bs.present_review_grade(
+                {"path": "runs/r/c.csv", "manifest_recorded": False,
+                 "not_mirrored": {"why": "a live delivery passed its gates"}}, salary)
+        self.assertFalse(withheld["presented"])
+        self.assertIsNone(withheld["path"])
+        # A row recorded beside a name never promoted: the file is still at its
+        # DO_NOT_UPLOAD_ name, which is never the FILE handed over.
+        unpromoted = self.root / "DO_NOT_UPLOAD_DKEntries_x.csv"
+        unpromoted.write_bytes(b"")
+        with contextlib.redirect_stderr(io.StringIO()) as err:
+            record = bs.present_review_grade(
+                {"delivered_path": str(unpromoted), "manifest_recorded": True,
+                 "label": "review_grade_uncertified"}, salary)
+        self.assertFalse(record["presented"])
+        self.assertIsNone(record["path"])
+        self.assertNotIn("FILE  ", err.getvalue())
+
+
+class LateSwapReviewParentTests(unittest.TestCase):
+    """R268, roadmap Session 09: a swap finds its parent by the file's bytes
+    and inherits what the parent shipped.
+
+    Reproduced at 2e579cb at `run_late_swap`: a review-grade parent raised
+    FileNotFoundError (no pointer) or the parent-mismatch ValueError; a parent
+    superseded by a later promotion raised the same ValueError; and a cap
+    re-derived tighter than the parent shipped, with most rows frozen, refused
+    with "already appears in 2 of the 2 row(s) this solve cannot change".
+    """
+
+    GATES = ReviewGradeExportTests.GATES
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.salary = self.root / "salary.csv"
+        self.ids = write_salary(self.salary)
+        self.r1, self.r2 = legal_rosters(self.ids)
+        self.r3 = self.r1[:-1] + [self.ids["CCC OF3"]]
+
+    def _entries(self, rows=2):
+        path = self.root / f"DKEntries_{rows}.csv"
+        write_entries(path, [None] * rows, contest_ids=[str(900 + i) for i in range(rows)])
+        return path
+
+    def _build(self, cands, rows=2, gates=None, controls=None, **kw):
+        reqs = [{"entry_id": str(5001 + i), "contest_id": str(900 + i),
+                 "contest_name": "Test WTA", "contest_shape": "large_wta"}
+                for i in range(rows)]
+        return run_initial_build(
+            runs_root=self.root / "runs", salary_csv=self.salary,
+            entries_csv=self._entries(rows), projections=projection_frame(self.ids),
+            candidates=cands, entry_requirements=reqs,
+            workflow_gates=gates or self.GATES,
+            portfolio_controls=controls or pipeline_controls(), **kw)
+
+    def _swap(self, current, controls=None, **kw):
+        return run_late_swap(
+            runs_root=self.root / "runs", current_entries_csv=current,
+            status_by_player_id=future_statuses(self.ids), as_of=NOW,
+            salary_csv=self.salary, projections=projection_frame(self.ids),
+            candidates=[candidate("A", self.r1, 100), candidate("B", self.r2, 99, "CCC")],
+            workflow_gates=self.GATES, portfolio_controls=controls or pipeline_controls(), **kw)
+
+    def _review_grade(self):
+        built = self._build([candidate("A", self.r1, 100), candidate("B", self.r2, 99, "CCC")],
+                            gates={**self.GATES, "odds_gate_passed": False})
+        self.assertEqual(built["errors"], ["Failed pre-export gate: odds_gate_passed"])
+        return built, Path(built["review_grade_export"]["path"])
+
+    # -- (b) which runs are a parent -------------------------------------- #
+
+    def test_a_review_grade_parent_swaps_with_no_flag_and_no_pointer(self):
+        built, path = self._review_grade()
+        self.assertFalse((self.root / "runs" / "latest_valid_run.json").exists())
+        late = self._swap(path)
+        self.assertTrue(late["passed"], late.get("errors"))
+        self.assertEqual(late["parent_run_id"], built["run_id"])
+        self.assertEqual(late["parent_resolution"], "review_grade")
+        self.assertTrue(late["current_matches_parent_export"])
+
+    def test_a_review_grade_parent_is_found_past_an_unrelated_promotion(self):
+        other = self._build([candidate("C", self.r3, 100), candidate("B", self.r2, 99, "CCC")])
+        self.assertTrue(other["passed"])
+        built, path = self._review_grade()
+        late = self._swap(path)
+        self.assertTrue(late["passed"], late.get("errors"))
+        self.assertEqual(late["parent_run_id"], built["run_id"])
+        self.assertEqual(late["latest_promoted_run_id"], other["run_id"])
+
+    def test_a_parent_superseded_by_a_later_promotion_is_still_the_parent(self):
+        a = self._build([candidate("A", self.r1, 100), candidate("B", self.r2, 99, "CCC")])
+        b = self._build([candidate("A", self.r1, 100), candidate("C", self.r3, 99)])
+        self.assertTrue(a["passed"] and b["passed"])
+        self.assertNotEqual(sha256_file(a["output_path"]), sha256_file(b["output_path"]))
+        late = self._swap(a["output_path"])
+        self.assertTrue(late["passed"], late.get("errors"))
+        self.assertEqual(late["parent_run_id"], a["run_id"])
+        self.assertEqual(late["parent_resolution"], "promoted")
+        self.assertEqual(late["latest_promoted_run_id"], b["run_id"])
+
+    def test_a_certified_unpromoted_run_is_a_parent(self):
+        deferred = self._build([candidate("A", self.r1, 100), candidate("B", self.r2, 99, "CCC")],
+                               defer_promotion=True)
+        self.assertTrue(deferred["promotion_deferred"])
+        late = self._swap(deferred["output_path"])
+        self.assertTrue(late["passed"], late.get("errors"))
+        self.assertEqual(late["parent_resolution"], "certified_unpromoted")
+
+    def test_a_file_matching_no_run_is_still_the_hard_error(self):
+        a = self._build([candidate("A", self.r1, 100), candidate("B", self.r2, 99, "CCC")])
+        edited = self.root / "edited.csv"
+        edited.write_bytes(Path(a["output_path"]).read_bytes().replace(b"Test WTA", b"Test WTB"))
+        from mlb_engine.swap.late_swap_manager import ParentLineageError
+        with self.assertRaisesRegex(ParentLineageError, "late swap parent mismatch"):
+            self._swap(edited)
+        allowed = self._swap(edited, allow_parent_mismatch=True)
+        self.assertEqual(allowed["parent_resolution"], "mismatch_allowed")
+        self.assertFalse(allowed["current_matches_parent_export"])
+
+    def test_a_v_failing_candidate_is_refused_by_name(self):
+        built = self._build([candidate("A", self.r1, 100), candidate("B", self.r2, 99, "CCC")],
+                            gates={**self.GATES, "salary_gate_passed": False})
+        self.assertIn("review_grade_withheld", built)
+        path = Path(built["run_dir"]) / "candidate" / "DO_NOT_UPLOAD_DKEntries.csv"
+        with self.assertRaisesRegex(ValueError, "failed a V gate"):
+            self._swap(path)
+
+    def test_a_tampered_review_grade_parent_fails_integrity(self):
+        built, path = self._review_grade()
+        diag = Path(built["run_dir"]) / "final" / "diagnostics.json"
+        payload = json.loads(diag.read_text())
+        payload["tampered"] = True
+        diag.write_text(json.dumps(payload))
+        with self.assertRaisesRegex(RuntimeError, "integrity"):
+            self._swap(path)
+
+    # -- (a) the parent's realized controls -------------------------------- #
+
+    def test_the_swap_inherits_what_the_parent_shipped(self):
+        """(iii) of the reproduction: three rows under a 1.0 player cap, two
+        frozen. Re-derived at 0.5 the frozen rows breach it by construction;
+        inherited, the swap solves."""
+        shipped = {**pipeline_controls(), "max_sp_pair_repetition": 3}
+        parent = self._build([candidate("A", self.r1, 100), candidate("B", self.r2, 99, "CCC"),
+                              candidate("C", self.r3, 98)], rows=3, controls=shipped)
+        self.assertTrue(parent["passed"], parent.get("errors"))
+        recorded = epi.parent_realized_controls(parent["run_dir"])
+        self.assertEqual(recorded["max_player_exposure_pct"], 1.0)
+        ls = SwapControlsInheritanceTests._late_swap()
+        inherited = ls.inherit_swap_controls(
+            {**recorded, "time_limit": 99, "max_consensus_cluster_share_pct": 0.5},
+            None, None, projections=projection_frame(self.ids), stripped_out=(stripped := {}))
+        self.assertEqual(inherited["max_player_exposure_pct"], 1.0)
+        self.assertNotIn("time_limit", inherited)
+        self.assertEqual(stripped, {"max_consensus_cluster_share_pct": 0.5})
+        self.assertTrue(inherited["player_team_by_id"])
+        ok = self._swap(parent["output_path"], controls=inherited, authorized_entry_ids=["5003"])
+        self.assertTrue(ok["passed"], ok.get("errors"))
+        tight = self._swap(parent["output_path"], controls={**inherited,
+                                                            "max_player_exposure_pct": 0.5},
+                           authorized_entry_ids=["5003"])
+        self.assertFalse(tight["passed"])
+        self.assertIn("this solve cannot change", " ".join(tight["errors"]))
+
+    def test_a_pre_r268_parent_has_no_recorded_controls(self):
+        self.assertIsNone(epi.parent_realized_controls(self.root / "no_such_run"))
+
+    def test_the_swap_label_is_never_better_than_the_parent_label(self):
+        ls = SwapControlsInheritanceTests._late_swap()
+        ok = {"workflow_valid": True}
+        un, dl, dg_label = "review_grade_uncertified", ls.DOWNGRADE_LABEL, "review_grade_deadline_build"
+        self.assertEqual(ls.swap_certification(ok, []), "certified")
+        self.assertEqual(ls.swap_certification(ok, [], "certified"), "certified")
+        self.assertEqual(ls.swap_certification(ok, [], dg_label), dg_label)
+        self.assertEqual(ls.swap_certification(ok, ["x"], dg_label), dl)
+        self.assertEqual(ls.swap_certification(ok, ["x"], un), un)
+        self.assertEqual(ls.swap_certification({}, [], un), "not_certified")
+
+    def test_a_deadline_parent_label_is_read_from_the_run_without_an_outputs_row(self):
+        from mlb_engine.pipeline import deadline_governor as dg
+        from mlb_engine.swap.late_swap_manager import resolve_parent_run
+        labels = ReviewGradeExportTests("test_a_certified_build_is_unchanged_and_records_its_controls")
+        labels.setUp()
+        self.addCleanup(labels._restore)
+        _salary, result = labels._build(label=dg.DEADLINE_LABEL)
+        self.assertTrue(result["passed"], result.get("errors"))
+        for path in (labels.root / "outputs").rglob("upload_manifest.json"):
+            path.unlink()
+        for path in (labels.root / "data").rglob("*.json"):
+            path.unlink()
+        parent = resolve_parent_run(labels.root / "runs", result["output_path"])
+        ls = SwapControlsInheritanceTests._late_swap()
+        label, source, _gates = ls.parent_delivery_label(parent, "2026-07-25")
+        self.assertEqual((label, source), (dg.DEADLINE_LABEL, "run_manifest"))
+
+    def test_an_uncertified_parent_label_carries_its_failing_gates(self):
+        from mlb_engine.swap.late_swap_manager import resolve_parent_run
+        _built, path = self._review_grade()
+        parent = resolve_parent_run(self.root / "runs", path)
+        ls = SwapControlsInheritanceTests._late_swap()
+        label, source, gates = ls.parent_delivery_label(parent, "2026-06-11")
+        self.assertEqual((label, source, gates),
+                         ("review_grade_uncertified", "review_grade_export", ["odds_gate_passed"]))
+
+    def test_a_governed_parent_that_still_failed_is_uncertified_not_deadline(self):
+        """run_slate records the deadline label in the run's metadata even when
+        the governed attempt refuses, so UNCERTIFIED named anywhere must win:
+        the swap row would otherwise carry a gates-passing label."""
+        from mlb_engine.pipeline import deadline_governor as dg
+        from mlb_engine.swap.late_swap_manager import resolve_parent_run
+        builds = ReviewGradeExportTests("test_a_certified_build_is_unchanged_and_records_its_controls")
+        builds.setUp()
+        self.addCleanup(builds._restore)
+        _salary, result = builds._build(unassumed=("odds_gate_passed",), label=dg.DEADLINE_LABEL)
+        self.assertEqual(result["review_grade_export"]["label"], "review_grade_uncertified")
+        parent = resolve_parent_run(builds.root / "runs", result["review_grade_export"]["path"])
+        ls = SwapControlsInheritanceTests._late_swap()
+        label, _source, gates = ls.parent_delivery_label(parent, "2026-07-25")
+        self.assertEqual((label, gates), ("review_grade_uncertified", ["odds_gate_passed"]))
+        self.assertEqual(ls.swap_certification({"workflow_valid": True}, [], label),
+                         "review_grade_uncertified")
+
+    def test_a_downgrade_label_is_read_from_the_tracked_record_alone(self):
+        """A delivery record keys its run on `manifest_row.run_id`; the label
+        a downgrade-accepted swap recorded must be found there when the
+        outputs/ manifest is gone (another host, a fresh container)."""
+        from mlb_engine.entries import upload_manifest as um
+        builds = ReviewGradeExportTests("test_a_certified_build_is_unchanged_and_records_its_controls")
+        builds.setUp()
+        self.addCleanup(builds._restore)
+        ls = SwapControlsInheritanceTests._late_swap()
+        delivered = builds.root / "outputs" / "2026-07-25" / "DKEntries_lateswap_x.csv"
+        delivered.parent.mkdir(parents=True)
+        write_entries(delivered)
+        um.record_delivery(date="2026-07-25", delivered_file=delivered, contest_type="classic",
+                           slate_tag="t", run_id="RUN_X", certification=ls.DOWNGRADE_LABEL)
+        (builds.root / "outputs" / "2026-07-25" / "upload_manifest.json").unlink()
+        parent = {"manifest": {"run_id": "RUN_X", "certification": {
+            "workflow_valid": True, "selection_certified": True, "allocation_certified": True}},
+            "run_dir": str(builds.root / "missing"), "parent_export_sha256": "0" * 64}
+        label, source, _gates = ls.parent_delivery_label(parent, "2026-07-25")
+        self.assertEqual((label, source), (ls.DOWNGRADE_LABEL, "delivery_record"))
+
+    # -- late_swap.py resolves the parent before any bank slice ------------ #
+
+    def _tool(self, *extra):
+        """The tool copied into a temp skeleton (`.claude/rules/engine.md`): it
+        derives REPO from its own path, so the copy reads `<skeleton>/runs`,
+        never this tree's runs/ or Ben's, and writes its bank cache there."""
+        import shutil
+        skeleton = self.root / "skeleton"
+        (skeleton / "tools").mkdir(parents=True, exist_ok=True)
+        shutil.copy(REPO / "tools" / "late_swap.py", skeleton / "tools" / "late_swap.py")
+        feed = self.root / "feed.json"
+        # The feed's date matches, so the parent check is the first refusal.
+        feed.write_text('{"date": "2026-07-29", "games": []}', encoding="utf-8")
+        entries = self.root / "parent_DKEntries.csv"
+        entries.write_text(SwapAndProbeLostWindowTests._ENTRIES_HEADER
+                           + "5200941022,Test Contest,192784653,$0.25,,,,,,,,,,,,x\n",
+                           encoding="utf-8")
+        env = {**os.environ, "PYTHONHASHSEED": "0", "PYTHONPATH": str(REPO),
+               "MLB_DFS_ARTIFACT_ROOT": str(skeleton)}
+        env.pop("MLB_DFS_ROOT", None)
+        return subprocess.run(
+            [sys.executable, str(skeleton / "tools" / "late_swap.py"), "--date", "2026-07-29",
+             "--salary", str(SwapAndProbeLostWindowTests._SALARY), "--lineups", str(feed),
+             "--parent-entries", str(entries), "--postures", "192784653=large_gpp",
+             "--budget", "1", *extra],
+            capture_output=True, text=True, cwd=str(skeleton), env=env)
+
+    def test_the_tool_refuses_a_file_matching_no_run_before_the_bank(self):
+        out = self._tool()
+        self.assertEqual(out.returncode, 3, out.stderr[-600:])
+        self.assertIn("PARENT BLOCKER", out.stderr)
+        self.assertIn("matches no run", out.stderr)
+        self.assertNotIn("Traceback", out.stderr)
+        self.assertNotIn("bank after the general slice", out.stdout)
+
+    def test_a_dry_run_only_warns_about_the_parent(self):
+        out = self._tool("--dry-run")
+        self.assertIn("parent (dry run, WARNING)", out.stderr)
+        self.assertNotIn("PARENT BLOCKER", out.stderr)
+        self.assertFalse((REPO / "runs" / "bank_cache_2026-07-29_2356399e2d.json").exists()
+                         and not self._runs_existed, "the tool wrote into this tree")
+
+    @classmethod
+    def setUpClass(cls):
+        cls._runs_existed = (REPO / "runs" / "bank_cache_2026-07-29_2356399e2d.json").exists()

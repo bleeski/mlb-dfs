@@ -346,8 +346,8 @@ keyboard. Inside T-30:
   without scipy there is no file at all.
 - **`read_it` is Mixed** until R388 splits it (Session 05). The engine treats
   it as a wall, so read the gate it names before deciding which class it is.
-- **An S or P failure ships review-grade.** It never removes the file and
-  never makes it upload-ready.
+- **An S or P failure ships review-grade, never upload-ready.** An S/P-only
+  refusal lands `UNCERTIFIED` in `outputs/`: `references/review_grade.md`.
 - **`--force` on the preflight stays Ben's at every clock.** The preflight
   does not yet tell a bookkeeping failure from a byte mismatch (R388(c),
   Session 13), so a file whose only preflight failures you judge P is

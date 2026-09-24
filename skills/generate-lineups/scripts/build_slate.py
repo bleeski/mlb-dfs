@@ -602,9 +602,9 @@ def later_failures(result: Mapping[str, Any]) -> list:
         out.append({"stage": "engine_after_certification",
                     "error": "; ".join(str(e) for e in result.get("errors") or []),
                     "note": "not mirrored to outputs/ and not promoted: hand over "
-                            "the runs/ export; it has no manifest row, and a late "
-                            "swap from it needs --allow-parent-mismatch because "
-                            "the latest-run pointer still names the prior run "
+                            "the runs/ export; it has no manifest row. A late "
+                            "swap from it resolves this run by the file's bytes "
+                            "(R268(b)), so it needs no --allow-parent-mismatch "
                             "(publication is R393(a), Session 23)"})
     out += [dict(f) for f in result.get("later_failures") or []]
     if result.get("last_usable_artifact_error"):
@@ -633,6 +633,55 @@ def _present_file(record: Mapping[str, Any]) -> None:
     print(f"FILE  {record.get('path')}  sha256={record.get('sha256')}  "
           f"label={record.get('label')}  "
           f"coverage={cov.get('filled')}/{cov.get('reserved')}", file=sys.stderr)
+
+
+def present_review_grade(export: Mapping[str, Any], salary_csv) -> dict:
+    """R388(d) / R124(a). The refusal's review-grade file, re-read and named.
+
+    `verify_classic`, the certified path's independent re-read, runs on the
+    UNCERTIFIED file first, and only a clean read is presented, with its sha256
+    and label, before the gate narrative. A file the mirror withheld (a live
+    gates-passing delivery for the slate) or failed to record is named, not
+    presented. Never raises: this is reporting on a refusal already decided.
+    """
+    record = {k: export.get(k) for k in (
+        "label", "sha256", "failing_gates", "coverage", "run_id",
+        "manifest_recorded", "manifest_error", "mirror_error", "not_mirrored")
+        if export.get(k) is not None}
+    record["runs_path"] = export.get("path")
+    path = export.get("delivered_path") if export.get("manifest_recorded") else None
+    # A row recorded beside a name that was never promoted leaves the file at
+    # its DO_NOT_UPLOAD_ name: not the path to hand over (Session 08's rule
+    # for a certified mirror, `classic_artifact_record`).
+    from mlb_engine.entries.upload_manifest import is_unrecorded_name
+    if path and (export.get("manifest_error") or is_unrecorded_name(path)):
+        path = None
+    record["path"] = path
+    record["presented"] = False
+    if not path:
+        why = (export.get("not_mirrored") or {}).get("why") or export.get(
+            "manifest_error") or export.get("mirror_error") or "not mirrored"
+        print(f"review-grade file NOT delivered ({why}); the candidate stays at "
+              f"{export.get('path')}", file=sys.stderr)
+        return record
+    try:
+        verdict = verify_classic(Path(salary_csv), Path(path))
+    except Exception as exc:  # noqa: BLE001
+        verdict = {"passed": False, "failures": [f"{type(exc).__name__}: {exc}"]}
+    record["verify_classic"] = {"passed": bool(verdict.get("passed")),
+                                "failures": list(verdict.get("failures") or [])[:5]}
+    if not verdict.get("passed"):
+        print(f"review-grade file FAILED the independent re-read and is not "
+              f"presented: {path}: {record['verify_classic']['failures']}",
+              file=sys.stderr)
+        return record
+    record["presented"] = True
+    _present_file({"path": path, "sha256": export.get("delivered_sha256"),
+                   "label": export.get("label"), "coverage": export.get("coverage")})
+    print(f"  NOT certified and never upload-ready: failing gates "
+          f"{', '.join(export.get('failing_gates') or [])} are all S or P "
+          f"(R388(d)); preflight it before upload", file=sys.stderr)
+    return record
 
 
 def note_last_usable(record: Mapping[str, Any]) -> dict:
@@ -3550,6 +3599,10 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
             replay=bool(getattr(args, "past_slate_replay", False)),
             confidence_may_relax=_tier_tightens and confidence_relax is None)
 
+    # R388(d). The newest review-grade export any solve left, so a later
+    # refusal (a rung that failed on V) still names the live UNCERTIFIED file.
+    latest_review_grade: dict = {}
+
     def _solve(controls: dict, certification_label: str | None = None,
                control_moves: list | None = None, reason: str = "initial"):
         # R290(c) step 2. Extracted so the deadline governor can re-solve with
@@ -3605,6 +3658,8 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
                 **slate_kwargs,
             ))
             outcome = "delivered" if has_deliverable(out) else "refused"
+            if isinstance(out.get("review_grade_export"), dict):
+                latest_review_grade["export"] = out["review_grade_export"]
             return out
         finally:
             ended_at = time.monotonic()
@@ -3716,6 +3771,13 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         row.get("bank_budget_floored") for row in solves))
 
     if not has_deliverable(result):
+        # R388(d) / R124(a). A legal file this refusal (or an earlier solve)
+        # left, presented before the narrative once it re-reads clean.
+        review_export = (result.get("review_grade_export")
+                         if isinstance(result.get("review_grade_export"), dict)
+                         else latest_review_grade.get("export"))
+        review_record = (present_review_grade(review_export, salary)
+                         if review_export else None)
         for blocker in result.get("contest_identity_blockers") or []:
             print(f"contest identity: {blocker}", file=sys.stderr)
         # R27 (open half): when a pre-export gate fails, its cause prints
@@ -3740,6 +3802,10 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
                    "date": args.date,
                    "errors": result.get("errors"),
                    **detail}
+        if review_record is not None:
+            payload["review_grade_export"] = review_record
+        elif isinstance(result.get("review_grade_withheld"), dict):
+            payload["review_grade_withheld"] = result["review_grade_withheld"]
         # R290(c). The split, resolved here rather than left to the reader. The
         # stamp above says SPLIT; these three keys say which way it split on
         # THIS refusal, gate by gate, so the operator sees "portfolio_caps:
@@ -7292,6 +7358,11 @@ def refusal_record_facts(context: Mapping[str, Any]) -> tuple:
         "failing_checks": failing,
         "run_id": brief.get("run_id"),
     }
+    # R388(d). A refusal that still delivered a review-grade file says so.
+    review = brief.get("review_grade_export")
+    if isinstance(review, Mapping):
+        facts["review_grade_export"] = {k: review.get(k) for k in (
+            "path", "sha256", "label", "failing_gates", "presented")}
     # R416. What each solve spent, when any ran: the record is read after the
     # terminal is gone, and "which solve took the window" is its question.
     solves = (brief.get("solves") or (brief.get("solve") or {}).get("solves")

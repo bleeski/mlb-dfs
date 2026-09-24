@@ -168,6 +168,10 @@ REVIEW_GRADE_REASONS = {
     "review_grade_downgrade_accepted": (
         "A late swap took entries that score below the lineups they replaced "
         "(--accept-downgrade), so it ships review-grade (R386)."),
+    # R388(d). Mirrors `upload_manifest.UNCERTIFIED_LABEL`.
+    "review_grade_uncertified": (
+        "The build failed only S or P gates and every V gate passed on these "
+        "bytes, so it ships review-grade and uncertified (R388(d))."),
 }
 CLASSIC_MAX_HITTERS_PER_TEAM = 5
 CLASSIC_MIN_GAMES = 2
@@ -1545,6 +1549,9 @@ def check_manifest(entries_path: Path, entries: Sequence[EntryRow],
     # R34: the verdict needs this. A file whose own record says it was not
     # certified must not be handed the 'upload_ready' label by a byte checker.
     rep.info["recorded_certification"] = match.get("certification")
+    # R388(d). The gates an UNCERTIFIED row failed, for the verdict note.
+    if match.get("failing_gates"):
+        rep.info["recorded_failing_gates"] = list(match.get("failing_gates") or [])
     rep.info["recorded_status"] = match.get("status")
     # R34: the status vocabulary is closed and was never enforced, so the
     # Showdown path wrote 'delivered' and it read as current everywhere that
@@ -2964,7 +2971,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 f"that label is reserved for a run where workflow_valid, "
                 f"selection_certified and allocation_certified all passed. "
                 + REVIEW_GRADE_REASONS.get(
-                    certification, "Showdown ships review-grade by design."))
+                    certification, "Showdown ships review-grade by design.")
+                + (" Failing gates: "
+                   + ", ".join(report["info"]["recorded_failing_gates"]) + "."
+                   if report["info"].get("recorded_failing_gates") else ""))
         else:
             verdict = "upload_ready"
     elif args.force:

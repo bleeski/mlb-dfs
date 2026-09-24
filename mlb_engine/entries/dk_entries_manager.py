@@ -1171,6 +1171,11 @@ def validate_dk_entries_file(
         "duplicate_same_contest": duplicate_same_contest,
         "roster_legality_passed": not roster_legality_errors,
         "portfolio_caps_passed": not portfolio_errors,
+        # R388(d). The cap errors by themselves, so a reader can tell an S
+        # failure from everything else without re-deriving the partition
+        # above from prefixes: two V errors ("entries file ...") share the
+        # overlap check's prefix and are in neither list.
+        "portfolio_errors": list(portfolio_errors),
         "locked_immutability_passed": not any("locked slot" in e for e in errors),
         "exposures": {
             "player_counts": dict(player_counts), "pitcher_counts": dict(pitcher_counts),
@@ -1262,6 +1267,164 @@ def derive_essential_validity(post_export: Mapping[str, Any]) -> Dict[str, Any]:
         "failed": failed,
         "excluded": [n for n in POST_EXPORT_GATES if n not in required],
         "preflight": None,
+    }
+
+
+#: R388(d). Each portfolio-cap error family `validate_dk_entries_file` writes,
+#: by the prefix it writes it under, and the control or controls that set it.
+#: `game ` names both game controls: the merge folds the scalar, which a
+#: never-relax may name, into the per-game dict, and the validator only ever
+#: says "game G".
+PORTFOLIO_CAP_ERROR_CONTROLS: Tuple[Tuple[str, Tuple[str, ...]], ...] = (
+    ("player ", ("max_player_exposure_pct",)),
+    ("pitcher ", ("max_pitcher_exposure_pct",)),
+    ("primary stack ", ("max_primary_stack_exposure_pct",)),
+    ("SP pair ", ("max_sp_pair_repetition",)),
+    ("entries ", ("max_shared_players",)),
+    ("game ", ("max_game_exposure_pct", "max_game_exposure_pct_by_game")),
+    ("team ", ("max_team_exposure_pct",)),
+)
+
+#: R388(d). Where a review-grade verdict came from.
+REVIEW_GRADE_BASIS = "engine_export_gates"
+
+
+def _cap_error_controls(error: str) -> Optional[Tuple[str, ...]]:
+    for prefix, controls in PORTFOLIO_CAP_ERROR_CONTROLS:
+        if str(error).startswith(prefix):
+            return controls
+    return None
+
+
+def classify_export_failures(
+    *,
+    pre: Mapping[str, Any],
+    template: Mapping[str, Any],
+    reconciliation: Mapping[str, Any],
+    candidate_validation: Mapping[str, Any],
+    delta: Mapping[str, Any],
+    never_relax: Iterable[str] = (),
+) -> Dict[str, Any]:
+    """R388(d). May a refused export ship review-grade, and why or why not?
+
+    Every failing check is placed by `gate_classes`, and the file may ship
+    review-grade only when every one is S or P (MLB_Classic.md §2):
+
+    * a pre-export gate is its own class; a MIXED gate with no V fact
+      (`selection_certified`) is not V whichever fact failed; a MIXED gate
+      WITH a V fact is unplaced, and unplaced is V, because the engine emits
+      one boolean per MIXED gate (the fact split is R388(c), Session 13);
+    * a candidate-validation error is S only when the validator itself put it
+      in `portfolio_errors`, and then only when no control it maps to
+      (`PORTFOLIO_CAP_ERROR_CONTROLS`) is in ``never_relax``; every other
+      validator error, and the template, reconciliation and late-swap delta
+      failures, are V;
+    * attribution is total: an error string in the refusal that no row claims
+      is V.
+
+    A name `gate_classes` has never classified is V. Pure: reads its inputs and
+    returns ``{"basis", "review_grade", "failing_gates", "failures",
+    "blocking"}``; the caller decides what to do with the file.
+    """
+    from mlb_engine.entries import gate_classes as gc  # stdlib-only, no cycle
+
+    held = {str(x) for x in (never_relax or ())}
+    failures: List[Dict[str, Any]] = []
+
+    def add(gate: str, klass: str, counts_as: str, errors: Sequence[str], *,
+            blocks: bool, reason: str = "", **extra: Any) -> None:
+        row: Dict[str, Any] = {"gate": gate, "class": klass,
+                               "counts_as": counts_as, "blocks": bool(blocks),
+                               "errors": [str(e) for e in errors]}
+        if reason:
+            row["reason"] = reason
+        row.update(extra)
+        failures.append(row)
+
+    pre = dict(pre or {})
+    for word, names in (("Missing", pre.get("missing_gates")),
+                        ("Failed", pre.get("failed_gates"))):
+        for name in names or []:
+            error = f"{word} pre-export gate: {name}"
+            try:
+                validity = gc.gate_validity(name)
+            except gc.UnclassifiedGateError:
+                add(str(name), "unclassified", gc.V, [error], blocks=True,
+                    reason="never classified in gate_classes; a check that "
+                           "cannot be placed is V (MLB_Classic.md §2)")
+                continue
+            classes = validity.classes()
+            if validity.klass in (gc.S, gc.P):
+                add(str(name), validity.klass, validity.klass, [error], blocks=False)
+            elif validity.klass == gc.MIXED and gc.V not in classes:
+                add(str(name), gc.MIXED, "/".join(sorted(classes)), [error],
+                    blocks=False, reason="MIXED with no V fact: whichever fact "
+                                         "failed, it is not V")
+            elif validity.klass == gc.MIXED:
+                add(str(name), gc.MIXED, gc.V, [error], blocks=True,
+                    reason="MIXED with a V fact; the engine emits one boolean "
+                           "per MIXED gate, so the failing fact cannot be "
+                           "placed, and unplaced is V (the split is R388(c), "
+                           "roadmap Session 13)")
+            else:
+                add(str(name), validity.klass, gc.V, [error], blocks=True)
+
+    for gate, block in (("template_preservation_passed", template),
+                        ("entry_reconciliation_passed", reconciliation),
+                        ("locked_immutability_passed", delta)):
+        block = dict(block or {})
+        if not block.get("passed", True) or block.get("errors"):
+            add(gate, gc.V, gc.V, list(block.get("errors") or []), blocks=True)
+
+    validation = dict(candidate_validation or {})
+    caps = [str(e) for e in validation.get("portfolio_errors") or []]
+    cap_set = set(caps)
+    others = [str(e) for e in validation.get("errors") or [] if str(e) not in cap_set]
+    locks = [e for e in others if "locked slot" in e]
+    rest = [e for e in others if "locked slot" not in e]
+    if locks:
+        add("locked_immutability_passed", gc.V, gc.V, locks, blocks=True)
+    if rest:
+        add("roster_legality_passed" if validation.get("roster_legality_passed") is False
+            else "export_validation", gc.V, gc.V, rest, blocks=True,
+            reason="a validator error outside the portfolio caps is V; "
+                   "roster_legality_passed is MIXED and its facts are not "
+                   "split yet (R388(c))")
+    if caps:
+        mapped = [(_cap_error_controls(e), e) for e in caps]
+        controls = sorted({c for ctl, _e in mapped if ctl for c in ctl})
+        unmapped = [e for ctl, e in mapped if ctl is None]
+        never = sorted(c for c in controls if c in held)
+        if unmapped:
+            add("portfolio_caps_passed", gc.S, gc.V, caps, blocks=True,
+                controls=controls,
+                reason=f"{len(unmapped)} cap error(s) under a prefix "
+                       "PORTFOLIO_CAP_ERROR_CONTROLS does not map; unplaced is V")
+        elif never:
+            add("portfolio_caps_passed", gc.S, gc.S, caps, blocks=True,
+                controls=controls, never_relax_held=never,
+                reason="a never-relax control is breached; shipping the file "
+                       "would relax it (R388(b))")
+        else:
+            add("portfolio_caps_passed", gc.S, gc.S, caps, blocks=False,
+                controls=controls)
+
+    claimed = {e for row in failures for e in row["errors"]}
+    every = ([str(e) for e in pre.get("errors") or []]
+             + [str(e) for b in (template, reconciliation, candidate_validation, delta)
+                for e in (dict(b or {}).get("errors") or [])])
+    loose = [e for e in every if e not in claimed]
+    if loose:
+        add("unattributed", "unclassified", gc.V, loose, blocks=True,
+            reason="an error no placed check claims is V")
+
+    blocking = [row for row in failures if row["blocks"]]
+    return {
+        "basis": REVIEW_GRADE_BASIS,
+        "review_grade": bool(failures) and not blocking,
+        "failing_gates": sorted({row["gate"] for row in failures}),
+        "failures": failures,
+        "blocking": blocking,
     }
 
 

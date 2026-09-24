@@ -19,9 +19,14 @@ and it scores the incumbent lineup against the chosen one and refuses a
 downgrade without ``--accept-downgrade``.
 
 R29(2): the latest-run pointer is promoted after the mirror to ``outputs/``,
-not at certification time. A refused run leaves the pointer naming the last
-genuinely delivered portfolio, so the next swap resolves its parent correctly
-and needs no ``--allow-parent-mismatch``.
+not at certification time, so a downgrade-refused swap never leaves the pointer
+naming it. That alone did not retire ``--allow-parent-mismatch``: the pointer is
+one global file, and once any later run is promoted it no longer names a file's
+parent. R268(b): the parent is resolved by the file's own bytes, before any bank
+slice (`resolve_parent_run`): a promoted run, a certified-but-unpromoted one, or
+a review-grade build (R388(d)). The flag is for a file matching no run at all.
+R268(a): the swap inherits the controls its parent recorded; ``--rederive-controls``
+re-derives them from postures and floors as before.
 
 Usage:
     python tools/late_swap.py --date 2026-07-22 \
@@ -68,13 +73,18 @@ from mlb_engine.entries.dk_entries_manager import (  # noqa: E402
 )
 from mlb_engine.optimize.bank_cache import BankCache, extend_bank, pool_signature  # noqa: E402
 from mlb_engine.entries.upload_manifest import (  # noqa: E402
-    record_delivery, stage_salary_for_delivery, unrecorded_name,
+    UNCERTIFIED_LABEL, record_delivery, recorded_delivery_row,
+    stage_salary_for_delivery, unrecorded_name,
+)
+from mlb_engine.swap.late_swap_manager import (  # noqa: E402
+    ParentLineageError, resolve_parent_run,
 )
 from mlb_engine.pipeline.execution_pipeline import (  # noqa: E402
     _assemble_projection_frame, _merged_controls_for_build, _slate_feasibility,
     controls_for_report, derive_roster_id_maps,
     resolve_shape_bands, slate_game_count,
     _resolve_contest_postures, _slate_tag, feasibility_floors_from,
+    CONTROL_ID_MAP_KEYS, parent_realized_controls,
     promote_deferred_run, raise_on_engine_crash, run_late_swap,
     unresolved_contest_blockers,
 )
@@ -120,12 +130,117 @@ LATE_SWAP_ASSUMED_GATES = [
 # back to is how it comes back.
 
 
-def swap_certification(result: dict, downgraded: list) -> str:
+def swap_certification(result: dict, downgraded: list, parent_label=None) -> str:
     """The manifest label for a delivered swap (R388(e)): failing gates win,
-    then an accepted downgrade, then `certified`."""
+    then an accepted downgrade, then `certified`.
+
+    R268(a). A swap never records a label better than its parent's: the rows
+    it keeps are the parent's, and a swap under inherited controls would
+    otherwise launder a deadline rung's opened caps into `certified`. An
+    UNCERTIFIED parent (R388(d)) outranks a downgrade; any other review-grade
+    parent label comes after it. ``parent_label=None`` is the old rule exactly.
+    """
     if not result.get("workflow_valid"):
         return "not_certified"
-    return DOWNGRADE_LABEL if downgraded else "certified"
+    label = str(parent_label or "")
+    if label == UNCERTIFIED_LABEL:
+        return UNCERTIFIED_LABEL
+    if downgraded:
+        return DOWNGRADE_LABEL
+    if label.startswith("review_grade"):
+        return label
+    return "certified"
+
+
+def parent_delivery_label(parent: dict, date: str) -> tuple:
+    """R268(a). ``(label, source, failing_gates)`` for a swap's parent run.
+
+    Read from the run itself first, so another host or a lost ``outputs/``
+    manifest cannot hide it: the run manifest's `certification_label` (a
+    governed build, R388(e)), then its `review_grade_export` (R388(d)), then
+    the ``outputs/<date>/`` row for these bytes, then the tracked delivery
+    record for the run (where a downgrade-accepted swap's label lives).
+    UNCERTIFIED named by any source wins, because a governed build that still
+    failed its gates records the deadline label in its metadata too; then any
+    other review-grade label; a run none of them names is labelled by its own
+    certification. The failing gates come from the export or the row.
+    """
+    manifest = dict((parent or {}).get("manifest") or {})
+    run_id = manifest.get("run_id")
+    found = []
+    gates: list = []
+    meta = (manifest.get("metadata") or {}).get("certification_label")
+    if meta:
+        found.append((str(meta), "run_manifest"))
+    try:
+        diag = json.loads((Path(parent["run_dir"]) / "final" / "diagnostics.json")
+                          .read_text(encoding="utf-8"))
+    except (OSError, ValueError, KeyError, TypeError):
+        diag = {}
+    export = diag.get("review_grade_export")
+    if isinstance(export, dict) and export.get("label"):
+        found.append((str(export["label"]), "review_grade_export"))
+        gates = list(export.get("failing_gates") or [])
+    try:
+        row = recorded_delivery_row(date, str(parent.get("parent_export_sha256") or ""))
+    except Exception:  # noqa: BLE001 - a missing manifest is not a label
+        row = None
+    if row and row.get("certification"):
+        found.append((str(row["certification"]), "upload_manifest"))
+        gates = gates or list(row.get("failing_gates") or [])
+    try:
+        from mlb_engine.entries.delivery_record import read_records
+        for rec in read_records(date=date):
+            row_of = rec.get("manifest_row") or {}
+            if rec.get("kind") == "delivery" and run_id and (
+                    rec.get("run_id") or row_of.get("run_id")) == run_id:
+                if row_of.get("certification"):
+                    found.append((str(row_of["certification"]), "delivery_record"))
+                gates = gates or list(row_of.get("failing_gates") or [])
+    except Exception:  # noqa: BLE001
+        pass
+    for label, source in found:
+        if label == UNCERTIFIED_LABEL:
+            return label, source, gates
+    for label, source in found:
+        if label.startswith("review_grade"):
+            return label, source, gates
+    if found:
+        return found[0][0], found[0][1], gates
+    cert = manifest.get("certification") or {}
+    if all(cert.get(k) is True for k in ("workflow_valid", "selection_certified",
+                                         "allocation_certified")):
+        return "certified", "run_certification", gates
+    return None, "none", gates
+
+
+def inherit_swap_controls(parent_controls, override, solver_budget,
+                          projections=None, stripped_out=None) -> dict:
+    """R268(a). The parent run's realized controls as the swap enforces them.
+
+    What the parent shipped, not a re-derivation: with most rows frozen, a cap
+    derived tighter than the parent's is unsatisfiable by construction (the
+    frozen rows already breach it; 1305_12g, 0.50 against a shipped 0.55).
+    The id maps are re-derived from this swap's frame (the record drops them),
+    the parent's `time_limit` is dropped for this swap's own, --controls-override
+    applies on top, and `SWAP_UNENFORCED_CONTROLS` are stripped exactly as
+    `resolve_swap_controls` strips them.
+    """
+    controls = {k: v for k, v in dict(parent_controls or {}).items()
+                if k not in CONTROL_ID_MAP_KEYS and k != "time_limit"}
+    maps = derive_roster_id_maps(projections) if projections is not None else {}
+    for key in CONTROL_ID_MAP_KEYS:
+        if maps.get(key):
+            controls[key] = dict(maps[key])
+    if solver_budget is not None:
+        controls["time_limit"] = float(solver_budget)
+    controls.update(override or {})
+    for key in SWAP_UNENFORCED_CONTROLS:
+        if key in controls:
+            value = controls.pop(key)
+            if stripped_out is not None:
+                stripped_out[key] = value
+    return controls
 
 
 def lateswap_dest_name(slate_tag: str, run_id: str) -> str:
@@ -570,11 +685,15 @@ def main() -> int:
                          "lineup it replaced under its own contest shape. Recorded "
                          "on stderr; there is no silent path.")
     ap.add_argument("--allow-parent-mismatch", action="store_true",
-                    help="proceed when --parent-entries does not hash to the "
-                         "promoted run's export (R20c blocks this by default, "
-                         "because it means the latest promotion is not the "
-                         "portfolio this file came from). The mismatch is "
-                         "recorded either way.")
+                    help="proceed when --parent-entries matches no run's export "
+                         "(R268(b): the parent is found by the file's bytes, so "
+                         "this is for a hand-edited, repaired or re-downloaded "
+                         "file). The latest promoted run is then the parent, "
+                         "and the mismatch is recorded.")
+    ap.add_argument("--rederive-controls", action="store_true",
+                    help="re-derive portfolio controls from this file's postures "
+                         "and the slate's floors instead of inheriting the "
+                         "parent run's realized controls (R268(a))")
     ap.add_argument("--ignore-unresolved-postures", action="store_true",
                     help="proceed when a contest name matches no archetype, "
                          "accepting the fallback posture. Recorded on stderr.")
@@ -717,6 +836,30 @@ def main() -> int:
         print(f"contest {cid} {rec['posture']} -> {rec['contest_shape']} "
               f"({rec['posture_source']})")
 
+    # R268(b). The parent, found by this file's bytes: after the cheap input
+    # refusals (geometry, feed, contest identity), whose order is pinned, and
+    # before the pool, the bank slices or the solve spend --budget.
+    # `run_late_swap` resolved it only after the slices, and a mismatch was an
+    # unguarded ValueError: exit 1 with a traceback. The engine resolves it
+    # again with the same function, so the two cannot disagree. --dry-run
+    # never checked the parent, so there it is a warning.
+    try:
+        swap_parent = resolve_parent_run(
+            REPO / "runs", args.parent_entries,
+            allow_parent_mismatch=args.allow_parent_mismatch)
+    except (ParentLineageError, FileNotFoundError, RuntimeError) as exc:
+        if not args.dry_run:
+            print(f"PARENT BLOCKER: {exc}. Nothing was swapped.", file=sys.stderr)
+            return 3
+        print(f"parent (dry run, WARNING): {exc}", file=sys.stderr)
+        swap_parent = None
+    if swap_parent is not None:
+        print(f"parent: run {swap_parent['manifest'].get('run_id')} "
+              f"({swap_parent['parent_resolution']}"
+              + ("" if swap_parent["current_matches_parent_export"]
+                 else ", NOT this file's bytes: --allow-parent-mismatch")
+              + f"; latest promoted {swap_parent.get('latest_promoted_run_id')})")
+
     status = build_status_map_from_lineups_feed(feed, str(salary))
     for dropped in status.get("doubleheader_legs_dropped") or []:
         print(f"doubleheader: dropped {dropped['game_id']} leg at "
@@ -849,10 +992,21 @@ def main() -> int:
         return 0
 
     swap_stripped: dict = {}
-    controls = resolve_swap_controls(
-        postures, args.controls_override, args.solver_budget,
-        requirements=requirements, projections=projections,
-        stripped_out=swap_stripped, never_relax=swap_never_relax)
+    # R268(a). Inherit what the parent shipped by default. A parent recorded
+    # before R268 carries no controls and is re-derived, and says so.
+    inherited = None
+    if (swap_parent is not None and swap_parent["current_matches_parent_export"]
+            and not args.rederive_controls):
+        inherited = parent_realized_controls(swap_parent["run_dir"])
+    if inherited is not None:
+        controls = inherit_swap_controls(
+            inherited, args.controls_override, args.solver_budget,
+            projections=projections, stripped_out=swap_stripped)
+    else:
+        controls = resolve_swap_controls(
+            postures, args.controls_override, args.solver_budget,
+            requirements=requirements, projections=projections,
+            stripped_out=swap_stripped, never_relax=swap_never_relax)
     if swap_stripped:
         print(f"consensus-cluster cap NOT enforced on a late swap (R405): stripped "
               f"{', '.join(f'{k}={v}' for k, v in sorted(swap_stripped.items()))} "
@@ -866,10 +1020,20 @@ def main() -> int:
     # enforces nothing (a cash-only portfolio) has to say so rather than look
     # like a line that failed to render.
     shown = ", ".join(f"{k}={v}" for k, v in sorted(controls.items())
-                      if k != "time_limit")
-    print("portfolio controls (derived from this file's postures and floored by "
-          "slate feasibility, exactly as the build derives them): "
-          + (shown or "none for these postures"))
+                      if k != "time_limit" and k not in CONTROL_ID_MAP_KEYS)
+    if inherited is not None:
+        print(f"portfolio controls INHERITED from parent run "
+              f"{swap_parent['manifest'].get('run_id')} (R268(a)): what it shipped, "
+              f"not a re-derivation; --rederive-controls re-derives them: "
+              + (shown or "none recorded"))
+    else:
+        if swap_parent is not None and not args.rederive_controls:
+            print("parent run recorded no portfolio_controls (a run before "
+                  "R268(a), or a mismatched parent), so they are re-derived",
+                  file=sys.stderr)
+        print("portfolio controls (derived from this file's postures and floored by "
+              "slate feasibility, exactly as the build derives them): "
+              + (shown or "none for these postures"))
     if args.controls_override:
         print(f"controls overridden by --controls-override: "
               f"{sorted(args.controls_override)}")
@@ -1028,6 +1192,11 @@ def main() -> int:
           file=sys.stderr)
     delivered_sha = ""
     delivered = provisional
+    # R268(a). The parent's label bounds this swap's (`swap_certification`).
+    parent_label, parent_label_source, parent_gates = (
+        parent_delivery_label(swap_parent, args.date) if swap_parent is not None
+        else (None, "none", []))
+    print(f"parent label: {parent_label} (from {parent_label_source})")
     try:
         record = record_delivery(
             date=args.date, delivered_file=dest, hash_source=provisional,
@@ -1035,7 +1204,10 @@ def main() -> int:
             slate_tag=slate_tag, contest_ids=sorted(contest_shapes),
             entries=len(after_rosters), run_id=result.get("run_id"),
             status="candidate",
-            certification=swap_certification(result, downgraded),
+            certification=swap_certification(result, downgraded, parent_label),
+            # R388(d). An UNCERTIFIED parent's failing gates ride its refinement.
+            failing_gates=(parent_gates if swap_certification(
+                result, downgraded, parent_label) == UNCERTIFIED_LABEL else None),
             projection_tier="proxy",  # the swap assembles emergency-proxy projections
             notes=f"late swap; parent {args.parent_entries}",
             # R377. The controls the joint solve ran under, and the one thing a
@@ -1043,6 +1215,9 @@ def main() -> int:
             controls=controls_for_report(
                 {k: v for k, v in controls.items() if k != "time_limit"}),
             relaxations={"downgrades_accepted": len(downgraded)},
+            # R388(d). A swap refines the file Ben entered, so an UNCERTIFIED
+            # refinement records even over a later passing build's row.
+            refinement=True,
         )
         delivered_sha = str(record.get("sha256") or "")
         # R96(4): the swap had no salary staging at all, so a late-swapped slate
