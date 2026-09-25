@@ -913,7 +913,8 @@ def _write_baseline_brief(args, salary: Path, block: Mapping[str, Any]) -> dict:
         signature = slate_signature(Path(salary))
         brief = {
             "status": "baseline_delivered",
-            "contest_type": "classic",
+            # R389(c): the Showdown baseline writes one too.
+            "contest_type": str(block.get("contest_type") or "classic"),
             "date": args.date,
             "lineage": "baseline",
             "delivered_path": str(path),
@@ -927,8 +928,11 @@ def _write_baseline_brief(args, salary: Path, block: Mapping[str, Any]) -> dict:
             "labels": ("deterministic review proxies and labeled priors only; "
                        "never ROI, win rate, cash rate, or probability"),
         }
-        stem = path.stem[len("DKEntries_"):] if path.stem.startswith("DKEntries_") \
-            else path.stem
+        stem = path.stem
+        if stem.startswith("DO_NOT_UPLOAD_"):
+            stem = stem[len("DO_NOT_UPLOAD_"):]
+        if stem.startswith("DKEntries_"):
+            stem = stem[len("DKEntries_"):]
         dest = path.with_name(f"build_brief_{stem}.json")
         tmp = dest.with_name(f".{dest.name}.tmp")
         tmp.write_text(json.dumps(brief, indent=1, default=str), encoding="utf-8")
@@ -967,14 +971,26 @@ def _earlier_live_delivery(block: Mapping[str, Any]) -> dict | None:
     otherwise. Never raises: a brief field."""
     if not (block.get("manifest_date") and block.get("published_utc")):
         return None
+    contest_type = str(block.get("contest_type") or "classic")
     try:
         from mlb_engine.entries.upload_manifest import live_gates_passing_row
-        live = live_gates_passing_row(block["manifest_date"], "classic",
+        live = live_gates_passing_row(block["manifest_date"], contest_type,
                                       block.get("slate_tag") or "")
     except Exception:  # noqa: BLE001
         return None
     if not live or str(live.get("recorded_utc") or "") >= str(block["published_utc"]):
         return None
+    if contest_type == "showdown":
+        # R389(c). Showdown passes no gates; its files are review-grade alike.
+        return {"delivered_file": live.get("delivered_file"),
+                "certification": live.get("certification"),
+                "sha256": live.get("sha256"), "run_id": live.get("run_id"),
+                "recorded_utc": live.get("recorded_utc"),
+                "note": ("an earlier build's thesis-ladder file for this slate is "
+                         "still live; this baseline was built on THIS call's "
+                         "inputs, so it is current when the inputs changed "
+                         "(lineups, scratches) and the earlier file is the "
+                         "better-shaped choice when they did not")}
     return {"delivered_file": live.get("delivered_file"),
             "certification": live.get("certification"),
             "sha256": live.get("sha256"), "run_id": live.get("run_id"),
@@ -993,6 +1009,12 @@ def present_baseline_as_current(reason: str) -> None:
         _present_file(_LAST_USABLE)
         print(f"  BASELINE is the current file: {reason}. Review-grade, never "
               f"certified; preflight it before upload", file=sys.stderr)
+        sleeve = _BASELINE.get("captain_sleeve") or {}
+        if sleeve.get("applied") is False:
+            # R381's rule: an operator instruction that did not arrive is loud.
+            print(f"  NOTE: --captain-sleeve designated "
+                  f"{sleeve.get('designated_entries')} entries and the baseline "
+                  f"carries NONE of them: {sleeve.get('reason')}", file=sys.stderr)
         live = _earlier_live_delivery(_BASELINE)
         if live:
             print(f"  an earlier build's {live['certification']} file is still "
@@ -5221,17 +5243,56 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                                    ("max_cpt_per_contest", cpt_per_contest))}
 
     sd_resolved = _sd_provenance()
+    # R389(c), and R425 found on the way. The pool is priced ONCE, before the
+    # governed loop: a deadline rung opens the three caps and nothing pricing
+    # reads, and re-pricing the points-max path's already-priced `df` on a
+    # re-solve multiplied F1 into every Base a second time.
+    if use_ladder:
+        priced = price_showdown_pool(df, use_ladder=True, bat_side=bat_side,
+                                     pitcher_hand=pitcher_hand,
+                                     supplied_base=supplied_base,
+                                     supplied_read=supplied_read,
+                                     f1_by_player_key=f1_by_player_key,
+                                     f1_report=f1_report)
+    else:
+        # R249. Same seam through the same function, with no prior to
+        # bypass: on this path Base IS raw AvgPointsPerGame, so a supplied
+        # number replaces it directly and the recorded ratio is against
+        # that same column.
+        df = price_showdown_pool(df, use_ladder=False, bat_side=bat_side,
+                                 pitcher_hand=pitcher_hand,
+                                 supplied_base=supplied_base,
+                                 supplied_read=supplied_read,
+                                 f1_by_player_key=f1_by_player_key,
+                                 f1_report=f1_report)
+    # R389(c), roadmap Session 12. Baseline first: a thesis-free points-max
+    # file over every incomplete reserved row, checked on its exact bytes,
+    # recorded in its own lineage and PRESENTED before the ladder, so a crash
+    # anywhere below still delivers it (exit 7) and a refusal re-presents it.
+    # On the points-max path the build's own bank is that construction, on
+    # the same frame at the same controls, so a baseline there would be the
+    # same file twice -- unless --entries-count leaves reserved rows the build
+    # would refuse to leave blank.
+    if use_ladder or n_entries < len(rows):
+        publish_showdown_baseline(
+            args, salary, entries, priced if use_ladder else df, reserved, rows,
+            showdown_baseline_deadline(args), share_cap=share_cap, cpt_cap=cpt_cap,
+            player_cap_pct=player_cap_pct, cpt_per_contest=cpt_per_contest,
+            captain_sleeve=captain_sleeve,
+            before="the thesis ladder" if use_ladder else "the points-max bank")
+    else:
+        _BASELINE.clear()
+        _BASELINE.update({
+            "status": "not_needed", "date": args.date, "contest_type": "showdown",
+            "lineage": "baseline",
+            "why": ("the points-max bank below is the thesis-free construction, "
+                    "on the same frame at the same controls, and it covers every "
+                    "reserved row; a baseline would be the same file twice")})
     while True:
         solve_diag.clear()
         cpt_diagnostics.clear()
         sd_refusal = None
         if use_ladder:
-            priced = price_showdown_pool(df, use_ladder=True, bat_side=bat_side,
-                                         pitcher_hand=pitcher_hand,
-                                         supplied_base=supplied_base,
-                                         supplied_read=supplied_read,
-                                         f1_by_player_key=f1_by_player_key,
-                                         f1_report=f1_report)
             ladder_meta = st.build_thesis_ladder(priced, n_entries, moneyline=moneyline,
                                                  max_cpt_exposure_pct=cpt_cap,
                                                  contest_of_entry=contest_of_entry,
@@ -5255,16 +5316,6 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                                                  "captain_sleeve"))
                 certs = [sd.certify_showdown(lineup, priced) for lineup in bank]
         else:
-            # R249. Same seam through the same function, with no prior to
-            # bypass: on this path Base IS raw AvgPointsPerGame, so a supplied
-            # number replaces it directly and the recorded ratio is against
-            # that same column.
-            df = price_showdown_pool(df, use_ladder=False, bat_side=bat_side,
-                                     pitcher_hand=pitcher_hand,
-                                     supplied_base=supplied_base,
-                                     supplied_read=supplied_read,
-                                     f1_by_player_key=f1_by_player_key,
-                                     f1_report=f1_report)
             bank = sd.build_showdown_bank(df, n=n_entries, max_cpt_exposure_pct=cpt_cap,
                                           max_shared_players=share_cap,
                                           max_player_exposure_pct=player_cap_pct,
@@ -5309,15 +5360,20 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                        args.declare_pitcher)}
         if governor is not None:
             payload["deadline"] = governor.stamp()
+        showdown_refusal_carries_baseline(payload, f"the Showdown build refused "
+                                                   f"({refusal_status})")
         print(json.dumps(payload, indent=1))
         return 3, {}
 
     failed = [c for c in certs if not c.get("passed")]
     if failed:
-        print(json.dumps({"status": "not_certified",
-                          **refusal_stamp("showdown_not_certified"),
-                          "date": args.date,
-                          "errors": [c.get("errors") for c in failed]}, indent=1))
+        payload = {"status": "not_certified",
+                   **refusal_stamp("showdown_not_certified"),
+                   "date": args.date,
+                   "errors": [c.get("errors") for c in failed]}
+        showdown_refusal_carries_baseline(payload, "the Showdown build's lineups "
+                                                   "failed certification")
+        print(json.dumps(payload, indent=1))
         return 3, {}
 
     # zip() silently truncates to the shorter side, so a bank short of the
@@ -5361,6 +5417,8 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
             }
             if governor is not None:
                 payload["deadline"] = governor.stamp()
+            showdown_refusal_carries_baseline(
+                payload, "the Showdown build fell short of the reserved rows")
             print(json.dumps(payload, indent=1))
             return 3, {}
 
@@ -5383,10 +5441,12 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
     write_report = sd.write_showdown_entries(str(entries), str(dest), assignments,
                                              promote=False)
     if not write_report.get("passed"):
-        print(json.dumps({"status": "showdown_export_failed",
-                          **refusal_stamp("showdown_export_failed"),
-                          "date": args.date,
-                          "errors": write_report.get("errors")}, indent=1))
+        payload = {"status": "showdown_export_failed",
+                   **refusal_stamp("showdown_export_failed"),
+                   "date": args.date,
+                   "errors": write_report.get("errors")}
+        showdown_refusal_carries_baseline(payload, "the Showdown build's export failed")
+        print(json.dumps(payload, indent=1))
         return 3, {}
     provisional = unrecorded_name(dest)
     delivered = provisional
@@ -5441,7 +5501,25 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
     showdown_later_failures = (
         [{"stage": "manifest", "error": manifest_error}]
         if manifest_error and showdown_essential else [])
-    if showdown_essential:
+    # R389(c). A file whose manifest row failed keeps its DO_NOT_UPLOAD_ name
+    # and preflight fails it on the missing row. A baseline that recorded its
+    # row is the better file to hand over, so it stays current and this one
+    # is named, not presented; the exit is 7 either way. When the baseline's
+    # record failed too, this copy is presented, as before R389(c).
+    ladder_not_presented = None
+    if showdown_essential and manifest_error and \
+            _BASELINE.get("status") == "delivered" and \
+            _BASELINE.get("promoted") is True and \
+            _LAST_USABLE.get("lineage") == "baseline":
+        ladder_not_presented = {
+            "path": str(delivered),
+            "why": ("its manifest row was not recorded, so preflight fails it; "
+                    "the recorded baseline stays the current file")}
+        print(f"the thesis ladder's file was NOT presented: "
+              f"{ladder_not_presented['why']} ({Path(delivered).name})",
+              file=sys.stderr)
+        present_baseline_as_current("the thesis ladder's manifest row was not recorded")
+    elif showdown_essential:
         _sd_bytes = Path(delivered).read_bytes()
         note_last_usable({
             "path": str(delivered),
@@ -5671,7 +5749,9 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         "manifest_error": manifest_error,
         # R393(b), the same two keys the Classic brief carries.
         "later_failures": showdown_later_failures,
-        "last_usable_artifact": dict(_LAST_USABLE) if showdown_essential else None,
+        "last_usable_artifact": (dict(_LAST_USABLE) if showdown_essential
+                                 or baseline_brief_block().get("current")
+                                 else None),
         "upload_manifest": manifest_repo_relative(
             REPO / "outputs" / args.date / "upload_manifest.json"),
         "showdown_module_version": sd.VERSION,
@@ -6129,6 +6209,19 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                        and captain_prior_brief.get("persons_without_prior")
                        else "")),
     }
+    # R389(c). What this call's baseline did, and whether it is current.
+    if _BASELINE:
+        brief["baseline"] = baseline_brief_block()
+    if ladder_not_presented:
+        # The brief names the CURRENT file: a supervisor pairs these fields.
+        # The ladder's unpresented copy keeps its own path and sha here.
+        ladder_not_presented["sha256"] = brief["delivered_sha256"]
+        brief["ladder_not_presented"] = ladder_not_presented
+        brief["delivered_path"] = str(_LAST_USABLE.get("path"))
+        brief["delivered_path_repo"] = manifest_repo_relative(_LAST_USABLE.get("path"))
+        brief["delivered_sha256"] = _LAST_USABLE.get("sha256")
+    elif not showdown_essential and template.get("passed"):
+        present_baseline_as_current("the thesis ladder's file left reserved rows blank")
     # R290(c) step 2. Same shape as the Classic delivered brief: the LABEL is
     # what a rung changes, never the gates.
     if governor is not None:
@@ -6151,8 +6244,235 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
     # no longer the template DK issued, and no label makes that enterable.
     if not template.get("passed"):
         brief.update(refusal_stamp("showdown_template_broken"))
+        present_baseline_as_current("the thesis ladder's file broke the template")
     return ((7 if showdown_later_failures else 0)
             if template.get("passed") else 3), brief
+
+
+def showdown_baseline_deadline(args) -> float:
+    """R389(c). The build's deadline for the Showdown baseline's window:
+    `main()`'s own (``args._deadline``), else this call's budget from now."""
+    deadline = getattr(args, "_deadline", None)
+    if deadline is not None:
+        return float(deadline)
+    budget = getattr(args, "max_seconds", None)
+    return time.monotonic() + float(budget if budget else default_max_seconds())
+
+
+def publish_showdown_baseline(args, salary: Path, entries: Path, frame,
+                              reserved: Mapping[str, Any], rows: list,
+                              deadline: float, *, share_cap, cpt_cap,
+                              player_cap_pct, cpt_per_contest,
+                              captain_sleeve=None,
+                              before: str = "the thesis ladder") -> dict:
+    """R389(c), roadmap Session 12. Publish the Showdown baseline before the
+    thesis ladder.
+
+    One points-max bank solve per incomplete reserved row (`build_showdown_bank`,
+    thesis-free) on the build's own priced frame, at the build's three
+    portfolio controls, relaxed per slot under R153's order and counted. The
+    template's complete rows are forbidden to it (F-3: never one lineup twice
+    in a contest), and it runs inside `BASELINE_WINDOW_SHARE` of the time left.
+    Every lineup is certified, the file is written and read back under its
+    ``DO_NOT_UPLOAD_`` staging name, and its template and row coverage are
+    checked on those exact bytes BEFORE any manifest row exists. Then it is
+    recorded review-grade in the baseline lineage as
+    ``DKEntries_showdown_<tag>_BASELINE_<sha12>.csv``, promoted, PRESENTED and
+    kept in `_LAST_USABLE`, so a crash anywhere in the ladder exits 7 with it.
+
+    Never raises and never stops the build: short, refused, not presented and
+    errored are named records in `_BASELINE`, and the ladder runs exactly as it
+    did before R389(c). Every value in the record is plain JSON, because
+    `main()` writes the brief without a ``default``.
+    """
+    from mlb_engine.optimize import showdown as sd
+    from mlb_engine.optimize import showdown_theses as st
+
+    _BASELINE.clear()
+    block: dict = {"status": "error", "date": args.date, "contest_type": "showdown",
+                   "lineage": "baseline"}
+
+    def _done() -> dict:
+        _BASELINE.update(block)
+        return dict(_BASELINE)
+
+    try:
+        from mlb_engine.entries.upload_manifest import (
+            BASELINE_LINEAGE, record_delivery, stage_salary_for_delivery,
+            unrecorded_name,
+        )
+        from mlb_engine.pipeline.baseline import BASELINE_WINDOW_SHARE
+        started = time.monotonic()
+        stop_at = started + BASELINE_WINDOW_SHARE * max(0.0, float(deadline) - started)
+        block["window"] = {"share": BASELINE_WINDOW_SHARE,
+                           "seconds": round(stop_at - started, 3)}
+        # The three the bank enforces. `max_cpt_per_contest` is only
+        # `solve_ladder`'s, so it is reported below and never listed as held.
+        controls = {"max_shared_players": share_cap,
+                    "max_cpt_exposure_pct": cpt_cap,
+                    "max_player_exposure_pct": player_cap_pct}
+        block["controls"] = dict(controls)
+        seeds, unmapped = sd.complete_row_player_keys(frame, reserved.get("reserved") or [])
+        diag: dict = {}
+        bank = sd.build_showdown_bank(
+            frame, n=len(rows), max_cpt_exposure_pct=cpt_cap,
+            max_shared_players=share_cap, max_player_exposure_pct=player_cap_pct,
+            diagnostics=diag, stop_at=stop_at, seed_forbidden=seeds)
+        block["solve"] = {
+            "mode": "points_max_bank", "built": len(bank), "needed": len(rows),
+            "wall_s": round(time.monotonic() - started, 3),
+            "stop_reason": diag.get("window_stopped"),
+            "solver_timeouts": int(diag.get("solver_timeouts") or 0),
+            "time_limited_accepted": int(diag.get("time_limited_accepted") or 0),
+            "complete_rows_forbidden": len(seeds),
+            "complete_rows_unmapped": list(unmapped),
+        }
+        block["relaxations"] = showdown_relaxation_counts(diag)
+        if captain_sleeve:
+            block["captain_sleeve"] = {
+                "applied": False,
+                "designated_entries": int(captain_sleeve.get("entries") or 0),
+                "reason": ("the baseline is a points-max bank, so no entry has a "
+                           "named captain to designate; the sleeve is the thesis "
+                           "ladder's"),
+            }
+        if len(bank) < len(rows):
+            block["status"] = "short"
+            block["note"] = ("the bank did not cover every reserved row inside its "
+                             "window, so no baseline file was written; F-2's "
+                             "removed-rows form is R401 (Session 22)")
+            print(f"BASELINE SHORT: {len(bank)} of {len(rows)} reserved rows "
+                  f"({block['solve']['stop_reason'] or 'the bank stopped'}); no "
+                  f"baseline file, the build continues", file=sys.stderr)
+            return _done()
+        certs = [sd.certify_showdown(lineup, frame) for lineup in bank]
+        failed = [c for c in certs if not c.get("passed")]
+        if failed:
+            block["status"] = "not_presented"
+            block["why"] = {"certify_showdown": [
+                "; ".join(str(e) for e in (c.get("errors") or [])) for c in failed][:5]}
+            print(f"BASELINE NOT PRESENTED: {len(failed)} lineup(s) failed "
+                  f"certify_showdown; the build continues", file=sys.stderr)
+            return _done()
+        contest_of_rows = [r["contest_id"] for r in rows]
+        per_contest = st.per_contest_report(frame, bank, contest_of_rows,
+                                            max_cpt_per_contest=cpt_per_contest)
+        block["per_contest"] = {
+            "enforced": False,
+            "max_cpt_per_contest": per_contest.get("max_cpt_per_contest"),
+            "over_cap": list(per_contest.get("over_cap") or []),
+            "clean": per_contest.get("clean"),
+            "note": ("the bank does not hold the per-contest captain cap (the "
+                     "ladder's control); this is what the file carries"),
+        }
+        suffix = slate_tag_suffix(salary)
+        tag = suffix.lstrip("_")
+        out_dir = REPO / "outputs" / args.date
+        out_dir.mkdir(parents=True, exist_ok=True)
+        assignments = [{"entry_id": row["entry_id"],
+                        "roster_ids": list(lineup["roster_ids"])}
+                       for row, lineup in zip(rows, bank)]
+        write = sd.write_showdown_entries(
+            str(entries), str(out_dir / f"DKEntries_showdown{suffix}_BASELINE.csv"),
+            assignments, promote=False)
+        if not write.get("passed"):
+            block["status"] = "refused"
+            block["errors"] = [str(e) for e in (write.get("errors") or [])][:5]
+            print(f"BASELINE REFUSED at the writer: {'; '.join(block['errors'][:2])}; "
+                  f"no baseline file, the build continues", file=sys.stderr)
+            return _done()
+        staged = Path(write["candidate_path"])
+        # The template check and row coverage read the staged BYTES, before any
+        # manifest row exists: preflight has no template to compare against.
+        template = sd.verify_template_preserved(str(entries), str(staged))
+        written = sd.read_showdown_reserved_rows(str(staged))
+        unfilled = sorted(r["entry_id"] for r in written["reserved"]
+                          if not r["is_complete"])
+        if not template.get("passed") or unfilled:
+            block["status"] = "not_presented"
+            block["why"] = {"template": list(template.get("errors") or [])[:5],
+                            "unfilled_rows": unfilled[:10]}
+            block["staged_file"] = str(staged)
+            print(f"BASELINE NOT PRESENTED: {block['why']}; it stays at "
+                  f"{staged.name}; the build continues", file=sys.stderr)
+            return _done()
+        data = staged.read_bytes()
+        sha = hashlib.sha256(data).hexdigest()
+        dest = out_dir / f"DKEntries_showdown{suffix}_BASELINE_{sha[:12]}.csv"
+        provisional = unrecorded_name(dest)
+        os.replace(staged, provisional)
+        delivered = provisional
+        try:
+            record_delivery(
+                date=args.date, delivered_file=dest, hash_source=provisional,
+                contest_type="showdown", slate_tag=tag,
+                contest_ids=sorted({r["contest_id"] for r in rows}),
+                contest_names=sorted({r.get("contest_name", "") for r in rows}),
+                entries=len(assignments), run_id=None, status="candidate",
+                certification="review_grade",
+                notes=(f"Showdown baseline (R389(c)): a points-max bank at the "
+                       f"build's controls, published before {before}. "
+                       f"Showdown ships review-grade; see CLAUDE.md."),
+                controls=controls, relaxations=block["relaxations"],
+                lineage=BASELINE_LINEAGE)
+            block["manifest_recorded"] = True
+        except Exception as exc:  # noqa: BLE001 - bookkeeping never costs the file
+            block["manifest_recorded"] = False
+            block["later_failures"] = [{"stage": "manifest",
+                                        "error": f"{type(exc).__name__}: {exc}"}]
+            print(f"BASELINE manifest not recorded ({exc}); the file keeps its "
+                  f"DO_NOT_UPLOAD_ name, the only copy", file=sys.stderr)
+        block["promoted"] = False
+        if block["manifest_recorded"]:
+            try:
+                stage_salary_for_delivery(args.date, str(salary), tag)
+                os.replace(provisional, dest)
+                delivered = dest
+                block["promoted"] = True
+            except Exception as exc:  # noqa: BLE001 - the row exists; name the step
+                block.setdefault("later_failures", []).append(
+                    {"stage": "promote", "error": f"{type(exc).__name__}: {exc}"})
+                print(f"BASELINE recorded but not promoted ({exc}); the file keeps "
+                      f"its DO_NOT_UPLOAD_ name, the only copy", file=sys.stderr)
+        coverage = _coverage(delivered)
+        block.update({
+            "status": "delivered", "date": args.date, "path": str(delivered),
+            "sha256": sha, "label": "review_grade", "coverage": coverage,
+            "essential_valid": {"essential_valid": True,
+                                "basis": "showdown_lineup_checks_and_template",
+                                "preflight": None},
+            "published_utc": dt.datetime.now(dt.timezone.utc).isoformat(),
+            "manifest_date": args.date, "slate_tag": tag,
+        })
+        # Presented the moment it passed; every later step is its own fact.
+        note_last_usable({
+            "path": str(delivered), "sha256": sha, "size_bytes": len(data),
+            "coverage": coverage, "label": "review_grade",
+            "essential_valid": block["essential_valid"], "run_id": None,
+            "contest_type": "showdown", "date": args.date, "lineage": "baseline",
+        })
+        print(f"BASELINE delivered before {before}: review-grade, "
+              f"{(coverage or {}).get('filled')}/{(coverage or {}).get('reserved')} "
+              f"rows, never certified; the ladder follows", file=sys.stderr)
+        block["brief"] = _write_baseline_brief(args, salary, block)
+    except Exception as exc:  # noqa: BLE001 - a baseline never costs the build
+        if block.get("status") != "delivered":
+            block["status"] = "error"
+        block["error"] = f"{type(exc).__name__}: {exc}"
+        print(f"BASELINE ERROR: {block['error']}; "
+              + ("the baseline above is still the delivered file"
+                 if block.get("status") == "delivered" else "no baseline presented")
+              + "; the build continues", file=sys.stderr)
+    return _done()
+
+
+def showdown_refusal_carries_baseline(payload: dict, reason: str) -> dict:
+    """R389(c). A Showdown refusal after the baseline names it in its payload
+    and re-presents it as the last FILE line, before the JSON is printed."""
+    if _BASELINE:
+        payload["baseline"] = baseline_brief_block()
+        present_baseline_as_current(reason)
+    return payload
 
 
 def inert_factors(factors) -> list:
@@ -7084,6 +7404,10 @@ def main() -> int:
 
     started = time.monotonic()
     deadline = started + args.max_seconds
+    # R389(c). The Showdown baseline's window reads the build's deadline; an
+    # attribute, as `_governor` and `_never_relax` are, so `run_showdown`'s
+    # signature is unchanged.
+    args._deadline = deadline
 
     salary, entries = Path(args.salary), Path(args.entries_csv)
     if not salary.exists() or not entries.exists():
@@ -7700,8 +8024,9 @@ REFUSAL_EXIT_NOTES = {
     # R393(b).
     7: ("delivered a prior valid artifact after a later failure: the file "
         "passed its essential checks and a later stage (research or the "
-        "enhanced solve after the R389(b) baseline, promotion, the brief, a "
-        "report, the mirror or the manifest) failed; the file is the "
+        "enhanced solve after the R389(b) baseline, the Showdown thesis ladder "
+        "after the R389(c) baseline, promotion, the brief, a report, the "
+        "mirror or the manifest) failed; the file is the "
         "deliverable under its own label"),
     10: "bank thin: resumable, run the same command again to add a slice",
 }

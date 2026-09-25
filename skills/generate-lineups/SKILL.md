@@ -317,8 +317,8 @@ keyboard. Inside T-30:
   it as a wall, so read the gate it names before deciding which class it is.
 - **An S or P failure ships review-grade, never upload-ready.** An S/P-only
   refusal lands `UNCERTIFIED` in `outputs/`: `references/review_grade.md`.
-- **Every Classic build ships a baseline first** (`DKEntries_<tag>_BASELINE_<run>.csv`,
-  review-grade), and the last `FILE` line is the current file: `references/baseline.md`.
+- **Every Classic build, and every Showdown ladder build, ships a review-grade baseline first**
+  (`*_BASELINE_*.csv`), and the last `FILE` line is the current file: `references/baseline.md`.
 - **`--force` on the preflight stays Ben's at every clock.** The preflight
   does not yet tell a bookkeeping failure from a byte mismatch (R388(c),
   Session 13), so a file whose only preflight failures you judge P is

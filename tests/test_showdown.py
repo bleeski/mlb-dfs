@@ -20,6 +20,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 import types
 import unittest
 import unittest.mock
@@ -6679,3 +6680,517 @@ class R382CaptainPriorWiringTests(unittest.TestCase):
         msg = str(caught.exception)
         self.assertIn("ownership_pred_nope.json", msg)
         self.assertIn("--captain-prior", msg)
+
+
+class ShowdownBaselineFirstTests(unittest.TestCase):
+    """R389(c), roadmap Session 12: a Showdown build publishes a baseline file
+    before its thesis ladder, so a crash or a refusal anywhere after it still
+    leaves Ben a legal, review-grade file.
+
+    Driven through the real exit door (`_main_recording_refusals`, with `main`
+    swapped for the `run_showdown` call) on the vendored MIN_CHC slate, on a
+    temp root: `mod.REPO` and `upload_manifest.REPO_ROOT` point there, the
+    lineups feed raises (no egress) and the moneyline is stubbed empty, so no
+    test reads the network or writes outside its own directory.
+    """
+
+    _DATE = "2026-07-18"
+    _AS_OF = "2026-07-18T12:00:00-04:00"   # before MIN@CHC's 02:20PM ET lock
+
+    @staticmethod
+    def _module():
+        path = REPO / "skills" / "generate-lineups" / "scripts" / "build_slate.py"
+        spec = importlib.util.spec_from_file_location("build_slate_r389c", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def _build(self, root, *, patches=(), salary_csv=None, entries_csv=None,
+               args_extra=None, mod=None):
+        import shutil
+        from mlb_engine.entries import upload_manifest as um
+        mod = mod or self._module()
+        sal, ent = root / "DKSalaries.csv", root / "DKEntries.csv"
+        shutil.copy2(salary_csv or SAL, sal)
+        shutil.copy2(entries_csv or ENT, ent)
+        args = types.SimpleNamespace(**{
+            "date": self._DATE, "entries": None, "controls_override": None,
+            "projections": None, "declare_pitcher": [], "lineups": None,
+            "odds": None, "brief": None, **(args_extra or {})})
+        stash: dict = {}
+
+        def main():
+            code, brief = mod.run_showdown(args, root, sal, ent)
+            stash["brief"] = brief
+            return code
+
+        def no_feed(*_a, **_k):
+            raise OSError("no egress in a test")
+
+        env = {k: v for k, v in os.environ.items() if k != "THE_ODDS_API_KEY"}
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.ExitStack() as stack:
+            stack.enter_context(unittest.mock.patch.dict(os.environ, env, clear=True))
+            for target, name, value in [
+                    (mod, "REPO", root), (um, "REPO_ROOT", root), (mod, "main", main),
+                    (mod, "fetch_lineups", no_feed),
+                    (mod, "showdown_moneyline", lambda *_a, **_k: ({}, {}, {})),
+                    (sys, "argv", ["build_slate.py", "--date", self._DATE]),
+                    *patches]:
+                stack.enter_context(unittest.mock.patch.object(target, name, value))
+            stack.enter_context(contextlib.redirect_stdout(out))
+            stack.enter_context(contextlib.redirect_stderr(err))
+            code = mod._main_recording_refusals()
+        text = out.getvalue()
+        brief = stash.get("brief")
+        if not brief and "{" in text:
+            brief = json.loads(text[text.rfind("\n{") + 1 if "\n{" in text
+                                    else text.find("{"):])
+        return types.SimpleNamespace(code=code, brief=brief or {}, out=text,
+                                     err=err.getvalue(), mod=mod, root=root,
+                                     salary=sal, entries=ent, args=args)
+
+    def _rows(self, root):
+        path = Path(root) / "outputs" / self._DATE / "upload_manifest.json"
+        return json.loads(path.read_text(encoding="utf-8"))["deliveries"]
+
+    @staticmethod
+    def _file_lines(err):
+        return [line for line in err.splitlines() if line.startswith("FILE  ")]
+
+    @staticmethod
+    def _path_of(file_line):
+        return Path(file_line.split("  ")[1])
+
+    def _baseline_files(self, root):
+        folder = Path(root) / "outputs" / self._DATE
+        return sorted(folder.glob("*BASELINE*.csv")) if folder.exists() else []
+
+    def _records(self, root, kind=None):
+        found = []
+        for path in sorted((Path(root) / "data" / "deliveries").rglob("*.json")):
+            body = json.loads(path.read_text(encoding="utf-8"))
+            if kind is None or body.get("kind") == kind:
+                found.append((path, body))
+        return found
+
+    @staticmethod
+    def _salary_rows():
+        with SAL.open(newline="", encoding="utf-8-sig") as fh:
+            return {row["ID"]: row for row in csv.DictReader(fh)}
+
+    @staticmethod
+    def _entry_rows(path):
+        parsed = sd.read_showdown_reserved_rows(path)
+        return parsed["reserved"]
+
+    def _preflight(self, path, salary, root):
+        """Preflight with ITS root at the build's, so the file under
+        ``outputs/`` counts as a delivery and the manifest row is required."""
+        from tools import preflight_upload
+        out = io.StringIO()
+        with unittest.mock.patch.object(preflight_upload, "REPO_ROOT", Path(root)), \
+                contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+            self.assertTrue(preflight_upload.is_delivered_file(Path(path)))
+            code = preflight_upload.main([
+                "--entries", str(path), "--salary", str(salary),
+                "--json", "--as-of", self._AS_OF])
+        return code, json.loads(out.getvalue())
+
+    @staticmethod
+    def _points_max_salary(dest):
+        """MIN_CHC with DK's Starting column blanked: no posted order, so
+        `run_showdown` takes the points-max bank rather than the ladder."""
+        with SAL.open(newline="", encoding="utf-8-sig") as fh:
+            rows = list(csv.reader(fh))
+        col = rows[0].index("Starting")
+        for row in rows[1:]:
+            if len(row) > col:
+                row[col] = ""
+        with dest.open("w", newline="", encoding="utf-8") as fh:
+            csv.writer(fh).writerows(rows)
+        return dest
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.base = Path(self.tmp.name)
+
+    def _root(self, name="root"):
+        root = self.base / name
+        root.mkdir()
+        return root
+
+    # -- the acceptance: delivered, superseding nothing, valid on its bytes -- #
+
+    def test_a_clean_build_presents_the_baseline_then_the_ladder(self):
+        r = self._build(self._root())
+        self.assertEqual(r.code, 0, r.err[-3000:])
+        files = self._file_lines(r.err)
+        self.assertEqual(len(files), 2, files)
+        self.assertIn("_BASELINE_", files[0])
+        self.assertNotIn("_BASELINE_", files[-1], "the ladder's file is current")
+        rows = self._rows(r.root)
+        base = [x for x in rows if x.get("lineage") == "baseline"]
+        ladder = [x for x in rows if not x.get("lineage")]
+        self.assertEqual((len(base), len(ladder)), (1, 1), rows)
+        self.assertLess(rows.index(base[0]), rows.index(ladder[0]))
+        for row in base + ladder:
+            self.assertEqual(row["contest_type"], "showdown")
+            self.assertEqual(row["certification"], "review_grade")
+            self.assertEqual(row["status"], "candidate", "neither supersedes the other")
+            self.assertFalse(row.get("superseded_by"))
+        block = r.brief["baseline"]
+        self.assertEqual(block["status"], "delivered")
+        self.assertFalse(block["current"])
+        # `main()` writes the brief with no `default`: the block is plain JSON.
+        json.dumps(r.brief)
+
+    def test_a_crash_in_the_ladder_delivers_the_baseline_with_exit_7(self):
+        def boom(*_a, **_k):
+            raise RuntimeError("the ladder crashed")
+
+        r = self._build(self._root(), patches=[(st, "build_thesis_ladder", boom)])
+        self.assertEqual(r.code, 7, r.err[-3000:])
+        files = self._file_lines(r.err)
+        self.assertTrue(files and "_BASELINE_" in files[-1], files)
+        self.assertLess(r.err.rfind(files[-1]), r.err.find("LATER FAILURE"))
+        self.assertEqual(r.brief["status"], "delivered_after_failure")
+        self.assertTrue(r.brief["baseline"]["current"])
+        delivered = Path(r.brief["delivered_path"])
+        self.assertEqual(hashlib.sha256(delivered.read_bytes()).hexdigest(),
+                         r.brief["delivered_sha256"])
+        refusals = [b for _p, b in self._records(r.root, "refusal")]
+        self.assertEqual([b["exit_code"] for b in refusals], [7])
+        self.assertEqual(refusals[0]["refusal"]["last_usable_artifact"]["sha256"],
+                         r.brief["delivered_sha256"])
+
+    def test_a_ladder_refusal_keeps_exit_3_and_re_presents_the_baseline(self):
+        r = self._build(self._root(), patches=[
+            (st, "solve_ladder", lambda _df, theses, **_k: [None] * len(theses))])
+        self.assertEqual(r.code, 3, r.err[-3000:])
+        payload = json.loads(r.out)             # stdout is ONE JSON document
+        self.assertEqual(payload["status"], "ladder_infeasible")
+        self.assertEqual(payload["baseline"]["status"], "delivered")
+        self.assertTrue(payload["baseline"]["current"])
+        files = self._file_lines(r.err)
+        self.assertEqual(len(files), 2, "presented once, then re-presented last")
+        self.assertIn("_BASELINE_", files[-1])
+        self.assertIn("BASELINE is the current file", r.err)
+        refusals = [b for _p, b in self._records(r.root, "refusal")]
+        self.assertEqual(refusals[0]["exit_code"], 3)
+        self.assertEqual(refusals[0]["refusal"]["baseline"]["status"], "delivered")
+
+    def test_the_baseline_passes_preflight_and_the_template_check_on_its_bytes(self):
+        r = self._build(self._root())
+        self.assertEqual(r.code, 0, r.err[-3000:])
+        (path,) = self._baseline_files(r.root)
+        self.assertTrue(sd.verify_template_preserved(ENT, path)["passed"])
+        self.assertTrue(all(row["is_complete"] for row in self._entry_rows(path)))
+        code, report = self._preflight(path, r.salary, r.root)
+        self.assertEqual(code, 0, report)
+        self.assertEqual(report.get("verdict"), "review_ready", report)
+
+    # -- the rows it fills ---------------------------------------------------- #
+
+    def test_complete_rows_are_preserved_and_never_repeated_in_their_contest(self):
+        first = self._build(self._root("first"))
+        (path,) = self._baseline_files(first.root)
+        held = self._entry_rows(path)[0]            # the baseline's slot 0
+        with ENT.open(newline="", encoding="utf-8-sig") as fh:
+            grid = list(csv.reader(fh))
+        grid[held["row_index"] - 1][4:10] = held["cells"]
+        template = self.base / "DKEntries_one_held.csv"
+        with template.open("w", newline="", encoding="utf-8") as fh:
+            csv.writer(fh).writerows(grid)
+        r = self._build(self._root("second"), entries_csv=template)
+        self.assertEqual(r.code, 0, r.err[-3000:])
+        (rerun,) = self._baseline_files(r.root)
+        rows = self._entry_rows(rerun)
+        kept = [row for row in rows if row["entry_id"] == held["entry_id"]]
+        self.assertEqual(kept[0]["cells"], held["cells"], "a complete row is immutable")
+        salary = self._salary_rows()
+        by_contest = collections.defaultdict(list)
+        for row in rows:
+            people = frozenset(salary[c]["Name"] for c in row["cells"])
+            by_contest[row["contest_id"]].append(people)
+        for contest, sets in by_contest.items():
+            self.assertEqual(len(sets), len(set(sets)),
+                             f"contest {contest} carries one lineup twice (F-3)")
+        self.assertEqual(r.brief["baseline"]["solve"]["complete_rows_forbidden"], 1)
+
+    def test_every_baseline_lineup_carries_both_teams(self):
+        r = self._build(self._root())
+        (path,) = self._baseline_files(r.root)
+        team = {pid: row["TeamAbbrev"] for pid, row in self._salary_rows().items()}
+        for row in self._entry_rows(path):
+            self.assertEqual({team[c] for c in row["cells"]}, {"MIN", "CHC"},
+                             row["entry_id"])
+
+    def test_the_baseline_brief_is_bound_to_its_bytes(self):
+        r = self._build(self._root())
+        (path,) = self._baseline_files(r.root)
+        stem = path.stem[len("DKEntries_"):]
+        brief = json.loads((path.parent / f"build_brief_{stem}.json").read_text(
+            encoding="utf-8"))
+        self.assertEqual(brief["delivered_sha256"],
+                         hashlib.sha256(path.read_bytes()).hexdigest())
+        self.assertEqual(brief["contest_type"], "showdown")
+        self.assertEqual(brief["lineage"], "baseline")
+        self.assertIn("declared_pitchers", brief)
+
+    # -- short, not needed, errored: named, and the build carries on ---------- #
+
+    def test_a_spent_window_is_short_writes_nothing_and_the_ladder_delivers(self):
+        r = self._build(self._root(), args_extra={"_deadline": time.monotonic() - 1})
+        self.assertEqual(r.code, 0, r.err[-3000:])
+        self.assertEqual(self._baseline_files(r.root), [])
+        self.assertEqual(r.brief["baseline"]["status"], "short")
+        self.assertEqual(r.brief["baseline"]["solve"]["stop_reason"], "window")
+        self.assertEqual(len(self._file_lines(r.err)), 1)
+
+    def test_the_points_max_path_needs_no_baseline_unless_rows_would_go_blank(self):
+        salary = self._points_max_salary(self.base / "DKSalaries_no_order.csv")
+        r = self._build(self._root("plain"), salary_csv=salary)
+        self.assertEqual(r.code, 0, r.err[-3000:])
+        self.assertEqual(r.brief["baseline"]["status"], "not_needed")
+        self.assertEqual(self._baseline_files(r.root), [])
+        self.assertEqual(len(self._file_lines(r.err)), 1)
+        # --entries-count below the reserved rows: the build's own bank refuses
+        # the rows it leaves blank, and the baseline covers every row.
+        short = self._build(self._root("short"), salary_csv=salary,
+                            args_extra={"entries": 5})
+        self.assertEqual(short.code, 3, short.err[-3000:])
+        payload = json.loads(short.out)
+        self.assertEqual(payload["baseline"]["status"], "delivered")
+        self.assertIn("_BASELINE_", self._file_lines(short.err)[-1])
+
+    def test_a_raising_bank_inside_the_baseline_never_costs_the_build(self):
+        def boom(*_a, **_k):
+            raise RuntimeError("bank crashed")
+
+        r = self._build(self._root(), patches=[(sd, "build_showdown_bank", boom)])
+        self.assertEqual(r.code, 0, r.err[-3000:])
+        self.assertEqual(r.brief["baseline"]["status"], "error")
+        self.assertIn("bank crashed", r.brief["baseline"]["error"])
+        self.assertEqual(len(self._file_lines(r.err)), 1)
+
+    def test_a_lineup_that_fails_certification_is_never_presented(self):
+        real = sd.build_showdown_bank
+
+        def misstated(*a, **k):
+            bank = real(*a, **k)
+            if bank:
+                bank[0] = dict(bank[0], salary=float(bank[0]["salary"]) + 500)
+            return bank
+
+        r = self._build(self._root(), patches=[(sd, "build_showdown_bank", misstated)])
+        self.assertEqual(r.code, 0, r.err[-3000:])
+        block = r.brief["baseline"]
+        self.assertEqual(block["status"], "not_presented")
+        self.assertIn("certify_showdown", block["why"])
+        self.assertEqual(self._baseline_files(r.root), [])
+        self.assertEqual(len(self._file_lines(r.err)), 1, "only the ladder's file")
+
+    def test_the_template_is_checked_before_any_row_is_recorded(self):
+        real = sd.verify_template_preserved
+
+        def broken_for_the_baseline(source, candidate, *a, **k):
+            if "_BASELINE" in str(candidate):
+                return {"passed": False, "errors": ["non-roster cell changed at row 2"]}
+            return real(source, candidate, *a, **k)
+
+        r = self._build(self._root(), patches=[
+            (sd, "verify_template_preserved", broken_for_the_baseline)])
+        self.assertEqual(r.code, 0, r.err[-3000:])
+        block = r.brief["baseline"]
+        self.assertEqual(block["status"], "not_presented")
+        self.assertTrue(Path(block["staged_file"]).name.startswith("DO_NOT_UPLOAD_"))
+        self.assertEqual([x for x in self._rows(r.root) if x.get("lineage")], [],
+                         "no manifest row for a file that failed its template")
+
+    def test_a_rerun_on_the_same_bytes_reuses_the_baseline_row(self):
+        root = self._root()
+        first = self._build(root)
+        again = self._build(root)
+        self.assertEqual((first.code, again.code), (0, 0))
+        self.assertEqual(len(self._baseline_files(root)), 1, "one name per bytes")
+        live = [x for x in self._rows(root) if x.get("lineage") == "baseline"
+                and x.get("status") != "superseded"]
+        self.assertEqual(len(live), 1)
+
+    def test_a_ladder_whose_record_alone_fails_leaves_the_baseline_current(self):
+        from mlb_engine.entries import upload_manifest as um
+        real = um.record_delivery
+
+        def only_the_baseline_records(**kw):
+            if kw.get("lineage") == "baseline":
+                return real(**kw)
+            raise OSError("manifest locked")
+
+        r = self._build(self._root(), patches=[(um, "record_delivery",
+                                                 only_the_baseline_records)])
+        self.assertEqual(r.code, 7, r.err[-3000:])
+        self.assertIn("_BASELINE_", self._file_lines(r.err)[-1])
+        self.assertTrue(r.brief["baseline"]["current"])
+        self.assertEqual(r.brief["last_usable_artifact"]["lineage"], "baseline")
+        self.assertEqual([f["stage"] for f in r.brief["later_failures"]], ["manifest"])
+        # The brief names the current file, so its path and sha agree.
+        (baseline,) = self._baseline_files(r.root)
+        self.assertEqual(Path(r.brief["delivered_path"]), baseline)
+        self.assertEqual(r.brief["delivered_sha256"],
+                         hashlib.sha256(baseline.read_bytes()).hexdigest())
+        ladder = Path(r.brief["ladder_not_presented"]["path"])
+        self.assertTrue(ladder.name.startswith("DO_NOT_UPLOAD_"))
+        self.assertEqual(r.brief["ladder_not_presented"]["sha256"],
+                         hashlib.sha256(ladder.read_bytes()).hexdigest())
+
+    def test_a_sleeve_refusal_stages_nothing_and_solves_nothing(self):
+        root = self._root()
+        r = self._build(root, args_extra={
+            "captain_sleeve": {"entries": 2, "from": ["Miguel Amaya", "Nobody Here"]}})
+        self.assertEqual(r.code, 4)
+        self.assertFalse((root / "outputs").exists(),
+                         "exit 4 stays before any solve, the baseline's included")
+        self.assertEqual(r.mod._BASELINE, {})
+
+    def test_the_points_max_governor_re_solve_prices_the_pool_once(self):
+        """R425, found by this session: the points-max loop re-priced an
+        already-priced frame on a governor re-solve, so F1 multiplied in
+        twice. Pricing happens once, before the loop, on both paths."""
+        from datetime import datetime, timedelta, timezone
+        from mlb_engine.pipeline import deadline_governor as dg
+        salary = self._points_max_salary(self.base / "DKSalaries_no_order.csv")
+        mod = self._module()
+        real_price, real_bank = mod.price_showdown_pool, sd.build_showdown_bank
+        priced, banks = [], []
+
+        def price(*a, **k):
+            priced.append(k.get("use_ladder"))
+            return real_price(*a, **k)
+
+        def bank(*a, **k):
+            banks.append(k.get("n"))
+            return [] if len(banks) == 1 else real_bank(*a, **k)
+
+        r = self._build(self._root(), salary_csv=salary, mod=mod, patches=[
+            (mod, "price_showdown_pool", price), (sd, "build_showdown_bank", bank)],
+            args_extra={"deliver_by": "set", "_governor": dg.DeadlineGovernor(
+                datetime.now(timezone.utc) + timedelta(minutes=2))})
+        self.assertEqual(r.code, 0, r.err[-3000:])
+        self.assertEqual(len(banks), 2, "the rung re-solved")
+        self.assertEqual(priced, [False], "priced once, not once per attempt")
+
+    def test_a_refused_rerun_names_the_earlier_ladder_file_still_live(self):
+        root = self._root()
+        first = self._build(root)
+        self.assertEqual(first.code, 0, first.err[-3000:])
+        (ladder,) = [x for x in self._rows(root) if not x.get("lineage")]
+        again = self._build(root, patches=[
+            (st, "solve_ladder", lambda _df, theses, **_k: [None] * len(theses))])
+        self.assertEqual(again.code, 3, again.err[-3000:])
+        live = json.loads(again.out)["baseline"]["live_delivery"]
+        self.assertEqual(live["delivered_file"], ladder["delivered_file"])
+        self.assertIn("thesis-ladder file", live["note"])
+        self.assertIn("still live for this slate", again.err)
+
+    def test_a_current_baseline_says_the_sleeve_did_not_arrive(self):
+        r = self._build(self._root(), args_extra={
+            "captain_sleeve": {"entries": 2, "from": ["Miguel Amaya", "Ryan Kreidler"]}},
+            patches=[(st, "solve_ladder",
+                      lambda _df, theses, **_k: [None] * len(theses))])
+        self.assertEqual(r.code, 3, r.err[-3000:])
+        block = json.loads(r.out)["baseline"]
+        self.assertIs(block["captain_sleeve"]["applied"], False)
+        self.assertIn("carries NONE of them", r.err)
+
+    # -- the bank's window and seeds (SD) -------------------------------------- #
+
+    def test_a_past_stop_at_builds_nothing_and_relaxes_nothing(self):
+        diag: dict = {}
+        bank = sd.build_showdown_bank(_synth(), n=3, diagnostics=diag,
+                                      stop_at=time.monotonic() - 1)
+        self.assertEqual(bank, [])
+        self.assertEqual(diag["window_stopped"], "window")
+        self.assertEqual(diag["solver_timeouts"], 0)
+        for key in ("relaxed_slots", "overlap_relaxed_slots", "both_relaxed_slots",
+                    "player_relaxed_slots"):
+            self.assertEqual(diag[key], 0, key)
+
+    def test_a_future_stop_at_builds_the_bank_none_builds(self):
+        plain_diag, timed_diag = {}, {}
+        plain = sd.build_showdown_bank(_synth(), n=4, diagnostics=plain_diag)
+        timed = sd.build_showdown_bank(_synth(), n=4, diagnostics=timed_diag,
+                                       stop_at=time.monotonic() + 600)
+        self.assertEqual([lu["player_keys"] for lu in plain],
+                         [lu["player_keys"] for lu in timed])
+        self.assertNotIn("window_stopped", plain_diag, "None changes nothing")
+        self.assertIsNone(timed_diag["window_stopped"])
+
+    def test_the_window_caps_each_solve_and_stops_on_a_projection(self):
+        ticks = iter(range(0, 1000, 3))           # every clock read is 3s later
+        limits = []
+        real = sd.build_showdown_lineup
+
+        def spy(*a, **k):
+            limits.append(k.get("time_limit"))
+            return real(*a, **k)
+
+        diag: dict = {}
+        with unittest.mock.patch.object(sd, "build_showdown_lineup", spy):
+            bank = sd.build_showdown_bank(_synth(), n=4, diagnostics=diag,
+                                          stop_at=10.0, clock=lambda: next(ticks),
+                                          time_limit=20)
+        self.assertEqual(len(bank), 1, "slot 1 would overrun the window")
+        self.assertEqual(diag["window_stopped"], "projected")
+        # Reads: the start (0), slot 0's check (3), its rung (6): min(20, 10 - 6).
+        self.assertEqual(limits, [4.0], "each rung gets the time the window has left")
+
+    def test_a_timeout_under_the_windows_cap_is_the_window_not_the_solver(self):
+        def always_times_out(*_a, status_out=None, **_k):
+            status_out.update(timed_out=True, status="time_limit")
+            return None
+
+        for stop_at, stopped, timeouts in ((time.monotonic() + 5, "window", 0),
+                                           (None, None, 1)):
+            diag: dict = {}
+            with unittest.mock.patch.object(sd, "build_showdown_lineup",
+                                            always_times_out):
+                bank = sd.build_showdown_bank(_synth(), n=3, diagnostics=diag,
+                                              stop_at=stop_at, time_limit=20)
+            self.assertEqual(bank, [])
+            self.assertEqual(diag.get("window_stopped"), stopped, stop_at)
+            self.assertEqual(diag["solver_timeouts"], timeouts,
+                             "only the caller's own limit is a solver timeout (R158)")
+
+    def test_seeded_sets_are_never_solved(self):
+        (best,) = sd.build_showdown_bank(_synth(), n=1, max_shared_players=None)
+        (other,) = sd.build_showdown_bank(_synth(), n=1, max_shared_players=None,
+                                          seed_forbidden=[best["player_keys"]])
+        self.assertNotEqual(sorted(best["player_keys"]), sorted(other["player_keys"]))
+
+    def test_complete_rows_map_to_player_keys_and_unmapped_ids_are_named(self):
+        df = _synth()
+        rows = [{"is_complete": True, "cells": ["2001", "1002", "1003", "1004", "1005", "1006"]},
+                {"is_complete": True, "cells": ["2001", "1002", "1003", "1004", "1005", "9999"]},
+                {"is_complete": False, "cells": ["", "", "", "", "", ""]}]
+        sets, unmapped = sd.complete_row_player_keys(df, rows)
+        self.assertEqual(sets, [sorted(["AA_Star|AA", "AA_2|AA", "AA_3|AA", "BB_1|BB",
+                                        "BB_2|BB", "BB_3|BB"])])
+        self.assertEqual(unmapped, ["9999"])
+
+    # -- records and names ------------------------------------------------------ #
+
+    def test_the_baseline_and_the_ladder_records_never_share_a_name(self):
+        from mlb_engine.entries.delivery_record import record_name
+        sha = "ab" * 32
+        self.assertEqual(record_name("1420_1g_sd", None, sha),
+                         f"1420_1g_sd_norun_{sha[:12]}.json", "every old name holds")
+        self.assertNotEqual(record_name("1420_1g_sd", None, sha, lineage="baseline"),
+                            record_name("1420_1g_sd", None, sha))
+        self.assertEqual(record_name("t", "run1", sha, lineage="baseline"),
+                         "t_run1.json", "a run id is already unique")
+        r = self._build(self._root())
+        names = sorted(p.name for p, b in self._records(r.root)
+                       if b.get("kind") != "refusal")
+        self.assertEqual(sum("_norun_baseline_" in n for n in names), 1, names)

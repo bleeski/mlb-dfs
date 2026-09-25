@@ -2,6 +2,185 @@
 
 What changed in the engine, the tools and the contracts, when, and why.
 
+## 2026-09-25 — R389(c) + R425: baseline-first Showdown. `run_showdown` publishes a review-grade points-max file over every reserved row before the thesis ladder, so a ladder crash or refusal still leaves a legal file; the pool is priced once (roadmap Session 12; R426 and R427 filed)
+
+**Scope.**
+- `skills/generate-lineups/scripts/build_slate.py`:
+  - `run_showdown`: the pool is priced once, before the governed loop, on both paths (R425). The baseline call follows (or a `not_needed` record). The five exit-3 sites carry and re-present the baseline. A ladder whose own manifest row failed leaves a recorded baseline current (`ladder_not_presented`). The brief carries `baseline`, and names the baseline as `last_usable_artifact` when it is current.
+  - `main`: `args._deadline`.
+  - New: `showdown_baseline_deadline`, `publish_showdown_baseline`, `showdown_refusal_carries_baseline`.
+  - `_write_baseline_brief` and `_earlier_live_delivery` read the block's `contest_type`. The brief name strips a `DO_NOT_UPLOAD_` prefix. Showdown gets its own live-row note.
+  - `present_baseline_as_current`: the sleeve that did not arrive.
+  - `REFUSAL_EXIT_NOTES[7]`.
+- `mlb_engine/optimize/showdown.py`: `build_showdown_bank(*, stop_at=, clock=, seed_forbidden=)` and `complete_row_player_keys` (new).
+- `mlb_engine/entries/delivery_record.py`: `record_name(lineage=)`, and `write_delivery_record` passes the row's lineage.
+- `tests/test_showdown.py`: `ShowdownBaselineFirstTests` (new, 24), and `import time`.
+- `tools/audit.py`: the test_showdown pin.
+- `skills/generate-lineups/references/baseline.md`: the retitled header and the Showdown section. `skills/generate-lineups/SKILL.md`: one bullet, edited in place (1,524 lines, unchanged).
+- `docs/backlog.md`: R389 CLOSED, R425 CLOSED, R426 and R427 filed.
+- `docs/ROADMAP.md`: Session 12 Complete and rewritten to what landed, NEXT Session 13, Sessions 113 and 114, Session 16(a)'s note, the ledger row.
+- `CHANGELOG.md`.
+
+**What was wrong, reproduced at `583aa26`.** A scratch harness drove the real exit door (`_main_recording_refusals`, `main` swapped for the `run_showdown` call) on the vendored MIN@CHC slate, on a temp root, with the feed raising and the moneyline stubbed. `TZ=America/New_York date` printed 14:16 EDT.
+- **Clean:** exit 0, one file (the ladder's, sha `23618d0f…`).
+- **A raising `build_thesis_ladder`:** exit 1, uncaught, with 0 files.
+- **`solve_ladder` returning all None:** exit 3, with 0 files.
+
+After the change, the same harness gives:
+- **Clean:** exit 0 with two files, the baseline presented first and the ladder's file last with the same sha `23618d0f…`, so the pricing hoist moved no byte.
+- **The crash:** exit 7, delivering the baseline.
+- **The refusal:** exit 3, with the baseline re-presented last.
+
+**Premise corrections.**
+- The row's `run_showdown L3698-4754` was stale. It was L5030-6156 at `583aa26`.
+- The entry's "one thesis-free solve per incomplete reserved row" is `build_showdown_bank` itself. That bank is the points-max path's own construction, which settled when a baseline is needed (below).
+
+**The plan and its review.** A read-only Plan agent reviewed the plan before any code. It found two blockers, both designed in:
+1. **F-3.** The bank never saw the template's complete rows (`forbidden` started empty, and `run_showdown` drops complete rows before any solve), so a points-max baseline could solve an already-entered lineup into a blank row of the same contest. `seed_forbidden` fixes that for the baseline; the ladder's share is R426.
+2. **Preflight's clock.** A preflight test on the 07-18 fixture fails every started slot unless it runs with `--as-of` before the lock.
+
+Its should-fixes, all taken:
+- a `date` in every status literal (the pin caught the one I missed);
+- the template checked on the staged bytes before any row;
+- no row lists `max_cpt_per_contest` as held;
+- the sleeve that did not arrive is said;
+- a ladder whose record alone fails;
+- plain-JSON blocks;
+- the `time_limit` merge;
+- the sha-named file;
+- the record-name collision;
+- no "upload-ready" in any new text;
+- `--entries-count` below the rows;
+- the Cowork window;
+- the fixtures;
+- the template-broken return kept as one expression;
+- the source-count traps.
+
+**What shipped.**
+- *When a baseline runs.*
+  - Always on the thesis-ladder path.
+  - On the points-max path only when `--entries-count` is below the reserved rows. There the build's own bank refuses to leave rows blank (exit 3), and the baseline covers every row.
+  - Otherwise the points-max bank IS the thesis-free construction, on the same frame at the same controls, so a baseline would be the same file twice, and its record would collide with the build's. `_BASELINE` then records `not_needed`, with the reason.
+- *Where.* After every exit-4 refusal, the governor setup and pricing, and before `while True`. Exit 4 still means before any solve, and nothing after it touches the network.
+- *The solve.*
+  - `build_showdown_bank` runs on the ladder's own priced frame, over every incomplete reserved row, at the build's `max_shared_players`, `max_cpt_exposure_pct` and `max_player_exposure_pct`, relaxed per slot under R153's order and counted in `baseline.relaxations`.
+  - The controls are held, not opened (Classic opens its caps). Measured on MIN@CHC at 14 rows: held gives 0.57s and at most 3 lineups per captain; opened gives 0.48s and one captain in all 14. At 150 rows, held took 41.2s and opened 58.5s. The floor rung already guarantees coverage.
+  - The per-contest captain cap is `solve_ladder`'s, so the row's `controls` omit it and `baseline.per_contest` reports it as `enforced: false`.
+- *F-3.* `complete_row_player_keys` maps each complete row's six IDs to `Player_Key` through `CPT_ID`/`UTIL_ID`. A row with an ID the pool lacks is skipped and named, because it cannot be re-solved. Its sets seed the bank's forbidden list under the same overlap rule, and they count toward no exposure.
+- *The window.* A quarter of the time left (`BASELINE_WINDOW_SHARE`, reused).
+  - `main` sets `args._deadline`, as it already sets `_governor` and `_never_relax`, so `run_showdown`'s signature is unchanged. Two test fakes take `(args, *_rest)`.
+  - `stop_at` stops the bank before a slot at or past it. After the first lineup, it also stops when that lineup's time multiplied by the slots left overruns the window (`projected`), because a short bank delivers nothing.
+  - Every rung's `time_limit`, relaxation rungs included, is `min(time_limit, time left)` read at that rung, 1s at least, and only when `stop_at` is set. A rung that times out under that cap stops the bank as `window`. It is never counted in `solver_timeouts`, because R158 reads a solver timeout as "raise the time limit", which is not the remedy for a closed window.
+  - At every default the bank is unchanged: `ShowdownSolverStatusTests`, `ShowdownDiversityTests` and `ShowdownSolverTests` pass unedited, and a test pins the equality.
+- *Checked before anything is recorded.*
+  1. `certify_showdown` passes on every lineup.
+  2. `write_showdown_entries(promote=False)` writes and reads back the `DO_NOT_UPLOAD_` staging file. Complete rows are preserved.
+  3. `verify_template_preserved` passes on the staged bytes, with no unfilled reserved row.
+
+  Then the bytes are hashed and renamed to `DO_NOT_UPLOAD_DKEntries_showdown_<tag>_BASELINE_<sha12>.csv`, recorded (`lineage: baseline`, `certification: review_grade`, `status: candidate`, `hash_source` the provisional file, `controls` the three held, `relaxations`), the salary staged, and the file promoted. `manifest_recorded` and `promoted` are separate facts: a row written before a failed stage or rename is named as a `promote` failure, not as a missing row. It is presented through `note_last_usable` with `lineage: baseline`, and a sha-bound `build_brief_showdown_<tag>_BASELINE_<sha12>.json` follows, carrying `declared_pitchers` for preflight.
+  - The certification stays `review_grade`, the entry's "no new label": preflight's `review_grade_baseline` reason is Classic wording and would be false here.
+  - A failed record presents the `DO_NOT_UPLOAD_` copy, the only one, with the failure in its own block and not in the ladder's `later_failures` (test_core 28366's pin).
+- *Which file is current.*
+  - The ladder's file becomes current only by passing its checks (`showdown_essential`) and recording its row. When only the ladder's record fails, the recorded baseline stays current. This applies only when the baseline was promoted. The ladder's `DO_NOT_UPLOAD_` copy is named under `ladder_not_presented`, with its own sha. The exit is 7, and the brief's `delivered_path`, `delivered_sha256` and `last_usable_artifact` all name the baseline, so a supervisor pairs one path with one sha.
+  - Every refusal re-presents the baseline before its JSON. `references/baseline.md` has the table.
+- *Records.* A run-less record in a lineage is `<tag>_norun_<lineage>_<sha12>.json`. The baseline's bytes can equal the build's own file, and one name would have let the second record overwrite the first. Every earlier name is unchanged.
+- *R425, found on the way.*
+  - On the points-max path the governed loop ran `df = price_showdown_pool(df, ...)` on every attempt, so a deadline re-solve multiplied F1 into every Base a second time.
+  - Pricing now runs once, before the loop, on both paths. No rung moves an input to it, and all three pricing functions copy their input.
+  - The source-count pins stay true: 3 for `price_showdown_pool(`, the definition plus both paths, and 2 for `f1_by_player_key=f1_by_player_key`.
+
+**R233, every site that records a delivery.** `grep -rn "record_delivery(\|[^_a-z]deliver(" --include=*.py mlb_engine tools skills`, `mlb_engine/production/` excluded:
+- EP `_deliver_mirror` (L7683), through `deliver`;
+- UM L573, `deliver`'s own call;
+- `tools/late_swap.py` L1224, Classic-only, in its parent's lineage;
+- `tools/promote_run.py` L309, which finds rows by `run_id`, so it never finds a Showdown row;
+- BS L5455, the ladder's writer, in the default lineage;
+- BS L6406, the Showdown baseline (new), in the `baseline` lineage.
+
+The one PF hit is a comment.
+
+**R233, every reader of the baseline's contest type.** `grep -n '"classic"' skills/generate-lineups/scripts/build_slate.py`, read against `_BASELINE`:
+- `_write_baseline_brief` and `_earlier_live_delivery` hard-coded Classic, and both read the block now.
+- `baseline_brief_block`, `present_baseline_as_current`, `_main_recording_refusals` and `_deliver_after_exception` read no contest type.
+- `note_last_usable` records carry their own `contest_type`.
+
+**R233, every reader of a run-less record name.** `grep -rn "_norun" --include=*.py mlb_engine tools skills tests`: `record_name` itself is the only production hit. The three test hits pin the default lineage's names, which are unchanged.
+
+**Measured** (cloud container, MIN@CHC, a 20-player pool):
+- 21 rows: 0.9s.
+- 150 rows at the cloud budget: the baseline built all 150 in 48.3s inside a 155s window, and the whole build took 59.9s at exit 0.
+- At Cowork's 100s budget the window is 25s. At 150 rows the projection stopped after one lineup, 0.2s spent, `short`. At 21 rows it delivered in 0.9s.
+- Every existing `run_showdown` test now runs a real baseline too. The test_showdown suite took about 43s for 362 tests.
+
+**Tests.** `ShowdownBaselineFirstTests`, 25:
+- a clean build presents the baseline then the ladder, both rows live and neither superseded, the brief plain JSON;
+- a ladder crash gives exit 7 with the baseline, sha-matched in the refusal record;
+- a ladder refusal keeps exit 3 and re-presents the baseline, stdout still one JSON document;
+- preflight (`--as-of` before the lock, its root at the build's so the file counts as delivered and needs its row) passes exit 0 `review_ready` on its bytes, and so does the template check;
+- a complete row that is the baseline's own slot 0 is kept byte-identical and never repeated in its contest;
+- both teams are in every lineup;
+- the sha-bound brief;
+- a spent window is `short` and the ladder delivers;
+- the points-max path is `not_needed` unless `--entries-count` would leave rows blank;
+- a raising bank, a failed certification and a broken template are each named and never presented, and the template is checked before any row;
+- a rerun on the same bytes reuses the row and the name;
+- a ladder whose record alone fails leaves the baseline current at exit 7, and the brief's path and sha agree;
+- a sleeve refusal solves nothing, asserted inside the temp root (R381's own pin runs after the directory is gone);
+- the points-max governor re-solve prices once (R425);
+- an earlier ladder file is named under `live_delivery`;
+- a sleeve that did not arrive is said;
+- the bank's past window, future window, time cap and projection (on a fake clock) and seeds;
+- a timeout under the window's cap is the window, not a solver timeout;
+- the complete-row mapping;
+- the record names.
+
+**Mutations.** 21 applied by a script, each restored and hash-checked, and all 21 red:
+- no baseline call; seeds ignored; refusals carry nothing; the record-failure rule off; re-pricing inside the loop; the window check off; the projection off; the time cap off; the record name ignoring lineage;
+- always a baseline on points-max; never one on short entries; the live row reading Classic; the brief saying Classic; the sleeve note off; no certification; never presented; no lineage on the row; no template check before the row;
+- the baseline row never recorded (the preflight test is among the four red); a window timeout counted as the solver's; the brief naming the unpresented copy.
+
+The first cut of the time-cap mutation passed a stray keyword and crashed every test, which proved nothing; it was replaced. The certification mutation survived its first run, and the certification test was added for it.
+
+**Also run.**
+- test_core `RefusalClassificationTests`, `LostWindowExitCodeTests` (red once, on a status literal with no date, and fixed), `LastUsableArtifactTests`, `DeadlineGovernorCliTests`, `LostWindowFlagValueTests` and `ClassicBaselineFirstTests`.
+- `test_upload_integrity`'s writer pins (P4, `_call`, controls, `hash_source`) and `PreflightContractDocumentation`.
+- `run_evals.py --only 1`: PASS. Per R420 it left two records under the real `data/deliveries/2026-07-18/` (the baseline adds one to R420's one), and both were removed.
+
+**Review.** A read-only subagent reviewed the diff, in place of `/code-review`, whose skill hook cannot run here (R424). It found no blockers, and eight items:
+- **Two should-fixes, both fixed, each with a test and a red mutation.**
+  1. When only the ladder's record failed, the brief's `delivered_path` and `delivered_sha256` named the ladder's unpresented copy while the baseline was current, so autobuild would have paired a sha with the wrong path.
+  2. A timeout under the window's cap counted as a solver timeout, and the cap was set once per slot, so the relaxation rungs could each run the full cap past the window.
+- **Two low items, fixed.**
+  - The points-max path's messages said "before the thesis ladder". It says "before the points-max bank" now.
+  - `manifest_recorded` read False when the row was written and only staging or the rename failed. The two are separate facts now, and only a promoted baseline outranks the ladder's unrecorded copy.
+- **Kept as it is.** Complete rows sit under the overlap rule, not only exact-set forbidding. They are part of the entered portfolio, so the bound against them is the diversity control doing its job, and every relaxation it forces is counted.
+- **Already filed.** The blank-row rung can never deliver a Showdown file (R401's 2026-09-23 rider). The baseline branch for that case stays, and becomes live when R401's removed-rows form lands.
+- **Two test gaps, closed.**
+  - The preflight test ran with the real repo root, so the file never counted as delivered. It runs under the build's root now, and the unrecorded-baseline mutation turns it red.
+  - The spent-window test now asserts `stop_reason: "window"`.
+
+**Gate.** Before, at `583aa26`: `PASS  v2.26.0  44 modules  2736 tests  5 skipped`, and `2737` after R424 (`4392d6f`). After, on the landed tree: `PASS  v2.26.0  44 modules  2762 tests  5 skipped  {test_core 1733/1733 (4 skipped) skipped_in_place; test_showdown 362/362 (1 skipped) skipped_in_place}` (6m22s), the same five host data guards (R155). test_showdown 337 -> 362.
+
+## 2026-09-25 — R424: the Fable advisor in every session. `.claude/settings.json` sets `advisorModel` to `fable` (roadmap Session 112)
+
+**Scope.** `.claude/settings.json` (the key and the `$comment` R-number), `tests/test_core.py` (`RepoAgentsAndHookEventsTests.test_the_advisor_is_fable`), `tools/audit.py` (the test_core pin), `docs/backlog.md` (R424 filed CLOSED), `docs/ROADMAP.md` (Session 112 Complete, its ledger row, Session 109 backfilled as `c76b1ba`), `CHANGELOG.md`.
+
+**Source.** Ben, 2026-09-25: "Use /update-config to edit settings.json so fable model is invoked when I use /advisor".
+
+**What was in the way.** `/update-config` could not run here. The org-managed PreToolUse skill hook is a bash script run under `/bin/sh`, which rejects `set -o pipefail`, so every Skill call is refused on this host. R389(b) recorded the same failure for `/code-review`. The change was made directly instead.
+
+**What the setting does, verified** at code.claude.com/docs/en/advisor.md:
+- `advisorModel` names the advisor's model. `"fable"` is an accepted alias, and a Fable advisor is accepted for an Opus 5.5 main model.
+- No setting picks the model for `/advisor` alone. `advisorModel` also turns the advisor on at every session start, and Fable advisor calls bill at Fable rates (usage credits on some plans).
+- Ben chose the project file, always on, over a per-session `/advisor fable` and over the gitignored `settings.local.json`. The project file is the one copy a cloud container keeps. `/advisor off` saves to user settings, which the project file outranks, so it lasts one session.
+- It applies to sessions started after the merge.
+
+**Test.** `test_the_advisor_is_fable` reads the project settings and wants `advisorModel == "fable"`. Mutation: `"opus"` in the file turns it red, and restoring the file turns it green again.
+
+**Review.** `/code-review` is blocked by the same hook. The diff is one settings key and one assertion, so no substitute review ran for it; the Session 12 diff that follows in this PR gets one.
+
+**Gate.** Before, at `583aa26`: `PASS  v2.26.0  44 modules  2736 tests  5 skipped` (6m15s). The five are the host data guards (R155): test_core 4 and test_showdown 1, skipped in place, the same five as the last four landings. After: `PASS  v2.26.0  44 modules  2737 tests  5 skipped` (5m52s), the same five skips; test_core 1732 -> 1733.
+
 ## 2026-09-25 — R422(a)+(b): tail seats scale with coverage. The market's bottom third of teams opens one seat per team once the portfolio could cover every comfortable team, pinned through the allocator's mask; the delivery record and the miner capture what the archive needs to grade it (roadmap Session 109; R423 filed)
 
 **Renumbered at landing.** This change was built and first committed as R421 (`c4017d0`), with Sessions 108-110. PR #60 merged first and took R421 and Session 108, so the branch merged main (`cf84632`) and renumbered its own text: R421 to R422, R422 to R423, and Sessions 108-110 to 109-111. #60's Session 108 ledger SHA is backfilled to its merge, `3f2914a`.

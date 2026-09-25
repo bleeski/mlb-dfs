@@ -13994,6 +13994,13 @@ class RepoAgentsAndHookEventsTests(unittest.TestCase):
                                     f"{event} points at {arg}, which is absent")
                     self.assertGreater(hook.get("timeout", 0), 0)
 
+    def test_the_advisor_is_fable(self):
+        """R424 (Ben, 2026-09-25): every session in this repo, on every host,
+        runs with the Fable advisor. The project file is the one copy a cloud
+        container keeps, so a rewrite that drops the key turns it off
+        everywhere with nothing said."""
+        self.assertEqual(self._settings().get("advisorModel"), "fable")
+
 
 class EnvLockTests(unittest.TestCase):
     """R7: pinned runtime. The lock is the resolution authority, the probe is

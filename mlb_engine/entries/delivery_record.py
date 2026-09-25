@@ -103,7 +103,7 @@ def _safe_tag(slate_tag: str) -> str:
 
 
 def record_name(slate_tag: str, run_id: Optional[str],
-                sha256: Optional[str] = None) -> str:
+                sha256: Optional[str] = None, lineage: str = "") -> str:
     """``<tag>_<run_id>.json``, or ``<tag>_norun_<sha12>.json`` without a run.
 
     R403(b). A run-less delivery (every Showdown build, a hand repair) was keyed
@@ -114,14 +114,22 @@ def record_name(slate_tag: str, run_id: Optional[str],
     (``record_delivery``'s early branch re-mirrors it): a sha key keeps that one
     record, and a clock key would split it into two. With no sha either, the
     clock is the only identity left.
+
+    R389(c). A run-less record in a lineage (the Showdown baseline) carries it:
+    ``<tag>_norun_<lineage>_<sha12>.json``. Its bytes can equal the thesis
+    ladder's own file, and the two are two deliveries in two manifest rows, so
+    one name would let the second record overwrite the first. A run id is
+    already unique, and the default lineage keeps every earlier name.
     """
     tag = _safe_tag(slate_tag)
     if run_id:
         return f"{tag}_{run_id}.json"
+    norun = f"{tag}_norun_{_safe_tag(lineage)}" if str(lineage or "").strip() \
+        else f"{tag}_norun"
     digest = str(sha256 or "").strip().lower()
     if digest:
-        return f"{tag}_norun_{digest[:12]}.json"
-    return f"{tag}_norun_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.json"
+        return f"{norun}_{digest[:12]}.json"
+    return f"{norun}_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.json"
 
 
 def code_identity() -> Dict[str, Any]:
@@ -347,7 +355,8 @@ def write_delivery_record(*, date: str, manifest_row: Mapping[str, Any],
             manifest_row.get("delivered_file") or "")
         return _write(base,
                       record_name(str(manifest_row.get("slate_tag") or ""),
-                                  resolved_run, manifest_row.get("sha256")),
+                                  resolved_run, manifest_row.get("sha256"),
+                                  str(manifest_row.get("lineage") or "")),
                       record)
     except Exception as exc:  # noqa: BLE001 - bookkeeping never fails a delivery
         print(f"delivery_record: not written ({type(exc).__name__}: {exc})")

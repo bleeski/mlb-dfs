@@ -23,7 +23,7 @@ import os
 import re
 import time as _time
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional, Sequence
+from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence
 
 import numpy as np
 import pandas as pd
@@ -1316,6 +1316,9 @@ def build_showdown_bank(df: pd.DataFrame, n: int, contract: RosterContract = SHO
                         max_shared_players: Optional[int] = DEFAULT_MAX_SHARED_PLAYERS,
                         max_player_exposure_pct: Optional[float] = DEFAULT_MAX_PLAYER_EXPOSURE_PCT,
                         diagnostics: Optional[Dict[str, Any]] = None,
+                        *, stop_at: Optional[float] = None,
+                        clock: Callable[[], float] = _time.monotonic,
+                        seed_forbidden: Optional[Sequence[Sequence[str]]] = None,
                         **kwargs) -> List[Dict[str, Any]]:
     """Up to ``n`` distinct legal lineups sharing at most ``max_shared_players``
     with any prior lineup, with no single captain filling more than
@@ -1339,9 +1342,27 @@ def build_showdown_bank(df: pd.DataFrame, n: int, contract: RosterContract = SHO
     already in front of it. ``diagnostics``, if passed a dict, is filled in place
     with ``cap_count``, ``captain_exposure`` (player_key -> count), and
     ``relaxed_slots`` so a caller can report or flag when the cap didn't hold.
+
+    R389(c). Three keyword-only arguments for the Showdown baseline, each a
+    no-op at its default, so every other caller's bank is unchanged:
+
+    * ``stop_at`` is a ``clock()`` instant the bank may not run past. Before
+      each slot a time at or past it stops the bank, and after the first slot
+      a projection (the time per lineup so far, times the slots left) past it
+      stops it too, because a short bank delivers nothing and spending the
+      rest of the window on it only takes the window from what follows. Each
+      rung's ``time_limit`` is capped at the time left, 1s at least, and a rung
+      that times out under that cap stops the bank as the window, never as a
+      solver timeout. ``diagnostics["window_stopped"]`` is None, ``"window"``
+      or ``"projected"``. A stop is not a relaxation and not a timeout.
+    * ``clock`` is the time source ``stop_at`` is read against.
+    * ``seed_forbidden`` are player sets the bank may not solve, placed ahead
+      of its own lineups under the same overlap rule: the template's complete
+      rows (``complete_row_player_keys``), so no lineup repeats one (F-3).
+      They count toward no exposure.
     """
     bank: List[Dict[str, Any]] = []
-    forbidden: List[List[str]] = []
+    forbidden: List[List[str]] = [list(s) for s in (seed_forbidden or [])]
     cpt_counts: Dict[str, int] = {}
     player_counts: Dict[str, int] = {}
     n_target = max(1, int(n))
@@ -1356,6 +1377,10 @@ def build_showdown_bank(df: pd.DataFrame, n: int, contract: RosterContract = SHO
     player_relaxed_slots = 0
     ignored_locks: List[str] = []
     caller_excludes = [str(x) for x in (kwargs.pop("excludes", None) or [])]
+    # R389(c). The caller's own solve kwargs, before any per-slot time cap.
+    base_kwargs = dict(kwargs)
+    window_stopped: Optional[str] = None
+    started = clock() if stop_at is not None else 0.0
     # R158. The bank ladder is the second consumer of the solver-status defect and
     # it fails the same way: a slow solve walked every rung, re-paying the time
     # limit, and each control it passed was recorded as relaxed. These counters sit
@@ -1372,10 +1397,21 @@ def build_showdown_bank(df: pd.DataFrame, n: int, contract: RosterContract = SHO
         """
         nonlocal time_limited_accepted
         st_out: Dict[str, Any] = {}
+        # R389(c). Every rung, not only a slot's first, gets the time the
+        # window has left, so no relaxation descent runs past it.
+        capped = False
+        if stop_at is not None:
+            limit = float(base_kwargs.get("time_limit", 20))
+            call_kw["time_limit"] = min(limit, max(1.0, stop_at - clock()))
+            capped = call_kw["time_limit"] < limit
         got = build_showdown_lineup(status_out=st_out, **call_kw)
         if got is None:
             if st_out.get("timed_out"):
                 latch["timed_out"] = True
+                # The window's cap ran out, not the caller's limit: R158 reads
+                # a solver timeout as "raise the time limit", and that is not
+                # the remedy for a window that closed.
+                latch["window_capped"] = capped
         elif st_out.get("optimality") == "time_limited":
             time_limited_accepted += 1
         return got
@@ -1387,6 +1423,14 @@ def build_showdown_bank(df: pd.DataFrame, n: int, contract: RosterContract = SHO
         return sorted(k for k, c in player_counts.items() if c >= player_cap)
 
     for _ in range(n_target):
+        if stop_at is not None:
+            now = clock()
+            if now >= stop_at:
+                window_stopped = "window"
+                break
+            if bank and now + (now - started) / len(bank) * (n_target - len(bank)) > stop_at:
+                window_stopped = "projected"
+                break
         cpt_excludes = [k for k, c in cpt_counts.items() if cap is not None and c >= cap] or None
         over = _over_cap()
         # The caller's own excludes always apply; the cap's excludes are the part
@@ -1477,7 +1521,9 @@ def build_showdown_bank(df: pd.DataFrame, n: int, contract: RosterContract = SHO
             # R158. A bank that stops here stops for one of two reasons, and the
             # caller needs to know which: no lineup exists under these controls, or
             # the clock ran out. Only the first is a fact about the pool.
-            if latch["timed_out"]:
+            if latch.get("window_capped"):
+                window_stopped = "window"
+            elif latch["timed_out"]:
                 solver_timeouts += 1
             break
         # R54(c). A lock the melt never carried used to no-op in silence.
@@ -1514,6 +1560,11 @@ def build_showdown_bank(df: pd.DataFrame, n: int, contract: RosterContract = SHO
         # control and do not reduce the pool.
         diagnostics["solver_timeouts"] = solver_timeouts
         diagnostics["time_limited_accepted"] = time_limited_accepted
+        # R389(c). Only when asked for, so every other caller's dict is as it was.
+        if stop_at is not None:
+            diagnostics["window_stopped"] = window_stopped
+        if seed_forbidden is not None:
+            diagnostics["seed_forbidden"] = len(seed_forbidden)
     return bank
 
 
@@ -1643,6 +1694,40 @@ def read_showdown_reserved_rows(path: str | Path, contract: RosterContract = SHO
             "cells": cells, "is_blank": not any(cells), "is_complete": all(cells),
         })
     return {"header": header, "rows": rows, "reserved": reserved}
+
+
+def complete_row_player_keys(df: pd.DataFrame,
+                             reserved_rows: Sequence[Mapping[str, Any]]
+                             ) -> tuple:
+    """R389(c). The player sets of a template's COMPLETE reserved rows, for
+    ``build_showdown_bank(seed_forbidden=)``.
+
+    F-3 is never one lineup twice in a contest, and a complete row is a lineup
+    already entered: a bank that never sees it can solve the same six players
+    into a blank row of the same contest. Each row's six draftable IDs map to
+    ``Player_Key`` through the pool's ``CPT_ID`` and ``UTIL_ID``. A row with an
+    ID the pool does not carry cannot be re-solved (that player is not in the
+    pool), so it is skipped, and its IDs are returned so the caller names them.
+    Returns ``(sets, unmapped_ids)``, both sorted.
+    """
+    by_id: Dict[str, str] = {}
+    if df is not None and len(df):
+        for cpt_id, util_id, key in zip(df["CPT_ID"], df["UTIL_ID"], df["Player_Key"]):
+            for pid in (_digits(cpt_id), _digits(util_id)):
+                if pid:
+                    by_id[pid] = str(key)
+    sets: List[List[str]] = []
+    unmapped: List[str] = []
+    for row in reserved_rows or []:
+        if not row.get("is_complete"):
+            continue
+        cells = [str(c) for c in (row.get("cells") or [])]
+        keys = [by_id.get(c) for c in cells]
+        if any(k is None for k in keys):
+            unmapped.extend(c for c, k in zip(cells, keys) if k is None)
+            continue
+        sets.append(sorted(set(keys)))
+    return sorted(sets), sorted(set(unmapped))
 
 
 def write_showdown_entries(template_path: str | Path, candidate_path: str | Path,
