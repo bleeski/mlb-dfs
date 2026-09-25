@@ -4043,7 +4043,7 @@ class R293BankOnEveryRungTests(unittest.TestCase):
         # the cluster-limited bucket both the sliced door and the plan leg
         # call; it forwards the allowance by name. R406, 2026-09-23: three more
         # in `build_sleeve_jobs` (chalk-fails, environment, salary-only), each
-        # forwarding it by name. R421, 2026-09-25: a sixth there, the tail
+        # forwarding it by name. R422, 2026-09-25: a sixth there, the tail
         # sleeve's depth jobs, forwarding it by name.
         ("mlb_engine/pipeline/execution_pipeline.py", "extend_bank"): (6, 6),
         # R389(a), 2026-09-24: the baseline core's probe and distinct-fill
@@ -32611,7 +32611,7 @@ class ClassicSleeveTests(unittest.TestCase):
         req = epi.resolve_sleeve_bank_request(reqs, {}, frame, implied_total_by_team=implied)
         self.assertNotIn("environment", req["sleeves"])
         self.assertIn("whole slate", req["dropped"]["environment"])
-        # R421: four priced teams and ten entries open one tail seat (S=4,
+        # R422: four priced teams and ten entries open one tail seat (S=4,
         # t=1, C=3), taken off the contest before the weights apportion the
         # other nine: 9 x 40/20/20/20 = 3/2/2/2.
         self.assertEqual(req["expected_entries"], {"projection": 3, "salary_only": 2,
@@ -32809,7 +32809,7 @@ class ClassicSleeveTests(unittest.TestCase):
 
 
 class ClassicTailSeatTests(unittest.TestCase):
-    """R421 (Ben, 2026-09-24, on 1410_4g): tail seats scale with coverage.
+    """R422 (Ben, 2026-09-24, on 1410_4g): tail seats scale with coverage.
 
     The slate's teams are ranked by the market's implied totals and the bottom
     third is the tail. Tail seats open once N could cover every comfortable
@@ -32817,7 +32817,7 @@ class ClassicTailSeatTests(unittest.TestCase):
     top-heavy contests of two or more entries and at most half of one. A tail
     seat is pinned to its team and seated, through the allocator's mask, on a
     projection-world lineup primary-stacking it. The build records the market
-    it ranked by (R421(a)) so the archive can grade the rule.
+    it ranked by (R422(a)) so the archive can grade the rule.
     """
 
     @staticmethod
@@ -33139,7 +33139,7 @@ class ClassicTailSeatTests(unittest.TestCase):
         self.assertEqual(stamped, {"5001": None, "5002": None, "5003": None, "5004": "AAA"})
 
     def test_the_delivery_record_carries_the_market_the_build_ranked_by(self):
-        """R421(a), through the real run_slate and record_delivery: the tracked
+        """R422(a), through the real run_slate and record_delivery: the tracked
         record names the slate's implied totals and game count, restricted to
         the slate, so the archive can rank a winner's stack by them."""
         from mlb_engine.entries import upload_manifest as um

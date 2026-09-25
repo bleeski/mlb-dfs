@@ -2601,7 +2601,7 @@ def resolve_sleeve_bank_request(
     by the static park run factor F5 itself reads. ``classic_sleeves: False`` in
     the merged controls (an override, the loose golden) turns it off.
 
-    R421. The ``tail`` block is ``resolve_tail_seats`` over the same inputs,
+    R422. The ``tail`` block is ``resolve_tail_seats`` over the same inputs,
     and its seats come off each contest before the weights apportion the rest.
     """
     from mlb_engine.optimize import classic_sleeves as cs
@@ -2678,10 +2678,10 @@ def _teams_by_game(projections: Any) -> Dict[str, List[str]]:
 def slate_market_record(projections: Any,
                         implied_total_by_team: Optional[Mapping[str, float]]
                         ) -> Optional[Dict[str, Any]]:
-    """R421(a). The market a Classic build was ranked against, for the tracked
+    """R422(a). The market a Classic build was ranked against, for the tracked
     delivery record, or None when no total was priced.
 
-    R421's rule reads the slate's teams by implied total, and the archive
+    R422's rule reads the slate's teams by implied total, and the archive
     cannot grade it without the same numbers: `f1_implied_total_by_team`
     otherwise lives only in the gitignored brief. Restricted to the slate's
     teams, with the game count the measurement cells on. A game whose two
@@ -2712,7 +2712,7 @@ def slate_market_record(projections: Any,
                               and implied[ts[0]] == implied[ts[1]]],
         "source": "F1 implied_total_by_team, as passed to run_slate",
         "note": ("the market's implied team totals this build ranked the slate "
-                 "by, recorded so the archive can grade R421's tail rule; "
+                 "by, recorded so the archive can grade R422's tail rule; "
                  "observed inputs, never a prediction or a probability"),
     }
 
@@ -2724,7 +2724,7 @@ def resolve_tail_seats(
     *,
     implied_total_by_team: Optional[Mapping[str, float]] = None,
 ) -> Dict[str, Any]:
-    """R421. The portfolio's tail seats, each pinned to a team.
+    """R422. The portfolio's tail seats, each pinned to a team.
 
     The one derivation for the bank's request and for ``run_slate``'s stamp,
     so the bank is asked for the seats the mask will confine. The teams are
@@ -2764,7 +2764,7 @@ def build_sleeve_jobs(
     * ``salary_only``: the salary-only COPY of the frame, in ``salary_cache``
       (a separate file: a different frame is a different projection digest,
       and sharing a cache would purge the ordinary bucket).
-    * ``tail`` (R421): the projection frame, stack jobs only for the tail teams
+    * ``tail`` (R422): the projection frame, stack jobs only for the tail teams
       the bank holds fewer than two lineups primary-stacking -- depth, like
       environment, because the ordinary grid already stacks every team.
 
@@ -2875,7 +2875,7 @@ def _stacked_on_teams(cache: Any, projections: Any, teams: Sequence[str],
 def _primary_stacked_on_teams(cache: Any, projections: Any, teams: Sequence[str],
                               prior_candidates: Optional[Sequence[Mapping[str, Any]]] = None,
                               ) -> Dict[str, int]:
-    """R421. How many DISTINCT projection-world lineups carry each of ``teams``
+    """R422. How many DISTINCT projection-world lineups carry each of ``teams``
     as their PRIMARY stack: the lineups the allocator's tail mask can seat.
 
     A cached roster is read through ``optimizer_v3.candidate_primary_stack``
@@ -2987,7 +2987,7 @@ def _direct_door_sleeves(
             cache, projections, request,
             consensus_members=consensus_cluster_members(out)["member_ids"],
             time_budget_s=time_budget_s, salary_cache=salary,
-            # R421: the tail's depth count sees the in-memory bank, not only
+            # R422: the tail's depth count sees the in-memory bank, not only
             # this empty throwaway cache.
             prior_candidates=out,
             leverage=leverage, **extend_kwargs)
@@ -6555,7 +6555,7 @@ def run_slate(
                 "from_merged_default": base, "raised_to": final, "reason": "feasibility floor",
             }
 
-    # R421. The tail seats, stamped on the entry requirements once the controls
+    # R422. The tail seats, stamped on the entry requirements once the controls
     # are final and before the plan leg or either door reads them: the same
     # helper and inputs the sliced door's bank request used, so the mask
     # confines exactly the seats the bank was asked to supply.
@@ -6721,7 +6721,7 @@ def run_slate(
             "note": MAX_CONSENSUS_CLUSTER_NOTE,
         },
         "controls_feasibility": controls_feasibility,
-        # R421. The coverage rule's inputs, the seats it placed, and why none
+        # R422. The coverage rule's inputs, the seats it placed, and why none
         # were when none were.
         "classic_tail_seats": tail_seats,
         "feasibility": checkpoint["feasibility"],
@@ -6800,7 +6800,7 @@ def run_slate(
             requested_n=int(requested_n or max(len(entry_requirements), 1)),
             contest_shapes=sorted(shape_counts_plan) or None,
             solver_time_limit_s=solver_time_limit_s,
-            # R421: the plan bank's tail request, from the build's own totals.
+            # R422: the plan bank's tail request, from the build's own totals.
             implied_total_by_team=sleeve_implied_total_by_team,
         )
         checkpoint["joint_allocation"] = joint
@@ -7097,7 +7097,7 @@ def run_slate(
                 "note": MAX_CONSENSUS_CLUSTER_NOTE,
             },
             "controls_feasibility": controls_feasibility,
-            # R421. The tail seats and the market they were ranked by; `market`
+            # R422. The tail seats and the market they were ranked by; `market`
             # is what the delivery record carries for the archive to grade.
             "classic_tail_seats": tail_seats,
             "market": market,
@@ -7704,7 +7704,7 @@ def _deliver_mirror(slate_date: str, dest: Path, source: Path,
         notes=_mirror_notes(result),
         # R389(b). Passed only when set, so every other row is unchanged.
         **({"lineage": lineage} if lineage else {}),
-        # R421(a). The market the build ranked by, into the tracked record.
+        # R422(a). The market the build ranked by, into the tracked record.
         market=result.get("market"),
     )
 

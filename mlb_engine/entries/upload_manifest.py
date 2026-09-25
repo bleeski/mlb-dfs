@@ -316,7 +316,7 @@ def _mirror_to_delivery_record(date: str, record: Mapping[str, Any],
                               run_id=record.get("run_id"), controls=controls,
                               relaxations=relaxations, egress=egress,
                               entries_source=entries_source,
-                              # R421(a). Only when the build priced a market, so
+                              # R422(a). Only when the build priced a market, so
                               # every other record keeps exactly its old keys.
                               extra={"market": dict(market)} if market else None)
     except Exception as exc:  # noqa: BLE001

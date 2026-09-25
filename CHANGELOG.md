@@ -2,7 +2,9 @@
 
 What changed in the engine, the tools and the contracts, when, and why.
 
-## 2026-09-25 — R421(a)+(b): tail seats scale with coverage. The market's bottom third of teams opens one seat per team once the portfolio could cover every comfortable team, pinned through the allocator's mask; the delivery record and the miner capture what the archive needs to grade it (roadmap Session 108; R422 filed)
+## 2026-09-25 — R422(a)+(b): tail seats scale with coverage. The market's bottom third of teams opens one seat per team once the portfolio could cover every comfortable team, pinned through the allocator's mask; the delivery record and the miner capture what the archive needs to grade it (roadmap Session 109; R423 filed)
+
+**Renumbered at landing.** This change was built and first committed as R421 (`c4017d0`), with Sessions 108-110. PR #60 merged first and took R421 and Session 108, so the branch merged main (`cf84632`) and renumbered its own text: R421 to R422, R422 to R423, and Sessions 108-110 to 109-111. #60's Session 108 ledger SHA is backfilled to its merge, `3f2914a`.
 
 **Scope.**
 - `mlb_engine/optimize/classic_sleeves.py` (VERSION 1.1), the one owner:
@@ -30,7 +32,7 @@ What changed in the engine, the tools and the contracts, when, and why.
   - `ClassicTailSeatTests` (15 tests);
   - an update to `ClassicSleeveTests.test_environment_game_ranking_and_its_tie_break`, deliberate and explained below;
   - `R293BankOnEveryRungTests.EXPECTED_CENSUS`: `execution_pipeline.extend_bank` (5, 5) -> (6, 6).
-- `tools/audit.py` (the pin), `docs/backlog.md` (R421's open remainder, R422, and a rider on R417), `docs/ROADMAP.md` (Sessions 108, 109 and 110, the ledger row, Session 11's SHA backfilled to `095e21b`), this file.
+- `tools/audit.py` (the pin), `docs/backlog.md` (R422's open remainder, R423, and a rider on R417), `docs/ROADMAP.md` (Sessions 108, 109 and 110, the ledger row, Session 11's SHA backfilled to `095e21b`), this file.
 - The fragment `docs/backlog_inbox/2026-09-24_BUILD_tail-seats-scale-with-coverage.md` is consumed and retired.
 
 **What was wrong.** On 1410_4g Ben asked for tail outcomes to grow with the entries entered and shrink with the games on the slate. The fragment is right on three counts, each verified in the tree:
@@ -176,7 +178,7 @@ One more is fixed in part: the implied-total parsing my two sites shared is now 
 **Gate.** `PASS  v2.26.0  44 modules  2736 tests  5 skipped`. The appended `skipped_in_place` note (test_core 4, test_showdown 1) is the session-start baseline's, word for word: host data guards (R155), not lost coverage.
 
 **Found, filed.**
-- R422 (Session 110): the ledger's backfill command returns a branch's own merge-from-main. For R389(b) it returns `3312941`, not PR #57's `095e21b`, which this landing backfilled by hand.
+- R423 (Session 111): the ledger's backfill command returns a branch's own merge-from-main. For R389(b) it returns `3312941`, not PR #57's `095e21b`, which this landing backfilled by hand.
 - A rider on R417 (Session 104): R406's environment depth check on the direct door counts the same empty throwaway cache, so its restricted jobs always run there. The tail's fix (`prior_candidates`) is the pattern; R406's surface is left as it is.
 - The first gate on this diff failed `test_upload_integrity`'s R387 pin, which counts `entries_source=source)` on both mirror paths. `market=` now precedes it, so the pinned text holds unedited.
 ## 2026-09-25 — R421: the instruction surface audited against the current Claude model. A delivery-record commit the guard stops, an uncertified-file rule older than delivery-first, file-diff and history prose rewritten to the present rule, and `/land` and `/ship` made the session's to run (roadmap Session 108)

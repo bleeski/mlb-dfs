@@ -3566,7 +3566,7 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         sleeve_request = resolve_sleeve_bank_request(
             _sleeve_entries,
             {"classic_sleeves": (args.controls_override or {}).get("classic_sleeves", True),
-             # R421. The tail's own switch, read from the same override.
+             # R422. The tail's own switch, read from the same override.
              "classic_tail_seats": (args.controls_override or {}).get(
                  "classic_tail_seats", True)},
             projections,
@@ -6343,7 +6343,7 @@ def format_sleeves_line(block: dict | None) -> str:
 
 
 def format_tail_clause(block: dict | None) -> str:
-    """R421. The tail seats: which teams seated, and the coverage arithmetic
+    """R422. The tail seats: which teams seated, and the coverage arithmetic
     that opened them (N entries, S teams), or why none opened."""
     block = dict(block or {})
     plan = dict((block.get("request") or {}).get("tail") or {})

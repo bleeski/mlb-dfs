@@ -22,7 +22,7 @@ Truthful labels: every sleeve is a deterministic construction over labeled
 priors. Nothing here is a probability or an edge, and a sleeve that does well in
 a replay is "supported in the shapes replayed", never more.
 
-R421 (Ben, 2026-09-24): tail seats scale with coverage. The slate's teams are
+R422 (Ben, 2026-09-24): tail seats scale with coverage. The slate's teams are
 ranked by the MARKET's implied totals and its bottom third is the tail. Once
 the portfolio holds enough entries to give every comfortable team one stack,
 each further entry opens one tail seat, highest-implied tail team first, until
@@ -69,7 +69,7 @@ SLEEVE_JOB_CLASS: Dict[str, str] = {
     SLEEVE_ENVIRONMENT: "sleeve_environment",
 }
 
-#: R421. The tail sleeve. Not in ``SLEEVES``: its seats are not apportioned by
+#: R422. The tail sleeve. Not in ``SLEEVES``: its seats are not apportioned by
 #: weight but counted off coverage and pinned to a team before the weights
 #: apportion the rest of each contest.
 SLEEVE_TAIL = "tail"
@@ -165,7 +165,7 @@ def apportion_entries(
     its share falls back to ``projection``, counted in ``fallbacks`` -- a
     relaxation, never a silent reshuffle.
 
-    R421. An entry stamped with a tail team (``TAIL_TEAM_KEY``, by
+    R422. An entry stamped with a tail team (``TAIL_TEAM_KEY``, by
     ``tail_seat_plan``) seats ``tail:<team>`` and the weights apportion the
     rest of its contest.
     """
@@ -214,7 +214,7 @@ def expected_entries_by_sleeve(
     tail_seats_by_contest: Optional[Mapping[str, int]] = None,
 ) -> Dict[str, int]:
     """How many entries each sleeve will seat, before any fallback: what the
-    bank has to be asked to supply. R421: a contest's tail seats come off its
+    bank has to be asked to supply. R422: a contest's tail seats come off its
     count before the weights apportion the rest, as ``apportion_entries``
     does, and ``tail`` appears only when a seat was placed."""
     tail = {str(k): int(v) for k, v in (tail_seats_by_contest or {}).items() if int(v) > 0}
@@ -403,7 +403,7 @@ def environment_teams_of(request: Optional[Mapping[str, Any]]) -> Optional[List[
 
 
 # --------------------------------------------------------------------------- #
-# R421. Tail seats scale with coverage.
+# R422. Tail seats scale with coverage.
 # --------------------------------------------------------------------------- #
 def tail_token(team: str) -> str:
     """The membership a projection-world lineup whose primary stack is ``team``
@@ -423,7 +423,7 @@ def tail_seat_count(n_entries: int, teams_on_slate: int) -> int:
     ``t = S // 3`` tail teams and ``C = S - t`` comfortable ones. No seat opens
     until N could give every comfortable team one stack; then each entry opens
     one, until every tail team holds one at ``N >= S``. More than one per tail
-    team waits for the archive measurement (R421(c)).
+    team waits for the archive measurement (R422(c)).
     """
     s = max(0, int(teams_on_slate))
     t = s // TAIL_DENOMINATOR
@@ -500,7 +500,7 @@ def tail_seat_plan(
     comfortable inside one; a cash or single-entry POSTURE seats none whatever
     shape it resolved to, as in ``contest_sleeve_weights``), largest ``N_c``
     first and then by contest id -- the build path carries no field size, so
-    "largest field first" waits on R421(d). Teams open highest-implied first. Inside a contest the tail seats
+    "largest field first" waits on R422(d). Teams open highest-implied first. Inside a contest the tail seats
     are the LAST entry ids, the end R406 seats its sleeves toward. A seat with
     no room is counted in ``unplaced``, never silently dropped.
     """

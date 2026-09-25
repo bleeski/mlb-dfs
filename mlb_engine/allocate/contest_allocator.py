@@ -1410,7 +1410,7 @@ def _resolve_classic_sleeves(
     to ``projection``), and an entry left with nothing compatible in its sleeve
     (unmasked). Mutates ``full_compatible`` in place.
 
-    R421. An entry stamped with a tail team (``classic_sleeves.TAIL_TEAM_KEY``)
+    R422. An entry stamped with a tail team (``classic_sleeves.TAIL_TEAM_KEY``)
     seats ``tail:<team>``: a projection-world candidate whose primary stack is
     that team carries the token, read here through ``_candidate_primary_stack``
     so the mask and the stack caps read one field. Tail seats apply without a
@@ -4540,7 +4540,7 @@ def select_and_assign_entries(
             sleeve_of = sleeve_report.get("sleeve_by_entry") or {}
             from mlb_engine.optimize.classic_sleeves import sleeve_family
             for e, k in enumerate(chosen_k):
-                # R421: every `tail:<team>` seat reports under `tail`.
+                # R422: every `tail:<team>` seat reports under `tail`.
                 by_sleeve[sleeve_family(sleeve_of.get(entry_ids[e], "projection"))].append(e)
             delivered: Dict[str, Any] = {}
             for sleeve, members in sorted(by_sleeve.items()):
