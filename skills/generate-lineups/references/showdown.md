@@ -4,18 +4,14 @@ Read this only when the Showdown path misbehaves or Ben asks about its internals
 The normal route is `scripts/build_slate.py`, which detects Showdown and handles
 all of it.
 
-**Construction changed 2026-07-25.** `run_showdown` now builds from the game-state
-thesis ladder in `mlb_engine/optimize/showdown_theses.py` whenever the pool basis
-is `declared_starters` with both orders posted. `build_showdown_bank`, documented
+`run_showdown` builds from the game-state thesis ladder in
+`mlb_engine/optimize/showdown_theses.py` whenever the pool basis is
+`declared_starters` with both orders posted. `build_showdown_bank`, documented
 below, is the fallback for an unposted slate.
 
-**THREE portfolio controls are enforced in the solver on both paths, not two,
-and the captain cap is 0.25 and not 0.33 (R153, Ben 2026-08-19).** This section
-said "two portfolio controls ... `max_cpt_exposure_pct=0.33`" until 2026-09-06,
-which is a money-boundary defect: a session reading it would have believed a cap
-50% looser than the one the solver holds, and would not have known the third
-control existed at all. The defaults live in `mlb_engine/optimize/showdown.py`
-and are the citation:
+**Three portfolio controls are enforced in the solver on both paths (R153, Ben
+2026-08-19).** The defaults live in `mlb_engine/optimize/showdown.py` and are
+the citation:
 
 | control | default | counts |
 |---|---|---|

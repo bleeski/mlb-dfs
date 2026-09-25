@@ -1,15 +1,13 @@
 ---
 name: ship
 description: Take a landed mlb-dfs commit the rest of the way: branch, push, open the PR, drive the gate check to green, merge, report the sha. Run it after /land, or when Ben asks to ship, push, open a PR, or get a change merged.
-disable-model-invocation: true
 ---
 
 # Ship a landed change
 
-`/land` ends with a commit on a branch. This is everything after it. R353,
-2026-09-17: before this, sessions stopped at the commit and Ben pushed, which
-does not work when the session is a cloud container that will be reclaimed and
-Ben is on a phone.
+`/land` ends with a commit on a branch. This is everything after it, and it is
+the session's (R353): a cloud container is reclaimed when the session ends, and
+Ben is often on a phone.
 
 Every step prints evidence. Show the output, not a summary of it.
 

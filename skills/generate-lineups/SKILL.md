@@ -55,39 +55,22 @@ says what happened. `python tools/qa_portfolio.py` prints this section first for
 exactly this reason: read it before forming any theory about a build.
 
 **Read the clock from the clock.** `slate_clock.minutes_to_deadline` in the
-brief, or `TZ=America/New_York date`. The same session estimated elapsed time
-from how many turns it had taken, concluded it was at T-2, and nearly stood down
-a build that had 28 minutes left. Turn count is not a clock.
+brief, or `TZ=America/New_York date` printed in the same call that needs it:
+every build call, every clock figure you quote to Ben (quote only a `date`
+printed that turn), and on entering and leaving any enrichment, research or QA
+phase, which runs no build call and still burns the slate clock (R318). A
+reading printed by the call that uses it cannot be stale by more than that
+call. Turn count and memory are not clocks: each has put a session ten or more
+minutes off its real deadline, and one cost a whole slate.
 
-**Print `TZ=America/New_York date` in the SAME bash call as every build.** The
-paragraph above was already here on 2026-09-01 and had been read in-session when
-a BUILD session concluded, at what it believed was 19:38, that lock was two
-minutes away. It was 19:28. Twelve minutes were left, one of them went to writing
-a failure narrative, and the slate delivered nothing. A reading printed by the
-same call as the build cannot be stale by more than that call.
-
-**Two more doors, R318, 2026-09-04.** A clock figure you QUOTE to Ben is a
-separate act from the clock inside a build call and drifts on its own: quote
-only a `date` printed in that same turn. And enrichment, research and QA phases
-run no build call and still burn the slate clock, so print
-`TZ=America/New_York date` entering one and again before deciding what to do
-with what you found. One instance each, both on 2026-09-04: a handoff that read
-"T-6" at T-18, and a 24-minute enrichment sweep that measured nothing and
-surfaced at T-9 believing T-30.
-
-**On a refusal, read `feasibility.checks` where `passed=False` FIRST, before
-`errors[]`.** `build_slate.py` prints them to stderr on every refusal now, ahead
-of the hint and the clock, so this needs no discipline — but read them there
-rather than scrolling to `errors[0]` out of habit. The reason is a whole lost
-slate: on 1940_9g `errors[0]` named `max_sp_pair_repetition` on four consecutive
-builds, which is a count over the BANK, while the one failing SLATE check
-(`shared_players_floor`, carrying `remedy: raise max_shared_players to >= 7`)
-never appeared in `errors[]` at all. The session escalated the cap 1 -> 2 -> 10
-and grew the bank twice, spending ten minutes of a twenty-three minute window on
-a check that was passing. Since R286 the refusal leads with the failing check, so
-`errors[0]` is right to read; since R207 `refusal_remedy` carries each remedy as
-data (printed as `REMEDY:` lines), and on an interaction refusal it names the one
-control that, dropped alone, restores feasibility, and its smallest step.
+**On a refusal, read the `FEASIBILITY:` lines first.** `build_slate.py` prints
+every failing `feasibility.checks` entry to stderr ahead of the hint and the
+clock, each with its `REMEDY:` where the engine derived one, and `errors[0]`
+leads with the same failing check (R286). `refusal_remedy` carries each remedy
+as data (R207); on an interaction refusal it names the one control that,
+dropped alone, restores feasibility, and its smallest step. Acting on a passing
+check instead of the failing one is how 1940_9g spent ten minutes of a
+twenty-three minute window and delivered nothing.
 
 **A slate-level check and a bank-level count are different objects.** A failing
 `feasibility.checks` entry is arithmetic about the SLATE: no bank growth can
@@ -127,13 +110,6 @@ REPO=$(git rev-parse --show-toplevel) && cd "$REPO"
 python tools/env_probe.py --install --venv
 ```
 
-**This line used to read `REPO=$(ls -d /sessions/*/mnt/mlb-dfs | head -1)`, which
-is a Cowork mount path.** On any other host that glob matches nothing, `REPO` is
-empty, `cd ""` fails, and the preflight silently never runs -- while this file's
-own first rule is that a session which cannot read the repo must stop. R355,
-2026-09-17. `build_slate.py`'s own `_find_repo` had already been rewritten away
-from that literal for the same reason; only this prose was left behind.
-
 Drop `--venv` only on a host that manages its own interpreter (Windows, with its
 pinned `.venv`; Cowork, with its vendored `.pylibs/`). On a Linux container the
 interpreter is shared with the OS package manager and the install belongs in a
@@ -161,14 +137,13 @@ python <repo>/tools/autobuild.py \
 ```
 
 `--per-build-seconds` is left off on purpose: it defaults to this host's call
-budget over six (105s on a 630s container, 21s on Cowork), and this recipe used
-to pin it at 20, which held every host to the Cowork ceiling one level down
-(R349 had already freed the CALL budget). Pass it only to override that.
+budget over six (105s on a 630s container, 21s on Cowork). Pass it only to
+override that.
 
 **Two clocks, and they are not the same number** (R296(f)).
 `--stop-after-minutes` is the SLATE's budget; `--call-budget-seconds` is THIS
 PROCESS's, and it is resolved per host by `mlb_engine.repo_env.call_budget_s()`
-(R349) rather than being the constant 130 it once was -- see `docs/hosts.md`. The
+(R349; `docs/hosts.md`). The
 defaults describe eight attempts of up to 110s under a twelve-minute wall, which
 on a short-budget host cannot fit one call, so the supervisor stops CLEANLY before an attempt that
 cannot finish, exits 5 with `resumable: true`, and the next call picks it up
@@ -239,9 +214,8 @@ python <repo>/skills/generate-lineups/scripts/build_slate.py \
   --entries <uploaded DKEntries.csv>
 ```
 
-`--max-seconds` is omitted deliberately; it already defaults to this host's
-call budget less 30s. The literal `100` this recipe used to carry was Cowork's
-130 minus 30, and it capped every other host at Cowork's ceiling.
+`--max-seconds` is omitted deliberately; it defaults to this host's call budget
+less 30s.
 
 It detects Classic vs Showdown from the files, stages them into
 `data/slates/<date>/`, builds the pool, measures the solver, picks a strategy that
@@ -268,30 +242,25 @@ no byproducts (R28):
 - **`cli_value_invalid`** — a flag VALUE this build cannot use: an unknown
   posture or gate name, a `--declare-pitcher` with no id, or a
   `--controls-override` / `--leverage` that parsed as JSON but is not an object.
-  Checked in `main()` before anything is staged. Until R296 these were first
-  read inside `run_classic` and aborted at exit 1 with no brief, so a typo in
-  `--postures` cost the whole bank spend and then read as a crash.
+  Checked in `main()` before anything is staged, so a typo in `--postures`
+  costs one line, not the bank spend.
 
 A build that runs and then does not certify writes its brief, including to an
 explicit `--brief` path, carrying `status: not_certified` with `failed_gates`
 and `pool_blockers`. **That is true of the exit-3 sites that BUILT and refused,
-and it is not true of exit 3 as a code** (R296(h), corrected 2026-09-03; this
-paragraph read "exit 3 now always writes its brief" and was false for most of
-them). Exit 3 means BUILT AND REFUSED, which is what `autobuild` spends
+and it is not true of exit 3 as a code** (R296(h)). Exit 3 means BUILT AND
+REFUSED, which is what `autobuild` spends
 attempts on: it grows the bank, reads `feasibility`, applies floors. A refusal
 that happened BEFORE any solve — bad input, a feed for another slate — is exit
 `4`, so the supervisor stops instead of retrying against a verdict that does
 not exist.
 
-**Measured at R290(c) (2026-09-03), which is also the second correction to the
-count in this paragraph: there are ELEVEN refusal exits, not nine and not
-eight.** Eight literal `return 3`, two conditional returns of 3, and one at
-exit `10`. Three of the eleven write a brief; the other eight print their JSON
-to stdout and nothing else. The count moved three times in three days while the
-item sat, which is why nothing here quotes a line number: read
-`REFUSAL_SITES` in `build_slate.py`, which is the one table, and
+There are eleven refusal exits (R290(c)): eight literal `return 3`, two
+conditional returns of 3, and one at exit `10`. Three write a brief; the other
+eight print their JSON to stdout and nothing else. `REFUSAL_SITES` in
+`build_slate.py` is the one table of them, and
 `test_every_refusal_exit_is_classified` fails the suite if a refusal exit is
-ever added without a row in it.
+ever added without a row in it, so trust the table over this count.
 
 ### Read the refusal's class before you read its errors
 
@@ -454,10 +423,8 @@ before lock, run them first and pass the results in:
   and moneylines itself if `THE_ODDS_API_KEY` is set, and leaves F1 at 1.0 for
   everyone if it is not.
   **`api.the-odds-api.com` is proxy-gated in SOME cloud sessions and not
-  others, so check rather than assume (R316, 2026-09-06).** This line read
-  "proxy-gated in cloud sessions, exactly as `statsapi.mlb.com` is"; measured
-  on the device VM 2026-09-06, both answer normally (the odds API 200 with the
-  repo key, statsapi 200 to plain `urllib`). Where it IS gated the fetch dies
+  others, so check rather than assume (R316).** In Claude Code the session-start
+  hook's `egress:` line reports it. Where it IS gated the fetch dies
   with a 403 tunnel error, the build says `F1 stays neutral` in one stderr
   line, and everything downstream certifies -- which is why the read below is
   the check either way. `enrichment.signal_applied: true` does NOT mean F1 ran -- five
@@ -499,11 +466,9 @@ R10's bar is a fitted ownership prior that beats flat-12 in the satellite cell,
 graded into the ledger, and this is what starts that record accumulating now
 instead of on the day the fit begins.
 
-**Since R246 (2026-09-01) this file is also a BUILD input, not only a grading
-artifact.** The sentence here read "nothing reads it today" until that date and
-it is no longer true: `--leverage` reads this exact file. Emitting it before
-lock is now the precondition for the only lever that moves the portfolio off
-chalk, so the reason to run it got stronger rather than going away.
+**This file is also a BUILD input, not only a grading artifact:** `--leverage`
+reads this exact file (R246), so emitting it before lock is the precondition for
+the only lever that moves the portfolio off chalk.
 
 It reads the same inputs the build does and reports each one as applied or INERT.
 Read that block: `implied_totals INERT` means every hitter fell back to a league
@@ -519,8 +484,8 @@ prediction is salary, order, implied total and probable-SP only.
 
 Emitting reaches nothing on its own: no projection, no `Ownership_Tier`, no
 solver row. It is an UNCALIBRATED STRUCTURAL PRIOR and the file says so on every
-read. What changed at R246 is that a SECOND, opt-in step can now feed it to the
-solver, and that step is the next section.
+read. A second, opt-in step feeds it to the solver, and that step is the next
+section.
 
 ### Leverage: the two constraints that move a portfolio off chalk (R246, opt-in)
 
@@ -544,13 +509,11 @@ Five things to know before you use it:
   rather than building unconstrained. That refusal is the feature: a leverage
   build that silently ignored the flag is the failure this item exists to end.
 - **`archetype` is REQUIRED whenever the prediction file carries more than
-  one, which is every file in practice.** The example above carried no
-  `archetype` key until 2026-09-06 and did not run: on 2210_2g the prior file
-  held six (`cash`, `large_field_gpp`, `mme`, `single_entry_gpp`, `small_gpp`,
-  `wta_satellite`) and the build exited `leverage_unresolved` with no brief
-  written, which also means the JSON explaining it is in
-  `outputs/<date>/_<tag>.out` and not at the brief path you passed. The refusal
-  names the valid set and the exact syntax; it cost a call to see it.
+  one, which is every file in practice** (2210_2g's held six: `cash`,
+  `large_field_gpp`, `mme`, `single_entry_gpp`, `small_gpp`, `wta_satellite`).
+  Without it the build exits `leverage_unresolved` with no brief written, so the
+  JSON explaining it is in `outputs/<date>/_<tag>.out` and not at the brief path
+  you passed. The refusal names the valid set and the exact syntax.
 - **`max_cumulative_ownership_pct` is the sum over ten slots**, so on a thin
   slate an unconstrained lineup lands near 100-105 and a cap of 90 is a real
   bind.
@@ -610,7 +573,7 @@ roster a hitter facing a rostered SP, and one 1,486-entry contest's ranks 1, 2
 
 **The frequency is slate-size dependent, and that is the whole reason to reach
 for it.** 62.5% of entries on an archived 2-game slate carry one; 3.2% on a
-12-game slate. So on a small slate the old wall forbade most of the legal space,
+12-game slate. So on a small slate a no-opposing-hitter wall forbids most of the legal space,
 and on a big one it barely bound. The measured cost of treating it as a rule: on
 1940_9g a hand builder held a 54%-exposure arm that banned every BAL bat from 20
 of 37 lineups, and BAL — highest implied team total on the slate at ~5.9, in an
@@ -623,11 +586,10 @@ Four things follow:
   the delegated decisions, not with the money-and-entry wall. Record the value
   and the reason in the brief, which carries `anti_correlation` on every Classic
   build including the default.
-- **The preflight WARNS and no longer fails**, so a legal roster no longer costs
-  a `--force`. You will see a line naming the entries and the count.
+- **The preflight WARNS rather than fails**, so a legal roster needs no
+  `--force`. You will see a line naming the entries and the count.
 - **The export validator grades against the DECLARED allowance**, so a raised
-  build reaches a file. Before R288 it hard-errored regardless and the control
-  would have been unusable end to end.
+  build reaches a file.
 - **Showdown refuses the flag** before staging rather than ignoring it, and
   `tools/repair_entry.py` KEEPS the no-opposing-hitter filter as its default,
   deliberately: a repair runs unattended inside a lock window, where the
@@ -637,8 +599,8 @@ Four things follow:
 ### The two washout-axis caps: team footprint and game exposure (R343, R333, Classic only)
 
 Ben's dual objective has two halves and the washout half binds at the PORTFOLIO
-level (CLAUDE.md), not inside a lineup. Until 2026-09-15 it had one live lever,
-`max_player_exposure_pct`, and two that could not reach it.
+level (CLAUDE.md), not inside a lineup. `max_player_exposure_pct` reaches it
+per player; the two caps below reach it per team and per game.
 
 **`max_team_exposure_pct` — a team's footprint over EVERY hitter slot, any stack
 role.** `max_primary_stack_exposure_pct` counts the PRIMARY stack alone, so a
@@ -686,8 +648,7 @@ Where to read the result: the brief's `team_footprint_any_role` (beside
 way it already mapped `game G exposure N>M`.
 
 The F5 material-weather cap (0.25 on medium postponement risk) is merged into
-the per-game dict by MIN and named in `weather_game_caps_applied`. It was
-computed and read by nobody before R333.
+the per-game dict by MIN and named in `weather_game_caps_applied` (R333).
 
 These are deterministic portfolio-shape controls. No archive number prices a
 team footprint; neither cap is a win rate, a cash rate, or a probability.
@@ -731,8 +692,8 @@ preference over labeled priors; never a win rate, a cash rate, or a probability.
 
 ### Classic scenario sleeves (R406, Classic only, ON by default)
 
-Every Classic candidate used to be an argmax of ONE projection, so a systematic
-projection error was shared by every entry. Sleeves build part of the portfolio
+An ordinary candidate is an argmax of ONE projection, so a systematic
+projection error is shared by every entry built from one. Sleeves build part of the portfolio
 in worlds where the projection is wrong in named ways, and the allocator
 confines each entry to one sleeve through its compatibility mask. The joint
 MILP and every cap still bind across the whole entered set.
@@ -761,8 +722,8 @@ MILP and every cap still bind across the whole entered set.
 
 ### Caps that scale with input confidence (R407, Classic only)
 
-The brief already reports when the inputs are weak; since R407 the build reads
-it back. Four facts, each the one the brief prints: no odds priced
+The brief reports when the inputs are weak, and the build reads that back
+(R407). Four facts, each the one the brief prints: no odds priced
 (`enrichment.counts.f1_games_priced == 0`); a side the pool used came from a
 platoon reference older than 7 days (R27's check); a Savant `expected_stats`
 file is past the enrichment age warning's own threshold; no handedness
@@ -878,9 +839,9 @@ Four things to read off it rather than rediscover:
 
 ## When Ben pastes lineups, that paste outranks any API pull (R32)
 
-R143 narrowed this: the paste is second, behind a complete DK 1-9 for the SAME
-side. It is still primary over the API and over every side DK has not posted,
-which on a pre-lock slate is most of them, and everything below is unchanged.
+The paste ranks second, behind a complete DK 1-9 for the SAME side (R143). It
+outranks the API on every side DK has not posted, which on a pre-lock slate is
+most of them.
 
 If the prompt contains a copy/paste from https://www.mlb.com/starting-lineups,
 **do not fetch lineups.** The paste is ground truth for every team in it. Write it
@@ -938,11 +899,10 @@ handedness, so the opposing platoon view falls back to its default.
 
 **Check that the probables actually attached (R117).** The parser reads both
 renders of mlb.com's hand line -- `RHP` alone, and `RHP 8-7, 3.87 ERA, 144 SO` on
-one line -- but only the first was read until 2026-08-18, and the failure was
-silent in every direction: zero probables attached, no warning, the held name
-became the game's VENUE, and DK's `Starting` fallback then supplied a name with a
-null id and an empty hand, which kills F4's Savant join AND its platoon prior.
-Three slates certified that way with `f4_non_neutral: 0`. So: if the tool prints
+one line. A render it does not know attaches zero probables: the held name
+becomes the game's VENUE, DK's `Starting` fallback supplies a name with a null
+id and an empty hand, which kills F4's Savant join AND its platoon prior, and
+the slate still certifies with `f4_non_neutral: 0`. So: if the tool prints
 `DK STARTING` for every side of a paste that clearly named pitchers, the hand line
 is a THIRD render and the parse warning names the line it could not read. Two
 surfaces answer this after the build without re-reading the log --
@@ -966,9 +926,7 @@ That is the fast path: one conversion call, then build.
 Host facts -- call budgets, whether `rm` works, where the repo sits, where
 attachments land -- live in `docs/hosts.md` and are resolved in code by
 `mlb_engine.repo_env.host_profile()`. Ask those, not this file, for a number.
-R354, 2026-09-17: this section used to be 147 lines of Cowork device-VM mechanics
-with the durable advice mixed in. The mechanics moved; what follows is what stays
-true on every host.
+What follows holds on every host.
 
 **Put one expensive thing in each call.** The default path does two network
 fetches inside the build: the MLB Stats API lineups pull, which alone has a
@@ -1026,9 +984,9 @@ ceiling, read `docs/hosts.md` before you pick a number rather than deriving one.
 
 Do not conclude the environment is broken from one observation. Pause, retry
 once, and check whether a second attempt behaves differently. If a stall persists
-across retries during a live slate, deliver from what is already certified rather
-than waiting it out -- a certified file in hand beats a better one that misses
-lock.
+across retries during a live slate, deliver the best legal file already written
+(certified, or review-grade under the deadline rules above) rather than waiting
+it out: a legal file in hand beats a better one that misses lock.
 
 **Dependencies do not persist between sessions.** The preflight at the top of
 this file is the whole answer; run it rather than diagnosing an import error.
@@ -1113,13 +1071,13 @@ on this slate. A team matching fewer than 5 of 9 salary hitters is a blocker, no
 a warning, because that is a name-crosswalk failure and building anyway
 substitutes a projected order while the real lineup sits unused.
 
-R133, 2026-08-18: a team merely SHORT OF NINE is a different fact and no longer
-blocks. Its bar is `MAX_HITTERS_PER_TEAM` (5), the count that fills a maximum DK
-stack, so 5 through 8 warns and certifies while under 5 blocks. Read
+A team merely SHORT OF NINE is a different fact and does not block (R133). Its
+bar is `MAX_HITTERS_PER_TEAM` (5), the count that fills a maximum DK stack, so 5
+through 8 warns and certifies while under 5 blocks. Read
 `pool_report.thin_teams`, which splits the two and carries the bar. Also worth
-knowing at T-10: `--ignore-pool-blockers` alone never certified, because the
+knowing at T-10: `--ignore-pool-blockers` alone never certifies, because the
 pre-export gate re-reads the pool report; pair it with `--assume-gates
-lineup_gate_passed` (the tool now prints this at the override) and the assertion
+lineup_gate_passed` (the tool prints this at the override) and the assertion
 lands in `overridden_gates` with the evidence it contradicts. A crosswalk failure
 is refused outright rather than overridden.
 
@@ -1134,9 +1092,7 @@ same message, and remind Ben the upload is manual. A path is not a delivery.
 This is the step a cloud session cannot skip. `outputs/<date>/` is gitignored and
 a cloud container is destroyed when the session ends, so a certified file that
 only ever exists on disk is a build that produced nothing Ben can upload. On
-Windows a path alone is survivable because the disk is his; nowhere else. R354,
-2026-09-17 -- before it, this read "present the delivered file so he can open
-it", which named no mechanism at all.
+Windows a path alone is survivable because the disk is his; nowhere else (R354).
 
 Order matters and does not bend: `preflight_upload.py` exits 0 FIRST, then the
 file goes over. Never hand over a file you have not preflighted, and never at
@@ -1159,7 +1115,7 @@ Nothing here touches DraftKings. Ben uploads by hand, always.
 
 ### Commit the delivery record, AFTER the hand-over
 
-R369, 2026-09-19. Every delivery now writes a tracked JSON at
+Every delivery writes a tracked JSON (R369) at
 `data/deliveries/<date>/<tag>_<run_id>.json` — the manifest row, the entry rows
 parsed out of the delivered file, the input fingerprints, the code identity, the
 effective controls, the host and the egress line. It is written for you by
@@ -1171,7 +1127,7 @@ outcome review all read this file and nothing else survives.
 
 ```bash
 git add data/deliveries/<date>
-git commit -m "record: <date> <tag> delivery (R369)"
+git commit -m "record: <date> <tag> delivery (R369)" -- data/deliveries/<date>
 git push -u origin <branch>
 ```
 
@@ -1205,11 +1161,9 @@ games that had already started; a second file that night carried 78 and also
 cleared. DK would have rejected both. It is a hard failure and not a warning,
 because a warning at the money boundary is one the clock talks someone past.
 `--as-of "19:56"` pins the clock to replay a check against a past moment, and a
-bare `HH:MM` is read as **Eastern**. R292(c): `preflight_upload.parse_as_of` is
-now the ONE reader of that flag, so `verify_export.py` and `tools/repair_entry.py`
-answer identically — until 2026-09-02 the same characters meant ET here, UTC in
-`verify_export` (four hours early, which reads a 19:40 first pitch as still open)
-and a naive `TypeError` in the repair tool, and only this tool took `HH:MM`.
+bare `HH:MM` is read as **Eastern**. `preflight_upload.parse_as_of` is the one
+reader of that flag (R292(c)), so `verify_export.py` and `tools/repair_entry.py`
+read it identically.
 
 Four inputs resolve themselves, because a check that runs only when you remember
 a flag is a check that does not run at T-5:
@@ -1232,7 +1186,7 @@ a flag is a check that does not run at T-5:
   `declared_pitchers`, so an arm the build rostered on a declaration is an
   acknowledged WARN naming the role instead of a hard failure (R114). An
   **undeclared** missing arm still fails. Two things follow for you. A declared
-  arm no longer needs `--force`, so if you find yourself reaching for it on a
+  arm needs no `--force`, so if you find yourself reaching for it on a
   "not in X's confirmed lineup or probables" line, check the brief resolved
   first: exit 4 on a spurious failure is the habit that eats the real one. And
   the WARN says `Evidence: operator_declared`, which is the truthful label — the
@@ -1337,8 +1291,8 @@ matched, which is a real weakness on a lopsided game and belongs in your report.
 
 - `max_shared_players` (default 4 of 6). No two lineups may share more than four
   players. Overlap counts the PLAYER, not the role, because promoting a UTIL to
-  CPT is not a differentiated lineup. Exact-set forbidding, the old default,
-  called a one-player swap unique.
+  CPT is not a differentiated lineup, and forbidding only an exact repeat
+  would call a one-player swap unique.
 - `max_cpt_exposure_pct` (default **0.25**, Ben 2026-08-19). No captain above a
   quarter of the entered set.
 - `max_player_exposure_pct` (default **0.50**, Ben 2026-08-19, new in R153). No
@@ -1351,10 +1305,8 @@ matched, which is a real weakness on a lopsided game and belongs in your report.
   were never measuring.
 
 Every cap count is a `floor()` of pct * entries, so realized exposure lands at or
-below the requested pct. That rounding rule is why the captain cap used to be
-0.33 rather than 0.35 (at 20 entries 0.35 permits seven captains, a realized
-35%); 0.25 has no such edge. The one escape is `pct * n < 1`, where the count
-clamps to 1 rather than forbidding everyone.
+below the requested pct. The one escape is `pct * n < 1`, where the count clamps
+to 1 rather than forbidding everyone.
 
 They relax rather than truncate, in a fixed order: overlap gives way first, then
 player exposure, then the captain lock, then the thesis. A short bank leaves a
@@ -1373,14 +1325,6 @@ nothing gave way, the cap held, and what moved was the thesis label. So a thesis
 row reading "BOS win close (variant 2, Wilyer Abreu captain)" can legitimately
 have a different captain, and the reassignment list is where that is stated.
 
-R153 second pass, worth knowing because both leaks shipped once: a cap enforced
-anywhere other than where the roster spots are actually spent is not a cap.
-`solve_ladder` enforced no captain cap at all, trusting `build_thesis_ladder`'s
-apportionment, so a lock substitution landed on top of a full captain (26.3%
-under a 25% cap). And the player cap's original carve-out for a thesis's own
-names let one player reach 57.9% under a 50% cap while `player_relaxed` read 0 —
-the cap reporting itself clean while not binding.
-
 Every relaxation is counted in `diversity`, `captain_exposure` and
 `player_exposure`, and repeated in `caution`. Read those before reporting the
 portfolio as clean. Override any of the three through `--controls-override`,
@@ -1392,11 +1336,9 @@ cannot hold no matter what the solver does. The engine reports that and does not
 widen the cap, because raising an exposure cap is a strategy change and CLAUDE.md
 makes it Ben's.
 
-Both defaults live in `mlb_engine/optimize/showdown.py`. The Showdown suite is
-`tests/test_showdown.py`, and `tools/audit.py` DOES gate it, along with
-`test_core`, `test_upload_integrity`, `test_golden_replay` and
-`test_paste_lineups`. (This paragraph claimed the opposite until 2026-07-30; the
-audit has gated four suites since 07-28 and five since 07-30.)
+The defaults live in `mlb_engine/optimize/showdown.py`. The Showdown suite is
+`tests/test_showdown.py`, and `tools/audit.py` gates it with every other suite
+in `EXPECTED_SUITE_COUNTS`.
 
 ## Late swap
 
@@ -1428,15 +1370,14 @@ most "no compatible candidate" errors: a locked slot cannot move, and a game tha
 has locked admits **no new players at all**, even into slots that are still open.
 So an entry holding one locked Yankee cannot pick up a different Yankee.
 
-**A failed swap now tells you which of the two problems you have.** A portfolio
+**A failed swap tells you which of the two problems you have.** A portfolio
 control naming itself (`binding control: max_sp_pair_repetition=3`) means the caps
 are the problem and `--controls-override` is the lever; "no compatible candidate"
-now says explicitly that it is NOT a control, so the bank or the pins are the
+says explicitly that it is NOT a control, so the bank or the pins are the
 problem and `--budget` is the lever. Do not grow the bank against a control
-failure: on 2026-07-29 that mistake cost twenty minutes because the two failures
-printed the same sentence. The swap also inherits the parent build's posture-based
-caps now, so you should not need `--controls-override` at all unless the parent
-build itself used one.
+failure; bank growth cannot clear one. The swap inherits the parent build's
+posture-based caps, so you should not need `--controls-override` at all unless
+the parent build itself used one.
 
 **What the swap does NOT inherit is leverage (R284, open).** The swap builds its
 candidates with no `max_cumulative_ownership_pct` and no `min_low_owned_hitters`,
@@ -1480,8 +1421,10 @@ against a 9-pin prefix cannot work and is not a search-effort problem: on
 1305_12g it went 566 → 1425 candidates across six invocations and the message
 never changed.
 
-**Certification fails.** Do not hand over the file. Report which gate failed and
-what the errors say. A file that does not certify is not a deliverable.
+**Certification fails.** Never present the file as certified or upload-ready.
+Report which gate failed and what the errors say, then follow its class: a V
+failure is a wall at every clock; inside T-30 an S or P failure ships
+review-grade (`references/review_grade.md`); outside T-30 it is Ben's question.
 
 **Blank reserved entry rows block certification.** Never bypass that.
 
@@ -1514,7 +1457,7 @@ python skills/generate-lineups/evals/run_evals.py    # --only <id> for one
 
 The audit checks dependencies first and names the install command if something is
 missing, because a missing solver is not a slow build, it is no build. It also
-pins the test count, PER SUITE since R62: `EXPECTED_SUITE_COUNTS` in
+pins the test count PER SUITE (R62): `EXPECTED_SUITE_COUNTS` in
 `tools/audit.py` is the source of truth and `EXPECTED_TEST_COUNT` is only its
 sum, so adding tests means bumping the suite's own entry, not a single total.
 Only the ledger Quick Card quotes the counts, and it is ARCHIVE's to move. A
@@ -1542,7 +1485,7 @@ python <repo>/tools/verify_export.py --entries <file.csv> --parent <prior file> 
 It runs every preflight rule (blanks, partial rows, duplicate Entry IDs, header
 geometry, DK Status, embedded-pool overlap, cap, slot eligibility, duplicate
 persons, two games, five hitters per team, players whose games have already
-started, hitter versus rostered SP — a WARN since R288, not a failure — Showdown
+started, hitter versus rostered SP — a WARN (R288), not a failure — Showdown
 both-teams and recomputed captain price) and adds the swap-specific ones:
 contest-identity diff against the parent, per-entry slot churn, no player
 introduced from a game that has already started, and no replacement of a player
@@ -1551,12 +1494,10 @@ whose game has started. Exit 2 on any failure.
 **Run it again for each file in a correction chain, and do not pass
 `--locked-teams` at all.** Locked teams are derived on every invocation from the
 lineups feed's own clock (falling back to the salary file's Game Info), and the
-report prints the clock and the source it used. `--locked-teams` ADDS to that set
-and can no longer replace it. This is not a preference: on 2026-07-29 a list
-passed once at 7:23 PM ET was still in use at 8:02, three games locked underneath
-it, this tool printed PASS, and DraftKings rejected 7 of 16 entries. If you see
-`STALE --locked-teams` in the output, drop the flag. Pass `--as-of` only to test
-the derivation against a fixed clock.
+report prints the clock and the source it used. `--locked-teams` only ADDS to
+that set and cannot replace it. If you see `STALE --locked-teams` in the output,
+drop the flag. Pass `--as-of` only to test the derivation against a fixed
+clock.
 
 ## Commands for Ben
 

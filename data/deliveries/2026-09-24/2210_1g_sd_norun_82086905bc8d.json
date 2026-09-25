@@ -1,0 +1,379 @@
+{
+ "code": {
+  "contest_allocator": "v1.12",
+  "execution_pipeline": "v1.17",
+  "git_dirty": true,
+  "git_sha": "5e2436604b1635ba3f7740eff265773c08365e68"
+ },
+ "controls": {},
+ "date": "2026-09-24",
+ "egress": "egress: statsapi 200, odds 401, savant 200, mlb-lineups 200, fangraphs 200 (curl), open-meteo timeout",
+ "egress_source": "session_start 2026-09-25T00:49:43+00:00",
+ "entries": [
+  {
+   "contest_id": "195995204",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (SD @ LAD)",
+   "entry_fee": 0.1,
+   "entry_id": "5268828738",
+   "filled": true,
+   "roster_ids": [
+    "44264250",
+    "44264156",
+    "44264157",
+    "44264158",
+    "44264174",
+    "44264183"
+   ]
+  },
+  {
+   "contest_id": "195995204",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (SD @ LAD)",
+   "entry_fee": 0.1,
+   "entry_id": "5268828747",
+   "filled": true,
+   "roster_ids": [
+    "44264251",
+    "44264161",
+    "44264162",
+    "44264163",
+    "44264164",
+    "44264174"
+   ]
+  },
+  {
+   "contest_id": "195995208",
+   "contest_name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (SD @ LAD)",
+   "entry_fee": 0.01,
+   "entry_id": "5268828801",
+   "filled": true,
+   "roster_ids": [
+    "44264248",
+    "44264158",
+    "44264163",
+    "44264164",
+    "44264174",
+    "44264183"
+   ]
+  },
+  {
+   "contest_id": "195995208",
+   "contest_name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (SD @ LAD)",
+   "entry_fee": 0.01,
+   "entry_id": "5268828802",
+   "filled": true,
+   "roster_ids": [
+    "44264251",
+    "44264157",
+    "44264158",
+    "44264161",
+    "44264167",
+    "44264183"
+   ]
+  },
+  {
+   "contest_id": "195995208",
+   "contest_name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (SD @ LAD)",
+   "entry_fee": 0.01,
+   "entry_id": "5268828803",
+   "filled": true,
+   "roster_ids": [
+    "44264259",
+    "44264153",
+    "44264157",
+    "44264158",
+    "44264172",
+    "44264183"
+   ]
+  },
+  {
+   "contest_id": "195995208",
+   "contest_name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (SD @ LAD)",
+   "entry_fee": 0.01,
+   "entry_id": "5268828804",
+   "filled": true,
+   "roster_ids": [
+    "44264249",
+    "44264155",
+    "44264160",
+    "44264167",
+    "44264174",
+    "44264183"
+   ]
+  },
+  {
+   "contest_id": "195995208",
+   "contest_name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (SD @ LAD)",
+   "entry_fee": 0.01,
+   "entry_id": "5268828805",
+   "filled": true,
+   "roster_ids": [
+    "44264248",
+    "44264156",
+    "44264163",
+    "44264165",
+    "44264174",
+    "44264183"
+   ]
+  },
+  {
+   "contest_id": "195995208",
+   "contest_name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (SD @ LAD)",
+   "entry_fee": 0.01,
+   "entry_id": "5268828806",
+   "filled": true,
+   "roster_ids": [
+    "44264249",
+    "44264160",
+    "44264163",
+    "44264167",
+    "44264168",
+    "44264174"
+   ]
+  },
+  {
+   "contest_id": "195995208",
+   "contest_name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (SD @ LAD)",
+   "entry_fee": 0.01,
+   "entry_id": "5268838543",
+   "filled": true,
+   "roster_ids": [
+    "44264250",
+    "44264159",
+    "44264160",
+    "44264164",
+    "44264167",
+    "44264174"
+   ]
+  },
+  {
+   "contest_id": "195995209",
+   "contest_name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (SD @ LAD)",
+   "entry_fee": 0.01,
+   "entry_id": "5268828782",
+   "filled": true,
+   "roster_ids": [
+    "44264263",
+    "44264154",
+    "44264156",
+    "44264159",
+    "44264167",
+    "44264174"
+   ]
+  },
+  {
+   "contest_id": "195995209",
+   "contest_name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (SD @ LAD)",
+   "entry_fee": 0.01,
+   "entry_id": "5268828820",
+   "filled": true,
+   "roster_ids": [
+    "44264248",
+    "44264154",
+    "44264163",
+    "44264172",
+    "44264174",
+    "44264183"
+   ]
+  },
+  {
+   "contest_id": "195995209",
+   "contest_name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (SD @ LAD)",
+   "entry_fee": 0.01,
+   "entry_id": "5268828821",
+   "filled": true,
+   "roster_ids": [
+    "44264249",
+    "44264160",
+    "44264162",
+    "44264168",
+    "44264170",
+    "44264172"
+   ]
+  },
+  {
+   "contest_id": "195995209",
+   "contest_name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (SD @ LAD)",
+   "entry_fee": 0.01,
+   "entry_id": "5268828822",
+   "filled": true,
+   "roster_ids": [
+    "44264248",
+    "44264160",
+    "44264167",
+    "44264168",
+    "44264172",
+    "44264175"
+   ]
+  },
+  {
+   "contest_id": "195995209",
+   "contest_name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (SD @ LAD)",
+   "entry_fee": 0.01,
+   "entry_id": "5268828823",
+   "filled": true,
+   "roster_ids": [
+    "44264251",
+    "44264153",
+    "44264161",
+    "44264163",
+    "44264175",
+    "44264183"
+   ]
+  },
+  {
+   "contest_id": "195995209",
+   "contest_name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (SD @ LAD)",
+   "entry_fee": 0.01,
+   "entry_id": "5268828824",
+   "filled": true,
+   "roster_ids": [
+    "44264251",
+    "44264158",
+    "44264163",
+    "44264164",
+    "44264165",
+    "44264175"
+   ]
+  },
+  {
+   "contest_id": "195995209",
+   "contest_name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (SD @ LAD)",
+   "entry_fee": 0.01,
+   "entry_id": "5268828825",
+   "filled": true,
+   "roster_ids": [
+    "44264253",
+    "44264153",
+    "44264156",
+    "44264164",
+    "44264175",
+    "44264183"
+   ]
+  },
+  {
+   "contest_id": "195995213",
+   "contest_name": "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (SD @ LAD)",
+   "entry_fee": 1.0,
+   "entry_id": "5268838535",
+   "filled": true,
+   "roster_ids": [
+    "44264248",
+    "44264154",
+    "44264164",
+    "44264170",
+    "44264174",
+    "44264183"
+   ]
+  },
+  {
+   "contest_id": "195996510",
+   "contest_name": "MLB Showdown $1K Solo Shot (SD @ LAD)",
+   "entry_fee": 1.0,
+   "entry_id": "5268820418",
+   "filled": true,
+   "roster_ids": [
+    "44264249",
+    "44264160",
+    "44264163",
+    "44264167",
+    "44264170",
+    "44264172"
+   ]
+  },
+  {
+   "contest_id": "195996511",
+   "contest_name": "MLB Showdown $250 Quarter Jukebox [Just $0.25!]  (SD @ LAD)",
+   "entry_fee": 0.25,
+   "entry_id": "5268820412",
+   "filled": true,
+   "roster_ids": [
+    "44264251",
+    "44264157",
+    "44264158",
+    "44264161",
+    "44264168",
+    "44264183"
+   ]
+  },
+  {
+   "contest_id": "195996511",
+   "contest_name": "MLB Showdown $250 Quarter Jukebox [Just $0.25!]  (SD @ LAD)",
+   "entry_fee": 0.25,
+   "entry_id": "5268838466",
+   "filled": true,
+   "roster_ids": [
+    "44264250",
+    "44264156",
+    "44264160",
+    "44264167",
+    "44264168",
+    "44264174"
+   ]
+  },
+  {
+   "contest_id": "196034408",
+   "contest_name": "MLB Showdown $50 Solo Shot [Single Entry] (SD @ LAD)",
+   "entry_fee": 1.0,
+   "entry_id": "5268838483",
+   "filled": true,
+   "roster_ids": [
+    "44264253",
+    "44264153",
+    "44264164",
+    "44264165",
+    "44264172",
+    "44264175"
+   ]
+  }
+ ],
+ "entries_binding": {
+  "source": "outputs/2026-09-24/DO_NOT_UPLOAD_DKEntries_showdown_2210_1g_sd_contestfit.csv",
+  "source_sha256": "82086905bc8d1a7bd94609c022981ec581f870069c74cf40a91374165c7c8bf5",
+  "status": "bound"
+ },
+ "host": {
+  "call_budget_s": 630.0,
+  "declared_ceiling_s": 900.0,
+  "host": "claude_code"
+ },
+ "kind": "delivery",
+ "labels": "deterministic review proxies and labeled priors only; never ROI, win rate, cash rate, or probability",
+ "manifest_row": {
+  "certification": "review_grade",
+  "contest_ids": [
+   "195995204",
+   "195995208",
+   "195995209",
+   "195995213",
+   "195996510",
+   "195996511",
+   "196034408"
+  ],
+  "contest_names": [
+   "MLB Showdown $100 Dime Time [Just $0.10!] (SD @ LAD)",
+   "MLB Showdown $1K Solo Shot (SD @ LAD)",
+   "MLB Showdown $250 Quarter Jukebox [Just $0.25!]  (SD @ LAD)",
+   "MLB Showdown $50 Solo Shot [Single Entry] (SD @ LAD)",
+   "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (SD @ LAD)",
+   "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (SD @ LAD)"
+  ],
+  "contest_type": "showdown",
+  "delivered_file": "outputs/2026-09-24/DKEntries_showdown_2210_1g_sd_contestfit.csv",
+  "entries": 21,
+  "notes": "Showdown ships review-grade. Whole-lineup reassignment of the thesis-ladder build (parent sha cb57178d6654): rows 0,6,11,16,18,19 permuted so no-SP lineups sit in the top-heavy GPPs and SP lineups in the ticket-line satellites. No player moved; portfolio exposures, captain counts and pairwise overlap are identical to the parent.",
+  "projection_tier": "unknown",
+  "recorded_utc": "2026-09-25T01:05:17.478615+00:00",
+  "run_id": null,
+  "sha256": "82086905bc8d1a7bd94609c022981ec581f870069c74cf40a91374165c7c8bf5",
+  "slate_tag": "2210_1g_sd",
+  "status": "candidate",
+  "strategy_state": {
+   "counts": {},
+   "state": "unknown"
+  }
+ },
+ "recorded_utc": "2026-09-25T01:05:17.501761+00:00",
+ "relaxations": {},
+ "run": {},
+ "schema_version": 1
+}

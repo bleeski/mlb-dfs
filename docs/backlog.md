@@ -6152,6 +6152,16 @@ which is R196's. Filed there, not here.
 - **Where it fails.** When the branch merged main before its PR merged, the oldest merge on that path is the branch's own. For R389(b) (`1ad76cf`) it returns `3312941`, "Merge origin/main ... into the R389(b) branch", not PR #57's `095e21b`.
 - **What does not fix it.** `--first-parent` alone returns nothing, because main's first-parent chain holds no descendant of the commit.
 - **Fix.** Walk `origin/main`'s first-parent merges and take the oldest one the commit is an ancestor of (`git merge-base --is-ancestor`). Pin it against R389(b) `095e21b`, R409 `648f8cf` and R416 `2e579cb`.
+### R421. CLOSED 2026-09-25 -- SHIPPED, filed and landed in one commit (roadmap Session 108), entry in CHANGELOG.md
+
+The instruction surface audited against the current Claude model (`/claude-api
+prompt-audit`, Ben 2026-09-25): a delivery-record commit the command guard
+stops, an uncertified-file rule older than R386, a stale gated-suite list,
+file-diff and history prose across the BUILD skill, its references, the rules,
+the DEV skills, `MLB_Classic.md` and CLAUDE.md rewritten to the present rule, a
+`/dev-session` premise step that no longer mandates a subagent per entry, and
+`/land` and `/ship` made model-invocable. Seven flags declined with reasons.
+Gate and commit: the CHANGELOG entry.
 
 ### R413. CLOSED 2026-09-23 -- SHIPPED, filed and landed in one commit (roadmap Session 100), entry in CHANGELOG.md
 

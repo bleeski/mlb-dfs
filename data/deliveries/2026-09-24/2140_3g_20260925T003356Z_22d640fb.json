@@ -1,0 +1,514 @@
+{
+ "code": {
+  "contest_allocator": "v1.12",
+  "execution_pipeline": "v1.17",
+  "git_dirty": false,
+  "git_sha": "095e21b779347505e3980849259294cd0d0950f9"
+ },
+ "controls": {
+  "classic_sleeves": false,
+  "five_stack_min_size": 5,
+  "max_consensus_cluster_share_pct": 1.0,
+  "max_game_exposure_pct": 1.0,
+  "max_game_exposure_pct_by_game": {
+   "HOU@ATH": 1.0,
+   "LAA@SEA": 1.0,
+   "SD@LAD": 1.0
+  },
+  "max_pitcher_exposure_pct": 1.0,
+  "max_player_exposure_pct": 1.0,
+  "max_primary_stack_exposure_pct": 1.0,
+  "max_shared_players": 9,
+  "max_sp_pair_repetition": 999,
+  "max_team_exposure_pct": 1.0,
+  "min_five_stack_share_pct": 0.0,
+  "player_game_by_id": {
+   "distinct_values": 3,
+   "players_mapped": 60,
+   "wired": true
+  },
+  "player_team_by_id": {
+   "distinct_values": 6,
+   "players_mapped": 60,
+   "wired": true
+  },
+  "primary_stack_min_size": 4
+ },
+ "date": "2026-09-24",
+ "egress": "egress: statsapi 200, odds 401, savant 200, mlb-lineups 200, fangraphs 200 (curl), open-meteo 200",
+ "egress_source": "session_start 2026-09-25T00:29:50+00:00",
+ "entries": [
+  {
+   "contest_id": "195995186",
+   "contest_name": "MLB $100 Dime Time [Just $0.10!] (Night)",
+   "entry_fee": 0.1,
+   "entry_id": "5268838387",
+   "filled": true,
+   "roster_ids": [
+    "44263894",
+    "44263834",
+    "44263944",
+    "44263820",
+    "44264066",
+    "44263934",
+    "44264065",
+    "44263982",
+    "44263909",
+    "44264108"
+   ]
+  },
+  {
+   "contest_id": "195995186",
+   "contest_name": "MLB $100 Dime Time [Just $0.10!] (Night)",
+   "entry_fee": 0.1,
+   "entry_id": "5268838392",
+   "filled": true,
+   "roster_ids": [
+    "44263894",
+    "44263860",
+    "44263944",
+    "44263899",
+    "44263932",
+    "44264059",
+    "44264065",
+    "44263909",
+    "44263919",
+    "44264021"
+   ]
+  },
+  {
+   "contest_id": "195995190",
+   "contest_name": "MLB Satellite to $2 MLB Pocket Cup MEGA Qualifier (Night)",
+   "entry_fee": 0.01,
+   "entry_id": "5268820488",
+   "filled": true,
+   "roster_ids": [
+    "44263894",
+    "44263834",
+    "44263944",
+    "44263820",
+    "44264066",
+    "44263934",
+    "44264065",
+    "44263982",
+    "44263909",
+    "44264108"
+   ]
+  },
+  {
+   "contest_id": "195995190",
+   "contest_name": "MLB Satellite to $2 MLB Pocket Cup MEGA Qualifier (Night)",
+   "entry_fee": 0.01,
+   "entry_id": "5268820518",
+   "filled": true,
+   "roster_ids": [
+    "44263834",
+    "44264047",
+    "44263859",
+    "44263851",
+    "44264066",
+    "44264106",
+    "44263857",
+    "44263981",
+    "44263982",
+    "44264067"
+   ]
+  },
+  {
+   "contest_id": "195995190",
+   "contest_name": "MLB Satellite to $2 MLB Pocket Cup MEGA Qualifier (Night)",
+   "entry_fee": 0.01,
+   "entry_id": "5268820519",
+   "filled": true,
+   "roster_ids": [
+    "44264074",
+    "44263834",
+    "44263924",
+    "44263893",
+    "44264066",
+    "44264059",
+    "44264065",
+    "44263909",
+    "44264078",
+    "44263815"
+   ]
+  },
+  {
+   "contest_id": "195995190",
+   "contest_name": "MLB Satellite to $2 MLB Pocket Cup MEGA Qualifier (Night)",
+   "entry_fee": 0.01,
+   "entry_id": "5268820520",
+   "filled": true,
+   "roster_ids": [
+    "44263894",
+    "44263860",
+    "44263944",
+    "44263899",
+    "44263932",
+    "44264059",
+    "44264065",
+    "44263909",
+    "44263919",
+    "44264021"
+   ]
+  },
+  {
+   "contest_id": "195995190",
+   "contest_name": "MLB Satellite to $2 MLB Pocket Cup MEGA Qualifier (Night)",
+   "entry_fee": 0.01,
+   "entry_id": "5268820521",
+   "filled": true,
+   "roster_ids": [
+    "44264074",
+    "44263860",
+    "44263924",
+    "44263899",
+    "44263932",
+    "44264106",
+    "44264065",
+    "44263919",
+    "44263815",
+    "44264021"
+   ]
+  },
+  {
+   "contest_id": "195995190",
+   "contest_name": "MLB Satellite to $2 MLB Pocket Cup MEGA Qualifier (Night)",
+   "entry_fee": 0.01,
+   "entry_id": "5268820522",
+   "filled": true,
+   "roster_ids": [
+    "44263834",
+    "44263894",
+    "44263944",
+    "44263893",
+    "44264066",
+    "44264059",
+    "44264065",
+    "44263982",
+    "44263977",
+    "44263909"
+   ]
+  },
+  {
+   "contest_id": "195995190",
+   "contest_name": "MLB Satellite to $2 MLB Pocket Cup MEGA Qualifier (Night)",
+   "entry_fee": 0.01,
+   "entry_id": "5268820523",
+   "filled": true,
+   "roster_ids": [
+    "44263985",
+    "44263860",
+    "44263944",
+    "44263820",
+    "44263932",
+    "44263934",
+    "44263901",
+    "44264021",
+    "44263919",
+    "44263815"
+   ]
+  },
+  {
+   "contest_id": "195995191",
+   "contest_name": "MLB Satellite to $2 MLB Pocket Cup MEGA Qualifier (Night)",
+   "entry_fee": 0.01,
+   "entry_id": "5268820501",
+   "filled": true,
+   "roster_ids": [
+    "44263894",
+    "44263834",
+    "44263944",
+    "44263820",
+    "44264066",
+    "44263934",
+    "44264065",
+    "44263982",
+    "44263909",
+    "44264108"
+   ]
+  },
+  {
+   "contest_id": "195995191",
+   "contest_name": "MLB Satellite to $2 MLB Pocket Cup MEGA Qualifier (Night)",
+   "entry_fee": 0.01,
+   "entry_id": "5268820502",
+   "filled": true,
+   "roster_ids": [
+    "44264074",
+    "44263860",
+    "44263924",
+    "44263899",
+    "44263932",
+    "44264106",
+    "44264065",
+    "44263919",
+    "44263815",
+    "44264021"
+   ]
+  },
+  {
+   "contest_id": "195995191",
+   "contest_name": "MLB Satellite to $2 MLB Pocket Cup MEGA Qualifier (Night)",
+   "entry_fee": 0.01,
+   "entry_id": "5268820503",
+   "filled": true,
+   "roster_ids": [
+    "44264074",
+    "44263834",
+    "44263924",
+    "44263893",
+    "44264066",
+    "44264059",
+    "44264065",
+    "44263909",
+    "44264078",
+    "44263815"
+   ]
+  },
+  {
+   "contest_id": "195995191",
+   "contest_name": "MLB Satellite to $2 MLB Pocket Cup MEGA Qualifier (Night)",
+   "entry_fee": 0.01,
+   "entry_id": "5268820504",
+   "filled": true,
+   "roster_ids": [
+    "44263894",
+    "44263860",
+    "44263944",
+    "44263899",
+    "44263932",
+    "44264059",
+    "44264065",
+    "44263909",
+    "44263919",
+    "44264021"
+   ]
+  },
+  {
+   "contest_id": "195995191",
+   "contest_name": "MLB Satellite to $2 MLB Pocket Cup MEGA Qualifier (Night)",
+   "entry_fee": 0.01,
+   "entry_id": "5268820505",
+   "filled": true,
+   "roster_ids": [
+    "44263834",
+    "44263894",
+    "44263944",
+    "44263893",
+    "44264066",
+    "44264059",
+    "44264065",
+    "44263982",
+    "44263977",
+    "44263909"
+   ]
+  },
+  {
+   "contest_id": "195995191",
+   "contest_name": "MLB Satellite to $2 MLB Pocket Cup MEGA Qualifier (Night)",
+   "entry_fee": 0.01,
+   "entry_id": "5268820506",
+   "filled": true,
+   "roster_ids": [
+    "44263985",
+    "44263860",
+    "44263944",
+    "44263820",
+    "44263932",
+    "44263934",
+    "44263901",
+    "44264021",
+    "44263919",
+    "44263815"
+   ]
+  },
+  {
+   "contest_id": "195995191",
+   "contest_name": "MLB Satellite to $2 MLB Pocket Cup MEGA Qualifier (Night)",
+   "entry_fee": 0.01,
+   "entry_id": "5268828902",
+   "filled": true,
+   "roster_ids": [
+    "44263834",
+    "44264047",
+    "44263859",
+    "44263851",
+    "44264066",
+    "44264106",
+    "44263857",
+    "44263981",
+    "44263982",
+    "44264067"
+   ]
+  },
+  {
+   "contest_id": "196031595",
+   "contest_name": "MLB $250 Solo Shot (Night)",
+   "entry_fee": 1.0,
+   "entry_id": "5268820363",
+   "filled": true,
+   "roster_ids": [
+    "44264074",
+    "44263834",
+    "44263924",
+    "44263893",
+    "44264066",
+    "44264059",
+    "44264065",
+    "44263909",
+    "44264078",
+    "44263815"
+   ]
+  },
+  {
+   "contest_id": "196033194",
+   "contest_name": "MLB $20 Quarter Jukebox [Just $0.25!] (Night)",
+   "entry_fee": 0.25,
+   "entry_id": "5268828552",
+   "filled": true,
+   "roster_ids": [
+    "44263834",
+    "44263894",
+    "44263944",
+    "44263893",
+    "44264066",
+    "44264059",
+    "44264065",
+    "44263982",
+    "44263977",
+    "44263909"
+   ]
+  },
+  {
+   "contest_id": "196033194",
+   "contest_name": "MLB $20 Quarter Jukebox [Just $0.25!] (Night)",
+   "entry_fee": 0.25,
+   "entry_id": "5268828553",
+   "filled": true,
+   "roster_ids": [
+    "44263834",
+    "44264047",
+    "44263859",
+    "44263851",
+    "44264066",
+    "44264106",
+    "44263857",
+    "44263981",
+    "44263982",
+    "44264067"
+   ]
+  },
+  {
+   "contest_id": "196033384",
+   "contest_name": "MLB Satellite to $20 NFL Fantasy Football Millionaire (Night)",
+   "entry_fee": 1.0,
+   "entry_id": "5268820359",
+   "filled": true,
+   "roster_ids": [
+    "44263985",
+    "44263860",
+    "44263944",
+    "44263820",
+    "44263932",
+    "44263934",
+    "44263901",
+    "44264021",
+    "44263919",
+    "44263815"
+   ]
+  }
+ ],
+ "entries_binding": {
+  "source": "outputs/2026-09-24/DO_NOT_UPLOAD_DKEntries_2140_3g_BASELINE_20260925T003356Z_22d640fb.csv",
+  "source_sha256": "5be990098e79a6d82d543d9b0d95d805b45816af1797e46b651b6215c135cd63",
+  "status": "bound"
+ },
+ "host": {
+  "call_budget_s": 630.0,
+  "declared_ceiling_s": 900.0,
+  "host": "claude_code"
+ },
+ "kind": "delivery",
+ "labels": "deterministic review proxies and labeled priors only; never ROI, win rate, cash rate, or probability",
+ "manifest_row": {
+  "certification": "review_grade_baseline",
+  "contest_ids": [
+   "195995186",
+   "195995190",
+   "195995191",
+   "196031595",
+   "196033194",
+   "196033384"
+  ],
+  "contest_names": [
+   "MLB $100 Dime Time [Just $0.10!] (Night)",
+   "MLB $20 Quarter Jukebox [Just $0.25!] (Night)",
+   "MLB $250 Solo Shot (Night)",
+   "MLB Satellite to $2 MLB Pocket Cup MEGA Qualifier (Night)",
+   "MLB Satellite to $20 NFL Fantasy Football Millionaire (Night)"
+  ],
+  "contest_type": "classic",
+  "delivered_file": "outputs/2026-09-24/DKEntries_2140_3g_BASELINE_20260925T003356Z_22d640fb.csv",
+  "entries": 20,
+  "lineage": "baseline",
+  "notes": "baseline (R389(b)): built before research on the unenriched frame, every portfolio cap opened to the deadline rung's value (never-relax held); review-grade, never certified",
+  "projection_tier": "proxy",
+  "recorded_utc": "2026-09-25T00:33:56.704980+00:00",
+  "run_id": "20260925T003356Z_22d640fb",
+  "sha256": "5be990098e79a6d82d543d9b0d95d805b45816af1797e46b651b6215c135cd63",
+  "slate_tag": "2140_3g",
+  "status": "candidate",
+  "strategy_state": {
+   "bank_warnings": [],
+   "counts": {
+    "controls_opened": 9
+   },
+   "evidence": "recorded",
+   "state": "relaxed",
+   "warnings": []
+  }
+ },
+ "recorded_utc": "2026-09-25T00:33:56.706488+00:00",
+ "relaxations": {},
+ "run": {
+  "certification": {
+   "allocation_certified": true,
+   "failed_post_export_gates": [],
+   "post_export_gates": {
+    "entry_reconciliation_passed": true,
+    "export_hash_binding_passed": true,
+    "locked_immutability_passed": true,
+    "portfolio_caps_passed": true,
+    "roster_legality_passed": true,
+    "template_preservation_passed": true
+   },
+   "pre_export_passed": true,
+   "selection_certified": true,
+   "workflow_valid": true
+  },
+  "environment": {
+   "lock_file": "requirements.lock",
+   "lock_sha256": "dd7723e54043e8c2644100beba5069959d835258f96e1cf6dc100ea1617ac0d6",
+   "packages": {
+    "numpy": "2.2.6",
+    "pandas": "2.3.3",
+    "scipy": "1.15.3"
+   },
+   "python": "3.11.15"
+  },
+  "inputs": {
+   "DKEntries.csv": {
+    "sha256": "0a028d88af8ccde0812b2e57ff1560a0050af58e2f59918e386d2ed527a3cfcb",
+    "size_bytes": 33574,
+    "source_path": "/home/user/mlb-dfs/data/slates/2026-09-24/DKEntries.csv"
+   },
+   "DKSalaries.csv": {
+    "sha256": "09a6b856ac7bec007ff31ad0f3d9a032aa6c0187a8d1d32a41a4dad341ef48dc",
+    "size_bytes": 27737,
+    "source_path": "/home/user/mlb-dfs/data/slates/2026-09-24/DKSalaries.csv"
+   }
+  }
+ },
+ "schema_version": 1
+}
