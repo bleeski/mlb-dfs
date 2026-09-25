@@ -1,0 +1,372 @@
+{
+ "code": {
+  "contest_allocator": "v1.12",
+  "execution_pipeline": "v1.17",
+  "git_dirty": false,
+  "git_sha": "22112685a8c038fd89042b818b1b00de53729a62"
+ },
+ "controls": {
+  "max_cpt_exposure_pct": 0.25,
+  "max_player_exposure_pct": 0.5,
+  "max_shared_players": 4
+ },
+ "date": "2026-09-25",
+ "egress": "egress: statsapi unreachable, odds unreachable, savant unreachable, mlb-lineups unreachable, fangraphs unreachable (curl), open-meteo unreachable",
+ "egress_source": "session_start 2026-09-25T19:46:22+00:00",
+ "entries": [
+  {
+   "contest_id": "196036323",
+   "contest_name": "MLB Showdown $300 Quarter Jukebox [Just $0.25!] (BAL @ NYY)",
+   "entry_fee": 0.25,
+   "entry_id": "5269391714",
+   "filled": true,
+   "roster_ids": [
+    "44284541",
+    "44284453",
+    "44284463",
+    "44284468",
+    "44284469",
+    "44284472"
+   ]
+  },
+  {
+   "contest_id": "196036323",
+   "contest_name": "MLB Showdown $300 Quarter Jukebox [Just $0.25!] (BAL @ NYY)",
+   "entry_fee": 0.25,
+   "entry_id": "5269397546",
+   "filled": true,
+   "roster_ids": [
+    "44284541",
+    "44284457",
+    "44284461",
+    "44284463",
+    "44284468",
+    "44284469"
+   ]
+  },
+  {
+   "contest_id": "196036326",
+   "contest_name": "MLB Showdown $1.5K Solo Shot (BAL @ NYY)",
+   "entry_fee": 1.0,
+   "entry_id": "5269391760",
+   "filled": true,
+   "roster_ids": [
+    "44284541",
+    "44284454",
+    "44284461",
+    "44284468",
+    "44284469",
+    "44284472"
+   ]
+  },
+  {
+   "contest_id": "196036373",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (BAL @ NYY)",
+   "entry_fee": 0.1,
+   "entry_id": "5269391641",
+   "filled": true,
+   "roster_ids": [
+    "44284541",
+    "44284454",
+    "44284463",
+    "44284468",
+    "44284469",
+    "44284471"
+   ]
+  },
+  {
+   "contest_id": "196036373",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (BAL @ NYY)",
+   "entry_fee": 0.1,
+   "entry_id": "5269397521",
+   "filled": true,
+   "roster_ids": [
+    "44284541",
+    "44284455",
+    "44284463",
+    "44284466",
+    "44284468",
+    "44284469"
+   ]
+  },
+  {
+   "contest_id": "196036377",
+   "contest_name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (BAL @ NYY)",
+   "entry_fee": 0.01,
+   "entry_id": "5269397459",
+   "filled": true,
+   "roster_ids": [
+    "44284559",
+    "44284451",
+    "44284454",
+    "44284455",
+    "44284463",
+    "44284472"
+   ]
+  },
+  {
+   "contest_id": "196036377",
+   "contest_name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (BAL @ NYY)",
+   "entry_fee": 0.01,
+   "entry_id": "5269397897",
+   "filled": true,
+   "roster_ids": [
+    "44284558",
+    "44284451",
+    "44284453",
+    "44284459",
+    "44284461",
+    "44284469"
+   ]
+  },
+  {
+   "contest_id": "196036377",
+   "contest_name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (BAL @ NYY)",
+   "entry_fee": 0.01,
+   "entry_id": "5269397898",
+   "filled": true,
+   "roster_ids": [
+    "44284558",
+    "44284451",
+    "44284454",
+    "44284457",
+    "44284462",
+    "44284469"
+   ]
+  },
+  {
+   "contest_id": "196036377",
+   "contest_name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (BAL @ NYY)",
+   "entry_fee": 0.01,
+   "entry_id": "5269397899",
+   "filled": true,
+   "roster_ids": [
+    "44284558",
+    "44284451",
+    "44284453",
+    "44284454",
+    "44284463",
+    "44284478"
+   ]
+  },
+  {
+   "contest_id": "196036377",
+   "contest_name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (BAL @ NYY)",
+   "entry_fee": 0.01,
+   "entry_id": "5269397900",
+   "filled": true,
+   "roster_ids": [
+    "44284559",
+    "44284451",
+    "44284453",
+    "44284454",
+    "44284463",
+    "44284477"
+   ]
+  },
+  {
+   "contest_id": "196036377",
+   "contest_name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (BAL @ NYY)",
+   "entry_fee": 0.01,
+   "entry_id": "5269397901",
+   "filled": true,
+   "roster_ids": [
+    "44284543",
+    "44284454",
+    "44284461",
+    "44284463",
+    "44284468",
+    "44284469"
+   ]
+  },
+  {
+   "contest_id": "196036377",
+   "contest_name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (BAL @ NYY)",
+   "entry_fee": 0.01,
+   "entry_id": "5269397902",
+   "filled": true,
+   "roster_ids": [
+    "44284558",
+    "44284453",
+    "44284454",
+    "44284457",
+    "44284462",
+    "44284463"
+   ]
+  },
+  {
+   "contest_id": "196036378",
+   "contest_name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (BAL @ NYY)",
+   "entry_fee": 0.01,
+   "entry_id": "5269391599",
+   "filled": true,
+   "roster_ids": [
+    "44284553",
+    "44284453",
+    "44284454",
+    "44284457",
+    "44284461",
+    "44284472"
+   ]
+  },
+  {
+   "contest_id": "196036378",
+   "contest_name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (BAL @ NYY)",
+   "entry_fee": 0.01,
+   "entry_id": "5269397852",
+   "filled": true,
+   "roster_ids": [
+    "44284549",
+    "44284453",
+    "44284454",
+    "44284461",
+    "44284462",
+    "44284472"
+   ]
+  },
+  {
+   "contest_id": "196036378",
+   "contest_name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (BAL @ NYY)",
+   "entry_fee": 0.01,
+   "entry_id": "5269397853",
+   "filled": true,
+   "roster_ids": [
+    "44284543",
+    "44284455",
+    "44284459",
+    "44284461",
+    "44284466",
+    "44284472"
+   ]
+  },
+  {
+   "contest_id": "196036378",
+   "contest_name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (BAL @ NYY)",
+   "entry_fee": 0.01,
+   "entry_id": "5269397854",
+   "filled": true,
+   "roster_ids": [
+    "44284543",
+    "44284457",
+    "44284459",
+    "44284461",
+    "44284462",
+    "44284471"
+   ]
+  },
+  {
+   "contest_id": "196036378",
+   "contest_name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (BAL @ NYY)",
+   "entry_fee": 0.01,
+   "entry_id": "5269397855",
+   "filled": true,
+   "roster_ids": [
+    "44284545",
+    "44284457",
+    "44284459",
+    "44284461",
+    "44284462",
+    "44284464"
+   ]
+  },
+  {
+   "contest_id": "196036378",
+   "contest_name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (BAL @ NYY)",
+   "entry_fee": 0.01,
+   "entry_id": "5269397856",
+   "filled": true,
+   "roster_ids": [
+    "44284545",
+    "44284457",
+    "44284459",
+    "44284461",
+    "44284466",
+    "44284467"
+   ]
+  },
+  {
+   "contest_id": "196036378",
+   "contest_name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (BAL @ NYY)",
+   "entry_fee": 0.01,
+   "entry_id": "5269397857",
+   "filled": true,
+   "roster_ids": [
+    "44284545",
+    "44284457",
+    "44284459",
+    "44284462",
+    "44284466",
+    "44284472"
+   ]
+  },
+  {
+   "contest_id": "196036382",
+   "contest_name": "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (BAL @ NYY)",
+   "entry_fee": 1.0,
+   "entry_id": "5269391776",
+   "filled": true,
+   "roster_ids": [
+    "44284545",
+    "44284457",
+    "44284459",
+    "44284462",
+    "44284467",
+    "44284471"
+   ]
+  }
+ ],
+ "entries_binding": {
+  "source": "outputs/2026-09-25/DO_NOT_UPLOAD_DKEntries_showdown_1605_1g_sd_BASELINE_057c55da1399.csv",
+  "source_sha256": "057c55da1399592c9c603d83559f0c820ba2c4d7ebea374a71d87e29b86d5eda",
+  "status": "bound"
+ },
+ "host": {
+  "call_budget_s": 630.0,
+  "declared_ceiling_s": 900.0,
+  "host": "claude_code"
+ },
+ "kind": "delivery",
+ "labels": "deterministic review proxies and labeled priors only; never ROI, win rate, cash rate, or probability",
+ "manifest_row": {
+  "certification": "review_grade",
+  "contest_ids": [
+   "196036323",
+   "196036326",
+   "196036373",
+   "196036377",
+   "196036378",
+   "196036382"
+  ],
+  "contest_names": [
+   "MLB Showdown $1.5K Solo Shot (BAL @ NYY)",
+   "MLB Showdown $100 Dime Time [Just $0.10!] (BAL @ NYY)",
+   "MLB Showdown $300 Quarter Jukebox [Just $0.25!] (BAL @ NYY)",
+   "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (BAL @ NYY)",
+   "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (BAL @ NYY)"
+  ],
+  "contest_type": "showdown",
+  "delivered_file": "outputs/2026-09-25/DKEntries_showdown_1605_1g_sd_BASELINE_057c55da1399.csv",
+  "entries": 20,
+  "lineage": "baseline",
+  "notes": "Showdown baseline (R389(c)): a points-max bank at the build's controls, published before the thesis ladder. Showdown ships review-grade; see CLAUDE.md.",
+  "projection_tier": "unknown",
+  "recorded_utc": "2026-09-25T20:01:30.405109+00:00",
+  "run_id": null,
+  "sha256": "057c55da1399592c9c603d83559f0c820ba2c4d7ebea374a71d87e29b86d5eda",
+  "slate_tag": "1605_1g_sd",
+  "status": "candidate",
+  "strategy_state": {
+   "counts": {},
+   "state": "unknown"
+  }
+ },
+ "recorded_utc": "2026-09-25T20:01:30.407259+00:00",
+ "relaxations": {
+  "both_relaxed_slots": 0,
+  "overlap_relaxed_slots": 0,
+  "player_relaxed_slots": 0,
+  "relaxed_slots": 0
+ },
+ "run": {},
+ "schema_version": 1
+}
