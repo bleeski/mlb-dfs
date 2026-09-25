@@ -71,13 +71,13 @@ Three hosts run this repo and `docs/hosts.md` is the table: how each is reached,
 - **Cowork is legacy**, kept because the mount still exists: no `rm` (`mv` into `_to_delete/`), and a lock CLASS to sweep before every git write (R109). Read `docs/cowork_sandbox.md` before the first bash call there.
 
 ## Sandbox
-The per-call budget belongs to the HOST and is resolved by `repo_env.call_budget_s()`: ~630s in a cloud container, 130s on Cowork, and 130s for a host that states nothing — R271's number, now one profile's value rather than every caller's default. Do not re-derive it per call and never hardcode it (R349, R358). `docs/cowork_sandbox.md` is the legacy procedure.
+The per-call budget belongs to the HOST and is resolved by `repo_env.call_budget_s()`: ~630s in a cloud container, 130s on Cowork, and 130s for a host that states nothing (R271). Do not re-derive it per call and never hardcode it (R349, R358). `docs/cowork_sandbox.md` is the legacy procedure.
 
 ## Showdown
 Review-grade only; `run_slate` and `run_late_swap` do not apply. Three controls are enforced in the solver against the REALIZED set and relaxed only in the order overlap, player exposure, captain lock, thesis, each relaxation counted in the brief (R153): `max_shared_players` 4 of 6, `max_cpt_exposure_pct` 0.25, `max_player_exposure_pct` 0.50. Counts are `floor(pct * entries)`, clamped to 1 when `pct * n < 1`. A portfolio is clean when the relaxation counts are zero, not when the gates pass. Override all three through `--controls-override`.
 
 ## T-schedule (BUILD)
-A ladder with actions, rewritten 2026-09-01 after a 23-minute window shipped nothing and made delivery-first 2026-09-22 (R386). T-30: skip the gate and the solver probe; they measure engineering health, not the file. T-20: skip every optional step. T-15: open every binding control AT ONCE, not stepwise (five careful steps cost more than one crude, reversible one). T-10: the best legal file is the deliverable; approve on posture defaults and auto-floors. T-6: hand-build if the engine has not produced a file, run the preflight, label it review-grade with its sha256. T-5: present the file with zero narration. Read the clock from the clock: print `TZ=America/New_York date` in the same call as every build, before every clock figure you state, and entering and leaving any phase that runs no build call (R318).
+A ladder with actions, delivery-first (R386). T-30: skip the gate and the solver probe; they measure engineering health, not the file. T-20: skip every optional step. T-15: open every binding control AT ONCE, not stepwise (five careful steps cost more than one crude, reversible one). T-10: the best legal file is the deliverable; approve on posture defaults and auto-floors. T-6: hand-build if the engine has not produced a file, run the preflight, label it review-grade with its sha256. T-5: present the file with zero narration. Read the clock from the clock: print `TZ=America/New_York date` in the same call as every build, before every clock figure you state, and entering and leaving any phase that runs no build call (R318).
 
 ## Where things live
 | Need | Read |

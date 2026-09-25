@@ -73,7 +73,7 @@ meaning, and every brief key `SKILL.md` names that this brief does not carry.
 Ben got the file, so the session supplies it or the gap is not computed. It is
 never guessed.
 
-Since R372 it also prints **repo agent runs**: every `dfs-qa` or `dfs-premise`
+It also prints **repo agent runs** (R372): every `dfs-qa` or `dfs-premise`
 run on the date, with its wall time, the model that served it and its findings
 count, read from `data/agent_runs/<date>/`. `findings: not stated` means the
 agent dropped the `FINDINGS: <n>` line its definition requires, and it is never
