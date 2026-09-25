@@ -6146,6 +6146,16 @@ which is R196's. Filed there, not here.
 
 ## Workstream 6 — Infrastructure, tests, environment, coordination, and docs
 
+### R424. CLOSED 2026-09-25 -- SHIPPED, filed and landed in one commit (roadmap Session 112), entry in CHANGELOG.md
+
+Ben asked for the Fable model to be the one `/advisor` invokes (2026-09-25).
+No setting picks the model for `/advisor` alone: `advisorModel` is the
+advisor's model and turns it on at every session start. Ben chose the
+project `.claude/settings.json`, always on, because it is the one copy a
+cloud container keeps. `"advisorModel": "fable"` is pinned by
+`RepoAgentsAndHookEventsTests.test_the_advisor_is_fable`. Gate and commit:
+the CHANGELOG entry.
+
 ### R423. The Progress Ledger's backfill command returns a branch's own merge-from-main (P3, XS) | new 2026-09-25, found at Session 109's landing | Roadmap: Session 111
 
 - **What.** The ledger header says the last line of `git log --format=%h --ancestry-path --merges <commit>..origin/main` is the merge that landed a row (R410).

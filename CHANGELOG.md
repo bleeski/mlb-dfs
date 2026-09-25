@@ -2,6 +2,26 @@
 
 What changed in the engine, the tools and the contracts, when, and why.
 
+## 2026-09-25 — R424: the Fable advisor in every session. `.claude/settings.json` sets `advisorModel` to `fable` (roadmap Session 112)
+
+**Scope.** `.claude/settings.json` (the key and the `$comment` R-number), `tests/test_core.py` (`RepoAgentsAndHookEventsTests.test_the_advisor_is_fable`), `tools/audit.py` (the test_core pin), `docs/backlog.md` (R424 filed CLOSED), `docs/ROADMAP.md` (Session 112 Complete, its ledger row, Session 109 backfilled as `c76b1ba`), `CHANGELOG.md`.
+
+**Source.** Ben, 2026-09-25: "Use /update-config to edit settings.json so fable model is invoked when I use /advisor".
+
+**What was in the way.** `/update-config` could not run here. The org-managed PreToolUse skill hook is a bash script run under `/bin/sh`, which rejects `set -o pipefail`, so every Skill call is refused on this host. R389(b) recorded the same failure for `/code-review`. The change was made directly instead.
+
+**What the setting does, verified** at code.claude.com/docs/en/advisor.md:
+- `advisorModel` names the advisor's model. `"fable"` is an accepted alias, and a Fable advisor is accepted for an Opus 5.5 main model.
+- No setting picks the model for `/advisor` alone. `advisorModel` also turns the advisor on at every session start, and Fable advisor calls bill at Fable rates (usage credits on some plans).
+- Ben chose the project file, always on, over a per-session `/advisor fable` and over the gitignored `settings.local.json`. The project file is the one copy a cloud container keeps. `/advisor off` saves to user settings, which the project file outranks, so it lasts one session.
+- It applies to sessions started after the merge.
+
+**Test.** `test_the_advisor_is_fable` reads the project settings and wants `advisorModel == "fable"`. Mutation: `"opus"` in the file turns it red, and restoring the file turns it green again.
+
+**Review.** `/code-review` is blocked by the same hook. The diff is one settings key and one assertion, so no substitute review ran for it; the Session 12 diff that follows in this PR gets one.
+
+**Gate.** Before, at `583aa26`: `PASS  v2.26.0  44 modules  2736 tests  5 skipped` (6m15s). The five are the host data guards (R155): test_core 4 and test_showdown 1, skipped in place, the same five as the last four landings. After: `PASS  v2.26.0  44 modules  2737 tests  5 skipped` (5m52s), the same five skips; test_core 1732 -> 1733.
+
 ## 2026-09-25 — R422(a)+(b): tail seats scale with coverage. The market's bottom third of teams opens one seat per team once the portfolio could cover every comfortable team, pinned through the allocator's mask; the delivery record and the miner capture what the archive needs to grade it (roadmap Session 109; R423 filed)
 
 **Renumbered at landing.** This change was built and first committed as R421 (`c4017d0`), with Sessions 108-110. PR #60 merged first and took R421 and Session 108, so the branch merged main (`cf84632`) and renumbered its own text: R421 to R422, R422 to R423, and Sessions 108-110 to 109-111. #60's Session 108 ledger SHA is backfilled to its merge, `3f2914a`.
