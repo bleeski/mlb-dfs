@@ -323,6 +323,9 @@ def run(args: argparse.Namespace) -> int:
             notes=notes,
             controls=prior_record.get("controls") or None,
             relaxations=prior_record.get("relaxations") or None,
+            # R421(a). The market the run was ranked by, or a re-promotion
+            # rewrites the tracked record without it.
+            market=(prior_record.get("extra") or {}).get("market") or None,
             **({"lineage": lineage} if lineage else {}),
         )
     except CorruptManifestError as exc:

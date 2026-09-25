@@ -2,6 +2,184 @@
 
 What changed in the engine, the tools and the contracts, when, and why.
 
+## 2026-09-25 — R421(a)+(b): tail seats scale with coverage. The market's bottom third of teams opens one seat per team once the portfolio could cover every comfortable team, pinned through the allocator's mask; the delivery record and the miner capture what the archive needs to grade it (roadmap Session 108; R422 filed)
+
+**Scope.**
+- `mlb_engine/optimize/classic_sleeves.py` (VERSION 1.1), the one owner:
+  - `SLEEVE_TAIL`, `BANK_SLEEVES`, `TAIL_TEAM_KEY`, `TAIL_TOKEN_PREFIX`, `TAIL_SHAPES` (validated against `contest_shapes` at import), `TAIL_DENOMINATOR`, and `SLEEVE_JOB_CLASS["tail"] = "sleeve_tail"`;
+  - `normalize_implied_totals`, `tail_seat_count`, `rank_tail_teams`, `tail_seat_plan`, `stamp_tail_seats`, `tail_token`, `sleeve_family`;
+  - `apportion_entries` seats a stamped entry `tail:<team>` and apportions the rest of its contest by weight; `expected_entries_by_sleeve(tail_seats_by_contest=)`;
+  - `tag_sleeves` maps `sleeve_tail` to the projection world, as it does environment.
+- `mlb_engine/pipeline/execution_pipeline.py`:
+  - `resolve_tail_seats`, `slate_market_record`, `_teams_by_game` and `_primary_stacked_on_teams`;
+  - `resolve_sleeve_bank_request` carries a `tail` block and `sleeves["tail"]`;
+  - `build_sleeve_jobs` gets a tail depth branch;
+  - `run_slate` stamps `tail_team` on the entry requirements once the controls are final, and carries `classic_tail_seats` and `market` on the checkpoint and the approved result;
+  - `_plan_joint_allocation(implied_total_by_team=)`, so the plan bank's request matches;
+  - `_deliver_mirror` passes `market` to the record.
+- `mlb_engine/allocate/contest_allocator.py`:
+  - `_resolve_classic_sleeves`: the tail mask, the no-sleeve-bank case and the `tail` report block;
+  - the delivered block folds `tail:<team>` under `tail`.
+- `mlb_engine/entries/upload_manifest.py`: `record_delivery(market=)` into the tracked record's `extra.market`, on both mirror paths.
+- `tools/promote_run.py`: a re-promotion carries the prior record's `extra.market`, as it already carried `controls` and `relaxations`.
+- `mlb_engine/field/field_miner.py`: each complete entry carries `primary_stack_team` and `primary_stack_size`, with `PRIMARY_STACK_MIN_HITTERS` mirroring the engine's.
+- `skills/generate-lineups/scripts/build_slate.py`:
+  - the sliced door's request reads `classic_tail_seats` from the override;
+  - `format_tail_clause` feeds the `sleeves:` line.
+- `tests/test_core.py`:
+  - `ClassicTailSeatTests` (15 tests);
+  - an update to `ClassicSleeveTests.test_environment_game_ranking_and_its_tie_break`, deliberate and explained below;
+  - `R293BankOnEveryRungTests.EXPECTED_CENSUS`: `execution_pipeline.extend_bank` (5, 5) -> (6, 6).
+- `tools/audit.py` (the pin), `docs/backlog.md` (R421's open remainder, R422, and a rider on R417), `docs/ROADMAP.md` (Sessions 108, 109 and 110, the ledger row, Session 11's SHA backfilled to `095e21b`), this file.
+- The fragment `docs/backlog_inbox/2026-09-24_BUILD_tail-seats-scale-with-coverage.md` is consumed and retired.
+
+**What was wrong.** On 1410_4g Ben asked for tail outcomes to grow with the entries entered and shrink with the games on the slate. The fragment is right on three counts, each verified in the tree:
+- R406's weights are a function of posture and shape only;
+- no sleeve targets a tail;
+- the environment sleeve takes the TOP games.
+
+Two of its premises were corrected:
+- **"No mechanism could have produced a MIA stack" is half right.** `extend_bank`'s job grid gives every team a stack job in round 0, since teams rotate across SP pairs. So the bank can hold MIA-primary lineups, and what was missing is a SEAT for one. On the 07-24 night replay the ordinary bank held 64 and 61 lineups primary-stacking the two tail teams. So the tail is a membership through the mask, R406's environment finding again, not a new build.
+- **"Measure before building" cannot run on committed data.**
+  - `data/odds_history/` has two totals-only snapshots, whose even splits tie both teams in a game.
+  - The miner counted hitters per team, then kept only `stack_pattern` and dropped the team.
+  - No mined file stores a game count.
+  - `f1_implied_total_by_team` lived only in the gitignored brief.
+  - At most 9 contests on 3 slates could be joined. So the capture ships first ((a)) and the grade is filed ((c)).
+
+**What shipped.**
+- **(a) The capture.**
+  - A Classic build that priced a market records `extra.market` in its `data/deliveries/` record:
+    - the slate's implied totals, restricted to the slate's teams (a whole-day feed does not leak in);
+    - `games` and `game_ids`;
+    - `teams_on_slate`;
+    - `unpriced_teams`;
+    - `equal_total_games`, because an even split and a pick'em both tie a game's teams and look the same here.
+
+    A build with no market writes no `extra`, so every other record keeps its keys.
+  - The record also carries `ranked_teams`, the order the tail ranking used, with unrounded totals, so the archive re-derives the same bottom third rather than re-breaking a rounded tie. A re-promotion (`tools/promote_run.py`) keeps the block.
+  - The miner writes `primary_stack_team` and `primary_stack_size` on fully joined lineups. Below the engine's 3-hitter primary-stack threshold, or on a tie, the team is `""`; with no join it is `None`. Neither is a guessed team.
+- **(b) The rule.**
+  - **Inputs.** S = teams on the slate, t = S // 3, C = S − t, N = entries in the portfolio.
+  - **Seats.** T = clamp(N − C, 0, t). No seat opens until N could give every comfortable team one stack. Each seat is one tail team, highest-implied first, and every tail team holds one once N ≥ S.
+
+    | slate | S | N=6 | N=12 | N=20 | N=30 |
+    | :--- | :--- | :--- | :--- | :--- | :--- |
+    | 2g | 4 | 1 | 1 | 1 | 1 |
+    | 4g | 8 | 0 | 2 | 2 | 2 |
+    | 7g | 14 | 0 | 2 | 4 | 4 |
+    | 10g | 20 | 0 | 0 | 6 | 6 |
+    | 15g | 30 | 0 | 0 | 0 | 10 |
+
+  - **The ranking is the market's only.** It uses F1's `implied_total_by_team`, descending, ties by team. A slate team without a total drops the tail by name; there is no park-factor or ownership fallback.
+  - **Placement.**
+    - Seats go only to `large_field_gpp`, `large_wta` and `mme_gpp` contests with 2 or more entries, and at most ⌊N_c/2⌋ in one contest, so tail never outnumbers comfortable inside a contest. A cash or single-entry POSTURE seats none whatever shape it resolved to, as in `contest_sleeve_weights`.
+    - Contests fill largest N_c first, then by contest id; field size is not on the build path, (d).
+    - Inside a contest the tail seats are the last entry ids, and the weights apportion the rest.
+    - A seat with no room is counted `unplaced`.
+  - **The mask.** The allocator gives a projection-world candidate the `tail:<team>` token when its `_candidate_primary_stack` (the field the stack caps read) is a stamped team, and its measured stack is not under `primary_stack_min_size`. The floor runs after the mask, so a seat confined to a sub-floor stack would starve there and read as the floor's relaxation. A stamped entry is confined to those candidates. The joint MILP and every cap are unchanged.
+  - **Counted fallbacks.** A team with too few distinct lineups sends its excess seats to projection, counted, the same as R406.
+  - **Without a sleeve bank** (for example `no_sleeve_bank`), the rest of the portfolio seats projection and is not counted as falling out of sleeves that were never built.
+  - **Depth jobs** (`extend_bank(stack_teams=<short teams>, job_class="sleeve_tail")`) run only for a tail team the bank holds fewer than 2 lineups of. The count:
+    - reads `optimizer_v3.candidate_primary_stack`, the same function the mask's field comes from;
+    - counts distinct rosters, in the projection world only, and only rosters the frame fully resolves;
+    - on the direct door, includes that door's in-memory bank (`prior_candidates`), not only its empty throwaway cache.
+  - **One helper.** `resolve_tail_seats` serves the sliced door's request, the direct door's, the plan leg's, and `run_slate`'s stamp.
+  - **Off.** `classic_sleeves: False` turns every sleeve off, including at the T-15 rung. `classic_tail_seats: False` turns off the tail alone.
+- **The report.** The `sleeves:` line reads, for example, `tail ATH 1, CIN 1 (bottom third by implied total; 2 of 2 opened at N=20, S=8)`, or `tail none (<why>)`. The brief's `exposure.classic_sleeves` carries the request's `tail` block and the allocator's `tail` block (requested, seated, entries by team, fell back).
+
+**Decisions made here (Ben's to overrule).**
+- Default ON. It is Ben's directive and a coverage rule with no probability claim, the footing R406's weights shipped on.
+- One seat per tail team. Depth waits on (c).
+- `mme_gpp` counts as top-heavy.
+- The half-contest cap.
+- The primary stack, not a secondary. Ben's own 1410_4g entry was CWS4 + MIA3, and the measurement and the stack caps read the primary.
+- On 1410_4g (S=8, N=12) the rule gives T=2. Both teams are placed, one each in Micro Booster and Dime Time, by the contest-id tie-break; Ben placed his hand entry in Jukebox.
+
+**Declined or deferred, with reasons.**
+- (c) The grade tool waits on captured slates.
+- (d) Largest field first needs a field size on the build path.
+- Late swap builds no sleeve bank and stamps nothing, so every swapped entry seats as before, R406's reason.
+- The probe gets no tail term, because depth runs only when the bank is short, and on both measured slates it was not.
+
+**Measured.**
+- **Replay: 2026-07-24 night.** Setup:
+  - 8 teams;
+  - synthetic market totals TEX 5.4 down to ATH 3.65;
+  - 20 entries in one large GPP;
+  - IL players excluded;
+  - `tools/_scratch_r421/replay.py`, with the artifact root in a temp dir.
+
+  Results:
+  - The request is S=8, T=2, teams CIN and ATH, both seats in the one GPP.
+  - The depth jobs were skipped, since the bank held 64 and 61 lineups stacking those teams.
+  - At default caps the build refused identically with the tail ON and OFF: first `max_shared_players 6` against a structural floor of 7, then a joint interaction. So the refusal is this synthetic pool's, not the tail's.
+  - With the caps opened in every arm (R157's sanity values), all three arms certify: sleeves off, tail off, tail on.
+  - The tail arm reads `projection 7, salary_only 4, chalk_fails 4, environment 3, tail 2`, with entries 700018 and 700019 seated on CIN and ATH stacks, 0 relaxations and 0 fallbacks.
+  - The delivery record carries `extra.market` with all 8 teams.
+  - Caveat: this emergency-proxy frame applies no F1, so the projection already stacked CIN and ATH twice each without the tail. Here the pin guarantees the coverage; the case the rule changes is 1410_4g's, where MIA sat at 0 of 12.
+- **Golden.** `tests/test_golden_replay.py` 9 passed, and no baseline moved. The production replay passes no implied totals, so the tail drops, and the LOOSE baseline has sleeves off.
+- **PROBE.** `solver_probe --date 2026-06-03 --entries 18` gives `base bank 12s + augmentation 0s + consensus-limited 5s + sleeves 6s = 23s`, budget 630s, FITS, with no new term. R406 measured 14s on another host run; the terms are unchanged.
+
+**R233, every call site of the sleeve helpers this change touches** (`grep -rn "apportion_entries(\|expected_entries_by_sleeve(\|_resolve_classic_sleeves(\|tag_sleeves(\|resolve_sleeve_bank_request(\|resolve_tail_seats(\|stamp_tail_seats(" --include=*.py mlb_engine tools skills`, excluding definitions and `tools/_scratch_*`):
+- `EP`:
+  - L2618 `resolve_tail_seats` inside `resolve_sleeve_bank_request`, and L2620 `expected_entries_by_sleeve` with the tail seats;
+  - L2925, L2947 and L2963 `tag_sleeves` (sleeve candidates, direct door);
+  - L5257 `resolve_sleeve_bank_request` in the plan leg, now with the build's totals, and L5289 `tag_sleeves` there;
+  - L6532 and L6535 `resolve_tail_seats` and `stamp_tail_seats` in `run_slate`;
+  - L6899 `resolve_sleeve_bank_request` on the direct door.
+- `CA`: L1444 `apportion_entries` and L3471 `_resolve_classic_sleeves`.
+- `BS`: L3566 `resolve_sleeve_bank_request` on the sliced door, which now reads `classic_tail_seats`, and L3672 `tag_sleeves`.
+
+Every request site computes the tail through `resolve_tail_seats`, and the one allocator site reads the stamp. The tail depth candidates' class maps to the projection world, so no `tag_sleeves` site needed a tail argument.
+
+**Review.** `/code-review` (high) on the diff raised 10 findings. Eight are fixed above, each with a test:
+- a re-promotion dropped `market`;
+- the depth count included chalk-fails and duplicate rosters;
+- the direct door counted an empty cache;
+- the miner named 2-hitter "stacks";
+- a sub-floor stack took a tail seat;
+- a rounded market could not reproduce the ranking;
+- `tail_teams_of` was unused, and is removed;
+- a cash posture with a GPP shape took seats.
+
+One more is fixed in part: the implied-total parsing my two sites shared is now `normalize_implied_totals`. Two parts are declined:
+- `rank_environment_games`' own stricter parser is R406's surface and stays as it is (surgical).
+- Recomputing `_teams_by_game` 2-3 times per request costs microseconds.
+
+**Tests.** `tests.test_core` goes from 1717 to 1732. `ClassicTailSeatTests` (15) covers:
+- the coverage table and its opening edge;
+- the market-only bottom third, dropped by name for a partial market, with off-slate totals ignored;
+- top-heavy placement, at most half a contest, unplaced counted, and order;
+- tail seats taken off the contest before the weights;
+- a pinned seat taking only its team's stack, and an unpinned build never choosing MIA;
+- a primary-stack cap still binding two pinned seats;
+- a stack under the floor taking no seat;
+- a missing team falling back, counted;
+- both switches leaving assignments identical;
+- depth jobs only when short, counting distinct projection-world rosters and the direct door's own bank, and building projection-world lineups on the team;
+- one helper for the request and the stamp, with a stale stamp cleared;
+- `run_slate` stamping at approve=False, through the real front door;
+- the delivery record carrying the market in the ranking's order, through the real `run_slate` and `record_delivery`, and keeping it through a real `promote_run`;
+- the miner's stack team: `""` on a tie or under 3 hitters, `None` unjoined, and the threshold equal to the engine's;
+- the brief line.
+
+29 of 29 hand mutations went red (20 on the first cut, 9 on the review fixes), each restored after. Two mutations first survived because their fixtures were weak: a cash-posture fixture below the opening edge, and a 2-hitter lineup that was a four-way tie. The fixtures were fixed and the mutations re-run red. Two pins moved deliberately:
+- The R406 test that passes implied totals on a 4-team, 10-entry slate now expects the one tail seat: projection 4 -> 3, `tail: 1`. Its `classic_tail_seats: False` arm pins the old 4/2/2/2.
+- The R293 census counts the tail's `extend_bank`, which forwards `max_opposing_hitters_per_sp` by name.
+
+`tests.test_core`'s 4 skips are host facts:
+- no vendored `.pylibs/scipy`;
+- no `.env`;
+- the 2026-08-16 salary file not staged (twice).
+
+**Gate.** `PASS  v2.26.0  44 modules  2736 tests  5 skipped`. The appended `skipped_in_place` note (test_core 4, test_showdown 1) is the session-start baseline's, word for word: host data guards (R155), not lost coverage.
+
+**Found, filed.**
+- R422 (Session 110): the ledger's backfill command returns a branch's own merge-from-main. For R389(b) it returns `3312941`, not PR #57's `095e21b`, which this landing backfilled by hand.
+- A rider on R417 (Session 104): R406's environment depth check on the direct door counts the same empty throwaway cache, so its restricted jobs always run there. The tail's fix (`prior_candidates`) is the pattern; R406's surface is left as it is.
+- The first gate on this diff failed `test_upload_integrity`'s R387 pin, which counts `entries_source=source)` on both mirror paths. `market=` now precedes it, so the pinned text holds unedited.
+
 ## 2026-09-24 — R389(b): baseline-first Classic. `run_classic` publishes an entry-mapped `review_grade_baseline` file in its own manifest lineage before any research, re-read on its exact bytes, so a crash after it delivers it (roadmap Session 11)
 
 **Scope.**

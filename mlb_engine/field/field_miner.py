@@ -134,6 +134,12 @@ DEGRADED_SALARY_LEFT = 5000
 # 24.2% -- and that max is 1605_2g, the filed sighting. A 25% bar therefore
 # sits just outside the observed p90 and catches the sighting.
 DEGRADED_PROXY_MARGIN_PCT = 25.0
+
+# R421(a). The engine's primary-stack threshold (optimizer_v3.PRIMARY_STACK_MIN_HITTERS),
+# mirrored rather than imported so the miner stays off the solver's import graph;
+# ClassicTailSeatTests pins the two equal.
+PRIMARY_STACK_MIN_HITTERS = 3
+
 _SUFFIXES = {"jr", "sr", "ii", "iii", "iv"}
 _ENTRYNAME_SEQ = re.compile(r"^(?P<user>.*?)\s*\((?P<k>\d+)\s*/\s*(?P<n>\d+)\)\s*$")
 
@@ -996,6 +1002,17 @@ def mine_contest(
         stacks = sorted(team_counts.values(), reverse=True)
         e["max_stack"] = (stacks[0] if stacks else 0) if has_salary else None
         e["stack_pattern"] = ("-".join(str(x) for x in stacks) if stacks else "") if has_salary else None
+        # R421(a). WHICH team the largest stack is, which the pattern above
+        # drops, so the archive can rank a winner's stack by the market's
+        # implied total. Only on a fully joined lineup (a missing hitter could
+        # be on the stack team); "" below the engine's primary-stack threshold
+        # or on a tie, never a guessed team.
+        top = team_counts.most_common(2)
+        e["primary_stack_team"] = (
+            (top[0][0] if top[0][1] >= PRIMARY_STACK_MIN_HITTERS
+             and (len(top) == 1 or top[0][1] > top[1][1]) else "")
+            if fully_joined and top else None)
+        e["primary_stack_size"] = (top[0][1] if top else 0) if fully_joined else None
         owned = [own[normalize_name(n)] for _, n in e["lineup"] if normalize_name(n) in own]
         e["chalk_score"] = round(statistics.fmean(owned), 2) if owned else None
         e["n_cheap"] = sum(
@@ -1271,6 +1288,8 @@ def mine_contest(
                 # R39: per entry, so the archive can answer "who did the winner
                 # captain" without re-parsing the source CSV.
                 "captain_norm",
+                # R421(a): which team the largest stack is, for the tail grade.
+                "primary_stack_team", "primary_stack_size",
             )} for e in entries if e["lineup_complete"]
         ],
         "player_table": ptable,
