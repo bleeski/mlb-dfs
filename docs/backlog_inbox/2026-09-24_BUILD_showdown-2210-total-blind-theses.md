@@ -30,7 +30,35 @@ own venue resolution is keyed by home team, so park factors should be unaffected
 (verify); the weather join is what breaks. Fix: an alias column or a venue alias
 map, owned by ARCHIVE for the CSV and DEV for the join.
 
-## 3. Sightings of filed items (no new entry needed)
+## 3. NEW: contest assignment is positional, and it sent the no-SP lineups to the satellites (P2, S)
+
+The dfs-qa pass (R344) found 6 of the 7 no-SP lineups in ticket-line satellite
+entries (195995208 x3, 195995209 x2, 195995213 x1), while the two top-heavy
+micro GPPs (Dime Time, Quarter Jukebox, 4 entries) held one. The ladder fills
+reserved rows in file order (R238's positional-assignment fragment), so no
+decision put them there. BUILD shipped a superseding file
+(sha256 82086905bc8d1a7bd94609c022981ec581f870069c74cf40a91374165c7c8bf5) that
+permutes rows 0, 6, 11, 16, 18, 19 whole: satellites now carry 3 of 15 no-SP
+lineups, the four micro-GPP entries carry 4 of 4, Solo Shots unchanged. No player
+moved, so the preflight's exposure lines and overlap histogram are identical to
+the parent. Script: `tools/_scratch_sd2210/reassign.py` (gitignored), through
+`upload_manifest.deliver`. The engine fix is R238's: resolve contest shape on the
+Showdown path and assign high-median lineups to flat-payout seats.
+
+## 4. NEW from dfs-qa, unverified by BUILD
+
+- **Template team splits collapse.** 17 of 21 lineups realized 5-1, 2 at 4-2, 2 at
+  3-3. Rationale strings say "two cheaper opposing bats" (close theses) and
+  "split locked even" (both_explode) on rosters carrying one opposing bat and a
+  4-2 split. Open question: does `solve_ladder` enforce template splits at all?
+- **The prior clips both SPs at 100.00** roster share in wta_satellite, small_gpp
+  and single_entry_gpp, and spends 60.6% to 116.5% of the 600% roster budget on
+  the 75 people outside both confirmed nines. For the R276/R306 prior owner.
+- **`odds_from_paste.py` drops total prices.** The paste had no O/U price columns,
+  so the packet carries `"price": null` on both sides at 7.5. The paste grammar
+  has no place for them; a total-aware thesis (finding 1) would need it.
+
+## 5. Sightings of filed items (no new entry needed)
 
 - **R399(b)**, again: `showdown_handedness` matched 17 of 18. Feed `Teoscar
   Hernández`, DK `Teoscar Hernandez`. He took a flat 1.00 platoon factor instead of
