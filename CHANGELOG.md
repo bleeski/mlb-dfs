@@ -42,7 +42,7 @@ What changed in the engine, the tools and the contracts, when, and why.
 
 **Verification.** The command guard on the recipe as written and as fixed: `permissionDecision: ask`, then no output and exit 0. Prose pins on the landed tree: `pytest tests/test_core.py -k "HostProseIsCurrent or RootContractBudget or ChangelogDebt or ClaimTool or EnvLock or SkillCacheDrift or AuditSkipHonesty or EgressProbe or strategy_doc_no_longer_contradicts or docs_instruct or RepoAgentsAndHookEvents"` 82 passed; `pytest tests/test_upload_integrity.py -k "PreflightContractDocumentation or probe_not_raw_pip"` 3 passed. `/code-review` was not run: the diff touches no `mlb_engine/`, `tools/`, `tests/`, `.claude/hooks/` or `scripts/` file (`/land` step 1).
 
-**Gate.** Before (a clean clone of HEAD `bad453a`) and after: running at commit time; the next commit on this branch records both lines here.
+**Gate.** Before, on a clean clone of HEAD `bad453a`: `PASS  v2.26.0  44 modules  2721 tests  5 skipped` (6m52s). After, on the landed tree: `PASS  v2.26.0  44 modules  2721 tests  5 skipped` (6m25s). The same five skips both times, test_core 4 and test_showdown 1 skipped in place: the absent optional files `/ship` expects on every clean checkout.
 
 ## 2026-09-24 — R389(b): baseline-first Classic. `run_classic` publishes an entry-mapped `review_grade_baseline` file in its own manifest lineage before any research, re-read on its exact bytes, so a crash after it delivers it (roadmap Session 11)
 
