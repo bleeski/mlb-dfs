@@ -6128,6 +6128,17 @@ which is R196's. Filed there, not here.
 
 ## Workstream 6 — Infrastructure, tests, environment, coordination, and docs
 
+### R421. CLOSED 2026-09-25 -- SHIPPED, filed and landed in one commit (roadmap Session 108), entry in CHANGELOG.md
+
+The instruction surface audited against the current Claude model (`/claude-api
+prompt-audit`, Ben 2026-09-25): a delivery-record commit the command guard
+stops, an uncertified-file rule older than R386, a stale gated-suite list,
+file-diff and history prose across the BUILD skill, its references, the rules,
+the DEV skills, `MLB_Classic.md` and CLAUDE.md rewritten to the present rule, a
+`/dev-session` premise step that no longer mandates a subagent per entry, and
+`/land` and `/ship` made model-invocable. Seven flags declined with reasons.
+Gate and commit: the CHANGELOG entry.
+
 ### R413. CLOSED 2026-09-23 -- SHIPPED, filed and landed in one commit (roadmap Session 100), entry in CHANGELOG.md
 
 `tools/plan_status.py` recognized a roadmap Session ID only as exactly two

@@ -64,7 +64,6 @@ Create legal DraftKings MLB Classic lineups that match the contest shape and, fo
 - Salary cap: $50,000. Roster slots: `P1,P2,C,1B,2B,3B,SS,OF1,OF2,OF3`.
 - No duplicate player within a lineup.
 - **No hitter against a rostered opposing pitcher is a GUIDELINE, not a rule in this section's sense, and the session may override it on judgment (R288, 2026-09-01).** It is a DFS convention about negative correlation. DraftKings does not prohibit the construction: across 22 archived slate dates, 19,072 of 102,201 fully-resolvable Classic entries in `data/archive/` carry one, and contest-standings-192464310 (2026-07-19, 1,486 entries) has ranks 1, 2 AND 3 all holding a NYY bat beside a rostered LAD arm starting against NYY — DK accepted, scored and paid those. Frequency is slate-size dependent (62.5% of entries on that 2-game slate, 3.2% on the 12-game 2026-08-11 slate), so on a small slate the convention forbids most of the legal space. The control is `optimizer_v3` `max_opposing_hitters_per_sp` / `build_slate.py --max-opposing-hitters-per-sp`, default 0 and PER SP (a two-arm Classic lineup's per-lineup worst case is twice the value); every Classic brief records `anti_correlation` including the default, and `preflight_upload.py` warns rather than failing. CLAUDE.md Autonomy delegates the decision; record the value and the reason in the brief.
-  This line read "unless the user explicitly overrides" from the start and no override existed: `optimizer_v3` emitted the constraint unconditionally with no parameter, and `preflight_upload` returned exit 2 on it. The strategy authority said overridable and both implementations said never — three readers, two disagreeing with the authority, which is why the wall survived unexamined into a hand builder on 1940_9g and cost the highest-implied-total team on the slate 2 roster slots out of 370.
 - Confirmed-out hitters are excluded. Once a team is confirmed, only listed starters from that team are eligible; unconfirmed teams are not restricted by other teams' confirmations.
 - Missing salary-row players are unrosterable; never substitute by name.
 - Locked players remain in their exact DraftKings slots.
@@ -88,7 +87,7 @@ An S or P failure changes the label to review-grade; it never removes the file. 
 **Ben's facts, 2026-09-22** (`docs/ROADMAP.md`, "Facts Ben answered").
 - **F-1.** Ben's upload takes 5 minutes, so the effective deadline is first lock minus 5 minutes (T-5).
 - **F-2.** DK accepts a partial DKEntries file only when the unresolved rows are removed. Blank rows are not the partial form. Partial salvage (R401, Session 22) will drop unresolved rows and report their Entry IDs as unresolved coverage, not invalidity.
-- **F-3.** DK accepts one lineup in two entries of one contest; Ben never wants it. Distinct lineups per contest is an S control with operator never-relax authority, kept under every deadline. The engine already enforced it; since R388(b) its stated authority is `operator_never_relax` (`gate_classes.FACT_AUTHORITY`), held on every build without a flag.
+- **F-3.** DK accepts one lineup in two entries of one contest; Ben never wants it. Distinct lineups per contest is an S control with operator never-relax authority, kept under every deadline. The engine enforces it, and its stated authority is `operator_never_relax` (`gate_classes.FACT_AUTHORITY`, R388(b)), held on every build without a flag.
 - **F-4.** Deadline-aware delivery applies to every build, not only with `--deliver-by`. This retires R290's promise that no delivered byte changes without the flag. Sessions 15-17 make it the default; until then a build is deadline-aware only when `--deliver-by` is passed.
 
 **R125(b) and (c) are decided; the code is not built.** Ben's delivery-first instruction is the decision both halves waited on. (b) A known Entry ID and contest whose name matches no posture may take a stated default posture, recorded in the brief and review-grade only; contest identity stays a V gate. R392 builds it (Session 21). (c) Classic S controls relax autonomously under deadline, never-relax controls held and every move counted in the brief. R391 builds it (Session 19). The fixed four-step order R125(c) proposed is retired: the audit's bounded-recovery contract (§8) takes the smallest useful recovery that can finish and mandates no universal order, and CLAUDE.md's T-15 rung still opens every binding control at once.
@@ -266,13 +265,11 @@ Use a compact bank based on unique lineup demand, not raw reserved entries.
 - Two to three: about 12.
 - Four to nine: requested count plus roughly six.
 - Larger reserved grids: largest same-contest block, reuse-cap minimum, and a small shape buffer.
-- Cap: `optimizer_v3.DEFAULT_CANDIDATE_BANK_CAP`, 150. **Corrected 2026-09-19
-  (R368).** This line read "Default near-lock cap: 24 candidates; 40 only when
-  justified", which the code has contradicted since before it was written and
-  which was filed as OH-7 on 2026-07-19. `resolve_candidate_bank_size`
-  (`optimize/optimizer_v3.py:3393-3422`) is entry-derived and reads no clock:
-  the four tiers above are exact, and the 10+ branch is `ceil(2n)` capped at
-  150. Whether a larger bank buys anything is UNMEASURED and is roadmap CC-A9.
+- Cap: `optimizer_v3.DEFAULT_CANDIDATE_BANK_CAP`, 150 (R368).
+  `optimizer_v3.resolve_candidate_bank_size` is entry-derived and reads no
+  clock: the four tiers above are exact, and the 10+ branch is `ceil(2n)`
+  capped at 150. Whether a larger bank buys anything is UNMEASURED and is
+  roadmap CC-A9.
 
 Scenario families should represent baseball outcomes—different SP pairs, offenses, and game environments—not repeated arbitrary exclusions. Game totals, park factors, and wind from §5 are the preferred seeds for scenario families.
 
@@ -463,9 +460,9 @@ It must report:
 - `selection_certified=False`
 - `allocation_certified=False`
 
-It no longer reports `forced_swap_validation_passed` (R176(c), 2026-08-30). That
-key was written as a literal `True` on both modes for a validation that does not
-exist in the tree, so it stated nothing and could be mistaken for evidence.
+It does not report `forced_swap_validation_passed` (R176(c)): no validation by
+that name exists in the tree, so the key would state nothing and could be
+mistaken for evidence.
 
 Manual comparison or catcher-only pivot review cannot inherit certification.
 

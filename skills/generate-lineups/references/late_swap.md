@@ -34,40 +34,24 @@ authorizes every reserved entry in the file.
 
 ## Scope `--entry-ids` to the entries you mean, not to protect the bank
 
-**This section changed on 2026-08-10 (R101). Scoping is now a scope choice.**
-It used to be a bank-preservation workaround, and if you learned the habit from
-the older version of this page, the reason you learned it is gone.
-
-The mechanism, as dated history. The swap builds one general bank, then one
-targeted slice per pinned entry, and each targeted slice passes an `excludes`
-list computed from *that entry's own* roster. Until R101 the exclude set was
-part of one `bank_cache` conditions signature, and `extend_bank` opened by
-calling `drop_stale_jobs`, which discarded every stored candidate built under a
-different signature — so each targeted slice threw away the candidates the
-previous slices built, the general bank included. Across nine runs on 2026-08-03
-the cache reached 1,007 candidates while the joint solve was handed 8, 9 or 10
-of them; scoped to the 2 entries that needed a change, which happened to share
-one exclude set so nothing was discarded between them, it was handed 90
-(R47, measured 2026-08-08 against `outputs/2026-08-03/_swap1..9.log`).
-
-What holds now:
+The swap builds one general bank, then one targeted slice per pinned entry, each
+passing an `excludes` list computed from that entry's own roster. The general
+bank and every targeted slice survive each other regardless of scope (R101), so
+scoping decides what may move, not how big the bank is.
 
 - **Name the entries you actually want to change, for the ordinary reason.**
-  A tight `--entry-ids` limits what may move in the file. It is no longer buying
-  you a bigger bank; the general bank and every targeted slice survive each
-  other regardless of scope.
+  A tight `--entry-ids` limits what may move in the file.
 - **Read `bank the joint solve will see: N candidates across K conditions
   bucket(s)`.** That line is printed after the targeted slices and it is the
   number the solve receives. The `candidate scoring:` line leads with the same
   number and names the only two things that can move it — duplicate rosters two
   buckets both reached, and scoring failures. `bank after the general slice:` is
   the general slice alone and says so.
-- **`superseded_jobs_dropped` now means one thing.** A non-zero value is the
-  PROJECTIONS having moved since the cache was written (or a cache file older
-  than R101), and it prints with the projection digest that caused it. It can no
-  longer mean a sibling slice quietly deleted your bank.
-- **A bigger `--budget` still does not fix a thin bank on its own.** It buys
-  more jobs, which is now worth buying, since nothing throws the results away.
+- **A non-zero `superseded_jobs_dropped` means the PROJECTIONS moved** since the
+  cache was written (or the cache file predates R101), and it prints with the
+  projection digest that caused it.
+- **A bigger `--budget` does not fix a thin bank on its own.** It buys more
+  jobs, and every job's results are kept.
 
 ## The two rules that explain most failures
 
@@ -152,15 +136,8 @@ python tools/verify_export.py --salary <DKSalaries.csv> \
 That confirms locked slots held and no new player arrived from a locked game,
 which is precisely what DK will reject if you got it wrong.
 
-**No `--locked-teams`.** This example passed `--locked-teams PIT,NYY` until
-2026-09-06, against SKILL.md's explicit "do not pass `--locked-teams` at all" —
-the two instructions have contradicted each other at the money boundary, and
-this one was wrong. The tool derives locked teams on EVERY invocation from the
-lineups feed's own clock, falling back to the salary file's `Game Info`, and
-prints the clock and the source it used. The flag only ADDS to that set and can
-no longer replace it, so a hand-typed list is a list that goes stale while you
-are still using it: on 2026-07-29 a list passed at 7:23 PM ET was still in use
-at 8:02 with three games locked underneath it, `verify_export.py` printed PASS,
-and DraftKings rejected 7 of 16 entries. If you see `STALE --locked-teams` in
-the output, drop the flag. `--as-of` is the only clock override, and it is for
-replaying a derivation against a fixed time.
+**No `--locked-teams`.** The tool derives locked teams on EVERY invocation from
+the lineups feed's own clock, falling back to the salary file's `Game Info`, and
+prints the clock and the source it used. The flag only ADDS to that set. If you
+see `STALE --locked-teams` in the output, drop the flag. `--as-of` is the only
+clock override, and it is for replaying a derivation against a fixed time.
