@@ -21,15 +21,26 @@ Ben's decisions (2026-09-23):
 Truthful labels: every sleeve is a deterministic construction over labeled
 priors. Nothing here is a probability or an edge, and a sleeve that does well in
 a replay is "supported in the shapes replayed", never more.
+
+R422 (Ben, 2026-09-24): tail seats scale with coverage. The slate's teams are
+ranked by the MARKET's implied totals and its bottom third is the tail. Once
+the portfolio holds enough entries to give every comfortable team one stack,
+each further entry opens one tail seat, highest-implied tail team first, until
+every tail team has one (``tail_seat_count``). A tail seat is pinned to its
+team and seated on a projection-world lineup whose PRIMARY stack is that team:
+a membership through the allocator's mask, like environment, because the
+bank's job grid already stacks every team. Seats go only to top-heavy shapes
+with two or more entries, at most half of a contest. A coverage rule over a
+labeled prior; it says nothing about how often a tail wins.
 """
 from __future__ import annotations
 
 import math
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
-from mlb_engine.contest_shapes import WTA_CONSTRUCTION_SHAPES
+from mlb_engine.contest_shapes import WTA_CONSTRUCTION_SHAPES, validate_shape
 
-VERSION = "1.0"
+VERSION = "1.1"
 
 SLEEVE_PROJECTION = "projection"
 SLEEVE_SALARY_ONLY = "salary_only"
@@ -57,6 +68,26 @@ SLEEVE_JOB_CLASS: Dict[str, str] = {
     SLEEVE_CHALK_FAILS: "sleeve_chalk_fails",
     SLEEVE_ENVIRONMENT: "sleeve_environment",
 }
+
+#: R422. The tail sleeve. Not in ``SLEEVES``: its seats are not apportioned by
+#: weight but counted off coverage and pinned to a team before the weights
+#: apportion the rest of each contest.
+SLEEVE_TAIL = "tail"
+SLEEVE_JOB_CLASS[SLEEVE_TAIL] = "sleeve_tail"
+#: The order the bank builds sleeves in: the weighted four, then the tail.
+BANK_SLEEVES: Tuple[str, ...] = SLEEVES + (SLEEVE_TAIL,)
+#: The entry-requirement key a tail seat's team is stamped under.
+TAIL_TEAM_KEY = "tail_team"
+#: The membership token a projection-world lineup stacking ``team`` carries.
+TAIL_TOKEN_PREFIX = "tail:"
+#: Top-heavy shapes, the only ones a tail seat goes to. Cash, satellites and
+#: single entry seat none, whatever N is.
+TAIL_SHAPES = frozenset({"large_field_gpp", "large_wta", "mme_gpp"})
+for _shape in sorted(TAIL_SHAPES):
+    validate_shape(_shape, "classic_sleeves.TAIL_SHAPES")
+del _shape
+#: The tail is the bottom 1/TAIL_DENOMINATOR of the slate's teams by implied total.
+TAIL_DENOMINATOR = 3
 #: R405's cluster limit for chalk-fails: at most one consensus bat per lineup.
 CHALK_FAILS_MAX_MEMBERS = 1
 #: The candidate key a sleeve tags its lineups with.
@@ -133,6 +164,10 @@ def apportion_entries(
     sleeves whose bank holds candidates; a sleeve outside it gets no seats and
     its share falls back to ``projection``, counted in ``fallbacks`` -- a
     relaxation, never a silent reshuffle.
+
+    R422. An entry stamped with a tail team (``TAIL_TEAM_KEY``, by
+    ``tail_seat_plan``) seats ``tail:<team>`` and the weights apportion the
+    rest of its contest.
     """
     have = set(available) if available is not None else set(SLEEVES)
     have.add(SLEEVE_PROJECTION)
@@ -143,12 +178,16 @@ def apportion_entries(
     contests: List[Dict[str, Any]] = []
     fallbacks: List[Dict[str, Any]] = []
     for cid in sorted(by_contest):
-        reqs = sorted(by_contest[cid], key=lambda r: str(r.get("entry_id")))
+        every = sorted(by_contest[cid], key=lambda r: str(r.get("entry_id")))
+        tail_reqs = [r for r in every if r.get(TAIL_TEAM_KEY)]
+        reqs = [r for r in every if not r.get(TAIL_TEAM_KEY)]
         declared = dict(weights.get(cid) or {SLEEVE_PROJECTION: 1.0})
-        if len(reqs) <= 1:
+        if len(every) <= 1:
             declared, rule = {SLEEVE_PROJECTION: 1.0}, "single entry"
         else:
             rule = "weights" if len(declared) > 1 else "projection only"
+        for req in tail_reqs:
+            sleeve_by_entry[str(req.get("entry_id"))] = tail_token(req[TAIL_TEAM_KEY])
         seats = largest_remainder(len(reqs), declared)
         for s in SLEEVES:
             if s != SLEEVE_PROJECTION and seats.get(s) and s not in have:
@@ -161,7 +200,9 @@ def apportion_entries(
             for req in reqs[cursor:cursor + seats.get(s, 0)]:
                 sleeve_by_entry[str(req.get("entry_id"))] = s
             cursor += seats.get(s, 0)
-        contests.append({"contest_id": cid, "entries": len(reqs), "weights": declared,
+        if tail_reqs:
+            seats = {**seats, SLEEVE_TAIL: len(tail_reqs)}
+        contests.append({"contest_id": cid, "entries": len(every), "weights": declared,
                          "entries_by_sleeve": seats, "rule": rule})
     return {"sleeve_by_entry": sleeve_by_entry, "contests": contests,
             "fallbacks": fallbacks, "relaxations": len(fallbacks)}
@@ -170,16 +211,22 @@ def apportion_entries(
 def expected_entries_by_sleeve(
     weights: Mapping[str, Mapping[str, float]],
     entries_by_contest: Mapping[str, int],
+    tail_seats_by_contest: Optional[Mapping[str, int]] = None,
 ) -> Dict[str, int]:
     """How many entries each sleeve will seat, before any fallback: what the
-    bank has to be asked to supply."""
+    bank has to be asked to supply. R422: a contest's tail seats come off its
+    count before the weights apportion the rest, as ``apportion_entries``
+    does, and ``tail`` appears only when a seat was placed."""
+    tail = {str(k): int(v) for k, v in (tail_seats_by_contest or {}).items() if int(v) > 0}
     totals = {s: 0 for s in SLEEVES}
     for cid, n in sorted(entries_by_contest.items()):
         declared = dict(weights.get(str(cid)) or {SLEEVE_PROJECTION: 1.0})
         if int(n) <= 1:
             declared = {SLEEVE_PROJECTION: 1.0}
-        for s, seats in largest_remainder(int(n), declared).items():
+        for s, seats in largest_remainder(int(n) - tail.get(str(cid), 0), declared).items():
             totals[s] += seats
+    if tail:
+        totals[SLEEVE_TAIL] = sum(tail.values())
     return totals
 
 
@@ -323,7 +370,7 @@ def tag_sleeves(candidates: Sequence[Mapping[str, Any]],
     for c in candidates:
         c = dict(c)
         built = SLEEVE_BY_JOB_CLASS.get(str(c.get("bank_job_class") or ""))
-        if built == SLEEVE_ENVIRONMENT:
+        if built in (SLEEVE_ENVIRONMENT, SLEEVE_TAIL):
             built = SLEEVE_PROJECTION  # a projection-world solve, a narrower grid
         world = built or SLEEVE_PROJECTION
         if world != SLEEVE_PROJECTION:
@@ -353,3 +400,172 @@ def environment_teams_of(request: Optional[Mapping[str, Any]]) -> Optional[List[
     if not req.get("active") or SLEEVE_ENVIRONMENT not in (req.get("sleeves") or {}):
         return None
     return list((req.get("environment") or {}).get("teams") or []) or None
+
+
+# --------------------------------------------------------------------------- #
+# R422. Tail seats scale with coverage.
+# --------------------------------------------------------------------------- #
+def tail_token(team: str) -> str:
+    """The membership a projection-world lineup whose primary stack is ``team``
+    carries, and the sleeve a tail seat pinned to ``team`` asks for."""
+    return f"{TAIL_TOKEN_PREFIX}{str(team).strip().upper()}"
+
+
+def sleeve_family(sleeve: str) -> str:
+    """``tail:MIA`` -> ``tail``; every other sleeve is its own family."""
+    text = str(sleeve or SLEEVE_PROJECTION)
+    return SLEEVE_TAIL if text.startswith(TAIL_TOKEN_PREFIX) else text
+
+
+def tail_seat_count(n_entries: int, teams_on_slate: int) -> int:
+    """Portfolio tail seats: ``clamp(N - C, 0, t)``.
+
+    ``t = S // 3`` tail teams and ``C = S - t`` comfortable ones. No seat opens
+    until N could give every comfortable team one stack; then each entry opens
+    one, until every tail team holds one at ``N >= S``. More than one per tail
+    team waits for the archive measurement (R422(c)).
+    """
+    s = max(0, int(teams_on_slate))
+    t = s // TAIL_DENOMINATOR
+    return max(0, min(t, int(n_entries) - (s - t)))
+
+
+def normalize_implied_totals(
+        implied_total_by_team: Optional[Mapping[str, Any]]) -> Dict[str, float]:
+    """Team code (stripped, upper-case) -> float, skipping values that do not
+    parse. The one reader the tail ranking and the market record share, so the
+    two cannot key or drop a feed's totals differently."""
+    out: Dict[str, float] = {}
+    for k, v in (implied_total_by_team or {}).items():
+        try:
+            out[str(k).strip().upper()] = float(v)
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
+def rank_tail_teams(
+    teams: Iterable[str],
+    implied_total_by_team: Optional[Mapping[str, float]] = None,
+) -> Dict[str, Any]:
+    """The slate's teams by the MARKET's implied total, and its bottom third.
+
+    Descending, ties by team. The market only: no park-factor or ownership
+    fallback, and a team without a total drops the tail by name, because the
+    market cannot rank a bottom third it did not price. ``tail_teams`` runs
+    highest-implied first, the order seats open in.
+    """
+    team_list = sorted({str(t).strip().upper() for t in teams if str(t).strip()})
+    implied = normalize_implied_totals(implied_total_by_team)
+    s = len(team_list)
+    t = s // TAIL_DENOMINATOR
+    out: Dict[str, Any] = {
+        "teams_on_slate": s, "tail_count": t, "comfortable_count": s - t,
+        "basis": "none", "tail_teams": [], "implied_total_by_team": {},
+        "dropped": None,
+        "note": ("the bottom third of the slate's teams by the market's implied "
+                 "total; a labeled prior, never a probability"),
+    }
+    if not implied:
+        out["dropped"] = ("no market implied totals were priced; the tail is "
+                          "defined by the market only")
+        return out
+    unpriced = [x for x in team_list if x not in implied]
+    if unpriced:
+        out["dropped"] = (f"no implied total for {', '.join(unpriced)}; the market "
+                          f"cannot rank a bottom third it did not price")
+        return out
+    if t < 1:
+        out["dropped"] = f"{s} team(s) on the slate leave no bottom third"
+        return out
+    ranked = sorted(team_list, key=lambda x: (-implied[x], x))
+    out.update({
+        "basis": "implied_total",
+        "ranked": ranked,
+        "implied_total_by_team": {x: round(implied[x], 3) for x in ranked},
+        "tail_teams": ranked[s - t:],
+    })
+    return out
+
+
+def tail_seat_plan(
+    entry_requirements: Sequence[Mapping[str, Any]],
+    rank: Mapping[str, Any],
+) -> Dict[str, Any]:
+    """Place the portfolio's tail seats and pin each to one team.
+
+    ``T = tail_seat_count(N, S)`` over every entry in the portfolio. Seats go
+    only to contests whose shape is in ``TAIL_SHAPES`` with two or more
+    entries, at most ``N_c // 2`` per contest (tail never outnumbers
+    comfortable inside one; a cash or single-entry POSTURE seats none whatever
+    shape it resolved to, as in ``contest_sleeve_weights``), largest ``N_c``
+    first and then by contest id -- the build path carries no field size, so
+    "largest field first" waits on R422(d). Teams open highest-implied first. Inside a contest the tail seats
+    are the LAST entry ids, the end R406 seats its sleeves toward. A seat with
+    no room is counted in ``unplaced``, never silently dropped.
+    """
+    reqs = list(entry_requirements or [])
+    n = len(reqs)
+    s = int(rank.get("teams_on_slate") or 0)
+    plan: Dict[str, Any] = {
+        "active": False, "entries": n, "teams_on_slate": s,
+        "tail_count": int(rank.get("tail_count") or 0),
+        "comfortable_count": int(rank.get("comfortable_count") or 0),
+        "basis": rank.get("basis"), "seats": 0, "tail_teams": [],
+        "seats_by_contest": {}, "unplaced": [], "placed_teams": [], "team_by_entry": {},
+        "dropped": rank.get("dropped"),
+        "note": ("a deterministic coverage rule over the market's implied totals; "
+                 "it says nothing about how often a tail wins"),
+    }
+    if rank.get("dropped"):
+        return plan
+    seats = tail_seat_count(n, s)
+    teams = list(rank.get("tail_teams") or [])[:seats]
+    plan.update({"seats": seats, "tail_teams": teams,
+                 "implied_total_by_team": {t: (rank.get("implied_total_by_team") or {}).get(t)
+                                           for t in teams}})
+    if not teams:
+        return plan
+    by_contest: Dict[str, List[Mapping[str, Any]]] = {}
+    for req in reqs:
+        by_contest.setdefault(str(req.get("contest_id") or ""), []).append(req)
+    eligible = [cid for cid, rows in by_contest.items() if len(rows) >= 2 and str(
+        rows[0].get("contest_shape") or "").strip().lower() in TAIL_SHAPES
+        and str(rows[0].get("posture") or "") not in SINGLE_ENTRY_POSTURES | CASH_POSTURES]
+    order = sorted(eligible, key=lambda cid: (-len(by_contest[cid]), cid))
+    queue = list(teams)
+    for cid in order:
+        room = len(by_contest[cid]) // 2
+        placed = queue[:room]
+        queue = queue[room:]
+        if not placed:
+            continue
+        ids = sorted(str(r.get("entry_id")) for r in by_contest[cid])
+        for eid, team in zip(ids[len(ids) - len(placed):], placed):
+            plan["team_by_entry"][eid] = team
+        plan["seats_by_contest"][cid] = placed
+    plan["unplaced"] = queue
+    plan["placed_teams"] = [t for t in teams if t not in queue]
+    plan["active"] = bool(plan["team_by_entry"])
+    if queue:
+        plan["unplaced_reason"] = (
+            "no top-heavy contest with two or more entries had room "
+            "(at most half of a contest's entries seat the tail)")
+    return plan
+
+
+def stamp_tail_seats(entry_requirements: Sequence[Dict[str, Any]],
+                     plan: Mapping[str, Any]) -> int:
+    """Write each tail seat's team onto its entry requirement, in place, and
+    return how many were stamped. A stale stamp from an earlier call is cleared
+    first, so the requirements always say what THIS plan placed."""
+    team_by_entry = dict(plan.get("team_by_entry") or {})
+    stamped = 0
+    for req in entry_requirements:
+        req.pop(TAIL_TEAM_KEY, None)
+        team = team_by_entry.get(str(req.get("entry_id")))
+        if team:
+            req[TAIL_TEAM_KEY] = team
+            stamped += 1
+    return stamped
+

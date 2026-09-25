@@ -287,7 +287,8 @@ def _mirror_to_delivery_record(date: str, record: Mapping[str, Any],
                                controls: Optional[Mapping[str, Any]],
                                relaxations: Optional[Mapping[str, Any]],
                                egress: str,
-                               entries_source: Optional[Path] = None) -> None:
+                               entries_source: Optional[Path] = None,
+                               market: Optional[Mapping[str, Any]] = None) -> None:
     """Project this delivery into the TRACKED record (R369).
 
     Written from here rather than from the three delivery tools because this is
@@ -314,7 +315,10 @@ def _mirror_to_delivery_record(date: str, record: Mapping[str, Any],
         write_delivery_record(date=date, manifest_row=record,
                               run_id=record.get("run_id"), controls=controls,
                               relaxations=relaxations, egress=egress,
-                              entries_source=entries_source)
+                              entries_source=entries_source,
+                              # R422(a). Only when the build priced a market, so
+                              # every other record keeps exactly its old keys.
+                              extra={"market": dict(market)} if market else None)
     except Exception as exc:  # noqa: BLE001
         print(f"delivery_record: mirror skipped ({type(exc).__name__}: {exc})")
 
@@ -342,6 +346,7 @@ def record_delivery(
     failing_gates: Optional[Sequence[str]] = None,
     refinement: bool = False,
     lineage: str = "",
+    market: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Append one delivery record and supersede any prior record for the same slate.
 
@@ -476,7 +481,7 @@ def record_delivery(
             _retire()
             _write(manifest_path(date), manifest)
             _mirror_to_delivery_record(date, prior, controls, relaxations, egress,
-                                       entries_source=source)
+                                       market=market, entries_source=source)
             return prior
         prior["status"] = "superseded"
         prior["superseded_by"] = record["delivered_file"]
@@ -485,7 +490,7 @@ def record_delivery(
     manifest["deliveries"].append(record)
     _write(manifest_path(date), manifest)
     _mirror_to_delivery_record(date, record, controls, relaxations, egress,
-                               entries_source=source)
+                               market=market, entries_source=source)
     return record
 
 

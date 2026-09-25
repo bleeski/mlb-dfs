@@ -4043,8 +4043,9 @@ class R293BankOnEveryRungTests(unittest.TestCase):
         # the cluster-limited bucket both the sliced door and the plan leg
         # call; it forwards the allowance by name. R406, 2026-09-23: three more
         # in `build_sleeve_jobs` (chalk-fails, environment, salary-only), each
-        # forwarding it by name.
-        ("mlb_engine/pipeline/execution_pipeline.py", "extend_bank"): (5, 5),
+        # forwarding it by name. R422, 2026-09-25: a sixth there, the tail
+        # sleeve's depth jobs, forwarding it by name.
+        ("mlb_engine/pipeline/execution_pipeline.py", "extend_bank"): (6, 6),
         # R389(a), 2026-09-24: the baseline core's probe and distinct-fill
         # solves, and its one in-memory grid pass; each forwards it by name.
         ("mlb_engine/pipeline/baseline.py", "build_single_lineup"): (2, 2),
@@ -32610,8 +32611,16 @@ class ClassicSleeveTests(unittest.TestCase):
         req = epi.resolve_sleeve_bank_request(reqs, {}, frame, implied_total_by_team=implied)
         self.assertNotIn("environment", req["sleeves"])
         self.assertIn("whole slate", req["dropped"]["environment"])
-        self.assertEqual(req["expected_entries"], {"projection": 4, "salary_only": 2,
-                                                   "chalk_fails": 2, "environment": 2})
+        # R422: four priced teams and ten entries open one tail seat (S=4,
+        # t=1, C=3), taken off the contest before the weights apportion the
+        # other nine: 9 x 40/20/20/20 = 3/2/2/2.
+        self.assertEqual(req["expected_entries"], {"projection": 3, "salary_only": 2,
+                                                   "chalk_fails": 2, "environment": 2,
+                                                   "tail": 1})
+        no_tail = epi.resolve_sleeve_bank_request(
+            reqs, {"classic_tail_seats": False}, frame, implied_total_by_team=implied)
+        self.assertEqual(no_tail["expected_entries"], {"projection": 4, "salary_only": 2,
+                                                       "chalk_fails": 2, "environment": 2})
         off = epi.resolve_sleeve_bank_request(reqs, {"classic_sleeves": False}, frame)
         self.assertFalse(off["active"])
 
@@ -32797,6 +32806,425 @@ class ClassicSleeveTests(unittest.TestCase):
         self.assertIn("1 entr(ies) fell back to projection", line)
         self.assertIn("not probabilities", line)
         self.assertTrue(bs.format_sleeves_line(None).startswith("not applied"))
+
+
+class ClassicTailSeatTests(unittest.TestCase):
+    """R422 (Ben, 2026-09-24, on 1410_4g): tail seats scale with coverage.
+
+    The slate's teams are ranked by the market's implied totals and the bottom
+    third is the tail. Tail seats open once N could cover every comfortable
+    team with one stack, one per tail team, highest-implied first, only in
+    top-heavy contests of two or more entries and at most half of one. A tail
+    seat is pinned to its team and seated, through the allocator's mask, on a
+    projection-world lineup primary-stacking it. The build records the market
+    it ranked by (R422(a)) so the archive can grade the rule.
+    """
+
+    @staticmethod
+    def _cs():
+        from mlb_engine.optimize import classic_sleeves
+        return classic_sleeves
+
+    #: 1410_4g's seven contests and shapes, 12 entries (data/deliveries/2026-09-24).
+    CONTESTS_1410 = [("195995357", "cash", 1), ("195995365", "large_wta", 2),
+                     ("195995372", "large_field_gpp", 2), ("195995392", "satellite", 2),
+                     ("195995418", "satellite", 2), ("195996455", "large_field_gpp", 2),
+                     ("196016370", "single_entry_gpp", 1)]
+
+    @staticmethod
+    def _reqs(contests):
+        return [{"entry_id": f"{cid}-{i}", "contest_id": cid, "contest_shape": shape}
+                for cid, shape, n in contests for i in range(n)]
+
+    def test_the_coverage_rule_grows_with_entries_and_shrinks_with_games(self):
+        cs = self._cs()
+        table = {g: [cs.tail_seat_count(n, 2 * g) for n in (6, 12, 20, 30)]
+                 for g in (2, 4, 7, 10, 15)}
+        self.assertEqual(table, {2: [1, 1, 1, 1], 4: [0, 2, 2, 2], 7: [0, 2, 4, 4],
+                                 10: [0, 0, 6, 6], 15: [0, 0, 0, 10]})
+        # The opening edge: nothing until N reaches C = S - S//3, then one
+        # seat per entry until every tail team holds one.
+        self.assertEqual([cs.tail_seat_count(n, 20) for n in (13, 14, 15, 19, 20, 150)],
+                         [0, 0, 1, 5, 6, 6])
+        self.assertEqual(cs.tail_seat_count(50, 2), 0, "two teams leave no bottom third")
+
+    def test_the_tail_is_the_markets_bottom_third_and_drops_by_name(self):
+        cs = self._cs()
+        teams = ["CWS", "MIA", "ATL", "BOS", "CHC", "DET", "SEA", "TEX"]
+        implied = {"CWS": 4.4, "MIA": 3.13, "ATL": 3.87, "BOS": 4.9, "CHC": 4.1,
+                   "DET": 4.6, "SEA": 5.0, "TEX": 3.87}
+        rank = cs.rank_tail_teams(teams, implied)
+        self.assertIsNone(rank["dropped"])
+        self.assertEqual((rank["teams_on_slate"], rank["tail_count"]), (8, 2))
+        # ATL and TEX tie at 3.87: ATL ranks higher by team, so the tail is
+        # TEX then MIA, highest-implied first.
+        self.assertEqual(rank["tail_teams"], ["TEX", "MIA"])
+        none = cs.rank_tail_teams(teams, None)
+        self.assertEqual((none["tail_teams"], none["basis"]), ([], "none"))
+        self.assertIn("market only", none["dropped"])
+        partial = cs.rank_tail_teams(teams, {k: v for k, v in implied.items() if k != "MIA"})
+        self.assertIn("MIA", partial["dropped"])
+        self.assertEqual(partial["tail_teams"], [])
+        self.assertIn("no bottom third", cs.rank_tail_teams(["A", "B"], {"A": 4, "B": 5})["dropped"])
+        # Totals for teams off the slate (a whole-day feed) neither rank nor block.
+        self.assertIsNone(cs.rank_tail_teams(teams, {**implied, "NYY": 1.0})["dropped"])
+
+    def test_seats_go_only_to_top_heavy_contests_at_most_half_each(self):
+        cs = self._cs()
+        rank = cs.rank_tail_teams(["CWS", "MIA", "ATL", "BOS", "CHC", "DET", "SEA", "TEX"],
+                                  {"CWS": 4.4, "MIA": 3.13, "ATL": 3.9, "BOS": 4.9,
+                                   "CHC": 4.1, "DET": 4.6, "SEA": 5.0, "TEX": 3.87})
+        plan = cs.tail_seat_plan(self._reqs(self.CONTESTS_1410), rank)
+        # S=8, t=2, C=6, N=12: two seats, TEX (3.87) then MIA (3.13); cash,
+        # satellite and single entry take none, each 2-entry GPP/WTA takes one,
+        # by entries then contest id, on its LAST entry id.
+        self.assertEqual((plan["seats"], plan["tail_teams"]), (2, ["TEX", "MIA"]))
+        self.assertEqual(plan["seats_by_contest"],
+                         {"195995365": ["TEX"], "195995372": ["MIA"]})
+        self.assertEqual(plan["team_by_entry"],
+                         {"195995365-1": "TEX", "195995372-1": "MIA"})
+        self.assertEqual(plan["unplaced"], [])
+        # One 2-entry GPP is room for one seat: the second is unplaced, counted.
+        one = cs.tail_seat_plan(self._reqs([("9", "large_field_gpp", 2), ("8", "cash", 10)]),
+                                rank)
+        self.assertEqual((one["seats"], one["placed_teams"], one["unplaced"]),
+                         (2, ["TEX"], ["MIA"]))
+        self.assertIn("at most half", one["unplaced_reason"])
+        # The contest with more entries fills first; mme_gpp is top-heavy too.
+        order = cs.tail_seat_plan(self._reqs([("1", "large_field_gpp", 2),
+                                              ("2", "mme_gpp", 6)]), rank)
+        self.assertEqual(order["seats_by_contest"], {"2": ["TEX", "MIA"]})
+        # A cash posture seats none even when its shape resolved to a GPP (an
+        # operator shape override), the rule contest_sleeve_weights applies.
+        # N=14 opens both seats; the only GPP-shaped contest is a cash posture.
+        cash = ([dict(r, posture="cash") for r in self._reqs([("7", "large_field_gpp", 4)])]
+                + self._reqs([("8", "cash", 10)]))
+        plan_cash = cs.tail_seat_plan(cash, rank)
+        self.assertEqual((plan_cash["seats"], plan_cash["team_by_entry"]), (2, {}))
+        self.assertEqual(plan_cash["unplaced"], ["TEX", "MIA"])
+        dropped = cs.tail_seat_plan(self._reqs(self.CONTESTS_1410),
+                                    cs.rank_tail_teams(["A", "B", "C"], None))
+        self.assertFalse(dropped["active"])
+        self.assertEqual(dropped["team_by_entry"], {})
+
+    def test_the_tail_seats_come_off_the_contest_before_the_weights(self):
+        cs = self._cs()
+        reqs = [{"entry_id": f"e{i}", "contest_id": "C1"} for i in range(6)]
+        reqs[5][cs.TAIL_TEAM_KEY] = "MIA"
+        plan = cs.apportion_entries(reqs, {"C1": cs.DEFAULT_WEIGHTS})
+        # The tail seat first, then 5 x 40/20/20/20 = 2/1/1/1 over the rest.
+        self.assertEqual(plan["contests"][0]["entries_by_sleeve"],
+                         {"projection": 2, "salary_only": 1, "chalk_fails": 1,
+                          "environment": 1, "tail": 1})
+        self.assertEqual(plan["sleeve_by_entry"]["e5"], "tail:MIA")
+        self.assertEqual(cs.expected_entries_by_sleeve({"C1": cs.DEFAULT_WEIGHTS}, {"C1": 6},
+                                                       {"C1": 1}),
+                         {"projection": 2, "salary_only": 1, "chalk_fails": 1,
+                          "environment": 1, "tail": 1})
+        self.assertNotIn("tail", cs.expected_entries_by_sleeve(
+            {"C1": cs.DEFAULT_WEIGHTS}, {"C1": 6}), "no seat, no key: R406's shape")
+
+    @staticmethod
+    def _bank(stacks):
+        """Distinct projection-world lineups scored 100-i, one per stack."""
+        return [{"candidate_id": f"P{i}",
+                 "roster_slot_ids": [f"pa{i}", f"pb{i}"] + [f"ph{i}_{j}" for j in range(8)],
+                 "sp_ids": [f"pa{i}", f"pb{i}"], "primary_stack": team,
+                 "objective": 100.0 - i}
+                for i, team in enumerate(stacks)]
+
+    @staticmethod
+    def _entries(tail=None, n=5):
+        out = [{"entry_id": f"e{i}", "contest_id": "C1", "contest_name": "T",
+                "contest_shape": "large_field_gpp", "posture": "large_gpp"} for i in range(n)]
+        if tail:
+            out[-1]["tail_team"] = tail
+        return out
+
+    def test_a_tail_entry_seats_only_on_a_lineup_stacking_its_team(self):
+        # MIA's lineups score LAST: without the pin no seat would go to one.
+        bank = self._bank(["NYY"] * 6 + ["MIA", "MIA"])
+        plain = ca.select_and_assign_entries(bank, self._entries(), {"max_candidate_reuse": 5})
+        self.assertTrue(plain["passed"], plain.get("errors"))
+        by_id = {c["candidate_id"]: c for c in bank}
+        self.assertNotIn("MIA", {by_id[a["candidate_id"]]["primary_stack"]
+                                 for a in plain["assignments"]})
+        out = ca.select_and_assign_entries(bank, self._entries("MIA"), {"max_candidate_reuse": 5})
+        self.assertTrue(out["passed"], out.get("errors"))
+        seat = {a["entry_id"]: by_id[a["candidate_id"]]["primary_stack"]
+                for a in out["assignments"]}
+        self.assertEqual(seat["e4"], "MIA")
+        self.assertEqual(sorted(seat.values()).count("MIA"), 1, "only the pinned seat")
+        block = out["classic_sleeves"]
+        self.assertEqual(block["status"], "applied")
+        # No sleeve bank: the other four seat projection, NOT counted as falling
+        # out of sleeves that were never built.
+        self.assertEqual(block["weighted_sleeves"], "no_sleeve_bank")
+        self.assertEqual(block["entries_by_sleeve"]["C1"],
+                         {"projection": 4, "salary_only": 0, "chalk_fails": 0,
+                          "environment": 0, "tail": 1})
+        self.assertEqual(block["relaxations"], 0)
+        self.assertEqual(block["tail"]["seated"], {"e4": "MIA"})
+        self.assertEqual(block["candidates_by_sleeve"]["tail:MIA"], 2)
+        self.assertEqual(set(block["delivered"]), {"projection", "tail"})
+
+    def test_caps_bind_across_the_tail_seat(self):
+        """The mask narrows what an entry may take and nothing else: a MIA
+        primary-stack cap of one still binds the pinned seat."""
+        bank = self._bank(["NYY"] * 6 + ["MIA", "MIA"])
+        entries = self._entries("MIA")
+        entries[3]["tail_team"] = "MIA"
+        out = ca.select_and_assign_entries(
+            bank, entries, {"max_candidate_reuse": 5,
+                            "max_primary_stack_exposure_pct": 0.2})
+        self.assertFalse(out["passed"], "two MIA seats against a cap of one")
+        self.assertEqual(out["classic_sleeves"]["status"], "applied")
+
+    def test_a_stack_below_the_floor_is_no_tail_seat(self):
+        """The primary-stack floor runs after the mask, so a MIA lineup whose
+        stack is under it would starve the pinned seat at the floor; it gets no
+        token and the seat falls back, counted as the tail's."""
+        bank = self._bank(["NYY"] * 6 + ["MIA", "MIA"])
+        for c in bank:
+            c["primary_stack_size"] = 3 if c["primary_stack"] == "MIA" else 4
+        out = ca.select_and_assign_entries(
+            bank, self._entries("MIA"), {"max_candidate_reuse": 5,
+                                         "primary_stack_min_size": 4})
+        self.assertTrue(out["passed"], out.get("errors"))
+        block = out["classic_sleeves"]
+        self.assertNotIn("tail:MIA", block["candidates_by_sleeve"])
+        self.assertEqual(block["tail"]["fell_back"], ["e4"])
+        for c in bank:
+            c["primary_stack_size"] = 4
+        out = ca.select_and_assign_entries(
+            bank, self._entries("MIA"), {"max_candidate_reuse": 5,
+                                         "primary_stack_min_size": 4})
+        self.assertEqual(out["classic_sleeves"]["tail"]["seated"], {"e4": "MIA"})
+
+    def test_a_tail_team_with_no_lineup_falls_back_and_is_counted(self):
+        bank = self._bank(["NYY"] * 6)
+        out = ca.select_and_assign_entries(bank, self._entries("MIA"), {"max_candidate_reuse": 5})
+        self.assertTrue(out["passed"], out.get("errors"))
+        block = out["classic_sleeves"]
+        self.assertEqual(block["relaxations"], 1)
+        self.assertEqual(block["tail"]["fell_back"], ["e4"])
+        self.assertTrue(any(f["sleeve"] == "tail:MIA" and "0 distinct" in f["reason"]
+                            for f in block["fallbacks"]), block["fallbacks"])
+
+    def test_the_switches_turn_the_tail_off_and_change_nothing(self):
+        bank = self._bank(["NYY"] * 6 + ["MIA", "MIA"])
+        base = ca.select_and_assign_entries(bank, self._entries(), {"max_candidate_reuse": 5})
+        self.assertEqual(base["classic_sleeves"]["status"], "no_sleeve_bank")
+        for ctl, status in (({"classic_tail_seats": False}, "no_sleeve_bank"),
+                            ({"classic_sleeves": False}, "off")):
+            out = ca.select_and_assign_entries(bank, self._entries("MIA"),
+                                               {"max_candidate_reuse": 5, **ctl})
+            self.assertEqual(out["classic_sleeves"]["status"], status, ctl)
+            self.assertEqual(out["assignments"], base["assignments"], ctl)
+        frame = diverse_projection_frame()
+        implied = {"T1": 4.0, "T2": 4.1, "T3": 5.0, "T4": 4.4}
+        reqs = [{"entry_id": str(i), "contest_id": "9", "contest_shape": "large_field_gpp"}
+                for i in range(10)]
+        self.assertTrue(epi.resolve_tail_seats(reqs, {}, frame,
+                                               implied_total_by_team=implied)["active"])
+        for ctl in ({"classic_tail_seats": False}, {"classic_sleeves": False}):
+            off = epi.resolve_tail_seats(reqs, ctl, frame, implied_total_by_team=implied)
+            self.assertFalse(off["active"], ctl)
+            self.assertIn("is off", off["dropped"])
+
+    def test_tail_depth_jobs_run_only_for_teams_the_bank_holds_too_few_of(self):
+        cs = self._cs()
+        frame = diverse_projection_frame()
+        request = {"active": True, "sleeves": {"tail": {"expected_entries": 1,
+                                                        "min_candidates_per_team": 2,
+                                                        "teams": ["T1"]}}}
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = bank_cache.BankCache(Path(tmp) / "b.json")
+            bank_cache.extend_bank(cache, frame, time_budget_s=60)
+            jobs = epi.build_sleeve_jobs(cache, frame, request, consensus_members=[],
+                                         time_budget_s=60)
+            tail_job = jobs["sleeves"]["tail"]
+            self.assertFalse(tail_job["attempted"], tail_job)
+            self.assertGreaterEqual(tail_job["already_held"]["T1"], 2)
+            thin = bank_cache.BankCache(Path(tmp) / "thin.json")
+            bank_cache.extend_bank(thin, frame, time_budget_s=60, max_candidates=1)
+            held = epi._primary_stacked_on_teams(thin, frame, ["T1"])
+            self.assertLess(held["T1"], 2)
+            thin_jobs = epi.build_sleeve_jobs(thin, frame, request, consensus_members=[],
+                                              time_budget_s=60)
+            self.assertTrue(thin_jobs["sleeves"]["tail"]["attempted"], thin_jobs)
+            self.assertEqual(thin_jobs["sleeves"]["tail"]["teams_short"], ["T1"])
+            # Only DISTINCT projection-world rosters count: the same roster in a
+            # second bucket counts once and a chalk-fails copy not at all.
+            t1 = next(e for e in cache.candidates if epi._primary_stacked_on_teams(
+                type("C", (), {"candidates": [e]})(), frame, ["T1"])["T1"] == 1)
+            fake = type("C", (), {"candidates": [
+                t1, dict(t1, job_class="consensus_limited"),
+                dict(t1, job_class="sleeve_chalk_fails")]})()
+            self.assertEqual(epi._primary_stacked_on_teams(fake, frame, ["T1"])["T1"], 1)
+            chalk_only = type("C", (), {"candidates": [dict(t1, job_class="sleeve_chalk_fails")]})()
+            self.assertEqual(epi._primary_stacked_on_teams(chalk_only, frame, ["T1"])["T1"], 0)
+            # The direct door's bank is in memory, not in its throwaway cache.
+            prior = [c for c in cs.tag_sleeves(cache.as_candidates(frame))
+                     if c.get("primary_stack") == "T1"][:2]
+            empty = bank_cache.BankCache(Path(tmp) / "empty.json")
+            self.assertEqual(epi._primary_stacked_on_teams(empty, frame, ["T1"], prior)["T1"], 2)
+            skipped = epi.build_sleeve_jobs(empty, frame, request, consensus_members=[],
+                                            time_budget_s=60, prior_candidates=prior)
+            self.assertFalse(skipped["sleeves"]["tail"]["attempted"], skipped)
+            _out, direct = epi._direct_door_sleeves(
+                cs.tag_sleeves(cache.as_candidates(frame)), frame, request,
+                requested_n=4, contest_shapes=None, time_budget_s=60)
+            self.assertFalse(direct["sleeves"]["tail"]["attempted"],
+                             "the direct door counts its own in-memory bank")
+            built = [c for c in cs.tag_sleeves(thin.as_candidates(frame))
+                     if c.get("bank_job_class") == "sleeve_tail"]
+            self.assertTrue(built and all(c["primary_stack"] == "T1" for c in built))
+            self.assertTrue(all(c["bank_sleeves"] == ["projection"] for c in built),
+                            "a tail depth lineup is a projection-world lineup")
+
+    def test_the_bank_request_and_the_run_slate_stamp_share_one_helper(self):
+        cs = self._cs()
+        frame = diverse_projection_frame()
+        implied = {"T1": 4.0, "T2": 4.1, "T3": 5.0, "T4": 4.4}
+        reqs = [{"entry_id": str(i), "contest_id": "9", "contest_shape": "large_field_gpp",
+                 "posture": "large_gpp"} for i in range(10)]
+        request = epi.resolve_sleeve_bank_request(reqs, {}, frame, implied_total_by_team=implied)
+        direct = epi.resolve_tail_seats(reqs, {}, frame, implied_total_by_team=implied)
+        self.assertEqual(request["tail"], direct)
+        self.assertEqual(request["sleeves"]["tail"]["teams"], ["T1"])
+        self.assertEqual(cs.stamp_tail_seats(reqs, direct), 1)
+        self.assertEqual(reqs[-1]["tail_team"], "T1")
+        self.assertEqual(cs.stamp_tail_seats(reqs, {}), 0, "a stale stamp is cleared")
+        self.assertNotIn("tail_team", reqs[-1])
+
+    def _run_slate(self, root, n, implied, approve, name="MLB $1K Quarter Jukebox"):
+        from tests.test_upload_integrity import (
+            CLASSIC_HEADER, blank_classic_entry, write_classic_salary)
+        from tests.test_upload_integrity import write_entries as write_rows
+        salary = root / "DKSalaries.csv"
+        lineup = write_classic_salary(salary)
+        entries = root / "DKEntries.csv"
+        write_rows(entries, CLASSIC_HEADER,
+                   [blank_classic_entry(str(5001 + i), "900", name=name) for i in range(n)])
+        projections = pd.DataFrame([{
+            "Player_ID": sp.player_id, "Name": sp.name, "Team": sp.team,
+            "Opponent": sp.opponent, "Position": sp.raw["Roster Position"],
+            "Salary": sp.salary, "Game_ID": sp.game_id,
+            "Floor": 12.0 if "P" in sp.positions else 5.0,
+            "Ceiling": 25.0 if "P" in sp.positions else 12.0,
+            "Excluded": False, "Locked": False,
+        } for sp in parse_dk_salary_csv(str(salary))])
+        with contextlib.redirect_stdout(io.StringIO()), \
+                contextlib.redirect_stderr(io.StringIO()):
+            return run_slate(
+                runs_root=root / "runs", salary_csv=salary, entries_csv=entries,
+                projections_override=projections,
+                candidates_override=[candidate("A", lineup, 100)],
+                portfolio_controls_override=dict(RunSlateFrontDoorTests.LOOSE),
+                approve=approve, assume_gates=list(RunSlateFrontDoorTests.UNEVIDENCED),
+                plan_solve_budget_s=0,
+                sleeve_implied_total_by_team=implied)
+
+    def test_run_slate_stamps_the_tail_seat_before_any_door(self):
+        """Through the real front door at approve=False: four entries in one
+        GPP on the fixture's four-team slate open one seat (S=4, t=1, C=3),
+        pinned to the lowest total, on the last entry id."""
+        with tempfile.TemporaryDirectory() as td:
+            result = self._run_slate(Path(td), 4, {"AAA": 3.1, "BBB": 4.5, "CCC": 4.0,
+                                                   "DDD": 5.0}, approve=False)
+        self.assertEqual(result["status"], "plan_pending_approval", result.get("errors"))
+        self.assertEqual(result["classic_tail_seats"]["seats"], 1)
+        stamped = {r["entry_id"]: r.get("tail_team") for r in result["entry_requirements"]}
+        self.assertEqual(stamped, {"5001": None, "5002": None, "5003": None, "5004": "AAA"})
+
+    def test_the_delivery_record_carries_the_market_the_build_ranked_by(self):
+        """R422(a), through the real run_slate and record_delivery: the tracked
+        record names the slate's implied totals and game count, restricted to
+        the slate, so the archive can rank a winner's stack by them."""
+        from mlb_engine.entries import upload_manifest as um
+        from mlb_engine.entries.delivery_record import read_records
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            original = um.REPO_ROOT
+            um.REPO_ROOT = root
+            try:
+                implied = {"AAA": 4.25, "BBB": 4.25, "CCC": 4.0, "DDD": 5.0, "NYY": 9.9}
+                result = self._run_slate(root, 1, implied, approve=True, name="Test WTA")
+                self.assertTrue(result["passed"], result.get("errors"))
+                records = read_records(root=root)
+                # A re-promotion rewrites the record; the market rides along.
+                from tools import promote_run
+                args = promote_run.build_parser().parse_args(
+                    ["--run-id", result["run_id"], "--repo-root", str(root)])
+                with contextlib.redirect_stdout(io.StringIO()):
+                    self.assertEqual(promote_run.run(args), 0)
+                promoted = read_records(root=root)
+            finally:
+                um.REPO_ROOT = original
+        self.assertEqual(len(records), 1)
+        market = records[0]["extra"]["market"]
+        # The ranking's own order, ties by team, so the archive re-derives the
+        # bottom third exactly.
+        self.assertEqual(market["ranked_teams"], ["DDD", "AAA", "BBB", "CCC"])
+        self.assertEqual(market["games"], 2)
+        self.assertEqual(market["teams_on_slate"], 4)
+        self.assertEqual(market["implied_total_by_team"],
+                         {"AAA": 4.25, "BBB": 4.25, "CCC": 4.0, "DDD": 5.0})
+        self.assertEqual(market["unpriced_teams"], [])
+        self.assertEqual(len(market["equal_total_games"]), 1, "AAA and BBB tie")
+        self.assertIsNone(epi.slate_market_record(diverse_projection_frame(), None))
+        self.assertEqual(promoted[-1].get("manifest_row", {}).get("re_promoted_from"),
+                         result["run_id"])
+        self.assertEqual(promoted[-1]["extra"]["market"], market)
+
+    def test_the_miner_keeps_the_primary_stack_team(self):
+        from mlb_engine.field import field_miner as fm
+        helper = FieldMinerContractTests("test_clean_classic_field_still_passes")
+        five = ("P AAA Player0 P BBB Player0 C AAA Player1 1B AAA Player2 2B AAA Player3 "
+                "3B AAA Player4 SS AAA Player5 OF BBB Player1 OF BBB Player2 OF CCC Player1")
+        tie = ("P AAA Player0 P BBB Player0 C AAA Player1 1B AAA Player2 2B AAA Player3 "
+               "3B BBB Player1 SS BBB Player2 OF BBB Player3 OF CCC Player1 OF DDD Player1")
+        # AAA's two hitters are the unique top count, and two is no stack.
+        pairs = ("P AAA Player0 P BBB Player0 C AAA Player1 1B AAA Player2 2B BBB Player1 "
+                 "3B CCC Player1 SS DDD Player1 OF EEE Player1 OF FFF Player1 OF GGG Player1")
+        with tempfile.TemporaryDirectory() as tmp:
+            smap = fm.load_salary_map(helper._slate_salary(
+                Path(tmp) / "DKSalaries.csv",
+                ["AAA", "BBB", "CCC", "DDD", "EEE", "FFF", "GGG"]))
+            mined = fm.mine_contest(helper._standings(tmp, [five, tie, pairs]), smap,
+                                    contest_id="1")
+            unjoined = fm.mine_contest(helper._standings(tmp, [five] * 3), None,
+                                       contest_id="1")
+        rows = {int(e["rank"]): e for e in mined["entries"]}
+        self.assertEqual((rows[1]["primary_stack_team"], rows[1]["primary_stack_size"]),
+                         ("AAA", 5))
+        self.assertEqual((rows[2]["primary_stack_team"], rows[2]["primary_stack_size"]),
+                         ("", 3), "a tie names no team")
+        self.assertEqual((rows[3]["primary_stack_team"], rows[3]["primary_stack_size"]),
+                         ("", 2), "two hitters are no primary stack, as in the engine")
+        self.assertEqual(fm.PRIMARY_STACK_MIN_HITTERS, opt.PRIMARY_STACK_MIN_HITTERS)
+        self.assertIsNone(unjoined["entries"][0]["primary_stack_team"],
+                          "no salary join, no team")
+
+    def test_the_brief_line_names_the_tail(self):
+        bs = ConsensusClusterCapTests._build_slate()
+        plan = {"seats": 2, "tail_count": 2, "entries": 12, "teams_on_slate": 8,
+                "unplaced": []}
+        block = {"status": "applied", "entries_by_sleeve": {"C1": {"projection": 10, "tail": 2}},
+                 "relaxations": 0, "tail": {"entries_by_team": {"MIA": 1, "TEX": 1}},
+                 "request": {"environment": {"games": ["A@B"], "basis": "implied_total"},
+                             "tail": plan}}
+        line = bs.format_sleeves_line(block)
+        self.assertIn("tail 2", line)
+        self.assertIn("tail MIA 1, TEX 1 (bottom third by implied total; 2 of 2 opened "
+                      "at N=12, S=8)", line)
+        self.assertEqual(bs.format_tail_clause({"request": {"tail": {
+            "dropped": "no market implied totals were priced"}}}),
+            "tail none (no market implied totals were priced)")
+        self.assertEqual(bs.format_tail_clause({"request": {}}), "tail not requested")
+        self.assertIn("1 unplaced", bs.format_tail_clause({"request": {"tail": {
+            **plan, "seats": 1, "unplaced": ["MIA"]}}}))
 
 
 class ReviewGradeExportTests(unittest.TestCase):

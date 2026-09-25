@@ -1440,6 +1440,22 @@ checkpoint has both objects in scope roughly 240 lines above.
 
 ## Workstream 2 — Strategy controls and the evidence that moves them
 
+### R422. Tail seats scale with coverage: the grade and the placement remain (P2, S) | new 2026-09-25, Ben 2026-09-24 on 1410_4g via fragment `2026-09-24_BUILD_tail-seats-scale-with-coverage.md`; (a) and (b) SHIPPED 2026-09-25 as roadmap Session 109, migrated to CHANGELOG.md | Roadmap: (c)+(d) Session 110
+
+- **What shipped (Session 109).**
+  - (a) The capture: the Classic delivery record's `extra.market`, and the miner's `primary_stack_team`.
+  - (b) The coverage rule: tail seats `T = clamp(N − C, 0, S//3)` on the market's bottom third, pinned through the allocator's mask.
+  - The CHANGELOG entry holds the design, the numbers and the replay.
+- **(c) Grade the rule.** `tools/tail_winners.py` joins mined contests to `data/deliveries/` records by contest id. For each rank-1 lineup it reads:
+  - its `primary_stack_team` (from `FM`, fully joined only; `""` on a tie is its own row, never guessed);
+  - that team's implied tercile on the slate, from the record's `extra.market`.
+
+  Cells are `EP.slate_size_bucket(games)` × `ownership_grade_archive.field_band(field_size)` × top-heavy or not. It prints n per cell, never pooled, labeled as observed outcomes. It says whether bottom-third winners occur, and at what slate sizes. That is the evidence for keeping one seat per tail team or giving a tail team more.
+  - Why it waits: no archived slate before 2026-09-25 carries team totals. `data/odds_history/` holds two totals-only snapshots, whose even splits tie both teams in a game.
+  - Mined files from before R422(a) carry no stack team. Recover one only where the slate's salary file is committed (8 dates), never by guessing.
+- **(d) Largest field first.** Tail seats fill contests by N_c, then contest id, because the build path carries no field size, and `contest_library` is deliberately off it. When a field size reaches the entry requirements (an operator posture override, or a decision to put the library on the path), order by it first.
+- **Truthful labels.** A deterministic coverage rule over the market's labeled prior. Nothing here says how often a tail wins.
+
 ### R405. CLOSED 2026-09-23 -- SHIPPED as roadmap Session 93 (all three parts), entry migrated to CHANGELOG.md
 
 The bank's consensus cluster (hitters in 15% or more of the distinct lineups the
@@ -3801,6 +3817,8 @@ for anything retrospective; forward-going, the snapshots are the record.
 
 ### R417. The direct door's wall clock is not the window's: `projected_direct` under-counts a 10+ game bank about 8x, and the sleeves' budget sits on top of the bank's (P2, V) | new 2026-09-24, found measuring R416 on the archived 2026-06-28 11g slate, cloud container
 
+**Rider 2026-09-25 (R422's review).** On the direct door, `_direct_door_sleeves` hands `build_sleeve_jobs` an empty throwaway `BankCache`. R406's environment depth check (`_stacked_on_teams`) therefore counts 0 held and always runs its restricted jobs inside the sleeves' share. R422's tail count takes the door's in-memory candidates (`prior_candidates`); do the same for environment when sizing (b).
+
 - **(a) The cost model.** `build_slate.py`'s `projected_direct` is `single_s x bank_size x (1 + (growth - 1) / 2) + cross_pairs x single_s`, fed by one warm `build_single_lineup` call.
   - 06-28 (11 games, 38 entries, 220 cross-game SP pairs): single_s 0.07-0.09s, projected 60-73s. Measured: the base bank built 76 of 76 lineups in 580s, and 31 of 76 in a 97s budget.
   - 06-03 (2 games, 18 entries): projected 25.8s, measured 20.1s. The model holds on small slates.
@@ -6128,6 +6146,12 @@ which is R196's. Filed there, not here.
 
 ## Workstream 6 — Infrastructure, tests, environment, coordination, and docs
 
+### R423. The Progress Ledger's backfill command returns a branch's own merge-from-main (P3, XS) | new 2026-09-25, found at Session 109's landing | Roadmap: Session 111
+
+- **What.** The ledger header says the last line of `git log --format=%h --ancestry-path --merges <commit>..origin/main` is the merge that landed a row (R410).
+- **Where it fails.** When the branch merged main before its PR merged, the oldest merge on that path is the branch's own. For R389(b) (`1ad76cf`) it returns `3312941`, "Merge origin/main ... into the R389(b) branch", not PR #57's `095e21b`.
+- **What does not fix it.** `--first-parent` alone returns nothing, because main's first-parent chain holds no descendant of the commit.
+- **Fix.** Walk `origin/main`'s first-parent merges and take the oldest one the commit is an ancestor of (`git merge-base --is-ancestor`). Pin it against R389(b) `095e21b`, R409 `648f8cf` and R416 `2e579cb`.
 ### R421. CLOSED 2026-09-25 -- SHIPPED, filed and landed in one commit (roadmap Session 108), entry in CHANGELOG.md
 
 The instruction surface audited against the current Claude model (`/claude-api

@@ -3565,7 +3565,10 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         # slice budget; the ordinary and limited buckets share the rest.
         sleeve_request = resolve_sleeve_bank_request(
             _sleeve_entries,
-            {"classic_sleeves": (args.controls_override or {}).get("classic_sleeves", True)},
+            {"classic_sleeves": (args.controls_override or {}).get("classic_sleeves", True),
+             # R422. The tail's own switch, read from the same override.
+             "classic_tail_seats": (args.controls_override or {}).get(
+                 "classic_tail_seats", True)},
             projections,
             implied_total_by_team=(f1_report or {}).get("implied_total_by_team"))
         _bank_budget = (slice_budget * (1.0 - BANK_SLEEVE_BUDGET_SHARE)
@@ -6334,8 +6337,29 @@ def format_sleeves_line(block: dict | None) -> str:
     games = ", ".join(env.get("games") or []) or "none"
     return (", ".join(f"{k} {v}" for k, v in totals.items() if v)
             + f"; environment games {games} (by {env.get('basis')}); "
+            + f"{format_tail_clause(block)}; "
             + f"{block.get('relaxations', 0)} entr(ies) fell back to projection "
             + "(constructions over labeled priors, not probabilities)")
+
+
+def format_tail_clause(block: dict | None) -> str:
+    """R422. The tail seats: which teams seated, and the coverage arithmetic
+    that opened them (N entries, S teams), or why none opened."""
+    block = dict(block or {})
+    plan = dict((block.get("request") or {}).get("tail") or {})
+    seated = dict((block.get("tail") or {}).get("entries_by_team") or {})
+    if not plan and not seated:
+        return "tail not requested"
+    if plan.get("dropped"):
+        return f"tail none ({plan['dropped']})"
+    arithmetic = (f"{plan.get('seats', 0)} of {plan.get('tail_count', 0)} opened at "
+                  f"N={plan.get('entries')}, S={plan.get('teams_on_slate')}")
+    if not seated:
+        unplaced = plan.get("unplaced") or []
+        why = f", {len(unplaced)} unplaced" if unplaced else ""
+        return f"tail none ({arithmetic}{why})"
+    return ("tail " + ", ".join(f"{t} {n}" for t, n in sorted(seated.items()))
+            + f" (bottom third by implied total; {arithmetic})")
 
 
 def format_degraded_line(degraded: dict | None) -> str:

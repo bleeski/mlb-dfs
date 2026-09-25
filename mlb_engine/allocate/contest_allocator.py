@@ -1409,21 +1409,48 @@ def _resolve_classic_sleeves(
     with fewer distinct compatible lineups than entries (its excess entries go
     to ``projection``), and an entry left with nothing compatible in its sleeve
     (unmasked). Mutates ``full_compatible`` in place.
+
+    R422. An entry stamped with a tail team (``classic_sleeves.TAIL_TEAM_KEY``)
+    seats ``tail:<team>``: a projection-world candidate whose primary stack is
+    that team carries the token, read here through ``_candidate_primary_stack``
+    so the mask and the stack caps read one field. Tail seats apply without a
+    sleeve bank too; the rest of such a portfolio then seats ``projection``, as
+    ``no_sleeve_bank`` would have, so a bank that never built the weighted
+    sleeves is not counted as falling out of them.
     """
     from mlb_engine.optimize import classic_sleeves as cs
     if controls.get("classic_sleeves") is False:
         return {"status": "off", "relaxations": 0}
     cand_sleeves = [set(cs.candidate_sleeves(c)) for c in candidates]
-    if all(x == {cs.SLEEVE_PROJECTION} for x in cand_sleeves):
+    sleeve_bank = not all(x == {cs.SLEEVE_PROJECTION} for x in cand_sleeves)
+    tail_on = controls.get("classic_tail_seats") is not False
+    tail_of = {str(e.get("entry_id") or ""): str(e[cs.TAIL_TEAM_KEY]).upper()
+               for e in entries if tail_on and e.get(cs.TAIL_TEAM_KEY)}
+    if not sleeve_bank and not tail_of:
         return {"status": "no_sleeve_bank", "relaxations": 0}
+    tail_teams = set(tail_of.values())
+    # A stack below the primary-stack floor is excluded after this mask, so it
+    # carries no token: a seat confined to it would starve at the floor and
+    # read as the floor's relaxation, not the tail's. An unmeasured size (0) is
+    # left to the floor's own unmeasurable-bank rule.
+    floor = int(controls.get("primary_stack_min_size") or 0)
+    for k, c in enumerate(candidates):
+        stack = _candidate_primary_stack(c)
+        size = _candidate_primary_stack_size(c)
+        if (stack in tail_teams and cs.SLEEVE_PROJECTION in cand_sleeves[k]
+                and not (floor and 0 < size < floor)):
+            cand_sleeves[k].add(cs.tail_token(stack))
     E, K = len(entries), len(candidates)
     weights: Dict[str, Dict[str, float]] = {}
     for entry in entries:
         cid = str(entry.get("contest_id") or "")
         weights.setdefault(cid, cs.contest_sleeve_weights(
-            entry.get("posture"), entry.get("contest_shape")))
+            entry.get("posture"), entry.get("contest_shape"))
+            if sleeve_bank else {cs.SLEEVE_PROJECTION: 1.0})
     available = sorted(set().union(*cand_sleeves))
-    plan = cs.apportion_entries(entries, weights, available=available)
+    plan = cs.apportion_entries(
+        [e if tail_on else {k: v for k, v in e.items() if k != cs.TAIL_TEAM_KEY}
+         for e in entries], weights, available=available)
     sleeve_of = dict(plan["sleeve_by_entry"])
     fallbacks = list(plan["fallbacks"])
     ids = [str(e.get("entry_id") or "") for e in entries]
@@ -1460,9 +1487,10 @@ def _resolve_classic_sleeves(
     entries_by_sleeve: Dict[str, Dict[str, int]] = {}
     for e, entry in enumerate(entries):
         cid = str(entry.get("contest_id") or "")
-        bucket = entries_by_sleeve.setdefault(cid, {x: 0 for x in cs.SLEEVES})
-        bucket[sleeve_of.get(ids[e], cs.SLEEVE_PROJECTION)] += 1
-    return {
+        bucket = entries_by_sleeve.setdefault(
+            cid, {x: 0 for x in cs.SLEEVES + ((cs.SLEEVE_TAIL,) if tail_of else ())})
+        bucket[cs.sleeve_family(sleeve_of.get(ids[e], cs.SLEEVE_PROJECTION))] += 1
+    out = {
         "status": "applied",
         "weights_by_contest": weights,
         "entries_by_sleeve": entries_by_sleeve,
@@ -1474,6 +1502,20 @@ def _resolve_classic_sleeves(
         "unmasked_entries": unmasked,
         "_cand_sleeves": cand_sleeves,
     }
+    if not sleeve_bank:
+        out["weighted_sleeves"] = "no_sleeve_bank"
+    if tail_of:
+        seated = {eid: sleeve_of.get(eid, "")[len(cs.TAIL_TOKEN_PREFIX):]
+                  for eid in sorted(tail_of)
+                  if cs.sleeve_family(sleeve_of.get(eid, "")) == cs.SLEEVE_TAIL
+                  and eid not in unmasked}
+        out["tail"] = {
+            "requested": dict(sorted(tail_of.items())),
+            "seated": seated,
+            "entries_by_team": dict(sorted(Counter(seated.values()).items())),
+            "fell_back": sorted(set(tail_of) - set(seated)),
+        }
+    return out
 
 
 def _prefilter_candidates(
@@ -4496,8 +4538,10 @@ def select_and_assign_entries(
         if sleeve_report.get("status") == "applied":
             by_sleeve: Dict[str, List[int]] = defaultdict(list)
             sleeve_of = sleeve_report.get("sleeve_by_entry") or {}
+            from mlb_engine.optimize.classic_sleeves import sleeve_family
             for e, k in enumerate(chosen_k):
-                by_sleeve[sleeve_of.get(entry_ids[e], "projection")].append(e)
+                # R422: every `tail:<team>` seat reports under `tail`.
+                by_sleeve[sleeve_family(sleeve_of.get(entry_ids[e], "projection"))].append(e)
             delivered: Dict[str, Any] = {}
             for sleeve, members in sorted(by_sleeve.items()):
                 fits = [raw_scores[(e, chosen_k[e])] for e in members]
