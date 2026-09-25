@@ -1193,7 +1193,8 @@ EXPECTED_SUITE_COUNTS = {
     # `resolve_captain_prior` itself over a real emitted file -- R300's rule,
     # because every string pin above it would stay green on a dead branch).
     # R399(e), 2026-09-23: 334 -> 337, the three CaptainSleeveBriefTruthTests (a selector sleeve's brief block carries what chose it; a listed sleeve carries the key as null; the label stops denying the prior the build read).
-    "tests.test_showdown": 337,
+    # Session 12 (R389(c) + R425), 2026-09-25: 337 -> 362, the twenty-five ShowdownBaselineFirstTests (a clean build presents the baseline then the ladder, both rows live; a ladder crash exits 7 with the baseline; a ladder refusal keeps 3 and re-presents it; preflight and the template check pass on its bytes; complete rows kept and never repeated in their contest; both teams in every lineup; a sha-bound brief; a spent window is short; the points-max path needs none unless rows would go blank; a raising bank, a failed certification and a broken template are named and never presented, the template checked before any row; a rerun reuses the row; a ladder whose record alone fails leaves the baseline current; a sleeve refusal solves nothing; the points-max re-solve prices once (R425); an earlier ladder file is named; a sleeve that did not arrive is said; the bank window, projection, time cap and seeds; a timeout under the window's cap is the window, not the solver; the record names).
+    "tests.test_showdown": 362,
     # R96, 2026-08-11: 141 -> 162, the twenty-one tests that pin the delivery
     # path. A `grew` verdict is the one case where moving a pin is correct.
     # R46 round 2, 2026-08-12: 162 -> 168, the six that pin the PARTIAL side.

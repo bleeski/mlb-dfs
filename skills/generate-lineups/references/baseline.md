@@ -1,4 +1,6 @@
-# The baseline: every Classic build ships a legal file before research (R389(b))
+# The baseline: a legal file before the build's own construction (R389(b), R389(c))
+
+Classic first; Showdown's differences are the last section.
 
 **What lands.** `run_classic` publishes a baseline before it reads reference data, odds, weather or venues.
 - **Where it sits.** Directly after the pool-blocker refusals and the `--leverage` check, so every earlier refusal still refuses first and exit 4 still means "before any solve".
@@ -52,3 +54,28 @@ An S/P-only baseline refusal is never published; the enhanced build keeps its ow
 - 06-28 blanked (11 games, 38 rows): 3.7s and 0.8s.
 
 The build's deadline is not moved, so enhancement keeps everything the baseline did not spend. The timing probe (`single_s`) still runs on the enriched frame: the core's probe time is 2-4x slower and would misjudge the bank's cost.
+
+## Showdown (R389(c))
+
+**What lands.** `run_showdown` publishes a baseline after pricing the pool and before the thesis ladder.
+- **Where it sits.** After every exit-4 refusal (the Excluded column, unreadable `--projections`, the captain prior and sleeve), so exit 4 still means "before any solve".
+- **The solve.** `build_showdown_bank` on the ladder's own priced frame: one points-max lineup per incomplete reserved row, thesis-free, at the build's `max_shared_players`, `max_cpt_exposure_pct` and `max_player_exposure_pct`. Those are relaxed per slot under R153's order and counted in `baseline.relaxations`. The per-contest captain cap is the ladder's control, so `baseline.per_contest` reports it and no row lists it as held. A `--captain-sleeve` does not reach it, and when the baseline is current the build says so.
+- **F-3.** The template's complete rows are forbidden to the bank (`complete_row_player_keys`), so no baseline lineup repeats one in its contest.
+- **The window** is a quarter of the time left. The bank stops early when its first lineup's time says the rest will not fit, and a short bank is `short`, with no file.
+- **The points-max path** builds no baseline (`not_needed`): its own bank is the same construction on the same frame. The exception is `--entries-count` below the reserved rows. There the build refuses the rows it would leave blank, and the baseline covers every row.
+
+**The file.** `outputs/<date>/DKEntries_showdown_<tag>_BASELINE_<sha12>.csv`, review-grade like every Showdown file, in the `baseline` lineage. Every lineup passes `certify_showdown`. The template check and row coverage run on the staged bytes before any manifest row is recorded. The same bytes on a rerun reuse the row and the name; new bytes are a new file that supersedes inside the lineage. Preflight says `review_ready`, exit 0. The brief beside it is `build_brief_showdown_<tag>_BASELINE_<sha12>.json`.
+
+**Which file is current.**
+
+| outcome of the thesis ladder | current file | exit |
+|---|---|---|
+| a file that passed its checks and recorded its row | the ladder's file | 0 |
+| a refusal (infeasible, not certified, short of rows, export failed, template broken) | the baseline, re-presented | 3 |
+| a crash anywhere after the baseline | the baseline | 7 |
+| a file whose own manifest row failed, beside a recorded baseline | the baseline; the ladder's `DO_NOT_UPLOAD_` copy is named, not presented | 7 |
+
+**What it costs**, measured on the cloud container on the MIN@CHC fixture:
+- 21 rows: 0.9s.
+- 150 rows: 48.3s for the baseline, 59.9s for the whole build.
+- At Cowork's 100s budget the window is 25s, so a 150-row baseline stops after its first lineup, as `short` (0.2s spent).

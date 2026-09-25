@@ -20,6 +20,25 @@ R-number comes from scanning this file AND CHANGELOG.md.
 
 ## Workstream 1 — Showdown correctness and certification
 
+### R427. The Showdown ladder row says `review_grade` after a deadline rung (P2, XS) | new 2026-09-25, found by Session 12's plan review | Roadmap: Session 114
+
+- **What.** `run_showdown` records the ladder's row with `certification="review_grade"` unconditionally (BS, the writer's `record_delivery`), while the file presented after a governor rung carries `review_grade_deadline_build` (`deadline_governor.DEADLINE_LABEL`) in `_LAST_USABLE`, the brief's `label` and the FILE line. The manifest, which preflight and the delivery record read, disagrees with every other surface: DD-09's class, which Session 03 closed for Classic.
+- **Fix.** Record the deadline label on the row when the governor walked, and give preflight's `REVIEW_GRADE_REASONS` its Showdown sentence.
+- **Acceptance.** A governed Showdown build's row, brief and FILE line carry one label.
+
+### R426. The thesis ladder can repeat a complete reserved row in its contest (P2, S) | new 2026-09-25, found by Session 12's plan review | Roadmap: Session 113
+
+- **What.** `run_showdown` drops the template's complete rows before any solve, and `solve_ladder` forbids only the ladder's own lineups, so a ladder lineup can equal a complete row in the same contest. That is F-3, the one never-relax. Preflight only advises on it (`partition_duplicate_lineups`).
+- **Fix.** Port the baseline's fix (R389(c)): `sd.complete_row_player_keys` and a seed in front of the ladder's forbidden sets.
+- **Acceptance.** A template whose complete row is the ladder's own slot-0 lineup gets no duplicate in that contest.
+
+### R425. CLOSED 2026-09-25 -- SHIPPED with R389(c) (roadmap Session 12), found building it, entry in CHANGELOG.md
+
+On the points-max path `run_showdown` re-priced its already-priced frame on
+every governed attempt (`df = price_showdown_pool(df, ...)` inside the loop),
+so a deadline re-solve multiplied F1 into every Base a second time. The pool is
+now priced once, before the loop, on both paths.
+
 ### R412. The Showdown melt refuses a same-name role collision among players nobody can roster, and the brief drops the hold that stood down for a lock (P2, S) | new 2026-09-23, Ben's review of closed PR #18 against main's R295 (c12fd2a) | Roadmap: Session 87
 
 - **What (a).** `melt_showdown_salary_csv` (`showdown.py`) collects `role_collisions` in the parse loop (L326-331) and raises at L337, before the participation filter (L440, `starters_only`) and the health filter (L443, `exclude_out`) run. Two benched or OUT players sharing a name and a team stop a Showdown build over people no lineup can hold. No file in the repo has carried such a pair (R295's scan), so this is latent. Under R386 it is a V-style stop on a fact that is not V: the collision can reach an upload only through a pooled person.
@@ -5393,23 +5412,13 @@ Principles only, no engine code. V, S and P are defined in `MLB_Classic.md` §2 
 - **(d) landed (Session 09).** `dk_entries_manager.classify_export_failures` places every failing check, and `execute_portfolio` gives an S/P-only, essential-valid refusal a `review_grade_export`; `run_slate` mirrors it as `DKEntries_<tag>_UNCERTIFIED_<run>.csv`, labelled `review_grade_uncertified`. (c) is what lets it place MIXED gates: until the validator splits their facts, a MIXED gate with a V fact (weather, lineup, pitcher audit, projection schema, roster legality, hash binding) is unplaced and so V, and its refusal stays `DO_NOT_UPLOAD_`.
 - **Boundary.** "Upload-ready" keeps CLAUDE.md's meaning. A failed flag is never set true.
 
-### R389. No entry-mapped baseline exists before research, the bank and joint allocation (Package B, baseline half) (P0, M across three sessions) | new 2026-09-22, audit DD-01; (a) SHIPPED 2026-09-24 as roadmap Session 10, (b) SHIPPED 2026-09-24 as roadmap Session 11, both migrated to CHANGELOG.md | Roadmap: (c) Session 12
+### R389. CLOSED 2026-09-25 -- SHIPPED in three parts: (a) roadmap Session 10 and (b) Session 11, 2026-09-24; (c) Session 12, 2026-09-25; entries in CHANGELOG.md
 
-- **What.** `run_showdown` has no early publication: its first file is the thesis ladder's (BS `run_showdown`). Classic's half landed in Sessions 10 and 11.
-- **What (c) inherits from (b).** It reuses these, and does not redefine them:
-  - `upload_manifest.BASELINE_LINEAGE`. Supersession keys on `(contest_type, slate_tag, lineage)`, so a Showdown baseline row needs no new key.
-  - `_BASELINE` and `publish_baseline`'s contract: presented and kept in `_LAST_USABLE` only after an exact-bytes re-read, never inside a solve's result.
-  - The rule that the last `FILE` line is the current file.
-
-  Showdown always ships review-grade, so it needs no new label, but its row should carry the baseline lineage so the thesis file supersedes nothing Ben holds.
-- **(c) Showdown, before the ladder.** After pool pricing and before the thesis ladder, `run_showdown` writes a baseline:
-  - one thesis-free solve per incomplete reserved row;
-  - complete rows preserved;
-  - the both-team rule enforced;
-  - validated, and published review-grade under its own name in the baseline lineage.
-
-  The ladder can replace it only with a validated file.
-- **Acceptance.** A crash after the Showdown baseline delivers it; the ladder's file supersedes nothing Ben holds; the baseline passes the Showdown template check on its exact bytes.
+Every build ships an entry-mapped, review-grade baseline file before its own
+construction: Classic before research (R389(a) the core, R389(b) the
+publication), Showdown before the thesis ladder (R389(c)). A crash after it
+delivers it at exit 7 and a refusal re-presents it. Gate and commit: the
+CHANGELOG entries.
 
 ### R390. A thin sliced bank returns exit 10 before the deadline governor or any recovery is consulted (P0, S) | new 2026-09-22, audit DD-03 | Roadmap: Session 18
 
