@@ -1,14 +1,19 @@
 {
  "files": {
   "expected_stats_batting.csv": {
-   "fetched_at": "2026-08-30T19:52:49.626453+00:00",
-   "rows": 637,
+   "fetched_at": "2026-09-25T00:36:36.811566+00:00",
+   "rows": 657,
    "source": "baseballsavant expected_statistics batter 2026 min=1"
   },
   "expected_stats_pitching.csv": {
-   "fetched_at": "2026-08-30T19:52:49.762671+00:00",
-   "rows": 832,
+   "fetched_at": "2026-09-25T00:36:37.011833+00:00",
+   "rows": 865,
    "source": "baseballsavant expected_statistics pitcher 2026 min=1"
+  },
+  "statsapi_season_pitching.csv": {
+   "fetched_at": "2026-09-25T00:36:38.498127+00:00",
+   "rows": 865,
+   "source": "mlb statsapi season pitching 2026 playerPool=All"
   }
  },
  "manifest_version": "1.0.0",
