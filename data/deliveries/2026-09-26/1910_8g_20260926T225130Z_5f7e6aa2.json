@@ -1,0 +1,404 @@
+{
+ "code": {
+  "contest_allocator": "v1.12",
+  "execution_pipeline": "v1.17",
+  "git_dirty": true,
+  "git_sha": "7533b782825365f833165fda0b8e6665eb1cb196"
+ },
+ "controls": {
+  "classic_sleeves": false,
+  "five_stack_min_size": 5,
+  "max_consensus_cluster_share_pct": 1.0,
+  "max_game_exposure_pct": 1.0,
+  "max_game_exposure_pct_by_game": {
+   "ARI@SD": 1.0,
+   "CLE@KC": 1.0,
+   "COL@CWS": 1.0,
+   "HOU@ATH": 1.0,
+   "LAA@SEA": 1.0,
+   "STL@MIL": 1.0,
+   "TB@PHI": 1.0
+  },
+  "max_pitcher_exposure_pct": 1.0,
+  "max_player_exposure_pct": 1.0,
+  "max_primary_stack_exposure_pct": 1.0,
+  "max_shared_players": 9,
+  "max_sp_pair_repetition": 999,
+  "max_team_exposure_pct": 1.0,
+  "min_five_stack_share_pct": 0.1928,
+  "player_game_by_id": {
+   "distinct_values": 7,
+   "players_mapped": 139,
+   "wired": true
+  },
+  "player_team_by_id": {
+   "distinct_values": 14,
+   "players_mapped": 139,
+   "wired": true
+  },
+  "primary_stack_min_size": 4
+ },
+ "date": "2026-09-26",
+ "egress": "egress: statsapi unreachable, odds unreachable, savant unreachable, mlb-lineups unreachable, fangraphs unreachable (curl), open-meteo unreachable",
+ "egress_source": "session_start 2026-09-26T22:46:12+00:00",
+ "entries": [
+  {
+   "contest_id": "196059126",
+   "contest_name": "LAST SHOT: MLB Satellite to 9-29 $20 Postseason Opener",
+   "entry_fee": 0.25,
+   "entry_id": "5270893282",
+   "filled": true,
+   "roster_ids": [
+    "44287159",
+    "44287169",
+    "44287228",
+    "44287317",
+    "44287333",
+    "44287233",
+    "44287200",
+    "44287187",
+    "44287195",
+    "44287305"
+   ]
+  },
+  {
+   "contest_id": "196059126",
+   "contest_name": "LAST SHOT: MLB Satellite to 9-29 $20 Postseason Opener",
+   "entry_fee": 0.25,
+   "entry_id": "5270895830",
+   "filled": true,
+   "roster_ids": [
+    "44287159",
+    "44287601",
+    "44287188",
+    "44287308",
+    "44287309",
+    "44287279",
+    "44287271",
+    "44287203",
+    "44287205",
+    "44287330"
+   ]
+  },
+  {
+   "contest_id": "196088823",
+   "contest_name": "MLB Satellite to $2 MLB Pocket Cup MEGA Qualifier",
+   "entry_fee": 0.01,
+   "entry_id": "5270892817",
+   "filled": true,
+   "roster_ids": [
+    "44287159",
+    "44287169",
+    "44287228",
+    "44287317",
+    "44287333",
+    "44287233",
+    "44287200",
+    "44287187",
+    "44287195",
+    "44287305"
+   ]
+  },
+  {
+   "contest_id": "196088823",
+   "contest_name": "MLB Satellite to $2 MLB Pocket Cup MEGA Qualifier",
+   "entry_fee": 0.01,
+   "entry_id": "5270893839",
+   "filled": true,
+   "roster_ids": [
+    "44287159",
+    "44287601",
+    "44287188",
+    "44287308",
+    "44287309",
+    "44287279",
+    "44287271",
+    "44287203",
+    "44287205",
+    "44287330"
+   ]
+  },
+  {
+   "contest_id": "196088823",
+   "contest_name": "MLB Satellite to $2 MLB Pocket Cup MEGA Qualifier",
+   "entry_fee": 0.01,
+   "entry_id": "5270893840",
+   "filled": true,
+   "roster_ids": [
+    "44287171",
+    "44287159",
+    "44287280",
+    "44287194",
+    "44287309",
+    "44287185",
+    "44287256",
+    "44287218",
+    "44287327",
+    "44287206"
+   ]
+  },
+  {
+   "contest_id": "196088823",
+   "contest_name": "MLB Satellite to $2 MLB Pocket Cup MEGA Qualifier",
+   "entry_fee": 0.01,
+   "entry_id": "5270893841",
+   "filled": true,
+   "roster_ids": [
+    "44287159",
+    "44287164",
+    "44287228",
+    "44287308",
+    "44287288",
+    "44287233",
+    "44287224",
+    "44287298",
+    "44287212",
+    "44287203"
+   ]
+  },
+  {
+   "contest_id": "196088823",
+   "contest_name": "MLB Satellite to $2 MLB Pocket Cup MEGA Qualifier",
+   "entry_fee": 0.01,
+   "entry_id": "5270893842",
+   "filled": true,
+   "roster_ids": [
+    "44287167",
+    "44287601",
+    "44287228",
+    "44287308",
+    "44287309",
+    "44287211",
+    "44287191",
+    "44287363",
+    "44287176",
+    "44287255"
+   ]
+  },
+  {
+   "contest_id": "196088823",
+   "contest_name": "MLB Satellite to $2 MLB Pocket Cup MEGA Qualifier",
+   "entry_fee": 0.01,
+   "entry_id": "5270893843",
+   "filled": true,
+   "roster_ids": [
+    "44287167",
+    "44287161",
+    "44287228",
+    "44287270",
+    "44287309",
+    "44287233",
+    "44287200",
+    "44287187",
+    "44287440",
+    "44287209"
+   ]
+  },
+  {
+   "contest_id": "196088823",
+   "contest_name": "MLB Satellite to $2 MLB Pocket Cup MEGA Qualifier",
+   "entry_fee": 0.01,
+   "entry_id": "5270893844",
+   "filled": true,
+   "roster_ids": [
+    "44287167",
+    "44287159",
+    "44287228",
+    "44287233",
+    "44287288",
+    "44287279",
+    "44287256",
+    "44287203",
+    "44287327",
+    "44287187"
+   ]
+  },
+  {
+   "contest_id": "196090422",
+   "contest_name": "MLB $200 Quarter Jukebox [Just $0.25!]",
+   "entry_fee": 0.25,
+   "entry_id": "5270892903",
+   "filled": true,
+   "roster_ids": [
+    "44287167",
+    "44287159",
+    "44287228",
+    "44287233",
+    "44287288",
+    "44287279",
+    "44287256",
+    "44287203",
+    "44287327",
+    "44287187"
+   ]
+  },
+  {
+   "contest_id": "196090422",
+   "contest_name": "MLB $200 Quarter Jukebox [Just $0.25!]",
+   "entry_fee": 0.25,
+   "entry_id": "5270892973",
+   "filled": true,
+   "roster_ids": [
+    "44287159",
+    "44287164",
+    "44287228",
+    "44287308",
+    "44287288",
+    "44287233",
+    "44287224",
+    "44287298",
+    "44287212",
+    "44287203"
+   ]
+  },
+  {
+   "contest_id": "196091110",
+   "contest_name": "MLB Satellite to $20 NFL Fantasy Football Millionaire",
+   "entry_fee": 0.25,
+   "entry_id": "5270893744",
+   "filled": true,
+   "roster_ids": [
+    "44287171",
+    "44287159",
+    "44287280",
+    "44287194",
+    "44287309",
+    "44287185",
+    "44287256",
+    "44287218",
+    "44287327",
+    "44287206"
+   ]
+  },
+  {
+   "contest_id": "196091110",
+   "contest_name": "MLB Satellite to $20 NFL Fantasy Football Millionaire",
+   "entry_fee": 0.25,
+   "entry_id": "5270895883",
+   "filled": true,
+   "roster_ids": [
+    "44287167",
+    "44287601",
+    "44287228",
+    "44287308",
+    "44287309",
+    "44287211",
+    "44287191",
+    "44287363",
+    "44287176",
+    "44287255"
+   ]
+  },
+  {
+   "contest_id": "196092654",
+   "contest_name": "MLB $200 Solo Shot",
+   "entry_fee": 1.0,
+   "entry_id": "5270893043",
+   "filled": true,
+   "roster_ids": [
+    "44287167",
+    "44287161",
+    "44287228",
+    "44287270",
+    "44287309",
+    "44287233",
+    "44287200",
+    "44287187",
+    "44287440",
+    "44287209"
+   ]
+  }
+ ],
+ "entries_binding": {
+  "source": "outputs/2026-09-26/DO_NOT_UPLOAD_DKEntries_1910_8g_BASELINE_20260926T225130Z_5f7e6aa2.csv",
+  "source_sha256": "f0550f78e060dbd32892fc7f19d107ccc307240025e76623aa84cfc35122e2e6",
+  "status": "bound"
+ },
+ "host": {
+  "call_budget_s": 630.0,
+  "declared_ceiling_s": 900.0,
+  "host": "claude_code"
+ },
+ "kind": "delivery",
+ "labels": "deterministic review proxies and labeled priors only; never ROI, win rate, cash rate, or probability",
+ "manifest_row": {
+  "certification": "review_grade_baseline",
+  "contest_ids": [
+   "196059126",
+   "196088823",
+   "196090422",
+   "196091110",
+   "196092654"
+  ],
+  "contest_names": [
+   "LAST SHOT: MLB Satellite to 9-29 $20 Postseason Opener",
+   "MLB $200 Quarter Jukebox [Just $0.25!]",
+   "MLB $200 Solo Shot",
+   "MLB Satellite to $2 MLB Pocket Cup MEGA Qualifier",
+   "MLB Satellite to $20 NFL Fantasy Football Millionaire"
+  ],
+  "contest_type": "classic",
+  "delivered_file": "outputs/2026-09-26/DKEntries_1910_8g_BASELINE_20260926T225130Z_5f7e6aa2.csv",
+  "entries": 14,
+  "lineage": "baseline",
+  "notes": "baseline (R389(b)): built before research on the unenriched frame, every portfolio cap opened to the deadline rung's value (never-relax held); review-grade, never certified",
+  "projection_tier": "proxy",
+  "recorded_utc": "2026-09-26T22:51:30.516362+00:00",
+  "run_id": "20260926T225130Z_5f7e6aa2",
+  "sha256": "f0550f78e060dbd32892fc7f19d107ccc307240025e76623aa84cfc35122e2e6",
+  "slate_tag": "1910_8g",
+  "status": "candidate",
+  "strategy_state": {
+   "bank_warnings": [],
+   "counts": {
+    "controls_opened": 9,
+    "five_stack_quota": 1
+   },
+   "evidence": "recorded",
+   "state": "relaxed",
+   "warnings": []
+  }
+ },
+ "recorded_utc": "2026-09-26T22:51:30.518840+00:00",
+ "relaxations": {},
+ "run": {
+  "certification": {
+   "allocation_certified": true,
+   "failed_post_export_gates": [],
+   "post_export_gates": {
+    "entry_reconciliation_passed": true,
+    "export_hash_binding_passed": true,
+    "locked_immutability_passed": true,
+    "portfolio_caps_passed": true,
+    "roster_legality_passed": true,
+    "template_preservation_passed": true
+   },
+   "pre_export_passed": true,
+   "selection_certified": true,
+   "workflow_valid": true
+  },
+  "environment": {
+   "lock_file": "requirements.lock",
+   "lock_sha256": "dd7723e54043e8c2644100beba5069959d835258f96e1cf6dc100ea1617ac0d6",
+   "packages": {
+    "numpy": "2.2.6",
+    "pandas": "2.3.3",
+    "scipy": "1.15.3"
+   },
+   "python": "3.11.15"
+  },
+  "inputs": {
+   "DKEntries.csv": {
+    "sha256": "dd96b3db9d451ab18ca151bd03edc1808d856ec8541ae0b8700a18874cc7828b",
+    "size_bytes": 82685,
+    "source_path": "/home/user/mlb-dfs/data/slates/2026-09-26/DKEntries.csv"
+   },
+   "DKSalaries.csv": {
+    "sha256": "f20795f6fe40298cf20feb48000561390e89c52ef7e5ce379d1a6faed0c7222b",
+    "size_bytes": 70898,
+    "source_path": "/home/user/mlb-dfs/data/slates/2026-09-26/DKSalaries.csv"
+   }
+  }
+ },
+ "schema_version": 1
+}
