@@ -1195,7 +1195,8 @@ EXPECTED_SUITE_COUNTS = {
     # because every string pin above it would stay green on a dead branch).
     # R399(e), 2026-09-23: 334 -> 337, the three CaptainSleeveBriefTruthTests (a selector sleeve's brief block carries what chose it; a listed sleeve carries the key as null; the label stops denying the prior the build read).
     # Session 12 (R389(c) + R425), 2026-09-25: 337 -> 362, the twenty-five ShowdownBaselineFirstTests (a clean build presents the baseline then the ladder, both rows live; a ladder crash exits 7 with the baseline; a ladder refusal keeps 3 and re-presents it; preflight and the template check pass on its bytes; complete rows kept and never repeated in their contest; both teams in every lineup; a sha-bound brief; a spent window is short; the points-max path needs none unless rows would go blank; a raising bank, a failed certification and a broken template are named and never presented, the template checked before any row; a rerun reuses the row; a ladder whose record alone fails leaves the baseline current; a sleeve refusal solves nothing; the points-max re-solve prices once (R425); an earlier ladder file is named; a sleeve that did not arrive is said; the bank window, projection, time cap and seeds; a timeout under the window's cap is the window, not the solver; the record names).
-    "tests.test_showdown": 362,
+    # Session 113 (R426), 2026-09-26: 362 -> 365, the three ShowdownLadderCompleteRowTests (a held row equal to slot 0's unseeded solve is forbidden; portfolio_report's all_unique_rosters reads the union of solved and held rosters; run_showdown threads complete_row_player_keys into solve_ladder and portfolio_report as seed_forbidden/held_rosters).
+    "tests.test_showdown": 365,
     # R96, 2026-08-11: 141 -> 162, the twenty-one tests that pin the delivery
     # path. A `grew` verdict is the one case where moving a pin is correct.
     # R46 round 2, 2026-08-12: 162 -> 168, the six that pin the PARTIAL side.
@@ -1401,7 +1402,8 @@ EXPECTED_SUITE_COUNTS = {
     # R387 + R377, 2026-09-23: 394 -> 401, the seven DeliveryRecordBytesTests that pin rosters read from the hashed bytes and the controls and egress passed.
     # R388(a), 2026-09-23: 401 -> 413, the twelve GateTaxonomyTests (every certification gate classified; every name DKM's validator can fail, raw and parsed, resolves; an unclassified name raises; the governor's lookup still defaults; one fact name, one class; MIXED checks name distinct facts across two classes; the governor table moved value for value and answers AttributeError without the engine; one refusal vocabulary; the audit's anchor classes; four evidence states; evidence read exactly as _gate_bool reads it; both classes side by side).
     # Session 09 (R388(d)), 2026-09-24: 413 -> 414, the one GateAssumptionVersusOverrideTests that pins a refused assumption as V, never reclassified into review-grade.
-    "tests.test_upload_integrity": 414,
+    # Session 113 (R444), 2026-09-26: 414 -> 420, the six WithinContestDuplicateTests (a Classic within-contest duplicate fails the check and exits 2 from both referees; two distinct lineups, and the same lineup across two contests, still pass; a Showdown double-up under different captains is not a duplicate (R225); a Showdown repeat under the same captain fails).
+    "tests.test_upload_integrity": 420,
     "tests.test_golden_replay": 9,
     # R117(a), 2026-08-18: 75 -> 82, the seven that pin BOTH renders of the
     # mlb.com hand line against the same paste -- the joined render derived from

@@ -5349,6 +5349,14 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
             "why": ("the points-max bank below is the thesis-free construction, "
                     "on the same frame at the same controls, and it covers every "
                     "reserved row; a baseline would be the same file twice")})
+    # R426. The template's complete rows are forbidden to the ladder and the
+    # bank the same way the baseline already forbids them (R389(c)): a lineup
+    # that reproduces a held complete row is the F-3 breach the baseline was
+    # seeded against, and the 2026-09-25 review reproduced it as slot 0's
+    # DEFAULT outcome on the ladder path, not a corner. Computed once, off the
+    # frame each path actually solves on.
+    ladder_seed_forbidden, ladder_seed_unmapped = sd.complete_row_player_keys(
+        priced if use_ladder else df, reserved.get("reserved") or [])
     while True:
         solve_diag.clear()
         cpt_diagnostics.clear()
@@ -5365,7 +5373,8 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                                      max_cpt_exposure_pct=cpt_cap,
                                      diagnostics=solve_diag,
                                      contest_of_entry=contest_of_entry,
-                                     max_cpt_per_contest=cpt_per_contest)
+                                     max_cpt_per_contest=cpt_per_contest,
+                                     seed_forbidden=ladder_seed_forbidden)
             if any(lu is None for lu in solved):
                 sd_refusal = ("showdown_ladder_infeasible", "ladder_infeasible",
                               {"unsolved": [t["name"] for t, lu in zip(theses, solved)
@@ -5374,13 +5383,15 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                 bank = list(solved)
                 report = st.portfolio_report(priced, theses, solved,
                                              captain_sleeve=ladder_meta.get(
-                                                 "captain_sleeve"))
+                                                 "captain_sleeve"),
+                                             held_rosters=ladder_seed_forbidden)
                 certs = [sd.certify_showdown(lineup, priced) for lineup in bank]
         else:
             bank = sd.build_showdown_bank(df, n=n_entries, max_cpt_exposure_pct=cpt_cap,
                                           max_shared_players=share_cap,
                                           max_player_exposure_pct=player_cap_pct,
-                                          diagnostics=cpt_diagnostics)
+                                          diagnostics=cpt_diagnostics,
+                                          seed_forbidden=ladder_seed_forbidden)
             if len(bank) < n_entries:
                 sd_refusal = ("showdown_bank_short", "bank_short",
                               {"built": len(bank), "needed": n_entries})
@@ -6061,7 +6072,12 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                            or player_relaxed or ignored_locks
                            or contest_cap_relaxed or cpt_cap_relaxed
                            or captain_budget_inversions)
-                      and not (per_contest.get("over_cap") or [])),
+                      and not (per_contest.get("over_cap") or [])
+                      # R426. A ladder lineup equal to a held complete row is
+                      # F-3, whatever the caps above read; `clean` cannot call
+                      # a duplicate-of-a-held-row file clean.
+                      and (report.get("all_unique_rosters", True)
+                           if use_ladder else True)),
         },
         # R158. Compute facts, deliberately NOT inside `counted_relaxations` and
         # deliberately not in `clean`. A timeout is an infrastructure limit, not a

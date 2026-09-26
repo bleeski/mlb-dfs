@@ -117,9 +117,11 @@ RUNG_ACCEPT_BLANK_ROWS = "accept_blank_rows"
 #: authority (`gate_classes.FACT_AUTHORITY`), kept under every deadline. No rung
 #: opens it and none can: the allocator's one-per-signature-per-contest row is
 #: unconditional and DKM's validator fails the gate, which is ILLEGAL and so
-#: never governed. Nine keeps the rung from even asking for a pair it could
-#: not deliver. `test_the_open_overlap_value_cannot_produce_an_identical_pair`
-#: pins it.
+#: never governed ON THE ENGINE PATH. Nine keeps the rung from even asking for
+#: a pair it could not deliver. As of R444, `tools/preflight_upload.py` and
+#: `tools/verify_export.py` hard-fail the same fact on the repair and
+#: hand-corrected paths, where this validator does not run.
+#: `test_the_open_overlap_value_cannot_produce_an_identical_pair` pins it.
 CLASSIC_ROSTER_SIZE = 10
 SHOWDOWN_ROSTER_SIZE = 6
 

@@ -109,11 +109,11 @@ sys.path.insert(1, str(Path(__file__).resolve().parents[1]))
 
 from preflight_upload import (  # noqa: E402
     EntryRow, Report, advisory, check_feed, check_legality, check_manifest,
-    check_parent_transition, check_pool_membership, check_row_shape, check_status,
-    derive_locked_teams_from_feed, load_entries, load_salary, parse_as_of,
-    parse_declared_pitcher_args, parse_embedded_pool, parse_game_info_datetime,
-    resolve_declared_pitchers, resolve_feed_for_slate, resolve_feed_source,
-    resolve_salary_from_promoted_run, sha256_of, verdict_exit_code,
+    check_no_within_contest_duplicates, check_parent_transition, check_pool_membership,
+    check_row_shape, check_status, derive_locked_teams_from_feed, load_entries,
+    load_salary, parse_as_of, parse_declared_pitcher_args, parse_embedded_pool,
+    parse_game_info_datetime, resolve_declared_pitchers, resolve_feed_for_slate,
+    resolve_feed_source, resolve_salary_from_promoted_run, sha256_of, verdict_exit_code,
 )
 
 # R324. `derive_locked_teams_from_feed` moved into `preflight_upload` with the
@@ -553,12 +553,20 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     for d in details:
         d.update(parent_detail.get(str(d.get("entry_id")), {}))
 
+    # R444/R266. Computed BEFORE the report dict, not inside it: the duplicate
+    # check registers into `rep` and `passed` is evaluated at dict-construction
+    # time, so built inline a failure here would land in `rep.failures` after
+    # `passed` had already read it as True (the same ordering bug R266 named
+    # in preflight_upload).
+    adv = advisory(contest, entries, salary)
+    check_no_within_contest_duplicates(adv, rep)
+
     report = {
         "tool": "verify_export", "passed": not rep.failures,
         "contest_type": contest, "entries": len(entries),
         "failures": rep.failures, "warnings": rep.warnings,
         "info": rep.info, "lineups": details,
-        "advisory": advisory(contest, entries, salary),
+        "advisory": adv,
     }
 
     if args.json:

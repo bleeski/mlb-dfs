@@ -484,10 +484,21 @@ class PreflightToolTests(unittest.TestCase):
         self.dir = Path(self.tmp.name)
         self.salary = self.dir / "DKSalaries.csv"
         self.lineup = write_classic_salary(self.salary)
+        # R444. Entry 901 used to reconstruct `self.lineup` verbatim (same ten
+        # ids), which was a within-contest DUPLICATE hiding in a fixture named
+        # "clean" -- advisory-only until this session, now a hard failure.
+        # CCC carries four legal OF and `self.lineup` uses three, so the
+        # fourth swaps in for a second lineup that is legal and genuinely
+        # distinct rather than a reconstruction of the first.
+        players = {p.player_id: p for p in parse_dk_salary_csv(str(self.salary))}
+        unused_of = next(pid for pid, p in players.items()
+                         if p.team == "CCC" and "OF" in p.positions
+                         and pid not in self.lineup)
+        self.lineup2 = self.lineup[:9] + [unused_of]
         self.entries = self.dir / "DKEntries.csv"
         write_entries(self.entries, CLASSIC_HEADER,
                       [classic_entry("900", "5", self.lineup),
-                       classic_entry("901", "5", self.lineup[:9] + [self.lineup[9]])])
+                       classic_entry("901", "5", self.lineup2)])
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -4944,6 +4955,130 @@ class DuplicateLineupContextTests(unittest.TestCase):
         self.assertIn("no_duplicates_within_contest", source,
                       "the brief half rides the allocator's own vocabulary")
         self.assertIn("allow_cross_contest_reuse", source)
+
+
+class WithinContestDuplicateTests(unittest.TestCase):
+    """R444. F-3 -- never one lineup twice in one contest -- is CLAUDE.md's one
+    default never-relax control, and both shipping referees only PRINTED
+    ``duplicates_within_contest`` as information: a Classic file holding one
+    lineup twice in one contest exited 0 from both, and the repair and
+    hand-corrected paths ship on those two exits alone (CLAUDE.md's repair
+    clause). Captain-aware on Showdown (R225): a CPT is a roster spot with a
+    different salary and a different score, so the same six people under two
+    different captains inside one contest is a legal double-up, not a copy.
+    """
+
+    @staticmethod
+    def _pf():
+        import importlib
+        return importlib.import_module("preflight_upload")
+
+    def test_a_classic_within_contest_duplicate_fails_the_check(self):
+        pf = self._pf()
+        with tempfile.TemporaryDirectory() as tmp:
+            salary_path = Path(tmp) / "DKSalaries.csv"
+            base = write_deep_of_salary(salary_path)
+            entries_path = Path(tmp) / "DKEntries.csv"
+            write_entries(entries_path, CLASSIC_HEADER, [
+                ["4700000001", "Cup", "111", "$1"] + list(base) + ["", "1. instructions"],
+                ["4700000002", "Cup", "111", "$1"] + list(base) + ["", "1. instructions"],
+            ])
+            contest, _slots, entries, _raw, _n = pf.load_entries(entries_path)
+            adv = pf.advisory(contest, entries, pf.load_salary(salary_path))
+            rep = pf.Report()
+            pf.check_no_within_contest_duplicates(adv, rep)
+        self.assertEqual(adv["duplicates_within_contest"], 1)
+        self.assertTrue(rep.failures)
+        self.assertIn("F-3", rep.failures[0])
+
+    def test_the_full_cli_exits_2_on_a_classic_within_contest_duplicate(self):
+        """The acceptance: a Classic file with one lineup in two entries of one
+        contest exits 2 from BOTH referees."""
+        with tempfile.TemporaryDirectory() as tmp:
+            salary_path = Path(tmp) / "DKSalaries.csv"
+            base = write_deep_of_salary(salary_path)
+            entries_path = Path(tmp) / "DKEntries.csv"
+            write_entries(entries_path, CLASSIC_HEADER, [
+                ["4700000001", "Cup", "111", "$1"] + list(base) + ["", "1. instructions"],
+                ["4700000002", "Cup", "111", "$1"] + list(base) + ["", "1. instructions"],
+            ])
+            pre = run_preflight("--entries", str(entries_path), "--salary", str(salary_path))
+            ver = run_verify("--entries", str(entries_path), "--salary", str(salary_path))
+        self.assertEqual(pre.returncode, 2, pre.stdout)
+        self.assertEqual(ver.returncode, 2, ver.stdout)
+
+    def test_two_distinct_lineups_in_one_contest_still_pass(self):
+        """Mutation guard: two DIFFERENT legal lineups in one contest must not
+        trip the new check, or it is not keyed on identity at all."""
+        with tempfile.TemporaryDirectory() as tmp:
+            salary_path = Path(tmp) / "DKSalaries.csv"
+            base = write_deep_of_salary(salary_path)
+            # distinct_lineups only guarantees its OWN k lineups are pairwise
+            # distinct, not that they differ from `base`; two of its own are
+            # the safe pair.
+            first, second = distinct_lineups(salary_path, base, 2)
+            entries_path = Path(tmp) / "DKEntries.csv"
+            write_entries(entries_path, CLASSIC_HEADER, [
+                ["4700000001", "Cup", "111", "$1"] + list(first) + ["", "1. instructions"],
+                ["4700000002", "Cup", "111", "$1"] + list(second) + ["", "1. instructions"],
+            ])
+            pre = run_preflight("--entries", str(entries_path), "--salary", str(salary_path))
+        self.assertEqual(pre.returncode, 0, pre.stdout)
+
+    def test_the_same_lineup_across_two_contests_still_passes(self):
+        """`duplicates_across_contests` is unaffected: separate contests have
+        separate prize pools, so reuse there stays free."""
+        with tempfile.TemporaryDirectory() as tmp:
+            salary_path = Path(tmp) / "DKSalaries.csv"
+            base = write_deep_of_salary(salary_path)
+            entries_path = Path(tmp) / "DKEntries.csv"
+            write_entries(entries_path, CLASSIC_HEADER, [
+                ["4700000001", "Cup A", "111", "$1"] + list(base) + ["", "1. instructions"],
+                ["4700000002", "Cup B", "222", "$1"] + list(base) + ["", "1. instructions"],
+            ])
+            pre = run_preflight("--entries", str(entries_path), "--salary", str(salary_path))
+        self.assertEqual(pre.returncode, 0, pre.stdout)
+
+    def test_a_showdown_double_up_under_different_captains_is_not_a_duplicate(self):
+        pf = self._pf()
+        with tempfile.TemporaryDirectory() as tmp:
+            salary_path = Path(tmp) / "DKSalaries.csv"
+            people = write_showdown_salary(salary_path)
+            common = ["Boone", "Crane", "Dunne", "Ellis", "Frost"]
+            lineup_a = ([people["AAA Aster"]["CPT"]]
+                       + [people[f"AAA {s}"]["UTIL"] for s in common])
+            lineup_b = ([people["AAA Boone"]["CPT"], people["AAA Aster"]["UTIL"]]
+                       + [people[f"AAA {s}"]["UTIL"] for s in common[1:]])
+            entries_path = Path(tmp) / "DKEntries.csv"
+            write_entries(entries_path, SHOWDOWN_HEADER, [
+                showdown_entry("4700000001", "111", lineup_a),
+                showdown_entry("4700000002", "111", lineup_b),
+            ])
+            contest, _slots, entries, _raw, _n = pf.load_entries(entries_path)
+            adv = pf.advisory(contest, entries, pf.load_salary(salary_path))
+        self.assertEqual(adv["duplicates_within_contest"], 0,
+                         "same six people, different captain: a legal double-up, "
+                         "not a copy (R225)")
+
+    def test_a_showdown_lineup_repeated_under_the_same_captain_fails(self):
+        pf = self._pf()
+        with tempfile.TemporaryDirectory() as tmp:
+            salary_path = Path(tmp) / "DKSalaries.csv"
+            people = write_showdown_salary(salary_path)
+            roster = ([people["AAA Aster"]["CPT"]]
+                      + [people[f"AAA {s}"]["UTIL"]
+                         for s in ("Boone", "Crane", "Dunne", "Ellis", "Frost")])
+            entries_path = Path(tmp) / "DKEntries.csv"
+            write_entries(entries_path, SHOWDOWN_HEADER, [
+                showdown_entry("4700000001", "111", roster),
+                showdown_entry("4700000002", "111", roster),
+            ])
+            contest, _slots, entries, _raw, _n = pf.load_entries(entries_path)
+            adv = pf.advisory(contest, entries, pf.load_salary(salary_path))
+            rep = pf.Report()
+            pf.check_no_within_contest_duplicates(adv, rep)
+        self.assertEqual(adv["duplicates_within_contest"], 1)
+        self.assertTrue(rep.failures)
 
 
 if __name__ == "__main__":
