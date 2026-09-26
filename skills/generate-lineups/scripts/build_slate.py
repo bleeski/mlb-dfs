@@ -700,6 +700,26 @@ def note_last_usable(record: Mapping[str, Any]) -> dict:
     return dict(_LAST_USABLE)
 
 
+def drop_superseded_review_grade() -> None:
+    """R459. A held UNCERTIFIED file whose manifest row a later mirror
+    superseded (a rung's certified row, a newer review-grade export) is no
+    longer the file in hand: preflight blocks it as superseded. Only the
+    `review_grade` lineage is touched; the baseline and a certified file are
+    never cleared here. Never raises."""
+    if _LAST_USABLE.get("lineage") != "review_grade":
+        return
+    try:
+        from mlb_engine.entries.upload_manifest import recorded_delivery_row
+        row = recorded_delivery_row(str(_LAST_USABLE.get("date") or ""),
+                                    str(_LAST_USABLE.get("sha256") or ""))
+    except Exception:  # noqa: BLE001
+        return
+    if row and row.get("status") == "superseded":
+        print(f"review-grade file superseded in the manifest and no longer held: "
+              f"{_LAST_USABLE.get('path')}", file=sys.stderr)
+        _LAST_USABLE.clear()
+
+
 def _coverage(path) -> dict | None:
     try:
         from mlb_engine.entries.dk_entries_manager import entry_coverage
@@ -3951,8 +3971,32 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
             outcome = "delivered" if has_deliverable(out) else "refused"
             if isinstance(out.get("review_grade_export"), dict):
                 latest_review_grade["export"] = out["review_grade_export"]
+                latest_review_grade.pop("record", None)
+                # R459. Held the moment it re-reads clean, so a later re-solve
+                # (a governor rung, R407's relax) that RAISES exits 7 naming it
+                # rather than 1 naming nothing. Only over nothing or an older
+                # review-grade file: a gates-passing file (the baseline, a
+                # certified solve) is never outranked by an uncertified one
+                # (R388(d)), and `baseline_brief_block` reads that lineage.
+                if (not has_deliverable(out)
+                        and _LAST_USABLE.get("lineage") in (None, "review_grade")):
+                    record = present_review_grade(out["review_grade_export"], salary)
+                    latest_review_grade["record"] = record
+                    if record.get("presented"):
+                        _LAST_USABLE.clear()
+                        _LAST_USABLE.update({
+                            "path": record["path"],
+                            "sha256": out["review_grade_export"].get("delivered_sha256"),
+                            "label": record.get("label"),
+                            "coverage": record.get("coverage"),
+                            "run_id": record.get("run_id"),
+                            "failing_gates": record.get("failing_gates"),
+                            "contest_type": "classic", "date": args.date,
+                            "lineage": "review_grade"})
             return out
         finally:
+            # R459. A later mirror may have superseded the held file's row.
+            drop_superseded_review_grade()
             ended_at = time.monotonic()
             if bank_out and bank_out.get("candidates"):
                 auto_bank.update(bank_out)
@@ -4067,7 +4111,13 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         review_export = (result.get("review_grade_export")
                          if isinstance(result.get("review_grade_export"), dict)
                          else latest_review_grade.get("export"))
-        review_record = (present_review_grade(review_export, salary)
+        # R459. `_solve` already re-read and presented this export; its record
+        # is reused so the file is read once and named once before the baseline.
+        review_record = (latest_review_grade["record"]
+                         if review_export is not None
+                         and review_export is latest_review_grade.get("export")
+                         and latest_review_grade.get("record") is not None
+                         else present_review_grade(review_export, salary)
                          if review_export else None)
         # R389(b). The baseline passed its gates, so it outranks an enhanced
         # UNCERTIFIED file (R388(d)): it is re-presented LAST, before the gate
@@ -4334,12 +4384,20 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         "contest_type": "classic",
         "date": args.date,
         "entries": n_entries,
-        "delivered_path": delivered,
+        # R461. A file that failed its independent re-read is not delivered:
+        # the three `delivered_*` keys are null on `verify_failed` and the file
+        # is named under `verify_failed_*`, so a reader of `delivered_path` at
+        # T-5 is never pointed at a file preflight would refuse.
+        "delivered_path": delivered if checks["passed"] else None,
         # Repo-relative and hashed. Every delivered_path recorded on 2026-07-25
         # was absolute against a session mount that no longer exists, and no
         # brief stated which bytes it was describing.
-        "delivered_path_repo": manifest_repo_relative(delivered),
-        "delivered_sha256": manifest_sha256(delivered),
+        "delivered_path_repo": (manifest_repo_relative(delivered)
+                                if checks["passed"] else None),
+        "delivered_sha256": manifest_sha256(delivered) if checks["passed"] else None,
+        **({} if checks["passed"] else {
+            "verify_failed_path": manifest_repo_relative(delivered),
+            "verify_failed_sha256": manifest_sha256(delivered)}),
         "upload_manifest": manifest_repo_relative(
             REPO / "outputs" / args.date / "upload_manifest.json"),
         # R298(b). The engine sets all three on the result and this brief
@@ -4352,7 +4410,10 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         # R393(b). On every delivered Classic brief, [] and None when nothing
         # applies, so absence is visible (R237). A non-empty list is exit 7.
         "later_failures": later_failures(result),
-        "last_usable_artifact": dict(_LAST_USABLE) if checks["passed"] else None,
+        # R461. On `verify_failed` the file in hand is whatever was presented
+        # before it (the baseline), so the brief agrees with the FILE line and
+        # the refusal record.
+        "last_usable_artifact": dict(_LAST_USABLE) or None,
         "pool_blockers_overridden": hard if (hard and args.ignore_pool_blockers) else [],
         "pool_blockers_soft": soft,
         # R104. The operator's PLR/PO decision is an INPUT to this build, so it is
@@ -7388,8 +7449,19 @@ def main() -> int:
     args._governor = None
     if getattr(args, "deliver_by", None):
         from mlb_engine.pipeline import deadline_governor as _dg  # noqa: PLC0415
+        # R460. HH:MM sits on the SLATE's day, which `args.date` names or the
+        # salary file dates; the salary is bound below this parse, so it is
+        # read here. A file that cannot be read yet falls back to today in ET,
+        # and the missing-inputs refusal below still fires.
+        slate_day = args.date
+        if not slate_day and Path(args.salary).exists():
+            try:
+                slate_day = slate_date_from_salary(Path(args.salary))
+            except Exception:  # noqa: BLE001 - the parse falls back to today ET
+                slate_day = None
         try:
-            deliver_by_utc, tz_source = _dg.parse_deliver_by(args.deliver_by)
+            deliver_by_utc, tz_source = _dg.parse_deliver_by(
+                args.deliver_by, slate_date=slate_day)
         except ValueError as exc:
             print(json.dumps({"status": "deliver_by_unparseable",
                               "date": args.date, "error": str(exc)}, indent=1))

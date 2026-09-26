@@ -290,14 +290,20 @@ def _eastern() -> Any:
         raise ValueError("Eastern timezone database unavailable; install the pinned tzdata runtime") from exc
 
 
-def parse_deliver_by(text: str, *, now: Optional[_dt.datetime] = None
-                     ) -> Tuple[_dt.datetime, str]:
+def parse_deliver_by(text: str, *, now: Optional[_dt.datetime] = None,
+                     slate_date: Optional[str] = None) -> Tuple[_dt.datetime, str]:
     """Parse `--deliver-by` into an aware UTC datetime.
 
     Two accepted forms, because an operator under a clock types the short one
     and a scheduled caller passes the long one:
       * a full ISO timestamp, with or without an offset (naive is read as ET)
       * `HH:MM`, read as ET on the slate's own day
+
+    R460. The slate's own day is `slate_date` (YYYY-MM-DD) when the caller
+    has it, and today in ET only when it does not. Today's date read a
+    night-before build's 19:05 lock as hours PAST, which puts the governor in
+    window (it stays open past the lock by design) on a slate with twenty
+    hours to spare.
 
     Returns `(utc_datetime, tz_source)`. Raises ValueError with the two forms
     named -- a refusal that does not say what it wanted costs a second call,
@@ -317,7 +323,18 @@ def parse_deliver_by(text: str, *, now: Optional[_dt.datetime] = None
             raise ValueError(
                 f"--deliver-by {raw!r} is not a valid time of day. Pass an ISO "
                 f"timestamp or HH:MM ET, e.g. 2026-09-03T19:40:00-04:00 or 19:40")
-        local = reference.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        day = reference.date()
+        if slate_date:
+            try:
+                day = _dt.date.fromisoformat(str(slate_date)[:10])
+            except ValueError as exc:
+                raise ValueError(
+                    f"slate date {slate_date!r} is not YYYY-MM-DD, so --deliver-by "
+                    f"{raw!r} has no day to sit on; pass an ISO timestamp") from exc
+        # Built on the day rather than `.replace()`d onto `reference`, so the
+        # offset is the slate day's own (a DST boundary between now and the
+        # slate moves it).
+        local = _dt.datetime(day.year, day.month, day.day, hour, minute, tzinfo=tz)
         return local.astimezone(_dt.timezone.utc), tz_source
 
     try:

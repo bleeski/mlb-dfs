@@ -31,7 +31,8 @@ Then a brief bound to its sha256 is written beside it, `build_brief_<tag>_BASELI
 | certified or deadline-labelled | the enhanced file | 0 (7 on a later failure) |
 | refused, including an UNCERTIFIED file | the baseline, re-presented after the UNCERTIFIED line | 3 |
 | sliced bank thin, resumable | the baseline, re-presented | 10 |
-| an enhanced file that fails its independent re-read (`verify_failed`) | the baseline, re-presented | 3 |
+| an enhanced file that fails its independent re-read (`verify_failed`) | the baseline, re-presented; the brief's `delivered_*` are null and the failed file is under `verify_failed_path` (R461) | 3 |
+| no baseline, an UNCERTIFIED file held, then a re-solve crashes (R459) | the UNCERTIFIED file | 7 |
 | a crash after the baseline and before an enhanced file is presented (research, the enhanced solve) | the baseline | 7 |
 | a crash after an enhanced file was presented (the brief, a report) | the enhanced file | 7 |
 

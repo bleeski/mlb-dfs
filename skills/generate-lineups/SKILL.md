@@ -162,6 +162,10 @@ structural, override a pool blocker classified benign and assert
 `lineup_gate_passed` on that same evidence. It stops on anything it cannot
 classify, and every decision lands in `outputs/<date>/autobuild_decisions.json`.
 Exit 0 certified, 3 refused, 4 bad input, 5 out of time, 7 delivered after a later failure.
+Every stop that did not deliver names the file in hand (R419): a `FILE` line on
+stderr and `file_in_hand` on the stop record, resolved from the last brief (its
+current baseline, a presented UNCERTIFIED file), then a killed child's own
+`FILE` line, then this run's live manifest rows. `null` means there is none.
 
 A stop is a real question, not a formality: an exposure cap has no engine-named
 floor, and a team matching under 5 of 9 salary hitters is a crosswalk failure,
@@ -331,7 +335,9 @@ lock minus 5 minutes, because Ben's upload takes 5 (F-1).
 
 ### `--deliver-by`: a clock inside the build
 
-Pass `--deliver-by <ISO or HH:MM ET>` and a `badly_shaped` refusal stops being
+Pass `--deliver-by <ISO or HH:MM ET>` (a bare `HH:MM` sits on the slate's own
+date, read off the salary file, so a night-before build is not read as past its
+lock; R460) and a `badly_shaped` refusal stops being
 a refusal from T-6. The build opens every portfolio control in **one move**,
 re-solves, and delivers the file labelled `review_grade_deadline_build` with
 the ladder it walked in `brief.deadline`. One crude step, not a stepwise walk,

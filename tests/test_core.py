@@ -20942,6 +20942,283 @@ class BankCapGrowthTests(unittest.TestCase):
                             for line in ca._infeasibility_remedies(timed, [])))
 
 
+class AutobuildFileInHandTests(unittest.TestCase):
+    """R419 (Session 106). Every autobuild stop that did not deliver names the
+    file in hand: the baseline a refusal kept current, a presented
+    review-grade file, a killed child's FILE line, or this run's manifest row.
+    Also R460's autobuild half: `--deliver-by HH:MM` sits on the slate's day.
+    """
+
+    _BASELINE = {"status": "delivered", "current": True, "lineage": "baseline",
+                 "path": "outputs/2026-07-29/DKEntries_2305_9g_BASELINE_r0.csv",
+                 "sha256": "a" * 64, "label": "review_grade_baseline"}
+
+    def setUp(self):
+        import importlib
+        self.ab = importlib.import_module("tools.autobuild")
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.salary = (REPO / "tests" / "fixtures" / "slates"
+                       / "DKSalaries_frozen_2026-07-29.csv")
+
+    def _run(self, side_effect, extra_argv=(), patches=()):
+        cmds = []
+
+        def fake_run(cmd, **kwargs):
+            cmds.append(list(cmd))
+            return side_effect(len(cmds), cmd, kwargs)
+
+        argv = ["autobuild.py", "--salary", str(self.salary),
+                "--entries", str(self.salary), *extra_argv]
+        root = Path(self.tmp.name)
+        err = io.StringIO()
+        with contextlib.ExitStack() as stack:
+            stack.enter_context(unittest.mock.patch.object(self.ab, "REPO", root))
+            stack.enter_context(unittest.mock.patch.object(self.ab.subprocess, "run", fake_run))
+            stack.enter_context(unittest.mock.patch.object(sys, "argv", argv))
+            stack.enter_context(unittest.mock.patch.object(
+                self.ab, "assert_classification_in_sync", lambda: None))
+            for target, name, value in patches:
+                stack.enter_context(unittest.mock.patch.object(target, name, value))
+            stack.enter_context(contextlib.redirect_stderr(err))
+            code = self.ab.main()
+        payload = {}
+        for path in sorted(root.glob("outputs/*/autobuild_decisions.json")):
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        return code, payload.get("decisions") or [], payload, err.getvalue()
+
+    def _refusal(self, **brief):
+        return types.SimpleNamespace(returncode=3, stderr="", stdout=json.dumps({
+            "status": "not_certified", "date": "2026-07-29",
+            "bank_exploration": {"job_list_exhausted": False, "jobs_attempted": 40,
+                                 "jobs_total": 700, "bank_stop_reason": "time_budget"},
+            **brief}))
+
+    def test_attempts_spent_on_refusals_after_a_baseline_name_the_baseline(self):
+        """The row's acceptance: every attempt refuses after a baseline, and the
+        run ends naming the baseline file and its sha."""
+        code, records, payload, err = self._run(
+            lambda n, cmd, kw: self._refusal(baseline=self._BASELINE),
+            extra_argv=["--max-attempts", "2"])
+        self.assertEqual(code, 3)
+        self.assertEqual(records[-1]["action"], "stop", "the stop stays the last record")
+        held = records[-1]["file_in_hand"]
+        self.assertEqual((held["path"], held["sha256"], held["source"]),
+                         (self._BASELINE["path"], self._BASELINE["sha256"], "brief.baseline"))
+        self.assertEqual(payload["file_in_hand"], held)
+        self.assertIn(f"FILE  {self._BASELINE['path']}  sha256={'a' * 64}", err)
+
+    def test_exit_10_twice_names_the_baseline(self):
+        brief = {"status": "bank_partial", "date": "2026-07-29", "baseline": self._BASELINE}
+        code, records, _payload, _err = self._run(
+            lambda n, cmd, kw: types.SimpleNamespace(
+                returncode=10, stderr="", stdout=json.dumps(brief)),
+            extra_argv=["--max-attempts", "2"])
+        self.assertEqual(code, 3)
+        self.assertEqual(records[-1]["file_in_hand"]["path"], self._BASELINE["path"])
+
+    def test_a_baseline_that_is_not_current_is_not_named(self):
+        stale = dict(self._BASELINE, current=False)
+        code, records, payload, err = self._run(
+            lambda n, cmd, kw: self._refusal(baseline=stale),
+            extra_argv=["--max-attempts", "1"])
+        self.assertEqual(code, 3)
+        self.assertIsNone(records[-1]["file_in_hand"])
+        self.assertIn("file_in_hand", payload, "found-none is recorded too")
+        self.assertIsNone(payload["file_in_hand"])
+        self.assertIn("no file in hand", err)
+
+    def test_a_presented_review_grade_file_is_named(self):
+        review = {"presented": True, "path": "outputs/2026-07-29/DKEntries_x.csv",
+                  "sha256": "c" * 64, "label": "review_grade_uncertified"}
+        code, records, _payload, _err = self._run(
+            lambda n, cmd, kw: self._refusal(review_grade_export=review,
+                                             bank_exploration={"job_list_exhausted": True}),
+            extra_argv=["--max-attempts", "1"])
+        self.assertEqual(code, 3)
+        held = records[-1]["file_in_hand"]
+        self.assertEqual((held["path"], held["label"], held["source"]),
+                         (review["path"], "review_grade_uncertified",
+                          "brief.review_grade_export"))
+
+    def test_a_killed_child_is_named_by_its_file_line(self):
+        """The handler used to read neither `exc.stderr` nor `exc.stdout`,
+        though `subprocess.run(capture_output=True, timeout=)` fills both."""
+        line = ("FILE  outputs/2026-07-29/DKEntries_2305_9g_BASELINE_fake.csv  "
+                "sha256=" + "d" * 64 + "  label=review_grade_baseline  coverage=18/18\n")
+
+        def hang(n, cmd, kw):
+            raise subprocess.TimeoutExpired(cmd, kw.get("timeout"), output=None,
+                                            stderr=("SOLVE ...\n" + line).encode())
+        code, records, _payload, err = self._run(hang)
+        self.assertEqual(code, 5)
+        self.assertEqual(records[-1]["action"], "build_timed_out")
+        held = records[-1]["file_in_hand"]
+        self.assertEqual(held["path"],
+                         "outputs/2026-07-29/DKEntries_2305_9g_BASELINE_fake.csv")
+        self.assertEqual(held["sha256"], "d" * 64)
+        self.assertEqual(held["source"], "child_stderr_file_line")
+        self.assertIn("source=child_stderr_file_line", err)
+
+    def test_a_killed_childs_brief_on_stdout_is_read(self):
+        def hang(n, cmd, kw):
+            raise subprocess.TimeoutExpired(
+                cmd, kw.get("timeout"),
+                output=json.dumps({"status": "not_certified", "date": "2026-07-29",
+                                   "baseline": self._BASELINE}), stderr=None)
+        code, records, _payload, _err = self._run(hang)
+        self.assertEqual(code, 5)
+        self.assertEqual(records[-1]["file_in_hand"]["source"], "brief.baseline")
+
+    def test_an_off_contract_exit_is_named_by_its_file_line(self):
+        line = "FILE  outputs/2026-07-29/f.csv  sha256=" + "e" * 64 + "  label=x\n"
+        code, records, _payload, _err = self._run(
+            lambda n, cmd, kw: types.SimpleNamespace(
+                returncode=1, stdout="", stderr=line + "Traceback ...\n"))
+        self.assertEqual(code, 3)
+        self.assertEqual(records[-1]["file_in_hand"]["path"], "outputs/2026-07-29/f.csv")
+
+    def test_a_kill_with_nothing_printed_reads_this_runs_manifest_rows(self):
+        """Newest gates-passing row recorded since this run started, whose
+        bytes still hash the same; an older row is another run's."""
+        from mlb_engine.entries import upload_manifest as um
+        root = Path(self.tmp.name) / "repo"
+        (root / "outputs" / "2026-07-29").mkdir(parents=True)
+        fresh = root / "outputs" / "2026-07-29" / "DKEntries_BASELINE.csv"
+        fresh.write_text("x\n", encoding="utf-8")
+        old = root / "outputs" / "2026-07-29" / "DKEntries_old.csv"
+        old.write_text("y\n", encoding="utf-8")
+        rows = [
+            {"delivered_file": "outputs/2026-07-29/DKEntries_old.csv",
+             "sha256": um.sha256_file(old), "certification": "certified",
+             "recorded_utc": "2000-01-01T00:00:00+00:00"},
+            {"delivered_file": "outputs/2026-07-29/DKEntries_BASELINE.csv",
+             "sha256": um.sha256_file(fresh), "certification": "review_grade_baseline",
+             "recorded_utc": "2999-01-01T00:00:00+00:00"},
+        ]
+
+        def hang(n, cmd, kw):
+            raise subprocess.TimeoutExpired(cmd, kw.get("timeout"))
+        code, records, _payload, _err = self._run(
+            hang, patches=[(um, "REPO_ROOT", root),
+                           (um, "current_deliveries", lambda date: list(rows))])
+        self.assertEqual(code, 5)
+        held = records[-1]["file_in_hand"]
+        self.assertEqual(held["path"], "outputs/2026-07-29/DKEntries_BASELINE.csv")
+        self.assertEqual(held["source"], "upload_manifest.current_deliveries")
+        rows[1]["sha256"] = "0" * 64
+        _code, records, _payload, _err = self._run(
+            hang, patches=[(um, "REPO_ROOT", root),
+                           (um, "current_deliveries", lambda date: list(rows))])
+        self.assertIsNone(records[-1]["file_in_hand"],
+                          "a row whose bytes changed, or another run's, is not named")
+
+    def test_the_current_attempts_file_line_outranks_an_earlier_brief(self):
+        """The review's finding 2: attempt 1 left baseline P1 current, attempt
+        2 published P2 (superseding P1) and was killed. P2 is the file."""
+        line = "FILE  outputs/2026-07-29/P2.csv  sha256=" + "2" * 64 + "  label=b\n"
+
+        def attempts(n, cmd, kw):
+            if n == 1:
+                return types.SimpleNamespace(returncode=10, stderr="", stdout=json.dumps(
+                    {"status": "bank_partial", "date": "2026-07-29",
+                     "baseline": dict(self._BASELINE, path="outputs/2026-07-29/P1.csv")}))
+            raise subprocess.TimeoutExpired(cmd, kw.get("timeout"), stderr=line)
+        code, records, _payload, _err = self._run(attempts, extra_argv=["--max-attempts", "2"])
+        self.assertEqual(code, 5)
+        self.assertEqual(records[-1]["file_in_hand"]["path"], "outputs/2026-07-29/P2.csv")
+
+    def test_an_earlier_brief_is_used_when_the_current_attempt_printed_nothing(self):
+        def attempts(n, cmd, kw):
+            if n == 1:
+                return types.SimpleNamespace(returncode=10, stderr="", stdout=json.dumps(
+                    {"status": "bank_partial", "date": "2026-07-29",
+                     "baseline": self._BASELINE}))
+            raise subprocess.TimeoutExpired(cmd, kw.get("timeout"))
+        _code, records, _payload, _err = self._run(attempts, extra_argv=["--max-attempts", "2"])
+        held = records[-1]["file_in_hand"]
+        self.assertEqual(held["path"], self._BASELINE["path"])
+        self.assertEqual(held["source"], "earlier_attempt_brief.baseline")
+
+    def test_bytes_a_brief_refused_are_never_named(self):
+        """The review's finding 1: a `verify_failed` file is never the file in
+        hand, from its FILE line or its manifest row."""
+        line = "FILE  outputs/2026-07-29/bad.csv  sha256=" + "9" * 64 + "  label=certified\n"
+        code, records, _payload, _err = self._run(
+            lambda n, cmd, kw: types.SimpleNamespace(
+                returncode=3, stderr=line, stdout=json.dumps(
+                    {"status": "verify_failed", "date": "2026-07-29",
+                     "delivered_path": None, "verify_failed_sha256": "9" * 64})))
+        self.assertEqual(code, 3)
+        self.assertIsNone(records[-1]["file_in_hand"])
+
+    def test_a_superseded_file_is_never_named(self):
+        from mlb_engine.entries import upload_manifest as um
+        code, records, _payload, _err = self._run(
+            lambda n, cmd, kw: self._refusal(baseline=self._BASELINE),
+            extra_argv=["--max-attempts", "1"],
+            patches=[(um, "recorded_delivery_row",
+                      lambda date, sha: {"sha256": sha, "status": "superseded"})])
+        self.assertIsNone(records[-1]["file_in_hand"])
+
+    def test_the_manifest_is_read_only_after_a_kill(self):
+        from mlb_engine.entries import upload_manifest as um
+        root = Path(self.tmp.name) / "repo"
+        (root / "outputs" / "2026-07-29").mkdir(parents=True)
+        live = root / "outputs" / "2026-07-29" / "x.csv"
+        live.write_text("x\n", encoding="utf-8")
+        rows = [{"delivered_file": "outputs/2026-07-29/x.csv",
+                 "sha256": um.sha256_file(live), "certification": "certified",
+                 "recorded_utc": "2999-01-01"}]
+        patches = [(um, "REPO_ROOT", root),
+                   (um, "current_deliveries", lambda date: list(rows))]
+        _code, records, _payload, _err = self._run(
+            lambda n, cmd, kw: self._refusal(bank_exploration={"job_list_exhausted": True}),
+            extra_argv=["--max-attempts", "1"], patches=patches)
+        self.assertIsNone(records[-1]["file_in_hand"],
+                          "a refusal that printed its own verdict is not a kill")
+
+        def hang(n, cmd, kw):
+            raise subprocess.TimeoutExpired(cmd, kw.get("timeout"))
+        _code, records, _payload, _err = self._run(hang, patches=patches)
+        self.assertEqual(records[-1]["file_in_hand"]["path"], "outputs/2026-07-29/x.csv")
+
+    def test_a_file_line_path_with_spaces_is_read_whole(self):
+        held = self.ab.file_in_hand(
+            {}, stderr_text="FILE  C:\\Users\\Ben Lee\\out\\f.csv  sha256=" + "3" * 64
+                            + "  label=x  coverage=1/1\n")
+        self.assertEqual(held["path"], "C:\\Users\\Ben Lee\\out\\f.csv")
+
+    def test_a_delivery_carries_no_file_in_hand_stamp(self):
+        delivered = {"status": "certified", "date": "2026-07-29",
+                     "delivered_path": "outputs/2026-07-29/DKEntries.csv",
+                     "delivered_sha256": "f" * 64}
+        code, records, payload, _err = self._run(
+            lambda n, cmd, kw: types.SimpleNamespace(
+                returncode=0, stderr="", stdout=json.dumps(delivered)))
+        self.assertEqual(code, 0)
+        self.assertNotIn("file_in_hand", records[-1])
+        self.assertNotIn("file_in_hand", payload)
+
+    def test_deliver_by_hhmm_is_parsed_on_the_salary_files_slate_date(self):
+        """R460. autobuild's clamp takes the same reference day as the build."""
+        from mlb_engine.pipeline import deadline_governor as dg
+        seen = []
+        real = dg.parse_deliver_by
+
+        def spy(text, **kw):
+            seen.append(kw.get("slate_date"))
+            return real(text, **kw)
+        delivered = {"status": "certified", "date": "2026-07-29",
+                     "delivered_path": "outputs/2026-07-29/DKEntries.csv",
+                     "delivered_sha256": "f" * 64}
+        self._run(lambda n, cmd, kw: types.SimpleNamespace(
+                      returncode=0, stderr="", stdout=json.dumps(delivered)),
+                  extra_argv=["--deliver-by", "19:05"],
+                  patches=[(dg, "parse_deliver_by", spy)])
+        self.assertEqual(seen, ["2026-07-29"])
+
+
 class AutobuildBankCapTests(unittest.TestCase):
     """R415. autobuild raises a capped bank's cap on a refusal, as search effort.
 
@@ -22924,11 +23201,23 @@ class SupervisorHardeningTests(unittest.TestCase):
         decision log', and it is checkable: every return in this function has
         to sit immediately after a `_write(...)` call in its own block. A new
         exit door added later fails here rather than in a post-mortem that
-        does not exist."""
+        does not exist.
+
+        R419 moved the supervisor's body into `_supervise`; `main` wraps it
+        and its only non-delivering return re-flushes after naming the file,
+        so the property is checked on `_supervise` and on `main`'s tail."""
         import ast
         src = (REPO / "tools" / "autobuild.py").read_text(encoding="utf-8")
-        main = next(n for n in ast.parse(src).body
-                    if isinstance(n, ast.FunctionDef) and n.name == "main")
+        tree = ast.parse(src)
+        wrapper = next(n for n in tree.body
+                       if isinstance(n, ast.FunctionDef) and n.name == "main")
+        tail = wrapper.body[-2:]
+        self.assertTrue(isinstance(tail[-1], ast.Return)
+                        and isinstance(tail[0], ast.Expr)
+                        and getattr(tail[0].value.func, "id", "") == "_write",
+                        "main()'s last return no longer follows a _write")
+        main = next(n for n in tree.body
+                    if isinstance(n, ast.FunctionDef) and n.name == "_supervise")
         nested = {n for f in ast.walk(main)
                   if isinstance(f, (ast.FunctionDef, ast.AsyncFunctionDef,
                                     ast.Lambda)) and f is not main
@@ -26719,6 +27008,24 @@ class DeadlineGovernorTests(unittest.TestCase):
         self.assertEqual(parsed, dt.datetime(2026, 9, 3, 23, 40,
                                              tzinfo=dt.timezone.utc))
 
+    def test_hhmm_sits_on_the_slate_date_not_today(self):
+        """R460. A night-before build: 23:00 ET on 06-02, `--deliver-by 19:05`
+        for the 06-03 slate. Today's date read it as 235 minutes PAST, which
+        the governor treats as in window."""
+        import datetime as dt
+        dg = self._dg()
+        now = dt.datetime(2026, 6, 3, 3, 0, tzinfo=dt.timezone.utc)  # 23:00 ET 06-02
+        parsed, _ = dg.parse_deliver_by("19:05", now=now, slate_date="2026-06-03")
+        self.assertEqual(parsed, dt.datetime(2026, 6, 3, 23, 5, tzinfo=dt.timezone.utc))
+        governor = dg.DeadlineGovernor(parsed, now_fn=lambda: now)
+        self.assertGreater(governor.minutes_remaining(), 1200)
+        self.assertFalse(governor.in_window())
+        # Across the DST boundary the slate day's own offset applies (EST).
+        parsed, _ = dg.parse_deliver_by("19:05", now=now, slate_date="2026-11-02")
+        self.assertEqual(parsed, dt.datetime(2026, 11, 3, 0, 5, tzinfo=dt.timezone.utc))
+        with self.assertRaises(ValueError):
+            dg.parse_deliver_by("19:05", now=now, slate_date="June 3")
+
     def test_an_iso_stamp_with_an_offset_is_taken_as_given(self):
         import datetime as dt
         dg = self._dg()
@@ -27116,8 +27423,12 @@ class DeadlineGovernorWiringTests(unittest.TestCase):
                          "which is the dict the export validator grades against")
 
     def _run(self, minutes_out, second_result=None, refusal=None,
-             args_overrides=None):
-        """Drive run_classic. Returns (code, brief, controls per run_slate call)."""
+             args_overrides=None, capture=None):
+        """Drive run_classic. Returns (code, brief, controls per run_slate call).
+
+        R459. ``capture`` (a dict) receives the module and the stderr buffer
+        before the call, so a test whose re-solve RAISES can read both, and
+        its ``preset_last_usable`` seeds `_LAST_USABLE` first."""
         import contextlib
         import datetime as dt
         import importlib.util
@@ -27173,6 +27484,9 @@ class DeadlineGovernorWiringTests(unittest.TestCase):
         original = epi.run_slate
         epi.run_slate = fake_run_slate
         out, err = io.StringIO(), io.StringIO()
+        if capture is not None:
+            capture.update(mod=mod, err=err)
+            mod._LAST_USABLE.update(capture.get("preset_last_usable") or {})
         try:
             with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
                 code, brief = mod.run_classic(
@@ -28666,6 +28980,15 @@ class DeadlineGovernorCliTests(unittest.TestCase):
         self.assertIsNotNone(seen.get("governor"),
                              "--deliver-by parsed and then reached nothing")
         self.assertTrue(hasattr(seen["governor"], "governs"))
+
+    def test_hhmm_resolves_on_the_salary_files_slate_date(self):
+        """R460. The fixture's games are on 2026-07-29; the parse runs above
+        the salary's own read, so it reads the date there, not today's."""
+        import datetime as dt
+        code, _payload, seen = self._main(["--deliver-by", "19:05"])
+        self.assertEqual(code, 3)
+        self.assertEqual(seen["governor"].deliver_by_utc,
+                         dt.datetime(2026, 7, 29, 23, 5, tzinfo=dt.timezone.utc))
 
     def test_no_deliver_by_means_no_governor_at_all(self):
         """A build without the flag must be byte-identical to before, and the
@@ -33630,6 +33953,98 @@ class ReviewGradeExportTests(unittest.TestCase):
         self.assertEqual(code, 3)
         self.assertEqual(brief["review_grade_export"]["path"], str(delivered))
 
+    class _RaisingResult:
+        """A `second_result` whose copy raises: the governor's rung re-solve
+        crashes inside `_solve`, after solve 1 left its UNCERTIFIED file."""
+        def __bool__(self):
+            return True
+
+        def keys(self):
+            raise RuntimeError("injected: the rung re-solve crashed")
+
+    def _stranded_export(self, wiring):
+        delivered = wiring._delivered_csv()
+        return delivered, {
+            "label": "review_grade_uncertified", "path": "runs/r1/candidate/x.csv",
+            "sha256": sha256_file(delivered), "delivered_path": str(delivered),
+            "delivered_sha256": sha256_file(delivered), "manifest_recorded": True,
+            "failing_gates": ["portfolio_caps_passed"], "run_id": "r1",
+            "coverage": {"reserved": 2, "filled": 2}}
+
+    def test_a_crashing_rung_re_solve_exits_7_naming_the_uncertified_file(self):
+        """R459. Solve 1 refuses on S/P gates only and leaves a legal file; the
+        governor re-solves and the re-solve raises. The file was mirrored and
+        recorded but nothing named it and the process exited 1. It is now held
+        the moment it re-reads clean, so the crash exits 7 naming it."""
+        wiring = DeadlineGovernorWiringTests("test_an_illegal_refusal_is_never_governed")
+        wiring.setUp()
+        self.addCleanup(wiring.doCleanups)
+        delivered, export = self._stranded_export(wiring)
+        first = dict(DeadlineGovernorWiringTests._REFUSAL, review_grade_export=export)
+        cap = {}
+        with self.assertRaises(RuntimeError):
+            wiring._run(2, refusal=first, second_result=self._RaisingResult(),
+                        capture=cap)
+        mod, err = cap["mod"], cap["err"].getvalue()
+        self.assertEqual(len(wiring.labels), 2, "the governor did not re-solve")
+        self.assertIn(f"FILE  {delivered}", err)
+        self.assertEqual(mod._LAST_USABLE["path"], str(delivered))
+        self.assertEqual(mod._LAST_USABLE["sha256"], sha256_file(delivered))
+        self.assertEqual(mod._LAST_USABLE["label"], "review_grade_uncertified")
+        self.assertEqual(mod._LAST_USABLE["lineage"], "review_grade")
+        out, err2 = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err2):
+            code = mod._deliver_after_exception(RuntimeError("the rung re-solve crashed"))
+        self.assertEqual(code, 7)
+        brief = json.loads(out.getvalue())
+        self.assertEqual(brief["delivered_path"], str(delivered))
+        self.assertEqual(brief["delivered_sha256"], sha256_file(delivered))
+        self.assertEqual(brief["label"], "review_grade_uncertified")
+
+    def test_an_uncertified_file_never_displaces_a_held_baseline(self):
+        """R459's guard. `baseline_brief_block` and `present_baseline_as_current`
+        read `_LAST_USABLE.lineage == "baseline"`; an uncertified file must
+        never overwrite a delivered baseline (R388(d))."""
+        wiring = DeadlineGovernorWiringTests("test_an_illegal_refusal_is_never_governed")
+        wiring.setUp()
+        self.addCleanup(wiring.doCleanups)
+        _delivered, export = self._stranded_export(wiring)
+        first = dict(DeadlineGovernorWiringTests._REFUSAL, review_grade_export=export)
+        baseline = {"path": "outputs/2026-07-29/DKEntries_x_BASELINE_b.csv",
+                    "sha256": "b" * 64, "label": "review_grade_baseline",
+                    "lineage": "baseline"}
+        cap = {"preset_last_usable": baseline}
+        with self.assertRaises(RuntimeError):
+            wiring._run(2, refusal=first, second_result=self._RaisingResult(),
+                        capture=cap)
+        self.assertEqual(cap["mod"]._LAST_USABLE, baseline)
+
+    def test_a_held_uncertified_file_is_dropped_once_superseded(self):
+        """The review's finding 3: a later mirror (a rung's certified row)
+        superseded the held file's row, so it is no longer the file in hand;
+        a baseline is never dropped by this."""
+        from mlb_engine.entries import upload_manifest as um
+        bs = RefusalClassificationTests._module()
+        held = {"path": "outputs/2026-07-29/a.csv", "sha256": "a" * 64,
+                "date": "2026-07-29", "lineage": "review_grade"}
+        rows = {"status": "superseded"}
+        with unittest.mock.patch.object(um, "recorded_delivery_row",
+                                        lambda date, sha: dict(rows)), \
+                contextlib.redirect_stderr(io.StringIO()):
+            bs._LAST_USABLE.clear()
+            bs._LAST_USABLE.update(held)
+            bs.drop_superseded_review_grade()
+            self.assertEqual(bs._LAST_USABLE, {})
+            bs._LAST_USABLE.update(dict(held, lineage="baseline"))
+            bs.drop_superseded_review_grade()
+            self.assertEqual(bs._LAST_USABLE["lineage"], "baseline")
+            rows["status"] = "candidate"
+            bs._LAST_USABLE.clear()
+            bs._LAST_USABLE.update(held)
+            bs.drop_superseded_review_grade()
+            self.assertEqual(bs._LAST_USABLE, held)
+        bs._LAST_USABLE.clear()
+
     def test_a_file_that_fails_the_re_read_is_not_presented(self):
         bs = RefusalClassificationTests._module()
         bad = self.root / "bad.csv"
@@ -35496,6 +35911,36 @@ class ClassicBaselineFirstTests(unittest.TestCase):
         its own row in THIS call, then fails `verify_classic` (exit 3,
         `verify_failed`): the baseline stays current and is re-presented, and
         this call's own failed file is never named as an earlier delivery."""
+        build, _enhanced = self._verify_failed_build()
+        self.assertEqual(build["code"], 3, build["err"][-800:])
+        block = build["brief"]["baseline"]
+        self.assertTrue(block["current"])
+        self.assertNotIn("live_delivery", block)
+        err = build["err"]
+        files = self._file_lines(err)
+        self.assertIn("_BASELINE_", files[-1])
+        self.assertGreater(err.rindex(files[-1]), err.index("SOLVE 1"))
+        self.assertIn("failed its independent re-read", err)
+        self.assertNotIn("an earlier build's", err)
+
+    def test_a_verify_failed_brief_names_the_baseline_not_the_failed_file(self):
+        """R461. The brief agrees with the last FILE line and the refusal
+        record: `delivered_*` are null, the failed file sits under
+        `verify_failed_*`, and `last_usable_artifact` is the baseline."""
+        build, enhanced = self._verify_failed_build()
+        brief = build["brief"]
+        self.assertEqual(brief["status"], "verify_failed")
+        self.assertIsNone(brief["delivered_path"])
+        self.assertIsNone(brief["delivered_path_repo"])
+        self.assertIsNone(brief["delivered_sha256"])
+        self.assertTrue(str(brief["verify_failed_path"]).endswith(enhanced.name))
+        self.assertTrue(brief["verify_failed_sha256"])
+        last = brief["last_usable_artifact"]
+        self.assertEqual(last["lineage"], "baseline")
+        self.assertIn("_BASELINE_", str(last["path"]))
+        self.assertIn(Path(str(last["path"])).name, self._file_lines(build["err"])[-1])
+
+    def _verify_failed_build(self):
         from mlb_engine.entries import upload_manifest as um
         root = Path(tempfile.mkdtemp(dir=self.base))
         real_run_slate = epi.run_slate
@@ -35523,16 +35968,7 @@ class ClassicBaselineFirstTests(unittest.TestCase):
             return {"passed": False, "failures": ["injected: the enhanced re-read failed"]}
         build = self._build_in(root, patches=[(epi, "run_slate", run_slate_spy),
                                               ("mod", "verify_classic", verify)])
-        self.assertEqual(build["code"], 3, build["err"][-800:])
-        block = build["brief"]["baseline"]
-        self.assertTrue(block["current"])
-        self.assertNotIn("live_delivery", block)
-        err = build["err"]
-        files = self._file_lines(err)
-        self.assertIn("_BASELINE_", files[-1])
-        self.assertGreater(err.rindex(files[-1]), err.index("SOLVE 1"))
-        self.assertIn("failed its independent re-read", err)
-        self.assertNotIn("an earlier build's", err)
+        return build, enhanced
 
     def test_a_baseline_run_is_never_re_promoted_under_the_enhanced_name(self):
         import shutil

@@ -378,6 +378,10 @@ class Decisions:
         # decision existed in memory only. Every `add` now flushes through this
         # writer, so the log on disk is never behind the decisions taken.
         self._writer: Optional[Any] = None
+        # R419. The file in hand at a stop that did not deliver; written to the
+        # decision log's top level beside the stop record's own copy.
+        self.file_in_hand: Optional[Dict[str, Any]] = None
+        self.file_in_hand_checked = False
 
     def attach_writer(self, writer) -> None:
         self._writer = writer
@@ -459,7 +463,184 @@ def parse_brief(stdout: str) -> Dict[str, Any]:
     return found[-1] if found else {}
 
 
+#: R419. build_slate's `_present_file` line: the LAST one a child printed is
+#: its current file (R389(b) re-presents the baseline last on a refusal).
+FILE_LINE_RE = re.compile(
+    r"^FILE\s+(?P<path>.+?)\s+sha256=(?P<sha>\S+)(?:\s+label=(?P<label>\S+))?",
+    re.M)
+
+
+def _text(value: Any) -> str:
+    """`TimeoutExpired.stdout`/`.stderr` are bytes on some Pythons, even with
+    `text=True`, and None when the child printed nothing."""
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return str(value)
+
+
+def _usable(path: Any, sha: Any) -> bool:
+    return bool(path) and bool(sha) and str(path) != "None" and str(sha) != "None"
+
+
+def _brief_file(brief: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Sources 1-3 of `file_in_hand`, off one brief."""
+    if _usable(brief.get("delivered_path"), brief.get("delivered_sha256")):
+        return {"path": str(brief["delivered_path"]),
+                "sha256": str(brief["delivered_sha256"]),
+                "label": brief.get("label") or brief.get("status"),
+                "source": "brief.delivered_path"}
+    last = brief.get("last_usable_artifact") or {}
+    if isinstance(last, dict) and _usable(last.get("path"), last.get("sha256")):
+        return {"path": str(last["path"]), "sha256": str(last["sha256"]),
+                "label": last.get("label"), "source": "brief.last_usable_artifact"}
+    base = brief.get("baseline") or {}
+    if (isinstance(base, dict) and base.get("current")
+            and _usable(base.get("path"), base.get("sha256"))):
+        return {"path": str(base["path"]), "sha256": str(base["sha256"]),
+                "label": base.get("label"), "source": "brief.baseline"}
+    review = brief.get("review_grade_export") or {}
+    if (isinstance(review, dict) and review.get("presented")
+            and _usable(review.get("path"), review.get("sha256"))):
+        return {"path": str(review["path"]), "sha256": str(review["sha256"]),
+                "label": review.get("label"), "source": "brief.review_grade_export"}
+    return None
+
+
+def _still_live(record: Dict[str, Any], date: Optional[str],
+                refused_shas: set) -> bool:
+    """False for bytes this run refused (`verify_failed_sha256`) or whose newest
+    manifest row is superseded: preflight would block either (the 2026-09-26
+    review of R419). Bytes with no row at all are kept: a `runs/` export has
+    none, and the child that printed it is the authority."""
+    if record["sha256"] in refused_shas:
+        return False
+    if not date:
+        return True
+    try:
+        from mlb_engine.entries import upload_manifest as um
+        row = um.recorded_delivery_row(str(date), record["sha256"])
+    except Exception:  # noqa: BLE001 - an unreadable manifest names the file anyway
+        return True
+    return not (row and row.get("status") == "superseded")
+
+
+def file_in_hand(brief: Optional[Dict[str, Any]], *, stderr_text: str = "",
+                 date: Optional[str] = None,
+                 since_utc: Optional[str] = None,
+                 earlier_brief: Optional[Dict[str, Any]] = None,
+                 killed: bool = False) -> Optional[Dict[str, Any]]:
+    """R419. The file this run has in hand at a stop, or None.
+
+    Since R389(b) a Classic build delivers a baseline before research, and a
+    refusal after it keeps exit 3 with the file under `baseline`; R388(d)'s
+    UNCERTIFIED file rides under `review_grade_export`. A stop that names
+    neither leaves a live file on disk that nobody was told about. In the order
+    of how much each source knows about NOW:
+
+      1. this attempt's brief: `delivered_path` (exit 0 and 7), then
+         `last_usable_artifact`, a `current` baseline, a presented
+         `review_grade_export`
+      2. this attempt's last `FILE` line on stderr (a killed child's brief
+         never printed, but its FILE line did)
+      3. an earlier attempt's brief, the same keys (its file may since have
+         been superseded by this attempt's, which item 2 would have named)
+      4. after a kill only: `upload_manifest.current_deliveries(date)` rows
+         recorded since this run started, gates-passing first, newest first,
+         whose bytes still hash the same
+
+    Every candidate is dropped when its bytes are ones a brief refused
+    (`verify_failed_sha256`) or its newest manifest row is superseded.
+    Returns `{path, sha256, label, source}`. Never raises: a stop is already
+    decided, and naming its file must not cost the decision log.
+    """
+    brief = brief or {}
+    refused = {str(b.get("verify_failed_sha256")) for b in (brief, earlier_brief or {})
+               if b.get("verify_failed_sha256")}
+    try:
+        candidates = [_brief_file(brief)]
+        lines = list(FILE_LINE_RE.finditer(_text(stderr_text)))
+        if lines and _usable(lines[-1].group("path"), lines[-1].group("sha")):
+            m = lines[-1]
+            candidates.append({"path": m.group("path").strip(), "sha256": m.group("sha"),
+                               "label": m.group("label"),
+                               "source": "child_stderr_file_line"})
+        if earlier_brief:
+            earlier = _brief_file(earlier_brief)
+            if earlier:
+                earlier["source"] = "earlier_attempt_" + earlier["source"]
+            candidates.append(earlier)
+        for record in candidates:
+            if record and _still_live(record, date, refused):
+                return record
+    except Exception:  # noqa: BLE001 - see the docstring
+        pass
+    if not (killed and date and since_utc):
+        return None
+    try:
+        from mlb_engine.entries import upload_manifest as um
+        rows = [r for r in um.current_deliveries(str(date))
+                if str(r.get("recorded_utc") or "") >= since_utc
+                and str(r.get("sha256") or "") not in refused]
+        # Gates-passing first (R388(d): an UNCERTIFIED file never outranks
+        # one), newest within each; `current_deliveries` is in record order.
+        rows = ([r for r in rows if um.passed_its_gates(r.get("certification"))][::-1]
+                + [r for r in rows if not um.passed_its_gates(r.get("certification"))][::-1])
+        for row in rows:
+            target = um.REPO_ROOT / str(row.get("delivered_file") or "")
+            if (row.get("delivered_file") and target.exists()
+                    and um.sha256_file(target) == row.get("sha256")):
+                return {"path": str(row["delivered_file"]), "sha256": row["sha256"],
+                        "label": row.get("certification"),
+                        "source": "upload_manifest.current_deliveries"}
+    except Exception:  # noqa: BLE001 - see the docstring
+        pass
+    return None
+
+
+def present_file_in_hand(dec: "Decisions", record: Optional[Dict[str, Any]]) -> None:
+    """R419. Attach the stop's file to its own record and print it once, in
+    build_slate's FILE-line shape, so a session reading stderr at the clock
+    finds the file where it finds every other one. The stop stays the last
+    record (a resume and every reader key on it)."""
+    if dec.log:
+        dec.log[-1]["file_in_hand"] = record
+    dec.file_in_hand = record
+    dec.file_in_hand_checked = True
+    if record:
+        print(f"FILE  {record['path']}  sha256={record['sha256']}  "
+              f"label={record.get('label')}  source={record['source']}",
+              file=sys.stderr)
+        print("  the file in hand at this stop: review-grade unless its label "
+              "says certified; preflight it before upload", file=sys.stderr)
+    else:
+        print("autobuild: no file in hand at this stop", file=sys.stderr)
+
+
 def main() -> int:
+    """R419. The supervisor, then the file in hand on every stop that did not
+    deliver (exit 0 and 7 name theirs in their own records)."""
+    ctx: Dict[str, Any] = {}
+    code = _supervise(ctx)
+    dec = ctx.get("dec")
+    if dec is None or code in (0, 7):
+        return code
+    state = ctx.get("state") or {}
+    a = ctx["args"]
+    brief = state.get("brief") or {}
+    current = state.get("current_brief") or {}
+    record = file_in_hand(current, stderr_text=state.get("stderr") or "",
+                          date=_decision_log_date(brief, a.salary),
+                          since_utc=ctx.get("started_utc"),
+                          earlier_brief=brief if brief is not current else None,
+                          killed=bool(state.get("killed")))
+    present_file_in_hand(dec, record)
+    _write(dec, brief, salary=a.salary)
+    return code
+
+
+def _supervise(ctx: Dict[str, Any]) -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--salary", required=True)
@@ -596,6 +777,9 @@ def main() -> int:
     # R169(a)'s siblings got missed in the first place).
     state: Dict[str, Any] = {"brief": {}}
     dec.attach_writer(lambda: _write(dec, state["brief"], salary=a.salary))
+    # R419. What `main` needs to name the file in hand after any return.
+    ctx.update(dec=dec, state=state, args=a,
+               started_utc=datetime.now(timezone.utc).isoformat())
 
     a._resumed_attempts = 0
     a._resumed_ignore_pool = False
@@ -712,7 +896,10 @@ def main() -> int:
     if getattr(a, "deliver_by", None):
         from mlb_engine.pipeline import deadline_governor as _dg
         try:
-            deliver_by_utc, tz_source = _dg.parse_deliver_by(a.deliver_by)
+            # R460. HH:MM on the slate's day: the salary file's game date,
+            # the same reader the decision log is dated by.
+            deliver_by_utc, tz_source = _dg.parse_deliver_by(
+                a.deliver_by, slate_date=_decision_log_date({}, a.salary))
         except ValueError as exc:
             dec.add(0, "stop", f"--deliver-by is unparseable: {exc}",
                     remedy="pass an ISO timestamp or HH:MM ET")
@@ -848,10 +1035,20 @@ def main() -> int:
             proc = subprocess.run(cmd, capture_output=True, text=True,
                                   cwd=str(REPO), timeout=a.per_build_seconds + 90)
         except subprocess.TimeoutExpired as exc:
+            # R419. A killed child printed what it printed: its FILE line (the
+            # baseline, first thing every Classic build delivers) and any brief.
+            killed_brief = parse_brief(_text(exc.stdout)) or parse_brief(_text(exc.stderr))
+            last_brief = killed_brief or last_brief
+            state["brief"] = last_brief
+            state["current_brief"] = killed_brief
+            state["stderr"] = _text(exc.stderr)
+            state["killed"] = True
             dec.add(attempt, "build_timed_out",
                     f"build_slate exceeded {a.per_build_seconds + 90}s of wall "
-                    f"clock and was killed; no brief was produced, so there is "
-                    f"nothing to classify and nothing to retry against",
+                    f"clock and was killed; no final verdict was produced, so "
+                    f"there is nothing to classify and nothing to retry against. "
+                    f"What it printed before the kill names any file it had "
+                    f"already delivered (R419)",
                     timeout_s=a.per_build_seconds + 90,
                     per_build_seconds=a.per_build_seconds,
                     **dec.controls_block())
@@ -860,6 +1057,8 @@ def main() -> int:
         brief = parse_brief(proc.stdout) or parse_brief(proc.stderr)
         last_brief = brief or last_brief
         state["brief"] = last_brief
+        state["current_brief"] = brief
+        state["stderr"] = proc.stderr or ""
         code = proc.returncode
 
         # R296(d). Anything outside build_slate's documented vocabulary fell
@@ -1249,6 +1448,9 @@ def _write(dec: Decisions, brief: Dict[str, Any],
                         # does not fall back to a cap a refusal already outgrew.
                         **({"bank_max_candidates": dec.bank_max_candidates}
                            if dec.bank_max_candidates is not None else {}),
+                        # R419. Only once a stop named one (or found none).
+                        **({"file_in_hand": dec.file_in_hand}
+                           if dec.file_in_hand_checked else {}),
                         "labels": "deterministic review proxies and labeled priors "
                                   "only; never ROI, win rate, cash rate, or "
                                   "probability"}, indent=1),
