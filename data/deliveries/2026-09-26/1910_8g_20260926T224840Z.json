@@ -1,0 +1,39 @@
+{
+ "code": {
+  "contest_allocator": "v1.12",
+  "execution_pipeline": "v1.17",
+  "git_dirty": false,
+  "git_sha": "7533b782825365f833165fda0b8e6665eb1cb196"
+ },
+ "date": "2026-09-26",
+ "exit_code": 3,
+ "host": {
+  "call_budget_s": 630.0,
+  "declared_ceiling_s": 900.0,
+  "host": "claude_code"
+ },
+ "kind": "refusal",
+ "labels": "a refusal is an observed build outcome, never a claim about the slate",
+ "recorded_utc": "2026-09-26T22:48:40.079290+00:00",
+ "refusal": {
+  "argv": [
+   "--salary",
+   "data/slates/2026-09-26/372fc605-DKSalaries_115.csv",
+   "--entries",
+   "data/slates/2026-09-26/02eb3041-DKEntries_93.csv",
+   "--max-seconds",
+   "105",
+   "--deliver-by",
+   "19:10"
+  ],
+  "errors": [],
+  "failing_checks": [],
+  "note": "built and refused: the build ran but did not certify, or the pool blocked it",
+  "refusal": "pool_blocked_hard",
+  "refusal_class": "read_it",
+  "run_id": null,
+  "status": ""
+ },
+ "schema_version": 1,
+ "slate_tag": "1910_8g"
+}
