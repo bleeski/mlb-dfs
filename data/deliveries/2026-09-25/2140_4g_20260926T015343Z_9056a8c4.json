@@ -1,0 +1,219 @@
+{
+ "code": {
+  "contest_allocator": "v1.12",
+  "execution_pipeline": "v1.17",
+  "git_dirty": true,
+  "git_sha": "24c7bb0eb1f0814dd58108379a8705de1a10a121"
+ },
+ "controls": {
+  "five_stack_min_size": 5,
+  "max_consensus_cluster_share_pct": 0.5,
+  "max_pitcher_exposure_pct": 0.6,
+  "max_player_exposure_pct": 0.6,
+  "max_primary_stack_exposure_pct": 0.4,
+  "max_shared_players": 8,
+  "max_sp_pair_repetition": 2,
+  "max_team_exposure_pct": 0.6,
+  "min_five_stack_share_pct": 0.0,
+  "player_game_by_id": {
+   "distinct_values": 4,
+   "players_mapped": 80,
+   "wired": true
+  },
+  "player_team_by_id": {
+   "distinct_values": 8,
+   "players_mapped": 80,
+   "wired": true
+  },
+  "primary_stack_min_size": 4
+ },
+ "date": "2026-09-25",
+ "egress": "egress: statsapi unreachable, odds unreachable, savant unreachable, mlb-lineups unreachable, fangraphs unreachable (curl), open-meteo unreachable",
+ "egress_source": "session_start 2026-09-26T01:40:32+00:00",
+ "entries": [
+  {
+   "contest_id": "196025455",
+   "contest_name": "MLB Satellite to $2 MLB Pocket Cup MEGA Qualifier (Night)",
+   "entry_fee": 0.01,
+   "entry_id": "5269687645",
+   "filled": true,
+   "roster_ids": [
+    "44280323",
+    "44280146",
+    "44280276",
+    "44280214",
+    "44280347",
+    "44280228",
+    "44280285",
+    "44280231",
+    "44280343",
+    "44279947"
+   ]
+  },
+  {
+   "contest_id": "196025456",
+   "contest_name": "MLB Satellite to $2 MLB Pocket Cup MEGA Qualifier (Night)",
+   "entry_fee": 0.01,
+   "entry_id": "5269680586",
+   "filled": true,
+   "roster_ids": [
+    "44280145",
+    "44280191",
+    "44280041",
+    "44279941",
+    "44280286",
+    "44280046",
+    "44280037",
+    "44280073",
+    "44280156",
+    "44280161"
+   ]
+  },
+  {
+   "contest_id": "196064033",
+   "contest_name": "MLB $250 Solo Shot (Night)",
+   "entry_fee": 1.0,
+   "entry_id": "5269680898",
+   "filled": true,
+   "roster_ids": [
+    "44280191",
+    "44280323",
+    "44280034",
+    "44280052",
+    "44280331",
+    "44280228",
+    "44280249",
+    "44280162",
+    "44280073",
+    "44280156"
+   ]
+  },
+  {
+   "contest_id": "196064682",
+   "contest_name": "MLB $30 Quarter Jukebox [Just $0.25!] (Night)",
+   "entry_fee": 0.25,
+   "entry_id": "5269680807",
+   "filled": true,
+   "roster_ids": [
+    "44280145",
+    "44280191",
+    "44280041",
+    "44279994",
+    "44280286",
+    "44279949",
+    "44280037",
+    "44280156",
+    "44280162",
+    "44280161"
+   ]
+  },
+  {
+   "contest_id": "196064682",
+   "contest_name": "MLB $30 Quarter Jukebox [Just $0.25!] (Night)",
+   "entry_fee": 0.25,
+   "entry_id": "5269687712",
+   "filled": true,
+   "roster_ids": [
+    "44280146",
+    "44280145",
+    "44280041",
+    "44279941",
+    "44280347",
+    "44279949",
+    "44280285",
+    "44280051",
+    "44280081",
+    "44280223"
+   ]
+  }
+ ],
+ "entries_binding": {
+  "source": "outputs/2026-09-25/DO_NOT_UPLOAD_DKEntries_2140_4g.csv",
+  "source_sha256": "60e13684c30997731ecd10700fdba14365f3e3de91ef5c47d4459e7bc5cc8266",
+  "status": "bound"
+ },
+ "host": {
+  "call_budget_s": 630.0,
+  "declared_ceiling_s": 900.0,
+  "host": "claude_code"
+ },
+ "kind": "delivery",
+ "labels": "deterministic review proxies and labeled priors only; never ROI, win rate, cash rate, or probability",
+ "manifest_row": {
+  "certification": "certified",
+  "contest_ids": [
+   "196025455",
+   "196025456",
+   "196064033",
+   "196064682"
+  ],
+  "contest_names": [
+   "MLB $250 Solo Shot (Night)",
+   "MLB $30 Quarter Jukebox [Just $0.25!] (Night)",
+   "MLB Satellite to $2 MLB Pocket Cup MEGA Qualifier (Night)"
+  ],
+  "contest_type": "classic",
+  "delivered_file": "outputs/2026-09-25/DKEntries_2140_4g.csv",
+  "entries": 5,
+  "notes": "",
+  "projection_tier": "enriched",
+  "recorded_utc": "2026-09-26T01:53:43.481303+00:00",
+  "run_id": "20260926T015343Z_9056a8c4",
+  "sha256": "60e13684c30997731ecd10700fdba14365f3e3de91ef5c47d4459e7bc5cc8266",
+  "slate_tag": "2140_4g",
+  "status": "candidate",
+  "strategy_state": {
+   "bank_warnings": [],
+   "counts": {
+    "built": 12,
+    "du_relaxation_high_water": 0,
+    "requested": 12
+   },
+   "evidence": "recorded",
+   "state": "relaxed",
+   "warnings": []
+  }
+ },
+ "recorded_utc": "2026-09-26T01:53:43.482424+00:00",
+ "relaxations": {},
+ "run": {
+  "certification": {
+   "allocation_certified": true,
+   "failed_post_export_gates": [],
+   "post_export_gates": {
+    "entry_reconciliation_passed": true,
+    "export_hash_binding_passed": true,
+    "locked_immutability_passed": true,
+    "portfolio_caps_passed": true,
+    "roster_legality_passed": true,
+    "template_preservation_passed": true
+   },
+   "pre_export_passed": true,
+   "selection_certified": true,
+   "workflow_valid": true
+  },
+  "environment": {
+   "lock_file": "requirements.lock",
+   "lock_sha256": "dd7723e54043e8c2644100beba5069959d835258f96e1cf6dc100ea1617ac0d6",
+   "packages": {
+    "numpy": "2.2.6",
+    "pandas": "2.3.3",
+    "scipy": "1.15.3"
+   },
+   "python": "3.11.15"
+  },
+  "inputs": {
+   "DKEntries_replay.csv": {
+    "sha256": "e041a492bfd1bdd2d63d3a013e1ea9139d94fffe71f005f66ffb33677033519b",
+    "size_bytes": 43770,
+    "source_path": "/home/user/mlb-dfs/data/slates/2026-09-25/DKEntries_replay.csv"
+   },
+   "DKSalaries_replay.csv": {
+    "sha256": "0704499a4a7d48835e7a2a7f8fb573f252da764323b8f90ee4c1fd9332d26a16",
+    "size_bytes": 38899,
+    "source_path": "/home/user/mlb-dfs/data/slates/2026-09-25/DKSalaries_replay.csv"
+   }
+  }
+ },
+ "schema_version": 1
+}
