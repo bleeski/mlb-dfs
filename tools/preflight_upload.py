@@ -2632,6 +2632,28 @@ def check_contest_captain_diversity(adv: Mapping[str, Any], rep: Report,
             rep.fail(msg) if strict else rep.warn(msg)
 
 
+def check_no_within_contest_duplicates(adv: Mapping[str, Any], rep: Report) -> None:
+    """R444. F-3 -- never one lineup twice in one contest -- is CLAUDE.md's one
+    DEFAULT never-relax control (Ben, 2026-09-22), unlike R266's captain
+    diversity above: a within-contest duplicate pays two entries into one
+    prize pool for one outcome, and there is no legitimate double-up to
+    protect. This used to be printed by ``partition_duplicate_lineups`` as
+    information only (``duplicates_within_contest``), so a Classic file
+    holding one lineup in two entries of one contest exited 0 here, and the
+    repair and hand-corrected paths ship on this referee's exit alone
+    (CLAUDE.md's repair clause). ``duplicates_across_contests`` is unaffected
+    and unmentioned: separate contests have separate prize pools, so reuse
+    there is free and often deliberate.
+    """
+    n = int(adv.get("duplicates_within_contest") or 0)
+    if n:
+        rep.fail(f"{n} lineup(s) duplicated within a contest: the same roster "
+                 f"filled two entries of one contest, paying twice into one "
+                 f"prize pool for one outcome. F-3 never relaxes (CLAUDE.md); "
+                 f"the same lineup entered in a DIFFERENT contest is unaffected "
+                 f"(duplicates_across_contests)")
+
+
 def advisory(contest: str, entries: Sequence[EntryRow],
              salary: Dict[str, Dict[str, str]],
              max_cpt_per_contest: int = DEFAULT_MAX_CPT_PER_CONTEST,
@@ -2687,8 +2709,20 @@ def advisory(contest: str, entries: Sequence[EntryRow],
     # hand-assembled file can leave the ID blank while the name still separates
     # the contests; when both are blank every entry lands in one bucket, which
     # degrades to exactly the old flat reading rather than to a wrong one.
+    #
+    # R444/R225. The IDENTITY a duplicate is keyed on, not the exposure set
+    # above: on Showdown a CPT is a roster spot with its own salary and a
+    # 1.5x score, so the same six people under two different captains are two
+    # different lineups, not copies. Folding the captain in here (and only
+    # here) makes `duplicates_within_contest` -- about to become a hard
+    # failure -- unable to manufacture a false positive out of a legal
+    # Showdown double-up; `top_exposure`/`overlap_histogram` above stay
+    # person-keyed, because exposure counts the PERSON whichever role they
+    # fill.
+    dup_keys = ([(persons.get(e.cells[0], e.cells[0]), s) for e, s in zip(filled, sets)]
+               if contest == "showdown" else list(sets))
     out.update(partition_duplicate_lineups(
-        (e.contest_id or e.contest_name or "", sig) for e, sig in zip(filled, sets)))
+        (e.contest_id or e.contest_name or "", sig) for e, sig in zip(filled, dup_keys)))
     if n > 1:
         overlaps = collections.Counter()
         for i in range(n):
@@ -2876,6 +2910,7 @@ def run(args: argparse.Namespace) -> Tuple[Report, Dict[str, Any]]:
                                                DEFAULT_MAX_CPT_PER_CONTEST))
     check_contest_captain_diversity(
         adv, rep, strict=bool(getattr(args, "strict_contest_diversity", False)))
+    check_no_within_contest_duplicates(adv, rep)
 
     report = {
         "tool": "preflight_upload", "version": VERSION,

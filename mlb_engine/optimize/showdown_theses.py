@@ -1772,6 +1772,7 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
                  diagnostics: Optional[Dict[str, Any]] = None,
                  contest_of_entry: Optional[Sequence[str]] = None,
                  max_cpt_per_contest: int = DEFAULT_MAX_CPT_PER_CONTEST,
+                 seed_forbidden: Optional[Sequence[Sequence[str]]] = None,
                  ) -> List[Optional[Dict[str, Any]]]:
     """Solve each thesis under its own constraints, enforcing the overlap bound
     and the player-exposure cap against every lineup already built.
@@ -1811,8 +1812,19 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
        awareness, so a substitution lands on top of an already-full captain. Payton
        Tolle reached 5 of 19 (26.3%) against a cap count of 4. The cap is now
        enforced here too, against the running realized count, on every rung.
+
+    R426. ``seed_forbidden`` are player sets the ladder may not solve, seeded
+    ahead of its own lineups under the same overlap rule: the template's
+    complete rows (``showdown.complete_row_player_keys``), the mirror of
+    ``build_showdown_bank``'s own ``seed_forbidden`` (R389(c)). Before this the
+    ladder forbade only lineups it had already built, so slot 0 -- which starts
+    with nothing prior -- could re-solve a held complete row's own thesis and
+    captain and reproduce it exactly: F-3, the one never-relax control, with no
+    wall anywhere on this path. The 2026-09-25 review found that the DEFAULT
+    outcome, not a corner: a deterministic solve on an unconstrained first slot
+    returns the same answer every time.
     """
-    prior: List[List[str]] = []
+    prior: List[List[str]] = [list(s) for s in (seed_forbidden or [])]
     out: List[Optional[Dict[str, Any]]] = []
     overlap_relaxed = cpt_relaxed = infeasible = both_relaxed = 0
     player_relaxed = contest_cap_relaxed = 0
@@ -2747,8 +2759,17 @@ def captain_sleeve_report(df: pd.DataFrame,
 def portfolio_report(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
                      lineups: Sequence[Optional[Mapping[str, Any]]],
                      captain_sleeve: Optional[Mapping[str, Any]] = None,
+                     held_rosters: Optional[Sequence[Sequence[str]]] = None,
                      ) -> Dict[str, Any]:
-    """Exposure, overlap, and per-lineup certification for a solved ladder."""
+    """Exposure, overlap, and per-lineup certification for a solved ladder.
+
+    R426. ``held_rosters`` are the template's own complete rows (already
+    entered, immutable) -- not solved by this ladder and so absent from
+    ``lineups``, but a repeat of one is exactly the F-3 breach the seeded
+    forbidden set exists to prevent. ``all_unique_rosters`` reads the union: a
+    solved lineup equal to another solved lineup OR to a held row is not
+    unique, even though it never appears in ``rows`` beside it.
+    """
     names = dict(zip(df["Player_Key"], df["Name"]))
     teams = dict(zip(df["Player_Key"], df["Team"]))
     rows, exposure, captains = [], {}, {}
@@ -2779,10 +2800,13 @@ def portfolio_report(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
     n = len(sets)
     max_overlap = max((len(a & b) for i, a in enumerate(sets)
                        for b in sets[i + 1:]), default=0)
+    solved_frozen = [frozenset(s) for s in sets]
+    held_frozen = {frozenset(s) for s in (held_rosters or [])}
     return {
         "lineups": rows,
         "solved": n,
-        "all_unique_rosters": len({frozenset(s) for s in sets}) == n,
+        "all_unique_rosters": (len(set(solved_frozen)) == n
+                               and not (set(solved_frozen) & held_frozen)),
         "max_pairwise_overlap": max_overlap,
         "captain_exposure": dict(sorted(captains.items(), key=lambda kv: -kv[1])),
         "max_captain_exposure_pct": round(max(captains.values()) / n * 100, 1) if n else 0.0,

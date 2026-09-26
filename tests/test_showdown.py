@@ -878,6 +878,118 @@ class ShowdownThesisLadderTests(unittest.TestCase):
                              f"(or another) could not solve at all")
 
 
+class ShowdownLadderCompleteRowTests(unittest.TestCase):
+    """R426. ``solve_ladder`` forbade only lineups IT had already built, so a
+    ladder lineup could equal a template's own held COMPLETE row -- F-3, the
+    one never-relax control -- and the 2026-09-25 review reproduced it as
+    slot 0's DEFAULT outcome: a deterministic solve on an unconstrained first
+    slot answers the same question the same way every time, and nothing
+    forbade the answer a complete row had already entered. Port of
+    ``build_showdown_bank``'s own ``seed_forbidden`` (R389(c)).
+    """
+
+    def setUp(self):
+        self.df = st.apply_base_prior(sd.melt_showdown_salary_csv(SAL),
+                                      pitcher_hand={"MIN": "R", "CHC": "R"})
+
+    def test_seeding_the_ladder_with_a_held_row_forbids_it(self):
+        """Mutation guard, the same shape as ``build_showdown_bank``'s own
+        ``test_seeded_sets_are_never_solved``: solve slot 0 unseeded, feed its
+        exact roster back in as ``seed_forbidden``, and the re-solve must
+        answer differently."""
+        ladder = st.build_thesis_ladder(self.df, 18, moneyline={"MIN": -150, "CHC": 130})
+        thesis = ladder["theses"][:1]
+        unseeded = st.solve_ladder(self.df, thesis, time_limit=5)
+        self.assertIsNotNone(unseeded[0], "slot 0 must solve for this repro to mean anything")
+        held = [sorted(unseeded[0]["player_keys"])]
+        seeded = st.solve_ladder(self.df, thesis, time_limit=5, seed_forbidden=held)
+        self.assertIsNotNone(seeded[0], "a legal alternative must exist in this pool")
+        self.assertNotEqual(sorted(seeded[0]["player_keys"]), held[0],
+                            "a complete row equal to the ladder's own slot-0 lineup "
+                            "must never be repeated in its contest")
+
+    def test_portfolio_report_reads_the_union_of_solved_and_held_rosters(self):
+        """``all_unique_rosters`` used to check the solved lineups against each
+        other only, so a solved lineup equal to a HELD row (never itself a
+        member of ``lineups``) read as unique. It is now the union."""
+        ladder = st.build_thesis_ladder(self.df, 3, moneyline={"MIN": -150, "CHC": 130})
+        theses = ladder["theses"]
+        solved = st.solve_ladder(self.df, theses, time_limit=5)
+        self.assertTrue(all(lu is not None for lu in solved))
+        clean = st.portfolio_report(self.df, theses, solved)
+        self.assertTrue(clean["all_unique_rosters"])
+        held = [sorted(solved[0]["player_keys"])]
+        dirty = st.portfolio_report(self.df, theses, solved, held_rosters=held)
+        self.assertFalse(dirty["all_unique_rosters"],
+                         "a solved lineup equal to a held row is not unique, even "
+                         "though it never appears twice inside `lineups`")
+
+    def _template_with_one_complete_row(self, ent_path: Path, legal_ids: list) -> None:
+        with ENT.open(newline="", encoding="utf-8-sig") as fh:
+            rows = list(csv.reader(fh))
+        rows[1][4:10] = [str(x) for x in legal_ids]
+        with ent_path.open("w", newline="", encoding="utf-8") as fh:
+            csv.writer(fh).writerows(rows)
+
+    def test_run_showdown_seeds_solve_ladder_and_portfolio_report_from_the_template(self):
+        """Wiring: ``run_showdown`` reads the template's complete rows through
+        ``complete_row_player_keys`` and threads them into ``solve_ladder`` and
+        ``portfolio_report`` the same way the baseline already does (R389(c)),
+        rather than leaving the ladder's own forbidden sets seeded with
+        nothing."""
+        import shutil
+        import types as _types
+        path = REPO / "skills" / "generate-lineups" / "scripts" / "build_slate.py"
+        spec = importlib.util.spec_from_file_location("build_slate_r426", path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        from mlb_engine.entries import upload_manifest as um
+
+        legal = sd.build_showdown_lineup(self.df)
+        self.assertIsNotNone(legal)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            sal, ent = root / "DKSalaries.csv", root / "DKEntries.csv"
+            shutil.copy2(SAL, sal)
+            self._template_with_one_complete_row(ent, legal["roster_ids"])
+
+            args = _types.SimpleNamespace(
+                date="2026-07-18", entries=None, controls_override=None,
+                projections=None, declare_pitcher=[], lineups=None, odds=None,
+                brief=None)
+            captured: dict = {}
+            real_solve_ladder = st.solve_ladder
+            real_portfolio_report = st.portfolio_report
+
+            def spy_solve_ladder(*a, **k):
+                captured["seed_forbidden"] = k.get("seed_forbidden")
+                return real_solve_ladder(*a, **k)
+
+            def spy_portfolio_report(*a, **k):
+                captured["held_rosters"] = k.get("held_rosters")
+                return real_portfolio_report(*a, **k)
+
+            with contextlib.ExitStack() as stack:
+                stack.enter_context(unittest.mock.patch.object(mod, "REPO", root))
+                stack.enter_context(unittest.mock.patch.object(um, "REPO_ROOT", root))
+                stack.enter_context(unittest.mock.patch.object(
+                    mod, "fetch_lineups",
+                    lambda *_a, **_k: (_ for _ in ()).throw(OSError("no egress in a test"))))
+                stack.enter_context(unittest.mock.patch.object(
+                    mod, "showdown_moneyline", lambda *_a, **_k: ({}, {}, {})))
+                stack.enter_context(unittest.mock.patch.object(st, "solve_ladder", spy_solve_ladder))
+                stack.enter_context(unittest.mock.patch.object(
+                    st, "portfolio_report", spy_portfolio_report))
+                stack.enter_context(contextlib.redirect_stdout(io.StringIO()))
+                stack.enter_context(contextlib.redirect_stderr(io.StringIO()))
+                mod.run_showdown(args, root, sal, ent)
+
+        expected = [sorted(legal["player_keys"])]
+        self.assertEqual(captured.get("seed_forbidden"), expected)
+        self.assertEqual(captured.get("held_rosters"), expected)
+
+
 # --------------------------------------------------------------------------
 # R29(5): the odds fetch reported "no moneyline matched" on a priced game
 # --------------------------------------------------------------------------
