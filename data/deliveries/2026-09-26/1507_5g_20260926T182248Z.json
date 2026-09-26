@@ -1,0 +1,240 @@
+{
+ "code": {
+  "contest_allocator": "v1.12",
+  "execution_pipeline": "v1.17",
+  "git_dirty": true,
+  "git_sha": "954c8b40dc20b3efd59a433f55d752d49779a6f4"
+ },
+ "date": "2026-09-26",
+ "exit_code": 3,
+ "host": {
+  "call_budget_s": 630.0,
+  "declared_ceiling_s": 900.0,
+  "host": "claude_code"
+ },
+ "kind": "refusal",
+ "labels": "a refusal is an observed build outcome, never a claim about the slate",
+ "recorded_utc": "2026-09-26T18:22:48.198612+00:00",
+ "refusal": {
+  "argv": [
+   "--salary",
+   "data/slates/2026-09-26/1b85c5f5-DKSalaries_114.csv",
+   "--entries",
+   "data/slates/2026-09-26/fba73ec9-DKEntries_92.csv",
+   "--lineups",
+   "data/slates/2026-09-26/lineups_feed.json",
+   "--postures",
+   "196059336=wta_satellite,196060141=large_gpp,196082298=wta_satellite,196083039=small_gpp",
+   "--controls-override",
+   "{\"max_shared_players\": 7}",
+   "--deliver-by",
+   "15:07",
+   "--brief",
+   "outputs/2026-09-26/build_brief_nobundle.json"
+  ],
+  "baseline": {
+   "brief": {
+    "path": "/home/user/mlb-dfs/outputs/2026-09-26/build_brief_1507_5g_BASELINE_20260926T181452Z_21d095c1.json",
+    "written": true
+   },
+   "controls": {
+    "held": [],
+    "never_relax": [
+     "distinct_lineups_per_contest"
+    ],
+    "opened": {
+     "classic_sleeves": false,
+     "max_consensus_cluster_share_pct": 1.0,
+     "max_game_exposure_pct": 1.0,
+     "max_pitcher_exposure_pct": 1.0,
+     "max_player_exposure_pct": 1.0,
+     "max_primary_stack_exposure_pct": 1.0,
+     "max_shared_players": 9,
+     "max_sp_pair_repetition": 999,
+     "max_team_exposure_pct": 1.0
+    }
+   },
+   "core": {
+    "by_contest": [
+     {
+      "contest_id": "196059336",
+      "fillable": 7,
+      "filled": 7,
+      "held": 0,
+      "partial": 0
+     },
+     {
+      "contest_id": "196060141",
+      "fillable": 2,
+      "filled": 2,
+      "held": 0,
+      "partial": 0
+     },
+     {
+      "contest_id": "196082298",
+      "fillable": 1,
+      "filled": 1,
+      "held": 0,
+      "partial": 0
+     },
+     {
+      "contest_id": "196083039",
+      "fillable": 1,
+      "filled": 1,
+      "held": 0,
+      "partial": 0
+     }
+    ],
+    "construction_label": "baseline_construction_proxy",
+    "distinct": 8,
+    "probe_wall_s": 0.1128,
+    "required": 7,
+    "short": 0,
+    "sources": {
+     "grid": 7,
+     "probe": 1
+    },
+    "status": "covered",
+    "stop_reason": "covered",
+    "target": 7,
+    "target_met": true,
+    "timings": {
+     "fill_s": 0.0,
+     "grid_s": 0.4154,
+     "left_s": 149.017,
+     "probe_s": 0.1136,
+     "total_s": 0.5451,
+     "window_s": 149.556,
+     "window_source": "deadline"
+    },
+    "uncovered": 0,
+    "version": "v1.0"
+   },
+   "coverage": {
+    "filled": 11,
+    "reserved": 11
+   },
+   "current": true,
+   "date": "2026-09-26",
+   "essential_valid": {
+    "basis": "engine_post_export",
+    "bytes_match_record": true,
+    "essential_valid": true,
+    "excluded": [
+     "portfolio_caps_passed"
+    ],
+    "failed": [],
+    "preflight": null,
+    "required": [
+     "template_preservation_passed",
+     "entry_reconciliation_passed",
+     "roster_legality_passed",
+     "locked_immutability_passed",
+     "export_hash_binding_passed"
+    ]
+   },
+   "label": "review_grade_baseline",
+   "later_failures": [],
+   "lineage": "baseline",
+   "manifest_date": "2026-09-26",
+   "manifest_recorded": true,
+   "path": "/home/user/mlb-dfs/outputs/2026-09-26/DKEntries_1507_5g_BASELINE_20260926T181452Z_21d095c1.csv",
+   "published_utc": "2026-09-26T18:21:56.683891+00:00",
+   "reused_row": {
+    "delivered_file": "outputs/2026-09-26/DKEntries_1507_5g_BASELINE_20260926T181452Z_21d095c1.csv",
+    "note": "these bytes are already the live baseline row's; that row and its file are the delivery",
+    "run_id": "20260926T181452Z_21d095c1"
+   },
+   "run_id": "20260926T182156Z_0dcc6e16",
+   "run_path": "/home/user/mlb-dfs/runs/20260926T182156Z_0dcc6e16/final/DKEntries.csv",
+   "sha256": "69cb95c7a60c2f62c0dd87f821f3b9fbe563640fe862d7d107af257a77f21678",
+   "slate_tag": "1507_5g",
+   "status": "delivered",
+   "window": {
+    "allocation_s": 0.3,
+    "core_s": 0.58,
+    "left_at_call_s": 598.4,
+    "share": 0.25,
+    "window_s": 149.6
+   }
+  },
+  "errors": [
+   "entry-level joint MILP proven infeasible: no single control is arithmetically binding against this bank, so the interaction of the active controls is. Active: max_consensus_cluster_share_pct=0.5, max_pitcher_exposure_pct=0.43, max_player_exposure_pct=0.4, max_primary_stack_exposure_pct=0.35, max_shared_players=7, max_sp_pair_repetition=2, max_team_exposure_pct=0.55"
+  ],
+  "failing_checks": [],
+  "last_usable_artifact": {
+   "certification": {
+    "allocation_certified": true,
+    "selection_certified": true,
+    "workflow_valid": true
+   },
+   "contest_type": "classic",
+   "coverage": {
+    "filled": 11,
+    "reserved": 11
+   },
+   "date": "2026-09-26",
+   "essential_valid": {
+    "basis": "engine_post_export",
+    "bytes_match_record": true,
+    "essential_valid": true,
+    "excluded": [
+     "portfolio_caps_passed"
+    ],
+    "failed": [],
+    "preflight": null,
+    "required": [
+     "template_preservation_passed",
+     "entry_reconciliation_passed",
+     "roster_legality_passed",
+     "locked_immutability_passed",
+     "export_hash_binding_passed"
+    ]
+   },
+   "label": "review_grade_baseline",
+   "lineage": "baseline",
+   "path": "/home/user/mlb-dfs/outputs/2026-09-26/DKEntries_1507_5g_BASELINE_20260926T181452Z_21d095c1.csv",
+   "run_id": "20260926T182156Z_0dcc6e16",
+   "run_path": "/home/user/mlb-dfs/runs/20260926T182156Z_0dcc6e16/final/DKEntries.csv",
+   "sha256": "69cb95c7a60c2f62c0dd87f821f3b9fbe563640fe862d7d107af257a77f21678",
+   "size_bytes": 54699
+  },
+  "note": "built and refused: the build ran but did not certify, or the pool blocked it",
+  "refusal": "classic_not_certified",
+  "refusal_class": "badly_shaped",
+  "run_id": "20260926T182246Z_115952f3",
+  "solves": [
+   {
+    "bank": "built",
+    "bank_budget_floored": false,
+    "bank_budget_s": 591.1,
+    "bank_elapsed_s": 46.59,
+    "call": 1,
+    "candidates": 70,
+    "left_at_end_s": 547.8,
+    "left_at_start_s": 597.1,
+    "outcome": "refused",
+    "reason": "initial",
+    "sleeves_elapsed_s": 2.1,
+    "wall_s": 49.3
+   },
+   {
+    "bank": "reused",
+    "bank_budget_floored": false,
+    "bank_budget_s": null,
+    "bank_elapsed_s": null,
+    "call": 2,
+    "candidates": 70,
+    "left_at_end_s": 546.0,
+    "left_at_start_s": 547.8,
+    "outcome": "refused",
+    "reason": "input_confidence_relax",
+    "sleeves_elapsed_s": null,
+    "wall_s": 1.8
+   }
+  ],
+  "status": "not_certified"
+ },
+ "schema_version": 1,
+ "slate_tag": "1507_5g"
+}
