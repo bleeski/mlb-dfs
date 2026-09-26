@@ -1,0 +1,37 @@
+{
+ "code": {
+  "contest_allocator": "v1.12",
+  "execution_pipeline": "v1.17",
+  "git_dirty": false,
+  "git_sha": "a20d692f0a89b90c0fa5422227e3348bed76be64"
+ },
+ "date": "2026-09-25",
+ "exit_code": 4,
+ "host": {
+  "call_budget_s": 630.0,
+  "declared_ceiling_s": 900.0,
+  "host": "claude_code"
+ },
+ "kind": "refusal",
+ "labels": "a refusal is an observed build outcome, never a claim about the slate",
+ "recorded_utc": "2026-09-26T01:44:24.927849+00:00",
+ "refusal": {
+  "argv": [
+   "--salary",
+   "data/slates/2026-09-25/f444bafc-DKSalaries_113.csv",
+   "--entries",
+   "data/slates/2026-09-25/7e6dcfa0-DKEntries_91.csv",
+   "--lineups",
+   "data/slates/2026-09-25/lineups_feed.json"
+  ],
+  "errors": [],
+  "failing_checks": [],
+  "note": "refused before any solve: inputs missing or unreadable, a wall, a units slip, or an unusable argument",
+  "refusal": "",
+  "refusal_class": "",
+  "run_id": null,
+  "status": ""
+ },
+ "schema_version": 1,
+ "slate_tag": "2140_4g"
+}
