@@ -1,0 +1,372 @@
+{
+ "code": {
+  "contest_allocator": "v1.12",
+  "execution_pipeline": "v1.17",
+  "git_dirty": true,
+  "git_sha": "c35cba53e74ad492af69e8eda364d128b4a9e7cc"
+ },
+ "controls": {
+  "max_cpt_exposure_pct": 0.25,
+  "max_player_exposure_pct": 0.5,
+  "max_shared_players": 4
+ },
+ "date": "2026-09-26",
+ "egress": "egress: statsapi unreachable, odds unreachable, savant unreachable, mlb-lineups unreachable, fangraphs unreachable (curl), open-meteo unreachable",
+ "egress_source": "session_start 2026-09-26T22:57:42+00:00",
+ "entries": [
+  {
+   "contest_id": "196059349",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (TB @ PHI)",
+   "entry_fee": 0.1,
+   "entry_id": "5270912590",
+   "filled": true,
+   "roster_ids": [
+    "44290780",
+    "44290645",
+    "44290647",
+    "44290653",
+    "44290658",
+    "44290660"
+   ]
+  },
+  {
+   "contest_id": "196059349",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (TB @ PHI)",
+   "entry_fee": 0.1,
+   "entry_id": "5270912619",
+   "filled": true,
+   "roster_ids": [
+    "44290780",
+    "44290645",
+    "44290648",
+    "44290653",
+    "44290658",
+    "44290659"
+   ]
+  },
+  {
+   "contest_id": "196059353",
+   "contest_name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (TB @ PHI)",
+   "entry_fee": 0.01,
+   "entry_id": "5270903335",
+   "filled": true,
+   "roster_ids": [
+    "44290780",
+    "44290646",
+    "44290647",
+    "44290653",
+    "44290658",
+    "44290659"
+   ]
+  },
+  {
+   "contest_id": "196059353",
+   "contest_name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (TB @ PHI)",
+   "entry_fee": 0.01,
+   "entry_id": "5270903336",
+   "filled": true,
+   "roster_ids": [
+    "44290780",
+    "44290645",
+    "44290647",
+    "44290654",
+    "44290658",
+    "44290659"
+   ]
+  },
+  {
+   "contest_id": "196059353",
+   "contest_name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (TB @ PHI)",
+   "entry_fee": 0.01,
+   "entry_id": "5270903337",
+   "filled": true,
+   "roster_ids": [
+    "44290780",
+    "44290642",
+    "44290652",
+    "44290653",
+    "44290658",
+    "44290660"
+   ]
+  },
+  {
+   "contest_id": "196059353",
+   "contest_name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (TB @ PHI)",
+   "entry_fee": 0.01,
+   "entry_id": "5270903338",
+   "filled": true,
+   "roster_ids": [
+    "44290751",
+    "44290644",
+    "44290645",
+    "44290652",
+    "44290653",
+    "44290687"
+   ]
+  },
+  {
+   "contest_id": "196059353",
+   "contest_name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (TB @ PHI)",
+   "entry_fee": 0.01,
+   "entry_id": "5270903339",
+   "filled": true,
+   "roster_ids": [
+    "44290740",
+    "44290644",
+    "44290653",
+    "44290654",
+    "44290658",
+    "44290687"
+   ]
+  },
+  {
+   "contest_id": "196059353",
+   "contest_name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (TB @ PHI)",
+   "entry_fee": 0.01,
+   "entry_id": "5270903340",
+   "filled": true,
+   "roster_ids": [
+    "44290751",
+    "44290644",
+    "44290645",
+    "44290647",
+    "44290657",
+    "44290687"
+   ]
+  },
+  {
+   "contest_id": "196059353",
+   "contest_name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (TB @ PHI)",
+   "entry_fee": 0.01,
+   "entry_id": "5270912550",
+   "filled": true,
+   "roster_ids": [
+    "44290746",
+    "44290645",
+    "44290647",
+    "44290652",
+    "44290657",
+    "44290687"
+   ]
+  },
+  {
+   "contest_id": "196059354",
+   "contest_name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (TB @ PHI)",
+   "entry_fee": 0.01,
+   "entry_id": "5270903381",
+   "filled": true,
+   "roster_ids": [
+    "44290751",
+    "44290643",
+    "44290647",
+    "44290652",
+    "44290653",
+    "44290687"
+   ]
+  },
+  {
+   "contest_id": "196059354",
+   "contest_name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (TB @ PHI)",
+   "entry_fee": 0.01,
+   "entry_id": "5270903382",
+   "filled": true,
+   "roster_ids": [
+    "44290746",
+    "44290643",
+    "44290644",
+    "44290645",
+    "44290647",
+    "44290658"
+   ]
+  },
+  {
+   "contest_id": "196059354",
+   "contest_name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (TB @ PHI)",
+   "entry_fee": 0.01,
+   "entry_id": "5270903383",
+   "filled": true,
+   "roster_ids": [
+    "44290746",
+    "44290642",
+    "44290644",
+    "44290645",
+    "44290647",
+    "44290660"
+   ]
+  },
+  {
+   "contest_id": "196059354",
+   "contest_name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (TB @ PHI)",
+   "entry_fee": 0.01,
+   "entry_id": "5270903384",
+   "filled": true,
+   "roster_ids": [
+    "44290738",
+    "44290642",
+    "44290644",
+    "44290647",
+    "44290657",
+    "44290659"
+   ]
+  },
+  {
+   "contest_id": "196059354",
+   "contest_name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (TB @ PHI)",
+   "entry_fee": 0.01,
+   "entry_id": "5270903385",
+   "filled": true,
+   "roster_ids": [
+    "44290738",
+    "44290642",
+    "44290644",
+    "44290652",
+    "44290654",
+    "44290657"
+   ]
+  },
+  {
+   "contest_id": "196059354",
+   "contest_name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (TB @ PHI)",
+   "entry_fee": 0.01,
+   "entry_id": "5270903386",
+   "filled": true,
+   "roster_ids": [
+    "44290736",
+    "44290642",
+    "44290644",
+    "44290652",
+    "44290657",
+    "44290659"
+   ]
+  },
+  {
+   "contest_id": "196059354",
+   "contest_name": "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (TB @ PHI)",
+   "entry_fee": 0.01,
+   "entry_id": "5270912568",
+   "filled": true,
+   "roster_ids": [
+    "44290752",
+    "44290642",
+    "44290643",
+    "44290644",
+    "44290646",
+    "44290654"
+   ]
+  },
+  {
+   "contest_id": "196059358",
+   "contest_name": "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (TB @ PHI)",
+   "entry_fee": 1.0,
+   "entry_id": "5270912684",
+   "filled": true,
+   "roster_ids": [
+    "44290745",
+    "44290642",
+    "44290644",
+    "44290646",
+    "44290648",
+    "44290659"
+   ]
+  },
+  {
+   "contest_id": "196090963",
+   "contest_name": "MLB Showdown $50 Solo Shot [Single Entry] (TB @ PHI)",
+   "entry_fee": 1.0,
+   "entry_id": "5270912648",
+   "filled": true,
+   "roster_ids": [
+    "44290739",
+    "44290642",
+    "44290643",
+    "44290652",
+    "44290654",
+    "44290657"
+   ]
+  },
+  {
+   "contest_id": "196094425",
+   "contest_name": "MLB Showdown $50 Quarter Jukebox [Just $0.25!] (TB @ PHI)",
+   "entry_fee": 0.25,
+   "entry_id": "5270912726",
+   "filled": true,
+   "roster_ids": [
+    "44290745",
+    "44290639",
+    "44290642",
+    "44290646",
+    "44290657",
+    "44290660"
+   ]
+  },
+  {
+   "contest_id": "196094425",
+   "contest_name": "MLB Showdown $50 Quarter Jukebox [Just $0.25!] (TB @ PHI)",
+   "entry_fee": 0.25,
+   "entry_id": "5270912753",
+   "filled": true,
+   "roster_ids": [
+    "44290735",
+    "44290643",
+    "44290648",
+    "44290652",
+    "44290654",
+    "44290659"
+   ]
+  }
+ ],
+ "entries_binding": {
+  "source": "outputs/2026-09-26/DO_NOT_UPLOAD_DKEntries_showdown_1915_1g_sd_BASELINE_45352425c75a.csv",
+  "source_sha256": "45352425c75a47ef43c82f0ee1a67cc923c0fea5a7be7256b52df33a4efbc7a8",
+  "status": "bound"
+ },
+ "host": {
+  "call_budget_s": 630.0,
+  "declared_ceiling_s": 900.0,
+  "host": "claude_code"
+ },
+ "kind": "delivery",
+ "labels": "deterministic review proxies and labeled priors only; never ROI, win rate, cash rate, or probability",
+ "manifest_row": {
+  "certification": "review_grade",
+  "contest_ids": [
+   "196059349",
+   "196059353",
+   "196059354",
+   "196059358",
+   "196090963",
+   "196094425"
+  ],
+  "contest_names": [
+   "MLB Showdown $100 Dime Time [Just $0.10!] (TB @ PHI)",
+   "MLB Showdown $50 Quarter Jukebox [Just $0.25!] (TB @ PHI)",
+   "MLB Showdown $50 Solo Shot [Single Entry] (TB @ PHI)",
+   "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (TB @ PHI)",
+   "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (TB @ PHI)"
+  ],
+  "contest_type": "showdown",
+  "delivered_file": "outputs/2026-09-26/DKEntries_showdown_1915_1g_sd_BASELINE_45352425c75a.csv",
+  "entries": 20,
+  "lineage": "baseline",
+  "notes": "Showdown baseline (R389(c)): a points-max bank at the build's controls, published before the thesis ladder. Showdown ships review-grade; see CLAUDE.md.",
+  "projection_tier": "unknown",
+  "recorded_utc": "2026-09-26T22:59:46.856804+00:00",
+  "run_id": null,
+  "sha256": "45352425c75a47ef43c82f0ee1a67cc923c0fea5a7be7256b52df33a4efbc7a8",
+  "slate_tag": "1915_1g_sd",
+  "status": "candidate",
+  "strategy_state": {
+   "counts": {},
+   "state": "unknown"
+  }
+ },
+ "recorded_utc": "2026-09-26T22:59:46.858117+00:00",
+ "relaxations": {
+  "both_relaxed_slots": 0,
+  "overlap_relaxed_slots": 0,
+  "player_relaxed_slots": 0,
+  "relaxed_slots": 0
+ },
+ "run": {},
+ "schema_version": 1
+}
