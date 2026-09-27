@@ -6794,16 +6794,18 @@ class R382CaptainPriorWiringTests(unittest.TestCase):
         self.assertIn("--captain-prior", msg)
 
 
-class ShowdownBaselineFirstTests(unittest.TestCase):
-    """R389(c), roadmap Session 12: a Showdown build publishes a baseline file
-    before its thesis ladder, so a crash or a refusal anywhere after it still
-    leaves Ben a legal, review-grade file.
+class _ShowdownExitDoorHarness:
+    """Shared harness, driven through the real exit door
+    (`_main_recording_refusals`, with `main` swapped for the `run_showdown`
+    call) on the vendored MIN_CHC slate, on a temp root: `mod.REPO` and
+    `upload_manifest.REPO_ROOT` point there, the lineups feed raises (no
+    egress) and the moneyline is stubbed empty, so no test reads the network
+    or writes outside its own directory.
 
-    Driven through the real exit door (`_main_recording_refusals`, with `main`
-    swapped for the `run_showdown` call) on the vendored MIN_CHC slate, on a
-    temp root: `mod.REPO` and `upload_manifest.REPO_ROOT` point there, the
-    lineups feed raises (no egress) and the moneyline is stubbed empty, so no
-    test reads the network or writes outside its own directory.
+    Not a TestCase itself (R456/R457): a class that mixes this in alongside
+    `unittest.TestCase` gets these helpers without re-running
+    `ShowdownBaselineFirstTests`'s own tests a second time under its name,
+    which subclassing that TestCase directly would do.
     """
 
     _DATE = "2026-07-18"
@@ -6932,6 +6934,13 @@ class ShowdownBaselineFirstTests(unittest.TestCase):
         root = self.base / name
         root.mkdir()
         return root
+
+
+class ShowdownBaselineFirstTests(_ShowdownExitDoorHarness, unittest.TestCase):
+    """R389(c), roadmap Session 12: a Showdown build publishes a baseline file
+    before its thesis ladder, so a crash or a refusal anywhere after it still
+    leaves Ben a legal, review-grade file.
+    """
 
     # -- the acceptance: delivered, superseding nothing, valid on its bytes -- #
 
@@ -7306,3 +7315,106 @@ class ShowdownBaselineFirstTests(unittest.TestCase):
         names = sorted(p.name for p, b in self._records(r.root)
                        if b.get("kind") != "refusal")
         self.assertEqual(sum("_norun_baseline_" in n for n in names), 1, names)
+
+
+class UseLadderGateTests(_ShowdownExitDoorHarness, unittest.TestCase):
+    """R456. The `use_ladder` gate used to count `Batting_Order` on the frame
+    AFTER `starters_only`/`exclude_out` drop a shelved bat, so one IL bat
+    inside an otherwise fully posted nine silently dropped the thesis ladder
+    to the points-max bank -- with no captain cap, R263 shadow, sleeve or
+    game-state deal, and no stderr line saying why. The gate now reads
+    `decided` off the participation report's own `sides[]`, computed before
+    either filter runs (R36 F8 / R159(a): a degraded nine is still DECIDED).
+    """
+
+    @staticmethod
+    def _busch_il_salary(dest):
+        """MIN_CHC with Michael Busch (CHC's posted #3 hitter) marked IL:
+        CHC's nine is still fully posted and DECIDED, one bat shelved out of
+        it -- the DK shape R456 is about."""
+        with SAL.open(newline="", encoding="utf-8-sig") as fh:
+            rows = list(csv.reader(fh))
+        header = rows[0]
+        name_col, status_col = header.index("Name"), header.index("Status")
+        hit = 0
+        for row in rows[1:]:
+            if len(row) > name_col and row[name_col] == "Michael Busch":
+                row[status_col] = "IL"
+                hit += 1
+        assert hit == 2, f"expected Busch's CPT and UTIL rows, found {hit}"
+        with dest.open("w", newline="", encoding="utf-8") as fh:
+            csv.writer(fh).writerows(rows)
+        return dest
+
+    def test_an_il_bat_inside_a_posted_nine_still_takes_the_ladder(self):
+        salary = self._busch_il_salary(self.base / "DKSalaries_busch_il.csv")
+        r = self._build(self._root(), salary_csv=salary)
+        self.assertEqual(r.code, 0, r.err[-3000:])
+        construction = r.brief.get("construction") or {}
+        self.assertEqual(construction.get("mode"), "thesis_ladder", r.brief)
+        per_contest = r.brief.get("per_contest") or {}
+        self.assertIs(per_contest.get("clean"), True, per_contest)
+        self.assertEqual(per_contest.get("over_cap"), [], per_contest)
+        sides = {s["team"]: s for s in
+                (r.brief.get("pool") or {}).get("participation", {}).get("sides", [])}
+        self.assertEqual(sides["CHC"]["state"], "degraded")
+        self.assertTrue(sides["CHC"]["decided"])
+        self.assertEqual(sides["CHC"]["shelved_in_posted_nine"], ["Michael Busch"])
+        self.assertNotIn("thesis ladder not used", r.err)
+        # The identical stale post-filter count the gate itself used to carry,
+        # a second reporting site the fix would otherwise have missed.
+        self.assertEqual((r.brief.get("pool") or {}).get("posted_hitters"), 18,
+                         r.brief.get("pool"))
+
+    def test_a_basis_that_cannot_take_the_ladder_prints_why(self):
+        salary = self._points_max_salary(self.base / "DKSalaries_no_order.csv")
+        r = self._build(self._root(), salary_csv=salary)
+        self.assertEqual(r.code, 0, r.err[-3000:])
+        construction = r.brief.get("construction") or {}
+        self.assertEqual(construction.get("mode"), "points_max_bank", r.brief)
+        self.assertIn("thesis ladder not used: pool basis is 'all_healthy'", r.err)
+        self.assertEqual(
+            construction.get("reason"),
+            "pool basis is 'all_healthy' with 0 posted hitters; the thesis "
+            "ladder needs both posted batting orders to condition on, so it "
+            "was not used")
+
+
+class ShowdownManifestCountTests(_ShowdownExitDoorHarness, unittest.TestCase):
+    """R457. Both Showdown manifest rows used to record `entries=len(assignments)`
+    -- the rows a build FILLED -- while `write_showdown_entries` preserves a
+    template's complete rows, so the delivered file holds filled plus complete.
+    A template carrying one complete row got both delivered files hard-blocked
+    by preflight as a truncated write. Both sites now count off the delivered
+    file's own bytes (`_showdown_entries_in`, mirroring
+    `execution_pipeline._entries_in`'s rule exactly), on the same complete-row
+    reproduction `ShowdownBaselineFirstTests.
+    test_complete_rows_are_preserved_and_never_repeated_in_their_contest` builds.
+    """
+
+    def test_a_complete_row_template_passes_preflight_on_both_files(self):
+        first = self._build(self._root("first"))
+        (path,) = self._baseline_files(first.root)
+        held = self._entry_rows(path)[0]             # the baseline's slot 0
+        with ENT.open(newline="", encoding="utf-8-sig") as fh:
+            grid = list(csv.reader(fh))
+        grid[held["row_index"] - 1][4:10] = held["cells"]
+        template = self.base / "DKEntries_one_held.csv"
+        with template.open("w", newline="", encoding="utf-8") as fh:
+            csv.writer(fh).writerows(grid)
+        r = self._build(self._root("second"), entries_csv=template)
+        self.assertEqual(r.code, 0, r.err[-3000:])
+        files = self._file_lines(r.err)
+        self.assertEqual(len(files), 2, files)
+        baseline_path, ladder_path = self._path_of(files[0]), self._path_of(files[-1])
+        total_rows = len(self._entry_rows(ladder_path))
+        self.assertEqual(total_rows, 14, "template unchanged: 13 filled + 1 held")
+        for label, path in (("baseline", baseline_path), ("ladder", ladder_path)):
+            code, report = self._preflight(path, r.salary, r.root)
+            self.assertEqual(code, 0, (label, report))
+            self.assertEqual(report.get("verdict"), "review_ready", (label, report))
+        rows = self._rows(r.root)
+        base_row = next(x for x in rows if x.get("lineage") == "baseline")
+        ladder_row = next(x for x in rows if not x.get("lineage"))
+        self.assertEqual(base_row["entries"], total_rows, base_row)
+        self.assertEqual(ladder_row["entries"], total_rows, ladder_row)
