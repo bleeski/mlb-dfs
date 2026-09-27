@@ -124,11 +124,41 @@ no fail-open policy: `missing_status_policy` is either `error` (block) or
 `treat_as_locked` (freeze). Use `treat_as_locked` when a player's lock state
 cannot be resolved.
 
+## Exit codes and the file in hand (R414)
+
+The swap presents the file (`FILE <path> sha256=... label=... coverage=...`)
+before any narrative, the moment it is written and its label is known, the same
+contract Session 08 gave `build_slate.py`. Codes:
+
+- **0** — delivered clean: promoted, recorded, staged, printed with its
+  preflight command.
+- **3** — refused: a downgrade without `--accept-downgrade`, or a promotion
+  another session's race beat (the file sits at its `DO_NOT_UPLOAD_` name,
+  withdrawn, not delivered).
+- **7** — delivered a prior valid artifact after a LATER failure: a raising
+  promotion, a raising `record_delivery`, or anything else after the file was
+  presented. The file above is the deliverable, under its own label (the
+  downgrade label when `--accept-downgrade` was taken); nothing was silently
+  swallowed into a clean exit 0 with the file stuck under `DO_NOT_UPLOAD_`.
+  `deliver_swap` is the whole tail (present, promote, record, ship) in one
+  function precisely so each of these later-failure branches is a small,
+  direct test rather than a full swap.
+
+A refused promotion (3) is not the same fact as a raising one (7): the first
+means "another session already delivered from this run," never a later failure
+of a real delivery, so the file is deliberately withdrawn rather than delivered
+under a bad label.
+
 ## After a swap
 
-Verify before handing it over:
+Verify before handing it over. `preflight_upload.py` auto-resolves `--parent`
+from the manifest's supersession chain when it is omitted (R450), the same
+mechanism `verify_export.py` already used, but the swap's own printed command
+already names it, so nothing needs to be typed under a clock:
 
 ```bash
+python tools/preflight_upload.py --entries <swapped file> --salary <DKSalaries.csv> \
+  --parent <parent file> --expect-sha256 <sha>
 python tools/verify_export.py --salary <DKSalaries.csv> \
   --entries <swapped file> --parent <parent file>
 ```

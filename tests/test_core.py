@@ -12448,13 +12448,23 @@ class DeferredPromotionTests(unittest.TestCase):
         text = (Path(__file__).resolve().parents[1] / "tools" / "late_swap.py").read_text(
             encoding="utf-8")
         self.assertIn("defer_promotion=True", text)
-        mirror = text.index("os.replace(tmp, provisional)")
-        promote = text.index("promote_deferred_run(result)")
-        refusal = text.index("late swap refused: these entries score below")
+        # R414: the mirror and the promotion moved into `deliver_swap`,
+        # extracted from `main()` so a test can drive its later-failure
+        # branches without a full swap behind them. The order within each
+        # still matters; across the split the pin is that `main()` resolves
+        # the accept-downgrade decision before it ever calls `deliver_swap`.
+        main_body = text[text.index("\ndef main() -> int:"):]
+        refusal = main_body.index("late swap refused: these entries score below")
+        calls_deliver = main_body.index("return deliver_swap(")
+        self.assertLess(refusal, calls_deliver,
+                        "main() must resolve the accept-downgrade decision "
+                        "before calling deliver_swap")
+        deliver_body = text[text.index("\ndef deliver_swap("):
+                            text.index("\ndef main() -> int:")]
+        mirror = deliver_body.index("os.replace(tmp, provisional)")
+        promote = deliver_body.index("promote_deferred_run(result)")
         self.assertLess(mirror, promote,
                         "promotion must follow the mirror to outputs/")
-        self.assertLess(refusal, promote,
-                        "promotion must follow the accept-downgrade decision")
 
 
 class SwapControlsInheritanceTests(unittest.TestCase):
@@ -28900,10 +28910,14 @@ class DeliveryLabelAgreementTests(unittest.TestCase):
         self.assertEqual(ls.swap_certification(ok, []), "certified")
         self.assertEqual(ls.swap_certification({}, ["5001"]), "not_certified")
         source = (REPO / "tools" / "late_swap.py").read_text(encoding="utf-8")
-        call = source[source.index("record = record_delivery("):]
         # R268(a): the parent's label bounds the swap's (`parent_label`).
-        self.assertIn("certification=swap_certification(result, downgraded, parent_label)",
-                      call[:call.index("\n        )")])
+        # R414: computed once, before the file is presented, and reused here
+        # rather than calling swap_certification twice inside the call.
+        self.assertIn(
+            "certification = swap_certification(result, downgraded, parent_label)",
+            source)
+        call = source[source.index("record = record_delivery("):]
+        self.assertIn("certification=certification", call[:call.index("\n    )")])
 
     def test_preflight_names_a_reason_for_every_review_grade_label_written(self):
         """Preflight imports nothing from the engine, so its reason table is a
@@ -34301,6 +34315,50 @@ class LateSwapReviewParentTests(unittest.TestCase):
         label, source, _gates = ls.parent_delivery_label(parent, "2026-07-25")
         self.assertEqual((label, source), (ls.DOWNGRADE_LABEL, "delivery_record"))
 
+    # -- R452: a mismatch never inherits the latest promotion's label ------ #
+
+    def test_a_mismatched_parent_never_inherits_the_latest_promotions_certified_label(self):
+        """Reproduced: run A promotes `certified`; a byte-different file B (a
+        hand-edited or repaired file matching no run) resolves under
+        --allow-parent-mismatch to A's manifest with `current_matches_parent_
+        export=False`. Before the fix, `parent_delivery_label` read A's
+        `parent_export_sha256` (A's own bytes) and returned A's `certified`
+        for B; preflight would then stamp B `upload_ready` though B was never
+        verified by any run."""
+        from mlb_engine.swap.late_swap_manager import resolve_parent_run
+        a = self._build([candidate("A", self.r1, 100), candidate("B", self.r2, 99, "CCC")])
+        self.assertTrue(a["passed"], a.get("errors"))
+        edited = self.root / "edited.csv"
+        edited.write_bytes(Path(a["output_path"]).read_bytes().replace(b"Test WTA", b"Test WTB"))
+        parent = resolve_parent_run(self.root / "runs", edited, allow_parent_mismatch=True)
+        self.assertFalse(parent["current_matches_parent_export"])
+        ls = SwapControlsInheritanceTests._late_swap()
+        label, source, gates = ls.parent_delivery_label(parent, "2026-07-25")
+        self.assertNotEqual(label, "certified")
+        self.assertEqual((label, source, gates), ("review_grade", "parent_mismatch_default", []))
+        lineage = ls.parent_delivery_lineage(parent, "2026-07-25")
+        self.assertEqual(lineage, "")
+
+    def test_a_mismatched_parent_reads_its_own_row_by_its_own_bytes(self):
+        """A mismatch still finds a label when THIS file's own bytes (not the
+        unrelated promoted run's) were already recorded, e.g. a prior
+        hand-repair recorded review-grade under its own sha."""
+        from mlb_engine.entries.upload_manifest import record_delivery, sha256_file
+        from mlb_engine.swap.late_swap_manager import resolve_parent_run
+        a = self._build([candidate("A", self.r1, 100), candidate("B", self.r2, 99, "CCC")])
+        self.assertTrue(a["passed"], a.get("errors"))
+        edited = self.root / "edited.csv"
+        edited.write_bytes(Path(a["output_path"]).read_bytes().replace(b"Test WTA", b"Test WTB"))
+        record_delivery(date="2026-07-25", delivered_file=edited, hash_source=edited,
+                        contest_type="classic", slate_tag="t", run_id="norun_edited",
+                        certification="review_grade_uncertified", failing_gates=["odds_gate_passed"])
+        parent = resolve_parent_run(self.root / "runs", edited, allow_parent_mismatch=True)
+        self.assertEqual(parent["current_entries_sha256"], sha256_file(edited))
+        ls = SwapControlsInheritanceTests._late_swap()
+        label, source, gates = ls.parent_delivery_label(parent, "2026-07-25")
+        self.assertEqual((label, source, gates),
+                         ("review_grade_uncertified", "upload_manifest", ["odds_gate_passed"]))
+
     # -- late_swap.py resolves the parent before any bank slice ------------ #
 
     def _tool(self, *extra):
@@ -34346,6 +34404,245 @@ class LateSwapReviewParentTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls._runs_existed = (REPO / "runs" / "bank_cache_2026-07-29_2356399e2d.json").exists()
+
+
+class LateSwapLastUsableTests(unittest.TestCase):
+    """R414. `deliver_swap` (late_swap.py's post-solve tail, split out of
+    `main()` for exactly this) presents the file BEFORE any narrative, so a
+    later exception -- a raising promotion, a raising record -- delivers it
+    at exit 7 under its own label instead of exit 1 with it silently
+    withheld under its DO_NOT_UPLOAD_ name. A REFUSED (not raising) promotion
+    stays exit 3 and withdraws the presented file, per R393(b)'s review fix 6
+    (a promotion refusal carries no artifact on `run_slate`'s own path either).
+
+    Drives `deliver_swap` directly with a fake ``result`` and small real
+    files standing in for a full swap's bank, feed and solve (the advisor's
+    suggestion): the point of extracting it was exactly to make each
+    later-failure branch mutation-checkable without one.
+    """
+
+    @staticmethod
+    def _tool():
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "late_swap_r414", REPO / "tools" / "late_swap.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    class _Args:
+        date = "2026-07-25"
+        parent_entries = "parent.csv"
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.ls = self._tool()
+        # Pre-load build_slate.py from its REAL location before REPO is
+        # repointed at the temp tree below: it lives under skills/ in the
+        # real repo, never under a per-test skeleton, and the load is cached
+        # (`_BUILD_SLATE_MODULE`) so this is the only time it is read.
+        self.ls._build_slate_module()
+        self.ls.REPO = self.root
+        from mlb_engine.entries import upload_manifest as um
+        self._um_root = um.REPO_ROOT
+        um.REPO_ROOT = self.root
+        self.addCleanup(self._restore_um_root)
+        self.salary = self.root / "salary.csv"
+        ids = write_salary(self.salary)
+        r1, r2 = legal_rosters(ids)
+        self.out = self.root / "swapped.csv"
+        write_entries(self.out, [r1, r2])
+
+    def _restore_um_root(self):
+        from mlb_engine.entries import upload_manifest as um
+        um.REPO_ROOT = self._um_root
+
+    def _deliver(self, result, **kw):
+        return self.ls.deliver_swap(
+            self._Args(), result, self.out, self.salary, kw.get("swap_parent"),
+            kw.get("contest_shapes", {}), kw.get("after_rosters", {}),
+            kw.get("downgraded", []), kw.get("controls", {}))
+
+    _OK = {"workflow_valid": True, "selection_certified": True,
+          "allocation_certified": True, "run_id": "RUN_X", "promoted": True}
+
+    def test_a_raising_record_presents_the_file_before_it_raises(self):
+        """The bug: a failed record used to be caught, printed as 'MANIFEST
+        NOT RECORDED', and exit 0 with the file still under DO_NOT_UPLOAD_.
+        Presentation now happens before the call that can fail, so the file
+        and its label are on the record even though the call still raises
+        (the wrapper is what turns this raise into exit 7)."""
+        self.ls.record_delivery = lambda **kw: (_ for _ in ()).throw(
+            RuntimeError("manifest write failed"))
+        with contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaisesRegex(RuntimeError, "manifest write failed"):
+                self._deliver(dict(self._OK))
+        bs = self.ls._build_slate_module()
+        self.assertTrue(bs._LAST_USABLE)
+        self.assertEqual(bs._LAST_USABLE["label"], "certified")
+        self.assertTrue(Path(bs._LAST_USABLE["path"]).exists(),
+                        "the DO_NOT_UPLOAD_ file must still be on disk")
+
+    def test_the_wrapper_turns_a_raising_record_into_exit_7(self):
+        """The same scenario through `_main_recording_refusals`, the door
+        `__main__` now calls instead of bare `main()`."""
+        self.ls.record_delivery = lambda **kw: (_ for _ in ()).throw(
+            RuntimeError("manifest write failed"))
+        self.ls.main = lambda: self._deliver(dict(self._OK))
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = self.ls._main_recording_refusals()
+        self.assertEqual(code, 7)
+        self.assertIn("FILE ", err.getvalue())
+        self.assertIn("label=certified", err.getvalue())
+        self.assertIn("manifest write failed", err.getvalue())
+
+    def test_a_raising_promotion_also_delivers_at_exit_7(self):
+        """R414's other named site: `promote_deferred_run` can raise (a
+        sqlite lock timeout), and the file must already be presented by then."""
+        self.ls.promote_deferred_run = lambda result: (_ for _ in ()).throw(
+            RuntimeError("lock timeout"))
+        self.ls.main = lambda: self._deliver(dict(self._OK))
+        with contextlib.redirect_stdout(io.StringIO()), \
+             contextlib.redirect_stderr(io.StringIO()) as err:
+            code = self.ls._main_recording_refusals()
+        self.assertEqual(code, 7)
+        self.assertIn("lock timeout", err.getvalue())
+
+    def test_a_refused_not_raising_promotion_stays_exit_3_and_withdraws_the_file(self):
+        """R393(b)'s review fix 6, mirrored here: a REFUSED (not raising)
+        promotion carries no artifact. Another session promoted while this
+        swap was solving; the file is deliberately withheld, not delivered
+        at exit 7 -- a promotion refusal is not a later failure of a real
+        delivery, it is the thing that keeps this from being one."""
+        self.ls.promote_deferred_run = lambda result: {
+            **result, "promoted": False, "errors": ["pointer conflict"]}
+        with contextlib.redirect_stdout(io.StringIO()), \
+             contextlib.redirect_stderr(io.StringIO()) as err:
+            code = self._deliver(dict(self._OK))
+        self.assertEqual(code, 3)
+        bs = self.ls._build_slate_module()
+        self.assertFalse(bs._LAST_USABLE,
+                         "a refused promotion must withdraw the presented file")
+        self.assertIn("PROMOTION REFUSED", err.getvalue())
+
+    def test_an_exception_before_any_file_is_presented_still_propagates(self):
+        """Nothing was ever written or presented (every refusal before the
+        joint solve), so this is unchanged: the exception is the caller's to
+        see, not softened into an exit code it never earned."""
+        self.ls.main = lambda: (_ for _ in ()).throw(
+            RuntimeError("refused before the bank ever ran"))
+        with contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaisesRegex(RuntimeError, "refused before the bank ever ran"):
+                self.ls._main_recording_refusals()
+
+    def test_a_clean_delivery_exits_0_and_the_printed_command_names_the_parent(self):
+        """R450 composes with R414 here: the printed preflight command names
+        --parent, so the auto-resolution isn't even needed on this path."""
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = self._deliver(dict(self._OK))
+        self.assertEqual(code, 0)
+        self.assertIn("wrote ", out.getvalue())
+        self.assertIn("--parent parent.csv", out.getvalue())
+
+
+class LateSwapCompositionTests(unittest.TestCase):
+    """R414 + R450 + R452 together, the roadmap row's own acceptance: a swap
+    of a mismatched parent (c) that crashes after the write (a) exits 7 under
+    the capped label, and the preflight command it prints (b) passes on
+    those exact bytes.
+    """
+
+    @staticmethod
+    def _tool():
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "late_swap_composition", REPO / "tools" / "late_swap.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    class _Args:
+        pass
+
+    def setUp(self):
+        from tests.test_upload_integrity import CLASSIC_HEADER, classic_entry
+        from tests.test_upload_integrity import write_classic_salary
+        from tests.test_upload_integrity import write_entries as write_rows
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.ls = self._tool()
+        self.ls._build_slate_module()   # loaded from the real tree, before REPO moves
+        self.ls.REPO = self.root
+        from mlb_engine.entries import upload_manifest as um
+        self._um_root = um.REPO_ROOT
+        um.REPO_ROOT = self.root
+        self.addCleanup(self._restore_um_root)
+        self.salary = self.root / "salary.csv"
+        lineup = write_classic_salary(self.salary)
+        # Zero-change swap: the parent and the delivered file carry the same
+        # roster, so `check_parent_transition` sees no changed slots and
+        # passes regardless of the wall clock (R324's own invariant).
+        self.parent = self.root / "parent.csv"
+        write_rows(self.parent, CLASSIC_HEADER, [classic_entry("900", "5", lineup)])
+        self.out = self.root / "swapped.csv"
+        write_rows(self.out, CLASSIC_HEADER, [classic_entry("900", "5", lineup)])
+        self.args = self._Args()
+        self.args.date = "2026-07-25"
+        self.args.parent_entries = str(self.parent)
+
+    def _restore_um_root(self):
+        from mlb_engine.entries import upload_manifest as um
+        um.REPO_ROOT = self._um_root
+
+    def test_a_mismatched_parent_crash_after_the_write_exits_7_and_its_command_passes(self):
+        # (c). A run this file does not match: the label caps at review_grade
+        # rather than inheriting that unrelated run's certified.
+        swap_parent = {
+            "manifest": {"run_id": "UNRELATED_RUN", "certification": {
+                "workflow_valid": True, "selection_certified": True,
+                "allocation_certified": True}},
+            "run_dir": str(self.root / "runs" / "UNRELATED_RUN"),
+            "parent_export_sha256": "f" * 64,
+            "current_entries_sha256": "0" * 64,
+            "current_matches_parent_export": False,
+        }
+        # (a). A later failure after record_delivery has already recorded the
+        # row (stage_salary_for_delivery raises before the rename): the file
+        # stays at its DO_NOT_UPLOAD_ name, and that is what gets presented.
+        self.ls.stage_salary_for_delivery = lambda *a, **kw: (_ for _ in ()).throw(
+            RuntimeError("disk full mid-stage"))
+        self.ls.main = lambda: self.ls.deliver_swap(
+            self.args,
+            {"workflow_valid": True, "selection_certified": True,
+             "allocation_certified": True, "run_id": "RUN_SWAP", "promoted": True},
+            self.out, self.salary, swap_parent, {"5": "large_gpp"},
+            {"900": []}, [], {})
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = self.ls._main_recording_refusals()
+        self.assertEqual(code, 7, err.getvalue())
+        brief = json.loads(out.getvalue()[out.getvalue().index("{"):])
+        artifact = brief["last_usable_artifact"]
+        self.assertEqual(artifact["label"], "review_grade")
+        self.assertIn("DO_NOT_UPLOAD_", artifact["path"])
+        self.assertTrue(Path(artifact["path"]).exists())
+        command = artifact["preflight_command"]
+        self.assertIn(f"--parent {self.parent}", command)
+        self.assertIn(artifact["path"], command)
+
+        # (b). CLAUDE.md's pre-upload rule adds --salary; the printed command
+        # supplies the rest. It runs and passes on these exact bytes.
+        from tools import preflight_upload
+        argv = command.split()[1:] + ["--salary", str(self.salary)]
+        pf_out = io.StringIO()
+        with contextlib.redirect_stdout(pf_out), contextlib.redirect_stderr(io.StringIO()):
+            pf_code = preflight_upload.main(argv)
+        self.assertEqual(pf_code, 0, pf_out.getvalue())
 
 
 class BaselineCoreTests(unittest.TestCase):
@@ -35767,8 +36064,10 @@ class ClassicBaselineFirstTests(unittest.TestCase):
         self.assertEqual(ls.parent_delivery_lineage(None, "2026-06-03"), "")
         source = (REPO / "tools" / "late_swap.py").read_text(encoding="utf-8")
         call = source[source.index("record = record_delivery("):]
+        # R414: the call unindented one level when its try/except was removed
+        # (a later failure here is now exit 7, not a swallowed exception).
         self.assertIn("lineage=parent_delivery_lineage(swap_parent, args.date)",
-                      call[:call.index("\n        )")])
+                      call[:call.index("\n    )")])
 
     def test_a_re_promoted_baseline_keeps_its_label_and_lineage(self):
         """With its outputs row gone, the run's own metadata names the label and

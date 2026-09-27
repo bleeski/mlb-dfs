@@ -894,7 +894,18 @@ EXPECTED_SUITE_COUNTS = {
     # R422, 2026-09-25: 1717 -> 1732, the fifteen ClassicTailSeatTests (the coverage table; the market-only bottom third, dropped by name; top-heavy placement at most half a contest, none for a cash posture; tail seats off the contest before the weights; a pinned seat takes only its team's stack, caps binding, a stack under the floor no seat, a missing team counted; both switches change nothing; depth jobs only when short, counting distinct projection-world rosters and the direct door's own bank; one helper for the bank and the stamp; run_slate stamps before any door; the delivery record carries the market and a re-promotion keeps it; the miner keeps the stack team at the engine's threshold; the brief line).
     # R424, 2026-09-25: 1732 -> 1733, the one test that pins advisorModel "fable" in the project settings.
     # Session 106, 2026-09-26: 1733 -> 1755, R419 +16 (AutobuildFileInHandTests, R460's autobuild half inside it), R459 +3, R460 +2, R461 +1.
-    "tests.test_core": 1755,
+    # Session 101 (R414, R450, R452), 2026-09-27: 1755 -> 1764, nine: two on
+    # LateSwapReviewParentTests (R452, a mismatched parent never inherits the
+    # latest promotion's certified label, and reads its own row by its own
+    # bytes when one exists), six LateSwapLastUsableTests (R414's exit-7
+    # contract on `deliver_swap`: a raising record presents the file first; the
+    # wrapper turns that raise into 7; a raising promotion also delivers at 7;
+    # a REFUSED, non-raising promotion stays 3 and withdraws the file; an
+    # exception before any file is presented still propagates; a clean
+    # delivery exits 0 and names --parent), one LateSwapCompositionTests (all
+    # three together: a mismatched parent that crashes after the write exits 7
+    # under the capped label, and the printed preflight command passes).
+    "tests.test_core": 1764,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps
@@ -1404,7 +1415,14 @@ EXPECTED_SUITE_COUNTS = {
     # R388(a), 2026-09-23: 401 -> 413, the twelve GateTaxonomyTests (every certification gate classified; every name DKM's validator can fail, raw and parsed, resolves; an unclassified name raises; the governor's lookup still defaults; one fact name, one class; MIXED checks name distinct facts across two classes; the governor table moved value for value and answers AttributeError without the engine; one refusal vocabulary; the audit's anchor classes; four evidence states; evidence read exactly as _gate_bool reads it; both classes side by side).
     # Session 09 (R388(d)), 2026-09-24: 413 -> 414, the one GateAssumptionVersusOverrideTests that pins a refused assumption as V, never reclassified into review-grade.
     # Session 113 (R444), 2026-09-26: 414 -> 420, the six WithinContestDuplicateTests (a Classic within-contest duplicate fails the check and exits 2 from both referees; two distinct lineups, and the same lineup across two contests, still pass; a Showdown double-up under different captains is not a duplicate (R225); a Showdown repeat under the same captain fails).
-    "tests.test_upload_integrity": 420,
+    # Session 101 (R450), 2026-09-27: 420 -> 423, the three
+    # PreflightParentAutoResolveTests (a legal post-first-pitch swap passes
+    # preflight with no explicit --parent, resolved from the manifest's
+    # supersession chain; an introduced started player still fails with no
+    # explicit --parent either; the same bytes with no manifest at all still
+    # run the initial-build case, proving the pass above is the resolution
+    # working and not the started-game rule going soft).
+    "tests.test_upload_integrity": 423,
     "tests.test_golden_replay": 9,
     # R117(a), 2026-08-18: 75 -> 82, the seven that pin BOTH renders of the
     # mlb.com hand line against the same paste -- the joined render derived from

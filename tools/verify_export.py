@@ -113,7 +113,8 @@ from preflight_upload import (  # noqa: E402
     check_row_shape, check_status, derive_locked_teams_from_feed, load_entries,
     load_salary, parse_as_of, parse_declared_pitcher_args, parse_embedded_pool,
     parse_game_info_datetime, resolve_declared_pitchers, resolve_feed_for_slate,
-    resolve_feed_source, resolve_salary_from_promoted_run, sha256_of, verdict_exit_code,
+    resolve_feed_source, resolve_parent_from_manifest, resolve_salary_from_promoted_run,
+    sha256_of, verdict_exit_code,
 )
 
 # R324. `derive_locked_teams_from_feed` moved into `preflight_upload` with the
@@ -291,53 +292,11 @@ def resolve_locked_teams(
             set(not_locked_teams) - operator)
 
 
-def resolve_parent_from_manifest(entries_path: Path, manifest_path: Optional[Path],
-                                 rep: Report) -> Optional[Path]:
-    """The delivery this file refines, read off the manifest's supersession chain.
-
-    R72(ii). The locked-game membership check ran only ``if args.parent`` -- so on
-    a refinement verified without that flag, nothing re-checked whether a changed
-    entry introduced a player from a game that had already started. (R324 closed
-    the remaining half of that: with no parent at all, the shared helper now runs
-    the initial-build case rather than nothing.) This tool already refuses to let
-    its two most
-    consequential inputs be opt-in (``--locked-teams`` is unioned rather than
-    substituted per R29, and the feed auto-resolves) for one reason, stated in the
-    module header: a check that runs only when the operator remembers a flag is a
-    check that does not run at T-5. The parent was the last opt-in input.
-
-    The chain is structured, not parsed from prose: the superseded record names
-    its successor in ``superseded_by``, so the parent of THIS file is the record
-    that points at it. (The child's own ``notes`` string also mentions a parent
-    run path, but a notes field is not a contract and is not read here.) An
-    explicit ``--parent`` always wins; this only fills the gap.
-    """
-    if manifest_path is None:
-        return None
-    try:
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return None                      # check_manifest reports unreadable records
-    records = manifest if isinstance(manifest, list) else manifest.get("deliveries", [])
-    name = entries_path.name
-    for rec in records:
-        successor = str(rec.get("superseded_by") or "").strip()
-        if not successor or Path(successor).name != name:
-            continue
-        for candidate in (REPO_ROOT / str(rec.get("delivered_file") or ""),
-                          REPO_ROOT / "runs" / str(rec.get("run_id") or "")
-                          / "final" / "DKEntries.csv"):
-            if candidate.exists():
-                rep.info["parent_source"] = (
-                    f"manifest supersession chain ({name} supersedes "
-                    f"{Path(str(rec.get('delivered_file') or '')).name})")
-                return candidate
-        rep.warn(f"the manifest says this file supersedes "
-                 f"{rec.get('delivered_file')}, but that file is not on disk and "
-                 f"neither is the run snapshot for {rec.get('run_id')}; "
-                 f"locked-slot preservation is unverified")
-        return None
-    return None
+# R450. `resolve_parent_from_manifest` moved to `preflight_upload.py` (imported
+# above), which lacked it entirely: with no `--parent`, `check_parent_transition`
+# ran the initial-build case there, hard-failing every legal swap made after the
+# first pitch. One owner, both referees import it, per R233's "two readers of
+# one rule" failure class already named in this module's header.
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
