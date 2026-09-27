@@ -5110,6 +5110,16 @@ def showdown_control_provenance(solved: dict, before: dict, governor,
                      "Showdown control is refused until that ladder reads it")}
 
 
+def _showdown_entries_in(path: Path) -> int:
+    # R457. Mirrors `execution_pipeline._entries_in`'s rule exactly: counted
+    # off the delivered file's own bytes, not off the assignments this build
+    # FILLED, because `write_showdown_entries` preserves a template's complete
+    # rows -- the file holds filled plus complete, and preflight's truncated-
+    # write check reads every parsed row of the file, the same fact.
+    from mlb_engine.entries.dk_entries_manager import parse_dk_entry_rows
+    return len(parse_dk_entry_rows(path))
+
+
 def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[int, dict]:
     from mlb_engine.optimize import showdown as sd
     from mlb_engine.optimize import showdown_theses as st
@@ -5194,12 +5204,30 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
     participation = df.attrs.get("participation_report") or {}
     basis = str(participation.get("slate_basis") or "") or (
         "empty" if not len(df) else "all_healthy")
-    posted = int(df["Batting_Order"].notna().sum()) if len(df) else 0
+    sides = list(participation.get("sides") or [])
+    # R456. `posted` used to count `Batting_Order` on THIS frame, after
+    # `starters_only`/`exclude_out` drop a shelved bat, so a side that posted a
+    # complete nine and then lost one bat to IL silently read as under-posted --
+    # the participation report already marks that side `decided=True` (R36 F8 /
+    # R159(a): a degraded nine is still a DECIDED one). Gate on `decided`
+    # directly. `basis == "declared_starters"` already implies every side is
+    # decided (the basis computation above requires it of every team), so the
+    # `all(...)` term is belt-and-suspenders on the fact the ladder actually
+    # needs, kept so a future change to the basis computation cannot silently
+    # reopen this.
+    use_ladder = (basis == "declared_starters" and bool(sides)
+                 and all(bool(s.get("decided")) for s in sides))
+    posted = sum(int(s.get("posted_slots") or 0) for s in sides)
     # The ladder is conditioned on batting order and declared starters. With
     # nothing posted there is no order to condition on, so the templates would be
     # labels over a pool the engine cannot actually distinguish. Fall back rather
     # than ship a thesis name that means nothing.
-    use_ladder = (basis == "declared_starters" and posted >= 2 * 9)
+    ladder_gate_reason = (
+        f"pool basis is {basis!r} with {posted} posted hitters; the thesis "
+        "ladder needs both posted batting orders to condition on, so it was "
+        "not used")
+    if not use_ladder:
+        print(f"thesis ladder not used: {ladder_gate_reason}", file=sys.stderr)
 
     ladder_meta: dict = {}
     solve_diag: dict = {}
@@ -5535,7 +5563,12 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
             # 'candidate' is the honest status for a review-grade Showdown file:
             # it has not been through the three certification gates, so it is a
             # candidate and preflight must not promote it past that.
-            entries=len(assignments), run_id=None, status="candidate",
+            # R457: counted off `provisional`'s own bytes (the file this row's
+            # `hash_source` also names), not off `assignments` -- the rows this
+            # build FILLED -- because a template carrying a complete row leaves
+            # the written file holding filled plus complete.
+            entries=_showdown_entries_in(provisional), run_id=None,
+            status="candidate",
             certification="review_grade",
             notes="Showdown ships review-grade; it does not pass the three "
                   "certification gates. See CLAUDE.md.",
@@ -5908,7 +5941,11 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
             "openers_kept": list(
                 (df.attrs.get("participation_report") or {}).get(
                     "openers_kept") or []),
-            "posted_hitters": int(df["Batting_Order"].notna().sum()) if len(df) else 0,
+            # R456. Reads the same `posted` the `use_ladder` gate above computed
+            # off `participation["sides"]`, not `Batting_Order` on this
+            # post-filter frame -- the identical stale count the gate itself
+            # used to carry, a second site the fix would otherwise have missed.
+            "posted_hitters": posted,
             # R291(c). Classic's `pool_report.excluded_column`, on the path that
             # had no pool report. `players` above is the CARRIED pool; read
             # `legal_players` for what the solve could actually roster.
@@ -6140,9 +6177,7 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
             "player_exposure": report.get("player_exposure"),
         } if use_ladder else {
             "mode": "points_max_bank",
-            "reason": (f"pool basis is {basis!r} with {posted} posted hitters; the "
-                       "thesis ladder needs both posted batting orders to "
-                       "condition on, so it was not used"),
+            "reason": ladder_gate_reason,
         }),
         "caution": (f"showdown.py is v{sd.VERSION} and Phase 3 is not complete. "
                     "Per-lineup checks, template preservation, the captain "
@@ -6485,7 +6520,12 @@ def publish_showdown_baseline(args, salary: Path, entries: Path, frame,
                 contest_type="showdown", slate_tag=tag,
                 contest_ids=sorted({r["contest_id"] for r in rows}),
                 contest_names=sorted({r.get("contest_name", "") for r in rows}),
-                entries=len(assignments), run_id=None, status="candidate",
+                # R457: counted off `provisional`'s own bytes, not off
+                # `assignments` -- the rows this build FILLED -- because a
+                # template carrying a complete row leaves the written file
+                # holding filled plus complete.
+                entries=_showdown_entries_in(provisional), run_id=None,
+                status="candidate",
                 certification="review_grade",
                 notes=(f"Showdown baseline (R389(c)): a points-max bank at the "
                        f"build's controls, published before {before}. "
