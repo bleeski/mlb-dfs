@@ -3884,16 +3884,21 @@ class R96PerCallerTests(unittest.TestCase):
                         "the name is promoted only once a row names it")
         self.assertLess(promote, record)
 
-    def test_p3_late_swap_leaves_the_provisional_name_when_recording_fails(self):
+    def test_p3_late_swap_presents_the_file_before_recording_can_fail(self):
+        """R414 superseded this P3 pin: a raising recorder no longer prints
+        'MANIFEST NOT RECORDED' and swallows the exception at exit 0 with the
+        file silently left under its DO_NOT_UPLOAD_ name. It raises, and the
+        file is already presented (`note_last_usable`) by the time it can,
+        so `_main_recording_refusals` delivers it at exit 7 under its own
+        label instead (`tests.test_core.LateSwapLastUsableTests`)."""
         text = self._text("tools/late_swap.py")
-        self.assertTrue("MANIFEST NOT RECORDED for" in text,
-                        "the raising-recorder branch must still say so out loud")
-        # The promotion sits INSIDE the try, so a raising recorder skips it.
-        head = text[text.index("record = record_delivery("):]
-        body = head[:head.index("except Exception as exc:")]
-        self.assertIn("os.replace(provisional, dest)", body,
-                      "promotion inside the try is what makes a raising "
-                      "recorder leave the DO_NOT_UPLOAD_ name")
+        self.assertNotIn("MANIFEST NOT RECORDED for", text,
+                         "a raising record is a later failure (exit 7), not "
+                         "a caught, printed, swallowed exception")
+        present = text.index("bs.note_last_usable(")
+        record = text.index("record = record_delivery(")
+        self.assertLess(present, record,
+                        "the file must be presented before the call that can fail")
 
     def test_p4_showdown_records_before_it_promotes(self):
         text = self._text("skills/generate-lineups/scripts/build_slate.py")
@@ -7550,6 +7555,120 @@ class R324ParentTransitionTests(unittest.TestCase):
                 (pre_rc == 2, ver_rc == 2), (expected, expected),
                 f"at {as_of} the oracle says started={expected} while "
                 f"preflight={pre_rc} and verify_export={ver_rc}\n{pre.stdout}")
+
+
+class PreflightParentAutoResolveTests(unittest.TestCase):
+    """R450. With no ``--parent``, preflight now resolves it from the
+    manifest's supersession chain (`resolve_parent_from_manifest`, moved here
+    from `verify_export.py` so both referees share one owner), the way
+    `verify_export` already did.
+
+    Reproduced: `late_swap.py` prints `preflight_upload.py --entries <f>
+    --expect-sha256 <sha>` with no `--parent`, and CLAUDE.md's pre-upload rule
+    is exactly that command. With no parent, `check_parent_transition` ran the
+    initial-build case, so a legal swap made after the first pitch of a
+    staggered slate (nine frozen slots holding started players, one changed
+    slot in the still-open game) hard-failed here every time -- and the check
+    that DOES need a parent, an introduced started player in a CHANGED slot,
+    never ran at all.
+
+    Reuses ``R324ParentTransitionTests``'s fixture shape (three games, two
+    started at PREGAME, one open) as class-attribute constants rather than
+    subclassing it, so this class's own tests are the only ones that run
+    under its name.
+    """
+
+    PREGAME = R324ParentTransitionTests.PREGAME
+    LATE = R324ParentTransitionTests.LATE
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.dir = Path(self.tmp.name)
+        self.salary = self.dir / "DKSalaries.csv"
+        self.ids = write_three_game_salary(self.salary)
+        self.feed = write_three_game_feed(self.dir / "lineups_feed.json")
+        self.parent_lineup = [
+            self.ids["AAA Aster"], self.ids["CCC Aster"],
+            self.ids["AAA Boone"], self.ids["AAA Crane"], self.ids["AAA Dunne"],
+            self.ids["AAA Ellis"], self.ids["AAA Frost"],
+            self.ids["EEE Gable"], self.ids["EEE Hollis"], self.ids["EEE Ives"],
+        ]
+        self.parent = self.dir / "parent.csv"
+        write_entries(self.parent, CLASSIC_HEADER,
+                      [classic_entry("900", "5", self.parent_lineup)])
+
+    def _child(self, lineup, name="child.csv"):
+        path = self.dir / name
+        write_entries(path, CLASSIC_HEADER, [classic_entry("900", "5", lineup)])
+        return path
+
+    def _swap_in_fff(self, name="child.csv"):
+        lineup = list(self.parent_lineup)
+        lineup[9] = self.ids["FFF Ives"]
+        return self._child(lineup, name)
+
+    def _manifest_naming_parent(self, child_name: str) -> Path:
+        """A manifest beside the child, the shape `record_delivery` leaves
+        after a real swap: the parent's row points at the child by name in
+        ``superseded_by``. No row for the child itself, so `check_manifest`'s
+        unrelated cross-check only warns (no record for it, not delivered)
+        rather than failing on a placeholder sha256 that cannot match real
+        bytes. ``delivered_file`` is this file's own absolute path, which
+        pathlib keeps whole under `REPO_ROOT / ...` regardless of REPO_ROOT."""
+        manifest = self.dir / "upload_manifest.json"
+        manifest.write_text(json.dumps({
+            "version": "1.1", "date": "2026-07-25", "deliveries": [
+                {"delivered_file": str(self.parent.resolve()),
+                 "sha256": "aa" * 32, "contest_type": "classic", "slate_tag": "t",
+                 "status": "superseded", "superseded_by": child_name},
+            ]}), encoding="utf-8")
+        return manifest
+
+    def test_a_legal_post_first_pitch_swap_passes_with_no_explicit_parent(self):
+        child = self._swap_in_fff()
+        self._manifest_naming_parent(child.name)
+        out = _run_preflight_argv([
+            "--entries", str(child), "--salary", str(self.salary),
+            "--feed", str(self.feed), "--as-of", self.PREGAME, "--no-manifest", "--json"])
+        self.assertEqual(out.returncode, 0, out.stdout + out.stderr)
+        payload = json.loads(out.stdout)
+        self.assertEqual(payload["info"]["parent_file"], str(self.parent.resolve()))
+        self.assertIn("manifest supersession chain", payload["info"]["parent_source"])
+        block = payload["info"]["parent_transition"]
+        self.assertEqual(block["mode"], "parent")
+        self.assertEqual(block["slots_changed"], 1)
+        self.assertTrue(block["carried_forward_from_started_games"])
+
+    def test_an_introduced_started_player_still_fails_with_no_explicit_parent(self):
+        """R450's other half: the check the missing parent used to remove.
+        Same file as above, 25 minutes later: the game it swaps INTO has
+        started, so the auto-resolved parent must still catch it."""
+        child = self._swap_in_fff()
+        self._manifest_naming_parent(child.name)
+        out = _run_preflight_argv([
+            "--entries", str(child), "--salary", str(self.salary),
+            "--feed", str(self.feed), "--as-of", self.LATE, "--no-manifest", "--json"])
+        self.assertEqual(out.returncode, 2, out.stdout + out.stderr)
+        payload = json.loads(out.stdout)
+        self.assertTrue(any("already-started game" in f for f in payload["failures"]),
+                        payload["failures"])
+        self.assertEqual(payload["info"]["parent_transition"]["mode"], "parent")
+
+    def test_the_same_bytes_with_no_manifest_at_all_run_the_initial_build_case(self):
+        """The control: with no ``upload_manifest.json`` beside it (nothing to
+        auto-resolve from) and no ``--parent``, the SAME legal swap still fails
+        -- proving the test above passes because of the auto-resolution, not
+        because the started-game rule went soft."""
+        child = self._swap_in_fff(name="unlinked.csv")
+        out = _run_preflight_argv([
+            "--entries", str(child), "--salary", str(self.salary),
+            "--feed", str(self.feed), "--as-of", self.PREGAME, "--no-manifest", "--json"])
+        self.assertEqual(out.returncode, 2, out.stdout + out.stderr)
+        payload = json.loads(out.stdout)
+        self.assertEqual(payload["info"]["parent_transition"]["mode"], "initial")
+        self.assertIsNone(payload["info"]["parent_file"])
+
 
 # ---------------------------------------------------------------------------
 # R323. `dk_order_coverage` counted role ROWS, so the one check that catches a

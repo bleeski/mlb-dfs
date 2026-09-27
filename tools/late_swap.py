@@ -43,6 +43,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import hashlib
 import json
 import os
 import sys
@@ -129,6 +130,48 @@ LATE_SWAP_ASSUMED_GATES = [
 # is a second source of truth for the same number, and keeping one around to fall
 # back to is how it comes back.
 
+#: R414. `build_slate.py` under `skills/generate-lineups/scripts/` is a script,
+#: not a package, so it is loaded by file path (the way `tools/build_asserted.py`
+#: and every test that drives it already do) rather than imported normally.
+#: Cached per process: `_LAST_USABLE`, `_present_file`, `note_last_usable` and
+#: `_deliver_after_exception` are read through this ONE module object, so a
+#: late-swap process and a repeated in-test `main()` call see the same state
+#: `_main_recording_refusals` below clears at the top of each call.
+_BUILD_SLATE_MODULE = None
+
+
+def _build_slate_module():
+    """Session 08's last-usable-artifact mechanism, reused rather than copied.
+
+    Late swap needs exactly what `build_slate.py` already built for R393(b):
+    present a written file before any narrative, then let a later exception or
+    a failed record become exit 7 under the file's own label instead of
+    silently withholding it. Writing a second copy of `_LAST_USABLE`,
+    `_present_file`, `note_last_usable` and `_deliver_after_exception` here
+    would be the exact "two readers of one rule" failure class CLAUDE.md
+    already names (R233): this loads the one definition instead.
+
+    Known limitation, found by the landing review, not fixed here because it
+    needs `skills/` and `tools/` to disagree about being on disk, which is a
+    tree-integrity failure rather than a per-swap one: if THIS load itself
+    raises (the file missing or broken, never true for a git checkout that
+    has `tools/`), the exception propagates out of `deliver_swap` before
+    anything is presented, and `_main_recording_refusals` sees
+    `_BUILD_SLATE_MODULE` still `None` and re-raises uncaught rather than
+    writing a refusal record. The provisional bytes are already on disk by
+    then; only the record and the presentation are lost, not the file.
+    """
+    global _BUILD_SLATE_MODULE
+    if _BUILD_SLATE_MODULE is None:
+        import importlib.util
+        path = (REPO / "skills" / "generate-lineups" / "scripts" / "build_slate.py")
+        spec = importlib.util.spec_from_file_location(
+            "build_slate_for_late_swap", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        _BUILD_SLATE_MODULE = module
+    return _BUILD_SLATE_MODULE
+
 
 def swap_certification(result: dict, downgraded: list, parent_label=None) -> str:
     """The manifest label for a delivered swap (R388(e)): failing gates win,
@@ -161,15 +204,27 @@ def parent_delivery_lineage(parent: dict | None, date: str) -> str:
     `verify_export` walks for locked slots), and `record_delivery`'s
     refinement retires every other lineage's live row. No parent, or one with
     neither, is the default lineage.
+
+    R452. A ``--allow-parent-mismatch`` run names the LATEST PROMOTED run's
+    manifest and export sha, not this file's: that manifest's own
+    ``delivery_lineage`` describes the promoted run, not the file being
+    refined, and its ``parent_export_sha256`` is that run's bytes, not the
+    file's. Neither is evidence about this file, so a mismatch reads the
+    file's own bytes (``current_entries_sha256``) instead, and the run's
+    metadata is not consulted at all.
     """
     if not parent:
         return ""
-    meta = str(((parent.get("manifest") or {}).get("metadata") or {}).get(
-        "delivery_lineage") or "")
-    if meta:
-        return meta
+    mismatched = (parent or {}).get("current_matches_parent_export") is False
+    if not mismatched:
+        meta = str(((parent.get("manifest") or {}).get("metadata") or {}).get(
+            "delivery_lineage") or "")
+        if meta:
+            return meta
+    sha = str((parent.get("current_entries_sha256") if mismatched
+               else parent.get("parent_export_sha256")) or "")
     try:
-        row = recorded_delivery_row(date, str(parent.get("parent_export_sha256") or ""))
+        row = recorded_delivery_row(date, sha)
     except Exception:  # noqa: BLE001 - a missing manifest is the default lineage
         row = None
     return row_lineage(row) if row else ""
@@ -187,41 +242,57 @@ def parent_delivery_label(parent: dict, date: str) -> tuple:
     failed its gates records the deadline label in its metadata too; then any
     other review-grade label; a run none of them names is labelled by its own
     certification. The failing gates come from the export or the row.
+
+    R452. ``resolve_parent_run(allow_parent_mismatch=True)`` hands back the
+    LATEST PROMOTED run's manifest and ``parent_export_sha256`` when the file
+    matches no run at all (``current_matches_parent_export`` is False): that
+    manifest, its ``diagnostics.json`` and its delivery records all describe
+    a DIFFERENT file. None of them is evidence about the file actually being
+    swapped, so a mismatch reads only the ``outputs/<date>/`` row for the
+    file's own bytes (``current_entries_sha256``) and never falls back to the
+    unrelated run's ``certified`` certification; no row caps it at
+    ``review_grade``, never better than a verified parent because there
+    isn't one.
     """
     manifest = dict((parent or {}).get("manifest") or {})
     run_id = manifest.get("run_id")
+    mismatched = (parent or {}).get("current_matches_parent_export") is False
     found = []
     gates: list = []
-    meta = (manifest.get("metadata") or {}).get("certification_label")
-    if meta:
-        found.append((str(meta), "run_manifest"))
+    if not mismatched:
+        meta = (manifest.get("metadata") or {}).get("certification_label")
+        if meta:
+            found.append((str(meta), "run_manifest"))
+        try:
+            diag = json.loads((Path(parent["run_dir"]) / "final" / "diagnostics.json")
+                              .read_text(encoding="utf-8"))
+        except (OSError, ValueError, KeyError, TypeError):
+            diag = {}
+        export = diag.get("review_grade_export")
+        if isinstance(export, dict) and export.get("label"):
+            found.append((str(export["label"]), "review_grade_export"))
+            gates = list(export.get("failing_gates") or [])
+    label_sha = str((parent.get("current_entries_sha256") if mismatched
+                     else parent.get("parent_export_sha256")) or "")
     try:
-        diag = json.loads((Path(parent["run_dir"]) / "final" / "diagnostics.json")
-                          .read_text(encoding="utf-8"))
-    except (OSError, ValueError, KeyError, TypeError):
-        diag = {}
-    export = diag.get("review_grade_export")
-    if isinstance(export, dict) and export.get("label"):
-        found.append((str(export["label"]), "review_grade_export"))
-        gates = list(export.get("failing_gates") or [])
-    try:
-        row = recorded_delivery_row(date, str(parent.get("parent_export_sha256") or ""))
+        row = recorded_delivery_row(date, label_sha)
     except Exception:  # noqa: BLE001 - a missing manifest is not a label
         row = None
     if row and row.get("certification"):
         found.append((str(row["certification"]), "upload_manifest"))
         gates = gates or list(row.get("failing_gates") or [])
-    try:
-        from mlb_engine.entries.delivery_record import read_records
-        for rec in read_records(date=date):
-            row_of = rec.get("manifest_row") or {}
-            if rec.get("kind") == "delivery" and run_id and (
-                    rec.get("run_id") or row_of.get("run_id")) == run_id:
-                if row_of.get("certification"):
-                    found.append((str(row_of["certification"]), "delivery_record"))
-                gates = gates or list(row_of.get("failing_gates") or [])
-    except Exception:  # noqa: BLE001
-        pass
+    if not mismatched:
+        try:
+            from mlb_engine.entries.delivery_record import read_records
+            for rec in read_records(date=date):
+                row_of = rec.get("manifest_row") or {}
+                if rec.get("kind") == "delivery" and run_id and (
+                        rec.get("run_id") or row_of.get("run_id")) == run_id:
+                    if row_of.get("certification"):
+                        found.append((str(row_of["certification"]), "delivery_record"))
+                    gates = gates or list(row_of.get("failing_gates") or [])
+        except Exception:  # noqa: BLE001
+            pass
     for label, source in found:
         if label == UNCERTIFIED_LABEL:
             return label, source, gates
@@ -230,6 +301,8 @@ def parent_delivery_label(parent: dict, date: str) -> tuple:
             return label, source, gates
     if found:
         return found[0][0], found[0][1], gates
+    if mismatched:
+        return "review_grade", "parent_mismatch_default", gates
     cert = manifest.get("certification") or {}
     if all(cert.get(k) is True for k in ("workflow_valid", "selection_certified",
                                          "allocation_certified")):
@@ -650,6 +723,159 @@ def _feed_age_report(feed: dict, slate_date: str, now: dt.datetime) -> tuple[lis
             f"late lineup changes since then are invisible to this swap"
         )
     return blockers, warnings
+
+
+def deliver_swap(args, result: dict, out: Path, salary: Path, swap_parent,
+                 contest_shapes: dict, after_rosters: dict, downgraded: list,
+                 controls: dict) -> int:
+    """Everything after a passing joint solve: present, promote, record, ship.
+
+    R414. Split out of `main()` so a test can drive every later-failure
+    branch (a raising promotion, a raising record) with a fake ``result`` and
+    a small real file standing in for a full swap's bank, feed and solve;
+    `main()` calls this once, with the real one. Returns the exit code.
+    """
+    dest_dir = REPO / "outputs" / args.date
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        slate_tag = _slate_tag(str(salary))
+    except Exception:  # noqa: BLE001 - naming must never block the file
+        slate_tag = ""
+    dest = dest_dir / lateswap_dest_name(slate_tag, str(result.get("run_id") or ""))
+    # R96(2). This wrote straight to `dest` and only recorded further down, past
+    # the promotion decision -- so a refused promotion returned 3 with an
+    # uploadable, unrecorded file sitting in outputs/. That is R29(2)'s window and
+    # it is one of the six paths R96 enumerated. The file now lands provisionally
+    # under DO_NOT_UPLOAD_ and is promoted only once a row exists, which keeps
+    # R29(2)'s own invariant (the mirror exists BEFORE promotion, so a refusal
+    # never leaves the pointer naming a run nothing was mirrored from) while
+    # making the refusal path self-labelling.
+    provisional = unrecorded_name(dest)
+    tmp = provisional.with_name(f".{provisional.name}.{uuid.uuid4().hex}.tmp")
+    content = out.read_bytes()
+    tmp.write_bytes(content)
+    os.replace(tmp, provisional)
+
+    # R414, Session 08's contract (R393(b)). Present the file BEFORE any
+    # narrative, the moment its bytes and its label both exist: a later
+    # exception anywhere below (a raising promotion, the consensus-summary
+    # prints, a failed record) is then a LATER FAILURE, delivered at exit 7
+    # under this label, rather than silently withheld under DO_NOT_UPLOAD_.
+    # R268(a) bounds the label at the parent's before anything is presented
+    # under it, so the label a later reader sees is never better than that.
+    parent_label, parent_label_source, parent_gates = (
+        parent_delivery_label(swap_parent, args.date) if swap_parent is not None
+        else (None, "none", []))
+    certification = swap_certification(result, downgraded, parent_label)
+    bs = _build_slate_module()
+    sha = hashlib.sha256(content).hexdigest()
+    # R450 folded in: computed now, against whichever name is currently on
+    # disk, so a later exception still delivers a runnable command (printed
+    # below on success, and carried in `_LAST_USABLE` for `_deliver_after_
+    # exception`'s brief on exit 7) rather than one only the success path saw.
+    preflight_command = (f"tools/preflight_upload.py --entries {provisional} "
+                        f"--parent {args.parent_entries} --expect-sha256 {sha[:12]}")
+    bs.note_last_usable({
+        "path": str(provisional), "sha256": sha,
+        "label": certification, "coverage": bs._coverage(provisional),
+        "date": args.date, "contest_type": "classic", "lineage": "late_swap",
+        "run_id": result.get("run_id"), "preflight_command": preflight_command,
+    })
+    print(f"parent label: {parent_label} (from {parent_label_source})")
+
+    # R29(2): the promotion held back at run_late_swap lands here, once this
+    # file is genuinely a delivery. Promoting at certification time meant a
+    # downgrade-refused run still owned the pointer with nothing in outputs/,
+    # and the next swap then failed on a parent mismatch that reads like a
+    # multi-session collision. The documented workaround was
+    # --allow-parent-mismatch on every later call, which is switching off the
+    # R20(c) protection because a bug taught the operator to distrust it.
+    result = promote_deferred_run(result)
+    if not result.get("promoted"):
+        # R393(b)'s review fix 6, mirrored here: a REFUSED promotion carries no
+        # artifact (what failed is the claim that this is the latest delivery,
+        # not the file), so this is exit 3 as it always was, not 7. Only a
+        # RAISING promotion -- caught by `_main_recording_refusals` below, not
+        # here -- is a later failure of a real delivery.
+        bs._LAST_USABLE.clear()
+        print("PROMOTION REFUSED after the file was written:", file=sys.stderr)
+        for err in result.get("errors") or []:
+            print(f"  {err}", file=sys.stderr)
+        print(f"{provisional} holds the lineups and is deliberately named so "
+              f"nobody uploads it: the latest-run pointer was not moved, so this "
+              f"file is not the recorded delivery and it never got a manifest "
+              f"row. Another session promoted while this swap was solving; "
+              f"decide which portfolio is the delivery before uploading "
+              f"anything.", file=sys.stderr)
+        return 3
+    print(f"gates: workflow_valid={result.get('workflow_valid')} "
+          f"selection={result.get('selection_certified')} "
+          f"allocation={result.get('allocation_certified')}")
+    # R405. Reported, never enforced here (see `resolve_swap_controls`). The
+    # parent's line is the build's own record; the swapped file's is the same
+    # function over the swap's bank, so the two can differ in membership.
+    # R414: no longer guarded against a raise -- the file is already presented,
+    # so an exception here is exit 7 under it, not a withheld delivery.
+    print("consensus cluster, parent build: " + consensus_cluster_summary(
+        parent_consensus_cluster(REPO / "runs", result.get("parent_run_id"))),
+          file=sys.stderr)
+    print("consensus cluster, swapped file (against the swap's bank, not "
+          "enforced): " + consensus_cluster_summary(result.get("consensus_cluster")),
+          file=sys.stderr)
+
+    # R414. No try/except here: bookkeeping "must never block the file" used
+    # to mean swallowing this exception and exiting 0 with the file still
+    # under its DO_NOT_UPLOAD_ name (a failed record read as a clean delivery).
+    # Now it means the file is already presented above, so a raise here is a
+    # LATER FAILURE that propagates to `_main_recording_refusals`, which reads
+    # `_LAST_USABLE` and delivers it at exit 7 under its own label instead.
+    record = record_delivery(
+        date=args.date, delivered_file=dest, hash_source=provisional,
+        contest_type="classic",
+        slate_tag=slate_tag, contest_ids=sorted(contest_shapes),
+        entries=len(after_rosters), run_id=result.get("run_id"),
+        status="candidate",
+        certification=certification,
+        # R388(d). An UNCERTIFIED parent's failing gates ride its refinement.
+        failing_gates=(parent_gates if certification == UNCERTIFIED_LABEL else None),
+        projection_tier="proxy",  # the swap assembles emergency-proxy projections
+        notes=f"late swap; parent {args.parent_entries}",
+        # R377. The controls the joint solve ran under, and the one thing a
+        # swap relaxes on its own authority: a downgrade taken anyway.
+        controls=controls_for_report(
+            {k: v for k, v in controls.items() if k != "time_limit"}),
+        relaxations={"downgrades_accepted": len(downgraded)},
+        # R388(d). A swap refines the file Ben entered, so an UNCERTIFIED
+        # refinement records even over a later passing build's row.
+        refinement=True,
+        # R389(b). In the parent's lineage, so a swap off the baseline
+        # supersedes the baseline and not the enhanced file.
+        lineage=parent_delivery_lineage(swap_parent, args.date),
+    )
+    delivered_sha = str(record.get("sha256") or "")
+    # R96(4): the swap had no salary staging at all, so a late-swapped slate
+    # was mineable only if some other path happened to stage the same date.
+    stage_salary_for_delivery(args.date, str(salary), slate_tag)
+    # R96(2): promote the name only now that a row names it.
+    os.replace(provisional, dest)
+    delivered = dest
+    # R450 + R414: the command named `provisional` (the only name guaranteed
+    # to exist if anything from here on had raised); now that the rename
+    # succeeded, both the presented record and the printed command follow it.
+    preflight_command = preflight_command.replace(str(provisional), str(dest), 1)
+    bs._LAST_USABLE["path"] = str(dest)
+    bs._LAST_USABLE["preflight_command"] = preflight_command
+    print(f"wrote {delivered}")
+    if delivered_sha:
+        print(f"delivered sha256: {delivered_sha}")
+        # R450. Preflight now auto-resolves a parent from the manifest chain
+        # when none is passed, but this file supersedes args.parent_entries
+        # directly, before that row exists: passing it here is faster and
+        # exact, and it is what CLAUDE.md's pre-upload sentence expects to
+        # find already recorded, printed rather than typed under a clock.
+        print(f"verify at upload: {preflight_command}")
+    print("Upload by hand. Nothing here entered a contest or moved money.")
+    return 0
 
 
 def main() -> int:
@@ -1162,108 +1388,72 @@ def main() -> int:
     # hard-fails. The name now carries the draftgroup tag and the swap run's
     # id, the write is staged then replaced, and the delivery is recorded so
     # "which file do I upload" stays one read of one file.
-    dest_dir = REPO / "outputs" / args.date
-    dest_dir.mkdir(parents=True, exist_ok=True)
-    try:
-        slate_tag = _slate_tag(str(salary))
-    except Exception:  # noqa: BLE001 - naming must never block the file
-        slate_tag = ""
-    dest = dest_dir / lateswap_dest_name(slate_tag, str(result.get("run_id") or ""))
-    # R96(2). This wrote straight to `dest` and only recorded further down, past
-    # the promotion decision -- so a refused promotion returned 3 with an
-    # uploadable, unrecorded file sitting in outputs/. That is R29(2)'s window and
-    # it is one of the six paths R96 enumerated. The file now lands provisionally
-    # under DO_NOT_UPLOAD_ and is promoted only once a row exists, which keeps
-    # R29(2)'s own invariant (the mirror exists BEFORE promotion, so a refusal
-    # never leaves the pointer naming a run nothing was mirrored from) while
-    # making the refusal path self-labelling.
-    provisional = unrecorded_name(dest)
-    tmp = provisional.with_name(f".{provisional.name}.{uuid.uuid4().hex}.tmp")
-    tmp.write_bytes(out.read_bytes())
-    os.replace(tmp, provisional)
+    #
+    # R414. Everything from here on (present, promote, record, ship) is
+    # `deliver_swap`, so a test can drive its later-failure branches without
+    # a full swap behind it.
+    return deliver_swap(args, result, out, salary, swap_parent, contest_shapes,
+                        after_rosters, downgraded, controls)
 
-    # R29(2): the promotion held back at run_late_swap lands here, once this
-    # file is genuinely a delivery. Promoting at certification time meant a
-    # downgrade-refused run still owned the pointer with nothing in outputs/,
-    # and the next swap then failed on a parent mismatch that reads like a
-    # multi-session collision. The documented workaround was
-    # --allow-parent-mismatch on every later call, which is switching off the
-    # R20(c) protection because a bug taught the operator to distrust it.
-    result = promote_deferred_run(result)
-    if not result.get("promoted"):
-        print("PROMOTION REFUSED after the file was written:", file=sys.stderr)
-        for err in result.get("errors") or []:
-            print(f"  {err}", file=sys.stderr)
-        print(f"{provisional} holds the lineups and is deliberately named so "
-              f"nobody uploads it: the latest-run pointer was not moved, so this "
-              f"file is not the recorded delivery and it never got a manifest "
-              f"row. Another session promoted while this swap was solving; "
-              f"decide which portfolio is the delivery before uploading "
-              f"anything.", file=sys.stderr)
-        return 3
-    print(f"gates: workflow_valid={result.get('workflow_valid')} "
-          f"selection={result.get('selection_certified')} "
-          f"allocation={result.get('allocation_certified')}")
-    # R405. Reported, never enforced here (see `resolve_swap_controls`). The
-    # parent's line is the build's own record; the swapped file's is the same
-    # function over the swap's bank, so the two can differ in membership.
-    print("consensus cluster, parent build: " + consensus_cluster_summary(
-        parent_consensus_cluster(REPO / "runs", result.get("parent_run_id"))),
-          file=sys.stderr)
-    print("consensus cluster, swapped file (against the swap's bank, not "
-          "enforced): " + consensus_cluster_summary(result.get("consensus_cluster")),
-          file=sys.stderr)
-    delivered_sha = ""
-    delivered = provisional
-    # R268(a). The parent's label bounds this swap's (`swap_certification`).
-    parent_label, parent_label_source, parent_gates = (
-        parent_delivery_label(swap_parent, args.date) if swap_parent is not None
-        else (None, "none", []))
-    print(f"parent label: {parent_label} (from {parent_label_source})")
+
+def _argv_date(argv) -> str:
+    """The ``--date`` this call was given (mirrors build_slate.py's own)."""
+    for i, arg in enumerate(argv):
+        if arg == "--date" and i + 1 < len(argv):
+            return argv[i + 1]
+        if arg.startswith("--date="):
+            return arg.split("=", 1)[1]
+    return ""
+
+
+def _main_recording_refusals() -> int:
+    """``main()``, with Session 08's R393(b) contract applied to late swap (R414).
+
+    Once `main()` has presented a written file (`note_last_usable`, on the
+    shared `build_slate` module loaded by `_build_slate_module` -- one
+    definition, not a third copy, per R233), a later exception no longer
+    exits 1 with that file silently sitting on disk under its DO_NOT_UPLOAD_
+    name: `_deliver_after_exception` presents it again, under its own label,
+    and this returns 7. With nothing presented yet -- every refusal before
+    the joint solve, and `EngineCrashed` before the file exists -- the
+    exception propagates exactly as it always did.
+
+    `build_slate.py` is loaded LAZILY, by `main()` itself, only once it has a
+    file to present: most refusals never reach that point, and a caller that
+    exercises late_swap.py from a skeleton tree holding only this one script
+    (`.claude/rules/engine.md`) must not need `skills/` on disk to hit them.
+    So this reads the module-level cache rather than forcing a load, and never
+    treats an absent `build_slate.py` as a reason to hide an exception.
+
+    Every non-zero exit also writes a refusal record, the same mechanism
+    build_slate's own recording door uses (R369): `main()` never learns of
+    this wrapper, so the only context available from outside it is argv's
+    ``--date`` and, on an exit-7 delivery, the file `_LAST_USABLE` names.
+    """
+    if _BUILD_SLATE_MODULE is not None:
+        _BUILD_SLATE_MODULE._LAST_USABLE.clear()
+    argv = sys.argv[1:]
     try:
-        record = record_delivery(
-            date=args.date, delivered_file=dest, hash_source=provisional,
-            contest_type="classic",
-            slate_tag=slate_tag, contest_ids=sorted(contest_shapes),
-            entries=len(after_rosters), run_id=result.get("run_id"),
-            status="candidate",
-            certification=swap_certification(result, downgraded, parent_label),
-            # R388(d). An UNCERTIFIED parent's failing gates ride its refinement.
-            failing_gates=(parent_gates if swap_certification(
-                result, downgraded, parent_label) == UNCERTIFIED_LABEL else None),
-            projection_tier="proxy",  # the swap assembles emergency-proxy projections
-            notes=f"late swap; parent {args.parent_entries}",
-            # R377. The controls the joint solve ran under, and the one thing a
-            # swap relaxes on its own authority: a downgrade taken anyway.
-            controls=controls_for_report(
-                {k: v for k, v in controls.items() if k != "time_limit"}),
-            relaxations={"downgrades_accepted": len(downgraded)},
-            # R388(d). A swap refines the file Ben entered, so an UNCERTIFIED
-            # refinement records even over a later passing build's row.
-            refinement=True,
-            # R389(b). In the parent's lineage, so a swap off the baseline
-            # supersedes the baseline and not the enhanced file.
-            lineage=parent_delivery_lineage(swap_parent, args.date),
-        )
-        delivered_sha = str(record.get("sha256") or "")
-        # R96(4): the swap had no salary staging at all, so a late-swapped slate
-        # was mineable only if some other path happened to stage the same date.
-        stage_salary_for_delivery(args.date, str(salary), slate_tag)
-        # R96(2): promote the name only now that a row names it.
-        os.replace(provisional, dest)
-        delivered = dest
-    except Exception as exc:  # noqa: BLE001 - bookkeeping must never block the file
-        print(f"MANIFEST NOT RECORDED for {dest.name}: {exc}; the file was NOT "
-              f"promoted and is at {provisional.name}, which names itself rather "
-              f"than waiting for preflight to hard-fail it", file=sys.stderr)
-    print(f"wrote {delivered}")
-    if delivered_sha:
-        print(f"delivered sha256: {delivered_sha}")
-        print(f"verify at upload: tools/preflight_upload.py --entries {delivered} "
-              f"--expect-sha256 {delivered_sha[:12]}")
-    print("Upload by hand. Nothing here entered a contest or moved money.")
-    return 0
+        code = main()
+    except Exception as exc:  # noqa: BLE001 - R414, see the docstring
+        bs = _BUILD_SLATE_MODULE
+        if bs is None or not bs._LAST_USABLE:
+            raise
+        code = bs._deliver_after_exception(exc)
+    if code == 0:
+        return code
+    try:
+        from mlb_engine.entries.delivery_record import write_refusal_record
+        bs = _BUILD_SLATE_MODULE
+        refusal: dict = {"argv": argv}
+        if code == 7 and bs is not None and bs._LAST_USABLE:
+            refusal["last_usable_artifact"] = dict(bs._LAST_USABLE)
+        write_refusal_record(date=_argv_date(argv), slate_tag="",
+                             exit_code=int(code), refusal=refusal)
+    except Exception as exc:  # noqa: BLE001 - never change the exit code
+        print(f"delivery_record: refusal not recorded ({type(exc).__name__}: {exc})")
+    return code
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(_main_recording_refusals())

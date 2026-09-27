@@ -1518,6 +1518,53 @@ def match_manifest_record(records: Sequence[Any], digest: str,
     return (live or pool)[-1]
 
 
+def resolve_parent_from_manifest(entries_path: Path, manifest_path: Optional[Path],
+                                 rep: Report) -> Optional[Path]:
+    """The delivery this file refines, read off the manifest's supersession chain.
+
+    R450. This is the ONE owner (moved here from `verify_export.py`, which
+    imports it back): with no ``--parent``, `check_parent_transition` ran the
+    initial-build case, so every carried-forward started slot read as a
+    placement and a placement refuses a locked player. That hard-failed every
+    legal swap made after the first pitch of a staggered slate -- exactly the
+    command `late_swap.py` prints and CLAUDE.md names as the pre-upload rule --
+    and it silently dropped the one check that needs a parent at all: an
+    introduced started player in a CHANGED slot.
+
+    The chain is structured, not parsed from prose: the superseded record names
+    its successor in ``superseded_by``, so the parent of THIS file is the record
+    that points at it. (The child's own ``notes`` string also mentions a parent
+    run path, but a notes field is not a contract and is not read here.) An
+    explicit ``--parent`` always wins; this only fills the gap.
+    """
+    if manifest_path is None:
+        return None
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None                      # check_manifest reports unreadable records
+    records = manifest if isinstance(manifest, list) else manifest.get("deliveries", [])
+    name = entries_path.name
+    for rec in records:
+        successor = str(rec.get("superseded_by") or "").strip()
+        if not successor or Path(successor).name != name:
+            continue
+        for candidate in (REPO_ROOT / str(rec.get("delivered_file") or ""),
+                          REPO_ROOT / "runs" / str(rec.get("run_id") or "")
+                          / "final" / "DKEntries.csv"):
+            if candidate.exists():
+                rep.info["parent_source"] = (
+                    f"manifest supersession chain ({name} supersedes "
+                    f"{Path(str(rec.get('delivered_file') or '')).name})")
+                return candidate
+        rep.warn(f"the manifest says this file supersedes "
+                 f"{rec.get('delivered_file')}, but that file is not on disk and "
+                 f"neither is the run snapshot for {rec.get('run_id')}; "
+                 f"locked-slot preservation is unverified")
+        return None
+    return None
+
+
 def check_manifest(entries_path: Path, entries: Sequence[EntryRow],
                    manifest_path: Path, rep: Report, delivered: bool = False) -> None:
     try:
@@ -2801,12 +2848,32 @@ def run(args: argparse.Namespace) -> Tuple[Report, Dict[str, Any]]:
     # it already passed in verify_export. The two referees disagreed on exactly
     # that file, and this is the tool CLAUDE.md names as THE pre-upload rule, so
     # the disagreement's whole cost landed on `--force`.
+    #
+    # R450. The manifest is resolved here, BEFORE the parent is: with no
+    # explicit --parent, `resolve_parent_from_manifest` fills the gap from the
+    # manifest's supersession chain, the way verify_export already does. This
+    # used to run only after `check_parent_transition`, so an omitted --parent
+    # ran the initial-build case unconditionally and every carried-forward
+    # started slot read as a placement: a legal swap made after the first pitch
+    # of a staggered slate hard-failed here, on the tool CLAUDE.md names as THE
+    # pre-upload rule, and the one check that needs a parent at all (an
+    # introduced started player in a CHANGED slot) never ran.
+    manifest_path = Path(args.manifest) if args.manifest else None
+    if manifest_path is None:
+        sibling = entries_path.resolve().parent / "upload_manifest.json"
+        if sibling.exists():
+            manifest_path = sibling
+            rep.info["manifest_source"] = "found next to the entries file"
     as_of = (parse_as_of(getattr(args, "as_of", None))
              if getattr(args, "as_of", None) else datetime.now(timezone.utc))
     parent_entries: Optional[Sequence[EntryRow]] = None
-    if args.parent:
+    parent_path = Path(args.parent) if args.parent else None
+    if parent_path is None:
+        parent_path = resolve_parent_from_manifest(entries_path, manifest_path, rep)
+    rep.info["parent_file"] = str(parent_path) if parent_path else None
+    if parent_path is not None:
         try:
-            _, _, loaded_parent, _, _ = load_entries(Path(args.parent))
+            _, _, loaded_parent, _, _ = load_entries(parent_path)
         except (OSError, ValueError) as exc:
             # This WARNED and skipped the diff while verify_export FAILED on the
             # same condition. One rule, one verdict: a parent the operator named
@@ -2815,12 +2882,12 @@ def run(args: argparse.Namespace) -> Tuple[Report, Dict[str, Any]]:
             # initial build -- refusing to check at all is the R292(d) hole,
             # where a post-lock file was checked by nobody.
             rep.fail(f"parent unreadable ({exc}); this file cannot be verified "
-                     f"as a swap against {args.parent}")
+                     f"as a swap against {parent_path}")
         else:
             if loaded_parent:
                 parent_entries = loaded_parent
             else:
-                rep.fail(f"parent {args.parent} holds no entry rows, so there is "
+                rep.fail(f"parent {parent_path} holds no entry rows, so there is "
                          f"nothing to diff against; this file cannot be verified "
                          f"as a swap")
     # R314. The postponed exemption needs an affirmative observation: the salary
@@ -2845,24 +2912,17 @@ def run(args: argparse.Namespace) -> Tuple[Report, Dict[str, Any]]:
                             exempt_teams=exempt_teams)
     details = check_legality(contest, slots, entries, salary, rep)
 
-    manifest = Path(args.manifest) if args.manifest else None
-    if manifest is None:
-        # The manifest sits next to the delivered file. Finding it without being
-        # told is the difference between a cross-check that runs at T-5 and one
-        # that runs when the operator remembers a flag.
-        sibling = entries_path.resolve().parent / "upload_manifest.json"
-        if sibling.exists():
-            manifest = sibling
-            rep.info["manifest_source"] = "found next to the entries file"
+    # R450. `manifest_path` was already resolved above, before the parent block,
+    # so `resolve_parent_from_manifest` and this cross-check read the same file.
     delivered = is_delivered_file(entries_path)
     rep.info["delivered_file"] = delivered
     if args.no_manifest:
         rep.info["manifest_source"] = "waived by --no-manifest"
         rep.warn("manifest cross-check waived by --no-manifest; nothing on disk "
                  "states this file is the one to upload")
-    elif manifest is not None:
-        rep.info["manifest_file"] = str(manifest)
-        check_manifest(entries_path, entries, manifest, rep, delivered=delivered)
+    elif manifest_path is not None:
+        rep.info["manifest_file"] = str(manifest_path)
+        check_manifest(entries_path, entries, manifest_path, rep, delivered=delivered)
     elif delivered:
         # R3(b). The manifest generation path is fail-open by design, so a
         # certified file can land in outputs/ with no record and nothing says
