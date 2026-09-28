@@ -127,6 +127,8 @@ It also found a regression the new bounds made deterministic. Past the Deadline'
   - a short `--max-seconds` never does.
 - Greenfield (+2): the `--publication` flag, its label and counts, and its nearest-rank percentile.
 
+CI caught one new CLI test that inherited the host's default `--max-seconds`. On a host that states nothing (CI's, 130s budget, a 100s default), `--max-seconds` bound before the 420s lock, so correctly nothing clamped. The test now pins `--max-seconds 600`, as the T-12 test beside it does, and passes with and without the Claude Code environment.
+
 Mutation checks, by hand: 30 of 30 red.
 - `deadline.py` (7): the lock bound, the start offset, the buffer, the reserve in `not_after`, frozen, `starved` on a request, `starved` on none.
 - `repo_env` (3): the count pick, the unmeasured label, the profile table.

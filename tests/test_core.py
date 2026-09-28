@@ -29477,8 +29477,12 @@ class DeadlineGovernorCliTests(unittest.TestCase):
         now = dt.datetime.now(dt.timezone.utc)
         lock = now + dt.timedelta(minutes=12)
         later = (now + dt.timedelta(minutes=45)).isoformat()
-        code, _payload, seen = self._main(["--deliver-by", later], replay=False,
-                                          first_lock=lock)
+        # --max-seconds pinned: the host default (100s on a host that states
+        # nothing, CI's) would bind before the 420s lock, and the clamp
+        # follows the lock only.
+        code, _payload, seen = self._main(["--deliver-by", later,
+                                           "--max-seconds", "600"],
+                                          replay=False, first_lock=lock)
         self.assertEqual(code, 3)
         governor = seen["governor"]
         self.assertAlmostEqual(governor.minutes_remaining(), 7.0, delta=0.2)
