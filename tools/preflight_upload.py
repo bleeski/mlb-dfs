@@ -172,6 +172,12 @@ REVIEW_GRADE_REASONS = {
     "review_grade_uncertified": (
         "The build failed only S or P gates and every V gate passed on these "
         "bytes, so it ships review-grade and uncertified (R388(d))."),
+    # R390. Mirrors `build_slate.BANK_THIN_LABEL`.
+    "review_grade_bank_thin_delivered": (
+        "The sliced bank was still growing when a re-run could no longer add a "
+        "slice before the deadline, so the build solved on the bank in hand "
+        "(R390); it ships review-grade, and the brief's thin_bank block names "
+        "the coverage floors it met."),
     # R389(b). Mirrors `upload_manifest.BASELINE_LABEL`.
     "review_grade_baseline": (
         "This is the baseline every Classic build publishes before research "

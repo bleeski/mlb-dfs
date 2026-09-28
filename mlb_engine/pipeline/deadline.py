@@ -74,6 +74,30 @@ class Deadline:
         """Seconds a search may still take, never negative."""
         return max(0.0, self.not_after() - self.now())
 
+    def external_remaining(self) -> Optional[float]:
+        """Seconds to the earliest EXTERNAL bound (``--deliver-by``, or the
+        first lock less F-1's buffer), or None when the build has none.
+
+        ``--max-seconds`` is not external: it is one call's budget, and the next
+        call starts a fresh one. ``bounds_s`` are offsets from ``started``.
+        """
+        external = [self.started + float(v) - self.now()
+                    for k, v in self.bounds_s.items() if k != BOUND_MAX_SECONDS]
+        return min(external) if external else None
+
+    def rerun_spendable(self, fresh_window_s: float) -> float:
+        """R390. Seconds of search a RE-RUN of this build could spend: a fresh
+        ``--max-seconds`` window, clipped by any external bound still ahead,
+        less the publication reserve. Never negative.
+
+        The sliced door's exit 10 asks for exactly that re-run, so this is the
+        arithmetic that says whether the request can be met before the lock.
+        """
+        external = self.external_remaining()
+        window = (float(fresh_window_s) if external is None
+                  else min(float(fresh_window_s), external))
+        return max(0.0, window - self.reserve_s)
+
     def slice(self, requested: Optional[float] = None, *, label: str) -> float:
         """At most ``requested`` seconds, and never past ``not_after``.
 

@@ -733,6 +733,10 @@ def execute_portfolio(
             # the refusal a caller prints is built from the result; only when it ran.
             if allocation.get("interaction_probe") is not None:
                 blocked["interaction_probe"] = allocation["interaction_probe"]
+            # R285 / R311. The bank facts the diagnosis found, as data: a
+            # supervisor branches on these rather than on the prose in errors[].
+            if allocation.get("bank_limits"):
+                blocked["bank_limits"] = allocation["bank_limits"]
             return blocked
 
         bank_coverage = _bank_coverage(projections, candidates) if compute_bank_coverage else None

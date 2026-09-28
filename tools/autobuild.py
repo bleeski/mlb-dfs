@@ -382,6 +382,9 @@ class Decisions:
         # decision log's top level beside the stop record's own copy.
         self.file_in_hand: Optional[Dict[str, Any]] = None
         self.file_in_hand_checked = False
+        # R285. The last child's persisted record (path and returncode), so a
+        # stop can name the file that holds what the child said.
+        self.child_record: Optional[Dict[str, Any]] = None
 
     def attach_writer(self, writer) -> None:
         self._writer = writer
@@ -406,6 +409,13 @@ class Decisions:
     def add(self, attempt: int, action: str, why: str, **extra: Any) -> None:
         rec = {"attempt": attempt, "action": action, "why": why,
                "utc": datetime.now(timezone.utc).isoformat(), **extra}
+        # R285. A stop after a child ran names what the child returned and
+        # where its stdout, stderr and parsed brief are kept. `setdefault`, so
+        # a stop that already recorded its own returncode keeps it.
+        child = self.child_record
+        if action == "stop" and child and child.get("attempt") == attempt:
+            rec.setdefault("returncode", child.get("returncode"))
+            rec["child_record"] = child.get("path")
         self.log.append(rec)
         print(f"[autobuild {attempt}] {action}: {why}", file=sys.stderr)
         if self._writer is not None:
@@ -419,9 +429,14 @@ def refusal_bank_report(brief: Dict[str, Any]) -> Dict[str, Any]:
     brief keeps them under ``bank_exploration`` and has no ``solve`` at all, so
     the refusal branch below read an empty dict on every real refusal and its
     grow_bank never fired outside a test that faked ``solve.bank``.
+
+    R285. The read is `bank_cache.bank_job_facts`, the one extractor over
+    ``solve.bank``, ``bank_exploration`` and ``bank_diagnostics``; the exit-10
+    log field below used to hard-code the first and read None on every partial.
     """
-    bank = ((brief.get("solve") or {}).get("bank")) or {}
-    return dict(bank or brief.get("bank_exploration") or {})
+    from mlb_engine.optimize.bank_cache import bank_job_facts
+    facts = bank_job_facts(brief)
+    return {} if facts.get("source") is None else facts
 
 
 def next_bank_cap(bank: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -442,6 +457,23 @@ def next_bank_cap(bank: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         return None
     return {"from": current, "to": raised, "ceiling": ceiling,
             "from_source": cap_block.get("source")}
+
+
+def refusal_remedy_of(brief: Dict[str, Any], bank: Dict[str, Any]) -> str:
+    """R285. The search-effort remedy a refusal brief licenses, as an enum.
+
+    Reads ``refusal_facts.remedy`` (build_slate's typed block); for a brief
+    without one, derives it from the bank facts the extractor found with
+    `bank_cache.bank_remedy`, which can say ``grow_bank``, ``raise_bank_cap`` or
+    ``at_ceiling`` but not ``take_sliced_door`` (that needs the allocator's
+    typed BANK-LIMITED finding, which only a brief with ``refusal_facts``
+    carries). Never a match over ``errors[]``.
+    """
+    typed = (brief.get("refusal_facts") or {}).get("remedy")
+    if typed:
+        return str(typed)
+    from mlb_engine.optimize.bank_cache import bank_remedy
+    return bank_remedy(bank, door=brief.get("solve_strategy"), bank_limited=False)
 
 
 def parse_brief(stdout: str) -> Dict[str, Any]:
@@ -1039,6 +1071,8 @@ def _supervise(ctx: Dict[str, Any]) -> int:
             # baseline, first thing every Classic build delivers) and any brief.
             killed_brief = parse_brief(_text(exc.stdout)) or parse_brief(_text(exc.stderr))
             last_brief = killed_brief or last_brief
+            persist_child(dec, attempt, cmd, None, exc.stdout, exc.stderr,
+                          killed_brief, salary=a.salary, killed=True)
             state["brief"] = last_brief
             state["current_brief"] = killed_brief
             state["stderr"] = _text(exc.stderr)
@@ -1060,6 +1094,8 @@ def _supervise(ctx: Dict[str, Any]) -> int:
         state["current_brief"] = brief
         state["stderr"] = proc.stderr or ""
         code = proc.returncode
+        persist_child(dec, attempt, cmd, code, proc.stdout, proc.stderr, brief,
+                      salary=a.salary)
 
         # R296(d). Anything outside build_slate's documented vocabulary fell
         # through to the code-3 handler below, which asks the brief what the
@@ -1130,9 +1166,12 @@ def _supervise(ctx: Dict[str, Any]) -> int:
             return 4
 
         if code == 10:
+            partial = refusal_bank_report(brief)
             dec.add(attempt, "grow_bank",
                     "job list not exhausted; search effort, not strategy",
-                    jobs=(brief.get("solve", {}) or {}).get("bank", {}).get("jobs_attempted"))
+                    jobs=partial.get("jobs_attempted"),
+                    jobs_total=partial.get("jobs_total"),
+                    bank_stop_reason=partial.get("bank_stop_reason"))
             continue
 
         # code 3: built but refused, or blocked before building.
@@ -1163,13 +1202,17 @@ def _supervise(ctx: Dict[str, Any]) -> int:
         # the refusal brief's bank became readable, growth ran ahead of a
         # failing floor and could spend every attempt re-running.
         bank = refusal_bank_report(brief)
+        # R285. The typed block first (`refusal_facts`, written by build_slate
+        # on both doors); a brief that predates it is read through the same
+        # extractor. No branch below reads a sentence in errors[].
+        remedy = refusal_remedy_of(brief, bank)
         slate_failed = any(
             c.get("passed") is False
             for c in (((brief.get("feasibility") or {}).get("checks")) or []))
         if slate_failed:
             pass
-        elif bank.get("job_list_exhausted") is False:
-            if bank.get("bank_stop_reason") == "candidate_cap":
+        elif remedy in ("grow_bank", "raise_bank_cap", "at_ceiling"):
+            if remedy in ("raise_bank_cap", "at_ceiling"):
                 # R415. A re-run cannot grow a bank that stopped at its cap, so
                 # the lever is the cap itself. Search effort: CLAUDE.md
                 # delegates growing the bank, and the legal pool is untouched.
@@ -1200,9 +1243,7 @@ def _supervise(ctx: Dict[str, Any]) -> int:
                         jobs_total=bank.get("jobs_total"),
                         bank_stop_reason=bank.get("bank_stop_reason"))
                 continue
-        elif (brief.get("solve_strategy") == "direct"
-              and dec.bank_max_candidates is None
-              and any("BANK-LIMITED" in str(e) for e in (brief.get("errors") or []))):
+        elif (remedy == "take_sliced_door" and dec.bank_max_candidates is None):
             # R415. The direct door's auto-bank is rebuilt from scratch on every
             # run (R416 reuses it across one run's re-solves), so a BANK-LIMITED
             # refusal there has no growth lever unless the next attempt takes
@@ -1425,6 +1466,50 @@ def _decision_log_date(brief: Dict[str, Any], salary: Optional[str] = None) -> s
               f"decision log is filed under a UTC-dated fallback directory and "
               f"the date is NOT the schedule's", file=sys.stderr)
         return f"_undated_utc_{datetime.now(timezone.utc).date().isoformat()}"
+
+
+def _redact(text: str) -> str:
+    """Never write a key: the environment's secrets, blanked wherever they
+    appear in a child's output (CLAUDE.md, hard walls)."""
+    import os
+    for name in ("THE_ODDS_API_KEY", "GH_PAT"):
+        value = os.environ.get(name)
+        if value and len(value) >= 8:
+            text = text.replace(value, f"<{name} redacted>")
+    return text
+
+
+def persist_child(dec: Decisions, attempt: int, cmd: List[str], returncode: Any,
+                  stdout: Any, stderr: Any, brief: Dict[str, Any],
+                  salary: Optional[str] = None, killed: bool = False) -> None:
+    """R285. Keep what a child said, beside the decision log.
+
+    `capture_output=True` held the child's stdout and stderr in memory and the
+    stop record kept a 2000-character stderr tail on two of its stops and
+    nothing on the rest; the 2026-09-01 attempt's `_ab1.out` was zero bytes and
+    the evidence that would have settled which producer supplied a report was
+    gone the moment it became interesting. Written for EVERY attempt the child
+    ran (a stop is only known afterwards), at
+    ``outputs/<date>/autobuild_child_<attempt>.json``, and named by the stop
+    record. A write that fails is a printed warning, never a change of verdict.
+    """
+    date = _decision_log_date(brief or {}, salary)
+    path = REPO / "outputs" / str(date) / f"autobuild_child_{attempt}.json"
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        # The whole record is serialized and THEN redacted, so a secret that
+        # rode inside the parsed brief is blanked too, not only the raw streams.
+        path.write_text(_redact(json.dumps({
+            "attempt": attempt, "returncode": returncode, "killed": killed,
+            "cmd": [str(c) for c in cmd],
+            "stdout": _text(stdout), "stderr": _text(stderr),
+            "brief": brief or {},
+        }, indent=1, default=str)), encoding="utf-8")
+        dec.child_record = {"attempt": attempt, "returncode": returncode,
+                            "path": str(path.relative_to(REPO)).replace("\\", "/")}
+    except Exception as exc:  # noqa: BLE001 - the record never changes a verdict
+        dec.child_record = None
+        print(f"autobuild: could not persist the child's output: {exc}", file=sys.stderr)
 
 
 def _write(dec: Decisions, brief: Dict[str, Any],
