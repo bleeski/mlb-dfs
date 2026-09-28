@@ -903,7 +903,15 @@ class LiveDataAdapterTests(unittest.TestCase):
             self.assertIn(ids["CCC 1B"], result["uncovered_salary_player_ids"])
             self.assertNotIn(ids["CCC 1B"], statuses)
             lock_iso = result["lock_time_by_game_id"]["AAA@BBB"]
-            self.assertEqual(lock_iso, (NOW + timedelta(hours=3)).isoformat())
+            # R325 (Session 28), updated deliberately: this fixture's feed says the
+            # game starts 3h after NOW while its salary file's Game Info says
+            # 17:00 UTC, three hours EARLIER than the feed. DK locks at its own
+            # file's time, so the feed's later time is clamped to it (and named)
+            # instead of being believed; this used to assert the feed's time.
+            self.assertEqual(lock_iso, "2026-06-11T17:00:00+00:00")
+            self.assertEqual(
+                [c["game_id"] for c in result["lock_times_clamped_to_salary"]],
+                ["AAA@BBB"])
             r1, _ = legal_rosters(ids)
             with tempfile.TemporaryDirectory() as tmp2:
                 entries = Path(tmp2) / "entries.csv"
@@ -35090,7 +35098,16 @@ class LateSwapLastUsableTests(unittest.TestCase):
 
     def test_a_clean_delivery_exits_0_and_the_printed_command_names_the_parent(self):
         """R450 composes with R414 here: the printed preflight command names
-        --parent, so the auto-resolution isn't even needed on this path."""
+        --parent, so the auto-resolution isn't even needed on this path.
+
+        R174 (Session 28): `deliver_swap` now runs the real referee on the bytes
+        it delivers, and this test's "file" is a few bytes under a fake parent
+        path, which no referee should pass. The referee is stubbed to a clean
+        verdict HERE, because this test is about R414's bookkeeping; the real
+        one is driven on real files by `LateSwapPreflightTests`."""
+        self.ls.run_post_swap_preflight = lambda *a, **k: {
+            "exit": 0, "ran": True, "failures": [], "warnings": [],
+            "error": None, "argv": []}
         out, err = io.StringIO(), io.StringIO()
         with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
             code = self._deliver(dict(self._OK))
@@ -37450,3 +37467,536 @@ class R285SupervisorTests(unittest.TestCase):
             self._child(3, none), extra_argv=["--max-attempts", "2"])
         self.assertNotIn("grow_bank", [r["action"] for r in records])
         self.assertEqual(len(cmds), 1)
+
+
+class LateSwapPreflightTests(unittest.TestCase):
+    """R174 + R404(a). The locked-team introduction ban holds AFTER export, and a
+    swap does not claim success before its referee has spoken.
+
+    Before this: the ban lived only in the allocator's candidate filter
+    (`_entry_candidate_compatible`), `validate_late_swap_delta` checked entry-level
+    authorization only, and `late_swap.py` wrote, recorded and promoted the file,
+    PRINTED the preflight command and returned 0. And a swap with no
+    `lineups_feed.json` on disk exited 4 before reading the salary file, though DK's
+    own `Starting` column covered every side (R143 ranks it above any feed).
+    """
+
+    LATE = "2026-07-25T19:45:00-04:00"   # every fixture game has started
+
+    def setUp(self):
+        from tests.test_upload_integrity import (
+            CLASSIC_HEADER, classic_entry, write_three_game_salary,
+            write_entries as write_rows)
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.salary = self.root / "DKSalaries.csv"
+        self.ids = write_three_game_salary(self.salary)
+        self.parent_lineup = [
+            self.ids["AAA Aster"], self.ids["CCC Aster"],
+            self.ids["AAA Boone"], self.ids["AAA Crane"], self.ids["AAA Dunne"],
+            self.ids["AAA Ellis"], self.ids["AAA Frost"],
+            self.ids["EEE Gable"], self.ids["EEE Hollis"], self.ids["EEE Ives"]]
+        self._rows = (CLASSIC_HEADER, classic_entry, write_rows)
+        self.parent = self.root / "parent.csv"
+        write_rows(self.parent, CLASSIC_HEADER,
+                   [classic_entry("900", "5", self.parent_lineup)])
+        swapped = list(self.parent_lineup)
+        swapped[9] = self.ids["FFF Ives"]
+        self.child = self.root / "child.csv"
+        write_rows(self.child, CLASSIC_HEADER, [classic_entry("900", "5", swapped)])
+        self.team_of = {}
+        with self.salary.open(encoding="utf-8-sig", newline="") as fh:
+            for row in csv.DictReader(fh):
+                self.team_of[row["ID"]] = row["TeamAbbrev"]
+        self.all_teams = sorted(set(self.team_of.values()))
+
+    # -- R174: the delta re-derives the ban from the file ---------------------- #
+
+    def test_an_introduced_player_from_a_started_game_is_refused_post_export(self):
+        from mlb_engine.swap.late_swap_manager import validate_late_swap_delta
+        out = validate_late_swap_delta(
+            self.parent, self.child, mutable_entry_ids=["900"],
+            excluded_new_teams=self.all_teams, player_team_by_id=self.team_of)
+        self.assertFalse(out["passed"])
+        self.assertTrue(any("already-started game" in e and self.ids["FFF Ives"] in e
+                            for e in out["errors"]), out["errors"])
+        self.assertEqual(out["introduced_from_locked_teams"],
+                         [{"entry_id": "900", "player_id": self.ids["FFF Ives"],
+                           "team": "FFF"}])
+
+    def test_the_same_swap_passes_when_that_players_game_is_open(self):
+        from mlb_engine.swap.late_swap_manager import validate_late_swap_delta
+        out = validate_late_swap_delta(
+            self.parent, self.child, mutable_entry_ids=["900"],
+            excluded_new_teams=["AAA", "BBB", "CCC", "DDD"],
+            player_team_by_id=self.team_of)
+        self.assertTrue(out["passed"], out["errors"])
+        self.assertEqual(out["introduced_from_locked_teams"], [])
+
+    def test_a_player_who_only_moved_slots_is_not_an_introduction(self):
+        from mlb_engine.swap.late_swap_manager import validate_late_swap_delta
+        header, classic_entry, write_rows = self._rows
+        moved = list(self.parent_lineup)
+        moved[7], moved[8] = moved[8], moved[7]      # two EEE outfielders trade slots
+        path = self.root / "moved.csv"
+        write_rows(path, header, [classic_entry("900", "5", moved)])
+        out = validate_late_swap_delta(
+            self.parent, path, mutable_entry_ids=["900"],
+            excluded_new_teams=self.all_teams, player_team_by_id=self.team_of)
+        self.assertTrue(out["passed"], out["errors"])
+        self.assertEqual(out["changed_entry_ids"], ["900"])
+
+    def test_an_introduced_player_with_no_team_fails_closed(self):
+        from mlb_engine.swap.late_swap_manager import validate_late_swap_delta
+        team_of = {k: v for k, v in self.team_of.items() if k != self.ids["FFF Ives"]}
+        out = validate_late_swap_delta(
+            self.parent, self.child, mutable_entry_ids=["900"],
+            excluded_new_teams=["AAA"], player_team_by_id=team_of)
+        self.assertFalse(out["passed"])
+        self.assertTrue(any("no team in the lock map" in e for e in out["errors"]))
+
+    def test_no_ban_expressed_means_no_team_check(self):
+        """The two new inputs are optional: every existing caller passes neither,
+        and None must stay 'the caller expressed no ban', as `mutable_entry_ids`
+        does."""
+        from mlb_engine.swap.late_swap_manager import validate_late_swap_delta
+        out = validate_late_swap_delta(self.parent, self.child,
+                                       mutable_entry_ids=["900"])
+        self.assertTrue(out["passed"])
+        self.assertEqual(out["excluded_new_teams_checked"], [])
+
+    def test_the_pipeline_helper_takes_teams_from_the_salary_file_not_the_feed(self):
+        """The wiring `execute_portfolio` uses: the union of the requirements'
+        `excluded_new_teams`, and a team map read off the SALARY file, so a feed
+        that mislabels a player's team (R325) cannot also hide him from the ban."""
+        reqs = [{"entry_id": "900", "excluded_new_teams": ["FFF"],
+                 "player_team_by_id": {self.ids["FFF Ives"]: "EEE"}}]   # the mislabel
+        out = epi._late_swap_delta_with_lock_ban(
+            self.parent, self.child, ["900"], reqs, self.salary)
+        self.assertFalse(out["passed"], out)
+        self.assertEqual(out["introduced_from_locked_teams"][0]["team"], "FFF")
+        clean = epi._late_swap_delta_with_lock_ban(
+            self.parent, self.child, ["900"],
+            [{"entry_id": "900", "excluded_new_teams": ["AAA"]}], self.salary)
+        self.assertTrue(clean["passed"], clean)
+        self.assertEqual(epi._salary_team_by_player_id(self.salary), self.team_of)
+
+    def test_the_salary_team_map_spells_teams_as_the_ban_does(self):
+        """The ban's teams come from the status map, which normalizes with
+        `to_dk_abbrev`; the map they are checked against must too, or a salary
+        team spelled `AZ` never matches a banned `ARI` and the check fails open."""
+        with self.salary.open(encoding="utf-8-sig", newline="") as fh:
+            rows = list(csv.reader(fh))
+        team_col = rows[0].index("TeamAbbrev")
+        for row in rows[1:]:
+            if row[team_col] == "AAA":
+                row[team_col] = "AZ"
+        with self.salary.open("w", newline="", encoding="utf-8") as fh:
+            csv.writer(fh).writerows(rows)
+        team_of = epi._salary_team_by_player_id(self.salary)
+        self.assertEqual(team_of[self.ids["AAA Aster"]], "ARI")
+
+    def test_execute_portfolio_calls_that_helper_on_the_late_swap_branch(self):
+        src = inspect.getsource(epi.execute_portfolio)
+        branch = src[src.index('if mode == "late_swap":\n            # R174'):]
+        branch = branch[:branch.index("else:")]
+        self.assertIn("_late_swap_delta_with_lock_ban(", branch)
+
+    # -- R174 rider: the swap runs the referee on its own bytes ----------------- #
+
+    @staticmethod
+    def _tool():
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "late_swap_r174", REPO / "tools" / "late_swap.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    class _Args:
+        pass
+
+    def _deliver(self, out_path, as_of, downgraded=None):
+        from mlb_engine.entries import upload_manifest as um
+        ls = self._tool()
+        ls._build_slate_module()
+        ls.REPO = self.root
+        um_root = um.REPO_ROOT
+        um.REPO_ROOT = self.root
+        self.addCleanup(setattr, um, "REPO_ROOT", um_root)
+        args = self._Args()
+        args.date = "2026-07-25"
+        args.parent_entries = str(self.parent)
+        args.preflight_as_of = as_of
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = ls.deliver_swap(
+                args, {"workflow_valid": True, "selection_certified": True,
+                       "allocation_certified": True, "run_id": "RUN_SWAP",
+                       "promoted": True},
+                out_path, self.salary, None, {"5": "large_gpp"},
+                {"900": []}, downgraded or [], {})
+        return ls, code, out.getvalue(), err.getvalue()
+
+    def test_a_clean_swap_reports_the_referee_verdict_before_it_claims_success(self):
+        _header, classic_entry, write_rows = self._rows
+        same = self.root / "same.csv"
+        write_rows(same, self._rows[0], [classic_entry("900", "5", self.parent_lineup)])
+        ls, code, out, err = self._deliver(same, self.LATE)
+        self.assertEqual(code, 0, out + err)
+        self.assertIn("referee: preflight_upload exit 0", out)
+        self.assertLess(out.index("referee: preflight_upload exit 0"),
+                        out.index("Upload by hand"))
+
+    def test_a_swap_that_introduces_a_started_player_does_not_exit_0(self):
+        """The rider's case, end to end: the swapped file rosters an FFF outfielder
+        whose game started. Before, the tool wrote it, printed a command, exited 0."""
+        ls, code, out, err = self._deliver(self.child, self.LATE)
+        self.assertEqual(code, ls.POST_SWAP_REFEREE_FAILED, out + err)
+        self.assertIn("REFEREE FAILED: preflight_upload exit 2", err)
+        self.assertIn("FFF Ives", err)
+        self.assertNotIn("Upload by hand", out)
+        bs = ls._build_slate_module()
+        self.assertEqual(bs._LAST_USABLE["referee"]["exit"], 2)
+        self.assertTrue(Path(bs._LAST_USABLE["path"]).exists(),
+                        "the file stays on disk: the referee reports, it does not delete")
+
+    def test_exit_0_from_the_referee_is_not_called_upload_ready_on_a_review_grade_file(self):
+        """Preflight exits 0 for `review_ready` as well as `upload_ready`. A swap
+        that took a downgrade is labelled review-grade (R386), and the swap must
+        say so rather than print the word CLAUDE.md reserves for a certified
+        Classic export."""
+        _header, classic_entry, write_rows = self._rows
+        same = self.root / "same_dg.csv"
+        write_rows(same, self._rows[0], [classic_entry("900", "5", self.parent_lineup)])
+        ls, code, out, err = self._deliver(same, self.LATE,
+                                           downgraded=[{"entry_id": "900"}])
+        self.assertEqual(code, 0, out + err)
+        self.assertIn("verdict review_ready", out)
+        self.assertIn("NOT upload-ready", out)
+        self.assertNotIn("verdict upload_ready", out)
+
+    def test_a_clean_certified_swap_reports_verdict_upload_ready(self):
+        _header, classic_entry, write_rows = self._rows
+        same = self.root / "same_ok.csv"
+        write_rows(same, self._rows[0], [classic_entry("900", "5", self.parent_lineup)])
+        ls, code, out, err = self._deliver(same, self.LATE)
+        self.assertIn("verdict upload_ready", out)
+        self.assertNotIn("NOT upload-ready", out)
+
+    def test_a_referee_that_exits_3_has_its_reason_printed_not_swallowed(self):
+        _header, classic_entry, write_rows = self._rows
+        same = self.root / "same3.csv"
+        write_rows(same, self._rows[0], [classic_entry("900", "5", self.parent_lineup)])
+        import preflight_upload
+
+        def _refuse(argv):
+            print("ERROR the salary file could not be parsed", file=sys.stderr)
+            return 3
+        with unittest.mock.patch.object(preflight_upload, "main", _refuse):
+            ls, code, out, err = self._deliver(same, self.LATE)
+        self.assertEqual(code, ls.POST_SWAP_REFEREE_FAILED)
+        self.assertIn("preflight_upload exit 3", err)
+        self.assertIn("preflight said: ERROR the salary file could not be parsed", err)
+
+    def test_a_referee_that_cannot_run_is_not_a_pass(self):
+        _header, classic_entry, write_rows = self._rows
+        same = self.root / "same2.csv"
+        write_rows(same, self._rows[0], [classic_entry("900", "5", self.parent_lineup)])
+        import preflight_upload
+        with unittest.mock.patch.object(
+                preflight_upload, "main", side_effect=RuntimeError("boom")):
+            ls, code, out, err = self._deliver(same, self.LATE)
+        self.assertEqual(code, ls.POST_SWAP_REFEREE_FAILED)
+        self.assertIn("REFEREE DID NOT RUN", err)
+        self.assertIn("boom", err)
+
+    def test_the_referee_is_called_with_the_arguments_claude_md_names(self):
+        ls = self._tool()
+        result = ls.run_post_swap_preflight(
+            self.child, self.parent, self.salary, "abcdef1234567890",
+            feed_path=self.root / "no_such_feed.json", as_of=self.LATE)
+        argv = result["argv"]
+        for flag in ("--entries", "--salary", "--parent", "--expect-sha256"):
+            self.assertIn(flag, argv)
+        self.assertEqual(argv[argv.index("--expect-sha256") + 1], "abcdef123456")
+        self.assertNotIn("--feed", argv, "a feed that is not on disk is not passed")
+        self.assertIn("--as-of", argv)
+
+    def test_the_default_clock_is_the_wall_clock_and_none_is_forwarded(self):
+        ls = self._tool()
+        seen = {}
+        import preflight_upload
+        real = preflight_upload.main
+        def spy(argv):
+            seen["argv"] = list(argv)
+            return real(argv)
+        with unittest.mock.patch.object(preflight_upload, "main", spy):
+            ls.run_post_swap_preflight(self.child, self.parent, self.salary, "0" * 12)
+        self.assertNotIn("--as-of", seen["argv"])
+
+    def test_a_failed_referee_writes_a_refusal_record_carrying_the_file(self):
+        """`_main_recording_refusals` recorded the artifact for exit 7 only; exit 5
+        also has a file in hand, and the record is where a later reader finds it."""
+        ls = self._tool()
+        ls._build_slate_module()
+        captured = {}
+        ls.main = lambda: self._deliver_for(ls)
+        with unittest.mock.patch(
+                "mlb_engine.entries.delivery_record.write_refusal_record",
+                lambda **kw: captured.update(kw)):
+            with contextlib.redirect_stdout(io.StringIO()), \
+                 contextlib.redirect_stderr(io.StringIO()):
+                code = ls._main_recording_refusals()
+        self.assertEqual(code, ls.POST_SWAP_REFEREE_FAILED)
+        artifact = captured["refusal"]["last_usable_artifact"]
+        self.assertEqual(artifact["referee"]["exit"], 2)
+        self.assertTrue(Path(artifact["path"]).exists())
+
+    def _deliver_for(self, ls):
+        from mlb_engine.entries import upload_manifest as um
+        ls.REPO = self.root
+        um_root = um.REPO_ROOT
+        um.REPO_ROOT = self.root
+        self.addCleanup(setattr, um, "REPO_ROOT", um_root)
+        args = self._Args()
+        args.date, args.parent_entries = "2026-07-25", str(self.parent)
+        args.preflight_as_of = self.LATE
+        return ls.deliver_swap(
+            args, {"workflow_valid": True, "selection_certified": True,
+                   "allocation_certified": True, "run_id": "RUN_SWAP",
+                   "promoted": True},
+            self.child, self.salary, None, {"5": "large_gpp"}, {"900": []}, [], {})
+
+    # -- R404(a): no feed file, DK's Starting column covers every side ---------- #
+
+    def _run_main(self, argv, stop_at_status=True):
+        ls = self._tool()
+        seen = {}
+
+        class _Stop(Exception):
+            pass
+
+        def _capture(feed, salary, *a, **k):
+            seen["feed"] = feed
+            raise _Stop()
+        if stop_at_status:
+            ls.build_status_map_from_lineups_feed = _capture
+        out, err = io.StringIO(), io.StringIO()
+        old = sys.argv
+        sys.argv = ["late_swap.py", "--date", "2099-01-01", "--dry-run",
+                    "--postures", "5=large_gpp", *argv]
+        try:
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                try:
+                    code = ls.main()
+                except _Stop:
+                    code = "reached the status map"
+        finally:
+            sys.argv = old
+        return code, seen.get("feed"), out.getvalue(), err.getvalue()
+
+    def test_full_dk_coverage_replaces_a_missing_feed_file(self):
+        code, feed, out, err = self._run_main(
+            ["--salary", str(self.salary), "--parent-entries", str(self.parent)])
+        self.assertEqual(code, "reached the status map", out + err)
+        self.assertIn("DK's Starting column covers all 6 side(s)", out)
+        self.assertIn("minutes ago", out)      # the salary file's age, stated
+        self.assertNotIn("feed: ", err,
+                         "the age warnings describe a disk feed; this one was built just now")
+        self.assertEqual(len(feed["games"]), 3)
+        for game in feed["games"]:
+            self.assertTrue(game["game_date_utc"])
+            for side in ("away", "home"):
+                self.assertEqual(game[side]["lineup_status"], "confirmed")
+                self.assertEqual(len(game[side]["lineup"]), 9)
+
+    def test_the_synthesized_feed_gives_every_player_a_lock_time(self):
+        """The reason this is not `build_slate`'s `{"games": []}`: the status map
+        reads the feed raw, and a status map with no games fails every slot
+        closed."""
+        from mlb_engine.intake.live_data_adapters import (
+            build_status_map_from_lineups_feed, dk_starting_only_feed)
+        feed, note = dk_starting_only_feed(self.salary, "2026-07-25")
+        self.assertIsNotNone(feed, note)
+        status = build_status_map_from_lineups_feed(feed, str(self.salary))
+        self.assertEqual(status["uncovered_salary_player_ids"], [])
+        self.assertEqual(sorted(status["lock_time_by_game_id"]),
+                         ["AAA@BBB", "CCC@DDD", "EEE@FFF"])
+        self.assertEqual(len(status["confirmed_hitter_ids"]), 54)
+
+    def test_one_uncovered_side_is_still_a_refusal_and_is_named(self):
+        with self.salary.open(encoding="utf-8-sig", newline="") as fh:
+            rows = list(csv.reader(fh))
+        team_col, start_col = rows[0].index("TeamAbbrev"), rows[0].index("Starting")
+        for row in rows[1:]:
+            if row[team_col] == "FFF":
+                row[start_col] = ""
+        with self.salary.open("w", newline="", encoding="utf-8") as fh:
+            csv.writer(fh).writerows(rows)
+        code, feed, out, err = self._run_main(
+            ["--salary", str(self.salary), "--parent-entries", str(self.parent)])
+        self.assertEqual(code, 4, out + err)
+        self.assertIsNone(feed)
+        self.assertIn("missing input", err)
+        self.assertIn("FFF", err)
+
+    def test_an_explicit_lineups_path_that_does_not_exist_is_still_a_refusal(self):
+        code, feed, out, err = self._run_main(
+            ["--salary", str(self.salary), "--parent-entries", str(self.parent),
+             "--lineups", str(self.root / "typo.json")])
+        self.assertEqual(code, 4, out + err)
+        self.assertIn("typo.json", err)
+        self.assertNotIn("DK's Starting", out)
+
+    def test_an_explicit_feed_outranks_the_synthesized_one(self):
+        from tests.test_upload_integrity import write_three_game_feed
+        feed_path = write_three_game_feed(self.root / "explicit.json")
+        code, feed, out, err = self._run_main(
+            ["--salary", str(self.salary), "--parent-entries", str(self.parent),
+             "--lineups", str(feed_path)])
+        self.assertEqual(code, 3, out + err)     # its date is 2026-07-25, not 2099-01-01
+        self.assertIn("lineups feed is for 2026-07-25", err)
+        self.assertNotIn("DK's Starting column covers", out)
+
+
+class RepairDkStartingTests(unittest.TestCase):
+    """R404(b). `repair_entry` with no `--feed` printed "no team treated as locked",
+    confirmed nobody, and returned no legal replacement for all five benched slots
+    on 1905_10g, one minute after TB@NYY started, though DK's `Starting` column
+    covered every side. Locks now come from `resolve_locked_teams` (the salary clock
+    always, the feed's when there is one) and confirmation from DK's posted orders
+    when they cover every side.
+    """
+
+    NOW = "2026-07-25T19:20:00-04:00"    # AAA@BBB and CCC@DDD started, EEE@FFF open
+
+    def setUp(self):
+        from tests.test_upload_integrity import (
+            CLASSIC_HEADER, classic_entry, write_three_game_salary,
+            write_entries as write_rows)
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.dir = Path(self.tmp.name)
+        self.salary = self.dir / "DKSalaries.csv"
+        self.ids = write_three_game_salary(self.salary)
+        self.entries = self.dir / "DKEntries.csv"
+        lineup = [self.ids["AAA Aster"], self.ids["CCC Aster"],
+                  self.ids["AAA Boone"], self.ids["AAA Crane"], self.ids["AAA Dunne"],
+                  self.ids["AAA Ellis"], self.ids["AAA Frost"],
+                  self.ids["EEE Gable"], self.ids["EEE Hollis"], self.ids["EEE Ives"]]
+        write_rows(self.entries, CLASSIC_HEADER, [classic_entry("900", "5", lineup)])
+        # A started-game outfielder who would win on projection if locks were blind.
+        self._set_points("AAA Jarrow", "99.0")
+
+    def _set_points(self, name, points):
+        with self.salary.open(encoding="utf-8-sig", newline="") as fh:
+            rows = list(csv.reader(fh))
+        name_col, pts_col = rows[0].index("Name"), rows[0].index("AvgPointsPerGame")
+        for row in rows[1:]:
+            if row[name_col] == name:
+                row[pts_col] = points
+        with self.salary.open("w", newline="", encoding="utf-8") as fh:
+            csv.writer(fh).writerows(rows)
+
+    def _repair(self, *extra):
+        sys.path.insert(0, str(REPO / "tools"))
+        import repair_entry
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = repair_entry.main(
+                ["--entries", str(self.entries), "--salary", str(self.salary),
+                 "--as-of", self.NOW, "--mode", "repair", "--dry-run", "--json",
+                 *extra])
+        return code, json.loads(out.getvalue()), err.getvalue()
+
+    def test_with_no_feed_the_salary_clock_still_locks_started_games(self):
+        code, result, _err = self._repair("--dead", self.ids["EEE Ives"])
+        self.assertEqual(result["locked_teams"], ["AAA", "BBB", "CCC", "DDD"])
+        self.assertEqual(result["lock_source"], "salary Game Info")
+        self.assertNotIn("no team treated as locked", result["lock_note"])
+
+    def test_with_no_feed_dk_starting_confirms_and_a_legal_replacement_is_found(self):
+        """The 1905_10g case. Before: exit 2, every candidate `not_confirmed`."""
+        code, result, err = self._repair("--dead", self.ids["EEE Ives"])
+        self.assertEqual(code, 4, result)        # 4 = clean and unwritten (--dry-run)
+        self.assertEqual(result["confirmation_source"], "dk_starting")
+        self.assertEqual(len(result["repairs"]), 1)
+        repair = result["repairs"][0]
+        # Never the started-game outfielder the projection prefers.
+        self.assertNotIn(repair["in_name"].split()[0], ("AAA", "BBB", "CCC", "DDD"))
+        self.assertTrue(repair["in_name"].startswith(("EEE ", "FFF ")), repair)
+        census = result["refusals"] or []
+        self.assertEqual(census, [])
+        self.assertIn("confirmation from DK's Starting column", err)
+
+    def test_a_started_games_player_is_counted_team_locked_not_offered(self):
+        """Take the open-game outfielders out of contention so the census shows
+        where the started-game candidate went."""
+        for name in ("EEE Jarrow", "FFF Gable", "FFF Hollis", "FFF Ives", "FFF Jarrow"):
+            self._set_salary(name, 20000)      # over the entry's cap headroom
+        code, result, _err = self._repair("--dead", self.ids["EEE Ives"])
+        self.assertEqual(code, 2, result)
+        census = result["refusals"][0]["rejection_census"]
+        self.assertGreater(census["team_locked"], 0, census)
+
+    def _set_salary(self, name, salary):
+        with self.salary.open(encoding="utf-8-sig", newline="") as fh:
+            rows = list(csv.reader(fh))
+        name_col, sal_col = rows[0].index("Name"), rows[0].index("Salary")
+        for row in rows[1:]:
+            if row[name_col] == name:
+                row[sal_col] = str(salary)
+        with self.salary.open("w", newline="", encoding="utf-8") as fh:
+            csv.writer(fh).writerows(rows)
+
+    def test_partial_dk_coverage_confirms_nobody_and_says_which_side(self):
+        with self.salary.open(encoding="utf-8-sig", newline="") as fh:
+            rows = list(csv.reader(fh))
+        team_col, start_col = rows[0].index("TeamAbbrev"), rows[0].index("Starting")
+        for row in rows[1:]:
+            if row[team_col] == "FFF":
+                row[start_col] = ""
+        with self.salary.open("w", newline="", encoding="utf-8") as fh:
+            csv.writer(fh).writerows(rows)
+        code, result, err = self._repair("--dead", self.ids["EEE Ives"])
+        self.assertEqual(code, 2, result)
+        self.assertEqual(result["confirmation_source"], "none")
+        self.assertIn("FFF", err)
+        self.assertEqual(result["locked_teams"], ["AAA", "BBB", "CCC", "DDD"])
+
+    def test_an_explicit_feed_is_the_confirmation_source_and_dk_is_not_consulted(self):
+        from tests.test_upload_integrity import write_three_game_feed
+        feed = write_three_game_feed(self.dir / "lineups_feed.json")
+        code, result, err = self._repair("--dead", self.ids["EEE Ives"],
+                                         "--feed", str(feed))
+        self.assertEqual(result["confirmation_source"], "feed lineups_feed.json")
+        self.assertNotIn("DK's Starting column", err)
+
+    def test_dead_from_feed_reads_dk_starting_when_it_covers_every_side(self):
+        """A scratched bat: DK's posted nine for EEE swaps Ives out for a bench
+        bat, and with no feed on disk the repair still finds him dead."""
+        with self.salary.open(encoding="utf-8-sig", newline="") as fh:
+            rows = list(csv.reader(fh))
+        name_col, start_col = rows[0].index("Name"), rows[0].index("Starting")
+        ives_slot = 0
+        for row in rows[1:]:
+            if row[name_col] == "EEE Ives":
+                ives_slot, row[start_col] = row[start_col], ""
+        template = next(r for r in rows[1:] if r[name_col] == "EEE Jarrow")
+        bench = list(template)
+        bench[rows[0].index("ID")] = "7777"
+        bench[name_col] = "EEE Bench"
+        bench[rows[0].index("Name + ID")] = "EEE Bench (7777)"
+        bench[start_col] = str(ives_slot)
+        rows.append(bench)
+        with self.salary.open("w", newline="", encoding="utf-8") as fh:
+            csv.writer(fh).writerows(rows)
+        from mlb_engine.intake.live_data_adapters import dk_order_coverage
+        covered, not_covered = dk_order_coverage(self.salary)
+        self.assertEqual(not_covered, [], "fixture must keep DK's coverage complete")
+        code, result, err = self._repair("--dead-from-feed")
+        self.assertEqual([d["name"] for d in result["dead_derived_from_feed"]],
+                         ["EEE Ives"], (result, err))
+        self.assertEqual(result["confirmation_source"], "dk_starting")

@@ -2696,7 +2696,12 @@ class VerifyExportLockDerivationTests(unittest.TestCase):
         locked, _note, _source, rep, _ = self._resolve(as_of=self.EARLY)
         self.assertIn("AAA", locked)
         self.assertIn("BBB", locked)
-        self.assertTrue(any("does not cover" in w for w in rep.warnings))
+        # R325 (Session 28), updated deliberately: this used to warn "does not
+        # cover" because the wrong-date feed's own clock (08-02) put no game at
+        # or before `now`. The feed is now checked against the salary file's date
+        # first, so it is named for what it is, IGNORED, and the salary file's
+        # start times stand in for its own.
+        self.assertTrue(any("IGNORED" in w for w in rep.warnings), rep.warnings)
 
     def test_only_an_affirmative_postponement_may_remove_a_team(self):
         """The one subtraction the feed is allowed, and the reason the union is
@@ -8192,6 +8197,325 @@ class GateTaxonomyTests(unittest.TestCase):
         site = self.gc.describe("showdown_not_certified", kind="refusal_site")
         self.assertEqual(site["validity"], "V")
         self.assertNotIn("refusal_class", site)
+
+
+class LockFeedTruthTests(unittest.TestCase):
+    """R325. A lineups feed may ADD evidence that a game has started and may not
+    REMOVE the salary clock's; the one thing it can take away is a postponement
+    dated to the salary file's own game.
+
+    Measured on the tree before the fix (three-game fixture, a child swapping a
+    started game's FFF outfielder in, 25 minutes after the last first pitch):
+    salary clock alone exit 2; a same-date feed saying "Postponed" exit 0; a feed
+    dated 2026-08-02 saying "Postponed" exit 0, in BOTH referees. Every test here
+    that runs the pair asserts the pair, for the reason R52 pinned the exit
+    contract as one: the defect was a divergence.
+    """
+
+    LATE = "2026-07-25T23:45:00+00:00"      # all three fixture games have started
+    EARLY = "2026-07-25T23:07:00+00:00"     # AAA@BBB started, the rest have not
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self.tmp.name)
+        self.salary = self.dir / "DKSalaries.csv"
+        self.ids = write_three_game_salary(self.salary)
+        self.feed = write_three_game_feed(self.dir / "lineups_feed.json")
+        self.parent_lineup = [
+            self.ids["AAA Aster"], self.ids["CCC Aster"],
+            self.ids["AAA Boone"], self.ids["AAA Crane"], self.ids["AAA Dunne"],
+            self.ids["AAA Ellis"], self.ids["AAA Frost"],
+            self.ids["EEE Gable"], self.ids["EEE Hollis"], self.ids["EEE Ives"],
+        ]
+        self.parent = self.dir / "parent.csv"
+        write_entries(self.parent, CLASSIC_HEADER,
+                      [classic_entry("900", "5", self.parent_lineup)])
+        lineup = list(self.parent_lineup)
+        lineup[9] = self.ids["FFF Ives"]
+        self.child = self.dir / "child.csv"
+        write_entries(self.child, CLASSIC_HEADER, [classic_entry("900", "5", lineup)])
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    # -- harness -------------------------------------------------------------- #
+
+    def _restamp_feed(self, utc_by_game=None, postponed=(), all_dates=None):
+        payload = json.loads(self.feed.read_text(encoding="utf-8"))
+        for game in payload["games"]:
+            gid = f"{game['away']['team_abbrev']}@{game['home']['team_abbrev']}"
+            if all_dates:
+                game["game_date_utc"] = all_dates
+            if utc_by_game and gid in utc_by_game:
+                game["game_date_utc"] = utc_by_game[gid]
+            if gid in postponed:
+                game["status"] = "Postponed"
+        self.feed.write_text(json.dumps(payload), encoding="utf-8")
+
+    def _set_game_info(self, teams, text):
+        with self.salary.open(encoding="utf-8-sig", newline="") as fh:
+            rows = list(csv.reader(fh))
+        team_col = rows[0].index("TeamAbbrev")
+        game_col = rows[0].index("Game Info")
+        for row in rows[1:]:
+            if row[team_col].upper() in teams:
+                row[game_col] = text
+        with self.salary.open("w", newline="", encoding="utf-8") as fh:
+            csv.writer(fh).writerows(rows)
+
+    def _pair(self, as_of, extra_pre=(), extra_ver=(), feed=True):
+        pre = ["--entries", str(self.child), "--salary", str(self.salary),
+               "--no-manifest", "--as-of", as_of, "--json",
+               "--parent", str(self.parent)]
+        ver = ["--entries", str(self.child), "--salary", str(self.salary),
+               "--as-of", as_of, "--json", "--parent", str(self.parent)]
+        if feed:
+            pre += ["--feed", str(self.feed)]
+            ver += ["--lineups", str(self.feed)]
+        pre += list(extra_pre)
+        ver += list(extra_ver)
+        return _run_preflight_argv(pre), _run_verify_argv(ver)
+
+    def _codes(self, *args, **kwargs):
+        pre, ver = self._pair(*args, **kwargs)
+        return (pre.returncode, ver.returncode), pre, ver
+
+    def _resolve(self, as_of, supplied=None):
+        sys.path.insert(0, str(REPO / "tools"))
+        from tools.preflight_upload import Report, load_salary, resolve_locked_teams
+        rep = Report()
+        locked, note, source, not_locked = resolve_locked_teams(
+            supplied, load_salary(self.salary), self.salary, self.feed,
+            datetime.fromisoformat(as_of), rep)
+        return locked, note, source, not_locked, rep
+
+    # -- the exemption needs the salary file's date --------------------------- #
+
+    def test_a_same_date_postponement_still_exempts_in_both(self):
+        """The control. Without it the wrong-date tests below could pass because
+        the exemption was deleted outright."""
+        self._restamp_feed(postponed=("EEE@FFF",))
+        codes, pre, ver = self._codes(self.LATE)
+        self.assertEqual(codes, (0, 0), pre.stdout + ver.stdout)
+
+    def test_a_wrong_date_postponement_exempts_nothing_in_either_referee(self):
+        """Measured before the fix: exit 0 in both. A feed dated 2026-08-02 says
+        EEE@FFF is postponed; the salary file says it was scheduled 2026-07-25 and
+        the clock says it started. The salary clock decides."""
+        self._restamp_feed(all_dates="2026-08-02T23:40:00Z", postponed=("EEE@FFF",))
+        codes, pre, ver = self._codes(self.LATE)
+        self.assertEqual(codes, (2, 2), pre.stdout + ver.stdout)
+        for tool, out in (("preflight", pre), ("verify_export", ver)):
+            payload = json.loads(out.stdout)
+            self.assertTrue(any("already-started game" in f
+                                for f in payload["failures"]), (tool, payload["failures"]))
+            self.assertEqual(payload["info"]["parent_transition"]["exempt_teams"], [], tool)
+            self.assertTrue(any("IGNORED" in w for w in payload["warnings"]), tool)
+
+    def test_a_postponement_dated_across_the_utc_boundary_is_compared_in_eastern(self):
+        """A 10:10 PM ET first pitch is the NEXT day in UTC. Comparing calendar
+        dates across the two zones would call the same night "another date" and
+        refuse a genuine postponement; comparing it against another Eastern
+        night must still refuse."""
+        self._set_game_info({"EEE", "FFF"}, "EEE@FFF 07/25/2026 10:10PM ET")
+        late_night = "2026-07-26T02:45:00+00:00"
+        self._restamp_feed(utc_by_game={"EEE@FFF": "2026-07-26T02:10:00Z"},
+                           postponed=("EEE@FFF",))
+        codes, pre, ver = self._codes(late_night)
+        self.assertEqual(codes, (0, 0), pre.stdout + ver.stdout)
+        self._restamp_feed(utc_by_game={"EEE@FFF": "2026-07-27T02:10:00Z"},
+                           postponed=("EEE@FFF",))
+        codes, pre, ver = self._codes(late_night)
+        self.assertEqual(codes, (2, 2), pre.stdout + ver.stdout)
+        # The zone matters when the two clocks disagree on the hour, not just on
+        # the day: the salary file says 10:10 PM ET (02:10Z the next UTC day), the
+        # feed carries the game's earlier 7:10 PM ET slot (23:10Z the same UTC
+        # day). Same NIGHT in Eastern, different day in UTC.
+        self._restamp_feed(utc_by_game={"EEE@FFF": "2026-07-25T23:10:00Z"},
+                           postponed=("EEE@FFF",))
+        codes, pre, ver = self._codes(late_night)
+        self.assertEqual(codes, (0, 0), pre.stdout + ver.stdout)
+
+    def test_a_postponement_the_salary_file_cannot_date_is_not_honored(self):
+        """An absence and an observation are not the same fact (R237): with no
+        readable Game Info for either team the feed's date cannot be checked, so
+        its postponement is refused rather than trusted."""
+        sys.path.insert(0, str(REPO / "tools"))
+        from tools.preflight_upload import Report, derive_lock_facts_from_feed
+        self._set_game_info({"EEE", "FFF"}, "TBD")
+        self._restamp_feed(postponed=("EEE@FFF",))
+        facts = derive_lock_facts_from_feed(
+            self.feed, self.salary, datetime.fromisoformat(self.LATE))
+        self.assertEqual(facts["not_locked"], set())
+        self.assertEqual([r["game_id"] for r in facts["ignored"]], ["EEE@FFF"])
+        self.assertIn("no start time", facts["ignored"][0]["reason"])
+
+    # -- a wrong-date feed is not evidence either way ------------------------- #
+
+    def test_yesterdays_feed_does_not_lock_tonights_teams(self):
+        """The other direction. The union used to take every feed start at or
+        before `now` as a lock, so a same-matchup feed from the 24th locked
+        tonight's teams before their first pitch. The salary clock alone says
+        AAA and BBB have started at EARLY; the stale feed adds nothing and is
+        named."""
+        self._restamp_feed(all_dates="2026-07-24T23:05:00Z")
+        locked, note, _source, not_locked, rep = self._resolve(self.EARLY)
+        self.assertEqual(locked, {"AAA", "BBB"})
+        self.assertEqual(not_locked, set())
+        self.assertIn("IGNORED", note)
+        self.assertEqual(len(rep.info["lock_feed_ignored"]), 3)
+
+    def test_a_feed_on_the_salary_date_still_adds_a_lock_the_clock_lacks(self):
+        """The asymmetry's other half: same-date evidence still ADDS. The feed
+        says CCC@DDD started 12 minutes before the salary file's Game Info time
+        says it did; the union keeps the earlier fact."""
+        self._restamp_feed(utc_by_game={"CCC@DDD": "2026-07-25T23:00:00Z"})
+        locked, *_ = self._resolve(self.EARLY)
+        self.assertEqual(locked, {"AAA", "BBB", "CCC", "DDD"})
+
+    # -- --locked-teams reaches the started-game rule in preflight ------------ #
+
+    def test_preflight_accepts_locked_teams_and_it_outranks_a_postponement(self):
+        self._restamp_feed(postponed=("EEE@FFF",))
+        (pre_rc, ver_rc), pre, ver = self._codes(self.LATE)
+        self.assertEqual((pre_rc, ver_rc), (0, 0), pre.stdout + ver.stdout)
+        codes, pre, ver = self._codes(
+            self.LATE, extra_pre=("--locked-teams", "EEE,FFF"),
+            extra_ver=("--locked-teams", "EEE,FFF"))
+        self.assertEqual(codes, (2, 2), pre.stdout + ver.stdout)
+        self.assertEqual(json.loads(pre.stdout)["info"]["locked_teams"],
+                         json.loads(ver.stdout)["info"]["locked_teams"])
+
+    def test_an_operator_lock_the_clock_does_not_see_reaches_both_referees(self):
+        """`--locked-teams` is a union: it ADDS a lock the salary clock has not
+        reached. At EARLY the clock says FFF's game is open and the swap into
+        FFF is legal (0, 0); naming FFF locked makes it a refusal in both. This
+        is the case that needs `locked_teams` passed to the started-game rule,
+        which the postponement A/B above cannot tell apart from the clock."""
+        (pre_rc, ver_rc), pre, ver = self._codes(self.EARLY)
+        self.assertEqual((pre_rc, ver_rc), (0, 0), pre.stdout + ver.stdout)
+        codes, pre, ver = self._codes(
+            self.EARLY, extra_pre=("--locked-teams", "FFF"),
+            extra_ver=("--locked-teams", "FFF"))
+        self.assertEqual(codes, (2, 2), pre.stdout + ver.stdout)
+        for out in (pre, ver):
+            self.assertTrue(any("already-started game" in f
+                                for f in json.loads(out.stdout)["failures"]))
+
+    def test_the_two_referees_report_one_locked_set_for_one_file(self):
+        self._restamp_feed(all_dates="2026-08-02T23:40:00Z", postponed=("EEE@FFF",))
+        _codes, pre, ver = self._codes(self.LATE)
+        self.assertEqual(json.loads(pre.stdout)["info"]["locked_teams"],
+                         json.loads(ver.stdout)["info"]["locked_teams"])
+        self.assertEqual(json.loads(pre.stdout)["info"]["locked_teams"],
+                         ["AAA", "BBB", "CCC", "DDD", "EEE", "FFF"])
+
+    # -- the build pool reads the same verdict -------------------------------- #
+
+    def _pool_excluded(self):
+        from mlb_engine.intake.live_data_adapters import build_slate_pool
+        payload = json.loads(self.feed.read_text(encoding="utf-8"))
+        pool = build_slate_pool(str(self.salary), payload, stale_platoon_policy="warn")
+        return pool["pool_report"]["excluded_postponed_teams"]
+
+    def test_a_same_date_postponement_still_leaves_the_build_pool(self):
+        self._restamp_feed(postponed=("EEE@FFF",))
+        self.assertEqual(self._pool_excluded(), ["EEE", "FFF"])
+
+    def test_a_wrong_date_postponement_does_not_trim_the_build_pool(self):
+        """The legal pool is never trimmed to fit anything, and a feed dated to
+        another day is not evidence that tonight's game is off. Measured before
+        the fix: a feed dated 2026-08-02 saying EEE@FFF is postponed removed both
+        teams from the pool of a slate whose salary file lists the game."""
+        self._restamp_feed(utc_by_game={"EEE@FFF": "2026-08-02T23:40:00Z"},
+                           postponed=("EEE@FFF",))
+        self.assertEqual(self._pool_excluded(), [])
+
+    # -- an explicit DK id must belong to the team the row sits under ---------- #
+
+    def _status_with_smuggled_id(self, dk_team_id_owner="AAA Aster"):
+        from mlb_engine.intake.live_data_adapters import build_status_map_from_lineups_feed
+        payload = json.loads(self.feed.read_text(encoding="utf-8"))
+        eee = next(g for g in payload["games"] if g["away"]["team_abbrev"] == "EEE")
+        names = [f"EEE {n}" for n in ("Aster", "Boone", "Crane", "Dunne", "Ellis",
+                                       "Frost", "Gable", "Hollis")]
+        rows = [{"name": n, "batting_order": i + 1} for i, n in enumerate(names)]
+        rows.append({"name": "Smuggled", "batting_order": 9,
+                     "dk_id": self.ids[dk_team_id_owner]})
+        eee["away"]["lineup"] = rows
+        eee["away"]["lineup_status"] = "confirmed"
+        return build_status_map_from_lineups_feed(payload, str(self.salary)), payload
+
+    def test_an_explicit_id_that_belongs_to_another_team_is_refused_and_named(self):
+        status, _ = self._status_with_smuggled_id()
+        smuggled = self.ids["AAA Aster"]
+        self.assertNotIn(smuggled, status["confirmed_hitter_ids"])
+        self.assertEqual(status["status_by_player_id"][smuggled].team, "AAA")
+        bad = [u for u in status["unmatched_feed_players"]
+               if u.get("reason") == "team_mismatch"]
+        self.assertEqual(len(bad), 1, status["unmatched_feed_players"])
+        self.assertEqual((bad[0]["team"], bad[0]["salary_team"]), ("EEE", "AAA"))
+
+    def test_an_explicit_id_on_its_own_team_still_matches(self):
+        """R143's DK-`Starting` route depends on this: the id skips the name
+        crosswalk, and only a disagreement with the salary team is refused."""
+        status, payload = self._status_with_smuggled_id("EEE Ives")
+        ives = self.ids["EEE Ives"]
+        self.assertIn(ives, status["confirmed_hitter_ids"])
+        self.assertEqual(
+            [u for u in status["unmatched_feed_players"]
+             if u.get("reason") == "team_mismatch"], [])
+
+    def test_the_swaps_locked_team_ban_still_names_the_smuggled_player(self):
+        """The consequence the rider measured: before the fix, the smuggled AAA
+        player carried team EEE, so `excluded_new_teams` (AAA, BBB) did not name
+        him and the parent's own slot holding him was not locked."""
+        from mlb_engine.swap.late_swap_manager import build_entry_requirements
+        status, _ = self._status_with_smuggled_id()
+        reqs = build_entry_requirements(
+            self.parent, status["status_by_player_id"],
+            datetime.fromisoformat(self.EARLY))
+        self.assertEqual(len(reqs), 1)
+        req = reqs[0]
+        self.assertIn("AAA", req["excluded_new_teams"])
+        self.assertEqual(req["player_team_by_id"][self.ids["AAA Aster"]], "AAA")
+        self.assertIn(self.ids["AAA Aster"], req["locked_player_ids"])
+
+    # -- a swap's lock time never moves LATER than the salary file's ----------- #
+
+    def test_a_feed_dated_later_than_the_salary_start_cannot_hold_a_game_open(self):
+        from mlb_engine.intake.live_data_adapters import build_status_map_from_lineups_feed
+        self._restamp_feed(utc_by_game={"AAA@BBB": "2026-08-02T23:05:00Z"})
+        payload = json.loads(self.feed.read_text(encoding="utf-8"))
+        status = build_status_map_from_lineups_feed(payload, str(self.salary))
+        self.assertEqual(status["lock_time_by_game_id"]["AAA@BBB"],
+                         "2026-07-25T23:05:00+00:00")
+        self.assertEqual([r["game_id"] for r in status["lock_times_clamped_to_salary"]],
+                         ["AAA@BBB"])
+        aaa = status["status_by_player_id"][self.ids["AAA Aster"]]
+        self.assertTrue(aaa.is_locked(datetime.fromisoformat(self.EARLY)))
+
+    def test_a_feed_time_later_on_the_same_day_is_clamped_to_the_salary_start_too(self):
+        """Not only the wrong-date case: DK locks at its own salary-file time, so
+        a feed carrying a later time on the right day must not hold the game open
+        for the half hour between the two."""
+        from mlb_engine.intake.live_data_adapters import build_status_map_from_lineups_feed
+        self._restamp_feed(utc_by_game={"AAA@BBB": "2026-07-25T23:35:00Z"})
+        payload = json.loads(self.feed.read_text(encoding="utf-8"))
+        status = build_status_map_from_lineups_feed(payload, str(self.salary))
+        self.assertEqual(status["lock_time_by_game_id"]["AAA@BBB"],
+                         "2026-07-25T23:05:00+00:00")
+        self.assertEqual(status["feed_dates_ignored"], [],
+                         "same Eastern day: clamped, but the feed is not called wrong-dated")
+
+    def test_a_feed_dated_earlier_than_the_salary_start_still_locks_earlier(self):
+        from mlb_engine.intake.live_data_adapters import build_status_map_from_lineups_feed
+        self._restamp_feed(utc_by_game={"EEE@FFF": "2026-07-25T23:00:00Z"})
+        payload = json.loads(self.feed.read_text(encoding="utf-8"))
+        status = build_status_map_from_lineups_feed(payload, str(self.salary))
+        self.assertEqual(status["lock_time_by_game_id"]["EEE@FFF"],
+                         "2026-07-25T23:00:00+00:00")
+        self.assertEqual(status["lock_times_clamped_to_salary"], [])
 
 if __name__ == "__main__":
     unittest.main()

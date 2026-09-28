@@ -1200,6 +1200,9 @@ a flag is a check that does not run at T-5:
   his team's CONFIRMED lineup is a hard failure; `--feed-lenient` demotes it to a
   warning. A team that has not posted stays soft. The feed's age prints next to
   the verdict and warns past 90 minutes, so a stale all-clear is visibly stale.
+- `--locked-teams`: teams to treat as locked IN ADDITION to the salary clock and
+  `--feed` (R325), a union that outranks a feed's postponement of the same team.
+  The clock derives it on every run, so you should not need it.
 - `--brief`: the build brief for this delivery, matched among the sibling
   `build_brief*.json` files by `delivered_sha256`. It is read for one field,
   `declared_pitchers`, so an arm the build rostered on a declaration is an
@@ -1428,6 +1431,13 @@ rather than guessing.
 for that entry's pins and exclusions. Run the command again to add another slice.
 If it persists, the entry may pin so many hitter slots that a 4-man stack cannot
 fit; the bank relaxes that automatically, but say so in the brief.
+
+**`repair_entry.py` needs no feed when DK has posted every side (R404).** It takes
+locks from the salary file's `Game Info` clock (unioned with `--feed`'s clock when
+there is one) and, with no `--feed`, confirmation from DK's `Starting` column
+when that covers every side; the result names both (`lock_source`,
+`confirmation_source`). A slate DK has only partly posted confirms nobody, and
+the tool says which side. `--dead-from-feed` reads the same DK orders.
 
 **Which tool owns the entry: `late_swap.py` while it is mostly OPEN,
 `tools/repair_entry.py` once it is mostly LOCKED, and the boundary is

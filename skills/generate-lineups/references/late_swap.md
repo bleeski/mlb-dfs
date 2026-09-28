@@ -130,8 +130,20 @@ The swap presents the file (`FILE <path> sha256=... label=... coverage=...`)
 before any narrative, the moment it is written and its label is known, the same
 contract Session 08 gave `build_slate.py`. Codes:
 
-- **0** — delivered clean: promoted, recorded, staged, printed with its
-  preflight command.
+- **0** — delivered clean: promoted, recorded, staged, and the swap's own run of
+  the preflight on those bytes exited 0 with verdict `upload_ready` (R174; see
+  below). A `review_ready` verdict also exits 0, and prints as such.
+- **4** — a required input is missing: the salary file, the parent, or an
+  explicit `--lineups` path that does not exist. A missing DEFAULT
+  `lineups_feed.json` is NOT this when DK's `Starting` column covers every side
+  (R404): the swap builds its feed from the salary file, prints
+  `DK's Starting column covers all N side(s)`, and goes on. One uncovered side
+  brings the exit 4 back, naming the side.
+- **5** — delivered, and the swap's own preflight run REFUSED the bytes (or could
+  not run). The file is written, recorded and on disk; the `REFEREE FAILED` lines
+  say which check failed. It is not upload-ready. Repair the failure
+  (`tools/repair_entry.py` for a dead or locked player) and run the preflight
+  again; nothing is withdrawn, and nothing was uploaded.
 - **3** — refused: a downgrade without `--accept-downgrade`, or a promotion
   another session's race beat (the file sits at its `DO_NOT_UPLOAD_` name,
   withdrawn, not delivered).
@@ -151,7 +163,14 @@ under a bad label.
 
 ## After a swap
 
-Verify before handing it over. `preflight_upload.py` auto-resolves `--parent`
+The swap runs `preflight_upload.py` on the file it just wrote, in process, with
+`--salary`, `--parent` and `--expect-sha256` (and `--feed` when a feed file was
+read), and prints `referee: preflight_upload exit 0 ... verdict <verdict>` before
+it prints the upload line. Only `verdict upload_ready` means upload-ready;
+preflight also exits 0 for `review_ready`, which is what a downgrade taken with
+`--accept-downgrade` or a review-grade parent produces, and the line says so. Exit 5 is the swap saying it has no such verdict. Also
+run `verify_export.py` below, because CLAUDE.md's two-referee clause is about two
+tools. Verify before handing it over. `preflight_upload.py` auto-resolves `--parent`
 from the manifest's supersession chain when it is omitted (R450), the same
 mechanism `verify_export.py` already used, but the swap's own printed command
 already names it, so nothing needs to be typed under a clock:
@@ -167,7 +186,11 @@ That confirms locked slots held and no new player arrived from a locked game,
 which is precisely what DK will reject if you got it wrong.
 
 **No `--locked-teams`.** The tool derives locked teams on EVERY invocation from
-the lineups feed's own clock, falling back to the salary file's `Game Info`, and
-prints the clock and the source it used. The flag only ADDS to that set. If you
+the salary file's `Game Info` clock, unioned with the lineups feed's own clock,
+and prints the clock and the source it used. A feed can only ADD to that set. The
+one thing it can remove is a game it reports postponed, and only when the feed's
+date for that game is the salary file's date for it (R325): a feed dated to
+another day is named `IGNORED` and the salary clock decides. `preflight_upload.py`
+and `verify_export.py` share this derivation and both accept the flag. The flag only ADDS to that set. If you
 see `STALE --locked-teams` in the output, drop the flag. `--as-of` is the only
 clock override, and it is for replaying a derivation against a fixed time.
