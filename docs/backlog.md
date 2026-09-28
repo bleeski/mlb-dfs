@@ -1217,127 +1217,9 @@ if the pinned pool makes any useful cap infeasible past ~4 pins, the honest
 outcome is the rider alone and the item closes at report-only. Owner: none.
 Rollback: drop the kwarg.
 
-### R285. The supervisor's bank-growth remedy reads a key the refusal brief does not write, so on the direct path it can never fire and autobuild stops for a human on the one remedy CLAUDE.md lists FIRST as unattended (P1, S) | new 2026-09-01, merged from BUILD fragment `2026-09-01_BUILD_autobuild_exit3_bank_growth.md`; **the fragment's own mechanism is FALSE and the real one is below**, verified in tree and against the delivered artifacts
+### R285. CLOSED 2026-09-28 -- SHIPPED as roadmap Session 18, entry migrated to CHANGELOG.md
 
-**Rider 2026-09-22 (R385): the whole entry lands in docs/ROADMAP.md Session 18 with R390.** Two corrections. The exit-3 grow branch also reads the wrong key (`autobuild.py:696` reads `solve.bank`; refusals write `bank_exploration` at `build_slate.py:2997`). And per `docs/backlog_inbox/2026-09-22_BUILD_1905-autobuild-sliced-read-and-untagged-refusals.md` §1, the SLICED path fails too: the 1905_10g refusal wrote `bank_exploration` at top level with no `solve` key, so "works on the sliced bank" above is false.
-
-**LANDED 2026-09-11 in R338's commit one; the record is that date's CHANGELOG entry.** The F37 and F38 halves shipped: `extend_bank` reports `job_list_exhausted` only when `done_here == len(jobs)`, and `autobuild.parse_brief` walks every JSON object in stdout with `raw_decode` and takes the last one carrying a string `status` -- exit 0 without `delivered_path` and `delivered_sha256` is a `stop`, and the terminal action is `delivered`, never `certified`. **The mechanism this entry is actually about is untouched and is what Session 5 keeps**: the direct path still never writes the key the bank-growth remedy reads.
-
-**Rider 2026-09-08 (ed12, F38 and F37): the producer side of the flag, and the success side of the parser.** *F38:* `extend_bank` (`bank_cache.py:858-946, 983`) can leave `exhausted=True` when the loop visited every job but every job raised, timed out or returned no proof; those jobs correctly stay out of `attempted`, yet `job_list_exhausted` then tells the supervisor no useful retry remains -- search effort read as an answered search, the R326 shape on the bank side. Keep `jobs_total`, `jobs_answered` (optimal or proven-infeasible only), `jobs_pending` and `search_complete` as distinct fields computed from exact job ids; an empty job grid is diagnosed separately from a solved slate; a validated limited incumbent stays usable while its job stays pending. *F37:* `parse_brief` (`autobuild.py:275-287`, `:596-600`) depends on JSON whitespace and key order in mixed stdout and logs exit 0 as "certified" although build paths deliberately deliver review-grade artifacts. Emit one versioned result JSON (`build-result-v1`: `FILE_VALID`, `EVIDENCE_VALID`, `SELECTION_VALID`, `ALLOCATION_VALID`, `RELEASE_DECISION`, `delivered_sha256`, `failure_class`) separately from human stdout; classify from its facts and verify the delivered hash independently; missing or reordered JSON is a protocol error, never a promotion. Roadmap: Session 5.
-
-**Rider 2026-09-03, from BUILD fragment
-`2026-09-03_BUILD_autobuild-bank-limited-and-stale-preflight-feed.md` §(a), and
-independently the greenfield eleventh edition (D13). A FIELD SIGHTING, inside a
-T-38 window, and it costs the entry its "prospective" status.** On 1915_6g,
-`autobuild.py` attempt 1 stopped with "refused with no remedy this supervisor
-may take" while its own recorded errors named the remedy twice: "`max_sp_pair_
-repetition`: 3 distinct SP pairs x cap 1 = 3 < 18 entries -- BANK-LIMITED:
-feasibility.inputs.viable_sp_pairs says the slate itself has 60 viable SP pairs;
-this bank sampled only 3, so grow the bank before relaxing this cap". A single
-`build_slate.py --max-seconds 110` by hand cleared both messages on the next
-call. So the engine classified the refusal BANK-LIMITED, printed the remedy
-CLAUDE.md's Autonomy section lists FIRST as unattended, and the supervisor
-stopped for a human anyway. `autobuild.py:637` grows on
-`bank.get("job_list_exhausted") is False` and `:608` on exit 10; a direct-path
-refusal carries neither field while saying `BANK-LIMITED:` in prose. **ed11's
-remedy is this entry's reader half stated better and is adopted: a typed
-`refusal` block on the engine payload carrying `class`, `remedy`,
-`job_list_exhausted`, `jobs_attempted` and `jobs_total`, with the supervisor
-branching on the enum. "No regular expression over `errors[]` belongs in the
-final fix" is the acceptance criterion.** Lands with R311 and R207, which want
-the same envelope for a different refusal class.
-
-**Rider 2026-09-02 (ed10, GF10-T11).** A third reader of the same absent key: `autobuild.py:393` reads `brief.solve.bank.jobs_attempted` on exit 10, and the partial payload (`build_slate.py:1852-1859`) has no `solve`. And the classification around it is wider than the key: any child exit outside {0, 4, 10} is handled as a code-3 refusal with neither `returncode` nor a stderr tail recorded (`outputs/2026-09-01/_ab1.err` shows the line). Lands with R296(d).
-
-**What happened.** Slate 2026-09-01 1840_6g, Classic turbo, 6 games, 9 entries.
-`tools/autobuild.py` attempt 1 stopped with `"refused with no remedy this
-supervisor may take"` while `outputs/2026-09-01/autobuild_decisions.json` records,
-in its own `errors` array, the engine having said:
-
-> `[BANK JOB LIST NOT EXHAUSTED -- see remedies below before relaxing any control]`
-> … `FIRST REMEDY, grow the bank: the job list was NOT exhausted (78 of 720 jobs
-> attempted, 10.8%) … Re-run the same build command; it exits 10 and resumes into
-> the same cache until the job list is exhausted.`
-
-A manual re-run of the identical command with a larger `--max-seconds` exhausted
-the job list in one call, and the refusal then came back WITHOUT the not-exhausted
-clause — which is the state R157's exposure-cap rescue requires before it may be
-applied. Cost was one call and about two minutes against 50 minutes of clock; on a
-12-game slate at T-15 it is the build.
-
-**The fragment's mechanism is FALSE, and checking it is what found the real one.**
-It reports the bank-growth branch as keyed on exit 10. It is not: `autobuild.py:390`
-handles exit 10, and there is a SECOND, separate bank-growth branch at **`:420` on
-the code-3 refusal path**, which is exactly the branch the fragment wanted and
-which already carries the right words ("refusal against a partial bank; the
-engine's first remedy is always to grow it, never to relax a control"). The
-supervisor's policy is right. **What fails is the read.**
-
-**The real mechanism: the fact is written in prose and read as a key, and the key
-has no writer on this path.** `:420` tests
-`brief["solve"]["bank"]["job_list_exhausted"] is False`. Measured on the delivered
-artifacts at this head:
-
-- `build_brief_1840_6g.json` (the refusal) has **no `solve` key at all** and **no
-  `bank_exploration` key**. Its `errors` array carries the counts as a SENTENCE.
-- `solve.bank` is written at `build_slate.py:2128` and is **`null` on the direct
-  path** — confirmed on `build_brief_final.json`, a CERTIFIED build, whose
-  `solve` block reads `['strategy','single_lineup_s','bank_budget_floored','bank']`
-  with `bank: null`. The comment at `:2124` says so outright: "`bank` is None on
-  the direct path".
-- `bank_exploration` (the refusal path's own bank block, `build_slate.py:2014`) is
-  guarded by `if bank_report is not None`, and `bank_report` is initialised None at
-  `:1798` and assigned only at `:1810`, inside the SLICED branch. **Sampled 21
-  briefs from 2026-08-3x and 2026-09-01: `bank_exploration` appears in ZERO of
-  them.**
-
-So `(brief.get("solve", {}) or {}).get("bank", {}) or {}` evaluates to `{}`,
-`.get("job_list_exhausted")` is `None`, `None is False` is False, and the branch is
-skipped. **It works on the sliced bank and not on the direct one** — R153's "on
-every rung", in the supervisor, one file over from where R246 just fixed the same
-shape for leverage.
-
-**The one OPEN question, and it must be closed before the fix is written.** The
-allocator composes that 720-job sentence at `contest_allocator.py:2808` from a
-`bank_report` whose `job_list_exhausted` is False — a job-grid report that only
-`extend_bank` produces. But the direct path's `bank_diag`
-(`execution_pipeline.py:4818`) carries no `job_list_exhausted`, no `jobs_attempted`
-and no `jobs_total`, because `build_diverse_candidate_bank` has no job list.
-**So something handed the allocator a job-grid report on a build whose
-`build_slate` local `bank_report` was None**, and until that is traced the writer
-half of the fix is aimed at a guess. The candidates are `caller_bank_diagnostics`
-(`:4422`, popped from metadata) and the plan leg's own sliced bank (`:3446`).
-Autobuild captures the subprocess with `capture_output=True` and persists neither
-the output nor the parsed brief on a stop, so `_ab1.out` is **0 bytes** and the
-evidence for attempt 1 no longer exists — which is a finding in its own right and
-the rider below.
-
-**Fix, in the order the open question allows.**
-1. Trace which producer supplied the allocator's report on the direct path. One
-   build with the subprocess output kept answers it.
-2. **Reader half, safe today and independent of (1):** the supervisor reads bank
-   exhaustion through ONE extractor over the brief, checking `solve.bank`, then
-   `bank_exploration`, then `bank_diagnostics` — rather than one hard-coded path.
-   R233's class is every consumer of bank exhaustion off a BRIEF (as distinct from
-   off a report), and `build_slate.py:199`, `late_swap.py:290` and
-   `autobuild.py:420` are three readers of one fact that do not share a definition.
-3. **Writer half, once (1) is closed:** the refusal brief carries the bank facts on
-   BOTH paths, so `bank_exploration` stops being a key that exists in zero briefs
-   and `infeasibility_hint` stops being fed `None` on the direct path.
-
-**Rider, independent and cheap: a `stop` should persist what it stopped on.**
-`autobuild` writes `autobuild_decisions.json` on a stop but keeps neither the
-subprocess stdout/stderr nor the parsed brief, so the artifact that would settle
-question (1) was discarded at the moment it became interesting. Write both beside
-the decisions file on any non-zero exit.
-
-**Audit fields.** Moves: search effort only — bank growth is explicitly search
-effort and never strategy (CLAUDE.md Autonomy), so no delivered lineup changes for
-a reason a human did not choose. Acceptance: a direct-path refusal against an
-unexhausted job list makes the supervisor grow the bank instead of stopping.
-Falsifier: if (1) shows the direct path genuinely cannot carry a job list, then the
-correct fix is the READER only plus an honest "no job list on this path" in the
-brief, and the entry closes smaller. Owner: none. Rollback: revert the extractor.
+The direct door cannot carry a job list (no job grid; the entry's falsifier held), so the fix is the reader plus an honest null block: `bank_cache.bank_job_facts` is the one extractor; both doors write `bank_exploration`; `refusal_facts` is the typed block autobuild branches on, replacing the `BANK-LIMITED` string match; every child's returncode, stdout, stderr and brief is kept and a stop names the file. The '78 of 720' sentence of 2026-09-01 is untraceable (history starts 2026-09-22). `build_slate.py` and `late_swap.py` read in-process reports, not briefs, and were left alone.
 
 ### R290. CLOSED 2026-09-03 -- (c) the deadline governor, both commits, entry migrated to CHANGELOG.md. (a) and (b) SURVIVE below and hold no slot
 
@@ -4341,72 +4223,11 @@ rejection census (R272/R292). QA proposing and a human disposing keeps CLAUDE.md
 report-never-a-gate contract intact, and R267(c)'s "the repair touches no
 portfolio control" argument is unaffected because nothing here writes a file.
 
-### R311. R157's delegated case points the operator at a floor that is guaranteed ABSENT in exactly the situation that triggers it, so the remedy is a hand bisection (P1, S) | new 2026-09-03, merged from BUILD fragment `2026-09-02_BUILD_r157-interaction-bind-has-no-derivable-floor.md`; measured on 1940_6g, five builds and ~9 minutes of a 66-minute window
+### R311. `build_slate.py --brief <path>` also writes `outputs/<date>/build_brief.json`, so a glob can read another build's brief (P2, XS) | new 2026-09-03, part (b) of the original entry; part (a) SHIPPED 2026-09-28 as roadmap Session 18, migrated to CHANGELOG.md | Roadmap: Session 130
 
-**Rider 2026-09-15 (DEV, from BUILD fragment `2026-09-12_BUILD_bank-limited-reads-as-cap-interaction.md`, consumed; roadmap CC-11).** The interaction refusal also FIRES on a bank-limited slate, and there it points at the lever CLAUDE.md most wants left alone. 1310_9g (9 games, 21 entries), default caps, exit 3 `badly_shaped`: "no single control is arithmetically binding against this bank, so the interaction of the active controls is" with `FEASIBILITY: no slate-level check failed` -- the literal R157 trigger. The R157 sanity step (all three caps at 1.0) returned a DIFFERENT and specific error: `max_sp_pair_repetition: 7 distinct SP pairs x cap 1 = 7 < 21 entries -- BANK-LIMITED: viable_sp_pairs says 144; this bank sampled only 7, so grow the bank before relaxing this cap`. Third build, default caps, `--max-seconds 320`: certified, 21 distinct lineups, 21 distinct SP pairs, 0 relaxations. The bind was never the exposure caps. Fix, added to this entry's scope: the interaction branch checks the bank's sampled SP pairs against `feasibility.inputs.viable_sp_pairs` FIRST and leads with the BANK-LIMITED line when the ratio is low, exactly as the open-caps run already does; the two refusals must not name different causes for one condition with only the second actionable. Interim: SKILL.md's "an under-explored bank reads as a tight exposure cap" belongs beside the refusal-class table, not under the retired 45-second budget.
+**(a) landed (Session 18).** The interaction refusal says BANK-LIMITED on a bank with fewer SP pairs than the slate has, says when bank growth cannot help, and a counting row names the smallest player-exposure cap the bank can satisfy; the typed rows travel to `refusal_remedy`.
 
-**What.** On 1940_6g (Classic, 18 entries, 6 games) the posture defaults refused
-with the engine's own message "no single control is arithmetically binding
-against this bank, so the interaction of the active controls is", which is
-R157's delegated case verbatim. R157 says to re-derive the delivered target from
-"that slate's structural floors (`player_exposure_floor` etc. in the feasibility
-report)". **On this refusal `feasibility.checks` was an EMPTY LIST on all five
-refusals**, because no slate-level check failed, which is the precondition R157
-itself names. The instruction points at a field guaranteed absent whenever the
-instruction applies.
-
-**The bisection that resulted**, five builds:
-
-| pitcher | player | stack | result |
-|---|---|---|---|
-| 0.43 | 0.40 | 0.35 | refused (posture default) |
-| 1.00 | 1.00 | 1.00 | CERTIFIED (R157 sanity check) |
-| 0.45 | 0.45 | 0.35 | refused |
-| 0.50 | 0.60 | 0.35 | refused (and again at `--max-seconds` 65 → 100) |
-| 0.50 | 0.95 | 0.50 | refused |
-| 0.60 | 0.95 | 0.50 | refused |
-| 0.50 | 1.00 | 0.35 | CERTIFIED, delivered |
-
-Two facts one number would have given in a single build: `max_player_exposure_pct`
-had to be exactly **1.0** on this bank (0.95 refused, i.e. one player is required
-in ALL 18 entries), and pitcher 0.50 with stack 0.35 were jointly satisfiable.
-The delivered file therefore carries Cam Smith at 88.9% and William Contreras at
-77.8%.
-
-**And bank growth is NOT the remedy here, while CLAUDE.md's Autonomy section
-reads as though it is.** "Grow the bank, always ... the first remedy for every
-refusal against an unexhausted job list" was applied (65s → 100s, warm cache,
-four prior slices) and the refusal came back byte-identical. That is correct
-behaviour, since the message says "proven infeasible" and not "job list
-unexhausted", but the instruction ordering spent a call on it. SKILL.md already
-distinguishes a slate-level check from a bank-level count; the INTERACTION bind
-is a third object named in neither list.
-
-**Fix.** When the allocator proves the joint MILP infeasible and no single
-control is arithmetically binding, report the per-axis maximum the CURRENT BANK
-can support, the same quantity `player_exposure.structural_floor_pct` already
-reports for Showdown, computed against the bank rather than the pool. R157's
-"re-derive it from that slate's structural floors, never hardcode a number
-forward" then becomes executable rather than aspirational. **Cheaper interim,
-take it first:** have the refusal say explicitly that bank growth cannot clear an
-interaction bind, so the authorized-first-remedy instruction stops costing a
-call. Lands with R285 and R207: one subject, three filings, and ed11's D13
-remedy (a typed `refusal.class` / `refusal.remedy`, no regular expression over
-`errors[]`) is the envelope all three want.
-
-**(b) A second, smaller item from the same session, and it is the third member
-of a family.** `build_slate.py --brief <path>` wrote the brief to the named path
-AND to `outputs/<date>/build_brief.json`. Four `build_brief*.json` files for one
-date now exist, two from a different draftgroup (1840_3g). A session that
-globbed the directory and took the last sorted name read
-`build_brief_open.json`, another draftgroup's CERTIFIED brief, and reported
-`f1_games_priced: 0` from it while its own build had priced 6 of 6. Caught before
-it reached the report; the trap is live. Sorted-glob on that directory does not
-select your own build and `run_id` is the only safe key. **Same family as R193
-(qa_portfolio read a stale brief), R305 (the feed resolver picks by mtime) and
-R242 (the salary auto-resolve accepts a superset snapshot): a filename or an
-mtime standing in for an identity the inputs already carry.** Fix: `--brief
-<path>` writes one file, and every resolver in that directory keys on `run_id`.
+**(b) A second, smaller item from the same session, and it is the third member of a family.** `build_slate.py --brief <path>` wrote the brief to the named path AND to `outputs/<date>/build_brief.json`. Four `build_brief*.json` files for one date now exist, two from a different draftgroup (1840_3g). A session that globbed the directory and took the last sorted name read `build_brief_open.json`, another draftgroup's CERTIFIED brief, and reported `f1_games_priced: 0` from it while its own build had priced 6 of 6. Caught before it reached the report; the trap is live. Sorted-glob on that directory does not select your own build and `run_id` is the only safe key. **Same family as R193 (qa_portfolio read a stale brief), R305 (the feed resolver picks by mtime) and R242 (the salary auto-resolve accepts a superset snapshot): a filename or an mtime standing in for an identity the inputs already carry.** Fix: `--brief <path>` writes one file, and every resolver in that directory keys on `run_id`.
 
 ### R312. CLOSED 2026-09-08 -- SHIPPED, entry migrated to CHANGELOG.md. One RIDER survives below and holds no slot
 
@@ -5546,16 +5367,9 @@ publication), Showdown before the thesis ladder (R389(c)). A crash after it
 delivers it at exit 7 and a refusal re-presents it. Gate and commit: the
 CHANGELOG entries.
 
-### R390. A thin sliced bank returns exit 10 before the deadline governor or any recovery is consulted (P0, S) | new 2026-09-22, audit DD-03 | Roadmap: Session 18
+### R390. CLOSED 2026-09-28 -- SHIPPED as roadmap Session 18, entry migrated to CHANGELOG.md
 
-**Rider 2026-09-28 (Session 15): the Deadline makes this reachable near lock.** Every Classic budget is now a slice of one Deadline bounded by the first lock less F-1's buffer, so a live build started a few minutes before that deadline hands the sliced door a small slice, and a thin bank exits 10 asking for a re-run with less time still. Session 15 closed the case where the slice is below the bank floor (the direct door then delivers or refuses, `solve.strategy_reason` says why); a slice above the floor and too small for the job list still takes this exit, which is this entry's fix.
-
-**Rider 2026-09-25 (the code review, orchestration area; `review_orchestration/repro_r390*.py`): the live trigger and the acceptance test.** Since R415 `bank_resume_warranted` (`BS` about L1473-1483) returns False on `candidate_cap`, so the exit-10 branch (L3727-3743) fires only on a time- or retry-stopped slice against an unexhausted grid, not the cap: a capped bank prints `BANK AT ITS CAP`, solves, and the in-window governor DID fire on it (`--bank-max-candidates 8`: exit 0, `governs called 1`, `review_grade_deadline_build`). On 06-03 the honest levers cannot reach the branch because the job grid (192 jobs) exhausts inside the 5s floor in 1.0s, so the acceptance test needs a slate whose grid outlasts a floored slice (1905_10g's shape) or a patched slice. When the branch does fire (patched): exit 10, `governs called 0`, no `deadline` block, zero enhanced solves, the baseline as the current file. The fix goes above L3743 as filed.
-
-
-- **What.** `build_slate.py:2670-2689` returns `10, {}` on a count or SP-pair shortfall against an unexhausted job list. The governor is first consulted at `:2856`. autobuild grows the bank again (`autobuild.py:667-671`). `REFUSAL_SITES` labels `bank_thin_partial` badly_shaped (`:248-264`), and that label changes nothing on this branch.
-- **Fix.** When the thin bank covers every reserved row under never-relax, go on to allocation with reuse relaxed and label it `bank_thin_delivered`; consult the governor before any return. Lands with R285 (whole) and R311.
-- **Acceptance.** A thin sliced bank with coverable entries produces a file inside the deadline.
+The sliced door's exit 10 now consults the governor and the Deadline before it returns: a thin bank that covers every reserved row under never-relax (F-3, a held SP-pair cap, a typed reuse cap) is solved when the governor's window is open or a re-run has less than the bank floor to spend, and labelled `bank_thin_delivered` / `review_grade_bank_thin_delivered`, never certified. Exit 10 stays while a re-run can add a slice. Reuse is the allocator's engine ladder, not a move. Remainder: an in-window bank that cannot cover the rows still exits 10 (R401, Session 22, delivers rows-removed).
 
 ### R391. The deadline rung opens a fixed subset of controls and leaves the binding ones closed (P1, M across two sessions) | new 2026-09-22, audit DD-07 | Roadmap: (a) Session 19, (b) 20
 

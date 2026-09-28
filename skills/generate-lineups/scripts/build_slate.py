@@ -31,6 +31,7 @@ touches DraftKings: lineups and money move only at Ben's manual upload.
 from __future__ import annotations
 
 import argparse
+import collections
 import csv
 import datetime as dt
 import hashlib
@@ -274,7 +275,12 @@ REFUSAL_SITES = (
                "possible reason: the remedy it prints is 'run the same command "
                "again to add a slice', which is the one remedy a deadline "
                "cannot buy, and a thin bank is search effort and never a "
-               "reduction of the legal player set.",
+               "reduction of the legal player set. R390: while a re-run can "
+               "still add a slice this stays the answer; once the governor's "
+               "window is open or a re-run has less than the bank floor to "
+               "spend, a bank that covers every reserved row is solved "
+               "instead (`bank_thin_delivered`, review-grade), and only a bank "
+               "that cannot cover them still exits here.",
     },
     {
         "key": "classic_not_certified",
@@ -1102,7 +1108,8 @@ def interaction_probe_limits(deadline, now, governor=None, minutes_to_deadline=N
 
 
 def typed_refusal_remedy(feasibility, interaction_probe, bank_report,
-                         control_provenance=None, never_relax=()) -> list:
+                         control_provenance=None, never_relax=(),
+                         bank_limits=None, strategy=None) -> list:
     """R207 (+R204's naming half). The Classic refusal's remedies, as data.
 
     Three sources, in the order a session should read them, each already in
@@ -1113,7 +1120,11 @@ def typed_refusal_remedy(feasibility, interaction_probe, bank_report,
       * the allocator's ``interaction_probe``: each control that, dropped
         ALONE, restores feasibility, with its smallest step and whether the
         step alone restores it;
-      * a bank job list that was not exhausted (search effort, first).
+      * a bank job list that was not exhausted (search effort, first);
+      * R285 / R311, the allocator's ``bank_limits`` rows: a BANK-LIMITED count
+        or interaction (``bank_limited``, search effort) and the smallest
+        player-exposure cap the bank can satisfy (``bank_floor``, a number
+        derived from the bank, not from the slate).
     Every raise is class S (MLB_Classic.md §2). A control the build holds by
     never-relax is listed with ``held: true``, never as something to move.
     ``errors[]`` is not read or written: its text stays byte-identical.
@@ -1197,7 +1208,60 @@ def typed_refusal_remedy(feasibility, interaction_probe, bank_report,
             "cap": lever["cap"],
             "class": "S", "note": "search effort, the first remedy (R98(2))",
         })
+    # R285 / R311. Typed where the allocator computes them, so no reader parses
+    # the BANK-LIMITED sentence out of errors[].
+    exhausted = (bank_report or {}).get("job_list_exhausted")
+    for row in bank_limits or []:
+        if row.get("kind") in ("counting", "interaction"):
+            lever = ("take_sliced_door" if strategy == "direct"
+                     else "grow_bank" if exhausted is False else "none")
+            remedies.append({
+                "kind": "bank_limited", "source": "allocator", "axis": row.get("axis"),
+                "basis": row.get("kind"), "sampled": row.get("sampled"),
+                "viable": row.get("viable"), "need": row.get("need"),
+                "entries": row.get("entries"), "door": strategy, "lever": lever,
+                "class": "S",
+                "note": "the bank, not a control, is short; search effort first",
+            })
+        elif row.get("kind") == "player_floor":
+            remedies.append({
+                "kind": "bank_floor", "source": "allocator",
+                "control": "max_player_exposure_pct", "op": ">=",
+                "to": row.get("required_cap_pct"),
+                "player_id": row.get("player_id"),
+                "lineups_with_player": row.get("lineups_with_player"),
+                "distinct_lineups": row.get("distinct_lineups"),
+                "arithmetic": True, "class": "S", "basis": "bank",
+                "note": "the smallest cap this bank can satisfy on that player; "
+                        "a larger bank may need less, so grow it first when its "
+                        "job list is not exhausted",
+            })
     return remedies
+
+
+def refusal_facts_block(refusal_class, bank_exploration, remedies, strategy) -> dict:
+    """R285. The typed block a supervisor branches on: no regex over errors[].
+
+    ``class`` is the refusal's governor class, ``remedy`` the search-effort
+    remedy the bank facts license (`bank_cache.bank_remedy`), and the job facts
+    are the ones `bank_exploration` carries (None on the direct door, which has
+    no job list). ``bank_limited`` is the allocator's typed finding, read off
+    ``remedies``. Built here once and written on the exit-3 refusal and the
+    exit-10 partial alike.
+    """
+    from mlb_engine.optimize.bank_cache import bank_job_facts, bank_remedy
+    facts = bank_job_facts({"bank_exploration": bank_exploration})
+    limited = any(r.get("kind") == "bank_limited" for r in remedies or [])
+    return {
+        "class": refusal_class,
+        "remedy": bank_remedy(facts, door=strategy, bank_limited=limited),
+        "bank_limited": limited,
+        "door": strategy,
+        "job_list_exhausted": facts.get("job_list_exhausted"),
+        "jobs_attempted": facts.get("jobs_attempted"),
+        "jobs_total": facts.get("jobs_total"),
+        "bank_stop_reason": facts.get("bank_stop_reason"),
+    }
 
 
 def format_typed_remedy(remedy) -> str:
@@ -1211,6 +1275,15 @@ def format_typed_remedy(remedy) -> str:
                 f"{remedy.get('jobs_total')} jobs attempted{how})")
     if remedy.get("kind") in ("no_single_control", "undetermined"):
         return remedy.get("note", "")
+    if remedy.get("kind") == "bank_limited":
+        return (f"BANK-LIMITED on {remedy.get('axis')} ({remedy.get('sampled')} "
+                f"sampled of {remedy.get('viable') or remedy.get('need')}); "
+                f"lever {remedy.get('lever')}")
+    if remedy.get("kind") == "bank_floor":
+        return (f"this bank cannot satisfy {remedy.get('control')} below "
+                f"{remedy.get('to')} on player {remedy.get('player_id')} "
+                f"({remedy.get('lineups_with_player')} of "
+                f"{remedy.get('distinct_lineups')} distinct lineups carry them)")
     text = f"{remedy.get('control')} "
     if remedy.get("to") is None:
         # The per-game caps: dropping them restores feasibility and no single
@@ -1507,6 +1580,146 @@ def bank_resume_warranted(bank_report: Mapping[str, Any], thin: bool) -> bool:
     if not thin or bank_report.get("job_list_exhausted"):
         return False
     return bank_report.get("bank_stop_reason") != "candidate_cap"
+
+
+#: R390. A thin sliced bank that is solved instead of returned for a re-run. The
+#: label starts with `review_grade` because `run_slate` refuses any other
+#: caller label (R388(e)), and a file built on a bank the clock stopped is never
+#: certified: relaxing reuse on it is a strategy move (S).
+BANK_THIN_LABEL = "review_grade_bank_thin_delivered"
+BANK_THIN_STATUS = "bank_thin_delivered"
+
+
+def distinct_lineup_count(candidates: list):
+    """How many DISTINCT lineups (by roster) this bank holds, or None.
+
+    R390. The allocator keys F-3's rows (one use of a lineup per contest) and
+    its reuse rows by this signature, and this reads the allocator's own
+    definition, so a duplicate candidate is not counted twice. None means the
+    reader was unavailable, which the coverage check reads as "cannot say".
+    """
+    try:
+        from mlb_engine.allocate.contest_allocator import _candidate_player_signature
+    except Exception:  # noqa: BLE001 - see the docstring
+        return None
+    signatures = set()
+    for cand in candidates:
+        try:
+            signatures.add(_candidate_player_signature(cand))
+        except Exception:  # noqa: BLE001
+            continue
+    return len(signatures)
+
+
+def thin_bank_coverage(*, distinct_lineups, largest_contest: int, n_entries: int,
+                       pairs_have, pairs_want: int, held,
+                       reuse_cap) -> dict:
+    """R390. Whether a thin bank can seat every reserved row without moving a
+    control that must hold, as arithmetic and nothing else.
+
+    Floors, each with what the bank has and needs:
+    * F-3, always: one contest's rows are distinct lineups, so the bank needs at
+      least the largest contest's row count of them. No control gates it.
+    * SP-pair coverage, only when ``max_sp_pair_repetition`` is held (a
+      never-relax): the pairs the cap needs. Otherwise the cap is one the
+      allocation may open, and the shortfall is not a floor.
+    * An operator-typed ``max_candidate_reuse``: the allocator holds it
+      verbatim, so ``distinct x cap`` has to reach the entry count. Absent that,
+      reuse is the engine's own ladder and it seats the file by construction
+      (``candidate_reuse_cap_rungs``).
+
+    Unknown is never coverable: a bank whose lineups cannot be counted has not
+    shown it covers anything.
+    """
+    floors = []
+    if distinct_lineups is None:
+        return {"covers": False, "floors": [], "reason": "the bank's distinct "
+                "lineups could not be counted, so it has not shown it covers "
+                "every reserved row"}
+    floors.append({"floor": "distinct_lineups_per_contest",
+                   "have": int(distinct_lineups), "need": int(largest_contest),
+                   "why": "F-3: one contest never holds a lineup twice"})
+    if "max_sp_pair_repetition" in set(held or ()) and pairs_have is not None \
+            and int(pairs_want) > 0:
+        floors.append({"floor": "max_sp_pair_repetition",
+                       "have": int(pairs_have), "need": int(pairs_want),
+                       "why": "held by --never-relax"})
+    if reuse_cap:
+        floors.append({"floor": "max_candidate_reuse",
+                       "have": int(distinct_lineups) * int(reuse_cap),
+                       "need": int(n_entries),
+                       "why": "the operator typed the cap"})
+    for floor in floors:
+        floor["met"] = floor["have"] >= floor["need"]
+    short = [f for f in floors if not f["met"]]
+    return {"covers": not short, "floors": floors,
+            "reason": ("every floor met" if not short else
+                       "short of " + ", ".join(
+                           f"{f['floor']} ({f['have']} < {f['need']})" for f in short))}
+
+
+def thin_bank_decision(coverage: Mapping[str, Any], *, in_window: bool,
+                       rerun_spendable_s: float) -> dict:
+    """R390. Deliver the thin bank, or ask for the re-run.
+
+    Exit 10 stays the answer while a re-run can add a slice: it is the
+    bank-growth remedy CLAUDE.md delegates. The bank is solved instead only
+    when the bank covers every reserved row AND a re-run cannot help, which two
+    facts say: the governor's window is open (``governs`` on this site's own
+    class), or a re-run's spendable window is below the bank floor (arithmetic
+    on the one Deadline, the sliced door's own R98(3) reasoning applied after
+    the slice instead of before it).
+
+    "Delivers" means the thin bank is SOLVED and labelled. Session 15's contract
+    for the direct door holds here unchanged: the solve delivers or refuses, and
+    only a governor (an open window on a `badly_shaped` refusal) can open
+    portfolio caps to turn a refusal into a file. With no `--deliver-by` and a
+    re-run the clock cannot afford, a thin bank whose posture caps bind refuses
+    at exit 3 with the typed remedies, as the direct door does.
+    """
+    unaffordable = float(rerun_spendable_s) < BANK_BUDGET_FLOOR_S
+    triggers = [name for name, on in (("governor_window", bool(in_window)),
+                                      ("rerun_unaffordable", unaffordable)) if on]
+    return {"deliver": bool(coverage.get("covers")) and bool(triggers),
+            "covers": bool(coverage.get("covers")), "triggers": triggers,
+            "rerun_spendable_s": round(float(rerun_spendable_s), 1),
+            "bank_floor_s": BANK_BUDGET_FLOOR_S}
+
+
+def bank_exploration_block(bank_report: Optional[Mapping[str, Any]],
+                           strategy: str) -> dict:
+    """R285. The bank's job facts as a refusal or partial brief carries them.
+
+    ONE writer for both doors and for exit 3 and exit 10. The sliced door
+    carries the merged slice report; the direct door has no job list at all
+    (its auto-bank is built per run, so `build_diverse_candidate_bank` has no
+    job grid), and the block SAYS so with null facts and a note instead of the
+    key being absent. Absent was indistinguishable from "not written", which is
+    how the supervisor read it as an answered search (R237).
+    """
+    report = bank_report
+    if report is None:
+        return {
+            "door": strategy, "job_list_exhausted": None, "jobs_attempted": None,
+            "jobs_total": None, "total_candidates": None, "budget_floored": None,
+            "bank_stop_reason": None, "bank_cap": None,
+            "candidates_to_allocator": None,
+            "note": "no job list on this door: the direct door builds its "
+                    "auto-bank per run and cannot grow it (R285)",
+        }
+    return {
+        "door": strategy,
+        "jobs_attempted": report.get("jobs_attempted"),
+        "jobs_total": report.get("jobs_total"),
+        "job_list_exhausted": report.get("job_list_exhausted"),
+        "total_candidates": report.get("total_candidates"),
+        "budget_floored": report.get("budget_floored"),
+        # R415. Why the bank stopped and the cap it stopped at, on the brief a
+        # refusal hands autobuild, which raises the cap on this.
+        "bank_stop_reason": report.get("bank_stop_reason"),
+        "bank_cap": report.get("bank_cap"),
+        "candidates_to_allocator": report.get("candidates_to_allocator"),
+    }
 
 
 def resolve_bank_budget(computed_s: float, *, label: str,
@@ -3596,6 +3809,9 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
     strategy = "direct"
     bank_report = None
     candidates = None
+    # R390. Set when a thin sliced bank is solved instead of returned for a
+    # re-run; the brief and the certification label read it.
+    thin_bank = None
 
     bank_budget_floored = False
     # R415. The operator's cap sizes the sliced bank and nothing else, so naming
@@ -3640,6 +3856,10 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         # R406. The entries the sleeve request is sized from, with each one's
         # posture and shape, filled below when shape resolution succeeds.
         _sleeve_entries: list = []
+        # R390. The reserved rows, kept for the thin-bank coverage check below;
+        # None when shape resolution failed, which reads the whole entry count
+        # as one contest (the safe, larger floor).
+        reserved_rows = None
         try:
             from mlb_engine.entries.dk_entries_manager import parse_dk_entry_rows
             from mlb_engine.pipeline.execution_pipeline import (
@@ -3844,22 +4064,77 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
                   f"solves on the bank it has. Raise --bank-max-candidates to "
                   f"grow it (R415).", file=sys.stderr)
         if bank_resume_warranted(bank_report, _thin_by_count or _thin_by_pairs):
-            present_baseline_as_current("the sliced bank is thin and resumable")
-            print(json.dumps({
-                **({"baseline": baseline_brief_block()} if _BASELINE else {}),
-                "status": "partial",
-                **refusal_stamp("bank_thin_partial"),
-                "date": args.date,
-                "strategy": strategy,
-                "candidates": len(candidates),
-                "needed_at_least": n_entries * 2,
-                "distinct_sp_pairs": _pairs_have,
-                "sp_pairs_needed": _pairs_want,
-                "thin_by": ([k for k, v in (("candidates", _thin_by_count),
-                                            ("sp_pair_coverage", _thin_by_pairs)) if v]),
-                "note": "bank still thin; run the same command again to add a slice",
-            }, indent=1, default=str))
-            return 10, {}
+            # R390. The governor and the Deadline are consulted BEFORE the
+            # return: a thin bank that covers every reserved row is solved when
+            # a re-run cannot add a slice, and exit 10 (the bank-growth remedy)
+            # stays the answer while one can.
+            _thin_gov = getattr(args, "_governor", None)
+            _reserved_counts = collections.Counter(str(r.contest_id) for r in (reserved_rows or []))
+            _coverage = thin_bank_coverage(
+                distinct_lineups=distinct_lineup_count(candidates),
+                largest_contest=(max(_reserved_counts.values())
+                                 if _reserved_counts else n_entries),
+                n_entries=n_entries, pairs_have=_pairs_have, pairs_want=_pairs_want,
+                held=never_relax,
+                reuse_cap=(args.controls_override or {}).get("max_candidate_reuse"))
+            _decision = thin_bank_decision(
+                _coverage,
+                in_window=bool(_thin_gov and _thin_gov.governs(
+                    {"refusal_class": REFUSAL_BY_KEY["bank_thin_partial"]["klass"]})),
+                rerun_spendable_s=deadline.rerun_spendable(args.max_seconds))
+            if _decision["deliver"]:
+                thin_bank = {
+                    "status": BANK_THIN_STATUS, "label": BANK_THIN_LABEL,
+                    **_decision, "coverage": _coverage,
+                    "candidates": len(candidates),
+                    "distinct_sp_pairs": _pairs_have, "sp_pairs_needed": _pairs_want,
+                    "thin_by": ([k for k, v in (("candidates", _thin_by_count),
+                                                ("sp_pair_coverage", _thin_by_pairs)) if v]),
+                    "bank_stop_reason": bank_report.get("bank_stop_reason"),
+                    "job_list_exhausted": bank_report.get("job_list_exhausted"),
+                    "reuse": "the allocator's engine-default reuse ladder "
+                             "(candidate_reuse_cap_rungs) seats the file; an "
+                             "operator-typed max_candidate_reuse is held",
+                    "note": "the bank was still growing, but a re-run cannot add "
+                            "a slice before the deadline, so this file is built on "
+                            "the bank in hand (R390); review-grade, never certified",
+                }
+                print(f"BANK THIN, DELIVERING: {len(candidates)} candidates "
+                      f"({_coverage['reason']}); trigger "
+                      f"{', '.join(_decision['triggers'])}; a re-run has "
+                      f"{_decision['rerun_spendable_s']}s to spend. Solving on this "
+                      f"bank with reuse at the engine ladder; the file is labelled "
+                      f"{BANK_THIN_LABEL} and never certified (R390).",
+                      file=sys.stderr)
+            else:
+                present_baseline_as_current("the sliced bank is thin and resumable")
+                print(json.dumps({
+                    **({"baseline": baseline_brief_block()} if _BASELINE else {}),
+                    "status": "partial",
+                    **refusal_stamp("bank_thin_partial"),
+                    "date": args.date,
+                    "strategy": strategy,
+                    "candidates": len(candidates),
+                    "needed_at_least": n_entries * 2,
+                    "distinct_sp_pairs": _pairs_have,
+                    "sp_pairs_needed": _pairs_want,
+                    "thin_by": ([k for k, v in (("candidates", _thin_by_count),
+                                                ("sp_pair_coverage", _thin_by_pairs)) if v]),
+                    # R390. Why this thin bank was NOT delivered: the governor was
+                    # consulted, and either a re-run can still add a slice or the
+                    # bank does not cover every reserved row.
+                    "thin_bank": {**_decision, "coverage": _coverage},
+                    **({"deadline": _thin_gov.stamp()} if _thin_gov is not None else {}),
+                    "build_deadline": deadline.stamp(),
+                    # R285. The job facts this partial brief was missing, under
+                    # the same key a refusal brief uses.
+                    "bank_exploration": bank_exploration_block(bank_report, strategy),
+                    "refusal_facts": refusal_facts_block(
+                        REFUSAL_BY_KEY["bank_thin_partial"]["klass"],
+                        bank_exploration_block(bank_report, strategy), [], strategy),
+                    "note": "bank still thin; run the same command again to add a slice",
+                }, indent=1, default=str))
+                return 10, {}
 
     slate_kwargs = dict(kwargs)
     # R333 fix (3). The F5 material-weather game cap reaches the control merge.
@@ -4122,7 +4397,11 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
             deadline.mark(f"solve {row['call']} end")
             print(f"SOLVE {format_solve_row(row)}", file=sys.stderr, flush=True)
 
-    result = _solve(attempt_controls)
+    # R390. A thin sliced bank that was solved instead of returned for a re-run
+    # is review-grade from its first solve, and every re-solve that is not a
+    # deadline rung (which carries its own label) keeps it.
+    _thin_label = BANK_THIN_LABEL if thin_bank is not None else None
+    result = _solve(attempt_controls, certification_label=_thin_label)
     # R407. On a PROVEN-infeasible joint MILP the confidence tightening is the
     # first thing relaxed, once, before the deadline governor or any other
     # control moves; the re-solve's block records the before and the would-be.
@@ -4133,7 +4412,8 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         print("input confidence: the joint MILP proved infeasible with the "
               "confidence tightening applied; relaxing it first and re-solving "
               "(R407)", file=sys.stderr)
-        result = _solve(attempt_controls, reason="input_confidence_relax")
+        result = _solve(attempt_controls, certification_label=_thin_label,
+                        reason="input_confidence_relax")
     print(f"input confidence: "
           f"{format_input_confidence_line(result.get('input_confidence'))}",
           file=sys.stderr)
@@ -4344,31 +4624,28 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
             print(f"hint: {hint}", file=sys.stderr)
         # R415. On the direct door there is no bank report and no cache to
         # resume, so "grow the bank" needs the door named to be actionable.
+        # R285. Read off the allocator's typed findings, not the sentence.
         if (bank_report is None
-                and any("BANK-LIMITED" in str(e) for e in (result.get("errors") or []))):
+                and any(b.get("kind") in ("counting", "interaction")
+                        for b in (result.get("bank_limits") or []))):
             print("BANK: this refusal is BANK-LIMITED on the direct door, whose "
                   "auto-bank is rebuilt on every run and cannot grow; pass "
                   "--bank-max-candidates to build the persistent sliced bank "
                   "(R415).", file=sys.stderr)
-        if bank_report is not None:
-            payload["bank_exploration"] = {
-                "jobs_attempted": bank_report.get("jobs_attempted"),
-                "jobs_total": bank_report.get("jobs_total"),
-                "job_list_exhausted": bank_report.get("job_list_exhausted"),
-                "total_candidates": bank_report.get("total_candidates"),
-                "budget_floored": bank_report.get("budget_floored"),
-                # R415. Why the bank stopped and the cap it stopped at, on the
-                # brief a refusal hands autobuild, which raises the cap on this.
-                "bank_stop_reason": bank_report.get("bank_stop_reason"),
-                "bank_cap": bank_report.get("bank_cap"),
-                "candidates_to_allocator": bank_report.get("candidates_to_allocator"),
-            }
+        # R285. On BOTH doors: the direct door's block says it has no job list.
+        payload["bank_exploration"] = bank_exploration_block(bank_report, strategy)
         # R207 (+R204 naming half). The remedies as data, beside the sentence
         # that errors[] keeps byte-identical, and the probe that named them.
         payload["refusal_remedy"] = typed_refusal_remedy(
             feas, result.get("interaction_probe"), bank_report,
             control_provenance=result.get("control_provenance"),
-            never_relax=never_relax)
+            never_relax=never_relax,
+            bank_limits=result.get("bank_limits"), strategy=strategy)
+        # R285. The block the supervisor branches on, beside the typed remedies
+        # it summarizes.
+        payload["refusal_facts"] = refusal_facts_block(
+            payload["refusal_class"], payload["bank_exploration"],
+            payload["refusal_remedy"], strategy)
         if result.get("interaction_probe") is not None:
             payload["interaction_probe"] = result["interaction_probe"]
         for remedy in payload["refusal_remedy"]:
@@ -4622,6 +4899,23 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
     # whether a rung moved this build, and the LABEL is what changes -- never
     # the gates, which stay exactly as strict as they were. `upload_ready` is
     # reserved for a certified export and a governed file is not one.
+    #
+    # R390. A thin bank solved instead of re-run: the label and status say so
+    # unless a deadline rung below moved the build further (its label is the
+    # later, wider one and `thin_bank` still records this).
+    if thin_bank is not None:
+        brief["thin_bank"] = dict(
+            thin_bank, candidate_reuse=result.get("candidate_reuse"))
+        brief["label"] = BANK_THIN_LABEL
+        brief["label_note"] = (
+            "REVIEW-GRADE, not certified: the sliced bank was still growing and a "
+            "re-run could not add a slice before the deadline, so this file is "
+            "built on the bank in hand. Read thin_bank for the coverage floors "
+            "and candidate_reuse for the reuse the allocator needed, and run "
+            "tools/preflight_upload.py before uploading.")
+        if brief["status"] == "certified":
+            brief["status"] = BANK_THIN_STATUS
+        print(f"BANK THIN: delivered as {BANK_THIN_LABEL} (R390)", file=sys.stderr)
     if governor is not None:
         brief["deadline"] = governor.stamp()
         if governor.walked:
@@ -4637,7 +4931,7 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
             # R388(e). The status said `certified` beside this label; the
             # manifest row, the delivery record and preflight now read the
             # label too, so the brief's own status does.
-            if brief["status"] == "certified":
+            if brief["status"] in ("certified", BANK_THIN_STATUS):
                 brief["status"] = dg.DEADLINE_LABEL
     # R298(b). A certified build whose mirror failed delivered nothing to
     # outputs/; the status says so rather than reading as a delivery.

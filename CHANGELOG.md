@@ -2,6 +2,93 @@
 
 What changed in the engine, the tools and the contracts, when, and why.
 
+## 2026-09-28 — R390 + R285 + R311: a thin bank delivers, the bank's job facts have one reader and a typed block, and the interaction refusal says BANK-LIMITED (roadmap Session 18)
+
+**Scope.**
+- `skills/generate-lineups/scripts/build_slate.py`:
+  - R390: `BANK_THIN_LABEL`, `BANK_THIN_STATUS`, `distinct_lineup_count`, `thin_bank_coverage`, `thin_bank_decision`; the `bank_resume_warranted` site in `run_classic` consults the governor and the Deadline before it returns; the label rides the first solve and the R407 re-solve; the delivered brief carries `thin_bank`;
+  - R285: `bank_exploration_block` (one writer, both doors, exit 3 and exit 10), `refusal_facts_block`, `typed_refusal_remedy(bank_limits=, strategy=)` with the new `bank_limited` and `bank_floor` kinds, and the direct-door stderr line read off the typed finding; the `bank_thin_partial` row's `why`.
+- `mlb_engine/pipeline/deadline.py`: `Deadline.external_remaining` and `rerun_spendable`.
+- `mlb_engine/optimize/bank_cache.py`: `bank_job_facts` (the one extractor) and `bank_remedy`.
+- `mlb_engine/allocate/contest_allocator.py`: `_diagnose_binding_constraints(bank_limits_out=)`, the player-exposure counting row, `interaction_bank_limits`, `compose_infeasibility_errors(bank_limits=, job_list_exhausted=, direct_door=)`, and the refusal's `bank_limits`.
+- `mlb_engine/pipeline/execution_pipeline.py`: `bank_limits` carried onto the blocked result.
+- `tools/autobuild.py`: `refusal_bank_report` through the extractor, `refusal_remedy_of`, `persist_child`, `_redact`, and `Decisions.add` naming the child on a stop.
+- `tools/preflight_upload.py`: the new label's reason.
+- `skills/generate-lineups/SKILL.md`: two short paragraphs.
+- `tests/test_core.py`, `tools/audit.py` (pin 1788 to 1813).
+- `docs/ROADMAP.md`, `docs/backlog.md`, `CHANGELOG.md`.
+
+**What was wrong.** Three filings on one subject, each checked against the tree at 61954c6 before any line was written.
+- **R390 (P0).** The sliced door returned `10, {}` at `build_slate.py:3846-3862` ("run the same command again") before the governor, at `:4007` and `:4167`, or any recovery was read.
+  - A live build started near the lock hands the sliced door a small slice, and a thin bank then asks for a re-run with less time still. Session 15 sent a slice below the bank floor to the direct door, but `--bank-max-candidates` skips that (`:3610-3615`), and a slice above the floor still exited 10.
+  - No test drove the branch (nothing in `tests/` asserts a thin sliced bank exits 10), so no existing test flipped.
+  - The row's L2670-2689 and the 09-25 rider's L3727-3743 were stale; the branch is where the 09-28 rider says.
+- **R285.** Part of the reader half had landed (`autobuild.refusal_bank_report`, R415), and these claims did not survive the tree:
+  - "the sliced path fails too": false, `refusal_bank_report` reads `bank_exploration`;
+  - "autobuild stops for a human on a BANK-LIMITED direct refusal": false since R415, which switches doors;
+  - "a stop persists nothing": two stops kept `returncode` and a stderr tail, the rest nothing, and stdout and the parsed brief were kept nowhere.
+  What did hold:
+  - the direct door's refusal wrote no job facts, and `bank_exploration` was guarded on the sliced door's report;
+  - the exit-10 payload carried none, so `autobuild.py:1135` logged `jobs=None` on every partial;
+  - `refusal_bank_report` had no `bank_diagnostics` leg;
+  - `autobuild.py:1205` matched `"BANK-LIMITED"` in `errors[]`.
+  The entry's open question is closed: the direct path CANNOT carry a job list. `build_diverse_candidate_bank` has no job grid, `bank_diag` (`execution_pipeline.py:6946-6975`) has no job key, and the plan leg that could is skipped under `approve=True`. The 2026-09-01 "78 of 720 jobs" sentence cannot be traced (the git history starts 2026-09-22 and `outputs/2026-09-01` is not in the tree). The entry's own falsifier holds: the fix is the reader plus an honest "no job list on this door".
+- **R311.** The mechanism held. The counting rows say BANK-LIMITED only when `buckets x cap < entries`, so 7 sampled SP pairs x a posture cap of 3 = 21 >= 21 passed the count and the refusal fell to "the interaction of the active controls is", with 144 viable pairs unsampled, and the R207 probe then named the cap that happens to restore a thin bank.
+  - Corrected: `feasibility.checks` is not an empty list at HEAD. `_feasibility_report` always returns `same_contest_unique_capacity` and the player floor; what hides them is `build_slate.py` attaching `feasibility` only when it fails. The observable part stands: no bank-derivable floor was printed.
+  - The Showdown `structural_floor_pct` is a counting lower bound, not "the per-axis maximum the bank supports" (it is a lower bound on the cap), so it was not reused; the one exposure control with no bank-level row was `max_player_exposure_pct`, the one that bound on 1940_6g.
+
+**What shipped.**
+- **R390.** Exit 10 is still the answer while a re-run can add a slice (it is the bank-growth remedy CLAUDE.md delegates). The thin bank is solved instead when BOTH hold:
+  - it covers every reserved row without moving a control that must hold, and
+  - a re-run cannot help: the governor's window is open (`governor.governs` on the site's own class, `badly_shaped`), or `Deadline.rerun_spendable(args.max_seconds)` is under the bank floor (a fresh window clipped by any external bound, less the reserve; `--max-seconds` is one call's budget and is not external).
+  Coverage is arithmetic and nothing else:
+  - F-3, always: distinct lineups (the allocator's own signature) at least the largest contest's reserved rows;
+  - `max_sp_pair_repetition` only when `--never-relax` holds it;
+  - an operator-typed `max_candidate_reuse`, whose `distinct x cap` must reach the entry count.
+  An uncountable bank covers nothing.
+  - **Reuse.** The row says "reuse relaxed"; it is the allocator's engine-default ladder (`candidate_reuse_cap_rungs`: rung 1 is `ceil(entries / distinct)`, which seats the file by construction, then the double, then none), not a move this branch makes. An explicit value would only remove the ladder's fallbacks. An operator-typed cap is held as a floor. F-3 is the allocator's unconditional per-contest rows and is untouched.
+  - **Label.** The first solve and the R407 re-solve carry `certification_label=review_grade_bank_thin_delivered` (`run_slate` refuses any label not starting `review_grade`); the brief's `status` is `bank_thin_delivered`, `label_note` says review-grade, and `thin_bank` records the trigger, the floors with have and need, and the reuse the allocator applied. A deadline rung after it wins the label (`review_grade_deadline_build`) and `thin_bank` still records it. Never `certified`, never upload-ready (S).
+  - **Governor.** The exit-10 payload now carries the governor's stamp and `build_deadline` when it is consulted, so a partial says the governor was read and why it did not act. No `REFUSAL_SITES` row was added or changed in identity: a delivery is not a refusal, the table stays 11 rows and the exit-10 return site stays (the AST pin holds at 10); the row's `why` says when it fires now.
+  - **Contract.** With no governor and a re-run the clock cannot afford, the thin bank SOLVES and then delivers or refuses like the direct door (Session 15's contract); only a governor opens caps. `thin_bank_decision`'s docstring says so.
+- **R285.**
+  - **One extractor.** `bank_cache.bank_job_facts` reads `solve.bank`, `bank_exploration`, `bank_diagnostics`, then a bare report, and a block counts when it carries any job key (a direct-door block with null facts is an answer; an absent block is not). `autobuild.refusal_bank_report` and the exit-10 log field use it.
+  - **Writer.** `bank_exploration_block` is written on the exit-3 refusal on BOTH doors and on the exit-10 partial. On the direct door it is null with `note: "no job list on this door"`.
+  - **Typed block.** The row's `refusal` block is realized as `refusal_facts` (`class`, `remedy`, `bank_limited`, `door`, `job_list_exhausted`, `jobs_attempted`, `jobs_total`, `bank_stop_reason`), because the key `refusal` is the site-key string that `build_slate.py` main and four tests read. `remedy` is `bank_cache.bank_remedy`: `grow_bank`, `raise_bank_cap`, `at_ceiling`, `take_sliced_door` or `none`, search effort only. The allocator's `bank_limits` rows travel `contest_allocator` -> `run_slate` result -> `refusal_remedy` (`bank_limited`, `bank_floor`), so nothing reads a sentence.
+  - **Supervisor.** `autobuild` branches on `refusal_facts.remedy` (an older brief through the extractor) and the `"BANK-LIMITED" in str(e)` match is gone. The one other sentence reader, `build_slate.py`'s direct-door stderr line, reads the typed finding.
+  - **Stops.** `persist_child` writes `outputs/<date>/autobuild_child_<attempt>.json` for every child run (returncode, cmd, stdout, stderr, parsed brief, `killed`), and any `stop` after it names the file as `child_record` and carries `returncode`. The values of `THE_ODDS_API_KEY` and `GH_PAT` are redacted from what is written.
+- **R311.**
+  - **BANK-LIMITED on an interaction refusal.** `interaction_bank_limits`: the bank holds fewer distinct SP pairs than the smaller of the slate's `viable_sp_pairs` and the entries (one pair per entry, the most a pair cap could ask), and the job list is not exhausted. The interaction sentence keeps its text and appends the BANK-LIMITED clause, and the R207 probe is suppressed for it as it already is for a partial bank. A proxy stated as counts, not a claim about the slate.
+  - **Three-way line.** With `job_list_exhausted` True the line says bank growth cannot clear it; False keeps the existing flag; None on the direct door says the door cannot grow and names `--bank-max-candidates`.
+  - **A derivable floor.** A counting row for `max_player_exposure_pct` in the R405 shape: a player in `n` of `k` distinct lineups leaves `k - n` lineups without them, so at most `(k - n) x reuse` entries can avoid them (0 when no reuse cap is set and `k - n` is 0), and the smallest cap the bank can satisfy on that player is `(entries - capacity) / entries` (`required_cap_pct`, a `bank_floor` remedy with `op >=`). Cam Smith in every candidate reads 1.0, the number the 1940_6g bisection took five builds to find. A necessary condition only, computed after a proven infeasibility, and skipped when the solve carries fixed rows (a late swap's untouched entries), whose caps this function cannot see.
+  - **Byte identity.** A caller that passes no `bank_limits` keeps R207's sentence byte for byte (`FalseSignalBatchTests`' pins at the two byte-identical tests are untouched and green).
+
+**Declined or left, with reasons.**
+- **R285 writer half on the direct door:** cannot be written (no job grid); the honest null block is the fix (the entry's falsifier).
+- **`build_slate.py` L199 and `late_swap.py` L290** read an in-process `extend_bank` report, not a brief; the row lists them as brief readers and they are not. They were left alone.
+- **R311 (b)** (`--brief` also writes `outputs/<date>/build_brief.json`) is out of this session's scope and stays as the entry's remainder.
+- **R311's per-axis floors beyond player exposure:** the other axes already have counting rows; the Showdown function was not reused (see above).
+- **In-window and uncoverable:** still exits 10 (the governor is consulted and stamped). Delivering rows-removed is R401 (Session 22).
+- **Tests that changed by design:** `AutobuildBankCapTests.test_a_bank_limited_refusal_on_the_direct_door_takes_the_sliced_bank` now supplies the typed block build_slate writes (its errors-sentence fixture would now be a stop, and a new sibling pins that); `test_preflight_names_a_reason_for_every_review_grade_label_written` gains the new label; `DeadlineGovernorWiringTests._run` also hands back stdout in `capture`; `_build_deadline` gains `external_s`.
+- No test asserted exit 10 from a thin sliced bank, so none flipped to a delivery.
+
+**R233 grep.** Every reader of the bank's job facts off a BRIEF, and every match over `errors[]`:
+- `grep -rn "bank_job_facts\|refusal_bank_report\|refusal_remedy_of" tools skills mlb_engine --include=*.py` hits: `tools/autobuild.py` (the definitions, the exit-10 log at L1169, the refusal branch at L1204-1208), `skills/generate-lineups/scripts/build_slate.py:1252` (`refusal_facts_block`), `mlb_engine/optimize/bank_cache.py` (the extractor). No other reader of `solve.bank` or `bank_exploration` off a brief remains in `tools/`.
+- `grep -rn 'BANK-LIMITED" in' tools skills mlb_engine --include=*.py`: no hit after this change (there were two, `autobuild.py` and `build_slate.py`).
+- Review-grade label tables: `grep -rn "review_grade_baseline\|review_grade_deadline_build" --include=*.py --include=*.md . | grep -v CHANGELOG\|backlog\|tests` hits `tools/preflight_upload.py` (the reason table, updated and now pinned by the label test), `mlb_engine/pipeline/deadline_governor.py`, `mlb_engine/entries/upload_manifest.py` (two labels, neither this one), `skills/generate-lineups/references/{baseline,review_grade}.md` and `SKILL.md:342` (prose about other labels, not tables), `tools/autobuild.py:706` (a help string). `late_swap` and `promote_run` read any label starting `review_grade`.
+
+**Evidence.**
+- New tests: `test_core` 1788 -> 1813 (nine `ThinBankRecoveryTests`, five `R311BankLimitedTests`, five `R285BankFactsTests`, five `R285SupervisorTests`, one `AutobuildBankCapTests`).
+- Mutations: 37 source mutations across the three items, each run red against the classes that pin it (a scratch harness that applies one, runs the classes, expects red and restores by sha; kept out of the repo). Four survived on the first pass and were traced to a no-op mutation, a test in the wrong `-k` class, and two missing assertions (the direct-door probe suppression, the `run_slate` pass-through), each fixed and re-run red.
+- Diff review (a `general-purpose` subagent, correctness only, told not to run tests): no merge blocker; four findings, all fixed before the commit and each mutation-checked red:
+  - the player-exposure line said "supports a cap of at most X" where the arithmetic is the smallest cap the bank can satisfy (renamed `required_cap_pct`, worded "cannot satisfy a cap below");
+  - that row could claim a bind with fixed rows in the solve (a late swap's untouched entries), because the diagnosis counts caps against the swappable entries only, so it is skipped when fixed rows exist;
+  - the interaction BANK-LIMITED proxy was not gated on a pair cap being in play, which on the direct door would have suppressed the R207 probe where no pair cap was tight;
+  - a dead constant in `bank_cache.py`.
+- A second pass (the advisor) found `persist_child` redacting the raw streams but writing the parsed brief unredacted; the whole record is now serialized and then redacted, and the test puts the key inside the brief.
+- `SKILL.md` grew by thirteen lines (the exit-10 delivery and `refusal_facts`), against `.claude/rules/skills.md`'s rule to put new reference material in `references/`. They stay in the body because they sit where a BUILD session reads exit 10 and a refusal, and the body is already 1.5k lines; moving them is a docs-only follow-up if Ben wants the body held.
+- Own miss, caught by the gate: `ThinBankRecoveryTests` asserted the exit-10 partial's job counts as 12 of 96, but the merged report sums the two stack-size slices; the assertion now pins the ratio. The first gate run on this tree failed on exactly that one test.
+- Gate: `PASS  v2.26.0  45 modules  2859 tests  5 skipped  {test_core 1813/1813 (4 skipped) skipped_in_place; test_showdown 368/368 (1 skipped) skipped_in_place}` (the five absent-file skips; the bracketed host warnings restate them). Baseline before this change: 2834 tests, test_core 1788. `solver_probe.py --date 2026-06-03 --salary data/archive/2026-06-03/DKSalaries_2026-06-03.csv --entries 20` prints FITS (22s projected against the 630s budget; the container has no `data/slates/`, so the vendored archive salary file is passed). `plan_status.py --check` exits 0. The golden histogram is unmoved (no delivered byte changes without a thin sliced bank, and the golden replay is inside the gate).
+
 ## 2026-09-28 — R98(3) + R98(4)-tail: one deadline on every Classic build, a measured publication reserve, and a brief that tells a deliberate cap from a starved one (roadmap Session 15)
 
 **Scope.**

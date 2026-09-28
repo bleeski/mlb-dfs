@@ -1164,3 +1164,60 @@ def extend_bank(
         "note": "deterministic candidate generation through the certified MILP path; "
                 "never an ROI, win-rate, or probability claim",
     }
+
+
+# --------------------------------------------------------------------------- #
+# R285. ONE reader of the bank's job facts, wherever a brief carries them.
+# --------------------------------------------------------------------------- #
+#: Where a build's brief (or a bare report) keeps the sliced bank's job facts,
+#: in the order `bank_job_facts` reads them: `solve.bank` is the delivered
+#: brief's; `bank_exploration` is the refusal and partial briefs' (R285 writes it
+#: on both doors); `bank_diagnostics` is the run metadata's copy of the report.
+_BANK_FACT_KEYS = ("job_list_exhausted", "jobs_attempted", "jobs_total")
+
+
+def bank_job_facts(brief: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
+    """The bank block a brief carries, as a dict copy plus ``source``.
+
+    R285. The supervisor read ``solve.bank`` off a brief, the exit-3 refusal
+    wrote ``bank_exploration``, and the run metadata wrote ``bank_diagnostics``:
+    three writers of one fact with one hard-coded reader, so a refusal that
+    carried the fact under the other name read as "no job facts" and the
+    bank-growth remedy CLAUDE.md lists first never fired. A block is taken when
+    it carries any of the job keys (a direct-door ``bank_exploration`` carries
+    them as None on purpose: "this door has no job list" is an answer, and an
+    absent block is not). A bare extend_bank report (job keys at the top level)
+    is read as itself. ``source`` is None and the job keys are None when
+    nothing carries them.
+    """
+    brief = brief or {}
+    solve = brief.get("solve") if isinstance(brief.get("solve"), Mapping) else {}
+    for name, block in (("solve.bank", (solve or {}).get("bank")),
+                        ("bank_exploration", brief.get("bank_exploration")),
+                        ("bank_diagnostics", brief.get("bank_diagnostics")),
+                        ("report", brief)):
+        if isinstance(block, Mapping) and any(k in block for k in _BANK_FACT_KEYS):
+            return {**{k: None for k in _BANK_FACT_KEYS}, **dict(block), "source": name}
+    return {**{k: None for k in _BANK_FACT_KEYS}, "source": None}
+
+
+def bank_remedy(facts: Mapping[str, Any], *, door: Optional[str] = None,
+                bank_limited: bool = False) -> str:
+    """The search-effort remedy the bank facts license, as an enum.
+
+    ``grow_bank`` (re-run the same command), ``raise_bank_cap`` and
+    ``at_ceiling`` (the cap bound; the second means raising it is Ben's call),
+    ``take_sliced_door`` (a BANK-LIMITED refusal on the direct door, whose
+    auto-bank is rebuilt per run and cannot grow; ``--bank-max-candidates``
+    selects the persistent sliced bank), else ``none``. Never a strategy
+    change: CLAUDE.md delegates growing the bank and nothing else here.
+    """
+    if facts.get("job_list_exhausted") is False:
+        if facts.get("bank_stop_reason") == "candidate_cap":
+            return ("at_ceiling" if (facts.get("bank_cap") or {}).get("at_ceiling")
+                    else "raise_bank_cap")
+        return "grow_bank"
+    if (door == "direct" and bank_limited
+            and facts.get("job_list_exhausted") is not True):
+        return "take_sliced_door"
+    return "none"

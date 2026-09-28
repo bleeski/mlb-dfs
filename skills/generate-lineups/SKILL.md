@@ -79,6 +79,15 @@ the candidates this slice happened to build, and growing the bank is the right
 first move against it (`bank_stop_reason`: re-run on `time_budget`, raise the cap
 on `candidate_cap`). The refusal labels which is which; they are not one lever.
 
+**`refusal_facts` is the block a supervisor branches on (R285, R311).** Every
+exit-3 refusal and the exit-10 partial carry `bank_exploration` (the job facts,
+or null with a note on the direct door, which has no job list) and
+`refusal_facts` (`class`, `remedy`: `grow_bank`, `raise_bank_cap`, `at_ceiling`,
+`take_sliced_door` or `none`, plus `bank_limited` and the job counts). Read
+those, never the sentences in `errors[]`. An interaction refusal on a bank that
+holds fewer SP pairs than the slate has says `BANK-LIMITED` and names the pairs;
+a `bank_floor` remedy names the smallest player-exposure cap this bank can satisfy.
+
 ## Multi-session check, before anything else
 
 CLAUDE.md carries the multi-session contract; a build session is BUILD,
@@ -1000,6 +1009,10 @@ this file is the whole answer; run it rather than diagnosing an import error.
 **On exit 10 the bank is thin, not wrong.** Run the identical command again; each
 pass adds to it. When `solve.bank_stop_reason` is `candidate_cap`, a re-run cannot
 grow it past the cap: raise `--bank-max-candidates` (R415). Shrink the bank, never the pool.
+Inside the governor's window, or when a re-run has less than the bank floor to
+spend, a thin bank that covers every reserved row is solved instead of returned
+(R390): status `bank_thin_delivered`, label `review_grade_bank_thin_delivered`,
+never certified. `brief.thin_bank` names the floors it met.
 
 ## Where the files come from
 

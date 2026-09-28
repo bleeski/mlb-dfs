@@ -767,6 +767,8 @@ def _diagnose_binding_constraints(
     team_exposure: Optional[Mapping[str, Any]] = None,
     game_exposure: Optional[Mapping[str, Any]] = None,
     consensus_cluster: Optional[Mapping[str, Any]] = None,
+    bank_limits_out: Optional[List[Dict[str, Any]]] = None,
+    fixed_rows: bool = False,
 ) -> List[str]:
     """Name the controls that cannot be satisfied by this bank, arithmetically.
 
@@ -782,9 +784,16 @@ def _diagnose_binding_constraints(
     LOWER than what the slate itself can support, the finding names the bank
     as the true limiter in the same line -- omitting it costs nothing; a bank
     that already matches or exceeds the slate's capacity states no such claim.
+
+    ``bank_limits_out`` (R285 / R311) receives each finding's facts as DATA, in
+    the same order the prose says them: ``kind`` is ``counting`` for a BANK-LIMITED
+    count (SP pairs, starters, the consensus cluster) and ``player_floor`` for the
+    bank-derived player-exposure ceiling. The supervisor branches on these rows
+    instead of reading the words.
     """
     findings: List[str] = []
     total = int(entries_count)
+    limits = bank_limits_out if bank_limits_out is not None else []
 
     stack_cap = _cap_count(total, controls.get("max_primary_stack_exposure_pct"))
     if stack_cap:
@@ -807,6 +816,9 @@ def _diagnose_binding_constraints(
             )
             viable_pairs = (feasibility_inputs or {}).get("viable_sp_pairs")
             if viable_pairs is not None and int(viable_pairs) > buckets:
+                limits.append({"axis": "sp_pairs", "kind": "counting",
+                               "sampled": buckets, "viable": int(viable_pairs),
+                               "cap": int(pair_cap), "entries": total})
                 finding += (
                     f" -- BANK-LIMITED: feasibility.inputs.viable_sp_pairs says "
                     f"the slate itself has {int(viable_pairs)} viable SP pairs; "
@@ -841,6 +853,9 @@ def _diagnose_binding_constraints(
             )
             viable_sps = (feasibility_inputs or {}).get("viable_sp_count")
             if viable_sps is not None and int(viable_sps) > len(arms):
+                limits.append({"axis": "pitchers", "kind": "counting",
+                               "sampled": len(arms), "viable": int(viable_sps),
+                               "cap": int(pitcher_cap), "entries": total})
                 finding += (
                     f" -- BANK-LIMITED: feasibility.inputs.viable_sp_count says "
                     f"the slate itself has {int(viable_sps)} viable starters; "
@@ -893,6 +908,8 @@ def _diagnose_binding_constraints(
         reuse = controls.get("max_candidate_reuse")
         capacity = low_distinct * (int(reuse) if reuse is not None else need)
         if need and capacity < need:
+            limits.append({"axis": "consensus_cluster", "kind": "counting",
+                           "sampled": low_distinct, "need": need, "entries": total})
             findings.append(
                 f"max_consensus_cluster_share_pct: at most "
                 f"{int(cluster.get('headroom') or 0)} entries may carry "
@@ -904,6 +921,54 @@ def _diagnose_binding_constraints(
                 f"{cluster.get('bank_candidates')} in the bank handed in) -- "
                 f"BANK-LIMITED: grow the cluster-limited bank jobs (R405(c)) "
                 f"before relaxing this cap"
+            )
+    # R311. The smallest player-exposure cap THIS bank can satisfy, in the same counting
+    # form. A cap of `player_cap` entries per player means at least `total -
+    # player_cap` entries carry a lineup without that player, and the bank can
+    # seat at most `lineups_without x reuse` of them (nothing bounds it, but for
+    # a player in every lineup, when no reuse cap is set). This is the only
+    # exposure control with no bank-level row until now, and it is the one that
+    # bound on 1940_6g: a player in every candidate needs the cap at 1.0, which a
+    # hand bisection took five builds to find. Skipped when the solve carries
+    # fixed rows (a late swap's untouched entries): the caps count against
+    # `total` plus those rows, and this function sees only the swappable ones,
+    # so the arithmetic here would claim a bind the real headroom does not have.
+    player_cap = _cap_count(total, controls.get("max_player_exposure_pct"))
+    need_without = total - int(player_cap or 0)
+    if player_cap and need_without > 0 and signatures and not fixed_rows:
+        distinct = sorted({tuple(sig) for sig in signatures})
+        reuse = controls.get("max_candidate_reuse")
+        with_player: Counter = Counter()
+        for sig in distinct:
+            with_player.update(set(sig))
+        tightest = None
+        for pid in sorted(with_player):
+            without = len(distinct) - with_player[pid]
+            if reuse is not None:
+                capacity = without * int(reuse)
+            elif without == 0:
+                capacity = 0
+            else:
+                continue
+            if capacity < need_without and (tightest is None or capacity < tightest[1]):
+                tightest = (pid, capacity, without, with_player[pid])
+        if tightest is not None:
+            pid, capacity, without, carrying = tightest
+            required = total - capacity
+            limits.append({
+                "axis": "player_exposure", "kind": "player_floor",
+                "player_id": pid, "lineups_with_player": carrying,
+                "distinct_lineups": len(distinct), "avoid_capacity": capacity,
+                "entries": total, "cap_count": int(player_cap),
+                "required_cap_count": required,
+                "required_cap_pct": round(required / total, 4),
+            })
+            findings.append(
+                f"max_player_exposure_pct: player {pid} is in {carrying} of "
+                f"{len(distinct)} distinct lineups, so at most {capacity} of {total} "
+                f"entries can avoid them; a cap of {int(player_cap)} needs "
+                f"{need_without}. This bank cannot satisfy a cap below "
+                f"{required}/{total} = {required / total:.3f} on that player"
             )
     return findings
 
@@ -1133,11 +1198,52 @@ INTERACTION_COUNT_CONTROLS = frozenset({
     "max_sp_pair_repetition", "max_shared_players", "max_candidate_reuse"})
 
 
+def interaction_bank_limits(
+    sp_pairs: Sequence[Tuple[str, ...]],
+    feasibility_inputs: Optional[Mapping[str, Any]],
+    entries_count: int,
+    bank_report: Optional[Mapping[str, Any]],
+    pair_cap: Optional[int] = None,
+) -> List[Dict[str, Any]]:
+    """R311. The BANK-LIMITED fact for an INTERACTION refusal, as data.
+
+    The counting rows only say BANK-LIMITED when ``buckets x cap < entries``, so
+    a posture cap of 3 on 7 sampled pairs (7 x 3 = 21 >= 21 entries) passed the
+    count and the refusal fell to "the interaction of the active controls is",
+    pointing at the exposure caps, with 144 viable pairs unsampled. 1310_9g
+    certified after one longer build with no cap moved.
+
+    The bank is limited on SP-pair coverage when it holds fewer distinct pairs
+    than the smaller of the slate's viable pairs and the entries: the most any
+    pair cap could ask for, one pair per entry. A proxy for the bank, stated as
+    counts. Empty when the slate has no such figure, when the bank has enough,
+    or when the job list is EXHAUSTED: a finished search that holds few pairs
+    is a fact about the slate, and growing it is not a lever.
+
+    Only when ``max_sp_pair_repetition`` is in play (``pair_cap`` not None): the
+    claim is about SP-pair coverage, and with no pair cap the bank's pair count
+    is not what the caps are tight against, so the probe should still run.
+    """
+    viable = (feasibility_inputs or {}).get("viable_sp_pairs")
+    if (viable is None or pair_cap is None
+            or (bank_report or {}).get("job_list_exhausted") is True):
+        return []
+    sampled = len(set(sp_pairs))
+    need = min(int(viable), int(entries_count))
+    if sampled >= need:
+        return []
+    return [{"axis": "sp_pairs", "kind": "interaction", "sampled": sampled,
+             "viable": int(viable), "need": need, "entries": int(entries_count)}]
+
+
 def compose_infeasibility_errors(
     binding: Sequence[str],
     controls: Mapping[str, Any],
     bank_flag: str,
     feasibility_checks: Optional[Sequence[Mapping[str, Any]]] = None,
+    bank_limits: Optional[Sequence[Mapping[str, Any]]] = None,
+    job_list_exhausted: Optional[bool] = None,
+    direct_door: bool = False,
 ) -> List[str]:
     """The one renderer for a PROVEN-infeasible joint allocation.
 
@@ -1172,7 +1278,7 @@ def compose_infeasibility_errors(
             for b in binding
         )
     elif not failing:
-        lines.append(
+        text = (
             "entry-level joint MILP proven infeasible: no single control is "
             "arithmetically binding against this bank, so the interaction of "
             "the active controls is. Active: "
@@ -1181,6 +1287,33 @@ def compose_infeasibility_errors(
                 if controls.get(k) is not None
             ) + bank_flag
         )
+        # R311. Only when the caller passed `bank_limits` (a list, possibly
+        # empty), so a caller that passes none keeps the sentence byte for byte.
+        # It says which of three things is true of the bank, so the operator
+        # is not sent to an exposure cap by a message that never looked.
+        if bank_limits is not None:
+            limited = [b for b in bank_limits if b.get("kind") == "interaction"]
+            if limited:
+                b = limited[0]
+                text += (
+                    f" -- BANK-LIMITED: feasibility.inputs.viable_sp_pairs says the "
+                    f"slate itself has {b['viable']} viable SP pairs; this bank "
+                    f"sampled only {b['sampled']}, fewer than the {b['entries']} "
+                    f"entries, so grow the bank before relaxing any cap"
+                )
+            elif job_list_exhausted is True:
+                text += (
+                    " -- bank growth cannot clear this: the job list is "
+                    "exhausted, so the search is complete and only a control "
+                    "can move"
+                )
+            elif job_list_exhausted is None and direct_door:
+                text += (
+                    " -- this door builds its bank per run and cannot report "
+                    "whether it was complete; pass --bank-max-candidates for "
+                    "the sliced bank, whose job list says"
+                )
+        lines.append(text)
     return lines
 
 
@@ -4011,6 +4144,9 @@ def select_and_assign_entries(
         # R207: the interaction case is a proven infeasibility whose `binding`
         # below comes back empty, so it needs a value on every branch.
         binding: List[str] = []
+        # R285 / R311. The bank facts behind `binding`, as data, for the caller
+        # to branch on. Empty on every branch that diagnoses nothing.
+        bank_limits: List[Dict[str, Any]] = []
         if timed_out:
             gap = "unknown" if mip_gap is None else f"{float(mip_gap):.4f}"
             errors = [
@@ -4049,7 +4185,14 @@ def select_and_assign_entries(
                 # of the bank. The two R343/R333 reports stay on the report call
                 # alone, as they shipped.
                 consensus_cluster=cluster_report,
+                bank_limits_out=bank_limits,
+                fixed_rows=bool(fixed_players),
             )
+            if not binding:
+                # R311. An interaction refusal, and the bank may be the cause.
+                bank_limits.extend(interaction_bank_limits(
+                    sp_pairs, feasibility_inputs, E, bank_report,
+                    pair_cap=controls.get("max_sp_pair_repetition")))
             # R112 rider (2026-08-14). This flag rides EVERY finding line below,
             # not only a remedy trailing the whole list: two separate blocked
             # runs against the same still-slicing bank (20260813T162123Z /
@@ -4070,6 +4213,9 @@ def select_and_assign_entries(
             errors = compose_infeasibility_errors(
                 binding, controls, bank_flag,
                 feasibility_checks=feasibility_checks,
+                bank_limits=bank_limits,
+                job_list_exhausted=(bank_report or {}).get("job_list_exhausted"),
+                direct_door=(bank_report or {}).get("source") == "build_diverse_candidate_bank",
             )
             # R98(2). Appended, never substituted: the arithmetic above is what
             # the solver proved and it stays first among the facts. What follows
@@ -4278,7 +4424,8 @@ def select_and_assign_entries(
                 E, stacks, sp_pairs, signatures, largest_contest, controls,
                 feasibility_inputs=feasibility_inputs,
                 team_exposure=team_cap_report, game_exposure=game_cap_report,
-                consensus_cluster=cluster_report)
+                consensus_cluster=cluster_report,
+                fixed_rows=bool(fixed_players))
             if proven_infeasible else []
         )
         # R207. The interaction case, and only it: proven infeasible, every
@@ -4290,7 +4437,11 @@ def select_and_assign_entries(
                 and proven_infeasible and not slate_blocked and not binding
                 # A partial bank's first remedy is to grow it (R98(2)); a
                 # probe there is a number the next slice will change.
-                and (bank_report or {}).get("job_list_exhausted") is not False):
+                and (bank_report or {}).get("job_list_exhausted") is not False
+                # R311. Likewise a bank that holds fewer SP pairs than the
+                # slate has: the probe would name the cap that happens to
+                # restore feasibility on that thin bank.
+                and not any(b.get("kind") == "interaction" for b in bank_limits)):
             exhausted_reuse = {"rung_index": len(reuse_rungs)}
 
             def _resolve(trial: Dict[str, Any]) -> Dict[str, Any]:
@@ -4320,6 +4471,9 @@ def select_and_assign_entries(
             "allocation_solver_status": solver_status,
             "allocation_solver_report": solver_report,
             **({"interaction_probe": probe_block} if probe_block is not None else {}),
+            # R285 / R311. Only when the diagnosis found one, so every other
+            # refusal is byte-identical.
+            **({"bank_limits": [dict(b) for b in bank_limits]} if bank_limits else {}),
             "errors": errors,
             "candidate_reuse": dict(reuse_state_report),
             # R405. Known before the solve, so it rides the refusal: a refusal

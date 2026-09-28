@@ -920,7 +920,22 @@ EXPECTED_SUITE_COUNTS = {
     # Deadline on, T-12 binds at the F-1 deadline, the governor's window reads
     # its reserve, a lock before --deliver-by clamps the governor, a short
     # --max-seconds never does).
-    "tests.test_core": 1788,
+    # R390 + R285 + R311 (Session 18), 2026-09-28: 1788 -> 1813, the 25 that pin
+    # a thin bank that delivers and the typed bank facts: nine ThinBankRecoveryTests
+    # (a coverable bank is solved inside the governor's window and labelled; a
+    # re-run with a slice to spend still exits 10; F-3 holds at any clock; a
+    # re-run below the bank floor delivers with no governor; a held SP-pair cap
+    # and a typed reuse cap are floors; the coverage, decision and re-run
+    # arithmetic), five R311BankLimitedTests (an interaction refusal on a thin
+    # bank says BANK-LIMITED, the three-way growth line, the bank-limit rows'
+    # arithmetic, the bank-derived player ceiling, the typed remedies by door),
+    # five R285BankFactsTests (the one extractor, the remedy enum, the direct
+    # door's honest block, a direct refusal's typed facts, run_slate carries
+    # bank_limits), five R285SupervisorTests (a stop keeps the child, no key
+    # in it, the exit-10 log, a bank_diagnostics-only refusal, the typed block
+    # is what is branched on) and one AutobuildBankCapTests (BANK-LIMITED in
+    # errors[] is not a remedy).
+    "tests.test_core": 1813,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps

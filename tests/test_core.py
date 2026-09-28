@@ -188,15 +188,22 @@ def diverse_projection_frame() -> pd.DataFrame:
 
 
 
-def _build_deadline(seconds, reserve_s=0.0, clock=None):
+def _build_deadline(seconds, reserve_s=0.0, clock=None, external_s=None):
     """R98(3). A build Deadline for harnesses that drive `run_classic`, which
     takes the object `main` builds. Reserve 0 by default: these harnesses are
-    not about the reserve, and DeadlineContractTests is."""
+    not about the reserve, and DeadlineContractTests is.
+
+    R390. ``external_s`` adds an external bound (the first lock less F-1's
+    buffer) that many seconds out; it binds when it is the earlier of the two."""
     from mlb_engine.pipeline.deadline import Deadline
     clock = clock or time.monotonic
     now = clock()
-    return Deadline(started=now, end=now + float(seconds), reserve_s=float(reserve_s),
-                    bound="max_seconds", bounds_s={"max_seconds": float(seconds)},
+    bounds = {"max_seconds": float(seconds)}
+    if external_s is not None:
+        bounds["first_lock_minus_buffer"] = float(external_s)
+    bound = min(bounds, key=lambda k: (bounds[k], k))
+    return Deadline(started=now, end=now + bounds[bound], reserve_s=float(reserve_s),
+                    bound=bound, bounds_s=bounds,
                     reserve_source="test harness", clock=clock)
 
 def _entry_reqs(n, contest_id="900", shape="large_wta"):
@@ -21337,10 +21344,21 @@ class AutobuildBankCapTests(unittest.TestCase):
                   "viable SP pairs; this bank sampled only 32, so grow the bank "
                   "before relaxing this cap"]
 
+        # R285. What build_slate writes on a direct-door refusal: the typed
+        # block the supervisor branches on, and a bank_exploration that says
+        # the door has no job list. The words in errors[] are not read.
+        facts = {"class": "badly_shaped", "remedy": "take_sliced_door",
+                 "bank_limited": True, "door": "direct", "job_list_exhausted": None,
+                 "jobs_attempted": None, "jobs_total": None, "bank_stop_reason": None}
+        exploration = {"door": "direct", "job_list_exhausted": None,
+                       "jobs_attempted": None, "jobs_total": None,
+                       "note": "no job list on this door"}
+
         def direct(n, cmd, kw):
             return types.SimpleNamespace(returncode=3, stderr="", stdout=json.dumps({
                 "status": "not_certified", "date": "2026-07-29", "entries": 38,
-                "solve_strategy": "direct", "errors": errors}))
+                "solve_strategy": "direct", "errors": errors,
+                "bank_exploration": exploration, "refusal_facts": facts}))
         code, records, cmds, _ = self._run(direct, extra_argv=["--max-attempts", "2"])
         raises = [r for r in records if r["action"] == "raise_bank_cap"]
         self.assertEqual(len(raises), 1, "the door switch is taken once, not per attempt")
@@ -21352,9 +21370,29 @@ class AutobuildBankCapTests(unittest.TestCase):
         def not_bank_limited(n, cmd, kw):
             return types.SimpleNamespace(returncode=3, stderr="", stdout=json.dumps({
                 "status": "not_certified", "date": "2026-07-29", "entries": 38,
-                "solve_strategy": "direct", "errors": ["max_team_exposure_pct binds"]}))
+                "solve_strategy": "direct", "errors": ["max_team_exposure_pct binds"],
+                "bank_exploration": exploration,
+                "refusal_facts": dict(facts, remedy="none", bank_limited=False)}))
         _, records, cmds, _ = self._run(not_bank_limited, extra_argv=["--max-attempts", "2"])
         self.assertNotIn("raise_bank_cap", [r["action"] for r in records])
+
+    def test_the_words_bank_limited_in_errors_are_not_a_remedy(self):
+        """R285's acceptance: no regular expression over errors[]. The same
+        sentence the supervisor used to match, on a brief that carries no typed
+        block, takes no door switch and no bank action at all."""
+        errors = ["entry-level joint MILP proven infeasible: max_sp_pair_repetition: "
+                  "32 distinct SP pairs x cap 1 = 32 < 38 entries -- BANK-LIMITED: "
+                  "grow the bank before relaxing this cap"]
+
+        def sentence_only(n, cmd, kw):
+            return types.SimpleNamespace(returncode=3, stderr="", stdout=json.dumps({
+                "status": "not_certified", "date": "2026-07-29", "entries": 38,
+                "solve_strategy": "direct", "errors": errors}))
+        _, records, cmds, _ = self._run(sentence_only, extra_argv=["--max-attempts", "2"])
+        actions = [r["action"] for r in records]
+        self.assertNotIn("raise_bank_cap", actions)
+        self.assertNotIn("grow_bank", actions)
+        self.assertEqual(len(cmds), 1, "an unread sentence is a stop, not a retry")
 
     def test_a_failing_slate_check_goes_before_bank_growth(self):
         """R286's order: a failing SLATE-LEVEL check is arithmetic no bank
@@ -26236,8 +26274,11 @@ class RefusalClassificationTests(unittest.TestCase):
     def test_bank_thin_at_exit_ten_is_a_refusal_the_item_did_not_count(self):
         """The R233 payoff for this item. The entry enumerated `return 3` and
         the class is refusal exits; exit 10 refuses too, and the remedy it
-        prints is 'run the same command again', which is the one remedy a
-        deadline cannot buy."""
+        prints is 'run the same command again', which a deadline cannot buy.
+        R390: once a re-run cannot add a slice, a bank that covers every
+        reserved row is solved instead of returned here, so the exit-10 site
+        stays live for the bank that does not cover them and for the clock that
+        still has a slice to spend."""
         mod = self._module()
         row = {r["key"]: r for r in mod.REFUSAL_SITES}["bank_thin_partial"]
         self.assertEqual(row["exit_code"], 10)
@@ -27822,7 +27863,7 @@ class DeadlineGovernorWiringTests(unittest.TestCase):
         epi.run_slate = fake_run_slate
         out, err = io.StringIO(), io.StringIO()
         if capture is not None:
-            capture.update(mod=mod, err=err)
+            capture.update(mod=mod, err=err, out=out)
             mod._LAST_USABLE.update(capture.get("preset_last_usable") or {})
         try:
             with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
@@ -29353,8 +29394,11 @@ class DeliveryLabelAgreementTests(unittest.TestCase):
         ls = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(ls)
         from mlb_engine.entries.upload_manifest import BASELINE_LABEL, UNCERTIFIED_LABEL
+        # R390. The thin-bank label is written by build_slate, which loads without
+        # the engine, so the label is read off the script itself.
+        bs = _load_build_slate_module("_bs_preflight_labels")
         for label in ("review_grade", dg.DEADLINE_LABEL, ls.DOWNGRADE_LABEL,
-                      UNCERTIFIED_LABEL, BASELINE_LABEL):
+                      UNCERTIFIED_LABEL, BASELINE_LABEL, bs.BANK_THIN_LABEL):
             self.assertIn(label, REVIEW_GRADE_REASONS)
 
 
@@ -36789,3 +36833,620 @@ class ClassicBaselineFirstTests(unittest.TestCase):
             self.assertEqual(promote_run.run(args), 2)
         self.assertIn("--canonical would write it over the enhanced file", out.getvalue())
         self.assertFalse((root / "outputs" / "2026-06-03" / "DKEntries_1840_2g.csv").exists())
+
+
+def _load_build_slate_module(name="_bs_thin_bank"):
+    """The build_slate script as a module, for tests that call its functions."""
+    import importlib.util
+    path = REPO / "skills" / "generate-lineups" / "scripts" / "build_slate.py"
+    spec = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+class ThinBankRecoveryTests(unittest.TestCase):
+    """R390. A thin sliced bank that covers every reserved row produces a file
+    inside the deadline instead of exit 10, and exit 10 stays the answer while a
+    re-run can still add a slice.
+
+    Drives `run_classic` on the sliced door with only `run_slate` and the bank
+    faked, so the governor's consult, the coverage check, the label and the
+    brief are the production path. The bank is a `time_budget`-stopped,
+    unexhausted slice with fewer candidates than twice the entries, which is
+    the only shape the exit-10 branch fires on (R415 sends a capped bank to the
+    solve)."""
+
+    _SALARY = DeadlineGovernorWiringTests._SALARY
+    _SLOTS = DeadlineGovernorWiringTests._SLOTS
+    setUp = DeadlineGovernorWiringTests.setUp
+    _legal_ids = DeadlineGovernorWiringTests._legal_ids
+    _entries_csv = DeadlineGovernorWiringTests._entries_csv
+    _delivered_csv = DeadlineGovernorWiringTests._delivered_csv
+    _REFUSAL = DeadlineGovernorWiringTests._REFUSAL
+    _run = DeadlineGovernorWiringTests._run
+
+    def _delivered(self):
+        return {"passed": True, "run_id": "r1", "workflow_valid": True,
+                "selection_certified": True, "allocation_certified": True,
+                "delivered_path": str(self._delivered_csv()),
+                "candidate_reuse": {"cap_applied": 1, "cap_source": "engine_default"}}
+
+    def _thin(self, minutes_out, *, lineups=3, deadline=None, governed=True,
+              overrides=None, reuse_of=None, extra_args=None):
+        """Run with a thin sliced bank of ``lineups`` distinct candidates."""
+        import contextlib
+        import mlb_engine.pipeline.execution_pipeline as epi
+        from mlb_engine.optimize import bank_cache
+        ids = self._legal_ids()
+        bank = [{"candidate_id": f"c{i}", "player_ids": ids[:-1] + [f"x{i}"],
+                 "sp_ids": [ids[0], ids[1]], "primary_stack": "", "objective": 100.0 - i}
+                for i in range(lineups)]
+        report = {"stop_reason": "time_budget", "job_list_exhausted": False,
+                  "jobs_attempted": 12, "jobs_total": 96, "total_candidates": lineups,
+                  "max_candidates": 12, "built_this_slice": lineups,
+                  "time_budget_s": 5.0}
+        patches = [(bank_cache, "extend_bank", lambda *a, **k: dict(report)),
+                   (bank_cache.BankCache, "as_candidates",
+                    lambda self_, *a, **k: [dict(c) for c in bank]),
+                   (epi, "build_sleeve_jobs", lambda *a, **k: {"attempted": False}),
+                   (epi, "build_consensus_limited_jobs",
+                    lambda *a, **k: {"attempted": False, "reason": "test"})]
+        originals = [(o, n, getattr(o, n)) for o, n, _ in patches]
+        for owner, name, fake in patches:
+            setattr(owner, name, fake)
+        try:
+            capture = {}
+            args_over = {"bank_max_candidates": 12, "controls_override": {
+                "classic_sleeves": False, "classic_tail_seats": False,
+                **(overrides or {})}}
+            if not governed:
+                args_over["_governor"] = None
+            args_over.update(extra_args or {})
+            code, brief, calls, err = self._run(
+                minutes_out, refusal=reuse_of or self._delivered(),
+                args_overrides=args_over, capture=capture,
+                deadline=deadline or _build_deadline(60))
+        finally:
+            for owner, name, original in originals:
+                setattr(owner, name, original)
+        return code, brief, calls, err, capture
+
+    def _printed(self, capture):
+        text = capture["out"].getvalue()
+        return json.loads(text[text.index("{"):text.rindex("}") + 1])
+
+    def test_a_coverable_thin_bank_is_delivered_inside_the_governor_window(self):
+        """The acceptance: two minutes from the deliver-by, a three-lineup bank
+        against two reserved rows produces a file, in one solve, labelled."""
+        code, brief, calls, err, _cap = self._thin(2)
+        self.assertEqual(code, 0, err[-800:])
+        self.assertEqual(len(calls), 1, "the thin bank was not solved exactly once")
+        self.assertEqual(self.labels, ["review_grade_bank_thin_delivered"])
+        self.assertEqual(brief["label"], "review_grade_bank_thin_delivered")
+        self.assertEqual(brief["status"], "bank_thin_delivered")
+        self.assertNotEqual(brief["status"], "certified")
+        thin = brief["thin_bank"]
+        self.assertEqual(thin["triggers"], ["governor_window"])
+        self.assertTrue(thin["covers"])
+        self.assertEqual(thin["coverage"]["floors"][0]["floor"],
+                         "distinct_lineups_per_contest")
+        self.assertEqual((thin["coverage"]["floors"][0]["have"],
+                          thin["coverage"]["floors"][0]["need"]), (3, 2))
+        self.assertEqual(brief["thin_bank"]["candidate_reuse"]["cap_source"],
+                         "engine_default")
+        self.assertIn("REVIEW-GRADE", brief["label_note"])
+        self.assertTrue(brief["verification"]["passed"])
+        self.assertIn("DELIVERING", err)
+
+    def test_outside_the_window_with_a_rerun_to_spend_it_still_exits_10(self):
+        """Exit 10 is the bank-growth remedy and it stays the answer while a
+        re-run can add a slice: sixty minutes out, twenty seconds per call."""
+        code, _brief, calls, _err, cap = self._thin(60)
+        self.assertEqual(code, 10)
+        self.assertEqual(calls, [], "a build that asked for a re-run solved anyway")
+        payload = self._printed(cap)
+        self.assertEqual(payload["status"], "partial")
+        self.assertTrue(payload["thin_bank"]["covers"])
+        self.assertEqual(payload["thin_bank"]["triggers"], [])
+        self.assertFalse(payload["thin_bank"]["deliver"])
+        # The governor was consulted before the return, and it says so.
+        self.assertIn("deadline", payload)
+        self.assertEqual(payload["deadline"]["rungs_walked"], [])
+        # R285. The partial carries the job facts the supervisor's exit-10 log
+        # read from a `solve` it does not have, and the typed remedy.
+        # The merged report sums the stack-size slices (each fake call says 12
+        # of 96), so the ratio is the fake's and the counts are not None.
+        attempted = payload["bank_exploration"]["jobs_attempted"]
+        total = payload["bank_exploration"]["jobs_total"]
+        self.assertTrue(attempted and total)
+        self.assertEqual(attempted * 96, total * 12)
+        self.assertEqual(payload["refusal_facts"]["remedy"], "grow_bank")
+        self.assertEqual(payload["refusal_facts"]["class"], "badly_shaped")
+
+    def test_a_bank_short_of_the_largest_contest_is_not_delivered_at_any_clock(self):
+        """F-3 never relaxes: two rows in one contest need two distinct
+        lineups, and a one-lineup bank cannot seat them however near the lock."""
+        code, _brief, calls, _err, cap = self._thin(2, lineups=1)
+        self.assertEqual(code, 10)
+        self.assertEqual(calls, [])
+        thin = self._printed(cap)["thin_bank"]
+        self.assertFalse(thin["covers"])
+        self.assertFalse(thin["deliver"])
+        self.assertEqual(thin["triggers"], ["governor_window"])
+        self.assertIn("distinct_lineups_per_contest (1 < 2)", thin["coverage"]["reason"])
+
+    def test_no_governor_still_delivers_when_a_rerun_cannot_add_a_slice(self):
+        """Session 15's rider: the Deadline is bound by the lock without any
+        --deliver-by, and a re-run with less than the bank floor to spend is a
+        request the clock cannot meet."""
+        deadline = _build_deadline(60, external_s=3.0)
+        code, brief, calls, err, _cap = self._thin(
+            2, governed=False, deadline=deadline)
+        self.assertEqual(code, 0, err[-800:])
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(brief["thin_bank"]["triggers"], ["rerun_unaffordable"])
+        self.assertLess(brief["thin_bank"]["rerun_spendable_s"], 5.0)
+        self.assertEqual(brief["label"], "review_grade_bank_thin_delivered")
+        self.assertNotIn("deadline", brief, "no governor, so no governor stamp")
+
+    def test_a_held_sp_pair_cap_is_a_floor_the_thin_bank_must_meet(self):
+        """`--never-relax max_sp_pair_repetition` reaches the coverage check: the
+        bank holds one SP pair, so the cap it must keep needs more, and the
+        build asks for the re-run even inside the window."""
+        from mlb_engine.pipeline import deadline_governor as dg
+        held = frozenset(dg.DEFAULT_NEVER_RELAX | {"max_sp_pair_repetition"})
+        # Six entries against the posture's pair cap need more than the one pair
+        # the bank holds (the cap is the posture's, so the count is not pinned).
+        code, _brief, calls, _err, cap = self._thin(
+            2, extra_args={"_never_relax": held, "entries": 6})
+        self.assertEqual(code, 10)
+        self.assertEqual(calls, [])
+        thin = self._printed(cap)["thin_bank"]
+        self.assertFalse(thin["covers"])
+        self.assertRegex(thin["coverage"]["reason"],
+                         r"max_sp_pair_repetition \(1 < [2-9]\)")
+        # The same bank, the same clock, the cap not held: it is delivered.
+        code, brief, _calls, _err, _cap = self._thin(2, extra_args={"entries": 6})
+        self.assertEqual(code, 0)
+        self.assertTrue(brief["thin_bank"]["covers"])
+
+    def test_an_operator_reuse_cap_that_cannot_seat_the_entries_is_held(self):
+        """The allocator holds a typed max_candidate_reuse verbatim, so the
+        thin bank must reach the entry count under it: 3 lineups x cap 1 = 3
+        seats 3 of 6 entries, and relaxing the operator's number is not the
+        build's call."""
+        code, _brief, calls, _err, cap = self._thin(
+            2, overrides={"max_candidate_reuse": 1}, extra_args={"entries": 6})
+        self.assertEqual(code, 10)
+        self.assertEqual(calls, [])
+        self.assertIn("max_candidate_reuse (3 < 6)",
+                      self._printed(cap)["thin_bank"]["coverage"]["reason"])
+        code, _brief, _calls, _err, _cap = self._thin(
+            2, overrides={"max_candidate_reuse": 2}, extra_args={"entries": 6})
+        self.assertEqual(code, 0, "3 x 2 = 6 seats every entry")
+
+    def test_the_coverage_floors_are_arithmetic_over_what_is_held(self):
+        bs = _load_build_slate_module()
+        base = dict(distinct_lineups=6, largest_contest=5, n_entries=12,
+                    pairs_have=2, pairs_want=4, held=(), reuse_cap=None)
+        self.assertTrue(bs.thin_bank_coverage(**base)["covers"],
+                        "an un-held SP-pair cap is not a floor")
+        held = bs.thin_bank_coverage(**{**base, "held": ("max_sp_pair_repetition",)})
+        self.assertFalse(held["covers"])
+        self.assertIn("max_sp_pair_repetition (2 < 4)", held["reason"])
+        typed = bs.thin_bank_coverage(**{**base, "reuse_cap": 1})
+        self.assertFalse(typed["covers"], "6 x 1 < 12 entries")
+        self.assertTrue(bs.thin_bank_coverage(**{**base, "reuse_cap": 2})["covers"])
+        unknown = bs.thin_bank_coverage(**{**base, "distinct_lineups": None})
+        self.assertFalse(unknown["covers"], "a bank that cannot be counted covers nothing")
+
+    def test_the_decision_needs_coverage_and_a_reason_a_rerun_cannot_help(self):
+        bs = _load_build_slate_module()
+        covers, short = {"covers": True}, {"covers": False}
+        self.assertTrue(bs.thin_bank_decision(covers, in_window=True,
+                                              rerun_spendable_s=60)["deliver"])
+        self.assertTrue(bs.thin_bank_decision(covers, in_window=False,
+                                              rerun_spendable_s=4.9)["deliver"])
+        self.assertFalse(bs.thin_bank_decision(covers, in_window=False,
+                                               rerun_spendable_s=5.0)["deliver"],
+                         "exactly the bank floor is enough for one more slice")
+        self.assertFalse(bs.thin_bank_decision(short, in_window=True,
+                                               rerun_spendable_s=0)["deliver"])
+
+    def test_the_deadline_says_what_a_rerun_could_spend(self):
+        from mlb_engine.pipeline.deadline import Deadline
+        d = _build_deadline(60, reserve_s=10.0, external_s=25.0)
+        self.assertAlmostEqual(d.external_remaining(), 25.0, delta=0.5)
+        self.assertAlmostEqual(d.rerun_spendable(100.0), 15.0, delta=0.5,
+                               msg="the lock clips the fresh window, then the reserve")
+        self.assertAlmostEqual(d.rerun_spendable(12.0), 2.0, delta=0.5,
+                               msg="a fresh window shorter than the lock binds")
+        plain = _build_deadline(60, reserve_s=10.0)
+        self.assertIsNone(plain.external_remaining())
+        self.assertAlmostEqual(plain.rerun_spendable(100.0), 90.0, delta=0.1,
+                               msg="--max-seconds is one call's budget, not a bound")
+        self.assertEqual(_build_deadline(60, 10.0, external_s=4.0).rerun_spendable(100.0),
+                         0.0)
+        self.assertIsInstance(d, Deadline)
+
+
+class R311BankLimitedTests(unittest.TestCase):
+    """R311. An interaction refusal on a thin bank says BANK-LIMITED and points
+    at the bank, and the bank-derived player-exposure ceiling is named.
+
+    1310_9g (2026-09-15): 7 sampled SP pairs x a posture cap of 3 = 21 >= 21
+    entries passed the count, so the refusal fell to "the interaction of the
+    active controls is" with 144 viable pairs unsampled, and pointed at the
+    exposure caps; one longer build certified with no cap moved."""
+
+    ENTRIES = [{"entry_id": str(i), "contest_id": "c1", "contest_shape": "large_wta"}
+               for i in (1, 2)]
+    CONTROLS = {"max_shared_players": 3, "max_sp_pair_repetition": 2}
+
+    @staticmethod
+    def _cand(cid, roster, score, stack, sp=("p1", "p2")):
+        return {"candidate_id": cid, "lineup_ids": roster, "player_ids": roster,
+                "sp_ids": list(sp), "primary_stack": stack, "objective": score,
+                "contest_fit_score": score}
+
+    def _thin_bank(self):
+        """Three lineups on ONE SP pair that share p1, p2 and three hitters, so
+        two of them share five players against max_shared_players 3: proven
+        infeasible, no counting row failing (1 pair x cap 2 = 2 >= 2 entries)."""
+        shared = [f"h{i}" for i in range(3)]
+        return [self._cand(cid, ["p1", "p2", *shared, *[f"{cid.lower()}{i}" for i in range(5)]],
+                           100 - n, stack)
+                for n, (cid, stack) in enumerate((("A", "S1"), ("B", "S1"), ("C", "S2")))]
+
+    def _refuse(self, feasibility_inputs, bank_report):
+        from mlb_engine.allocate import contest_allocator as ca
+        return ca.select_and_assign_entries(
+            self._thin_bank(), self.ENTRIES, dict(self.CONTROLS),
+            bank_report=bank_report, feasibility_inputs=feasibility_inputs,
+            interaction_probe_budget_s=5.0)
+
+    def test_an_interaction_refusal_on_a_thin_bank_leads_with_bank_limited(self):
+        out = self._refuse({"viable_sp_pairs": 50}, {"job_list_exhausted": False,
+                                                     "jobs_attempted": 1, "jobs_total": 9})
+        self.assertFalse(out["passed"])
+        line = out["errors"][0]
+        self.assertIn("the interaction of the active controls is", line,
+                      "the sentence R207's pins read is kept")
+        self.assertIn("BANK-LIMITED", line)
+        self.assertIn("50 viable SP pairs", line)
+        self.assertIn("sampled only 1", line)
+        self.assertEqual(out["bank_limits"], [{
+            "axis": "sp_pairs", "kind": "interaction", "sampled": 1, "viable": 50,
+            "need": 2, "entries": 2}])
+        self.assertNotIn("interaction_probe", out,
+                         "the probe would name the cap that happens to restore a thin bank")
+
+    def test_the_interaction_line_says_whether_bank_growth_can_help(self):
+        exhausted = self._refuse({"viable_sp_pairs": 50}, {"job_list_exhausted": True})
+        self.assertIn("bank growth cannot clear this", exhausted["errors"][0])
+        self.assertNotIn("BANK-LIMITED", exhausted["errors"][0])
+        self.assertNotIn("bank_limits", exhausted, "a finished search is not bank-limited")
+        self.assertIn("interaction_probe", exhausted, "the probe still runs there")
+        direct = self._refuse({"viable_sp_pairs": 50}, {
+            "job_list_exhausted": None, "source": "build_diverse_candidate_bank"})
+        self.assertIn("BANK-LIMITED", direct["errors"][0])
+        self.assertNotIn("interaction_probe", direct,
+                         "no job list to say the bank was complete, and it is thin")
+        # No pair cap in play: the bank's pair count is not what is tight, so the
+        # sentence is R207's and the probe still names the restoring control.
+        from mlb_engine.allocate import contest_allocator as ca
+        no_pair_cap = ca.select_and_assign_entries(
+            self._thin_bank(), self.ENTRIES, {"max_shared_players": 3},
+            bank_report={"job_list_exhausted": None,
+                         "source": "build_diverse_candidate_bank"},
+            feasibility_inputs={"viable_sp_pairs": 50}, interaction_probe_budget_s=5.0)
+        self.assertNotIn("BANK-LIMITED", no_pair_cap["errors"][0])
+        self.assertIn("interaction_probe", no_pair_cap)
+        # No slate figure: nothing new is said, and the sentence is R207's.
+        plain = self._refuse(None, None)
+        self.assertNotIn("BANK-LIMITED", plain["errors"][0])
+        self.assertNotIn("cannot clear", plain["errors"][0])
+        self.assertTrue(plain["errors"][0].startswith(
+            "entry-level joint MILP proven infeasible: no single control"))
+
+    def test_the_bank_limit_is_data_with_its_own_arithmetic(self):
+        from mlb_engine.allocate import contest_allocator as ca
+        pairs = [("a", "b")] * 3 + [("c", "d")] * 4          # 2 distinct
+        row = ca.interaction_bank_limits(pairs, {"viable_sp_pairs": 144}, 21, {}, pair_cap=3)
+        self.assertEqual(row, [{"axis": "sp_pairs", "kind": "interaction", "sampled": 2,
+                                "viable": 144, "need": 21, "entries": 21}])
+        many = [(f"a{i}", f"b{i}") for i in range(21)]
+        self.assertEqual(ca.interaction_bank_limits(many, {"viable_sp_pairs": 144}, 21, {}, pair_cap=3), [],
+                         "one pair per entry is the most a cap could ask for")
+        self.assertEqual(ca.interaction_bank_limits(pairs, {"viable_sp_pairs": 2}, 21, {}, pair_cap=3), [],
+                         "a slate whose only viable pairs are the two the bank holds "
+                         "is not bank-limited")
+        self.assertEqual(len(ca.interaction_bank_limits(
+            pairs, {"viable_sp_pairs": 3}, 21, {}, pair_cap=3)), 1, "one pair short of the slate is")
+        self.assertEqual(ca.interaction_bank_limits(pairs, {}, 21, {}, pair_cap=3), [])
+        self.assertEqual(ca.interaction_bank_limits(
+            pairs, {"viable_sp_pairs": 144}, 21, {"job_list_exhausted": True},
+            pair_cap=3), [])
+        self.assertEqual(ca.interaction_bank_limits(
+            pairs, {"viable_sp_pairs": 144}, 21, {}), [],
+            "no pair cap in play: pair coverage is not what the caps are tight against")
+
+    def test_a_player_in_every_lineup_names_the_cap_the_bank_requires(self):
+        """1940_6g: a player in every candidate needs max_player_exposure_pct at
+        1.0 however the other caps are set, which a hand bisection took five
+        builds to find. Now it is one counting line and one typed row."""
+        from mlb_engine.allocate import contest_allocator as ca
+        sigs = [tuple(sorted(["star", "p1", "p2", f"x{i}", f"y{i}"])) for i in range(4)]
+        limits = []
+        found = ca._diagnose_binding_constraints(
+            entries_count=10, stacks=["S"] * 4, sp_pairs=[("p1", "p2")] * 4,
+            signatures=sigs, largest_contest_entries=4,
+            controls={"max_player_exposure_pct": 0.9}, bank_limits_out=limits)
+        self.assertTrue(any(f.startswith("max_player_exposure_pct: player") for f in found), found)
+        self.assertTrue([f for f in found if "cannot satisfy a cap below 10/10 = 1.000" in f],
+                        "the floor reads as a floor, not as a ceiling")
+        self.assertFalse([f for f in found if "at most 10/10" in f])
+        # With fixed rows in the solve the caps count against rows this function
+        # does not see, so it makes no claim.
+        limits_fixed = []
+        fixed = ca._diagnose_binding_constraints(
+            entries_count=10, stacks=["S"] * 4, sp_pairs=[("p1", "p2")] * 4,
+            signatures=sigs, largest_contest_entries=4,
+            controls={"max_player_exposure_pct": 0.9}, bank_limits_out=limits_fixed,
+            fixed_rows=True)
+        self.assertFalse([f for f in fixed if f.startswith("max_player_exposure_pct")])
+        self.assertFalse([b for b in limits_fixed if b["kind"] == "player_floor"])
+        row = [b for b in limits if b["kind"] == "player_floor"][0]
+        # star, p1 and p2 are all in 4 of 4; sorted order names the first.
+        self.assertEqual(row["player_id"], "p1")
+        self.assertEqual((row["lineups_with_player"], row["distinct_lineups"]), (4, 4))
+        self.assertEqual(row["required_cap_pct"], 1.0)
+        self.assertEqual(row["cap_count"], 9)
+        # A lineup without the player, and no reuse cap: nothing to say.
+        with_spare = sigs + [("z1", "z2", "z3", "z4", "z5", "z6", "z7", "z8", "z9", "z0")]
+        limits = []
+        found = ca._diagnose_binding_constraints(
+            entries_count=10, stacks=["S"] * 5, sp_pairs=[("p1", "p2")] * 5,
+            signatures=with_spare, largest_contest_entries=4,
+            controls={"max_player_exposure_pct": 0.9}, bank_limits_out=limits)
+        self.assertFalse([f for f in found if f.startswith("max_player_exposure_pct")])
+        # With a reuse cap the spare lineup seats reuse x 1 entries: 1 < 1 fails
+        # for a cap needing 1 without... need is 10 - 9 = 1, capacity 1 x 1 = 1.
+        limits = []
+        found = ca._diagnose_binding_constraints(
+            entries_count=10, stacks=["S"] * 5, sp_pairs=[("p1", "p2")] * 5,
+            signatures=[s for s in with_spare], largest_contest_entries=4,
+            controls={"max_player_exposure_pct": 0.8, "max_candidate_reuse": 1},
+            bank_limits_out=limits)
+        row = [b for b in limits if b["kind"] == "player_floor"][0]
+        self.assertEqual((row["avoid_capacity"], row["required_cap_count"]), (1, 9))
+        self.assertEqual(row["required_cap_pct"], 0.9)
+
+    def test_the_typed_remedies_carry_the_lever_for_the_door(self):
+        bs = _load_build_slate_module("_bs_r311")
+        limits = [{"axis": "sp_pairs", "kind": "interaction", "sampled": 1, "viable": 50,
+                   "need": 2, "entries": 2},
+                  {"axis": "player_exposure", "kind": "player_floor", "player_id": "p1",
+                   "lineups_with_player": 4, "distinct_lineups": 4, "required_cap_pct": 1.0}]
+        direct = bs.typed_refusal_remedy({}, None, None, bank_limits=limits, strategy="direct")
+        by_kind = {r["kind"]: r for r in direct}
+        self.assertEqual(by_kind["bank_limited"]["lever"], "take_sliced_door")
+        self.assertEqual(by_kind["bank_floor"]["to"], 1.0)
+        self.assertEqual(by_kind["bank_floor"]["control"], "max_player_exposure_pct")
+        sliced = bs.typed_refusal_remedy(
+            {}, None, {"job_list_exhausted": False, "jobs_attempted": 1, "jobs_total": 9},
+            bank_limits=limits, strategy="sliced_bank")
+        self.assertEqual([r["kind"] for r in sliced][:2], ["grow_bank", "bank_limited"])
+        self.assertEqual({r["kind"]: r for r in sliced}["bank_limited"]["lever"], "grow_bank")
+        for remedy in direct + sliced:
+            self.assertTrue(bs.format_typed_remedy(remedy))
+
+
+class R285BankFactsTests(unittest.TestCase):
+    """R285. The bank's job facts have one reader over a brief, both doors write
+    them, the supervisor branches on a typed block, and a stop keeps what the
+    child said."""
+
+    def test_one_extractor_reads_every_place_a_brief_keeps_the_bank(self):
+        from mlb_engine.optimize.bank_cache import bank_job_facts
+        block = {"job_list_exhausted": False, "jobs_attempted": 5, "jobs_total": 50}
+        self.assertEqual(bank_job_facts({"solve": {"bank": block}})["source"], "solve.bank")
+        self.assertEqual(bank_job_facts({"bank_exploration": block})["source"],
+                         "bank_exploration")
+        self.assertEqual(bank_job_facts({"bank_diagnostics": block})["source"],
+                         "bank_diagnostics")
+        self.assertEqual(bank_job_facts(block)["source"], "report")
+        both = bank_job_facts({"solve": {"bank": dict(block, jobs_attempted=1)},
+                               "bank_exploration": block})
+        self.assertEqual((both["source"], both["jobs_attempted"]), ("solve.bank", 1))
+        # solve.bank is None on the direct door; the next place answers.
+        self.assertEqual(bank_job_facts({"solve": {"bank": None},
+                                         "bank_diagnostics": block})["source"],
+                         "bank_diagnostics")
+        nothing = bank_job_facts({"solve": {"bank": None}})
+        self.assertEqual((nothing["source"], nothing["job_list_exhausted"]), (None, None))
+        # "This door has no job list" is an answer, and not the same as absent.
+        direct = bank_job_facts({"bank_exploration": {
+            "job_list_exhausted": None, "jobs_attempted": None, "jobs_total": None,
+            "note": "no job list on this door"}})
+        self.assertEqual(direct["source"], "bank_exploration")
+
+    def test_the_remedy_enum_is_search_effort_only(self):
+        from mlb_engine.optimize.bank_cache import bank_remedy
+        cap = {"job_list_exhausted": False, "bank_stop_reason": "candidate_cap"}
+        self.assertEqual(bank_remedy({"job_list_exhausted": False,
+                                      "bank_stop_reason": "time_budget"}), "grow_bank")
+        self.assertEqual(bank_remedy(cap), "raise_bank_cap")
+        self.assertEqual(bank_remedy(dict(cap, bank_cap={"at_ceiling": True})), "at_ceiling")
+        self.assertEqual(bank_remedy({"job_list_exhausted": None}, door="direct",
+                                     bank_limited=True), "take_sliced_door")
+        self.assertEqual(bank_remedy({"job_list_exhausted": None}, door="direct"), "none")
+        self.assertEqual(bank_remedy({"job_list_exhausted": True}, door="direct",
+                                     bank_limited=True), "none",
+                         "a finished search is not grown")
+
+    def test_the_direct_door_block_says_it_has_no_job_list(self):
+        bs = _load_build_slate_module("_bs_r285")
+        direct = bs.bank_exploration_block(None, "direct")
+        self.assertEqual(direct["door"], "direct")
+        self.assertIsNone(direct["job_list_exhausted"])
+        self.assertIn("no job list on this door", direct["note"])
+        sliced = bs.bank_exploration_block(
+            {"jobs_attempted": 12, "jobs_total": 96, "job_list_exhausted": False,
+             "bank_stop_reason": "time_budget", "total_candidates": 3}, "sliced_bank")
+        self.assertEqual((sliced["jobs_attempted"], sliced["jobs_total"],
+                          sliced["job_list_exhausted"]), (12, 96, False))
+        self.assertNotIn("note", sliced)
+
+    def test_a_direct_door_refusal_writes_the_facts_the_supervisor_reads(self):
+        """Through run_classic: the allocator's typed BANK-LIMITED finding on a
+        direct-door refusal becomes `refusal_facts.remedy == take_sliced_door`
+        with `bank_exploration` present, on the door that has no job list."""
+        harness = DeadlineGovernorWiringTests
+        case = types.SimpleNamespace(
+            _SALARY=harness._SALARY, _SLOTS=harness._SLOTS, _REFUSAL=harness._REFUSAL)
+        case.root = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, case.root, True)
+        for name in ("_legal_ids", "_entries_csv", "_delivered_csv"):
+            setattr(case, name, getattr(harness, name).__get__(case))
+        case.fail = self.fail
+        refusal = dict(harness._REFUSAL, bank_limits=[
+            {"axis": "sp_pairs", "kind": "counting", "sampled": 3, "viable": 60,
+             "cap": 1, "entries": 18}])
+        code, brief, _calls, err = harness._run(case, 30, refusal=refusal)
+        self.assertEqual(code, 3)
+        self.assertIn("BANK-LIMITED on the direct door", err,
+                      "the operator's line is off the typed finding, with no sentence in errors[]")
+        self.assertEqual(brief["solve_strategy"], "direct")
+        self.assertEqual(brief["bank_exploration"]["door"], "direct")
+        self.assertIsNone(brief["bank_exploration"]["job_list_exhausted"])
+        facts = brief["refusal_facts"]
+        self.assertEqual(facts["remedy"], "take_sliced_door")
+        self.assertTrue(facts["bank_limited"])
+        self.assertEqual(facts["class"], brief["refusal_class"])
+        self.assertEqual((facts["job_list_exhausted"], facts["jobs_total"]), (None, None))
+        kinds = [r["kind"] for r in brief["refusal_remedy"]]
+        self.assertIn("bank_limited", kinds)
+        # And the same refusal without the allocator's finding names no remedy.
+        code, brief, _calls, _err = harness._run(case, 30)
+        self.assertEqual(brief["refusal_facts"]["remedy"], "none")
+        self.assertFalse(brief["refusal_facts"]["bank_limited"])
+
+
+    def test_run_slate_returns_the_allocators_bank_limits(self):
+        """The wiring, through the real run_slate and execute_portfolio: only
+        the allocator is faked. The typed findings ride the refusal result, the
+        same way the interaction probe does, so build_slate can type them."""
+        rows = [{"axis": "sp_pairs", "kind": "interaction", "sampled": 1, "viable": 50,
+                 "need": 2, "entries": 2}]
+
+        def fake(candidates, entries, controls, **kw):
+            return {"passed": False, "assignments": [], "errors": ["refused"],
+                    "selection_certified": False, "allocation_certified": False,
+                    "bank_limits": rows}
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            salary = root / "salary.csv"; ids = write_salary(salary)
+            entries = root / "DKEntries.csv"; write_entries(entries)
+            r1, r2 = legal_rosters(ids)
+            with unittest.mock.patch.object(epi, "select_and_assign_entries", fake):
+                out = run_slate(
+                    runs_root=root / "runs", salary_csv=salary, entries_csv=entries,
+                    projections_override=projection_frame(ids),
+                    candidates_override=[candidate("A", r1, 100), candidate("B", r2, 99, "CCC")],
+                    portfolio_controls_override=RunSlateFrontDoorTests.LOOSE,
+                    assume_gates=RunSlateFrontDoorTests.UNEVIDENCED,
+                    approve=True)
+        self.assertFalse(out["passed"])
+        self.assertEqual(out["bank_limits"], rows)
+
+
+class R285SupervisorTests(unittest.TestCase):
+    """R285 on the supervisor: it branches on the typed block through the one
+    extractor, and every stop keeps the child's returncode, stdout, stderr and
+    parsed brief beside the decision log."""
+
+    setUp = AutobuildBankCapTests.setUp
+    _run = AutobuildBankCapTests._run
+
+    @staticmethod
+    def _child(returncode, brief, stderr=""):
+        return lambda n, cmd, kw: types.SimpleNamespace(
+            returncode=returncode, stderr=stderr,
+            stdout="noise before\n" + json.dumps(brief) + "\nnoise after")
+
+    def _child_files(self):
+        return sorted(Path(self.tmp.name).glob("outputs/*/autobuild_child_*.json"))
+
+    def test_a_stop_keeps_what_the_child_said(self):
+        brief = {"status": "not_certified", "date": "2026-07-29",
+                 "errors": ["entry-level joint MILP proven infeasible: x"]}
+        code, records, _cmds, _ = self._run(
+            self._child(3, brief, stderr="the child's own stderr"),
+            extra_argv=["--max-attempts", "1"])
+        self.assertEqual(code, 3)
+        stop = [r for r in records if r["action"] == "stop"][-1]
+        self.assertEqual(stop["returncode"], 3)
+        files = self._child_files()
+        self.assertEqual([f.name for f in files], ["autobuild_child_1.json"])
+        self.assertTrue(stop["child_record"].endswith("autobuild_child_1.json"))
+        kept = json.loads(files[0].read_text(encoding="utf-8"))
+        self.assertEqual(kept["returncode"], 3)
+        self.assertEqual(kept["stderr"], "the child's own stderr")
+        self.assertIn("noise before", kept["stdout"])
+        self.assertEqual(kept["brief"]["status"], "not_certified")
+        self.assertFalse(kept["killed"])
+
+    def test_the_child_record_never_holds_a_key(self):
+        secret = "ghp_S3cretValue0123456789"
+        # The secret rides stderr AND the parsed brief (an error string a child
+        # echoed), so redacting the raw streams alone would still write it.
+        brief = {"status": "not_certified", "date": "2026-07-29",
+                 "errors": [f"fetch failed with {secret}"]}
+        with unittest.mock.patch.dict(os.environ, {"GH_PAT": secret}):
+            self._run(self._child(3, brief, stderr=f"auth failed for {secret}"),
+                      extra_argv=["--max-attempts", "1"])
+        text = self._child_files()[0].read_text(encoding="utf-8")
+        self.assertNotIn(secret, text)
+        self.assertIn("<GH_PAT redacted>", text)
+        kept = json.loads(text)
+        self.assertIn("<GH_PAT redacted>", kept["brief"]["errors"][0])
+
+    def test_the_exit_10_log_reads_the_partial_briefs_facts(self):
+        partial = {"status": "partial", "date": "2026-07-29",
+                   "bank_exploration": {"job_list_exhausted": False, "jobs_attempted": 12,
+                                        "jobs_total": 96, "bank_stop_reason": "time_budget"}}
+        _code, records, _cmds, _ = self._run(
+            self._child(10, partial), extra_argv=["--max-attempts", "1"])
+        grow = [r for r in records if r["action"] == "grow_bank"][0]
+        self.assertEqual((grow["jobs"], grow["jobs_total"], grow["bank_stop_reason"]),
+                         (12, 96, "time_budget"))
+
+    def test_a_refusal_that_keeps_its_bank_under_bank_diagnostics_still_grows(self):
+        refusal = {"status": "not_certified", "date": "2026-07-29",
+                   "bank_diagnostics": {"job_list_exhausted": False, "jobs_attempted": 5,
+                                        "jobs_total": 50, "bank_stop_reason": "time_budget"}}
+        _code, records, cmds, _ = self._run(
+            self._child(3, refusal), extra_argv=["--max-attempts", "2"])
+        self.assertIn("grow_bank", [r["action"] for r in records])
+        self.assertEqual(len(cmds), 2)
+
+    def test_the_typed_block_is_what_the_supervisor_branches_on(self):
+        """No bank facts anywhere on the brief, and a typed `grow_bank`: the
+        remedy is taken from the block. And the reverse: bank facts that say
+        `grow_bank` under a block that says `none` are not overruled by errors."""
+        typed = {"status": "not_certified", "date": "2026-07-29",
+                 "refusal_facts": {"remedy": "grow_bank"}}
+        _c, records, cmds, _ = self._run(
+            self._child(3, typed), extra_argv=["--max-attempts", "2"])
+        self.assertIn("grow_bank", [r["action"] for r in records])
+        self.assertEqual(len(cmds), 2)
+        none = {"status": "not_certified", "date": "2026-07-29",
+                "refusal_facts": {"remedy": "none"},
+                "bank_exploration": {"job_list_exhausted": False, "jobs_attempted": 5,
+                                     "jobs_total": 50, "bank_stop_reason": "time_budget"}}
+        _c, records, cmds, _ = self._run(
+            self._child(3, none), extra_argv=["--max-attempts", "2"])
+        self.assertNotIn("grow_bank", [r["action"] for r in records])
+        self.assertEqual(len(cmds), 1)
