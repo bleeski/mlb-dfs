@@ -905,7 +905,22 @@ EXPECTED_SUITE_COUNTS = {
     # delivery exits 0 and names --parent), one LateSwapCompositionTests (all
     # three together: a mismatched parent that crashes after the write exits 7
     # under the capped label, and the printed preflight command passes).
-    "tests.test_core": 1764,
+    # R98(3) + R98(4)-tail (Session 15), 2026-09-28: 1764 -> 1788, the 24 that
+    # pin one build Deadline: twelve DeadlineContractTests (the earliest bound
+    # and its name, time already spent counts, F-1's buffer is slate_clock's,
+    # a slow stage cannot spend the reserve, frozen, a past end floors audibly,
+    # the reserve is measured per host by entries, no runtime benchmark import,
+    # the bank's per-job limit inherits its slice, the probe cannot spend the
+    # reserve, the cap vocabulary is the rung's, caps_vs_bank on both doors),
+    # four DeadlineGovernorTests (the window from the reserve, floored at T-6,
+    # set before the ladder; the clamp moves only earlier), three
+    # DeadlineGovernorWiringTests (a re-solve and the sliced bank take what is
+    # left of the one deadline; below the bank floor the direct door delivers
+    # rather than exit 10) and five DeadlineGovernorCliTests (main hands one
+    # Deadline on, T-12 binds at the F-1 deadline, the governor's window reads
+    # its reserve, a lock before --deliver-by clamps the governor, a short
+    # --max-seconds never does).
+    "tests.test_core": 1788,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps
@@ -1466,7 +1481,10 @@ EXPECTED_SUITE_COUNTS = {
     # not govern the bank most builds deliver from, and neither golden can move
     # when it moves. The seventh pins that --live never publishes a certified
     # delivery record into the tracked ledger, which its first cut did.
-    "tests.test_greenfield_regressions": 37,
+    # R98(3), 2026-09-28: 37 -> 39, `benchmark_engine --publication` (a real
+    # flag, a truthful label, the counts repo_env stores, an identifiable
+    # contest) and its nearest-rank percentile.
+    "tests.test_greenfield_regressions": 39,
     "tests.test_production": 101,
 }
 # The sum, not a second number to keep in step: R70 left this comment reading

@@ -1932,13 +1932,19 @@ def parse_game_info_datetime(game_info: Any) -> Optional[datetime]:
     return datetime(year, month, day, hour, int(mi), tzinfo=_eastern_tz(year, month, day))
 
 
+#: F-1 (Ben, 2026-09-22): the upload takes five minutes, so the delivery
+#: deadline is first lock minus this. `slate_clock` and
+#: `mlb_engine.pipeline.deadline` read the one value (R98(3)).
+DELIVERY_BUFFER_MINUTES = 5
+
+
 def slate_clock(
     salary_csv: Optional[str] = None,
     *,
     players: Optional[Sequence[SalaryPlayer]] = None,
     lock_time_by_game_id: Optional[Dict[str, Any]] = None,
     now: Optional[datetime] = None,
-    buffer_minutes: int = 5,
+    buffer_minutes: int = DELIVERY_BUFFER_MINUTES,
 ) -> Dict[str, Any]:
     """First-lock clock and the T-minus-``buffer_minutes`` delivery deadline.
 

@@ -35,7 +35,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DOTENV_PATH = REPO_ROOT / ".env"
@@ -358,6 +358,10 @@ def host_profile(host: Optional[str] = None,
     profile["bank_candidates_per_entry"] = round(bank_candidates_per_entry(
         budget_s=profile["call_budget_s"]), 2)
     profile["bank_full_solve_ceiling"] = BANK_FULL_SOLVE_CEILING
+    # R98(3). The measured publication reserve, by entry count.
+    table, source = publication_reserve_table(host=resolved, env=environ)
+    profile["publication_reserve_s_by_entries"] = table
+    profile["publication_reserve_source"] = source
     return profile
 
 
@@ -407,6 +411,70 @@ def bank_max_candidates(n_entries: int, budget_s: Optional[float] = None,
     per_entry = bank_candidates_per_entry(budget_s=budget_s, host=host, env=env)
     return max(BANK_MIN_CANDIDATES,
                min(int(int(n_entries) * per_entry), BANK_FULL_SOLVE_CEILING))
+
+
+# ---------------------------------------------------------------------------
+# The publication reserve (R98(3), 2026-09-28)
+# ---------------------------------------------------------------------------
+# What a Classic build spends AFTER its search stops: with a bank in hand,
+# run_slate rebuilds the frame, runs the allocator's joint MILP, certifies,
+# exports and writes. `mlb_engine.pipeline.deadline.Deadline` keeps this much
+# of every build's window back from the bank. Measured, never a literal in the
+# deadline code, and never measured at build time (the benchmark imports
+# `mlb_engine.production`, which the build path does not).
+#
+# Keyed by entry count, because the allocator is most of it and it grows with
+# the entries: a build uses the smallest measured count at or above its own. The
+# 150-entry figure is the allocator hitting its own 30s `time_limit`
+# (contest_allocator.py, unsliced until Session 16); it shrinks when that solve
+# takes a slice of the deadline too.
+PUBLICATION_RESERVE_COMMAND = ("python tools/benchmark_engine.py --publication "
+                               "--output <dir>")
+PUBLICATION_RESERVE_MEASURED: Dict[str, Dict[str, object]] = {
+    # 2026-09-28, this container (call budget 630s): the tracked 2026-06-28
+    # 11-game slate, one 734-candidate bank, loose controls, five timed runs per
+    # count. The allocator was 1.0-1.1s of it at 9 entries, 4.6-5.3s at 38, and
+    # 36.7-39.9s at 150, where it ran to its time limit every run.
+    HOST_CLAUDE_CODE: {
+        "p95_s_by_entries": {9: 1.62, 38: 5.84, 150: 40.46},
+        "source": (f"measured 2026-09-28 on {HOST_CLAUDE_CODE} by "
+                   f"`{PUBLICATION_RESERVE_COMMAND}` (2026-06-28 11g, "
+                   f"734-candidate bank, p95 of 5 runs per count)"),
+    },
+}
+#: The host whose measurement an unmeasured host borrows, said so in the source.
+PUBLICATION_RESERVE_REFERENCE_HOST = HOST_CLAUDE_CODE
+
+
+def publication_reserve_table(host: Optional[str] = None,
+                              env: Optional[Dict[str, str]] = None
+                              ) -> Tuple[Dict[int, float], str]:
+    """This host's measured ``{entries: p95 seconds}`` and where it came from."""
+    resolved = host or detect_host(env=os.environ if env is None else env)
+    measured = PUBLICATION_RESERVE_MEASURED.get(resolved)
+    if measured is not None:
+        return dict(measured["p95_s_by_entries"]), str(measured["source"])
+    borrowed = PUBLICATION_RESERVE_MEASURED[PUBLICATION_RESERVE_REFERENCE_HOST]
+    return (dict(borrowed["p95_s_by_entries"]),
+            f"unmeasured on {resolved}; {PUBLICATION_RESERVE_REFERENCE_HOST}'s "
+            f"figure ({borrowed['source']})")
+
+
+def publication_reserve_s(n_entries: Optional[int] = None,
+                          host: Optional[str] = None,
+                          env: Optional[Dict[str, str]] = None
+                          ) -> Tuple[float, str]:
+    """``(seconds, source)`` reserved for publication at ``n_entries``.
+
+    The smallest measured count at or above ``n_entries``; the largest when it
+    is unknown or above every measured count, which is the conservative read.
+    """
+    table, source = publication_reserve_table(host=host, env=env)
+    counts = sorted(table)
+    pick = counts[-1]
+    if n_entries:
+        pick = next((c for c in counts if c >= int(n_entries)), counts[-1])
+    return float(table[pick]), f"{source}; the {pick}-entry p95"
 
 
 def call_budget_source(explicit: Optional[float] = None,

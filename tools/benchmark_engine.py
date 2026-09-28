@@ -59,6 +59,28 @@ LIVE_LOOSE_CONTROLS = {
 LIVE_ASSUMED_GATES = ["odds_gate_passed", "weather_gate_passed",
                       "pitcher_audit_gate_passed", "lineup_gate_passed"]
 
+# R98(3). `--publication` times what a build spends AFTER its search stops: a
+# bank already in hand goes to run_slate as `candidates_override`, which
+# rebuilds the frame, allocates, certifies, exports and writes. That is the
+# phase `mlb_engine.pipeline.deadline.Deadline`'s reserve protects. It is timed
+# at 9, 38 and 150 entries (DK's 150-entry maximum) on one bank from the
+# 11-game 2026-06-28 slate, the largest tracked archive, and each count's p95
+# is what `repo_env.HOST_PROFILES[...]["publication_reserve_s_by_entries"]`
+# stores. Nothing reads this tool at build time.
+PUBLICATION_LABEL = (
+    "publication phase: execution_pipeline.run_slate with a candidate bank "
+    "already in hand (candidates_override) at 9, 38 and 150 reserved entries on the "
+    "vendored 2026-06-28 slate; real allocator MILP, certification, export and "
+    "write; emergency_proxy projections. Host-dependent timings on ONE slate; "
+    "never ROI, edge, a win rate, or a probability"
+)
+PUBLICATION_SLATE_DATE = "2026-06-28"
+PUBLICATION_ENTRIES = 150
+PUBLICATION_ENTRY_COUNTS = (9, 38, PUBLICATION_ENTRIES)
+PUBLICATION_REPETITIONS = 5
+PUBLICATION_BANK_BUDGET_S = 240.0
+PUBLICATION_SLOTS = ("P", "P", "C", "1B", "2B", "3B", "SS", "OF", "OF", "OF")
+
 
 def measure(fn, repetitions=5, warmup=True):
     """Time ``fn`` then trace it, in separate runs.
@@ -275,6 +297,147 @@ def _run_live_inner(output_dir):
     return results
 
 
+def publication_entries_csv(path, n=PUBLICATION_ENTRIES):
+    """``n`` blank reserved Classic rows in one 150-max contest."""
+    header = ",".join(ENTRIES_HEADER_PREFIX + list(PUBLICATION_SLOTS)) + ",,Instructions\n"
+    blanks = "," * len(PUBLICATION_SLOTS)
+    rows = "".join(
+        f"{9100000000 + i},MLB $15K mini-MAX [150 Entry Max],999000001,$1.00{blanks},\n"
+        for i in range(n))
+    Path(path).write_text(header + rows, encoding="utf-8")
+    return Path(path)
+
+
+def percentile(samples, pct):
+    """Nearest-rank percentile, so p95 of five samples is the slowest one."""
+    ordered = sorted(samples)
+    rank = max(1, -(-len(ordered) * pct // 100))
+    return ordered[int(rank) - 1]
+
+
+def run_publication(output_dir, entry_counts=PUBLICATION_ENTRY_COUNTS,
+                    repetitions=PUBLICATION_REPETITIONS):
+    """Time the publication phase; redirected artifact root, as `run_live`."""
+    import os
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as artifact_root:
+        previous = os.environ.get("MLB_DFS_ARTIFACT_ROOT")
+        os.environ["MLB_DFS_ARTIFACT_ROOT"] = artifact_root
+        try:
+            import mlb_engine.entries.upload_manifest as _um
+            previous_repo_root = _um.REPO_ROOT
+            _um.REPO_ROOT = Path(artifact_root)
+            try:
+                return _run_publication_inner(output_dir, entry_counts, repetitions)
+            finally:
+                _um.REPO_ROOT = previous_repo_root
+        finally:
+            if previous is None:
+                os.environ.pop("MLB_DFS_ARTIFACT_ROOT", None)
+            else:
+                os.environ["MLB_DFS_ARTIFACT_ROOT"] = previous
+
+
+def _run_publication_inner(output_dir, entry_counts, repetitions):
+    import tempfile
+    from mlb_engine import repo_env
+    import mlb_engine.allocate.contest_allocator as _ca
+    from mlb_engine.optimize.bank_cache import BankCache, extend_bank
+    from mlb_engine.pipeline.execution_pipeline import (
+        _assemble_projection_frame, run_slate,
+    )
+    from mlb_engine.production.workflow import runtime_identity
+
+    archive = ROOT / "data" / "archive" / PUBLICATION_SLATE_DATE
+    salary_csv, _entries = live_inputs(archive)
+    if salary_csv is None:
+        raise SystemExit(f"--publication needs data/archive/{PUBLICATION_SLATE_DATE}/'s "
+                         "DK salary export")
+    counts = sorted({int(n) for n in entry_counts})
+    projection_rows = live_projection_rows(salary_csv)
+    frame, _meta = _assemble_projection_frame(
+        salary_csv, projection_rows, "emergency_proxy", None, None, None)
+    cache = BankCache(Path(output_dir) / "bank.json")
+    started = time.perf_counter()
+    bank_report = extend_bank(
+        cache, frame, time_budget_s=PUBLICATION_BANK_BUDGET_S,
+        max_candidates=repo_env.bank_max_candidates(max(counts)))
+    bank_s = time.perf_counter() - started
+
+    # The allocator's joint MILP, timed on its own: it is most of this phase
+    # and it has its own solver limit (contest_allocator's `time_limit`).
+    allocator_calls = []
+    original = _ca.select_and_assign_entries
+
+    def timed_allocator(*a, **k):
+        t0 = time.perf_counter()
+        out = original(*a, **k)
+        report = out.get("allocation_solver_report") or {}
+        allocator_calls.append({"seconds": round(time.perf_counter() - t0, 2),
+                                "optimality": report.get("optimality"),
+                                "status": report.get("status")})
+        return out
+
+    import mlb_engine.pipeline.execution_pipeline as _ep
+    patched = [name for name in dir(_ep) if getattr(_ep, name) is original]
+    _ca.select_and_assign_entries = timed_allocator
+    for name in patched:
+        setattr(_ep, name, timed_allocator)
+    by_entries = {}
+    try:
+        for n in counts:
+            entries_csv = publication_entries_csv(
+                Path(output_dir) / f"DKEntries_publication_{n}.csv", n)
+            candidates = cache.as_candidates(frame, requested_n=n)
+            outcomes = []
+            allocator_calls.clear()
+
+            def run():
+                with tempfile.TemporaryDirectory() as tmp:
+                    out = run_slate(
+                        runs_root=Path(tmp) / "runs", salary_csv=salary_csv,
+                        entries_csv=entries_csv, projection_rows=projection_rows,
+                        projection_mode="emergency_proxy", requested_n=n,
+                        candidates_override=candidates,
+                        portfolio_controls_override=LIVE_LOOSE_CONTROLS,
+                        approve=True, assume_gates=LIVE_ASSUMED_GATES)
+                outcomes.append(bool(out.get("passed")))
+
+            timing = measure(run, repetitions=repetitions, warmup=False)
+            samples = timing["samples_seconds"]
+            by_entries[str(n)] = {
+                "candidates": len(candidates),
+                "samples_seconds": [round(x, 2) for x in samples],
+                "p50_s": round(percentile(samples, 50), 2),
+                "p95_s": round(percentile(samples, 95), 2),
+                "max_s": round(max(samples), 2),
+                # measure() runs `fn` once more under tracemalloc after the
+                # timed runs; that run is reported apart, never in the timing.
+                "certified_runs": f"{sum(outcomes[:repetitions])}/{repetitions}",
+                "traced_run_certified": (outcomes[repetitions]
+                                         if len(outcomes) > repetitions else None),
+                "allocator_calls": list(allocator_calls[:repetitions]),
+            }
+    finally:
+        _ca.select_and_assign_entries = original
+        for name in patched:
+            setattr(_ep, name, original)
+    return {
+        "environment": runtime_identity(),
+        "host_profile": repo_env.host_profile(),
+        "label": PUBLICATION_LABEL,
+        "mode": "publication",
+        "slate_date": PUBLICATION_SLATE_DATE,
+        "repetitions": repetitions,
+        "bank": {"candidates": len(cache), "build_s": round(bank_s, 1),
+                 "stop_reason": bank_report.get("bank_stop_reason"),
+                 "job_list_exhausted": bank_report.get("job_list_exhausted")},
+        "by_entries": by_entries,
+        "llm_calls": 0, "llm_tokens": 0, "network_calls": 0,
+    }
+
+
 def main():
     from mlb_engine.production.contracts import Controls, EvidenceBundle
     from mlb_engine.production.csvio import parse_entries, parse_salary
@@ -294,8 +457,31 @@ def main():
              f"the vendored data/archive/{LIVE_SLATE_DATE}/ slate instead of the "
              "synthetic production workload. Emits LIVE_LABEL, never SYNTHETIC_LABEL.",
     )
+    p.add_argument(
+        "--publication", action="store_true",
+        help="time the publication phase (run_slate with a bank in hand) at "
+             f"--entries counts on data/archive/{PUBLICATION_SLATE_DATE}/; "
+             "each count's p95 is what repo_env's publication_reserve_s_by_entries "
+             "stores (R98(3)).",
+    )
+    p.add_argument(
+        "--entries", default=None,
+        help="with --publication: comma-separated entry counts to time "
+             f"(default {','.join(str(n) for n in PUBLICATION_ENTRY_COUNTS)})")
     args = p.parse_args()
     args.output.mkdir(parents=True, exist_ok=False)
+
+    if args.publication:
+        counts = ([int(x) for x in args.entries.split(",") if x.strip()]
+                  if args.entries else PUBLICATION_ENTRY_COUNTS)
+        results = run_publication(args.output, entry_counts=counts)
+        (args.output / "benchmarks.json").write_text(
+            json.dumps(results, indent=2, allow_nan=False, default=str), encoding="utf-8")
+        print(json.dumps({"mode": "publication", "bank": results["bank"],
+                          "p95_s": {n: r["p95_s"] for n, r in results["by_entries"].items()},
+                          "certified": {n: r["certified_runs"]
+                                        for n, r in results["by_entries"].items()}}))
+        return
 
     if args.live:
         results = run_live(args.output)

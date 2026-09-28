@@ -473,6 +473,52 @@ def test_benchmark_engine_exposes_live_as_a_real_flag():
     )
 
 
+def test_benchmark_engine_publication_mode_measures_what_repo_env_stores():
+    """R98(3). `--publication` is the instrument behind the Deadline's reserve:
+    a real flag, a truthful label, the counts repo_env stores, and a synthetic
+    template whose contest the archetype table identifies (an unidentified one
+    refuses in 0.15s, which the first measurement timed by mistake)."""
+    import subprocess
+    import sys
+    import tempfile
+    from pathlib import Path
+
+    import tools.benchmark_engine as be
+    from mlb_engine import repo_env
+    from mlb_engine.entries.dk_entries_manager import parse_dk_entry_rows
+
+    assert "synthetic" not in be.PUBLICATION_LABEL.lower()
+    assert "never ROI, edge, a win rate, or a probability" in be.PUBLICATION_LABEL
+    table, _source = repo_env.publication_reserve_table(host=repo_env.HOST_CLAUDE_CODE)
+    assert sorted(table) == sorted(be.PUBLICATION_ENTRY_COUNTS)
+    assert max(be.PUBLICATION_ENTRY_COUNTS) == be.PUBLICATION_ENTRIES == 150
+
+    with tempfile.TemporaryDirectory() as tmp:
+        path = be.publication_entries_csv(Path(tmp) / "e.csv", 38)
+        rows = parse_dk_entry_rows(str(path))
+    assert len(rows) == 38
+    patterns = (Path(__file__).resolve().parents[1] / "data" / "reference"
+                / "dk_contest_archetypes.csv").read_text(encoding="utf-8")
+    assert "mini-MAX" in patterns and "mini-MAX" in rows[0].contest_name
+
+    root = Path(__file__).resolve().parents[1]
+    out = subprocess.run(
+        [sys.executable, str(root / "tools" / "benchmark_engine.py"),
+         "--publication", "--entries", "9", "--output", str(root)],
+        capture_output=True, text=True, timeout=180)
+    assert out.returncode != 2, f"argparse rejected --publication: {out.stderr}"
+    assert "FileExistsError" in out.stderr, out.stderr[-400:]
+
+
+def test_benchmark_engine_percentile_is_nearest_rank():
+    import tools.benchmark_engine as be
+
+    samples = [5.0, 1.0, 3.0, 2.0, 4.0]
+    assert be.percentile(samples, 95) == 5.0
+    assert be.percentile(samples, 50) == 3.0
+    assert be.percentile([7.0], 95) == 7.0
+
+
 def test_benchmark_engine_live_replay_config_matches_the_golden_replay():
     """The baseline must time the SAME shape the golden gate pins for correctness.
 

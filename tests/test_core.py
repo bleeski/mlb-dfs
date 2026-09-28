@@ -187,6 +187,18 @@ def diverse_projection_frame() -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+
+def _build_deadline(seconds, reserve_s=0.0, clock=None):
+    """R98(3). A build Deadline for harnesses that drive `run_classic`, which
+    takes the object `main` builds. Reserve 0 by default: these harnesses are
+    not about the reserve, and DeadlineContractTests is."""
+    from mlb_engine.pipeline.deadline import Deadline
+    clock = clock or time.monotonic
+    now = clock()
+    return Deadline(started=now, end=now + float(seconds), reserve_s=float(reserve_s),
+                    bound="max_seconds", bounds_s={"max_seconds": float(seconds)},
+                    reserve_source="test harness", clock=clock)
+
 def _entry_reqs(n, contest_id="900", shape="large_wta"):
     return [{"entry_id": str(i), "contest_id": contest_id, "contest_shape": shape} for i in range(n)]
 
@@ -4051,6 +4063,10 @@ class R293BankOnEveryRungTests(unittest.TestCase):
         ("mlb_engine/pipeline/baseline.py", "build_single_lineup"): (2, 2),
         ("mlb_engine/pipeline/baseline.py", "extend_bank"): (1, 1),
         ("tools/late_swap.py", "extend_bank"): (0, 2),
+        # R98(3), 2026-09-28: `benchmark_engine --publication` builds the bank
+        # it times publication against. A timing input on the golden's loose
+        # configuration, never a delivered bank, so it forwards no control.
+        ("tools/benchmark_engine.py", "extend_bank"): (0, 1),
         ("tools/solver_probe.py", "build_single_lineup"): (0, 1),
         ("tools/solver_probe.py", "build_multi_lineup"): (0, 1),
         ("tools/stack_shape_probe.py", "build_single_lineup"): (0, 2),
@@ -27009,6 +27025,50 @@ class DeadlineGovernorTests(unittest.TestCase):
         by = now + dt.timedelta(minutes=minutes_out)
         return dg.DeadlineGovernor(by, now_fn=lambda: now, **kw)
 
+    # -- R98(3): the window from the reserve ----------------------------- #
+    def test_the_window_never_drops_below_t6_and_grows_with_the_reserve(self):
+        dg = self._dg()
+        self.assertEqual(dg.window_minutes_for(None)[0], dg.WINDOW_MINUTES)
+        self.assertIn("fallback", dg.window_minutes_for(None)[1])
+        floor, source = dg.window_minutes_for(40.46)
+        self.assertEqual(floor, dg.WINDOW_MINUTES)
+        self.assertIn("floor", source)
+        big, source = dg.window_minutes_for(300.0)
+        self.assertEqual(big, dg.GOVERNED_ATTEMPT_RESERVES * 300.0 / 60.0)
+        self.assertGreater(big, dg.WINDOW_MINUTES)
+        self.assertIn("derived", source)
+
+    def test_a_derived_window_governs_a_refusal_the_t6_window_would_not(self):
+        dg = self._dg()
+        governor = self._at(8.0)  # T-8: outside T-6
+        refusal = {"refusal_class": dg.CLASS_BADLY_SHAPED}
+        self.assertFalse(governor.governs(refusal))
+        governor.derive_window(300.0)  # a slow host: 10 minutes to re-solve
+        self.assertTrue(governor.governs(refusal))
+        self.assertEqual(governor.stamp()["window_minutes"], 10.0)
+
+    def test_the_clamp_moves_only_earlier_and_only_before_a_rung(self):
+        import datetime as dt
+        dg = self._dg()
+        governor = self._at(30.0)
+        by = governor.deliver_by_utc
+        self.assertFalse(governor.clamp_to(by + dt.timedelta(minutes=5), "x"))
+        self.assertEqual(governor.deliver_by_utc, by)
+        self.assertTrue(governor.clamp_to(by - dt.timedelta(minutes=20), "lock"))
+        self.assertAlmostEqual(governor.minutes_remaining(), 10.0)
+        self.assertEqual(governor.stamp()["deliver_by_clamped"]["bound"], "lock")
+        late = self._at(2.0)
+        late.take_rung(dg.RUNG_OPEN_CONTROLS)
+        with self.assertRaises(ValueError):
+            late.clamp_to(late.deliver_by_utc - dt.timedelta(minutes=1), "lock")
+
+    def test_the_window_is_set_before_the_ladder_is_walked(self):
+        dg = self._dg()
+        governor = self._at(2.0)
+        governor.take_rung(dg.RUNG_OPEN_CONTROLS)
+        with self.assertRaises(ValueError):
+            governor.derive_window(300.0)
+
     # -- parsing --------------------------------------------------------- #
     def test_hhmm_is_read_as_eastern_on_the_slate_day(self):
         import datetime as dt
@@ -27338,6 +27398,267 @@ class DeadlineGovernorTests(unittest.TestCase):
                 self.assertIn("R153", str(caught.exception))
 
 
+class DeadlineContractTests(unittest.TestCase):
+    """R98(3) + F18, roadmap Session 15. One frozen Deadline per build.
+
+    Acceptance, from the row: an injected slow stage cannot consume the
+    reserve, and no retry resets the deadline. Every clock here is injected;
+    none reads the wall clock for a verdict."""
+
+    class _Clock:
+        def __init__(self, t=1000.0):
+            self.t = float(t)
+
+        def __call__(self):
+            return self.t
+
+        def advance(self, s):
+            self.t += float(s)
+
+    def _resolve(self, clock, **kw):
+        import datetime as dt
+        from mlb_engine.pipeline import deadline as dl
+        now_utc = dt.datetime(2026, 9, 28, 18, 0, tzinfo=dt.timezone.utc)
+        kw.setdefault("max_seconds", 600.0)
+        kw.setdefault("reserve_s", 20.0)
+        return dl.resolve_deadline(started=clock(), now_utc=now_utc, clock=clock, **kw), now_utc
+
+    @staticmethod
+    def _script():
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "build_slate_deadline_contract",
+            REPO / "skills" / "generate-lineups" / "scripts" / "build_slate.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    def test_the_end_is_the_earliest_bound_and_the_stamp_names_it(self):
+        import datetime as dt
+        from mlb_engine.pipeline import deadline as dl
+        clock = self._Clock()
+        now_utc = dt.datetime(2026, 9, 28, 18, 0, tzinfo=dt.timezone.utc)
+        # T-12: the F-1 deadline is 7 minutes (420s) out and binds a 600s budget.
+        d, _ = self._resolve(clock, first_lock_utc=now_utc + dt.timedelta(minutes=12))
+        self.assertEqual(d.bound, dl.BOUND_FIRST_LOCK)
+        self.assertAlmostEqual(d.end - d.started, 420.0, places=3)
+        # A --deliver-by earlier than that binds instead.
+        d, _ = self._resolve(clock, first_lock_utc=now_utc + dt.timedelta(minutes=12),
+                             deliver_by_utc=now_utc + dt.timedelta(minutes=3))
+        self.assertEqual(d.bound, dl.BOUND_DELIVER_BY)
+        self.assertAlmostEqual(d.end - d.started, 180.0, places=3)
+        # Hours out, --max-seconds binds; the stamp carries every bound.
+        d, _ = self._resolve(clock, first_lock_utc=now_utc + dt.timedelta(hours=3))
+        self.assertEqual(d.bound, dl.BOUND_MAX_SECONDS)
+        self.assertEqual(d.stamp()["bound"], dl.BOUND_MAX_SECONDS)
+        self.assertEqual(set(d.stamp()["bounds_s"]),
+                         {dl.BOUND_MAX_SECONDS, dl.BOUND_FIRST_LOCK})
+
+    def test_the_wall_clock_bounds_are_measured_from_the_build_s_start(self):
+        """`started` was read before the pool build; a bound resolved later
+        still counts the time already spent."""
+        import datetime as dt
+        from mlb_engine.pipeline import deadline as dl
+        clock = self._Clock()
+        started = clock()
+        clock.advance(100.0)
+        now_utc = dt.datetime(2026, 9, 28, 18, 0, tzinfo=dt.timezone.utc)
+        d = dl.resolve_deadline(started=started, max_seconds=600.0, reserve_s=0.0,
+                                now_utc=now_utc, clock=clock,
+                                first_lock_utc=now_utc + dt.timedelta(minutes=10))
+        self.assertEqual(d.bound, dl.BOUND_FIRST_LOCK)
+        self.assertAlmostEqual(d.remaining(), 300.0, places=3)
+
+    def test_the_buffer_is_the_one_slate_clock_uses(self):
+        import datetime as dt
+        import inspect
+        from mlb_engine.intake import slate_intake_manager as sim
+        self.assertEqual(inspect.signature(sim.slate_clock)
+                         .parameters["buffer_minutes"].default,
+                         sim.DELIVERY_BUFFER_MINUTES)
+        clock = self._Clock()
+        now_utc = dt.datetime(2026, 9, 28, 18, 0, tzinfo=dt.timezone.utc)
+        d, _ = self._resolve(clock, max_seconds=3600.0,
+                             first_lock_utc=now_utc + dt.timedelta(minutes=30))
+        self.assertAlmostEqual(d.end - d.started,
+                               (30 - sim.DELIVERY_BUFFER_MINUTES) * 60.0, places=3)
+
+    def test_an_injected_slow_stage_cannot_consume_the_reserve(self):
+        clock = self._Clock()
+        d, _ = self._resolve(clock, max_seconds=100.0, reserve_s=20.0)
+        self.assertAlmostEqual(d.slice(label="first"), 80.0)
+        clock.advance(50.0)  # a slow pool build or probe
+        second = d.slice(label="after the slow stage")
+        self.assertAlmostEqual(second, 30.0)
+        self.assertLessEqual(clock() + second, d.not_after() + 1e-9)
+        clock.advance(45.0)  # it overran again, into the reserve
+        self.assertEqual(d.slice(label="inside the reserve"), 0.0)
+        self.assertEqual(d.slice(10.0, label="asked for ten"), 0.0)
+        slices = d.stamp()["slices"]
+        self.assertEqual([r["granted_s"] for r in slices], [80.0, 30.0, 0.0, 0.0])
+        self.assertTrue(slices[-1]["starved"])
+        # Nothing was requested: no ask to fall short of, so not False either.
+        self.assertIsNone(slices[0]["starved"])
+
+    def test_no_retry_resets_the_deadline(self):
+        import dataclasses
+        clock = self._Clock()
+        d, _ = self._resolve(clock, max_seconds=100.0, reserve_s=10.0)
+        end = d.end
+        for field in ("end", "reserve_s", "started"):
+            with self.assertRaises(dataclasses.FrozenInstanceError):
+                setattr(d, field, 1e9)
+        clock.advance(60.0)
+        d.slice(label="a retry")
+        self.assertEqual(d.end, end)
+        self.assertAlmostEqual(d.spendable(), 30.0)
+
+    def test_a_past_end_slices_zero_and_the_bank_floor_still_says_so(self):
+        """Not a refusal: the governor delivers past the deadline, and
+        R98(1)'s floor stays audible rather than silently removed."""
+        import contextlib
+        import io
+        clock = self._Clock()
+        d, _ = self._resolve(clock, max_seconds=30.0, reserve_s=10.0)
+        clock.advance(45.0)
+        self.assertLess(d.remaining(), 0)
+        self.assertTrue(d.stamp()["past_end"])
+        mod = self._script()
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            budget, floored = mod.resolve_bank_budget(
+                d.slice(label="sliced bank"), label="sliced bank")
+        self.assertTrue(floored)
+        self.assertEqual(budget, mod.BANK_BUDGET_FLOOR_S)
+        self.assertIn("BANK BUDGET FLOORED", err.getvalue())
+
+    def test_the_reserve_is_measured_per_host_and_scales_with_entries(self):
+        from mlb_engine import repo_env as re_
+        table, source = re_.publication_reserve_table(host=re_.HOST_CLAUDE_CODE)
+        self.assertEqual(sorted(table), [9, 38, 150])
+        self.assertTrue(all(v > 0 for v in table.values()), table)
+        self.assertIn("benchmark_engine.py --publication", source)
+        small, _ = re_.publication_reserve_s(9, host=re_.HOST_CLAUDE_CODE)
+        mid, mid_src = re_.publication_reserve_s(10, host=re_.HOST_CLAUDE_CODE)
+        big, _ = re_.publication_reserve_s(None, host=re_.HOST_CLAUDE_CODE)
+        self.assertEqual(small, table[9])
+        self.assertEqual(mid, table[38])
+        self.assertIn("38-entry", mid_src)
+        self.assertEqual(big, table[150])
+        self.assertEqual(re_.publication_reserve_s(400, host=re_.HOST_CLAUDE_CODE)[0],
+                         table[150])
+        # An unmeasured host borrows the figure and SAYS so, never scaled.
+        cow, cow_src = re_.publication_reserve_s(9, host=re_.HOST_COWORK)
+        self.assertEqual(cow, table[9])
+        self.assertIn("unmeasured on cowork", cow_src)
+        profile = re_.host_profile(host=re_.HOST_CLAUDE_CODE, env={})
+        self.assertEqual(profile["publication_reserve_s_by_entries"], table)
+
+    def test_the_benchmark_that_measures_it_is_not_imported_by_the_deadline(self):
+        """Never a runtime call: the deadline, repo_env and the script do not
+        import the benchmark (which imports mlb_engine.production)."""
+        import subprocess
+        import sys as _sys
+        code = ("import sys; sys.path.insert(0, %r)\n"
+                "import mlb_engine.pipeline.deadline, mlb_engine.repo_env\n"
+                "print(sorted(m for m in sys.modules if 'benchmark' in m "
+                "or m.startswith('mlb_engine.production')))" % str(REPO))
+        out = subprocess.run([_sys.executable, "-c", code], capture_output=True,
+                             text=True, check=True)
+        self.assertEqual(out.stdout.strip(), "[]")
+
+    def test_the_bank_s_per_job_limit_inherits_its_slice(self):
+        """BC's per-job limit clamps to what is left of the call's budget, so
+        a bank handed a Deadline slice never runs past `end - reserve` by more
+        than one solve's floor, however slow each solve is."""
+        import pandas as pd
+        import mlb_engine.optimize.bank_cache as bc
+        clock = self._Clock()
+        d, _ = self._resolve(clock, max_seconds=100.0, reserve_s=20.0)
+        clock.advance(55.0)  # the prefix ran long
+        budget = d.slice(label="sliced bank")
+        limits = []
+
+        def slow_solve(frame, **kw):
+            limits.append(kw["time_limit_s"])
+            clock.advance(min(7.0, kw["time_limit_s"]))
+            return None, None
+
+        frame = pd.DataFrame({
+            "Player_ID": [f"p{i}" for i in range(8)],
+            "Position": ["P", "P", "P", "P", "OF", "OF", "OF", "OF"],
+            "Team": ["A", "B", "C", "D", "A", "B", "C", "D"],
+            "Game_ID": ["g1", "g1", "g2", "g2", "g1", "g1", "g2", "g2"],
+            "Salary": [9000] * 8, "Base": [10.0] * 8,
+        })
+        with tempfile.TemporaryDirectory() as tmp, \
+                unittest.mock.patch.object(bc, "build_single_lineup", slow_solve), \
+                unittest.mock.patch.object(bc.time, "monotonic", clock):
+            bc.extend_bank(bc.BankCache(Path(tmp) / "b.json"), frame,
+                           time_budget_s=budget)
+        self.assertTrue(limits, "no job ran")
+        for limit in limits:
+            self.assertLessEqual(limit, budget + 1e-9)
+        self.assertLessEqual(clock(), d.not_after() + max(limits) + 1e-9)
+
+    def test_the_interaction_probe_cannot_spend_the_reserve(self):
+        mod = self._script()
+        _budget, not_after = mod.interaction_probe_limits(1000.0, 0.0)
+        self.assertEqual(not_after, 1000.0 - mod.INTERACTION_PROBE_MARGIN_S)
+        _budget, not_after = mod.interaction_probe_limits(
+            1000.0, 0.0, reserve_not_after=900.0)
+        self.assertEqual(not_after, 900.0)
+        self.assertEqual(mod.interaction_probe_limits(
+            1000.0, 0.0, reserve_not_after=0.5), (None, None))
+
+    def test_the_cap_vocabulary_matches_the_rung(self):
+        from mlb_engine.pipeline import deadline_governor as dg
+        mod = self._script()
+        self.assertEqual(set(mod.PORTFOLIO_CAP_KEYS),
+                         set(dg.OPEN_CONTROL_VALUES) - {"classic_sleeves"})
+
+    def test_caps_vs_bank_names_a_starved_cap_on_both_doors(self):
+        mod = self._script()
+        typed = {"max_player_exposure_pct": 0.8, "max_candidate_reuse": 3}
+        starved = mod.caps_vs_bank_block(
+            typed, [], "sliced_bank",
+            {"bank_stop_reason": "time_budget", "job_list_exhausted": False},
+            [], {})
+        self.assertEqual(starved["verdict"], "starved")
+        self.assertEqual(starved["caps_set_by_operator"],
+                         {"max_player_exposure_pct": 0.8})
+        capped = mod.caps_vs_bank_block(
+            typed, [], "sliced_bank",
+            {"bank_stop_reason": "candidate_cap", "job_list_exhausted": False},
+            [], {})
+        self.assertEqual(capped["verdict"], "deliberate")
+        floored = mod.caps_vs_bank_block(
+            typed, [], "sliced_bank",
+            {"bank_stop_reason": None, "job_list_exhausted": True,
+             "budget_floored": True}, [], {})
+        self.assertEqual(floored["verdict"], "starved")
+        # The direct door: solve.bank is None, the auto-bank says why it stopped.
+        direct = {"bank_diagnostics": {"diversity_augmentation": {"budget_exhausted": True}}}
+        self.assertEqual(mod.caps_vs_bank_block(typed, [], "direct", None, [],
+                                                direct)["verdict"], "starved")
+        direct_ok = {"bank_diagnostics": {"diversity_augmentation": {"budget_exhausted": False}}}
+        self.assertEqual(mod.caps_vs_bank_block(typed, [], "direct", None, [],
+                                                direct_ok)["verdict"], "deliberate")
+        # A rung's move counts as a set cap; nothing set reads so.
+        moves = [{"control": "max_team_exposure_pct", "before": 0.3, "after": 1.0}]
+        self.assertEqual(mod.caps_vs_bank_block(None, moves, "direct", None, [],
+                                                direct)["verdict"], "starved")
+        self.assertEqual(mod.caps_vs_bank_block(None, [], "direct", None, [],
+                                                direct)["verdict"], "no_cap_set")
+        # No evidence of why the bank stopped is `unknown`, never deliberate.
+        self.assertEqual(mod.caps_vs_bank_block(typed, [], "direct", None, [],
+                                                {})["verdict"], "unknown")
+        self.assertEqual(mod.caps_vs_bank_block(
+            typed, [], "sliced_bank",
+            {"bank_stop_reason": None, "job_list_exhausted": False}, [],
+            {})["verdict"], "unknown")
+
+
 class DeadlineGovernorWiringTests(unittest.TestCase):
     """R290(c) step 2's acceptance criterion, executed.
 
@@ -27433,8 +27754,12 @@ class DeadlineGovernorWiringTests(unittest.TestCase):
                          "which is the dict the export validator grades against")
 
     def _run(self, minutes_out, second_result=None, refusal=None,
-             args_overrides=None, capture=None):
+             args_overrides=None, capture=None, deadline=None, on_call=None):
         """Drive run_classic. Returns (code, brief, controls per run_slate call).
+
+        R98(3). ``deadline`` is the build Deadline to pass (a 60s one by
+        default), and ``on_call(kwargs)`` runs inside each faked solve, so a
+        test can advance an injected clock the way a slow solve would.
 
         R459. ``capture`` (a dict) receives the module and the stderr buffer
         before the call, so a test whose re-solve RAISES can read both, and
@@ -27470,6 +27795,8 @@ class DeadlineGovernorWiringTests(unittest.TestCase):
             calls.append(dict(kw.get("portfolio_controls_override") or {}))
             self.labels.append(kw.get("certification_label"))
             self.solve_kwargs.append(dict(kw))
+            if on_call is not None:
+                on_call(kw)
             if len(calls) == 1:
                 return dict(refusal or self._REFUSAL)
             return dict(second_result or (refusal or self._REFUSAL))
@@ -27501,10 +27828,103 @@ class DeadlineGovernorWiringTests(unittest.TestCase):
             with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
                 code, brief = mod.run_classic(
                     args, slate_dir, self._SALARY, self._entries_csv(),
-                    {"games": []}, _time.monotonic() + 60)
+                    {"games": []}, deadline or _build_deadline(60))
         finally:
             epi.run_slate = original
         return code, brief, calls, err.getvalue()
+
+    def test_a_re_solve_takes_what_is_left_of_the_one_deadline(self):
+        """R98(3)'s acceptance, through run_classic: each faked solve spends 30s
+        of an injected clock and builds no bank, so the governed re-solve builds
+        one, and its budget is what the first solve LEFT of the build's
+        Deadline, never a fresh window. The brief carries the Deadline's stamp
+        and R98(4)-tail's caps block."""
+        delivered = self._delivered_csv()
+        second = {"passed": True, "run_id": "r2", "workflow_valid": True,
+                  "selection_certified": True, "allocation_certified": True,
+                  "delivered_path": str(delivered)}
+
+        class _Clock:
+            t = 5000.0
+
+            def __call__(self):
+                return self.t
+        clock = _Clock()
+        deadline = _build_deadline(120.0, reserve_s=10.0, clock=clock)
+
+        def spend(_kw):
+            clock.t += 30.0
+        code, brief, calls, err = self._run(2, second_result=second,
+                                            deadline=deadline, on_call=spend)
+        self.assertEqual(code, 0, err[-600:])
+        rows = brief["solve"]["solves"]
+        self.assertEqual(len(rows), 2, rows)
+        # The 2-entry fixture measures a direct bank that fits; both solves
+        # build, because the faked run_slate hands no bank back.
+        self.assertEqual(brief["solve"]["strategy"], "direct")
+        self.assertEqual([r["bank"] for r in rows], ["not_built", "not_built"])
+        first, again = rows[0]["bank_budget_s"], rows[1]["bank_budget_s"]
+        self.assertAlmostEqual(first, 110.0, delta=0.1)
+        self.assertAlmostEqual(again, 80.0, delta=0.1,
+                               msg="the re-solve's bank did not take what was left")
+        self.assertAlmostEqual(self.solve_kwargs[1]["bank_time_budget_s"], again,
+                               delta=0.1)
+        self.assertEqual(rows[1]["left_at_start_s"], 90.0)
+        stamp = brief["build_deadline"]
+        self.assertEqual(stamp["reserve_s"], 10.0)
+        stages = [r["stage"] for r in stamp["stages"]]
+        for stage in ("pool_built", "probe_solved", "solve 1 start", "solve 1 end",
+                      "solve 2 end", "brief"):
+            self.assertIn(stage, stages)
+        self.assertEqual(brief["caps_vs_bank"]["caps_opened_by_deadline"][0]["by"],
+                         "open_controls")
+        # The faked solves hand no bank back, so nothing recorded why a bank
+        # stopped: a rung opened caps, and the brief cannot call that deliberate.
+        self.assertEqual(brief["caps_vs_bank"]["verdict"], "unknown")
+
+    def test_the_sliced_bank_takes_its_budget_from_the_one_deadline(self):
+        """R98(3) on the sliced door (R415: naming a cap selects it), with the
+        real extend_bank: its budget is the Deadline's slice, `end - reserve`
+        less what the prefix spent, not the window less a literal."""
+        delivered = self._delivered_csv()
+        second = {"passed": True, "run_id": "r2", "workflow_valid": True,
+                  "selection_certified": True, "allocation_certified": True,
+                  "delivered_path": str(delivered)}
+
+        class _Clock:
+            t = 7000.0
+
+            def __call__(self):
+                return self.t
+        clock = _Clock()
+        deadline = _build_deadline(120.0, reserve_s=10.0, clock=clock)
+        clock.t += 40.0  # the pool build and the probe ran long
+        code, brief, _calls, err = self._run(
+            2, second_result=second, deadline=deadline,
+            args_overrides={"bank_max_candidates": 12})
+        self.assertEqual(code, 0, err[-600:])
+        self.assertEqual(brief["solve"]["strategy"], "sliced_bank")
+        slices = {r["label"]: r for r in brief["build_deadline"]["slices"]}
+        self.assertIn("sliced bank", slices)
+        self.assertAlmostEqual(slices["sliced bank"]["granted_s"], 70.0, delta=0.1)
+        self.assertIn("sliced_bank_built",
+                      [r["stage"] for r in brief["build_deadline"]["stages"]])
+
+    def test_below_the_bank_floor_the_direct_door_delivers_rather_than_exit_10(self):
+        """R98(3), found by the diff review. Past the deadline every bank is
+        floored and a re-run has less still, so the sliced door's exit 10
+        asks for a re-run the clock cannot afford. The direct door delivers
+        (here through the governor's re-solve) instead."""
+        delivered = self._delivered_csv()
+        second = {"passed": True, "run_id": "r2", "workflow_valid": True,
+                  "selection_certified": True, "allocation_certified": True,
+                  "delivered_path": str(delivered)}
+        code, brief, calls, err = self._run(
+            2, second_result=second, deadline=_build_deadline(3.0))
+        self.assertEqual(code, 0, err[-600:])
+        self.assertEqual(brief["solve"]["strategy"], "direct")
+        self.assertIn("below the", brief["solve"]["strategy_reason"])
+        self.assertEqual(len(calls), 2)
 
     def test_a_deadline_turns_a_badly_shaped_refusal_into_a_delivery(self):
         """R290(c)'s done-when, run: an over-constrained slate with a deliver-by
@@ -27785,7 +28205,9 @@ class DirectDoorResolveBankTests(unittest.TestCase):
         original = epi.run_slate
         epi.run_slate = fake_run_slate
         out, err = io.StringIO(), io.StringIO()
-        self.deadline = _time.monotonic() + max_seconds
+        # R98(3): a real reserve, so "inside the window" means inside
+        # `end - reserve`, which is what the old `- 6.0` literal stood for.
+        self.deadline = _build_deadline(max_seconds, reserve_s=6.0)
         try:
             with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
                 code, brief = mod.run_classic(
@@ -27809,7 +28231,8 @@ class DirectDoorResolveBankTests(unittest.TestCase):
         self.assertEqual(brief["solve_strategy"], "direct")
         first, second = self.kw
         self.assertIsNotNone(first["bank_time_budget_s"])
-        self.assertLessEqual(first["bank_time_budget_s"], 60.0 - 6.0)
+        self.assertLessEqual(first["bank_time_budget_s"],
+                             60.0 - self.deadline.reserve_s)
         self.assertIsNone(first["reuse_auto_bank"])
         self.assertIsNone(second["bank_time_budget_s"],
                           "the re-solve was handed a second bank budget")
@@ -27825,7 +28248,7 @@ class DirectDoorResolveBankTests(unittest.TestCase):
         handed = [kw["bank_time_budget_s"] for kw in self.kw
                   if kw["bank_time_budget_s"] is not None]
         self.assertEqual(len(handed), 1, handed)
-        self.assertLessEqual(sum(handed), 40.0 - 6.0)
+        self.assertLessEqual(sum(handed), 40.0 - self.deadline.reserve_s)
 
     def test_the_governed_re_solve_solves_on_the_first_bank(self):
         """R386's delivery-first path gets the bank solve 1 built, not a 5s floor."""
@@ -28373,7 +28796,7 @@ class LastUsableArtifactTests(unittest.TestCase):
 
         def main():
             code, _brief = mod.run_classic(args, slate_dir, self._SALARY, entries,
-                                           {"games": []}, _time.monotonic() + 60)
+                                           {"games": []}, _build_deadline(60))
             return code
 
         def raising(*_a, **_k):
@@ -28946,7 +29369,9 @@ class DeadlineGovernorCliTests(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name)
 
-    def _main(self, extra_argv):
+    def _main(self, extra_argv, replay=True, first_lock=None):
+        """``first_lock`` (an aware datetime) stands in for the salary file's
+        own, so a live build's F-1 bound can be driven off a past fixture."""
         import contextlib
         import importlib.util
         import io
@@ -28956,14 +29381,23 @@ class DeadlineGovernorCliTests(unittest.TestCase):
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
         seen = {}
+        if first_lock is not None:
+            real_signature = mod.slate_signature
+
+            def signature(path):
+                return {**real_signature(path), "first_lock": first_lock.isoformat()}
+            mod.slate_signature = signature
 
         def fake(args, *_rest):
             seen["governor"] = getattr(args, "_governor", None)
             seen["never_relax"] = getattr(args, "_never_relax", None)
+            seen["args_deadline"] = getattr(args, "_deadline", None)
+            seen["rest"] = _rest
             return 3, {}
 
         argv = ["build_slate.py", "--salary", str(self._SALARY),
-                "--entries", str(self._SALARY), "--past-slate-replay", *extra_argv]
+                "--entries", str(self._SALARY),
+                *(["--past-slate-replay"] if replay else []), *extra_argv]
         out, err = io.StringIO(), io.StringIO()
         with unittest.mock.patch.object(mod, "REPO", self.root), \
                 unittest.mock.patch.object(mod, "run_classic", fake), \
@@ -29003,6 +29437,74 @@ class DeadlineGovernorCliTests(unittest.TestCase):
         self.assertEqual(code, 3)
         self.assertEqual(seen["governor"].deliver_by_utc,
                          dt.datetime(2026, 7, 29, 23, 5, tzinfo=dt.timezone.utc))
+
+    def test_main_builds_one_deadline_and_hands_the_same_object_on(self):
+        """R98(3). Every build, flag or not, gets ONE Deadline with the
+        measured reserve, and run_classic and the Showdown baseline read that
+        object, not a float each re-derives."""
+        from mlb_engine import repo_env
+        from mlb_engine.pipeline import deadline as dl
+        code, _payload, seen = self._main(["--max-seconds", "90"])
+        self.assertEqual(code, 3)
+        deadline = seen["args_deadline"]
+        self.assertIsInstance(deadline, dl.Deadline)
+        self.assertIs(seen["rest"][-1], deadline)
+        # A replay has no lock to respect, so --max-seconds binds.
+        self.assertEqual(deadline.bound, dl.BOUND_MAX_SECONDS)
+        self.assertAlmostEqual(deadline.end - deadline.started, 90.0, places=3)
+        reserve, source = repo_env.publication_reserve_s(None)
+        self.assertEqual(deadline.reserve_s, reserve)
+        self.assertIn("benchmark_engine.py --publication", deadline.reserve_source)
+
+    def test_a_live_build_twelve_minutes_from_lock_ends_at_the_f1_deadline(self):
+        """The rider's measured gap: at T-12 the build planned its whole
+        --max-seconds. Now the first lock less F-1's five minutes binds."""
+        import datetime as dt
+        from mlb_engine.pipeline import deadline as dl
+        lock = dt.datetime.now(dt.timezone.utc) + dt.timedelta(minutes=12)
+        code, _payload, seen = self._main(["--max-seconds", "600"], replay=False,
+                                          first_lock=lock)
+        self.assertEqual(code, 3)
+        deadline = seen["args_deadline"]
+        self.assertEqual(deadline.bound, dl.BOUND_FIRST_LOCK)
+        self.assertAlmostEqual(deadline.remaining(), 420.0, delta=5.0)
+
+    def test_a_lock_before_the_deliver_by_moves_the_governor_with_it(self):
+        """The review's finding 5: with --deliver-by later than the F-1
+        deadline, the build's clock ends first, so the governor's window
+        anchors there too, and the stamp keeps the operator's value."""
+        import datetime as dt
+        now = dt.datetime.now(dt.timezone.utc)
+        lock = now + dt.timedelta(minutes=12)
+        later = (now + dt.timedelta(minutes=45)).isoformat()
+        code, _payload, seen = self._main(["--deliver-by", later], replay=False,
+                                          first_lock=lock)
+        self.assertEqual(code, 3)
+        governor = seen["governor"]
+        self.assertAlmostEqual(governor.minutes_remaining(), 7.0, delta=0.2)
+        clamp = governor.stamp()["deliver_by_clamped"]
+        self.assertEqual(clamp["bound"], "first_lock_minus_buffer")
+
+    def test_a_short_max_seconds_never_moves_the_governor(self):
+        """A --max-seconds that ends first is a budget, not a fact: anchoring
+        the window to it would open every control on a short autobuild child
+        hours before lock."""
+        import datetime as dt
+        far = (dt.datetime.now(dt.timezone.utc) + dt.timedelta(hours=3)).isoformat()
+        code, _payload, seen = self._main(["--deliver-by", far, "--max-seconds", "60"])
+        self.assertEqual(code, 3)
+        self.assertIsNone(seen["governor"].stamp()["deliver_by_clamped"])
+        self.assertGreater(seen["governor"].minutes_remaining(), 170)
+
+    def test_the_governor_s_window_is_derived_from_the_deadline_s_reserve(self):
+        from mlb_engine.pipeline import deadline_governor as dg
+        code, _payload, seen = self._main(["--deliver-by", "23:40"])
+        self.assertEqual(code, 3)
+        governor, deadline = seen["governor"], seen["args_deadline"]
+        expected, source = dg.window_minutes_for(deadline.reserve_s)
+        self.assertEqual(governor.window_minutes, expected)
+        self.assertEqual(governor.window_source, source)
+        self.assertEqual(governor.stamp()["window_source"], source)
 
     def test_no_deliver_by_means_no_governor_at_all(self):
         """A build without the flag must be byte-identical to before, and the
@@ -34805,7 +35307,7 @@ class BaselineCoreTests(unittest.TestCase):
                     contextlib.redirect_stdout(io.StringIO()):
                 with self.assertRaises(Stop):
                     mod.run_classic(args, slate_dir, self._SALARY, self._ENTRIES,
-                                    {"games": []}, time.monotonic() + 120.0)
+                                    {"games": []}, _build_deadline(120.0))
         return seen, helper
 
     def test_run_classic_builds_its_degraded_frame_through_the_helper(self):
@@ -35516,7 +36018,7 @@ class ClassicBaselineFirstTests(unittest.TestCase):
         def main():
             code, brief = mod.run_classic(
                 args, root / "slate", cls._SALARY, cls._ENTRIES, {"games": []},
-                time.monotonic() + float(args.max_seconds))
+                _build_deadline(float(args.max_seconds)))
             stash["brief"] = brief
             return code
 

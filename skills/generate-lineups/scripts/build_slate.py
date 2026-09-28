@@ -155,8 +155,10 @@ UNRESOLVED_MAX_SECONDS_S = 100.0
 
 def default_max_seconds() -> float:
     """This invocation's default wall clock: the host's call budget, less the
-    reserve the post-search tail needs. Floored so a host declaring a tiny
-    ceiling still gets a budget the bank floor can work inside.
+    headroom the call needs outside the build's own clock (process start, the
+    engine import, the exit). Floored so a host declaring a tiny ceiling still
+    gets a budget the bank floor can work inside. The post-search tail itself
+    is the build Deadline's MEASURED reserve inside this window (R98(3)).
 
     The engine import is INSIDE this function, and that placement is pinned by
     ``test_the_script_still_loads_without_the_engine_on_the_path``. This script
@@ -1063,7 +1065,8 @@ INTERACTION_PROBE_T_MINUS_MINUTES = 15.0
 
 
 def interaction_probe_limits(deadline, now, governor=None, minutes_to_deadline=None,
-                             replay=False, confidence_may_relax=False):
+                             replay=False, confidence_may_relax=False,
+                             reserve_not_after=None):
     """R207. ``(budget_s, not_after)`` for the allocator's interaction probe, or
     ``(None, None)`` when it should not run. ``deadline`` and ``now`` are
     ``time.monotonic()`` readings; ``not_after`` is absolute, so a budget sized
@@ -1075,6 +1078,8 @@ def interaction_probe_limits(deadline, now, governor=None, minutes_to_deadline=N
       * while R407's tightening is still applied and relaxable, because a
         refusal then re-solves at once with it relaxed, and that re-solve is
         the one worth probing.
+    ``reserve_not_after`` is the build Deadline's ``end - reserve`` (R98(3)),
+    so the probe cannot spend the measured publication reserve either.
     """
     if confidence_may_relax:
         return None, None
@@ -1082,6 +1087,8 @@ def interaction_probe_limits(deadline, now, governor=None, minutes_to_deadline=N
             and minutes_to_deadline < INTERACTION_PROBE_T_MINUS_MINUTES):
         return None, None
     not_after = deadline - INTERACTION_PROBE_MARGIN_S
+    if reserve_not_after is not None:
+        not_after = min(not_after, float(reserve_not_after))
     if governor is not None:
         if governor.in_window():
             return None, None
@@ -1527,6 +1534,81 @@ def resolve_bank_budget(computed_s: float, *, label: str,
             file=sys.stderr,
         )
     return budget, floored
+
+
+#: R98(4)-tail. The portfolio caps a relaxation can move, which are the keys
+#: the deadline governor's rung opens (`deadline_governor.OPEN_CONTROL_VALUES`,
+#: less the sleeve mask, which is not a cap). Kept here by name because this
+#: script loads without the engine; `test_the_cap_vocabulary_matches_the_rung`
+#: holds the two equal.
+PORTFOLIO_CAP_KEYS = frozenset({
+    "max_shared_players", "max_sp_pair_repetition", "max_player_exposure_pct",
+    "max_pitcher_exposure_pct", "max_primary_stack_exposure_pct",
+    "max_team_exposure_pct", "max_game_exposure_pct",
+    "max_consensus_cluster_share_pct",
+})
+
+
+def caps_vs_bank_block(controls_override: Optional[Mapping[str, Any]],
+                       governor_moves: Optional[list], strategy: str,
+                       bank_report: Optional[Mapping[str, Any]],
+                       solves: Optional[list],
+                       auto_bank: Optional[Mapping[str, Any]]) -> dict:
+    """R98(4)-tail. Whether a cap set on this build sat on a bank the clock
+    stopped (``starved``) or on one that stopped on its own terms
+    (``deliberate``), on both doors.
+
+    What stopped the bank: on the sliced door `bank_stop_reason` and
+    `job_list_exhausted` (R415); on the direct door, where `solve.bank` is None,
+    the auto-bank's `diversity_augmentation.budget_exhausted`. A floored budget
+    is starved on either door. "Set" is the honest word: an operator's value
+    or a rung's move, compared with no default here.
+    """
+    typed = {k: v for k, v in (controls_override or {}).items()
+             if k in PORTFOLIO_CAP_KEYS}
+    opened = [dict(m) for m in (governor_moves or [])
+              if m.get("control") in PORTFOLIO_CAP_KEYS]
+    floored = any(r.get("bank_budget_floored") for r in (solves or []))
+    if strategy == "sliced_bank":
+        report = bank_report or {}
+        floored = floored or bool(report.get("budget_floored"))
+        stopped_by = report.get("bank_stop_reason") or (
+            "job_list_exhausted" if report.get("job_list_exhausted") else None)
+        exhausted = report.get("job_list_exhausted")
+        starved = floored or stopped_by == "time_budget"
+    else:
+        aug = (((auto_bank or {}).get("bank_diagnostics") or {})
+               .get("diversity_augmentation") or {})
+        budget_hit = aug.get("budget_exhausted")
+        stopped_by = (None if budget_hit is None
+                      else "time_budget" if budget_hit else "completed")
+        exhausted = None
+        starved = floored or bool(budget_hit)
+    moved = bool(typed or opened)
+    # Starved needs evidence and so does deliberate: a bank whose stop reason
+    # nothing recorded is `unknown`, never read as having stopped on its terms.
+    verdict = ("no_cap_set" if not moved
+               else "starved" if starved
+               else "unknown" if stopped_by is None else "deliberate")
+    return {
+        "caps_set_by_operator": typed,
+        "caps_opened_by_deadline": opened,
+        "door": strategy,
+        "bank_stopped_by": stopped_by,
+        "job_list_exhausted": exhausted,
+        "bank_budget_floored": floored,
+        "bank_starved": starved,
+        "verdict": verdict,
+        "note": ("starved: a cap was set against a bank the clock stopped, so the "
+                 "concentration may be the search's and not the cap's; grow the "
+                 "bank first (CLAUDE.md, Autonomy)" if verdict == "starved"
+                 else "deliberate: the cap sat on a bank that stopped on its own "
+                      "terms (its job list, or its candidate cap)"
+                 if verdict == "deliberate"
+                 else "unknown: a cap was set and nothing recorded why the bank "
+                      "stopped, so this brief cannot say it was not starved"
+                 if verdict == "unknown" else "no portfolio cap was set"),
+    }
 
 
 def format_solve_row(row: Mapping[str, Any]) -> str:
@@ -3178,7 +3260,9 @@ def anti_correlation_brief_block(requested, bank_report, result) -> dict:
 # Classic
 # --------------------------------------------------------------------------- #
 def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
-                feed: dict, deadline: float) -> tuple[int, dict]:
+                feed: dict, deadline) -> tuple[int, dict]:
+    """``deadline`` is the build's one ``mlb_engine.pipeline.deadline.Deadline``
+    (R98(3)); every budget in here is a slice of it."""
     from mlb_engine.intake.live_data_adapters import build_slate_pool
     from mlb_engine.optimize.bank_cache import BankCache, extend_bank, pool_signature
     from mlb_engine.optimize.classic_sleeves import (  # R406
@@ -3349,7 +3433,8 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
     # so a crash anywhere below still delivers it (exit 7). It never stops the
     # build: short, refused or errored, it is a named record and enhancement
     # runs exactly as before.
-    publish_baseline(args, salary, entries, pool, n_entries, deadline,
+    deadline.mark("pool_built")
+    publish_baseline(args, salary, entries, pool, n_entries, deadline.end,
                      attempt_controls, never_relax)
 
     reference = resolve_reference_data(args)
@@ -3487,7 +3572,10 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
     )
     build_single_lineup(projections, target="ceiling")
     single_s = time.monotonic() - t0
-    remaining = deadline - time.monotonic()
+    # R98(3). What a search may still spend: the deadline less its measured
+    # publication reserve, not the whole window less a literal.
+    deadline.mark("probe_solved")
+    remaining = deadline.spendable()
 
     # Model the real cost, which is base bank plus SP-pair augmentation. A naive
     # per-lineup estimate ignores the augmentation and understates the total by
@@ -3514,7 +3602,17 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
     # one selects that door; the brief says which reason chose it.
     strategy_reason = "measured: the direct bank fits the window"
     _bank_cap = None
-    if projected_direct > remaining or getattr(args, "bank_max_candidates", None):
+    # R98(3). Once the deadline has less to spend than the bank floor, every
+    # bank is floored and a re-run has less still, so the sliced door's exit 10
+    # ("re-run to grow the bank") is a request the clock cannot afford. The
+    # direct door delivers or refuses, and the governor can act on a refusal.
+    _below_floor = (remaining < BANK_BUDGET_FLOOR_S
+                    and not getattr(args, "bank_max_candidates", None))
+    if _below_floor:
+        strategy_reason = (f"the deadline's spendable window ({remaining:.1f}s) is "
+                           f"below the {BANK_BUDGET_FLOOR_S:g}s bank floor, so a "
+                           f"resumable bank has nothing to resume into")
+    elif projected_direct > remaining or getattr(args, "bank_max_candidates", None):
         strategy = "sliced_bank"
         strategy_reason = ("measured: the direct bank does not fit the window"
                            if projected_direct > remaining
@@ -3524,7 +3622,7 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         # in the bank report is THIS value, so the brief's `solve.bank` recorded
         # 5.0 with no way to tell it apart from a chosen budget.
         slice_budget, bank_budget_floored = resolve_bank_budget(
-            remaining - 8.0, label="sliced bank")
+            deadline.slice(label="sliced bank"), label="sliced bank")
         # F15 + R340, resolved ONCE and before the bank rather than twice and
         # after it. F15 needs the contest shapes the reserved CSV actually
         # contains, so a cash entry is not ranked on a ceiling-max score; R340
@@ -3711,6 +3809,7 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
                 stack_min=int(_sizes[-1]))
         bank_report["classic_sleeves_request"] = sleeve_request
         bank_report["classic_sleeves_jobs"] = sleeve_jobs
+        deadline.mark("sliced_bank_built")
         candidates = tag_sleeves(cache.as_candidates(
             projections, requested_n=n_entries, contest_shapes=slice_shapes),
             environment_teams_of(sleeve_request))
@@ -3905,7 +4004,8 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
 
     def _probe_limits():
         return interaction_probe_limits(
-            deadline, time.monotonic(), governor=getattr(args, "_governor", None),
+            deadline.end, deadline.now(), governor=getattr(args, "_governor", None),
+            reserve_not_after=deadline.not_after(),
             minutes_to_deadline=clock.get("minutes_to_deadline"),
             replay=bool(getattr(args, "past_slate_replay", False)),
             confidence_may_relax=_tier_tightens and confidence_relax is None)
@@ -3924,13 +4024,16 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         # R388(e): the governed re-solve passes the deadline label, so the
         # manifest row records what the brief says rather than `certified`.
         probe_budget, probe_not_after = _probe_limits()
+        deadline.mark(f"solve {len(solves) + 1} start")
         started_at = time.monotonic()
         # R416. Only a direct-door solve with no bank in hand builds one, and
         # its budget is what is left of the window NOW.
         reuse = auto_bank if (strategy == "direct" and auto_bank.get("candidates")) else None
         builds = strategy == "direct" and reuse is None
+        # R98(3). A slice of the one deadline, so a solve that builds after
+        # another spent the clock gets what is left, never a fresh window.
         budget, floored = (resolve_bank_budget(
-            deadline - started_at - 6.0,
+            deadline.slice(label=f"run_slate auto-bank, solve {len(solves) + 1}"),
             label=f"run_slate auto-bank, solve {len(solves) + 1}", door="direct")
             if builds else (None, False))
         bank_out: dict | None = {} if builds else None
@@ -3939,7 +4042,7 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
                         else "sliced_bank"),
                "bank_budget_s": round(budget, 1) if budget is not None else None,
                "bank_budget_floored": floored,
-               "left_at_start_s": round(deadline - started_at, 1)}
+               "left_at_start_s": round(deadline.remaining(), 1)}
         outcome = "raised"
         try:
             # R297(c). A crash with nothing usable leaves here as a crash, so no
@@ -4012,10 +4115,11 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
                                if _held else (len(candidates) if candidates is not None
                                               else None)),
                 "wall_s": round(ended_at - started_at, 1),
-                "left_at_end_s": round(deadline - ended_at, 1),
+                "left_at_end_s": round(deadline.remaining(), 1),
                 "outcome": outcome,
             })
             solves.append(row)
+            deadline.mark(f"solve {row['call']} end")
             print(f"SOLVE {format_solve_row(row)}", file=sys.stderr, flush=True)
 
     result = _solve(attempt_controls)
@@ -4472,6 +4576,15 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         "exposure": exposure,
         "verification": checks,
         "controls_override_applied": args.controls_override,
+        # R98(4)-tail. Beside the override, on both doors: whether a cap set on
+        # this build sat on a bank the clock starved or one that stopped on its
+        # own terms, so a certified build that relaxed a cap against an
+        # unexhausted job list says so.
+        "caps_vs_bank": caps_vs_bank_block(
+            args.controls_override,
+            [m for rung in (governor.walked if governor is not None else [])
+             for m in (rung.get("moves") or [])],
+            strategy, bank_report, solves, auto_bank),
         # R388(b). Each resolved control's value and provenance as run_slate
         # resolved it, and the never-relax set the build ran under.
         "control_provenance": result.get("control_provenance"),
@@ -4496,6 +4609,15 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
     # the current file (it is when the enhanced file failed its re-read).
     if _BASELINE:
         brief["baseline"] = baseline_brief_block()
+    # R98(3). The build's one clock: which bound set it, the measured reserve,
+    # each stage's timestamp and each slice it granted.
+    deadline.mark("brief")
+    brief["build_deadline"] = deadline.stamp()
+    if brief["caps_vs_bank"]["verdict"] == "starved":
+        print(f"CAPS VS BANK: a portfolio cap was set against a bank the clock "
+              f"stopped ({brief['caps_vs_bank']['bank_stopped_by'] or 'floored'}); "
+              f"the concentration may be the search's, not the cap's. Grow the "
+              f"bank first.", file=sys.stderr)
     # R290(c) step 2. On a DELIVERED Classic file the deadline block records
     # whether a rung moved this build, and the LABEL is what changes -- never
     # the gates, which stay exactly as strict as they were. `upload_ready` is
@@ -6363,10 +6485,11 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
 
 def showdown_baseline_deadline(args) -> float:
     """R389(c). The build's deadline for the Showdown baseline's window:
-    `main()`'s own (``args._deadline``), else this call's budget from now."""
+    `main()`'s own (``args._deadline``, R98(3)'s Deadline, so its end is
+    bounded by the first lock too), else this call's budget from now."""
     deadline = getattr(args, "_deadline", None)
     if deadline is not None:
-        return float(deadline)
+        return float(deadline.end)
     budget = getattr(args, "max_seconds", None)
     return time.monotonic() + float(budget if budget else default_max_seconds())
 
@@ -7524,18 +7647,10 @@ def main() -> int:
             return 4
         args._governor = _dg.DeadlineGovernor(deliver_by_utc,
                                               tz_source=tz_source)
-        print(f"DEADLINE: deliver-by {args._governor.deliver_by_utc.isoformat()} "
-              f"({round(args._governor.minutes_remaining(), 1)} min); the "
-              f"governor takes over at T-{_dg.WINDOW_MINUTES:.0f} and reaches "
-              f"{sorted(_dg.governed_classes())} refusals only",
-              file=sys.stderr)
 
+    # R98(3). The build's clock starts here; the Deadline it becomes is built
+    # below the past-lock check, once the first lock is known.
     started = time.monotonic()
-    deadline = started + args.max_seconds
-    # R389(c). The Showdown baseline's window reads the build's deadline; an
-    # attribute, as `_governor` and `_never_relax` are, so `run_showdown`'s
-    # signature is unchanged.
-    args._deadline = deadline
 
     salary, entries = Path(args.salary), Path(args.entries_csv)
     if not salary.exists() or not entries.exists():
@@ -7754,6 +7869,55 @@ def main() -> int:
                          "(replays and evals); nothing was staged."),
             }, indent=1))
             return 4
+
+    # R98(3) + F18. ONE deadline for the whole build, from all three bounds:
+    # --max-seconds, --deliver-by, and the first lock less F-1's buffer (a
+    # replay has no lock to respect). Every budget below is a slice of it, and
+    # it is frozen, so no re-solve, rung or retry resets it. The reserve is the
+    # publication phase MEASURED on this host at this build's entry count
+    # (`repo_env.publication_reserve_s`), never a literal.
+    from mlb_engine import repo_env as _repo_env  # noqa: PLC0415
+    from mlb_engine.pipeline import deadline as _deadline_mod  # noqa: PLC0415
+    try:
+        _reserve_n = args.entries or count_reserved(entries)
+    except Exception:  # noqa: BLE001 - the largest measured count is the safe read
+        _reserve_n = None
+    _reserve_s, _reserve_source = _repo_env.publication_reserve_s(_reserve_n)
+    _first_lock_utc = None
+    if signature.get("first_lock") and not args.past_slate_replay:
+        _first_lock_utc = dt.datetime.fromisoformat(signature["first_lock"])
+    deadline = _deadline_mod.resolve_deadline(
+        started=started, max_seconds=args.max_seconds, reserve_s=_reserve_s,
+        reserve_source=_reserve_source,
+        deliver_by_utc=(args._governor.deliver_by_utc
+                        if args._governor is not None else None),
+        first_lock_utc=_first_lock_utc)
+    deadline.mark("deadline_resolved")
+    # R389(c). The Showdown baseline's window reads the build's deadline; an
+    # attribute, as `_governor` and `_never_relax` are, so `run_showdown`'s
+    # signature is unchanged.
+    args._deadline = deadline
+    print(f"DEADLINE: build ends in {round(deadline.remaining(), 1)}s "
+          f"(bound: {deadline.bound}); {round(deadline.reserve_s, 1)}s reserved "
+          f"for publication ({_reserve_source})", file=sys.stderr)
+    if args._governor is not None:
+        from mlb_engine.pipeline import deadline_governor as _dg  # noqa: PLC0415
+        # A first lock that binds before the operator's --deliver-by moves the
+        # governor's window with it (recorded). Only the lock, an external
+        # fact: a --max-seconds that ends first is a budget, and anchoring the
+        # window to it would open the controls on every short autobuild child
+        # hours before lock.
+        if deadline.bound == _deadline_mod.BOUND_FIRST_LOCK:
+            args._governor.clamp_to(
+                dt.datetime.now(dt.timezone.utc)
+                + dt.timedelta(seconds=deadline.remaining()), deadline.bound)
+        args._governor.derive_window(deadline.reserve_s)
+        print(f"DEADLINE: deliver-by {args._governor.deliver_by_utc.isoformat()} "
+              f"({round(args._governor.minutes_remaining(), 1)} min); the "
+              f"governor takes over at T-{args._governor.window_minutes:g} "
+              f"({args._governor.window_source}) and reaches "
+              f"{sorted(_dg.governed_classes())} refusals only",
+              file=sys.stderr)
 
     slate_dir = REPO / "data" / "slates" / args.date
     slate_dir.mkdir(parents=True, exist_ok=True)
