@@ -3982,6 +3982,12 @@ for anything retrospective; forward-going, the snapshots are the record.
 
 ## Workstream 4 — Solver, allocator, swap, and brief truth
 
+### R462. At 150 entries the allocator's joint MILP runs to its 30s limit, and identical inputs certify or refuse by timing (P1, S) | new 2026-09-28 (DEV, Session 15's reserve measurement) | Roadmap: Session 16
+
+- **What.** `python tools/benchmark_engine.py --publication` on the tracked 2026-06-28 11-game slate, one 734-candidate bank (loose controls, 150 reserved rows in one 150-max contest): every allocator call at 150 entries hit `time_limit` (36.7-39.9s wall), and one of the six runs (five timed, one traced) did not certify; a separate run of the same slate on a 742-candidate bank refused too. At 38 entries the same bank solves optimal in 4.6-5.3s, at 9 in about 1s.
+- **Why.** Whether the largest allocation a build makes certifies is decided by where the solver stood at 30s, which moves run to run, and the refusal reads like a strategy problem. It is also most of the 150-entry publication reserve (40.46s p95), so the Deadline keeps back time for a solve that is not converging. It contradicts `repo_env.py`'s R415 comment that "the certify-path solve never binds, because the prefilter hands it at most 6 per entry".
+- **Fix.** Measure first: the gap at the limit, and the candidates per entry the certify path actually hands the joint MILP at 150 entries on this bank. Then bound the solve from the Deadline (Session 16), keeping a verified time-limited incumbent as today, and shrink the model if the gap says it will not close (per-contest decomposition is the obvious one). Never trim the legal pool.
+
 ### R461. CLOSED 2026-09-26 -- SHIPPED, roadmap Session 106, entry in CHANGELOG.md
 
 On `verify_failed` the brief's `delivered_*` are null, the failed file is under `verify_failed_path`/`verify_failed_sha256`, and `last_usable_artifact` names the baseline.
@@ -4730,108 +4736,12 @@ No IIS: scipy 1.15.3's `milp` exposes none and `highspy` is not installed.
   into the refusal) is the cheaper diagnostic and should land BEFORE this
   item's detection half, because the detection reads exactly that signal.
 
-### R98(3) + R98(4)-tail. The bank budget is still derived from leftover clock, and the CERTIFIED brief still cannot distinguish a deliberate cap from a starved one (P1, M) | new 2026-08-08; (1) and (2) landed the same evening, (4) half-landed
+### R98(3) remainder. The solvers and autobuild's child still take their own time limits, not a slice of the build's Deadline (P1, M) | new 2026-08-08; the Deadline half landed 2026-09-28 (roadmap Session 15) and R98(4)-tail CLOSED with it, entry in CHANGELOG.md | Roadmap: Session 16
 
-**Rider 2026-09-25 (the code review, orchestration area): F-4's gap, measured on this host.** Without `--deliver-by` a build has no deadline: `BS` about L7406 sets `deadline = started + args.max_seconds`, `default_max_seconds` is the call budget minus 30 (600s here), and the pool's `minutes_to_deadline` reaches only the T-30 confidence relax, the T-15 probe skip and the printout; the only lock read in `main` refuses a lock already passed. At T-12 the F-1 deadline is 420s away and the build's own is 600s, a 180s overshoot by construction, before the re-solves: each allocator solve runs at its own 30s limit (`contest_allocator.py:3939`, read from no deadline) after the bank spent `deadline - 6s`, so three solves plus export can exceed autobuild's `per_build_seconds + 90` (195s here) by arithmetic. autobuild's `--stop-after-minutes` (12.0) is clamped to the lock only when `--deliver-by` is passed. Sessions 15-16 as specified.
+Session 15 gave every Classic build one frozen `Deadline(end, reserve)` (`mlb_engine/pipeline/deadline.py`), built once in `build_slate.main` from `--max-seconds`, `--deliver-by` and the first lock less F-1's buffer, with a publication reserve measured per host by entry count; the sliced bank, the direct door's per-solve auto-bank and the interaction probe take slices of it. The filed text, its four riders and what landed are in CHANGELOG.md under 2026-09-28.
 
-**Rider 2026-09-22 (R385): elevated to docs/ROADMAP.md Sessions 15-17 by the delivery-first rule, ahead of R87.** Ben's F-4: the deadline runs on every build, not only with `--deliver-by`. 1905_10g sighting: `--max-seconds 540` and `250` each chose DIRECT and wrote `solve.bank: null`; about 16 minutes went to calls that could not grow the persistent bank.
-
-**Rider 2026-09-08 (ed12, F18): the remedy is one monotonic deadline, not a better leftover.** Each rung, recursion and child receives a NEW time limit (`showdown_theses.py:1014, 1186-1454`; `contest_allocator.py:3152-3254`; `autobuild.py:473-489, 541-565`; `bank_cache.py:557-564`); serialization, process startup, projection rebuilding and validation sit outside every solver budget; the governor reacts to a refusal already computed. Adopt a frozen `Deadline(end, reserve)` created once per build with a publication RESERVE, `deadline.slice(requested)` passed to every solver call and subprocess, recursion inheriting the same object, and process termination at the boundary since a check between calls cannot interrupt a hung native solve. Acceptance: injected slow stages cannot consume the reserve; no retry resets the deadline; p50/p95/p99 include validation and writing. Roadmap: Session 22, after R87 measures.
-
-- **ed6 rider (2026-08-22, VERIFIED-read at ac8ac05; build_slate edited since,
-  mechanism unchanged):** the direct-vs-sliced boundary is characterized.
-  Strategy flips to sliced iff `projected_direct > remaining`, where
-  `remaining` is measured AFTER staging, fetches, enrichment and a probe
-  solve, and `projected_direct` is quadratic in the bank size — the same
-  command can flip strategies run to run on probe noise. On the DIRECT path
-  the `BankCache` is never opened: nothing persists, exit-10 resume is
-  STRUCTURALLY unreachable, a killed call loses all work, and a refusal
-  carries no `bank_exploration` block, so the grow-the-bank hint cannot fire.
-  The direct budget floor fires by construction once the prefix eats the
-  window (observed live: `BANK BUDGET FLOORED ... -1.7s remained`). Cheap
-  rider for whoever lands this: persist the direct path's auto-built bank
-  into the same cache — resume then survives the strategy choice and
-  direct-path refusals get the same evidence block.
-
-**Parts (1) and (2) LANDED 2026-08-08 (evening); full record in CHANGELOG.md.**
-Shipped: `resolve_bank_budget()` making both floored budgets audible on stderr,
-in `bank_warnings`, as `solve.bank.budget_floored` and `solve.bank_budget_floored`;
-`select_and_assign_entries(bank_report=...)` appending ordered remedies that name
-bank growth before `--controls-override` and separate a structural floor from an
-exposure cap that has none; `infeasibility_hint()` doing the same in the refusal
-payload; 13 tests reproducing the 1910_9g shape and pinning remedy ORDER and the
-three silences. **One correction to the filing:** (a) named `build_slate.py:1453`,
-but the observed `time_budget_s: 5.0` came from `:1346` — the bank report's
-`time_budget_s` is `extend_bank`'s own parameter, and `:1453` is inert whenever
-`candidates_override` is supplied. Both floors are now audible.
-
-- **What remains, part (3):** the bank budget is still whatever is left of
-  `--max-seconds` minus a reserve. Making the floor audible removed the
-  INVISIBILITY, not the bad budget: five seconds for 2592 jobs and 9 entries
-  could never have supported the defaults, and a build that now announces its
-  floor still builds a 1.8% bank. Derive it from entry count and job-list size
-  instead, and signal the exit-10 resume loop as the intended answer rather than
-  as an exception path.
-- **What remains, part (4):** `bank_exploration` (`jobs_attempted`,
-  `jobs_total`, `job_list_exhausted`, `total_candidates`, `budget_floored`) now
-  travels in the not_certified payload beside the hint derived from it. The
-  CERTIFIED brief is the open half: `solve.bank` carries the counts on the
-  sliced path only and never sits beside `controls_override_applied`, so after a
-  build SUCCEEDS a reader still cannot tell a deliberate cap from a starved one
-  without opening the bank block. That is the 1910_9g case exactly — it
-  certified.
-- **Extension 2026-08-10 (from the consumed postures fragment, part 2):** when
-  the default portfolio controls are JOINTLY infeasible, the refusal correctly
-  says no single control is binding but not which relaxation is smallest, so
-  the operator guesses. Live case 2026-08-08 (1505_3g): certified on the
-  second run at 0.6/0.55/0.5/7/2 after guessing. A hint naming the minimum
-  feasible value per control turns two builds into one; it belongs with (3)'s
-  remedy work because both are the refusal teaching the operator the exact
-  move instead of the direction.
-- **Repriced M, and the priority holds.** (1) was the part worth landing alone
-  and it is landed, which is why this drops out of the numbered queue's position
-  8 and into the opportunistic tier: the failure is now loud. What is left is
-  the actual budgeting work plus one brief field, and neither is urgent while
-  the floor announces itself. Done when: the budget is a function of the job
-  list rather than of the clock, and a certified build that relaxed an exposure
-  cap against an unexhausted job list says so in its brief.
-- **Why this family is P1 (carried from the filing).** This is the R51/R92
-  family seen from the strategy side: every individual report was honest and the
-  composite steered wrong. The delivered portfolio's concentration was the shape
-  of an under-explored search presented as a considered set of caps. It is the
-  fourth recorded instance of the same two-round pattern (2026-08-01, 08-03,
-  08-04, 08-08); the three earlier ones all ran short bank budgets too and were
-  each filed as "small multi-contest slate," so the operator-side note had
-  generalised the wrong variable three times running before the 08-08 pass
-  corrected it.
-- **Adjacent, do not merge.** R87's closing note ("Classic defers diversity to
-  the allocator and discovers the shortfall at selection time") is the
-  architectural statement of the same problem and is the right home for any
-  in-solver overlap work; this is the budgeting half and does not need R87's
-  golden regen. R73(f) budgets `solver_probe`, a different entry point. R92 is
-  the same "report that cannot inform" family on the bank's warning lines.
-- **Extension 2026-08-14 (audit, from BUILD fragment
-  `2026-08-14_BUILD_floored-bank-hint-names-the-wrong-remedy.md`, fifth
-  recorded instance of the family):** when `budget_floored` is true, the
-  JSON `hint` leads with "re-run the SAME command" — the one remedy that
-  cannot converge on a floored budget (measured: three re-runs at
-  `--max-seconds` 14/20/22 bought ONE job and ONE candidate, 39→40 of
-  3600), while the stderr line correctly says raise `--max-seconds` and
-  forbids relaxing controls. The JSON is the channel the operator reads;
-  the session obeyed it, relaxed five controls against a 34-candidate bank,
-  and shipped 7 unique lineups across 15 entries. A 145s window then took
-  the DIRECT path and certified twice (single lineup 0.14-0.35s) — there
-  was never a bank problem, only budget arithmetic (`remaining - 8.0` going
-  negative). Adopted asks: (i) when floored, "raise `--max-seconds`" is the
-  FIRST remedy in the JSON hint, with the arithmetic stated; re-run advice
-  only when NOT floored. (ii) refuse the loop outright when floored and
-  `jobs_attempted` grew by less than a small N against the cached run —
-  non-convergence named, not re-invited. (iii) SKILL.md stops teaching
-  `--max-seconds 14` / `timeout 33`: on any slate taking the sliced path
-  that guidance floors the budget BY CONSTRUCTION, and its 45s-ceiling
-  premise is stale (`timeout 155` ran clean twice under the ~180s call
-  ceiling; this audit's own suite runs agree). Measure the ceiling once,
-  prefer a long window.
+- **What remains.** F18's other readers still receive a NEW limit each: the Showdown solves (`optimize/showdown.py`, the `showdown_theses.py` ladder; the Showdown baseline already reads the Deadline's end), the allocator's joint MILP (`contest_allocator.py`'s `time_limit`, 30s, from no deadline; R462 measured it binding at 150 entries), and autobuild's child timeout (`per_build_seconds + 90`, reset per attempt, and `--stop-after-minutes` clamped to the lock only with `--deliver-by`).
+- **Fix.** Each takes `Deadline.slice()`, and no attempt resets it (roadmap Session 16). Done when an injected slow stage in each cannot consume the reserve.
 
 ### R115. SP-pair coverage: the bank freezes at `requested_n`, the resume path cannot engage, and no control can floor arm diversity (P1, M) | new 2026-08-14, merged from BUILD fragment `2026-08-13_BUILD_bank-cache-freezes-at-first-slice.md` + ledger fragments 2026-08-13 (1507_3g); mechanisms verified in tree by the audit
 
@@ -5637,6 +5547,8 @@ delivers it at exit 7 and a refusal re-presents it. Gate and commit: the
 CHANGELOG entries.
 
 ### R390. A thin sliced bank returns exit 10 before the deadline governor or any recovery is consulted (P0, S) | new 2026-09-22, audit DD-03 | Roadmap: Session 18
+
+**Rider 2026-09-28 (Session 15): the Deadline makes this reachable near lock.** Every Classic budget is now a slice of one Deadline bounded by the first lock less F-1's buffer, so a live build started a few minutes before that deadline hands the sliced door a small slice, and a thin bank exits 10 asking for a re-run with less time still. Session 15 closed the case where the slice is below the bank floor (the direct door then delivers or refuses, `solve.strategy_reason` says why); a slice above the floor and too small for the job list still takes this exit, which is this entry's fix.
 
 **Rider 2026-09-25 (the code review, orchestration area; `review_orchestration/repro_r390*.py`): the live trigger and the acceptance test.** Since R415 `bank_resume_warranted` (`BS` about L1473-1483) returns False on `candidate_cap`, so the exit-10 branch (L3727-3743) fires only on a time- or retry-stopped slice against an unexhausted grid, not the cap: a capped bank prints `BANK AT ITS CAP`, solves, and the in-window governor DID fire on it (`--bank-max-candidates 8`: exit 0, `governs called 1`, `review_grade_deadline_build`). On 06-03 the honest levers cannot reach the branch because the job grid (192 jobs) exhausts inside the 5s floor in 1.0s, so the acceptance test needs a slate whose grid outlasts a floored slice (1905_10g's shape) or a patched slice. When the branch does fire (patched): exit 10, `governs called 0`, no `deadline` block, zero enhanced solves, the baseline as the current file. The fix goes above L3743 as filed.
 

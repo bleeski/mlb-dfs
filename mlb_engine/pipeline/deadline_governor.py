@@ -98,7 +98,30 @@ def governed_classes() -> frozenset:
 #: Minutes before the deliver-by time at which the governor takes over. Six,
 #: from CLAUDE.md's T-schedule, where T-6 is the rung that says hand-build if
 #: the engine has not produced a file. This is the engine doing that itself.
+#: R98(3): since 2026-09-28 it is the FLOOR and the FALLBACK, not the window
+#: itself. `window_minutes_for` derives the window from the build Deadline's
+#: measured publication reserve and never goes below this, because a smaller
+#: window would leave a refusal between T-6 and it ungoverned.
 WINDOW_MINUTES = 6.0
+
+#: What a governed attempt costs, in publication reserves: the rung's re-solve
+#: on the bank already in hand (one allocation and publication, which is what
+#: the reserve measures) and the delivery after it.
+GOVERNED_ATTEMPT_RESERVES = 2
+
+
+def window_minutes_for(reserve_s: Optional[float]) -> Tuple[float, str]:
+    """The governor's window from the Deadline's reserve: time for one governed
+    attempt, floored at `WINDOW_MINUTES`. Returns ``(minutes, source)``."""
+    if reserve_s is None:
+        return WINDOW_MINUTES, "fallback: no measured reserve"
+    derived = GOVERNED_ATTEMPT_RESERVES * float(reserve_s) / 60.0
+    if derived <= WINDOW_MINUTES:
+        return WINDOW_MINUTES, (f"T-{WINDOW_MINUTES:g} floor: {GOVERNED_ATTEMPT_RESERVES} x "
+                                f"the {float(reserve_s):g}s reserve is "
+                                f"{derived:.1f} min")
+    return round(derived, 2), (f"derived: {GOVERNED_ATTEMPT_RESERVES} x the "
+                               f"{float(reserve_s):g}s reserve")
 
 RUNG_OPEN_CONTROLS = "open_controls"
 RUNG_ACCEPT_BLANK_ROWS = "accept_blank_rows"
@@ -367,9 +390,13 @@ class DeadlineGovernor:
             raise ValueError("deliver_by_utc must be timezone-aware")
         self.deliver_by_utc = deliver_by_utc.astimezone(_dt.timezone.utc)
         self.window_minutes = float(window_minutes)
+        self.window_source = ("fallback: no measured reserve"
+                              if self.window_minutes == WINDOW_MINUTES
+                              else "stated by the caller")
         self.tz_source = tz_source
         self._now_fn = now_fn or (lambda: _dt.datetime.now(_dt.timezone.utc))
         self._walked: List[Dict[str, Any]] = []
+        self.deliver_by_clamped: Optional[Dict[str, Any]] = None
 
     # -- the clock ------------------------------------------------------- #
     def now(self) -> _dt.datetime:
@@ -377,6 +404,33 @@ class DeadlineGovernor:
 
     def minutes_remaining(self) -> float:
         return (self.deliver_by_utc - self.now()).total_seconds() / 60.0
+
+    def clamp_to(self, end_utc: _dt.datetime, bound: str) -> bool:
+        """R98(3). Anchor the window to the build Deadline's end when that ends
+        first (first lock less F-1's buffer, or --max-seconds), so a refusal
+        after the deadline and before a later --deliver-by is still governed.
+        The operator's value is kept in the stamp. Returns whether it moved."""
+        if self._walked:
+            raise ValueError("the clock is clamped before the ladder is walked")
+        end = end_utc.astimezone(_dt.timezone.utc)
+        if end >= self.deliver_by_utc:
+            return False
+        self.deliver_by_clamped = {
+            "operator_deliver_by_utc": self.deliver_by_utc.isoformat().replace(
+                "+00:00", "Z"),
+            "clamped_to_utc": end.isoformat().replace("+00:00", "Z"),
+            "bound": bound,
+        }
+        self.deliver_by_utc = end
+        return True
+
+    def derive_window(self, reserve_s: Optional[float]) -> float:
+        """R98(3). Set the window from the build Deadline's reserve, once,
+        before any rung; `window_minutes_for` says how."""
+        if self._walked:
+            raise ValueError("the window is set before the ladder is walked")
+        self.window_minutes, self.window_source = window_minutes_for(reserve_s)
+        return self.window_minutes
 
     def in_window(self) -> bool:
         """True from T-6 onward, INCLUDING past the deadline.
@@ -510,7 +564,9 @@ class DeadlineGovernor:
             "deliver_by_utc": self.deliver_by_utc.isoformat().replace(
                 "+00:00", "Z"),
             "deadline_tz_source": self.tz_source,
+            "deliver_by_clamped": self.deliver_by_clamped,
             "window_minutes": self.window_minutes,
+            "window_source": self.window_source,
             "minutes_remaining": round(self.minutes_remaining(), 2),
             "in_window": self.in_window(),
             "deadline_ladder": self.walked,

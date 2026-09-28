@@ -7063,7 +7063,10 @@ class ShowdownBaselineFirstTests(_ShowdownExitDoorHarness, unittest.TestCase):
     # -- short, not needed, errored: named, and the build carries on ---------- #
 
     def test_a_spent_window_is_short_writes_nothing_and_the_ladder_delivers(self):
-        r = self._build(self._root(), args_extra={"_deadline": time.monotonic() - 1})
+        from mlb_engine.pipeline.deadline import Deadline
+        spent = time.monotonic() - 1
+        r = self._build(self._root(), args_extra={"_deadline": Deadline(
+            started=spent - 60, end=spent, reserve_s=0.0, bound="max_seconds")})
         self.assertEqual(r.code, 0, r.err[-3000:])
         self.assertEqual(self._baseline_files(r.root), [])
         self.assertEqual(r.brief["baseline"]["status"], "short")
