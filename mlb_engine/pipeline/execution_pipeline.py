@@ -793,7 +793,15 @@ def execute_portfolio(
             require_all_reserved_filled=True,
         )
         if mode == "late_swap":
-            delta = validate_late_swap_delta(entries_csv, candidate_path, mutable_entry_ids=mutable_ids)
+            # R174. The locked-team introduction ban, re-derived from the file.
+            # The teams come from the requirements the allocator was given; the
+            # team of each player comes from the SALARY file, which is
+            # authoritative for teams, not from the feed's status map that the
+            # requirements carry (R325: that map is the one a hand-shaped feed
+            # can mislabel).
+            delta = _late_swap_delta_with_lock_ban(
+                entries_csv, candidate_path, mutable_ids, entry_requirements,
+                salary_csv)
         else:
             delta = {"passed": True, "errors": [], "changed_entry_ids": mutable_ids}
 
@@ -1641,6 +1649,36 @@ def _applied(block: Any) -> Optional[bool]:
             return None
         return int(block.get("matched") or 0) > 0
     return None
+
+
+def _late_swap_delta_with_lock_ban(entries_csv: Any, candidate_path: Any,
+                                   mutable_ids: Sequence[str],
+                                   entry_requirements: Sequence[Mapping[str, Any]],
+                                   salary_csv: Any) -> Dict[str, Any]:
+    """``validate_late_swap_delta`` with R174's locked-team introduction ban.
+
+    The teams are the union of the requirements' ``excluded_new_teams``; the team
+    of each player comes from the SALARY file, which is authoritative for teams,
+    not from the feed's status map that the requirements carry (R325: that map is
+    the one a hand-shaped feed can mislabel). One function so a test can drive
+    the wiring without a full late swap.
+    """
+    banned = sorted({str(t) for req in entry_requirements
+                     for t in (req.get("excluded_new_teams") or [])})
+    return validate_late_swap_delta(
+        entries_csv, candidate_path, mutable_entry_ids=mutable_ids,
+        excluded_new_teams=banned,
+        player_team_by_id=_salary_team_by_player_id(salary_csv) if banned else None)
+
+
+def _salary_team_by_player_id(salary_csv: Any) -> Dict[str, str]:
+    """player_id -> DK team abbreviation, straight off the salary export (R174)."""
+    from mlb_engine.intake.slate_intake_manager import parse_dk_salary_csv
+    from mlb_engine.team_codes import to_dk_abbrev
+    # Through `to_dk_abbrev`, as `build_entry_requirements` does for the ban's
+    # teams, so the two sides of the comparison cannot spell a team differently.
+    return {str(p.player_id): to_dk_abbrev(p.team)
+            for p in parse_dk_salary_csv(str(salary_csv)) if p.team}
 
 
 def validate_salary_export(salary_csv: Any) -> Dict[str, Any]:

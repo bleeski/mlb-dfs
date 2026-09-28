@@ -42,8 +42,10 @@ enters a contest, or moves money. Lineups move only at Ben's manual upload.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import datetime as dt
 import hashlib
+import io
 import json
 import os
 import sys
@@ -67,7 +69,7 @@ if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
 from mlb_engine.intake.live_data_adapters import (  # noqa: E402
-    build_slate_pool, build_status_map_from_lineups_feed,
+    build_slate_pool, build_status_map_from_lineups_feed, dk_starting_only_feed,
 )
 from mlb_engine.entries.dk_entries_manager import (  # noqa: E402
     assert_contest_geometry, parse_dk_entry_rows,
@@ -725,9 +727,60 @@ def _feed_age_report(feed: dict, slate_date: str, now: dt.datetime) -> tuple[lis
     return blockers, warnings
 
 
+POST_SWAP_REFEREE_FAILED = 5
+
+
+def run_post_swap_preflight(entries: Path, parent, salary: Path, sha: str,
+                            feed_path=None, as_of=None) -> dict:
+    """CLAUDE.md's pre-upload sentence, run on the swap's own bytes (R174 rider).
+
+    This tool wrote, recorded and promoted the file, then PRINTED the preflight
+    command and returned 0: the independent referee was optional human
+    follow-up on exactly the path with the least time to follow up. Now the
+    tool calls it, in process, with `--salary`, `--parent` and
+    `--expect-sha256`, and the verdict is part of what the swap reports.
+
+    Returns ``{"exit", "verdict", "failures", "warnings", "stderr", "ran",
+    "error"}``. A referee that cannot run is ``ran=False`` and is never read as a
+    pass. Exit 0 is not "upload-ready" by itself: preflight exits 0 for a
+    ``review_ready`` file too, and the word is preflight's ``verdict``, not this
+    tool's.
+    """
+    tools_dir = str(Path(__file__).resolve().parent)
+    if tools_dir not in sys.path:
+        sys.path.insert(0, tools_dir)
+    argv = ["--entries", str(entries), "--salary", str(salary),
+            "--parent", str(parent), "--expect-sha256", sha[:12], "--json"]
+    if feed_path is not None and Path(feed_path).exists():
+        argv += ["--feed", str(feed_path)]
+    if as_of:
+        argv += ["--as-of", str(as_of)]
+    buf, errbuf = io.StringIO(), io.StringIO()
+    try:
+        import preflight_upload
+        with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(errbuf):
+            try:
+                code = preflight_upload.main(argv)
+            except SystemExit as exc:
+                code = exc.code if isinstance(exc.code, int) else 3
+    except Exception as exc:  # noqa: BLE001 - the referee not running is a verdict of its own
+        return {"exit": None, "ran": False, "failures": [], "warnings": [],
+                "error": f"{type(exc).__name__}: {exc}", "argv": argv}
+    try:
+        payload = json.loads(buf.getvalue())
+    except ValueError:
+        payload = {}
+    return {"exit": int(code), "ran": True,
+            "verdict": str(payload.get("verdict") or ""),
+            "failures": list(payload.get("failures") or []),
+            "warnings": list(payload.get("warnings") or []),
+            "stderr": errbuf.getvalue().strip()[-600:],
+            "error": None, "argv": argv}
+
+
 def deliver_swap(args, result: dict, out: Path, salary: Path, swap_parent,
                  contest_shapes: dict, after_rosters: dict, downgraded: list,
-                 controls: dict) -> int:
+                 controls: dict, feed_path=None) -> int:
     """Everything after a passing joint solve: present, promote, record, ship.
 
     R414. Split out of `main()` so a test can drive every later-failure
@@ -874,6 +927,42 @@ def deliver_swap(args, result: dict, out: Path, salary: Path, swap_parent,
         # exact, and it is what CLAUDE.md's pre-upload sentence expects to
         # find already recorded, printed rather than typed under a clock.
         print(f"verify at upload: {preflight_command}")
+
+    # R174 rider. The referee runs on the bytes just delivered, and the swap
+    # does not claim success before it has a verdict. A failure is NOT a
+    # withdrawn file (the file is recorded and stays on disk, and CLAUDE.md's
+    # autonomy clause keeps the call to ship or repair with Ben's session): it is
+    # an exit that says these bytes are not upload-ready and why.
+    referee = run_post_swap_preflight(
+        dest, args.parent_entries, salary, delivered_sha or sha,
+        feed_path=feed_path, as_of=getattr(args, "preflight_as_of", None))
+    bs._LAST_USABLE["referee"] = {k: referee.get(k) for k in
+                                  ("exit", "ran", "error", "verdict")}
+    if not referee["ran"]:
+        print(f"REFEREE DID NOT RUN: preflight_upload raised {referee['error']}. "
+              f"This file has NO independent verdict. Run the command above "
+              f"before uploading anything.", file=sys.stderr)
+        return POST_SWAP_REFEREE_FAILED
+    if referee["exit"] != 0:
+        print(f"REFEREE FAILED: preflight_upload exit {referee['exit']} on "
+              f"{dest} (sha256 {(delivered_sha or sha)[:12]}): NOT upload-ready.",
+              file=sys.stderr)
+        for failure in referee["failures"]:
+            print(f"  FAIL  {failure}", file=sys.stderr)
+        if not referee["failures"] and referee.get("stderr"):
+            # Exit 3 (an unreadable input) and an argparse exit 2 carry their
+            # reason on stderr and no failures list; drop neither.
+            print(f"  preflight said: {referee['stderr']}", file=sys.stderr)
+        print("The file is written and recorded and is not blocked from you; "
+              "repair the failure (tools/repair_entry.py for a dead or locked "
+              "player) or acknowledge it deliberately. Nothing was uploaded.",
+              file=sys.stderr)
+        return POST_SWAP_REFEREE_FAILED
+    verdict = referee.get("verdict") or "no verdict field"
+    print(f"referee: preflight_upload exit 0 on {(delivered_sha or sha)[:12]} "
+          f"({len(referee['warnings'])} warning(s)); verdict {verdict}"
+          + ("" if verdict == "upload_ready" else
+             f" -- NOT upload-ready: this file is labelled {certification}"))
     print("Upload by hand. Nothing here entered a contest or moved money.")
     return 0
 
@@ -1008,12 +1097,32 @@ def main() -> int:
     # had long since posted. --lineups supplies a fresh feed without touching
     # the shared file other concurrent sessions read and write.
     salary, feed_path = resolve_swap_inputs(args.salary, args.lineups, slate)
+    # R404. Only the DEFAULT feed name may be absent, and only when DK's own
+    # `Starting` column covers every side. An explicit --lineups that does not
+    # exist is still a refusal: the operator named a file.
+    dk_feed = None
     for path in (salary, feed_path, Path(args.parent_entries)):
-        if not path.exists():
-            print(f"missing input: {path}", file=sys.stderr)
+        if path.exists():
+            continue
+        if path == feed_path and not args.lineups and salary.exists():
+            dk_feed, dk_note = dk_starting_only_feed(salary, args.date)
+            if dk_feed is not None:
+                age_min = max(0.0, (time.time() - salary.stat().st_mtime) / 60.0)
+                print(f"lineups feed: none at {feed_path}; {dk_note} "
+                      f"(R143: DK's posted orders outrank any feed). These orders "
+                      f"are as fresh as the salary file, which was written "
+                      f"{age_min:.0f} minutes ago: a scratch DK posted since is "
+                      f"not in it")
+                continue
+            print(f"missing input: {path}; and {dk_note}. Fetch a feed, or pass "
+                  f"--lineups at one.", file=sys.stderr)
             return 4
+        print(f"missing input: {path}", file=sys.stderr)
+        return 4
     for label, path, flag in (("salary", salary, "--salary"),
                               ("lineups feed", feed_path, "--lineups")):
+        if path == feed_path and dk_feed is not None:
+            continue
         shared = path.resolve() == (slate / path.name).resolve()
         print(f"{label}: {path}"
               + ("  [SHARED staging path: a concurrent build for this date can "
@@ -1045,7 +1154,8 @@ def main() -> int:
     # locked-game exclusions from this feed. An empty feed there is not a
     # cheaper swap, it is a swap that believes no game has started.
     try:
-        feed = json.loads(feed_path.read_text(encoding="utf-8"))
+        feed = (dk_feed if dk_feed is not None
+                else json.loads(feed_path.read_text(encoding="utf-8")))
     except (OSError, ValueError) as exc:
         print(f"FEED BLOCKER: {feed_path} cannot be read or parsed "
               f"({type(exc).__name__}: {exc}). A swap derives its locked-game "
@@ -1058,7 +1168,9 @@ def main() -> int:
     # slate or this hour. A swap is the one build that runs after lineups move,
     # so a feed for the wrong day is a wrong-slate build with locked-game
     # exclusions computed from the wrong games.
-    feed_blockers, feed_warnings = _feed_age_report(feed, args.date, now)
+    feed_blockers, feed_warnings = (
+        ([], []) if dk_feed is not None       # built from the salary file just now
+        else _feed_age_report(feed, args.date, now))
     for warning in feed_warnings:
         print(f"feed: {warning}", file=sys.stderr)
     for blocker in feed_blockers:
@@ -1110,6 +1222,13 @@ def main() -> int:
               + f"; latest promoted {swap_parent.get('latest_promoted_run_id')})")
 
     status = build_status_map_from_lineups_feed(feed, str(salary))
+    # R325. A feed game dated to another day than the salary file's is not
+    # evidence about this one, and the status map replaced its start time with
+    # the salary file's. Named here, not silent (R237).
+    for ignored in status.get("feed_dates_ignored") or []:
+        print(f"feed dates: the feed's {ignored['kind']} for {ignored['game_id']} is "
+              f"dated {ignored['feed_date']} and the salary file says "
+              f"{ignored['salary_date']}; ignored, the salary file's start stands")
     for dropped in status.get("doubleheader_legs_dropped") or []:
         print(f"doubleheader: dropped {dropped['game_id']} leg at "
               f"{dropped['start_utc']} ({dropped['reason']})")
@@ -1393,7 +1512,8 @@ def main() -> int:
     # `deliver_swap`, so a test can drive its later-failure branches without
     # a full swap behind it.
     return deliver_swap(args, result, out, salary, swap_parent, contest_shapes,
-                        after_rosters, downgraded, controls)
+                        after_rosters, downgraded, controls,
+                        feed_path=(feed_path if dk_feed is None else None))
 
 
 def _argv_date(argv) -> str:
@@ -1446,7 +1566,7 @@ def _main_recording_refusals() -> int:
         from mlb_engine.entries.delivery_record import write_refusal_record
         bs = _BUILD_SLATE_MODULE
         refusal: dict = {"argv": argv}
-        if code == 7 and bs is not None and bs._LAST_USABLE:
+        if code in (7, POST_SWAP_REFEREE_FAILED) and bs is not None and bs._LAST_USABLE:
             refusal["last_usable_artifact"] = dict(bs._LAST_USABLE)
         write_refusal_record(date=_argv_date(argv), slate_tag="",
                              exit_code=int(code), refusal=refusal)

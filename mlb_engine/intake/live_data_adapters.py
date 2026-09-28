@@ -171,6 +171,19 @@ def _parse_utc(value: str) -> datetime:
     return parsed.astimezone(timezone.utc)
 
 
+def _eastern_date(moment: datetime):
+    """The Eastern calendar date of an instant (R325).
+
+    Eastern, not UTC: DK's ``Game Info`` is Eastern, and a 10:10 PM ET first
+    pitch is the NEXT day in UTC, so a date comparison has to be made in the
+    zone the salary file speaks.
+    """
+    from mlb_engine.intake.slate_intake_manager import _eastern_tz
+    aware = moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
+    utc = aware.astimezone(timezone.utc)
+    return utc.astimezone(_eastern_tz(utc.year, utc.month, utc.day)).date()
+
+
 def _salary_game_times(players: Mapping[str, Any]) -> Dict[str, datetime]:
     """DK game_id -> earliest UTC start parsed from the salary Game Info column.
 
@@ -598,6 +611,50 @@ def dk_order_coverage(salary_csv: str | Path) -> Tuple[List[str], List[str]]:
     return report["covered"], sorted(report["degraded"] + report["uncovered"])
 
 
+def dk_starting_only_feed(salary_csv: str | Path,
+                          slate_date: Optional[str] = None) -> Tuple[Optional[Dict[str, Any]], str]:
+    """``(feed, note)`` built from DK's own ``Starting`` column alone, or
+    ``(None, why not)``.
+
+    R404. R143 ranks a complete DK ``Starting`` 1-9 above any pasted or fetched
+    lineup, and ``build_slate.py`` already builds with no feed file when DK
+    covers every side (``dk_order_coverage``). ``late_swap.py`` and
+    ``repair_entry.py`` each demanded the file anyway: the swap exited 4 before
+    it read the salary file at all, and the repair confirmed nobody and locked
+    nobody. On 1905_10g every data host was blocked, DK had posted all 20 sides,
+    and both refused for want of a file that carried nothing DK's own did not.
+
+    The feed is ``merge_dk_starting_into_feed(None, salary)``: confirmed sides
+    with DK's ids and orders, and every game synthesized from ``Game Info`` so
+    each has a lock time. It is NOT ``build_slate``'s ``{"games": []}``: that
+    feeds the pool, which merges DK internally, while a status map reads the
+    feed raw, and a status map with no games gives no player a lock time, which
+    fails every slot closed.
+
+    Partial coverage is a refusal, and it is named: a side DK has not posted (or
+    posted with a shelved player) has no lineup, and calling it confirmed is the
+    false label. One definition, shared by both tools (R233).
+    """
+    try:
+        covered, not_covered = dk_order_coverage(salary_csv)
+    except Exception as exc:  # noqa: BLE001 - a refusal with the reason, not a crash
+        return None, f"DK's Starting column could not be read ({type(exc).__name__}: {exc})"
+    if not covered:
+        return None, "DK's Starting column has no complete 1-9 for any side"
+    if not_covered:
+        return None, (f"DK's Starting column covers {len(covered)} side(s) and not "
+                      f"{sorted(not_covered)}")
+    feed, report = merge_dk_starting_into_feed(None, str(salary_csv))
+    if report.get("games_unsynthesizable"):
+        return None, (f"DK covers every side but {report['games_unsynthesizable']} "
+                      f"have no readable Game Info, so no lock time can be derived")
+    feed = dict(feed)
+    if slate_date:
+        feed["date"] = slate_date
+    return feed, (f"DK's Starting column covers all {len(covered)} side(s); "
+                  f"{len(report.get('games_synthesized') or [])} game(s) read from Game Info")
+
+
 def _note_hands(report: Dict[str, Any], team: str,
                 merged: Sequence[Mapping[str, Any]]) -> None:
     """R159(d). How many of this side's hitters kept a bat side, per side.
@@ -971,9 +1028,13 @@ def build_status_map_from_lineups_feed(
         key = (normalize_name(_record_get(record, "name")), str(_record_get(record, "team")).strip().upper())
         salary_by_name_team.setdefault(key, []).append(str(pid))
 
+    salary_times = _salary_game_times(players)
     games, doubleheader_legs_dropped = _select_slate_legs(
-        list(feed.get("games") or []), _salary_game_times(players)
+        list(feed.get("games") or []), salary_times
     )
+    lock_times_clamped: List[Dict[str, str]] = []
+    feed_dates_ignored: List[Dict[str, str]] = []
+    postponement_verified: List[str] = []
     lock_time_by_game_id: Dict[str, datetime] = {}
     game_meta: Dict[str, Dict[str, Any]] = {}
     excluded_game_ids: List[str] = []
@@ -992,8 +1053,26 @@ def build_status_map_from_lineups_feed(
         # crosswalk entirely. DK's own `Starting` column supplies the id with
         # the order, so the side it posted cannot fail on a name variant the
         # way a paste or an API row can.
+        #
+        # R325. An explicit id is accepted only for the team the ROW sits under.
+        # It used to be accepted whatever the salary file said that id's team
+        # was, so a row {"name", "dk_id": <an AAA player>} placed under EEE's
+        # confirmed lineup gave him team EEE, EEE's open game and
+        # `Confirmed_Starter`: the swap's locked-team ban and locked-slot map,
+        # both read off this status map, then no longer named him. A DK
+        # `Starting` side cannot do this (its ids come from the same rows as
+        # its teams); a paste-converted or hand-shaped feed can. The salary
+        # file is authoritative for teams, so a disagreement is a refusal and
+        # is NAMED, never resolved in either direction.
         if dk_id and str(dk_id) in players:
-            return str(dk_id)
+            salary_team = to_dk_abbrev(_record_get(players[str(dk_id)], "team"))
+            if salary_team == dk_team:
+                return str(dk_id)
+            unmatched.append({
+                "name": str(name), "team": dk_team, "dk_id": str(dk_id),
+                "reason": "team_mismatch",
+                "salary_team": str(salary_team or "")})
+            return None
         hits = salary_by_name_team.get((normalize_name(name), dk_team), [])
         if len(hits) == 1:
             return hits[0]
@@ -1037,6 +1116,40 @@ def build_status_map_from_lineups_feed(
                      "game_date_utc": str(game_entry.get("game_date_utc") or ""),
                      "reason": "unparseable game_date_utc; no lock time can be derived"})
             continue
+        # R325. The salary file is authoritative for WHEN a game starts and DK
+        # locks it then, so the feed's date is checked against it before the feed
+        # is believed about anything:
+        #   - a feed game dated to another Eastern day than the salary file's is
+        #     another day's game (yesterday's same matchup, the wrong doubleheader
+        #     leg): its postponed status is NOT honored, so it neither trims the
+        #     pool nor unlocks a started game, and its start time is replaced by
+        #     the salary file's;
+        #   - a feed start LATER than the salary file's is clamped to it (the
+        #     swap used to read a started game as open and admit its players);
+        #   - a feed start earlier than the salary file's on the same day stands:
+        #     a feed may make a game lock earlier and never later.
+        # A postponement is `verified` only when the dates agree; one the salary
+        # file cannot date stays excluded, as R220(a) requires, and is NOT
+        # verified, which is the fact the lock referees read.
+        salary_start = salary_times.get(game_id)
+        date_verdict = (None if salary_start is None
+                        else _eastern_date(lock_time) == _eastern_date(salary_start))
+        if date_verdict is False:
+            feed_dates_ignored.append({
+                "game_id": game_id, "kind": "postponement" if excluded else "clock",
+                "feed_date": _eastern_date(lock_time).isoformat(),
+                "salary_date": _eastern_date(salary_start).isoformat(),
+                "reason": "the feed's date is not the salary file's date for this matchup"})
+            if excluded:
+                excluded_game_ids.remove(game_id)
+                excluded = False
+        elif excluded and date_verdict is True:
+            postponement_verified.append(game_id)
+        if salary_start is not None and (date_verdict is False or salary_start < lock_time):
+            lock_times_clamped.append({
+                "game_id": game_id, "feed_lock_time": lock_time.isoformat(),
+                "salary_lock_time": salary_start.astimezone(timezone.utc).isoformat()})
+            lock_time = salary_start.astimezone(timezone.utc)
         lock_time_by_game_id[game_id] = lock_time
         game_meta[game_id] = {
             "game_pk": game_entry.get("game_pk"),
@@ -1127,6 +1240,11 @@ def build_status_map_from_lineups_feed(
         "lock_time_by_game_id": {k: v.isoformat() for k, v in lock_time_by_game_id.items()},
         "game_meta": game_meta,
         "unmatched_feed_players": unmatched,
+        # R325: what the date check did, named rather than silent (R237).
+        "feed_dates_ignored": sorted(feed_dates_ignored, key=lambda r: r["game_id"]),
+        "postponement_verified_game_ids": sorted(set(postponement_verified)),
+        "lock_times_clamped_to_salary": sorted(lock_times_clamped,
+                                               key=lambda r: r["game_id"]),
         "uncovered_salary_player_ids": sorted(uncovered),
         "partial_lineup_teams": sorted(partial_lineup_teams,
                                        key=lambda r: (r["team"], r["game_id"])),

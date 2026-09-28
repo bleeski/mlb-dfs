@@ -935,7 +935,25 @@ EXPECTED_SUITE_COUNTS = {
     # in it, the exit-10 log, a bank_diagnostics-only refusal, the typed block
     # is what is branched on) and one AutobuildBankCapTests (BANK-LIMITED in
     # errors[] is not a remedy).
-    "tests.test_core": 1813,
+    # R174 + R404 (Session 28), 2026-09-28: 1813 -> 1841, the 28 that pin a
+    # post-export locked-team ban and a swap that runs its own referee, and a
+    # repair that needs no feed: 22 LateSwapPreflightTests (the delta refuses an
+    # introduced player from a started game, passes an open one, ignores a slot
+    # move, fails closed on an unmapped id, checks nothing when no ban is
+    # expressed; the pipeline helper takes teams from the salary file and
+    # execute_portfolio calls it, and its team map is spelled as the ban's is; the
+    # swap runs the referee, says review_ready and not upload_ready for a
+    # downgrade, prints a referee's exit-3 reason, refuses to exit 0
+    # on a started-game introduction or a referee that cannot run, hands it
+    # CLAUDE.md's arguments and no invented clock, and a failed referee writes
+    # its refusal record; full DK coverage stands in for a missing feed file, a
+    # synthesized feed gives every player a lock time, one uncovered side and an
+    # explicit missing --lineups still exit 4, an explicit feed outranks DK) and
+    # six RepairDkStartingTests (locks from the salary clock with
+    # no feed, DK confirms and a legal replacement is found, a started game's
+    # player is counted team_locked, partial DK coverage confirms nobody, an
+    # explicit feed is the source, --dead-from-feed reads DK's orders).
+    "tests.test_core": 1841,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps
@@ -1452,7 +1470,19 @@ EXPECTED_SUITE_COUNTS = {
     # explicit --parent either; the same bytes with no manifest at all still
     # run the initial-build case, proving the pass above is the resolution
     # working and not the started-game rule going soft).
-    "tests.test_upload_integrity": 423,
+    # R325 (Session 28), 2026-09-28: 423 -> 440, the seventeen LockFeedTruthTests
+    # (a same-date postponement still exempts, a wrong-date one exempts nothing
+    # in either referee, dates compare in Eastern across the UTC boundary and
+    # across a moved start, a postponement the salary file cannot date is not
+    # honored, yesterday's feed neither locks nor unlocks tonight, same-date
+    # evidence still adds a lock, preflight accepts --locked-teams and an
+    # operator lock the clock has not reached binds both referees, the two
+    # referees report one locked set, the build pool keeps the teams of a
+    # wrong-date postponement and still drops a same-date one, an explicit DK id
+    # must belong to its row's team and a matching one still matches, the swap's
+    # ban names the smuggled player, and a feed can only move a game's lock time
+    # earlier than the salary's, on a wrong day or the same one).
+    "tests.test_upload_integrity": 440,
     "tests.test_golden_replay": 9,
     # R117(a), 2026-08-18: 75 -> 82, the seven that pin BOTH renders of the
     # mlb.com hand line against the same paste -- the joined render derived from

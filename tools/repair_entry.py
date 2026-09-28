@@ -22,11 +22,14 @@ file. Six constraints, all mechanical:
   1. slot eligibility -- `Roster Position` admits the DK column the dead
      player occupies;
   2. salary -- the entry's total after removing the dead player leaves room;
-  3. the candidate's game has NOT locked, from the feed clock, through
-     `verify_export.derive_locked_teams_from_feed` (the same derivation the
-     verifier uses, so the tool that repairs and the tool that checks read one
-     fact rather than two);
-  4. confirmed starter -- the feed's confirmed set, AND his game has not yet
+  3. the candidate's game has NOT locked, through
+     `preflight_upload.resolve_locked_teams` (R404/R325: the salary file's Game
+     Info clock, unioned with the feed's clock when there is one, the same
+     function both referees call, so the tool that repairs and the tool that
+     checks read one fact rather than two);
+  4. confirmed starter -- the feed's confirmed set, or with no `--feed` DK's own
+     posted `Starting` orders when they cover EVERY side (R404; R143 ranks a
+     complete DK 1-9 above any feed), AND his game has not yet
      begun. The OBSERVED tier (R270(b)) only ever REMOVES a candidate here: it
      bars a player it says `did_not_start`, and it bars one it says `started`,
      because `started` means that game is already underway (R292(b)). It never
@@ -98,10 +101,10 @@ if str(REPO_ROOT) not in sys.path:
 # wrong; `preflight_upload` owns the DK file geometry and the slot-eligibility
 # rule, and `verify_export` owns the lock derivation.
 from preflight_upload import (  # noqa: E402
-    CLASSIC_SLOTS, SALARY_CAP, EntryRow, load_entries, load_salary,
-    parse_as_of, person_key, slot_admits, _digits, _int_or_none, _norm_name,
+    CLASSIC_SLOTS, SALARY_CAP, EntryRow, Report, load_entries, load_salary,
+    parse_as_of, person_key, resolve_locked_teams, slot_admits, _digits,
+    _int_or_none, _norm_name,
 )
-from verify_export import derive_locked_teams_from_feed  # noqa: E402
 
 PITCHER_SLOTS = {"P", "SP", "RP"}
 
@@ -583,19 +586,55 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     trailing = [row for line_no, row in enumerate(all_rows[1:], start=2)
                 if line_no not in entry_lines]
 
-    locked: set[str] = set()
+    # R404 + R325. THE LOCK DECISION is `preflight_upload.resolve_locked_teams`,
+    # the function both referees call: the salary file's Game Info clock, unioned
+    # with the feed's clock when one is supplied, minus only a postponement the
+    # feed dates to the salary file's own game. This tool used to derive locks
+    # from `--feed` alone, so with no feed it printed "no team treated as
+    # locked" and offered replacements from games that had started (measured on
+    # 1905_10g, one minute after TB@NYY's first pitch), and with a feed it
+    # ignored the salary clock the verifier unions in.
+    lock_report = Report()
+    locked, lock_note, lock_source, _not_locked = resolve_locked_teams(
+        None, salary, args.salary, args.feed, now, lock_report)
+    for warning in lock_report.warnings:
+        print(f"repair_entry: {warning}", file=sys.stderr)
     confirmed: List[str] = []
     status: Dict[str, Any] = {}
-    lock_note = "no feed supplied; no team treated as locked"
+    # CONFIRMATION. An explicit --feed wins; with none, DK's own posted orders
+    # confirm when they cover EVERY side (R143 ranks a complete DK 1-9 above any
+    # feed, and preflight already synthesizes the same feed for its posted-
+    # lineup check). Partial DK coverage confirms nothing: a side DK has not
+    # posted is not a confirmed side, and the reason is printed.
+    confirmation_source = "none"
+    feed_payload: Optional[Dict[str, Any]] = None
     if args.feed:
-        derived = derive_locked_teams_from_feed(args.feed, args.salary, now)
-        if derived is not None:
-            locked, lock_note, _not_locked = derived
+        try:
+            feed_payload = _load_json(args.feed)
+            confirmation_source = f"feed {args.feed.name}"
+        except Exception as exc:  # noqa: BLE001
+            print(f"repair_entry: feed unreadable for confirmation ({exc}); "
+                  f"no player will pass the confirmed test on feed evidence",
+                  file=sys.stderr)
+    else:
+        try:
+            from mlb_engine.intake.live_data_adapters import dk_starting_only_feed
+            feed_payload, dk_note = dk_starting_only_feed(args.salary)
+        except Exception as exc:  # noqa: BLE001
+            feed_payload, dk_note = None, f"{type(exc).__name__}: {exc}"
+        if feed_payload is not None:
+            confirmation_source = "dk_starting"
+            print(f"repair_entry: no --feed; confirmation from {dk_note} "
+                  f"(R143: DK's posted orders outrank any feed)", file=sys.stderr)
+        else:
+            print(f"repair_entry: no --feed and DK's posted orders cannot stand in "
+                  f"({dk_note}); no player will pass the confirmed test",
+                  file=sys.stderr)
+    if feed_payload is not None:
         try:
             from mlb_engine.intake.live_data_adapters import (
                 build_status_map_from_lineups_feed)
-            status = build_status_map_from_lineups_feed(
-                _load_json(args.feed), str(args.salary))
+            status = build_status_map_from_lineups_feed(feed_payload, str(args.salary))
             confirmed = list(status.get("confirmed_hitter_ids") or []) + list(
                 status.get("probable_pitcher_ids") or [])
         except Exception as exc:  # noqa: BLE001
@@ -653,14 +692,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     # operator gets behaviour nobody asked for.
     feed_dead: List[Dict[str, str]] = []
     if args.dead_from_feed:
-        if not args.feed:
-            print("repair_entry: REFUSING, --dead-from-feed needs --feed",
-                  file=sys.stderr)
-            return 3
         if not status:
             print("repair_entry: REFUSING, --dead-from-feed was asked for but "
-                  "the feed produced no status map, so 'absent from the posted "
-                  "nine' cannot be told from 'this feed has not posted'",
+                  "there is no --feed and DK's posted orders do not cover every "
+                  "side, or the feed produced no status map, so 'absent from the "
+                  "posted nine' cannot be told from 'nothing has posted'",
                   file=sys.stderr)
             return 3
         feed_dead = derive_dead_from_feed(entries, slots, salary, status)
@@ -670,7 +706,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                             observed, [e for e in args.entry_ids.split(",") if e],
                             args.mode)
     result.update({"contest": contest, "as_of": now.isoformat(),
-                   "lock_note": lock_note, "locked_teams": sorted(locked),
+                   "lock_note": lock_note, "lock_source": lock_source,
+                   "confirmation_source": confirmation_source,
+                   "locked_teams": sorted(locked),
                    "dead_player_ids": dead_ids,
                    "dead_derived_from_observed": derived_dead,
                    "dead_derived_from_feed": feed_dead,
@@ -701,7 +739,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         for d in result["deferred"]:
             print(f"{d['entry_id']}: DEFERRED to the whole-lineup solve "
                   f"({d['open_slots']} open / {d['pinned_slots']} pinned)")
-        print(f"lock: {result['lock_note']}")
+        print(f"lock: {result['lock_note']} [{result['lock_source']}]")
+        print(f"confirmation: {result['confirmation_source']}")
         if result["written"]:
             print(f"wrote {result['written']}")
             print("REVIEW-GRADE, not certified. Run the preflight before upload:")

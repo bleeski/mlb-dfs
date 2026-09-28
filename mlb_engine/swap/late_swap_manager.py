@@ -484,7 +484,13 @@ def validate_locked_immutability(source_path: str | Path, candidate_path: str | 
     return {"passed": not errors, "errors": errors}
 
 
-def validate_late_swap_delta(source_path: str | Path, candidate_path: str | Path, mutable_entry_ids: Optional[Iterable[str]] = None) -> Dict[str, Any]:
+def validate_late_swap_delta(
+    source_path: str | Path,
+    candidate_path: str | Path,
+    mutable_entry_ids: Optional[Iterable[str]] = None,
+    excluded_new_teams: Optional[Iterable[str]] = None,
+    player_team_by_id: Optional[Mapping[str, str]] = None,
+) -> Dict[str, Any]:
     """Diff a swapped file against its parent and reject unauthorized changes.
 
     ``mutable_entry_ids=None`` means unrestricted: no authorization was
@@ -501,9 +507,21 @@ def validate_late_swap_delta(source_path: str | Path, candidate_path: str | Path
     input; these two now agree.
     """
     mutable = None if mutable_entry_ids is None else {str(x) for x in mutable_entry_ids}
+    # R174. ``excluded_new_teams`` is the pre-solve ban (build-contract item 5)
+    # re-derived from the FILE: every player ID a changed entry holds now and did
+    # not hold in its parent is checked against the teams whose game has started.
+    # It was enforced only inside the allocator's candidate filter, so a
+    # regression there (R72(i) is the recorded case of that function failing
+    # open) shipped a file rostering a started player through every post-export
+    # gate the engine has. None means the caller expressed no ban; an empty
+    # collection means nobody is locked, and both skip the check.
+    banned = ({str(t).strip().upper() for t in excluded_new_teams}
+              if excluded_new_teams is not None else set())
+    team_of = {str(k): str(v).strip().upper()
+               for k, v in (player_team_by_id or {}).items()}
     before = {row.entry_id: row for row in parse_dk_entry_rows(source_path)}
     after = {row.entry_id: row for row in parse_dk_entry_rows(candidate_path)}
-    errors, changed = [], []
+    errors, changed, introduced_locked = [], [], []
     for entry_id, old in before.items():
         new = after.get(entry_id)
         if new is None:
@@ -512,7 +530,32 @@ def validate_late_swap_delta(source_path: str | Path, candidate_path: str | Path
             changed.append(entry_id)
             if mutable is not None and entry_id not in mutable:
                 errors.append(f"Entry ID {entry_id} changed without permission")
+            if banned:
+                # A SET difference, not a per-slot one: a player who moved
+                # slots is not an introduction, and the same player in two
+                # slots is one.
+                came_in = ({str(c) for c in new.roster_cells if c}
+                           - {str(c) for c in old.roster_cells if c})
+                for pid in sorted(came_in):
+                    team = team_of.get(pid)
+                    if team is None:
+                        # Fail closed (R72(i)): a player whose team is unknown
+                        # cannot be shown to be in a game that has not started.
+                        errors.append(
+                            f"Entry ID {entry_id}: introduced player {pid} has no "
+                            f"team in the lock map, so his game cannot be shown "
+                            f"not to have started")
+                        introduced_locked.append({"entry_id": entry_id,
+                                                  "player_id": pid, "team": None})
+                    elif team in banned:
+                        errors.append(
+                            f"Entry ID {entry_id}: introduced player {pid} ({team}) "
+                            f"is from an already-started game")
+                        introduced_locked.append({"entry_id": entry_id,
+                                                  "player_id": pid, "team": team})
     return {"passed": not errors, "errors": errors, "changed_entry_ids": changed,
+            "introduced_from_locked_teams": introduced_locked,
+            "excluded_new_teams_checked": sorted(banned),
             "authorization": "unrestricted" if mutable is None
                              else f"{len(mutable)} authorized Entry ID(s)"}
 

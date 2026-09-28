@@ -5441,10 +5441,9 @@ The refusal was `mlb_engine/intake/paste_odds.py`'s, and the pool's `excluded_po
 
 `main()` leaves the slate tag, its brief and the last refusal stamp in `build_slate._REFUSAL_CONTEXT`; `_main_recording_refusals` passes the tag and `refusal_record_facts` (status, refusal, `refusal_class`, `errors[:3]`, the failing `feasibility.checks`, run_id) to `write_refusal_record`. Run-less delivery records are `<tag>_norun_<sha12>.json`, keyed on the delivered sha256 so the same bytes recorded twice stay one record. A refusal before the salary file is read stays untagged, truthfully. Pinned by `test_core.RefusalRecordTagTests`. Gate: see the CHANGELOG entry.
 
-### R404. Late swap and repair demand a feed file even when DK's `Starting` column covers every side (P1, S) | new 2026-09-22, from `docs/backlog_inbox/2026-09-22_BUILD_1905-late-swap-needs-feed-dk-starting-ignored.md` §1-2 | Roadmap: Session 28
+### R404. CLOSED 2026-09-28 -- SHIPPED: late swap builds its feed from DK's `Starting` column when it covers every side, and `repair_entry` locks and confirms without a feed, roadmap Session 28, entry migrated to CHANGELOG.md
 
-- **What.** At 19:04 ET on 1905_10g, with a complete DK `Starting` 1-9 for all 20 sides and every data host blocked, `tools/late_swap.py` exited 4 on a missing `lineups_feed.json`. `tools/repair_entry.py` counted every candidate `not_confirmed` and printed `lock: no feed supplied; no team treated as locked` one minute after TB@NYY started. The five benched slots were repaired by hand under R272.
-- **Fix.** Accept "no feed, DK covers every side" the way `build_slate.py` does (`dk_order_coverage`; R143 ranks DK above any feed). Take confirmation from the feed synthesized from the salary file, as `preflight_upload.py` does, and fall back to salary Game Info for locks, as `verify_export.py` does.
+`late_swap.py` no longer exits 4 for want of the default `lineups_feed.json` when `dk_starting_only_feed` finds a complete DK 1-9 for every side (one uncovered side, or an explicit `--lineups` that does not exist, still exits 4 and names it), and `repair_entry.py` takes locks from `resolve_locked_teams` and confirmation from `--feed` else DK's orders under the same condition. Gate and commit: the CHANGELOG entry.
 
 ### R377. CLOSED 2026-09-23 -- SHIPPED: Showdown, late swap and egress as roadmap Session 02 (b), the Classic caller and the re-promotion as Session 03 (d), entry migrated to CHANGELOG.md
 
@@ -5474,37 +5473,9 @@ NAMED but the tool cannot read now fails in both tools (preflight warned) --
 with the check still running as an initial build, because refusing to check
 at all is the R292(d) hole.
 
-### R325. `verify_export` resolves its lock feed by team SET and lets that feed UNLOCK a salary-clock lock; explicit DK ids in a feed are accepted without a team/event check (P1, S) | new 2026-09-08, from the greenfield twelfth edition (F22); VERIFIED-read by the edition; R305's stated remainder ("date/game identity and the separate lock-feed path remain incomplete")
+### R325. CLOSED 2026-09-28 -- SHIPPED: one date-checked lock decision for the pool, the swap and both referees, roadmap Session 28, entry migrated to CHANGELOG.md
 
-**Rider 2026-09-25 (the code review, delivery area; `review_delivery/repro_locks.py`, `repro_locks2.py`): the preflight side, the introduction case, and the wrong-date feed, measured.** (1) A lineups source that says "Postponed" UNLOCKS a started game in BOTH referees: `preflight_upload.py:1057` (`player_lock_state` returns `LOCK_EXEMPT` before it consults `locked_teams` or the clock), `:1169` (an introduced "in" player in EXEMPT state goes to `exempted`, never `introduced`), `:2804` (`exempt_teams = postponed_teams_from_feed(--feed)`); `verify_export.py:260` (`derived -= not_locked`) with `:291` letting `--locked-teams` outrank the feed; preflight has no `--locked-teams`. `select_one_leg_per_matchup` keeps a single-leg game whatever its date, so a wrong-date feed's "Postponed" reaches `excluded_game_ids`. Measured, a child introducing a bat from a game started 15 minutes earlier: salary clock only, `preflight --parent: exit 2 FAIL introduced`; with a same-date feed saying Postponed, `exit 0` in both referees; with a WRONG-DATE (08-02) feed, `exit 0` in both; `verify_export --locked-teams AAA,BBB: exit 2`. Fix: a postponement exempts only when the feed game's `game_date_utc` date equals the salary file's Game Info date for that matchup (in `derive_locked_teams_from_feed`, so both inherit), and preflight gains the `--locked-teams` union. (2) The third clause, measured into the swap: `live_data_adapters.py:995-996` accepts an explicit `dk_id` with no team check, so a feed row `{"name", "dk_id": <AAA Aster>}` under EEE's confirmed lineup gives him team EEE, an open game and `Confirmed_Starter`; `late_swap_manager.py:440-441, 462` take `locked_teams` and `player_team_by_id` from the status map, so `excluded_new_teams=['AAA','BBB']` does not name him, the pre-solve ban admits him anywhere, the parent's own slot holding him is not locked, and `execution_pipeline.py:774-787`'s post-export validator takes `locked_slots` from the same requirements (R174). A DK-Starting synthesized feed cannot do this; a paste-converted or hand-shaped MCP feed can. Fix: `match_dk_id` accepts an explicit id only when the salary team (via `to_dk_abbrev`) equals `dk_team`, else `team_mismatch` in `unmatched_feed_players`; and the post-export validator gets an `excluded_new_teams` input.
-
-
-**Rider 2026-09-25 (the code review, intake area; `review_intake/r3_source_ranking.py`, 07-30 fixture).** The pool-side consequence of the ed12 F34 rider, measured: a feed side labelled `confirmed` with eight rows arrives confirmed (`live_data_adapters.py:1058` reads the label, `:646` `_side_is_complete` returns True before counting, `:1976-1985` warns and blocks only under 5, `:2044` keeps confirmed teams out of `tbd_teams` so no fill runs). BOS: 8 rows in the pool, no blocker, `thin_teams.short_of_nine: ['BOS']`; the same eight rows labelled `partial` yield nine (`posted_partial_plus_appg_fallback`). Neither the paste path (`paste_lineups.py:867`) nor the bundle (`fetch_slate_bundle.py:186`) emits `confirmed` under nine, so the door is a hand-rolled feed, which SKILL.md's MCP-shaping paragraph invites. Fix as the rider says, at `build_status_map_from_lineups_feed`: `confirmed` requires nine unique names in slots 1..9, else demote to `partial` and name it. XS-S, rides Session 28.
-
-
-- **What.** `verify_export.resolve_lineups_feed` (`:152-174`) and
-  `resolve_locked_teams` (`:247-320`, called near `:543`) match a feed on
-  away/home team sets, so yesterday's same matchup or the wrong doubleheader leg
-  is accepted; the posted-lineup resolver R305 built (identity by GAME set) is not
-  the resolver the LOCK derivation uses. `resolve_locked_teams` subtracts
-  feed-derived `not_locked` teams from the salary-clock locks, so a stale or
-  postponed-game feed can mark the current game open. `preflight_upload.
-  feed_compatibility` (`:1464-1486`) has the same team-set shape. And explicit DK
-  ids carried by a feed (`live_data_adapters.py:905-917`) are accepted without
-  checking that the id's team and event match the claim.
-- **Why P1.** A started slot read as open is the money boundary. R303 already
-  carried a "day-wide `lock_time_by_game_id`" PLAUSIBLE small; this is its
-  verified mechanism with the direction stated.
-- **Fix.** Bind the lock path to the R305 resolver: one immutable, freshness-
-  checked feed chosen by game set at intake, every consumer bound to its hash;
-  require `game_pk` plus `game_date_utc` (UTC-normalized) reconciliation against
-  the salary file's games; a feed may ADD evidence but may never remove a
-  salary-clock lock; a player's claimed `(team, event)` must match the feed's; an
-  approved reschedule creates a new snapshot rather than mutating identity.
-  Acceptance: same teams on another date, the wrong DH leg, and a conflicting
-  explicit id all fail; a whole-day superset stays usable after exact event
-  selection; no feed unlocks a started slot. Roadmap: Session 13 with R175 and
-  R174.
+A feed game dated to another Eastern day than the salary file's is not evidence: its postponement neither trims the pool nor exempts a started game, its start time is replaced by the salary file's, and a later feed time is clamped to it; `resolve_locked_teams` lives in `preflight_upload` and is called by both referees and `repair_entry`; preflight has `--locked-teams`; `match_dk_id` refuses an explicit id whose salary team is not the row's. Declined with reasons in the CHANGELOG: the hash-bound snapshot redesign and a time-of-day tolerance. The 2026-09-25 intake rider (a `confirmed` side with eight rows) moved to R177. Gate and commit: the CHANGELOG entry.
 
 ### R314. CLOSED 2026-09-08 -- SHIPPED inside R324's helper, entry migrated to CHANGELOG.md
 
@@ -5835,18 +5806,9 @@ already become "under 5 hitters"; the defect was unaffected. R233 scan found one
 remaining site of the shape, `if roles:` ten lines below, deliberately kept because
 its keys ARE the content. R177/F16 stays open as the same family. Gate 1469 -> 1473.
 
-### R174. The locked-team introduction ban is enforced only pre-solve; no post-export gate re-derives it from the exported file (P1, S) | new 2026-08-22, from the greenfield sixth edition; VERIFIED-read (`late_swap_manager.py`/`dk_entries_manager.py` unchanged since the review). **Rider 2026-08-27 (ed8 F-31), same batch, same argument:** `tools/late_swap.py` writes, records and promotes the swap CSV, then PRINTS the preflight command and returns success — the independent referee is optional human follow-up on exactly the path with the least time to follow up. Have the tool run the preflight (or `verify_export`) on its own final bytes and report the verdict before claiming success; the T-minutes case is where a skipped check ships.
+### R174. CLOSED 2026-09-28 -- SHIPPED: the locked-team ban holds post-export and the swap runs its referee, roadmap Session 28, entry migrated to CHANGELOG.md
 
-- **What:** build-contract item 5 lives entirely in
-  `_entry_candidate_compatible` against in-memory candidates;
-  `validate_dk_entries_file` never receives `excluded_new_teams`, and
-  `validate_late_swap_delta` checks entry-level authorization only. R72(i)
-  proves this exact function class has failed open in practice — a future
-  regression ships a certified file rostering a player whose game already
-  started, and every post-export gate passes.
-- **Fix:** extend `validate_late_swap_delta` (it already diffs rosters) to
-  reject introduced player IDs whose team is in `excluded_new_teams` — one
-  file-derived check closing the doctrine gap at the money boundary.
+`validate_late_swap_delta` rejects an introduced player id whose team is in `excluded_new_teams` (teams read off the salary file, an unmapped id fails closed), `execute_portfolio` wires it, and `late_swap.deliver_swap` runs `preflight_upload` on its own bytes and exits 5 rather than 0 when the referee refuses or cannot run. The entry's claim that no post-export gate re-derived the ban was already false for the two referees (R292(d), R324, R450). Gate and commit: the CHANGELOG entry.
 
 ### R175. verify_export is the weaker checker on exactly the files it exists for: no contest-identity check, delivered-manifest failures downgraded (P1, S) | new 2026-08-22, from the greenfield sixth edition; VERIFIED-read (`verify_export.py` unchanged since the review)
 
@@ -5889,6 +5851,11 @@ function. Gate 1473 -> 1489.
 
 ### R177. Empty `confirmed_hitter_ids` and None are conflated fail-open — the F16 class on a sibling check (P2, XS) | new 2026-08-22, from the greenfield sixth edition; VERIFIED-read (`dk_entries_manager.py` unchanged since the review)
 
+**Rider 2026-09-28 (Session 28's premise check of R325's 2026-09-25 intake rider; measured, and the mechanism corrected).** A feed side labelled `confirmed` with eight rows arrives confirmed: `build_status_map_from_lineups_feed` reads the label (`live_data_adapters.py`, `posted = ...lineup_status`), the under-five blocker in `build_slate_pool` never fires at eight, `tbd_teams` excludes confirmed teams so no platoon fill runs, and the pool report says only `thin_teams.short_of_nine: ['T1']` with a `confirmed lineup matched 8/9` warning; the same eight rows labelled `partial` yield nine (`posted_partial_plus_appg_fallback`). CORRECTED: the entry blamed `_side_is_complete`, which is called only inside `merge_dk_starting_into_feed`'s DK-degraded-side branch and is not on this path; the label read alone admits the side. Neither `paste_lineups.py` nor `fetch_slate_bundle.py` emits `confirmed` under nine, so the door is a hand-shaped feed. Fix: at `build_status_map_from_lineups_feed`, `confirmed` requires nine unique names in slots 1..9, else demote to `partial` and name it. XS-S. It collides with `DkDegradedSideTests.test_completeness_is_the_order_set_not_the_row_count` (test_core, the `confirmed` label is trusted without re-deriving the slots; its nine rows carry no order), which the fix updates deliberately. Rides Session 73, not Session 28.
+
+**Second finding on the same rider (Session 28's diff review, declined there):** a feed game dated to another Eastern day than the salary file's (yesterday's same matchup, a lone wrong leg) still populates `confirmed_teams`, `confirmed_hitter_ids` and `Confirmed_Starter` in `build_status_map_from_lineups_feed`; Session 28's date rule (`feed_dates_ignored`) repairs the lock time and the postponement only. Consequence: `repair_entry --dead-from-feed` and `check_feed` would judge today's actual starters absent from yesterday's nine, and yesterday's nine could be offered as replacements. The fix is a choice, not a mechanic, so it is filed with the label rule it belongs beside: skip or demote the wrong-date game's lineups (and name them in the pool report), knowing a hand-shaped feed with a sloppy `game_date_utc` would then lose its confirmed sides. `_feed_age_report` (late_swap) checks the feed's top-level `date` only.
+
+
 **Rider 2026-09-08 (ed12, F34): the same fail-open on the feed side.** `build_status_map_from_lineups_feed` (`live_data_adapters.py:973-999`) trusts a side's `lineup_status="confirmed"`, marks the team confirmed and converts order values without requiring nine unique players in slots 1..9; upstream adapters validate more strongly, but direct callers and imported feeds (and `preflight_upload.py:1737-1744`'s declared-pitcher parse) bypass that protection, so a partial or duplicate list establishes participation truth or throws in conversion. Validate at the shared boundary for every side labelled confirmed (nine unique ids, slots exactly 1..9, integer orders, no booleans); explicit pitcher roles validated against the role enum before they satisfy a role gate; projected partial lists stay projected. Explicit ids still need R325's team/event check. Roadmap: Session 46.
 
 - **What:** `confirmed = {...} or []` then `if confirmed:` skips the whole
@@ -5900,6 +5867,9 @@ function. Gate 1473 -> 1489.
   fails every hitter on that team.
 
 ### R178. Checker exit-contract smalls: csv.Error escapes as a raw traceback, and the declared-arm acknowledgment is Classic-only (P2, XS) | new 2026-08-22, from the greenfield sixth edition; (a) VERIFIED-repro, (b) VERIFIED-read (`preflight_upload.py`/`verify_export.py` unchanged since the review)
+
+**Rider 2026-09-28 (Session 28, found while measuring R325's `--locked-teams` case; VERIFIED-repro).** Usage errors exit 2, which is the hard-failure code: `python tools/preflight_upload.py --bogus` and `python tools/verify_export.py --bogus` both exit 2 (argparse's own code), while `preflight_upload.py`'s docstring says `3  usage or IO error. The check did not run.` A wrapper that reads exit 2 as "this file is blocked" misreads a mistyped flag as a verdict on the file, and one that reads 3 as "the check did not run" never sees a usage error. Fix: catch argparse's `SystemExit` in both mains (or subclass the parser's `error`) and return 3 with the usage line on stderr; `PreflightContractDocumentationTests` pins the documented table and should pin the behavior. XS. Rides Session 14 (b).
+
 
 - **What:** (a) both checker mains catch `(OSError, ValueError)` only;
   `_csv.Error` (field-limit overflow from a corrupted export) exits 1 with a
