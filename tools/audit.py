@@ -961,7 +961,8 @@ EXPECTED_SUITE_COUNTS = {
     # `build_f1_map`, an arm's team never joining the hitters' mean, the brief
     # count and its unpriced list, Showdown's constant), the starter-centered F4
     # mean (8) and the F1 x F4 ablation grade (11).
-    "tests.test_core": 1874,
+    # R446+R447+R17, 2026-09-29: 1874 -> 1887, the 13 that pin contest-title routing (`ContestTitleRoutingTests`: the bracket cap, the ' SE' token, contest_library reading a title as the engine does).
+    "tests.test_core": 1887,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps

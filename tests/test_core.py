@@ -7788,6 +7788,208 @@ class ContestLibraryTests(unittest.TestCase):
             self.assertIsInstance(block["coverage_target"], dict)
 
 
+class ContestTitleRoutingTests(unittest.TestCase):
+    """R446 + R447 + R17: what a contest TITLE says decides its posture.
+
+    Posture routing sets the caps and the shape score for a whole contest, so a
+    title read wrong builds the wrong contest. Three defects, each tested alone:
+    (a) DK spells the cap "[20 Entry Max]" and nothing parsed it, (b) the
+    curated ' SE' guard covered only its left edge, so ' Season' and ' SEA'
+    matched, (c) contest_library kept its own copy of the matcher and ranking.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        from mlb_engine.entries import dk_entries_manager as dkm
+        cls.dkm = dkm
+        cls.archetypes = dkm.load_archetypes(None)
+
+    def _route(self, title):
+        inferred = self.dkm.infer_contest_archetype(title, 5.0, self.archetypes)
+        posture = normalize_posture(inferred.get("inferred_type"),
+                                    inferred.get("payout_shape_default"),
+                                    inferred.get("inferred_max_entries"))
+        return inferred, posture, epi.resolve_contest_shape(posture, inferred)
+
+    # ---- (a) R446: the bracket form ------------------------------------------
+    def test_a_bracket_cap_routes_like_the_curated_hyphen_form(self):
+        """The CSV intends 3-Max and 20-Max as small_gpp and 150-Max as mme. The
+        spelling DK actually uses must land on the same posture and shape."""
+        for cap, posture, shape in ((3, "small_gpp", "small_field_gpp"),
+                                    (20, "small_gpp", "small_field_gpp"),
+                                    (150, "mme", "mme_gpp")):
+            with self.subTest(cap=cap):
+                _, hyphen_posture, hyphen_shape = self._route(f"MLB $5 Knuckleball [{cap}-Max]")
+                inferred, got_posture, got_shape = self._route(f"MLB $5 Knuckleball [{cap} Entry Max]")
+                self.assertEqual((hyphen_posture, hyphen_shape), (posture, shape))
+                self.assertEqual((got_posture, got_shape), (posture, shape))
+                self.assertEqual(inferred["inferred_max_entries"], cap)
+                self.assertEqual(inferred["max_entries_source"], "title")
+
+    def test_the_real_unmatched_title_no_longer_falls_through_to_large_gpp(self):
+        """'Strike Three [5 Entry Max]' is the archived title this defect really
+        moves: no archetype row matches it at all, so the cap was the only fact."""
+        inferred, posture, shape = self._route("MLB $1K Strike Three [5 Entry Max]")
+        self.assertIsNone(inferred["matched_pattern"])
+        self.assertEqual(inferred["inferred_type"], "unknown")
+        self.assertIn("contest_type", inferred["decision_critical_gaps"])
+        self.assertEqual(inferred["inferred_max_entries"], 5)
+        self.assertEqual((posture, shape), ("small_gpp", "small_field_gpp"))
+
+    def test_the_cap_thresholds_hold_at_every_boundary(self):
+        expected = {1: "single_entry", 2: "small_gpp", 20: "small_gpp",
+                    21: "large_gpp", 99: "large_gpp", 100: "mme", 150: "mme"}
+        for cap, posture in expected.items():
+            with self.subTest(cap=cap):
+                self.assertEqual(self._route(f"MLB $5 Pocket Cup [{cap} Entry Max]")[1], posture)
+
+    def test_only_a_cap_the_title_actually_states_is_read(self):
+        read = self.dkm._explicit_max_entries
+        self.assertEqual(read("MLB $5 Foo (20 Entry Max)"), 20)
+        self.assertEqual(read("MLB $5 Foo [20 entry  max]"), 20)
+        self.assertEqual(read("MLB $4.5K mini-MAX [$1K to 1st 150 Entry Max] (Night)"), 150)
+        self.assertEqual(read("MLB $5 Foo [20 Entry Max] [20 Entry Max]"), 20)
+        for title in ("MLB $5 Foo [0 Entry Max]",            # zero is not a cap
+                      "MLB $5 Foo [9999999 Entry Max]",       # not a plausible cap
+                      "MLB $5 Foo [Entry Max 20]",            # the number is not before the phrase
+                      "MLB $5 Foo [Entry Max]",
+                      "MLB $150 Entry Max Special",           # a price
+                      "MLB $5 Foo 1.5 Entry Max",             # a decimal
+                      "MLB $5 Foo [2,500 Entry Max]",         # the tail of a thousands figure
+                      "MLB $5 Foo [3 Entry Max] [20 Entry Max]",  # two caps: ambiguous
+                      "MLB $5 Foo [20 Entry Maximum]", "", None):
+            with self.subTest(title=title):
+                self.assertIsNone(read(title))
+
+    def test_a_title_cap_fills_a_blank_and_never_overrides_a_curated_row(self):
+        """Solo Shot's row says max 1 and DK titles it '[20 Entry Max]'. That
+        contradiction is R196's to decide; this change reports it and does not
+        move the ContestCard the allocator reads."""
+        inferred, posture, _ = self._route("MLB $1.5K Solo Shot [20 Entry Max]")
+        self.assertEqual(inferred["inferred_max_entries"], 1)
+        self.assertEqual(inferred["max_entries_source"], "archetype")
+        self.assertEqual(inferred["title_max_entries"], 20)
+        self.assertEqual(posture, "single_entry")
+        # A row whose cap is a curated guess ('verify max entries') is held the
+        # same way: the fill is for a BLANK only.
+        daily, posture, _ = self._route("MLB $1 Daily Dollar [3 Entry Max]")
+        self.assertEqual((daily["inferred_max_entries"], daily["max_entries_source"],
+                          daily["title_max_entries"]), (1, "archetype", 3))
+        self.assertEqual(posture, "single_entry")
+
+    def test_a_type_word_keeps_its_precedence_when_a_cap_is_also_stated(self):
+        cases = {"MLB $5 Satellite to Knuckleball [20 Entry Max]": ("wta_satellite", "satellite"),
+                 "MLB $5 WTA Knuckleball [20 Entry Max]": ("wta_satellite", "large_wta"),
+                 "MLB $5 Double Up [20 Entry Max]": ("cash", "cash"),
+                 "MLB $15K mini-MAX [150 Entry Max]": ("mme", "mme_gpp")}
+        for title, want in cases.items():
+            with self.subTest(title=title):
+                inferred, posture, shape = self._route(title)
+                self.assertEqual((posture, shape), want)
+
+    # ---- (b) R447: ' SE' is a whole token -------------------------------------
+    def test_a_word_that_merely_starts_with_se_is_not_the_single_entry_row(self):
+        for title in ("MLB $10 Pocket Cup (Late Season)", "MLB $10 Pocket Cup (Sunday Series)",
+                      "MLB $5 Knuckleball Select", "MLB $10 Pocket Cup (ATH @ SEA)"):
+            with self.subTest(title=title):
+                inferred, posture, shape = self._route(title)
+                self.assertNotEqual(inferred["matched_pattern"], " SE")
+                self.assertNotIn(" SE", inferred["competing_patterns"])
+                self.assertEqual((posture, shape), ("large_gpp", "large_field_gpp"))
+
+    def test_the_token_still_matches_where_it_is_a_token(self):
+        for title in ("MLB $5 SE", "MLB $5 Foo SE)", "MLB $5 Foo SE]", "MLB $5 Foo SE Bar",
+                      "MLB $5 Foo SE!", "MLB $5 Base SE"):
+            with self.subTest(title=title):
+                inferred, posture, _ = self._route(title)
+                self.assertEqual(inferred["matched_pattern"], " SE")
+                self.assertEqual(posture, "single_entry")
+        self.assertEqual(self._route("MLB $5 Single Entry")[0]["matched_pattern"], "Single Entry")
+
+    def test_the_left_edge_is_still_the_curated_space(self):
+        """Pre-existing and unchanged: '(SE)' and '[SE]' have no space before
+        the token, so the ' SE' row does not match them. Widening the left edge
+        would route new contests to single_entry, which is a strategy call."""
+        for title in ("MLB $5 Foo (SE)", "MLB $5 Foo [SE]", "MLB $5 PhaSE"):
+            with self.subTest(title=title):
+                self.assertIsNone(self._route(title)[0]["matched_pattern"])
+
+    def test_the_boundary_is_scoped_to_patterns_with_a_curated_guard(self):
+        """Only a pattern that begins with whitespace is a token. 'MME' and
+        'Quarter' stay substrings; that hazard is filed (R464), not changed here."""
+        match = self.dkm._pattern_in_title
+        self.assertTrue(match("MME", "MLB $5 Summer Special"))
+        self.assertTrue(match("Quarter", "MLB $5 Quarterback Special"))
+        self.assertFalse(match(" SE", "MLB $5 Season Opener"))
+        self.assertFalse(match("", "MLB $5 Season Opener"))
+        self.assertFalse(match("   ", "MLB $5 Season Opener"))
+
+    # ---- (c) R17: contest_library reads a title the way the engine does ----------
+    def test_contest_library_agrees_with_the_engine_on_every_title_above(self):
+        from mlb_engine.field import contest_library as cl
+        rows = cl.load_archetype_rows(ContestLibraryTests.ARCH)
+        self.assertIn(" SE", [r["pattern"] for r in rows],
+                      "the ' SE' guard space must survive the load, never be stripped")
+        titles = ("MLB $5 Baseball Bonanza [20 Entry Max]", "MLB $5 Baseball Bonanza",
+                  "MLB $4 Single Entry Satellite to the Chin Music [1 Ticket]",
+                  "MLB $10 Pocket Cup (Late Season)", "MLB $5 Knuckleball Select",
+                  "MLB $10 Pocket Cup (ATH @ SEA)", "MLB $5 Foo SE)", "MLB $5 SE",
+                  "MLB $5 Knuckleball [3 Entry Max]", "MLB $5 Knuckleball [150-Max]",
+                  "MLB $15K mini-MAX [150 Entry Max]", "MLB $1K Strike Three [5 Entry Max]",
+                  "MLB $1.5K Solo Shot [20 Entry Max]", "MLB $5 Double Up [20 Entry Max]",
+                  "MLB $5 Satellite to Knuckleball [20 Entry Max]")
+        for title in titles:
+            with self.subTest(title=title):
+                theirs = cl.infer_from_name(title, rows)
+                mine = self.dkm.infer_contest_archetype(title, None, self.archetypes)
+                if mine["matched_pattern"] is None:
+                    # No row matched: the engine still reports the title's cap on an
+                    # unknown type, and the library has no archetype to return.
+                    self.assertIsNone(theirs)
+                    continue
+                self.assertEqual(theirs["pattern"], mine["matched_pattern"])
+                self.assertEqual(theirs["inferred_type"], mine["inferred_type"])
+                self.assertEqual(theirs["inferred_max_entries"], mine["inferred_max_entries"])
+                self.assertEqual(theirs["matched_patterns"],
+                                 sorted([mine["matched_pattern"], *mine["competing_patterns"]]))
+
+    def test_the_named_contest_library_defects_are_closed(self):
+        from mlb_engine.field import contest_library as cl
+        rows = cl.load_archetype_rows(ContestLibraryTests.ARCH)
+        self.assertIsNone(cl.infer_from_name("MLB $5 Baseball Bonanza [20 Entry Max]", rows))
+        sat = cl.infer_from_name(
+            "MLB $4 Single Entry Satellite to the Chin Music [1 Ticket]", rows)
+        self.assertEqual(sat["inferred_type"], "satellite")
+        self.assertEqual(sat["ambiguous_types"], ["satellite", "se_gpp"])
+        self.assertGreater(sat["payout_breadth"], 0.05)  # a Floor/Volume tier, not the 1% Apex tier
+        capped = cl.infer_from_name("MLB $1K Strike Three [5 Entry Max]", rows)
+        self.assertIsNone(capped)  # no row matches: no archetype, and no breadth to invent
+        knuckle = cl.infer_from_name("MLB $5 Knuckleball [20 Entry Max]", rows)
+        self.assertEqual((knuckle["inferred_max_entries"], knuckle["max_entries_source"]),
+                         (20, "title"))
+
+    def test_the_archive_grader_reads_the_same_type_as_the_build(self):
+        """tools/ownership_grade_archive.resolve_archetype is contest_library's
+        one real caller (R306). It grades a title under the type the engine would
+        have built it under."""
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "ownership_grade_archive_r17",
+            Path(__file__).resolve().parents[1] / "tools" / "ownership_grade_archive.py")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        for title, field in (("MLB $4 Single Entry Satellite to the Chin Music [1 Ticket]", 5000),
+                             ("MLB $10 Pocket Cup (Late Season)", 5000)):
+            with self.subTest(title=title):
+                archetype, _exactness, why = mod.resolve_archetype(title, field)
+                mine = self.dkm.infer_contest_archetype(title, None, self.archetypes)
+                self.assertEqual(why, "")
+                expected = __import__("mlb_engine.field.ownership_prior", fromlist=["x"]) \
+                    .archetype_for_contest_facts(
+                        mine["inferred_type"], field, mine["inferred_max_entries"] or 1)
+                self.assertEqual(archetype, expected[0])
+
+
 class BankCacheTests(unittest.TestCase):
     """A resumable bank exists because an unbounded build inside a bounded
     execution environment is killed with no output and no diagnostic."""

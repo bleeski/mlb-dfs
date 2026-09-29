@@ -426,6 +426,57 @@ ARCHETYPE_TYPE_PRECEDENCE = {
 }
 
 
+def archetype_rank_key(inferred_type: Any, has_max_entries: bool, pattern: str) -> Tuple[Any, ...]:
+    """The one ranking every reader of the archetype CSV uses (R17).
+
+    Type precedence, then a row that pins max entries over one that does not,
+    then the longer pattern, then the pattern text for a stable tiebreak.
+    ``contest_library`` reads this instead of keeping its own order.
+    """
+    return (ARCHETYPE_TYPE_PRECEDENCE.get(str(inferred_type).lower(), 0),
+            1 if has_max_entries else 0, len(pattern), pattern)
+
+
+def _pattern_in_title(pattern: Any, title: Any) -> bool:
+    """Does a curated archetype pattern occur in a contest title? (R447)
+
+    A pattern whose curated text BEGINS with whitespace is a token guard: the
+    CSV's ' SE' row says its leading space "prevents false-positive matches on
+    titles containing USE, POSE, or similar substrings". The guard only covered
+    the left edge, so ' SE' still matched ' Season', ' Series', ' Select' and
+    ' SEA' (a Showdown "(ATH @ SEA)" suffix). A guarded pattern therefore has to
+    end at a token edge too: end of title, a space, a bracket, any character that
+    is not a letter or digit. Every other pattern stays a plain substring, so
+    'Quarter', 'MME' and 'Ticket' route as they always did.
+    """
+    pat = str(pattern or "").lower()
+    low = str(title or "").lower()
+    if not pat.strip():
+        return False
+    if pat[0].isspace():
+        return re.search(re.escape(pat) + r"(?![^\W_])", low) is not None
+    return pat in low
+
+
+# R446: DK spells the entry cap "[20 Entry Max]"; the CSV's rows carry "20-Max".
+# The digits immediately before "Entry Max" are the cap, so a title with two
+# numbers ("[$1K to 1st 150 Entry Max]") reads the right one. Not preceded by a
+# word character, dot, comma or "$", so a price, a decimal or the tail of "2,500"
+# is never read as a cap.
+_ENTRY_MAX_RE = re.compile(r"(?<![\w.,$])(\d{1,6})\s+entry\s+max\b", re.IGNORECASE)
+
+
+def _explicit_max_entries(title: Any) -> Optional[int]:
+    """The entry cap a contest title states, or None. A labelled fact from the title.
+
+    Zero is not a cap, and a title that states two different caps is ambiguous,
+    so neither routes anything; both read as "the title does not say".
+    """
+    caps = {int(x) for x in _ENTRY_MAX_RE.findall(str(title or ""))}
+    caps.discard(0)
+    return next(iter(caps)) if len(caps) == 1 else None
+
+
 def find_archetypes_csv() -> Optional[str]:
     """Locate the curated reference CSV without depending on the caller's cwd.
 
@@ -538,20 +589,25 @@ def infer_contest_archetype(contest_name: str, entry_fee: Optional[float] = None
     """
     name = str(contest_name or "")
     pool = list(archetypes) if archetypes else list(DEFAULT_ARCHETYPES)
-    matches = [a for a in pool if a.pattern.lower().strip() and a.pattern.lower() in name.lower()]
+    matches = [a for a in pool if _pattern_in_title(a.pattern, name)]
     selected = max(
         matches,
         # Type precedence first; then an archetype that pins max entries beats
         # one that does not, because "$0.25 Knuckleball [150-Max]" matches both
         # and only the 150-Max row carries the field structure that decides the
         # posture; then longest pattern, then the name for a stable tiebreak.
-        key=lambda a: (ARCHETYPE_TYPE_PRECEDENCE.get(str(a.inferred_type).lower(), 0),
-                       1 if a.inferred_max_entries is not None else 0,
-                       len(a.pattern), a.pattern),
+        key=lambda a: archetype_rank_key(a.inferred_type, a.inferred_max_entries is not None, a.pattern),
         default=None,
     )
+    # R446: the cap the TITLE states. It fills a blank and never overrides a
+    # curated row: 'MLB $1.5K Solo Shot [20 Entry Max]' keeps the Solo Shot row's
+    # max 1 (R196 owns that contradiction) and is only reported here.
+    title_max = _explicit_max_entries(name)
     if selected is None:
-        return {"inferred_type": "unknown", "inferred_max_entries": None, "payout_shape_default": "unknown", "objective_class": None, "ticket_count": None, "confidence": CONFIDENCE_UNKNOWN, "decision_critical_gaps": ["contest_type"], "matched_pattern": None, "competing_patterns": []}
+        return {"inferred_type": "unknown", "inferred_max_entries": title_max, "payout_shape_default": "unknown", "objective_class": None, "ticket_count": None, "confidence": CONFIDENCE_UNKNOWN, "decision_critical_gaps": ["contest_type"], "matched_pattern": None, "competing_patterns": [], "title_max_entries": title_max, "max_entries_source": "title" if title_max is not None else None}
+    max_entries = selected.inferred_max_entries if selected.inferred_max_entries is not None else title_max
+    max_source = ("archetype" if selected.inferred_max_entries is not None
+                  else "title" if title_max is not None else None)
     gaps: List[str] = []
     if selected.inferred_type == "satellite":
         # R1c: a curated ticket_count closes the first gap. It is the one fact
@@ -560,7 +616,9 @@ def infer_contest_archetype(contest_name: str, entry_fee: Optional[float] = None
         gaps = ["ticket_value"] if selected.ticket_count else ["ticket_count", "ticket_value"]
     return {
         "inferred_type": selected.inferred_type,
-        "inferred_max_entries": selected.inferred_max_entries,
+        "inferred_max_entries": max_entries,
+        "title_max_entries": title_max,
+        "max_entries_source": max_source,
         "payout_shape_default": selected.payout_shape_default,
         "objective_class": selected.objective_class,
         "ticket_count": selected.ticket_count,

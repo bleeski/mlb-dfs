@@ -446,7 +446,15 @@ class PreflightContestIdentityTests(unittest.TestCase):
                      "MLB $0.25 Knuckleball [150-Max]",
                      "MLB $5 Double Up",
                      "MLB $30 Quarter Jukebox [Just $0.25!] (Turbo)",
-                     "MLB $3 Wednesday Special"):
+                     "MLB $3 Wednesday Special",
+                     # R17/R447: the six names above hold no "se" inside a word, so
+                     # they could not tell a stripped ' SE' from the curated one.
+                     "MLB $5 Baseball Bonanza",
+                     "MLB $10 Pocket Cup (Late Season)",
+                     "MLB $5 Knuckleball Select",
+                     "MLB $10 Pocket Cup (ATH @ SEA)",
+                     "MLB $5 Foo SE)", "MLB $5 SE", "MLB $5 Foo (SE)",
+                     "MLB $1K Strike Three [5 Entry Max]"):
             mine = self.pf.match_archetype(name, rows)
             theirs = dem.infer_contest_archetype(name, None, engine_rows)
             self.assertEqual(
