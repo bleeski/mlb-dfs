@@ -189,6 +189,11 @@ python <repo>/tools/qa_portfolio.py --entries <delivered.csv> \
   --salary <DKSalaries.csv> --brief outputs/<date>/build_brief<suffix>.json
 ```
 
+The brief must be THIS build's: its `run_id` is the FILE line's run and its
+`delivered_sha256` is the delivered file's. A date can hold another draftgroup's
+certified brief under any name, so never take "the last one sorted" or "the
+newest" (R311(b)); `qa_portfolio.py` reads the path you hand it and does not check.
+
 Section 1 is what the build applied, from the artifact. Section 2 checks stacks
 against market implied totals and arms and bats against Savant expected stats.
 Section 3 is the dual-objective frontier. FanGraphs 403s scripted pulls, so a
@@ -232,8 +237,12 @@ less 30s.
 
 It detects Classic vs Showdown from the files, stages them into
 `data/slates/<date>/`, builds the pool, measures the solver, picks a strategy that
-fits the budget, builds, certifies, verifies the written CSV, and writes a brief
-to `outputs/<date>/build_brief.json`.
+fits the budget, builds, certifies, verifies the written CSV, and writes a brief.
+`--brief <path>` writes exactly that file and nothing in `outputs/<date>/`;
+without it the brief is `outputs/<date>/build_brief<suffix>.json` plus a
+slate-tagged copy beside it. Neither name says whose brief it is: `tools/retro.py`
+ties one to a delivery by the `run_id` (else `delivered_sha256`) the brief
+carries, and names what it declined when none matches (R311(b)).
 
 Exit codes: `0` certified, `10` partial progress saved (run the exact same command
 again, it resumes), `3` built but did not certify, `4` a precondition was never

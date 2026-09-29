@@ -33676,8 +33676,10 @@ class RetroFactsTests(unittest.TestCase):
         if brief is not None:
             out = root / "outputs" / self.DATE
             out.mkdir(parents=True, exist_ok=True)
+            # R311(b): a brief is tied to its delivery by identity, and the
+            # record above carries sha256 "b" * 64 and no run_id.
             (out / "build_brief_sd_1910_1g.json").write_text(
-                json.dumps(brief), encoding="utf-8")
+                json.dumps({"delivered_sha256": "b" * 64, **brief}), encoding="utf-8")
         record["_path"] = str(path.relative_to(root))
         return record
 
@@ -33853,6 +33855,366 @@ class RetroFactsTests(unittest.TestCase):
                             "## Tools against their contracts",
                             "does not carry (R363)"):
                 self.assertIn(heading, text)
+
+
+class BriefPathIdentityTests(unittest.TestCase):
+    """R311(b). A filename or an mtime is not an identity.
+
+    The filed claim was that ``--brief <path>`` also wrote
+    ``outputs/<date>/build_brief.json``. At this head it does not (the tagged
+    copy is guarded), so the writer half is a pin. The live defect was the
+    reader: ``retro.find_brief`` took a tag glob, then the bare name, then
+    ``sorted[0]``, and on a date with two draftgroups returned the OTHER
+    draftgroup's certified brief. The resolver now compares the delivery
+    record's ``run_id`` (else ``sha256``) with what each brief says about itself.
+    """
+
+    DATE = "2026-09-26"
+    A = {"tag": "1507_5g", "run": "20260926T181452Z_21d095c1", "sha": "a" * 64}
+    B = {"tag": "1840_3g", "run": "20260926T171000Z_9c9c9c9c", "sha": "b" * 64}
+
+    @staticmethod
+    def _bs():
+        import importlib.util
+        path = (Path(__file__).resolve().parents[1] / "skills" / "generate-lineups"
+                / "scripts" / "build_slate.py")
+        spec = importlib.util.spec_from_file_location("build_slate_r311b", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    @staticmethod
+    def _retro():
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
+        import retro
+        return retro
+
+    def _resolve(self, root, run, sha, lineage=""):
+        return self._retro().resolve_brief(root, self.DATE, run, sha,
+                                           lineage=lineage)
+
+    def _brief(self, who, **extra):
+        return {"status": "delivered", "date": self.DATE,
+                "slate": {"tag": who["tag"]}, "run_id": who["run"],
+                "delivered_sha256": who["sha"], **extra}
+
+    def _put(self, out: Path, name: str, payload, mtime=None) -> Path:
+        out.mkdir(parents=True, exist_ok=True)
+        path = out / name
+        path.write_text(json.dumps(payload), encoding="utf-8")
+        if mtime is not None:
+            os.utime(path, (mtime, mtime))
+        return path
+
+    # -- the writer ---------------------------------------------------------
+
+    def test_brief_flag_writes_exactly_the_named_file(self):
+        bs = self._bs()
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            named = root / "elsewhere" / "deeper" / "mine.json"
+            wrote = bs.write_brief_files(
+                {"run_id": "r1"}, brief_arg=str(named),
+                outputs_dir=root / "outputs" / self.DATE, suffix="",
+                tag=self.A["tag"])
+            self.assertEqual(wrote, [named])
+            self.assertEqual(json.loads(named.read_text(encoding="utf-8")),
+                             {"run_id": "r1"})
+            self.assertEqual(sorted(p.relative_to(root).as_posix()
+                                    for p in root.rglob("*") if p.is_file()),
+                             ["elsewhere/deeper/mine.json"])
+            self.assertFalse((root / "outputs").exists(),
+                             "--brief left a copy in outputs/<date>/ for a glob to find")
+
+    def test_without_the_flag_the_brief_is_the_bare_and_the_tagged_name(self):
+        bs = self._bs()
+        with tempfile.TemporaryDirectory() as raw:
+            out = Path(raw) / "outputs" / self.DATE
+            wrote = bs.write_brief_files({"run_id": "r1"}, brief_arg=None,
+                                         outputs_dir=out, suffix="_sd",
+                                         tag=self.A["tag"])
+            self.assertEqual([p.name for p in wrote],
+                             ["build_brief_sd.json",
+                              f"build_brief_sd_{self.A['tag']}.json"])
+            self.assertEqual(sorted(p.name for p in out.iterdir()),
+                             sorted(p.name for p in wrote))
+            self.assertEqual(wrote[0].read_text(encoding="utf-8"),
+                             wrote[1].read_text(encoding="utf-8"))
+
+    def test_main_hands_the_brief_flag_to_the_writer(self):
+        """The writer test above is only a pin if `main()` passes `--brief`
+        through: a call that hard-codes None would write the two default files
+        for a named path and no test of the function alone would notice."""
+        import ast
+        tree = ast.parse((Path(__file__).resolve().parents[1] / "skills"
+                          / "generate-lineups" / "scripts" / "build_slate.py"
+                          ).read_text(encoding="utf-8"))
+        main = next(n for n in tree.body
+                    if isinstance(n, ast.FunctionDef) and n.name == "main")
+        calls = [n for n in ast.walk(main) if isinstance(n, ast.Call)
+                 and getattr(n.func, "id", "") == "write_brief_files"]
+        self.assertEqual(len(calls), 1, "main() writes the brief in one place")
+        kw = {k.arg: ast.unparse(k.value) for k in calls[0].keywords}
+        self.assertEqual(kw["brief_arg"], "args.brief")
+
+    # -- the resolver -------------------------------------------------------
+
+    def test_the_other_draftgroups_newer_brief_is_never_selected(self):
+        """Two draftgroups, one date. B's briefs are NEWER and one sorts first;
+        A's own brief is the OLDEST file and sorts in the middle. Only the
+        run_id says which is A's."""
+        retro = self._retro()
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            out = root / "outputs" / self.DATE
+            self._put(out, "build_brief.json", self._brief(self.B), mtime=3000)
+            self._put(out, "build_brief_1840_3g.json", self._brief(self.B), mtime=3000)
+            self._put(out, "build_brief_open.json", self._brief(self.B), mtime=4000)
+            mine = self._put(out, "build_brief_1507_5g.json",
+                             self._brief(self.A, marker="mine"), mtime=1000)
+            self._put(out, "build_brief_0legacy.json",
+                      {"slate": {"tag": self.A["tag"]}}, mtime=5000)
+            path, how = self._resolve(root, self.A["run"],
+                                            self.A["sha"])
+            self.assertEqual(path, mine)
+            self.assertIn(self.A["run"], how)
+            # and with A's brief absent, the answer is NONE, not B's:
+            mine.unlink()
+            path, how = self._resolve(root, self.A["run"],
+                                            self.A["sha"])
+            self.assertIsNone(path, how)
+            self.assertIn(self.A["run"], how)
+            for name in ("build_brief.json", "build_brief_1840_3g.json",
+                         "build_brief_open.json", "build_brief_0legacy.json"):
+                self.assertIn(name, how, "the refusal names what it declined")
+
+    def test_a_brief_with_another_run_id_never_matches_even_on_the_same_bytes(self):
+        """A rebuild that re-delivers identical bytes is another build."""
+        retro = self._retro()
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            out = root / "outputs" / self.DATE
+            other = dict(self.A, run="20260926T190000Z_deadbeef")
+            self._put(out, "build_brief_rebuild.json", self._brief(other))
+            path, how = self._resolve(root, self.A["run"],
+                                            self.A["sha"])
+            self.assertIsNone(path, how)
+
+    def test_a_legacy_brief_with_no_run_id_matches_by_sha_and_only_by_sha(self):
+        retro = self._retro()
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            out = root / "outputs" / self.DATE
+            legacy = self._put(out, "build_brief_legacy.json",
+                               {"delivered_sha256": self.A["sha"].upper(),
+                                "slate": {"tag": self.A["tag"]}})
+            self._put(out, "build_brief_other.json",
+                      {"delivered_sha256": self.B["sha"]})
+            path, how = self._resolve(root, self.A["run"],
+                                            self.A["sha"])
+            self.assertEqual(path, legacy)
+            self.assertIn("no run_id", how)
+            # a run_id match outranks the legacy sha match
+            new = self._put(out, "build_brief_z_new.json", self._brief(self.A))
+            path, how = self._resolve(root, self.A["run"],
+                                            self.A["sha"])
+            self.assertEqual(path, new, how)
+
+    def test_a_record_with_a_run_id_and_no_sha_does_not_match_a_brief_with_neither(self):
+        """Two absences are not a match: an empty string equals an empty string."""
+        retro = self._retro()
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            self._put(root / "outputs" / self.DATE, "build_brief_refused.json",
+                      {"status": "not_certified", "slate": {"tag": "x"}})
+            path, how = self._resolve(root, self.A["run"], None)
+            self.assertIsNone(path, how)
+            path, how = self._resolve(root, None, None)
+            self.assertIsNone(path)
+            self.assertIn("neither a run_id nor a sha256", how)
+
+    def test_a_record_with_no_run_id_matches_on_sha_alone(self):
+        """Showdown writes no runs/ directory, so its record has no run_id."""
+        retro = self._retro()
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            out = root / "outputs" / self.DATE
+            self._put(out, "build_brief_sd_1840_3g.json",
+                      dict(self._brief(self.B), run_id=None))
+            mine = self._put(out, "build_brief_sd_1507_5g.json",
+                             dict(self._brief(self.A), run_id=None))
+            path, how = self._resolve(root, None, self.A["sha"])
+            self.assertEqual(path, mine)
+            self.assertIn("no run_id", how)
+            path, how = self._resolve(root, None, "c" * 64)
+            self.assertIsNone(path, how)
+
+    def test_distinct_briefs_for_one_run_are_ambiguous_and_copies_are_one(self):
+        retro = self._retro()
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            out = root / "outputs" / self.DATE
+            first = self._put(out, "build_brief.json", self._brief(self.A))
+            self._put(out, "build_brief_1507_5g.json", self._brief(self.A))
+            path, how = self._resolve(root, self.A["run"],
+                                            self.A["sha"])
+            self.assertEqual(path, first, "byte-identical copies are one brief")
+            # A different brief for the same run and a different file's bytes:
+            # the record's sha narrows it to the brief describing THIS file.
+            swap = self._put(out, "build_brief_swap.json",
+                             dict(self._brief(self.A, marker="swap"),
+                                  delivered_sha256="d" * 64))
+            path, how = self._resolve(root, self.A["run"],
+                                            self.A["sha"])
+            self.assertEqual(path, first, how)
+            # with no sha to narrow by, two different briefs are named, not picked
+            path, how = self._resolve(root, self.A["run"], None)
+            self.assertIsNone(path)
+            self.assertIn("AMBIGUOUS", how)
+            self.assertIn(swap.name, how)
+
+    def test_unreadable_and_non_object_briefs_are_named_not_skipped_silently(self):
+        retro = self._retro()
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            out = root / "outputs" / self.DATE
+            out.mkdir(parents=True)
+            (out / "build_brief_torn.json").write_text("{not json", encoding="utf-8")
+            self._put(out, "build_brief_list.json", [1, 2])
+            path, how = self._resolve(root, self.A["run"],
+                                            self.A["sha"])
+            self.assertIsNone(path)
+            self.assertIn("unreadable: build_brief_list.json, build_brief_torn.json", how)
+            self.assertIsNone(retro.resolve_brief(
+                root, "2026-01-01", self.A["run"], self.A["sha"], lineage="")[0])
+
+    def test_two_different_briefs_for_one_run_stay_ambiguous_when_no_sha_narrows(self):
+        """`narrowed or hits`: when the record's sha matches neither brief the
+        tie is still reported as a tie, not as 'no brief carries this'."""
+        retro = self._retro()
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            out = root / "outputs" / self.DATE
+            self._put(out, "build_brief_one.json",
+                      dict(self._brief(self.A, marker="1"), delivered_sha256="d" * 64))
+            self._put(out, "build_brief_two.json",
+                      dict(self._brief(self.A, marker="2"), delivered_sha256=None))
+            path, how = self._resolve(root, self.A["run"], self.A["sha"])
+            self.assertIsNone(path)
+            self.assertIn("AMBIGUOUS", how)
+
+    def test_a_baseline_brief_from_a_same_bytes_rerun_answers_for_the_reused_row(self):
+        """A rerun that rebuilds identical baseline bytes reuses the live row
+        and its file: the record keeps the ORIGINAL run, the brief written over
+        that file carries the NEW one and names the original."""
+        retro = self._retro()
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            out = root / "outputs" / self.DATE
+            new_run = "20260926T183000Z_feedface"
+            baseline = self._put(
+                out, "build_brief_1507_5g_BASELINE_x.json",
+                dict(self._brief(dict(self.A, run=new_run)), lineage="baseline",
+                     baseline={"reused_row": {"run_id": self.A["run"]}}))
+            self._put(out, "build_brief_1840_3g.json", self._brief(self.B))
+            for run in (self.A["run"], new_run):
+                path, how = self._resolve(root, run, self.A["sha"], "baseline")
+                self.assertEqual(path, baseline, (run, how))
+            path, how = self._resolve(root, self.B["run"], self.A["sha"], "baseline")
+            self.assertEqual(path.name, "build_brief_1840_3g.json")
+
+    def test_a_shared_sha_is_told_apart_by_lineage(self):
+        """Showdown, thesis ladder not presented: the main brief's
+        `delivered_sha256` is the baseline's, so one sha names two briefs."""
+        retro = self._retro()
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            out = root / "outputs" / self.DATE
+            shared = dict(self.A, run=None)
+            main_brief = self._put(out, "build_brief_showdown.json",
+                                   dict(self._brief(shared, marker="main"), run_id=None))
+            base_brief = self._put(out, "build_brief_showdown_BASELINE_a.json",
+                                   dict(self._brief(shared, marker="baseline"),
+                                        run_id=None, lineage="baseline"))
+            path, how = self._resolve(root, None, self.A["sha"], "baseline")
+            self.assertEqual(path, base_brief, how)
+            path, how = self._resolve(root, None, self.A["sha"], "")
+            self.assertEqual(path, main_brief, how)
+            # a record of a lineage neither brief has still names the tie
+            self._put(out, "build_brief_showdown_BASELINE_b.json",
+                      dict(self._brief(shared, marker="baseline again"),
+                           run_id=None, lineage="baseline"))
+            path, how = self._resolve(root, None, self.A["sha"], "baseline")
+            self.assertIsNone(path)
+            self.assertIn("AMBIGUOUS", how)
+
+    def test_a_lineage_no_tied_brief_carries_still_names_the_tie(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            out = root / "outputs" / self.DATE
+            shared = dict(self.A, run=None)
+            for name in ("one", "two"):
+                self._put(out, f"build_brief_{name}_BASELINE.json",
+                          dict(self._brief(shared, marker=name), run_id=None,
+                               lineage="baseline"))
+            path, how = self._resolve(root, None, self.A["sha"], "")
+            self.assertIsNone(path)
+            self.assertIn("AMBIGUOUS", how)
+
+    def test_retro_hands_the_records_lineage_to_the_resolver(self):
+        retro = self._retro()
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            (root / "skills" / "generate-lineups").mkdir(parents=True)
+            (root / "skills" / "generate-lineups" / "SKILL.md").write_text(
+                "", encoding="utf-8")
+            out = root / "outputs" / self.DATE
+            shared = dict(self.A, run=None)
+            self._put(out, "build_brief_showdown.json",
+                      dict(self._brief(shared, elapsed_s=1.0), run_id=None))
+            self._put(out, "build_brief_showdown_BASELINE_a.json",
+                      dict(self._brief(shared, elapsed_s=2.0), run_id=None,
+                           lineage="baseline"))
+            record = {"date": self.DATE, "manifest_row": {
+                "run_id": None, "sha256": self.A["sha"], "lineage": "baseline",
+                "slate_tag": self.A["tag"], "contest_type": "showdown"}}
+            facts = retro.retro(record, root)
+            self.assertEqual(facts["clock"]["build_elapsed_s"], 2.0)
+            record["manifest_row"].pop("lineage")
+            self.assertEqual(retro.retro(record, root)["clock"]["build_elapsed_s"], 1.0)
+
+    def test_retro_reads_no_facts_from_another_draftgroups_brief(self):
+        """Through `retro()`, the door a session uses: the wrong brief used to
+        supply `elapsed_s` and the degraded-inputs section."""
+        retro = self._retro()
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            (root / "skills" / "generate-lineups").mkdir(parents=True)
+            (root / "skills" / "generate-lineups" / "SKILL.md").write_text(
+                "", encoding="utf-8")
+            out = root / "outputs" / self.DATE
+            self._put(out, "build_brief.json", self._brief(self.B, elapsed_s=999.0))
+            record = {"date": self.DATE, "manifest_row": {
+                "run_id": self.A["run"], "sha256": self.A["sha"],
+                "slate_tag": self.A["tag"], "contest_type": "classic"}}
+            facts = retro.retro(record, root)
+            self.assertIn("outputs/", facts["brief"])
+            self.assertIn(self.A["run"], facts["brief_resolution"])
+            self.assertIsNone(facts["clock"]["build_elapsed_s"])
+            self._put(out, "build_brief_1507_5g.json",
+                      self._brief(self.A, elapsed_s=41.0))
+            facts = retro.retro(record, root)
+            self.assertEqual(facts["clock"]["build_elapsed_s"], 41.0)
+            self.assertTrue(facts["brief"].endswith("build_brief_1507_5g.json"))
+            # an operator-named brief is still honored, and says so
+            named = self._put(root, "mine.json", self._brief(self.A, elapsed_s=7.0))
+            facts = retro.retro(record, root, brief_path=named)
+            self.assertEqual(facts["clock"]["build_elapsed_s"], 7.0)
+            self.assertEqual(facts["brief_resolution"], "given by --brief")
+            # the text a session reads says how the brief was matched
+            self.assertIn("given by --brief", retro.render(facts))
+            facts = retro.retro(record, root)
+            self.assertIn(f"matched by run_id {self.A['run']}", retro.render(facts))
 
 
 if __name__ == "__main__":

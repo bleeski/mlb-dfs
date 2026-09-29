@@ -963,7 +963,8 @@ EXPECTED_SUITE_COUNTS = {
     # mean (8) and the F1 x F4 ablation grade (11).
     # R446+R447+R17, 2026-09-29: 1874 -> 1887, the 13 that pin contest-title routing (`ContestTitleRoutingTests`: the bracket cap, the ' SE' token, contest_library reading a title as the engine does).
     # R453, 2026-09-29: 1887 -> 1910, the 23 that pin the sliced bank's cap counting the requesting build's own buckets (`BankCapPerBucketTests`: both directions of the reproduction, the cap still binding on a cap-bound bucket, fresh-cache equivalence, the sleeves' relative cap, the caller census, the starved-slice disagreement, the slice-wide `anti_correlation` merge).
-    "tests.test_core": 1910,
+    # R311(b), 2026-09-29: 1910 -> 1926, the 16 that pin a brief's identity (`BriefPathIdentityTests`: `--brief` writes exactly the named file and main() passes it through, the bare and tagged names without it, `retro.resolve_brief` keyed on run_id then sha and never a tag, a sorted position or an mtime, legacy briefs, a baseline brief answering for the row a rerun reused, a shared sha told apart by lineage, the ambiguous and unreadable cases, and `retro()` end to end).
+    "tests.test_core": 1926,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps
