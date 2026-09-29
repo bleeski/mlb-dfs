@@ -1,7 +1,10 @@
 """contest_library.py -- name-keyed DraftKings contest library (untracked companion).
 
-STATUS: review-only companion, deliberately OUTSIDE the audited engine, on the
-same footing as posture_allocator.py, ownership_prior.py, and field_miner.py. It
+STATUS: review-only companion, deliberately OUTSIDE the audited engine's build
+path, on the same footing as posture_allocator.py, ownership_prior.py, and
+field_miner.py. It reads a contest TITLE through dk_entries_manager's matcher,
+ranking and entry-cap parse (R17), imported at first use, so it has one reader of
+a title and not a copy; it needs the engine's imports to resolve a name. It
 never calls run_slate, never writes an entry requirement, and never auto-applies
 anything. It resolves the tier inputs a contest menu needs and emits a paste-ready
 ``waterfall`` (a posture_allocator.allocate result) that Ben passes explicitly to
@@ -113,8 +116,10 @@ def load_archetype_rows(archetypes_path: Optional[str] = None) -> List[Dict[str,
     rows: List[Dict[str, Any]] = []
     with Path(path).open(newline="", encoding="utf-8-sig") as fh:
         for r in csv.DictReader(fh):
-            pattern = str(r.get("pattern") or "").strip()
-            if not pattern:
+            # Raw, never stripped: the ' SE' row's leading space is a curated
+            # token guard (R17). A blank pattern is skipped, as before.
+            pattern = str(r.get("pattern") or "")
+            if not pattern.strip():
                 continue
             breadth = None
             raw = r.get("payout_breadth")
@@ -144,23 +149,33 @@ def infer_from_name(name: str, archetype_rows: Sequence[Mapping[str, Any]]) -> O
     """Match a contest name to an archetype row, returning the payout_breadth the tier
     logic needs.
 
-    Ranking is CONFIDENCE FIRST (the CSV's own confidence column), then pattern length.
-    That implements the archetype CSV's own notes ("if title says Qualifier treat as
-    satellite") and fixes the ledger 3.4 recurring-family trap: a high-confidence
-    contest-type token (Satellite, Qualifier, WTA) now outranks a low-confidence
-    recurring-family name (Pocket Cup, Relay Throw, Knuckleball). Measured on the
-    2026-06/07 archive, plain longest-match mis-tiered 6 of 9 satellites as Volume
-    when they are Floor. Disagreements are still flagged in ambiguous_types."""
-    low = str(name or "").lower()
-    matches = [r for r in archetype_rows if r["pattern"].lower() in low]
+    R17: this reads the contest name the way the engine does, through the engine's
+    own matcher (``_pattern_in_title``: a guarded ' SE' matches as a whole token),
+    ranking (``archetype_rank_key``: type precedence, then a row that pins max
+    entries, then pattern length) and title-cap parse (``_explicit_max_entries``,
+    which fills a blank ``inferred_max_entries`` and never overrides a row). It
+    used to keep its own copy: it stripped the ' SE' guard space and ranked by
+    confidence then length, so "Baseball" resolved se_gpp and "Single Entry
+    Satellite" resolved se_gpp where the engine resolves a satellite. Type
+    precedence supersedes the confidence-first order that fixed ledger 3.4 (a
+    high-confidence Satellite/Qualifier/WTA token outranks a low-confidence
+    recurring-family name); it is the same answer on those titles and the right
+    one on the rest. Disagreements are still flagged in ambiguous_types."""
+    from mlb_engine.entries import dk_entries_manager as dkm
+
+    matches = [r for r in archetype_rows if dkm._pattern_in_title(r["pattern"], name)]
     if not matches:
         return None
-    conf_rank = {"inferred_high": 3, "inferred_medium": 2, "inferred_low": 1}
-
-    def _rank(r):
-        return (conf_rank.get(str(r.get("confidence", "")).strip().lower(), 0), len(r["pattern"]))
-
-    selected = dict(max(matches, key=_rank))
+    selected = dict(max(matches, key=lambda r: dkm.archetype_rank_key(
+        r.get("inferred_type"), r.get("inferred_max_entries") is not None, r["pattern"])))
+    title_max = dkm._explicit_max_entries(name)
+    selected["title_max_entries"] = title_max
+    if selected.get("inferred_max_entries") is None and title_max is not None:
+        selected["inferred_max_entries"] = title_max
+        selected["max_entries_source"] = "title"
+    else:
+        selected["max_entries_source"] = ("archetype" if selected.get("inferred_max_entries") is not None
+                                          else None)
     types = sorted({r["inferred_type"] for r in matches})
     selected["ambiguous_types"] = types if len(types) > 1 else []
     selected["matched_patterns"] = sorted({r["pattern"] for r in matches})

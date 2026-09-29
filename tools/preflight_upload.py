@@ -634,6 +634,24 @@ def load_archetypes(path: Path = ARCHETYPES_CSV) -> List[Dict[str, str]]:
         return []
 
 
+def _pattern_in_title(pattern: object, title: object) -> bool:
+    """A copy of dk_entries_manager._pattern_in_title (R447, R17), by contract.
+
+    A pattern whose curated text begins with whitespace is a token guard (the
+    ' SE' row) and must end at a token edge as well; every other pattern is a
+    plain substring. The pattern is never stripped: this reader used to strip it,
+    which turned ' SE' into 'se' and matched "Baseball". Preflight may not
+    import the engine, so the parity test pins the two copies to each other.
+    """
+    pat = str(pattern or "").casefold()
+    low = str(title or "").casefold()
+    if not pat.strip():
+        return False
+    if pat[0].isspace():
+        return re.search(re.escape(pat) + r"(?![^\W_])", low) is not None
+    return pat in low
+
+
 def match_archetype(contest_name: str,
                     archetypes: Sequence[Mapping[str, str]]) -> Optional[Mapping[str, str]]:
     """Type precedence, then max-entries, then pattern length, then name.
@@ -644,18 +662,16 @@ def match_archetype(contest_name: str,
     Cup" and a satellite is not a GPP. Reproduced here on the archived names
     before this was written.
     """
-    name = str(contest_name or "").casefold()
     matches = [row for row in archetypes
-               if str(row.get("pattern") or "").strip()
-               and str(row["pattern"]).strip().casefold() in name]
+               if _pattern_in_title(row.get("pattern"), contest_name)]
     if not matches:
         return None
     return max(matches, key=lambda row: (
         ARCHETYPE_TYPE_PRECEDENCE.get(
             str(row.get("inferred_type") or "").strip().lower(), 0),
         1 if str(row.get("inferred_max_entries") or "").strip() else 0,
-        len(str(row.get("pattern") or "").strip()),
-        str(row.get("pattern") or "").strip(),
+        len(str(row.get("pattern") or "")),
+        str(row.get("pattern") or ""),
     ))
 
 
