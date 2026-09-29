@@ -650,6 +650,14 @@ def _template_specs(shape: Mapping[str, Any]) -> List[Dict[str, Any]]:
     both_sp = [sp[t] for t in shape["teams"] if sp[t]]
 
     def duel():
+        # R463 (2), Ben 2026-09-29. With fewer than two LIVE starters (a bullpen
+        # side, an IL starter, an opener, an arm the Excluded cell removed) there
+        # is no duel: the template used to build a one-arm lineup under the name
+        # "both starters rostered". None drops it from the ladder, and its slot
+        # goes to the templates that are true on this slate.
+        excluded = shape.get("_excluded") or ()
+        if len(both_sp) < 2 or any(k in excluded for k in both_sp):
+            return None
         return {
             "name": "Pitchers duel - both starters rostered",
             "why": ("Neither offense gets going. Both arms on the card carry the "
@@ -1511,6 +1519,15 @@ def build_thesis_ladder(df: pd.DataFrame, n_entries: int,
     shape = dict(describe_slate(df, moneyline, implied_totals))
     shape["_base"] = dict(zip(df["Player_Key"], df["Base"]))
     shape["_team"] = dict(zip(df["Player_Key"], df["Team"]))
+    # The Excluded column counts: its cell takes an arm out of every solve (at
+    # `build_showdown_lineup`, the single door), so an operator-excluded starter
+    # is not live even though `describe_slate` still lists him. Read off the same
+    # `excluded_flags` reader the solver uses, so there is one token rule. The
+    # duel template and the duel floor both read this one set.
+    from mlb_engine.optimize.optimizer_v3 import excluded_flags
+    _flags, _ = excluded_flags(df)
+    excluded_keys = set(df.loc[_flags, "Player_Key"]) if len(df) else set()
+    shape["_excluded"] = excluded_keys
 
     specs = [s for s in _template_specs(shape) if s["build"]() is not None]
     fav, dog = shape["favorite"], shape["underdog"]
@@ -1536,14 +1553,6 @@ def build_thesis_ladder(df: pd.DataFrame, n_entries: int,
     # for them. Gated on TWO live starters and read off the slate, never off
     # `duel()` returning non-None: it never does, and a one-arm slate builds a
     # one-arm "both starters" duel that a floor must not multiply.
-    #
-    # The Excluded column counts: its cell takes an arm out of every solve (at
-    # `build_showdown_lineup`, the single door), so an operator-excluded starter
-    # is not live even though `describe_slate` still lists him. Read off the same
-    # `excluded_flags` reader the solver uses, so there is one token rule.
-    from mlb_engine.optimize.optimizer_v3 import excluded_flags
-    _flags, _ = excluded_flags(df)
-    excluded_keys = set(df.loc[_flags, "Player_Key"]) if len(df) else set()
     both_live = sum(1 for k in (shape.get("starters") or {}).values()
                     if k and k not in excluded_keys) >= 2
     counts, duel_floor = _apply_duel_floor(counts, weights, specs,

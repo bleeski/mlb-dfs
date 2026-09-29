@@ -2,6 +2,28 @@
 
 What changed in the engine, the tools and the contracts, when, and why.
 
+## 2026-09-29 — R463 (2): a one-arm slate has no pitchers duel, and Ben's calls on Session 119's two open questions (roadmap Session 131 (2))
+
+**Decided (Ben, 2026-09-29, agreeing both recommendations).**
+- **Keep the duel flip.** The second `pitchers_duel` entry captains the other arm (his 2026-08-22 rule), accepting the measured cost of one arm seat where that arm has thin demand (MIN@CHC n=16 at -150/+130: 7 of 16 against 8 of 16 for the floor alone). Nothing changes in code; the Session 119 entry stands.
+- **Fix the one-arm duel.** Built below.
+
+**Scope.** `mlb_engine/optimize/showdown_theses.py` (`build_thesis_ladder` computes the Excluded set once and puts it on the shape as `_excluded`; `duel()` returns None with fewer than two starters or an Excluded one), `tests/test_showdown.py` (`PitchersDuelFloorTests`: three new, one rewritten), `tools/audit.py` (`tests.test_showdown` 408 -> 411), `CHANGELOG.md`, `docs/ROADMAP.md`, `docs/backlog.md`.
+
+**What was wrong.** With one live starter (a bullpen side, an IL starter, an opener, or an arm the Excluded cell removed) `both_sp` held one arm and the template shipped as "Pitchers duel - both starters rostered" with one arm as captain and lock, while `bullpen_game` fired for the other side at once. A truthful-label defect on a review-grade file, and a slot spent on a thesis the slate cannot express.
+
+**What shipped.** `duel()` returns None unless both starters are live and neither is Excluded, which drops it from `specs`; the apportionment spends its slot on the templates that are true on the slate. Session 119's floor already refused on one arm; its `no pitchers_duel template` reason now fires first, and its own `fewer than two live starters` gate stays for a direct caller (unit-tested). The Excluded set is now read once, before the specs, and both the template and the floor read it.
+
+**Measured** (MIN@CHC, Boyd's row removed, -150/+130, `time_limit=6`; `/tmp` script `oneArm.py`, HEAD then this tree): duel slots 1 -> 0 at n=7, 14 and 20; `bullpen_game` slots unchanged (1, 1, 2); every entry solved (7 of 7, 14 of 14, 20 of 20). Both-starters slates are unchanged: the Session 119 classes pass as they were.
+
+**Existing test changed, by design.** `PitchersDuelFloorTests.test_one_live_starter_is_not_multiplied` asserted the floor's reason on a one-arm slate; that slate now has no duel template, so it asserts that and tests the floor's own gate directly. `test_bullpen_template_appears_only_without_a_declared_starter` and `test_pitchers_duel_always_carries_both_starters_however_it_solves` pass unchanged.
+
+**Mutation checks.** Four, all red: no live-count guard, no Excluded guard, the whole guard removed, `_excluded` not set on the shape.
+
+**Declined.** R463 (1), (3) and (4) stay open as Session 131. `ace_loses` still builds with one arm live (`ace` is the lone arm); its label ("the ace dominates and still takes the loss") is true of that arm, so it was left alone.
+
+**Gate.** `PASS  v2.26.0  45 modules  2947 tests  5 skipped  {test_core 1841/1841 (4 skipped) skipped_in_place; test_showdown 411/411 (1 skipped) skipped_in_place}  [the two bracketed notes describe the host: the same five known absent optional files as the Session 119 gate (2944 tests)]`, so +3 is exactly the new tests. `GOLD` unmoved (Classic-only, inside `test_core`'s 1841). `plan_status.py --check` exits 0.
+
 ## 2026-09-29 — R263 build (a) + R437 + R211: Showdown captain order, a team-split floor the solver enforces, and a duel floor with a captain rotation (roadmap Session 119)
 
 **Scope.**

@@ -8189,19 +8189,58 @@ class PitchersDuelFloorTests(_ShowdownExitDoorHarness, unittest.TestCase):
 
     def test_one_live_starter_is_not_multiplied(self):
         """A bullpen game, an IL starter or a declared arm the pool lacks leaves
-        ONE live starter, and `duel()` builds a one-arm lineup under a two-arm
-        name (filed, not changed here). The floor must not double it."""
+        ONE live starter. `duel()` no longer builds a one-arm lineup under a
+        two-arm name (R463 (2)), so there is no duel template for the floor to
+        raise; the floor's own gate still refuses when it is called with one."""
         one_arm = self.df[self.df["Player_Key"] != "Matthew Boyd|CHC"].reset_index(drop=True)
         ladder = st.build_thesis_ladder(one_arm, 20, moneyline=self.ML[0])
         rec = ladder["duel_floor"]
         self.assertFalse(rec["both_starters_live"])
         self.assertFalse(rec["applied"])
-        self.assertIn("fewer than two live starters", rec["reason"])
+        self.assertIn("no pitchers_duel template", rec["reason"])
+        # the floor's own gate, for a caller that still hands it a duel spec
+        specs = [{"id": f"t{i}"} for i in range(12)] + [{"id": "pitchers_duel"}]
+        counts, direct = st._apply_duel_floor(
+            {**{i: 1 for i in range(13)}, 3: 2}, {i: 1 / 13 for i in range(13)},
+            specs, 14, False)
+        self.assertFalse(direct["applied"])
+        self.assertIn("fewer than two live starters", direct["reason"])
+        self.assertEqual(counts[12], 1)
         with unittest.mock.patch.object(
                 st, "_apply_duel_floor",
                 lambda counts, weights, specs, n_, live: (dict(counts), None)):
             bare = st.build_thesis_ladder(one_arm, 20, moneyline=self.ML[0])
         self.assertEqual(ladder["allocation"], bare["allocation"])
+
+    def test_a_one_arm_slate_has_no_duel_and_its_slot_goes_elsewhere(self):
+        """R463 (2), Ben 2026-09-29. With one live starter (the arm's row removed,
+        which is what a bullpen side, an IL starter or an opener reads as) the
+        ladder has no `pitchers_duel` thesis at all: none is named, none is
+        allocated, every entry is still built and solved, and the slots the duel
+        would have held sit with the other templates. Teeth: restoring the old
+        `duel()` builds a one-arm duel here."""
+        one_arm = self.df[self.df["Player_Key"] != "Matthew Boyd|CHC"].reset_index(drop=True)
+        for n in (7, 14, 20):
+            ladder, solved, diag, duels = self._duels(n, self.ML[0], df=one_arm)
+            self.assertEqual(duels, [], n)
+            self.assertNotIn("pitchers_duel", ladder["allocation"], n)
+            self.assertFalse(any("Pitchers duel" in t["name"] for t in ladder["theses"]), n)
+            self.assertEqual(len(ladder["theses"]), n)
+            self.assertEqual(sum(ladder["allocation"].values()), n)
+            self.assertTrue(all(lu is not None for lu in solved), n)
+
+    def test_a_bullpen_slate_keeps_its_bullpen_template_and_loses_only_the_duel(self):
+        one_arm = self.df[self.df["Player_Key"] != "Matthew Boyd|CHC"].reset_index(drop=True)
+        ladder = st.build_thesis_ladder(one_arm, 18, moneyline=self.ML[0])
+        self.assertEqual(ladder["shape"]["bullpen_teams"], ["CHC"])
+        self.assertIn("bullpen_game", ladder["allocation"])
+        self.assertNotIn("pitchers_duel", ladder["allocation"])
+
+    def test_an_excluded_arm_leaves_no_duel_either(self):
+        d2 = self.df.copy()
+        d2.loc[d2["Player_Key"] == "Taj Bradley|MIN", "Excluded"] = True
+        ladder = st.build_thesis_ladder(d2, 20, moneyline=self.ML[0])
+        self.assertNotIn("pitchers_duel", ladder["allocation"])
 
     def test_an_operator_excluded_starter_is_not_a_live_starter(self):
         """The Excluded cell removes an arm from every solve, so an excluded
