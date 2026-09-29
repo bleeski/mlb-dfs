@@ -1349,7 +1349,17 @@ have a different captain, and the reassignment list is where that is stated.
 
 Every relaxation is counted in `diversity`, `captain_exposure` and
 `player_exposure`, and repeated in `caution`. Read those before reporting the
-portfolio as clean. Override any of the three through `--controls-override`,
+portfolio as clean.
+
+Two templates carry a team-split floor, `win_close` (two of each side) and
+`both_explode` (three of each). It is a solver row, so the rationale names what
+the roster carries. It gives way after overlap, player cap and captain lock and
+before the portfolio floor rungs, and it is counted in
+`counted_relaxations.min_per_team_relaxed_slots`, which is inside `clean`;
+`min_per_team_slots_carrying_floor` says how many slots asked. `construction.duel_floor`
+says whether `pitchers_duel` was raised to two entries (one per arm as captain)
+and why or why not: the threshold is more entries than live templates (14 with
+the usual 13), and never with fewer than two live starters. Override any of the three through `--controls-override`,
 which reads all of them from one dict.
 
 `player_exposure.structural_floor_pct` is `roster_size / pool_size`, the lowest

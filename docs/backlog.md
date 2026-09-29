@@ -20,6 +20,17 @@ R-number comes from scanning this file AND CHANGELOG.md.
 
 ## Workstream 1 — Showdown correctness and certification
 
+### R463. Showdown thesis labels claim what the solver does not enforce: `shootout`'s "bats still producing", a one-arm duel named "both starters", `(variant N, X captain)` naming the APPORTIONED captain, and arm-led directional repeats that share a captain (P2, S) | new 2026-09-29, found landing Session 119 (R437's and R211's premise checks, the independent review) | Roadmap: Session 131
+
+- **What.** Four label-versus-solver mismatches, each reproduced on the MIN@CHC fixture while Session 119 landed, none in that session's scope.
+  (1) `shootout`'s `why` ("{s}-tilted split with {o} bats still producing", `SDT` `shootout()`): the spec locks the winning side's four best bats (three once the captain, drawn from the same list, is stripped) and the both-teams rule is min 1, so the solver enforces one {o} bat, not "bats". Measured at n=21 (-150/+130): all three shootout slots (two `favorite_shootout`, one `underdog_shootout`) realized 5-1.
+  (2) `duel()` has no None branch. With one starter live (a bullpen side, an IL starter, an opener, or an arm the operator's Excluded cell removed) `both_sp` holds one arm and the thesis ships as "Pitchers duel - both starters rostered" with one arm, captain and lock (`describe_slate` reads a starter as a battingless row; `bullpen_game` fires for the other side at the same time). Session 119's duel floor is gated on two live starters so it does not multiply this; it does not fix it.
+  (3) `(variant N, X captain)` names the captain the APPORTIONMENT picked. `solve_ladder` can substitute it (a captain at a cap is recorded in `cpt_cap_reassigned`, a lock relaxation in `lock_relaxation_detail`), so the label can name a captain the lineup does not carry. Session 119's walk order makes it rarer on the duel; it does not make it impossible.
+  (4) R211's declined half: `win_big` and `win_close` lead their ladder with their own side's starter, so on a repeat occurrence both variants captain the same arm and "variant 2" differs only by its supporting hitters. An UNGUARDED per-thesis rotation gives the repeat to a bat and was measured to take the MIN@CHC pitcher-captain share at n=21 from 10 of 21 to 7 of 21 (ceiling 10), so Session 119 rotates only within the head's kind (arm to arm, bat to bat) and these repeat their arm.
+- **Why.** Truthful labels are non-negotiable and `rationale` ships verbatim into `construction.lineups[].rationale`, the field a post-slate reader grades the ladder by. (2) also changes what the duel IS on a bullpen slate.
+- **Fix.** (1) rewrite `shootout`'s `why` (and `bottom_order`, whose name says "win close" while its sibling `win_close` now promises two of each side and it realizes 5-1 with no claim behind it) to what is enforced, or give it `min_per_team` (a template decision, S: it moves the 5-1 mix again). (2) `duel()` returns None unless both starters are live, which moves the bullpen-slate allocation and the pins at `tests/test_showdown.py` about L781-790 (a bullpen slate would spend the duel's slot elsewhere); measure both first. (3) name the REALIZED captain in `portfolio_report` rows, or drop the captain from the variant label. (4) label a repeat by what differs (its supporting hitters or its overlap), not by a captain it shares. Acceptance: `UT test_showdown.ThesisLabelTruthTests` asserting each label against the solved lineup.
+
+
 ### R458. A partially filled reserved row (a hand-typed CPT cell) is fillable on the Showdown path and the writer overwrites all six cells while the template check passes (P3, XS) | new 2026-09-25, found by the 2026-09-25 code review (Showdown area; `review_showdown/r4_total_caps_partial.py` (d)) | Roadmap: Session 64
 
 - **What.** `SD` about L1694 defines `is_complete = all(cells)` and `is_blank = not any(cells)`; a partial row is neither, `BS` about L5094 admits it to the fillable rows, and `SD` about L1778 replaces every cell; `verify_template_preserved` checks non-roster cells only. Measured: a row holding only a CPT id is filled, the hand-typed captain is gone after the write, and the template check passes. DK exports blank or complete rows, so this is a hand-edited template only.
@@ -36,12 +47,8 @@ R-number comes from scanning this file AND CHANGELOG.md.
 - **Why.** Every chalk-positive or leverage read on a Showdown delivery is conditioned on this prior; a budget spent outside the nines makes a real lineup read contrarian. Report-only until R342's availability component reaches the Showdown path.
 - **Fix.** Report per contest, beside section 4's scores: the SP clip count, the share of the roster budget inside and outside the confirmed nines, and the same for the captain budget. Rides Session 47's panels; the model change is R342's.
 
-### R437. `solve_ladder` does not enforce the template's team split, so the realized split collapses to 5-1 whatever the thesis says (P1, S; measured 17 of 21 on 2210_1g_sd, mechanism to confirm) | new 2026-09-25, from the dfs-qa pass on 2210_1g_sd (`2026-09-24_BUILD_showdown-2210-total-blind-theses.md` §4) | Roadmap: Session 119
+### R437. CLOSED 2026-09-29 -- SHIPPED as roadmap Session 119 (b), entry in CHANGELOG.md
 
-- **What.** 17 of 21 delivered lineups realized a 5-1 team split, 2 at 4-2 and 2 at 3-3, while the rationale strings said "two cheaper opposing bats" (the close theses) and "split locked even" (`both_explode`) on rosters carrying one opposing bat. Ledger 3.21: our Showdown 5-1 share is 73.4% against the top-1% cohort's 50.2% and the field's 35.3%, the one axis where we are OVER-concentrated; R263's shadow band reads `above_band` on nearly every delivery.
-- **Mechanism confirmed by the 2026-09-25 code review (Showdown area; `review_showdown/r3_splits_cpt.py`).** `solve_ladder` reads no team count anywhere; a template's split claim is carried by suppression multipliers alone and the solver's both-teams rule is min 1. `win_close` (`ST` about L555-561) promises "two cheaper %s bats stay live" and its spec carries no locks, so it ships 5-1; `both_explode` (`ST` about L691-700) locks two favorite bats and one underdog bat, and `raw_locks` (`ST` about L1677) strips the captain, so the single dog lock vanishes whenever the dog's top bat captains, leaving "split locked even" over a 5-1 roster. On the MIN@CHC fixture at n=21: `team_split_mix {'5-1': 18, '4-2': 2, '3-3': 1}`; at the 2210 odds (-174/+146) 5-1 is 85.7%. `rationale` ships verbatim into `construction.lineups[].rationale`.
-- **Why.** A template whose split is a label and not a constraint cannot move the portfolio's team-split mix, so no weight or band can act on the archive's second-strongest Showdown signal until the split binds where roster spots are spent (R153's ground, Ben 2026-08-28).
-- **Fix.** Confirmed prose (above). Enforce each template's split as a constraint in `solve_ladder`, relaxed last in the R153 ladder and counted, with `construction_shadow` printing the realized mix before and after. Mechanism: a `min_per_team` field on a template (two both-teams rows in `solve_ladder`, relaxed and counted like the others), and the two `why` strings rewritten to what the solver enforces until then. Lands with R263's rotation and R211 (Session 119).
 
 ### R435. The thesis weights never read the posted total (P2, S; strategy, Ben's curve first) | new 2026-09-25, from BUILD fragment `2026-09-24_BUILD_showdown-2210-total-blind-theses.md` §1 | Roadmap: Session 118, after D-2
 
@@ -654,57 +661,8 @@ repair one, so finding 2's guard has to sit at the PRIOR and not at the cap.
   control half dies, the report stands. FOSS: existing. Owner: D3. Rollback:
   report is additive; control defaults off.
 
-### R211. `pitchers_duel` gets one slot and the ladder never rotates a captain, so Ben's stated rule is unreachable at any entry count (P1, S-M) | new 2026-08-23, merged from BUILD fragment `2026-08-22_BUILD_pitchers-duel-needs-both-captain-variants.md`; Ben's rule stated 2026-08-22, both gaps traced to the line
+### R211. CLOSED 2026-09-29 -- SHIPPED as roadmap Session 119 (c), entry in CHANGELOG.md; the declined half (arm-led directional repeats) is R463 (4)
 
-- **Ben's rule (2026-08-22), quoted:** "When we think of a 'pitchers duel' game
-  thesis for showdown we need to include both pitchers, and if we have enough
-  lineup slots in our portfolio we should have at least 2: one where each P is
-  captain and the other is UTIL. We can have more if it makes sense, but two
-  lineups (one with each as captain and the other as util) should be the
-  minimum."
-- **What already works:** R156's `duel()` hard-locks both starters into every
-  `pitchers_duel` lineup regardless of who captains, unfiltered by `cpt` and
-  surviving every rung of `solve_ladder`'s relaxation ladder. Both-pitchers-
-  rostered is solid. **What is missing is the second lineup with the captain
-  flipped**, and it is two independent gaps, both in `build_thesis_ladder`
-  (`showdown_theses.py` ~415). **(1) No allocation floor.** `pitchers_duel` is
-  one row among 13 templates, weighted 0.45 inside the 18% `NEUTRAL_SHARE`
-  slice and apportioned by `_largest_remainder` like everything else; on the
-  08-22 1335_1g_sd build it landed on exactly **1 slot out of 19 entries**.
-  R156's own comment already flags this. Nothing forces a second slot when both
-  starters are live, at any portfolio size. **(2) Repeated occurrences of one
-  thesis do not rotate captains.** The selection loop (~462) skips a candidate
-  only once he is at the GLOBAL exposure cap (4 of 19 that night), with no
-  memory of "already captained for THIS thesis id" — so a second
-  `pitchers_duel` occurrence would walk the same 2-element `cpt_ladder =
-  list(both_sp)`, find the first starter still under cap (true after one use),
-  and pick him AGAIN. Two occurrences of one template differ today only because
-  `solve_ladder`'s overlap bound forces different filler hitters, and the
-  `(variant 2, … captain)` label at ~481 names whatever the loop picked rather
-  than a guaranteed-different one. **Proven on the same delivery:** entries 1
-  and 14, "TOR win big - starter carries it" and "… (variant 2, Dylan Cease
-  captain)", both captained Dylan Cease — the variant was entirely in the four
-  supporting hitters.
-- **Why:** with one slot, the captain was whichever starter sorts first in
-  `shape["teams"]` (Weathers, NYY < TOR) — **a team-name-ordering artifact, not
-  a scored choice.** Getting the Cease-captain / Weathers-UTIL lineup into the
-  portfolio took a manual post-hoc `build_showdown_lineup` with
-  `cpt_lock=Cease, locks=[Weathers]`, hand-patched into an entry, because
-  nothing in the ladder produces it on its own even at higher `n_entries`.
-- **Fix, matching the two gaps.** **Allocation floor:** after `counts =
-  _largest_remainder(weights, n_entries)`, if the `pitchers_duel` spec is live
-  (`duel()` returned non-None, i.e. both starters declared) and the portfolio
-  can afford it without zeroing a template that would otherwise get a slot,
-  raise that index to at least 2, borrowing from wherever the remainder ranked
-  lowest. **"Can afford it" needs a real threshold and that threshold is DEV's
-  call** — Ben's own phrasing ("if we have enough lineup slots") makes it
-  conditional, and a 1-entry Solo Shot obviously keeps today's single slot.
-  **Per-thesis captain rotation:** give the selection loop a second piece of
-  state beside the global `cpt_counts` — which captains have already been used
-  for THIS thesis id — and on a second or later occurrence of the same template
-  skip a candidate already captained for it, in addition to the cap check,
-  before falling back to allowing a repeat. That second half fixes the
-  false-`variant` label on every directional template, not just this one.
 
 ### R210. Three Showdown tool gaps: the probe errors out, QA section 1 reads Classic-shaped fields, and `--postures` IS a silent no-op (P2, S) | new 2026-08-23, merged from BUILD fragment `2026-08-21_BUILD_showdown-tool-gaps.md`; (c) upgraded from "may be" to VERIFIED 2026-08-29, second sighting
 
@@ -2780,7 +2738,7 @@ replaced.
 
 ### R263, remainder. The Showdown captain/split HARD bands and the satellite chalk floor (P1, gated on R238/R239 and on R10) | filed 2026-08-28; decision answered and shadow build SHIPPED the same day
 
-**Rider 2026-09-25 (the code review, Showdown area; `review_showdown/r3_splits_cpt.py`, `r5_preflight_and_labels.py`): where the captain seats actually go, measured on the MIN@CHC fixture.** The realized pitcher-CPT share sits AT the structural ceiling at n=14/19/20/21 and one under at n=16 (templates apportioned 7, cap allowed 8), so the archive's 40% against 45% gap does not reproduce on the fixture. When both arms are at cap, the DUEL, walked last in spec-index order (`_round_robin`, index 10), is the thesis that loses its arm captain: without a partition the apportionment forces one arm past the cap and R153's enforcement hands the seat to a bat (`pitchers_duel 4-2 cpt=Austin Martin locks=['Matthew Boyd','Taj Bradley']`); with a partition `captain_pool_widened` does the same. R156's comment at `ST` about L653-654 ("the walk below forces one past it rather than reaching for a bat") is false either way. So the cheap lever is sharper than "rotate the leading arm": walk the neutral specs first, or reserve one arm-captain slot for the duel before the directional templates spend them. Also: `construction_shadow`'s ceiling (`ST` about L2590, `min(n, len(pitcher_names) * per_player)`) reads only the portfolio cap and ignores `max_cpt_per_contest`; in a single contest of 9+ entries the per-contest bar of 2 binds below the portfolio cap and pitcher-CPT is capped at `2*2/n` (one 21-entry contest: realized 4 of 21 = 19.0% against a printed ceiling of 47.6%, `band_reachable=False`). Latent on Ben's contest sizes (every archived Showdown delivery caps at 7 entries per contest, where 2/7 > 25%); fix the ceiling as `min(portfolio ceiling, sum over contests of min(n_j, arms x bar_j))` and correct the comment. Rides Session 119 (a).
+**Build (a) SHIPPED 2026-09-29 (roadmap Session 119), text MIGRATED to CHANGELOG.md.** The captains are now CHOSEN neutral-templates-first (`_captain_walk_order`) and BUILT in slot order, so the duel keeps a starter as captain (on the MIN@CHC fixture at n=19-21 its second slot planned a starter past the cap and shipped a bat; at n=7 the ONE duel slot did) and the apportionment's captain-cap relaxation went from 1 to 0 at n=7/19/20/21. The filed diagnosis was narrower than written: only the favorite's `win_big`/`win_close` and `ace_loses` share an arm (the ace, who is the favorite's on this fixture), and both arms were over-demanded at n=19, not one. Nothing raised the share, because it was already AT the structural ceiling at n=14/19/20/21: the lever moves which thesis holds the armband, not how many armbands exist. Flipping the second duel to the other arm (R211) costs one arm seat where that arm has thin demand (n=16 at -150/+130: 7 of 16 against 8 of 16 without the flip). `construction_shadow`'s ceiling now reads `max_cpt_per_contest` (one 21-entry contest: ceiling 19.0%, was 47.6%) and prints the apportioned share beside the delivered one on the same denominator. **Still open here:** the HARD bands and the satellite chalk floor, gated as below on R238/R239 and R10; the R156 comment that was false at both walk sites is corrected. No cap moved and every band is still shadow.
 
 - **What.** Three measured mismatches between what we deliver into satellites
   and what their top cohorts look like, none owned elsewhere as a DECISION:
@@ -2819,7 +2777,9 @@ replaced.
   order in which the ladder spends captain slots across the two arms. That last
   one is the cheap one and it is diagnosed: `win_big`, `win_close` and
   `ace_loses` all lead their `cpt_ladder` with the SAME arm, so pitcher-captain
-  demand piles onto one capped player instead of spreading across two.
+  demand piles onto one capped player instead of spreading across two. **Shipped 2026-09-29 as build (a) (see the rider above): the
+  order lever moved the duel's armband and nothing else, because the share was already at
+  the ceiling; the diagnosis was narrower than filed.**
 - **The coarse weight lever is SPENT, measured 2026-08-28.** Ben asked for a
   thesis-weight bump to move the delivered share ~40% -> ~50% on R156's
   precedent. Built and measured over 96 apportion-and-solve checks (six
