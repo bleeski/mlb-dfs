@@ -1,0 +1,148 @@
+{
+ "code": {
+  "contest_allocator": "v1.12",
+  "execution_pipeline": "v1.17",
+  "git_dirty": true,
+  "git_sha": "6ffd0ffda0c5ef485b81f404404b2671c6213a4e"
+ },
+ "date": "2026-09-29",
+ "exit_code": 3,
+ "host": {
+  "call_budget_s": 630.0,
+  "declared_ceiling_s": 900.0,
+  "host": "claude_code"
+ },
+ "kind": "refusal",
+ "labels": "a refusal is an observed build outcome, never a claim about the slate",
+ "recorded_utc": "2026-09-29T16:36:03.567437+00:00",
+ "refusal": {
+  "argv": [
+   "--salary",
+   "data/slates/2026-09-29/a789b883-DKSalaries_MLB.csv",
+   "--entries",
+   "data/slates/2026-09-29/b1e37d09-DKEntries_MLB.csv",
+   "--max-seconds",
+   "105",
+   "--lineups",
+   "data/slates/2026-09-29/lineups_feed.json",
+   "--odds",
+   "data/slates/2026-09-29/odds_from_paste.json",
+   "--postures",
+   "195970831=wta_satellite,196052739=large_gpp",
+   "--deliver-by",
+   "13:55",
+   "--declare-pitcher",
+   "44321112=declared_probable_sp",
+   "--declare-pitcher",
+   "44321357=viable_bulk_or_alt_sp",
+   "--declare-pitcher",
+   "44321115=viable_bulk_or_alt_sp",
+   "--controls-override",
+   "{\"max_shared_players\": 7}"
+  ],
+  "baseline": {
+   "controls": {
+    "held": [],
+    "never_relax": [
+     "distinct_lineups_per_contest"
+    ],
+    "opened": {
+     "classic_sleeves": false,
+     "max_consensus_cluster_share_pct": 1.0,
+     "max_game_exposure_pct": 1.0,
+     "max_pitcher_exposure_pct": 1.0,
+     "max_player_exposure_pct": 1.0,
+     "max_primary_stack_exposure_pct": 1.0,
+     "max_shared_players": 9,
+     "max_sp_pair_repetition": 999,
+     "max_team_exposure_pct": 1.0
+    }
+   },
+   "core": {
+    "by_contest": [
+     {
+      "contest_id": "195970831",
+      "fillable": 5,
+      "filled": 5,
+      "held": 0,
+      "partial": 0
+     },
+     {
+      "contest_id": "196052739",
+      "fillable": 4,
+      "filled": 4,
+      "held": 0,
+      "partial": 0
+     }
+    ],
+    "construction_label": "baseline_construction_proxy",
+    "distinct": 6,
+    "probe_wall_s": 0.2919,
+    "required": 5,
+    "short": 0,
+    "sources": {
+     "grid": 5,
+     "probe": 1
+    },
+    "status": "covered",
+    "stop_reason": "covered",
+    "target": 5,
+    "target_met": true,
+    "timings": {
+     "fill_s": 0.0,
+     "grid_s": 0.3819,
+     "left_s": 25.306,
+     "probe_s": 0.2925,
+     "total_s": 0.6863,
+     "window_s": 25.988,
+     "window_source": "deadline"
+    },
+    "uncovered": 0,
+    "version": "v1.0"
+   },
+   "current": false,
+   "date": "2026-09-29",
+   "errors": [
+    "Failed pre-export gate: lineup_gate_passed"
+   ],
+   "failing_checks": [],
+   "lineage": "baseline",
+   "run_id": "20260929T163537Z_c2049946",
+   "status": "refused",
+   "window": {
+    "allocation_s": 0.16,
+    "core_s": 0.72,
+    "left_at_call_s": 104.1,
+    "share": 0.25,
+    "window_s": 26.0
+   }
+  },
+  "errors": [
+   "Failed pre-export gate: lineup_gate_passed"
+  ],
+  "failing_checks": [],
+  "note": "built and refused: the build ran but did not certify, or the pool blocked it",
+  "refusal": "classic_not_certified",
+  "refusal_class": "read_it",
+  "run_id": "20260929T163603Z_a0e8b5af",
+  "solves": [
+   {
+    "bank": "built",
+    "bank_budget_floored": false,
+    "bank_budget_s": 101.3,
+    "bank_elapsed_s": 24.03,
+    "call": 1,
+    "candidates": 56,
+    "left_at_end_s": 76.9,
+    "left_at_start_s": 102.9,
+    "outcome": "refused",
+    "reason": "initial",
+    "sleeves_elapsed_s": 1.53,
+    "wall_s": 26.1
+   }
+  ],
+  "status": "not_certified"
+ },
+ "schema_version": 1,
+ "slate_tag": "1400_4g"
+}

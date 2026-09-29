@@ -1,0 +1,299 @@
+{
+ "code": {
+  "contest_allocator": "v1.12",
+  "execution_pipeline": "v1.17",
+  "git_dirty": true,
+  "git_sha": "6ffd0ffda0c5ef485b81f404404b2671c6213a4e"
+ },
+ "controls": {
+  "classic_sleeves": false,
+  "five_stack_min_size": 5,
+  "max_consensus_cluster_share_pct": 1.0,
+  "max_game_exposure_pct": 1.0,
+  "max_game_exposure_pct_by_game": {
+   "BOS@NYY": 1.0,
+   "CHC@SD": 1.0,
+   "CWS@HOU": 1.0,
+   "PHI@ATL": 1.0
+  },
+  "max_pitcher_exposure_pct": 1.0,
+  "max_player_exposure_pct": 1.0,
+  "max_primary_stack_exposure_pct": 1.0,
+  "max_shared_players": 9,
+  "max_sp_pair_repetition": 999,
+  "max_team_exposure_pct": 1.0,
+  "min_five_stack_share_pct": 0.0,
+  "player_game_by_id": {
+   "distinct_values": 4,
+   "players_mapped": 80,
+   "wired": true
+  },
+  "player_team_by_id": {
+   "distinct_values": 8,
+   "players_mapped": 80,
+   "wired": true
+  },
+  "primary_stack_min_size": 4
+ },
+ "date": "2026-09-29",
+ "egress": "egress: statsapi unreachable, odds unreachable, savant unreachable, mlb-lineups unreachable, fangraphs unreachable (curl), open-meteo unreachable",
+ "egress_source": "session_start 2026-09-29T16:24:11+00:00",
+ "entries": [
+  {
+   "contest_id": "195970831",
+   "contest_name": "LAST SHOT: MLB $100K Baseball Pocket Cup mini-MAX 10x MEGA Qualifier #291-300",
+   "entry_fee": 2.0,
+   "entry_id": "5268244944",
+   "filled": true,
+   "roster_ids": [
+    "44321108",
+    "44321113",
+    "44321172",
+    "44321158",
+    "44321147",
+    "44321140",
+    "44321135",
+    "44321154",
+    "44321117",
+    "44321200"
+   ]
+  },
+  {
+   "contest_id": "195970831",
+   "contest_name": "LAST SHOT: MLB $100K Baseball Pocket Cup mini-MAX 10x MEGA Qualifier #291-300",
+   "entry_fee": 2.0,
+   "entry_id": "5268244988",
+   "filled": true,
+   "roster_ids": [
+    "44321319",
+    "44321112",
+    "44321172",
+    "44321134",
+    "44321147",
+    "44321123",
+    "44321135",
+    "44321154",
+    "44321186",
+    "44321132"
+   ]
+  },
+  {
+   "contest_id": "195970831",
+   "contest_name": "LAST SHOT: MLB $100K Baseball Pocket Cup mini-MAX 10x MEGA Qualifier #291-300",
+   "entry_fee": 2.0,
+   "entry_id": "5268245030",
+   "filled": true,
+   "roster_ids": [
+    "44321109",
+    "44321113",
+    "44321136",
+    "44321161",
+    "44321189",
+    "44321123",
+    "44321135",
+    "44321200",
+    "44321132",
+    "44321141"
+   ]
+  },
+  {
+   "contest_id": "195970831",
+   "contest_name": "LAST SHOT: MLB $100K Baseball Pocket Cup mini-MAX 10x MEGA Qualifier #291-300",
+   "entry_fee": 2.0,
+   "entry_id": "5268245048",
+   "filled": true,
+   "roster_ids": [
+    "44321108",
+    "44321319",
+    "44321180",
+    "44321152",
+    "44321156",
+    "44321196",
+    "44321135",
+    "44321154",
+    "44321128",
+    "44321144"
+   ]
+  },
+  {
+   "contest_id": "195970831",
+   "contest_name": "LAST SHOT: MLB $100K Baseball Pocket Cup mini-MAX 10x MEGA Qualifier #291-300",
+   "entry_fee": 2.0,
+   "entry_id": "5274460055",
+   "filled": true,
+   "roster_ids": [
+    "44321108",
+    "44321109",
+    "44321136",
+    "44321152",
+    "44321147",
+    "44321183",
+    "44321135",
+    "44321143",
+    "44321174",
+    "44321200"
+   ]
+  },
+  {
+   "contest_id": "196052739",
+   "contest_name": "MLB $200K Postseason Opener [$50K to 1st]",
+   "entry_fee": 20.0,
+   "entry_id": "5269337450",
+   "filled": true,
+   "roster_ids": [
+    "44321108",
+    "44321113",
+    "44321172",
+    "44321158",
+    "44321147",
+    "44321140",
+    "44321135",
+    "44321154",
+    "44321117",
+    "44321200"
+   ]
+  },
+  {
+   "contest_id": "196052739",
+   "contest_name": "MLB $200K Postseason Opener [$50K to 1st]",
+   "entry_fee": 20.0,
+   "entry_id": "5269344569",
+   "filled": true,
+   "roster_ids": [
+    "44321109",
+    "44321113",
+    "44321136",
+    "44321161",
+    "44321189",
+    "44321123",
+    "44321135",
+    "44321200",
+    "44321132",
+    "44321141"
+   ]
+  },
+  {
+   "contest_id": "196052739",
+   "contest_name": "MLB $200K Postseason Opener [$50K to 1st]",
+   "entry_fee": 20.0,
+   "entry_id": "5269344580",
+   "filled": true,
+   "roster_ids": [
+    "44321108",
+    "44321109",
+    "44321136",
+    "44321152",
+    "44321147",
+    "44321183",
+    "44321135",
+    "44321143",
+    "44321174",
+    "44321200"
+   ]
+  },
+  {
+   "contest_id": "196052739",
+   "contest_name": "MLB $200K Postseason Opener [$50K to 1st]",
+   "entry_fee": 20.0,
+   "entry_id": "5274217927",
+   "filled": true,
+   "roster_ids": [
+    "44321319",
+    "44321112",
+    "44321172",
+    "44321134",
+    "44321147",
+    "44321123",
+    "44321135",
+    "44321154",
+    "44321186",
+    "44321132"
+   ]
+  }
+ ],
+ "entries_binding": {
+  "source": "outputs/2026-09-29/DO_NOT_UPLOAD_DKEntries_1400_4g_BASELINE_20260929T163643Z_79103677.csv",
+  "source_sha256": "d74ae4084d5c2327e2adefc00be717c39e46c1e6be6bdb59b298650617bc29f2",
+  "status": "bound"
+ },
+ "host": {
+  "call_budget_s": 630.0,
+  "declared_ceiling_s": 900.0,
+  "host": "claude_code"
+ },
+ "kind": "delivery",
+ "labels": "deterministic review proxies and labeled priors only; never ROI, win rate, cash rate, or probability",
+ "manifest_row": {
+  "certification": "review_grade_baseline",
+  "contest_ids": [
+   "195970831",
+   "196052739"
+  ],
+  "contest_names": [
+   "LAST SHOT: MLB $100K Baseball Pocket Cup mini-MAX 10x MEGA Qualifier #291-300",
+   "MLB $200K Postseason Opener [$50K to 1st]"
+  ],
+  "contest_type": "classic",
+  "delivered_file": "outputs/2026-09-29/DKEntries_1400_4g_BASELINE_20260929T163643Z_79103677.csv",
+  "entries": 9,
+  "lineage": "baseline",
+  "notes": "baseline (R389(b)): built before research on the unenriched frame, every portfolio cap opened to the deadline rung's value (never-relax held); review-grade, never certified",
+  "projection_tier": "proxy",
+  "recorded_utc": "2026-09-29T16:36:43.513208+00:00",
+  "run_id": "20260929T163643Z_79103677",
+  "sha256": "d74ae4084d5c2327e2adefc00be717c39e46c1e6be6bdb59b298650617bc29f2",
+  "slate_tag": "1400_4g",
+  "status": "candidate",
+  "strategy_state": {
+   "bank_warnings": [],
+   "counts": {
+    "controls_opened": 9
+   },
+   "evidence": "recorded",
+   "state": "relaxed",
+   "warnings": []
+  }
+ },
+ "recorded_utc": "2026-09-29T16:36:43.514903+00:00",
+ "relaxations": {},
+ "run": {
+  "certification": {
+   "allocation_certified": true,
+   "failed_post_export_gates": [],
+   "post_export_gates": {
+    "entry_reconciliation_passed": true,
+    "export_hash_binding_passed": true,
+    "locked_immutability_passed": true,
+    "portfolio_caps_passed": true,
+    "roster_legality_passed": true,
+    "template_preservation_passed": true
+   },
+   "pre_export_passed": true,
+   "selection_certified": true,
+   "workflow_valid": true
+  },
+  "environment": {
+   "lock_file": "requirements.lock",
+   "lock_sha256": "dd7723e54043e8c2644100beba5069959d835258f96e1cf6dc100ea1617ac0d6",
+   "packages": {
+    "numpy": "2.2.6",
+    "pandas": "2.3.3",
+    "scipy": "1.15.3"
+   },
+   "python": "3.11.15"
+  },
+  "inputs": {
+   "DKEntries.csv": {
+    "sha256": "78a120560e31dae0067667eea19059ec4886884c6aae7a2c7008c5c364c9d6d1",
+    "size_bytes": 43173,
+    "source_path": "/home/user/mlb-dfs/data/slates/2026-09-29/DKEntries.csv"
+   },
+   "DKSalaries.csv": {
+    "sha256": "67060c93261306fe74a6ebfb3f3c1c5d04cdd5d9219827bdb1d832987f4e4255",
+    "size_bytes": 36840,
+    "source_path": "/home/user/mlb-dfs/data/slates/2026-09-29/DKSalaries.csv"
+   }
+  }
+ },
+ "schema_version": 1
+}
