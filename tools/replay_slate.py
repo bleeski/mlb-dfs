@@ -727,13 +727,21 @@ def projection_frame_for_grade(salary_path: str, slate_date: str) -> Tuple[Any, 
     return frame, live
 
 
-def grade_slate(salary_path: str, contests: Sequence[Mapping[str, Any]],
-                slate_date: str) -> Dict[str, Any]:
-    """One slate: realized points from its contests' tables, joined to the
-    production frame by the miner's own name normalization."""
+def duplicate_name_norms(names: Sequence[str]) -> set:
+    """Normalized names that two or more salary rows share: one realized-points
+    line would be credited to both, so neither is graded (as `grade_slate`)."""
     _engine_on_path()
     from mlb_engine.field.field_miner import normalize_name
-    frame, live = projection_frame_for_grade(salary_path, slate_date)
+    seen: Dict[str, int] = {}
+    for name in names:
+        norm = normalize_name(str(name or ""))
+        seen[norm] = seen.get(norm, 0) + 1
+    return {norm for norm, count in seen.items() if count > 1}
+
+
+def realized_by_norm(contests: Sequence[Mapping[str, Any]]) -> Tuple[Dict[str, int], set]:
+    """Realized points (integer cents) by normalized name over one slate's
+    contests, and the names that conflict or collide and so are never graded."""
     realized: Dict[str, int] = {}
     conflicts: set = set()
     for record in contests:
@@ -746,6 +754,17 @@ def grade_slate(salary_path: str, contests: Sequence[Mapping[str, Any]],
             if norm in realized and realized[norm] != cents:
                 conflicts.add(norm)
             realized.setdefault(norm, cents)
+    return realized, conflicts
+
+
+def grade_slate(salary_path: str, contests: Sequence[Mapping[str, Any]],
+                slate_date: str) -> Dict[str, Any]:
+    """One slate: realized points from its contests' tables, joined to the
+    production frame by the miner's own name normalization."""
+    _engine_on_path()
+    from mlb_engine.field.field_miner import normalize_name
+    frame, live = projection_frame_for_grade(salary_path, slate_date)
+    realized, conflicts = realized_by_norm(contests)
     ids_by_norm: Dict[str, List[str]] = {}
     for row in frame.itertuples():
         ids_by_norm.setdefault(normalize_name(row.Name), []).append(str(row.Player_ID))
@@ -834,6 +853,249 @@ def grade_projection(dates: Optional[Sequence[str]] = None,
     }
 
 
+#: R441. Posted-price history, one file per pull. Totals only: no moneyline.
+ODDS_HISTORY = ROOT / "data" / "odds_history"
+#: The nearest Savant pitching snapshot that is tracked. Its vintage comes from
+#: the file name and is compared with each slate's date, never assumed.
+ABLATION_SAVANT = (ROOT / "tests" / "fixtures" / "enrichment"
+                   / "expected_stats_pitching_frozen_2026-07-25.csv")
+ABLATION_LABEL = (
+    "R441 ablation: observed outcomes on named archived slates, per slate, hitters "
+    "only, never pooled. A difference between arms is an observed comparison on "
+    "that slate; it is never a lift, ROI, a win rate, an edge, or a probability, "
+    "and a cell that names a post-dated input cannot settle a shrink"
+)
+#: F1 (game total) x F4 quality (opposing-SP Savant xwOBA), each on or off. The
+#: platoon half of F4 stays on in every arm: only the quality term is ablated.
+ABLATION_ARMS: Tuple[Tuple[str, bool, bool], ...] = (
+    ("f1_off_q_off", False, False), ("f1_off_q_on", False, True),
+    ("f1_on_q_off", True, False), ("f1_on_q_on", True, True),
+)
+
+
+def savant_vintage(path: Path) -> Optional[str]:
+    """The snapshot date a Savant file name states (``..._2026-07-25.csv``), or
+    None when it states none."""
+    found = re.findall(r"\d{4}-\d{2}-\d{2}", Path(path).name)
+    return found[-1] if found else None
+
+
+def load_odds_history(slate_date: str, odds_dir: Path = ODDS_HISTORY
+                      ) -> Tuple[Dict[str, Dict[str, Any]], Dict[str, Any]]:
+    """``({AWAY@HOME: {"total": ...}}, provenance)`` from the earliest odds pull
+    stored for the date, or ``({}, {"available": False, ...})``. The book's
+    posted total is DraftKings' point, FanDuel's when DK posted none. Team codes
+    are the MLB Stats API's (``AZ``), so each is mapped to DK's (``ARI``) through
+    ``team_codes.to_dk_abbrev``: the salary file, and so ``build_f1_factors``,
+    speaks DK's, and an unmapped key would leave a whole team unpriced."""
+    files = sorted(Path(odds_dir).glob(f"{slate_date}-*.json")) if Path(odds_dir).is_dir() else []
+    if not files:
+        return {}, {"available": False, "reason": "no odds pull stored for this date"}
+    record = json.loads(files[0].read_text(encoding="utf-8"))
+    snapshots = record.get("snapshots") or []
+    if not snapshots:
+        return {}, {"available": False, "reason": f"{files[0].name} holds no snapshot"}
+    snap = snapshots[0]
+    _engine_on_path()
+    from mlb_engine.team_codes import to_dk_abbrev
+    odds: Dict[str, Dict[str, Any]] = {}
+    for game in snap.get("games") or []:
+        point = (game.get("draftkings") or {}).get("point")
+        if point in (None, ""):
+            point = (game.get("fanduel") or {}).get("point")
+        if point in (None, "") or not game.get("away_team") or not game.get("home_team"):
+            continue
+        odds[f"{to_dk_abbrev(game['away_team'])}@{to_dk_abbrev(game['home_team'])}"] = {
+            "total": float(point), "source": files[0].name}
+    return odds, {"available": True, "file": files[0].name,
+                  "fetched_at": snap.get("fetched_at"),
+                  "kind": "posted totals (DK point, FD when absent); no moneyline",
+                  "games": len(odds)}
+
+
+def ablate_slate(salary_path: str, contests: Sequence[Mapping[str, Any]],
+                 slate_date: str, savant_csv: Path = ABLATION_SAVANT,
+                 odds_dir: Path = ODDS_HISTORY) -> Dict[str, Any]:
+    """One slate's 2x2: F1 on/off x F4-quality on/off, hitters graded on
+    ``Base_Projection`` against realized points. Every cell names its inputs."""
+    _engine_on_path()
+    from datetime import datetime
+    from mlb_engine.field.field_miner import normalize_name
+    from mlb_engine.intake.live_data_adapters import (
+        build_slate_pool, merge_dk_starting_into_feed)
+    from mlb_engine.pipeline.execution_pipeline import _assemble_projection_frame
+    from mlb_engine.projections.projection_builder import (
+        build_f1_factors, compute_f4_factors, load_savant_expected_stats)
+
+    feed, _ = merge_dk_starting_into_feed(None, salary_path)
+    pool = build_slate_pool(salary_path, feed, platoon_json={},
+                            now=datetime.fromisoformat(f"{slate_date}T12:00:00+00:00"),
+                            stale_platoon_policy="warn")
+    rows = pool["run_slate_kwargs"]["projection_rows"]
+    teams = dict(pool.get("team_by_player_id") or {})
+    opposing = pool.get("opposing_probables") or {}
+    hands = pool.get("batter_hands") or {}
+    savant = load_savant_expected_stats(savant_csv)
+    vintage = savant_vintage(savant_csv)
+    odds, odds_note = load_odds_history(slate_date, odds_dir)
+    pool_teams = {str(t).strip().upper() for t in teams.values()}
+    priced_games = sorted(g for g in odds if set(g.split("@")) & pool_teams)
+    odds_note["slate_games_priced"] = len(priced_games)
+    # A slate team with no posted total keeps F1 = 1.0 while the others move, so
+    # the F1-on arms are only as complete as this list is empty.
+    odds_note["pool_teams_without_a_posted_total"] = sorted(
+        pool_teams - {t for g in odds for t in g.split("@")}) if odds else []
+
+    f4_on, f4_on_report = compute_f4_factors(teams, opposing, savant, hands)
+    f4_off, _ = compute_f4_factors(teams, opposing, None, hands)
+    f1_map, _ = build_f1_factors(odds, teams) if priced_games else ({}, {})
+    quality_teams = sum(1 for v in f4_on_report["quality_factor_by_team"].values()
+                        if abs(v - 1.0) > 1e-12)
+    inputs = {
+        "f1_basis": "posted total split evenly (no moneyline), park-inclusive, no F5 in any arm",
+        "savant": {"file": Path(savant_csv).name, "vintage": vintage,
+                   "post_dated": vintage is None or vintage >= slate_date},
+        "odds": odds_note,
+        # The off arm keeps the platoon half; the on arm's quality term is centered
+        # on the snapshot's own all-row mean (R443's starter set needs a season
+        # pitching table as of the slate, and the only one on disk is September's).
+        "f4_league_mean_basis": f4_on_report["league_mean_basis"],
+        "opposing_probables": len([t for t, v in opposing.items() if (v or {}).get("name")]),
+        "f4_quality_non_neutral_sides": quality_teams,
+    }
+    out: Dict[str, Any] = {
+        "slate_date": slate_date,
+        "salary_file": str(Path(salary_path).relative_to(ROOT)
+                           if Path(salary_path).is_relative_to(ROOT) else salary_path),
+        "contests": sorted(str(r.get("contest_id")) for r in contests),
+        "inputs": inputs, "arms": {}, "reasons": [],
+    }
+    if quality_teams == 0:
+        out["status"] = "not_graded"
+        out["reasons"].append(
+            "F4 quality is 1.0 on every side (no opposing probable joined to the "
+            "Savant snapshot; a slate without DK's Starting column has none), so "
+            "the on and off arms are the same arm")
+        return out
+    have_f1 = bool(f1_map)
+    if not have_f1:
+        out["reasons"].append(
+            "no posted odds for this slate's games: the F1-on arms are not graded")
+    out["status"] = "graded" if have_f1 else "f1_absent_only"
+
+    realized, conflicts = realized_by_norm(contests)
+    conflicts = set(conflicts) | duplicate_name_norms([r.get("Name") for r in rows])
+    for arm, f1_on, q_on in ABLATION_ARMS:
+        if f1_on and not have_f1:
+            out["arms"][arm] = {"graded": False, "reason": "no posted odds"}
+            continue
+        f4_map = f4_on if q_on else f4_off
+        frame, _ = _assemble_projection_frame(
+            salary_path, rows, "emergency_proxy", None, None, None,
+            f1_by_player_id=(f1_map or None) if f1_on else None,
+            f4_by_player_id=f4_map or None)
+        graded_rows = []
+        for row in frame.itertuples():
+            if str(row.Position) == "P":
+                continue
+            norm = normalize_name(row.Name)
+            if norm in conflicts or norm not in realized:
+                continue
+            graded_rows.append({"player_id": str(row.Player_ID),
+                                "realized_cents": realized[norm],
+                                "engine_base": float(row.Base_Projection),
+                                "ceiling": float(row.Ceiling),
+                                "salary": float(row.Salary),
+                                "appg": float(row.AvgPointsPerGame)})
+        graded = grade_side(graded_rows)
+        base = (graded.get("predictors") or {}).get("engine_base") or {}
+        out["arms"][arm] = {
+            "graded": bool(graded.get("graded")), "n": graded.get("n"),
+            "decile_size": graded.get("decile_size"),
+            "spearman": base.get("spearman"),
+            "top_decile_hits": base.get("top_decile_hits"),
+            "tail_hits": base.get("tail_hits")}
+
+    def delta(on: str, off: str) -> Optional[Dict[str, Any]]:
+        a, b = out["arms"].get(on) or {}, out["arms"].get(off) or {}
+        if not (a.get("graded") and b.get("graded")):
+            return None
+        return {metric: (round(a[metric] - b[metric], 4)
+                         if a.get(metric) is not None and b.get(metric) is not None
+                         else None)
+                for metric in ("spearman", "top_decile_hits", "tail_hits")}
+
+    out["quality_effect"] = {"with_f1_absent": delta("f1_off_q_on", "f1_off_q_off"),
+                             "with_f1_present": delta("f1_on_q_on", "f1_on_q_off")}
+    return out
+
+
+def ablate_f4_quality(dates: Optional[Sequence[str]] = None, archive: Path = ARCHIVE,
+                      savant_csv: Path = ABLATION_SAVANT,
+                      odds_dir: Path = ODDS_HISTORY) -> Dict[str, Any]:
+    """R441. The F1 x F4-quality 2x2 on every gradeable archived Classic slate,
+    one row per slate. Never pooled; the cross-slate lines are COUNTS of slates
+    by status and by whether every input pre-dates the slate."""
+    slates: List[Dict[str, Any]] = []
+    wanted = set(dates or [])
+    for date_dir in sorted(p for p in Path(archive).iterdir() if p.is_dir()):
+        if wanted and date_dir.name not in wanted:
+            continue
+        found = slate_groups(date_dir)
+        for path, contests in sorted(found["groups"].items()):
+            slates.append(ablate_slate(path, contests, date_dir.name,
+                                       savant_csv, odds_dir))
+    by_status: Dict[str, int] = {}
+    for slate in slates:
+        by_status[slate["status"]] = by_status.get(slate["status"], 0) + 1
+    leak_free = [s["slate_date"] for s in slates
+                 if s["status"] == "graded" and not s["inputs"]["savant"]["post_dated"]
+                 and (s["inputs"]["odds"] or {}).get("available")]
+    return {"label": ABLATION_LABEL, "slates": slates, "slate_count": len(slates),
+            "by_status": by_status, "graded_with_every_input_pre_dated": leak_free}
+
+
+def format_ablation_table(result: Mapping[str, Any]) -> str:
+    """One line per slate: status, inputs, the four arms, the quality effect with
+    F1 absent and with F1 present."""
+    lines = [f"# {result['label']}", "",
+             "| slate | salary file | status | savant (vintage, post-dated) | odds "
+             "| arm Spearman / top-decile / tail (f1_off_q_off, f1_off_q_on, "
+             "f1_on_q_off, f1_on_q_on) | quality effect, F1 absent | quality effect, "
+             "F1 present |", "|---|---|---|---|---|---|---|---|"]
+    for slate in result["slates"]:
+        inputs = slate["inputs"]
+        savant = inputs["savant"]
+        odds = inputs["odds"]
+        odds_text = (f"{odds['file']} ({odds['slate_games_priced']} slate games)"
+                     if odds.get("available") else f"none ({odds.get('reason')})")
+        cells = []
+        for arm, _, _ in ABLATION_ARMS:
+            a = slate["arms"].get(arm)
+            cells.append("-" if not a or not a.get("graded") else
+                         f"{a['spearman']}/{a['top_decile_hits']}/{a['tail_hits']}")
+        effect = slate.get("quality_effect") or {}
+        def fmt(d):
+            if not d or any(d.get(m) is None for m in
+                            ("spearman", "top_decile_hits", "tail_hits")):
+                return "-"
+            return f"{d['spearman']:+}/{d['top_decile_hits']:+}/{d['tail_hits']:+}"
+        n_hitters = ((slate["arms"].get("f1_off_q_off") or {}).get("n"))
+        status = slate["status"] + (
+            f" ({'; '.join(slate['reasons'])})" if slate["reasons"] else "") + (
+            f"; hitters n={n_hitters}" if n_hitters else "")
+        lines.append(
+            f"| {slate['slate_date']} | {Path(slate['salary_file']).name} | {status} "
+            f"| {savant['vintage']}, post_dated={savant['post_dated']} | {odds_text} "
+            f"| {' ; '.join(cells)} | {fmt(effect.get('with_f1_absent'))} "
+            f"| {fmt(effect.get('with_f1_present'))} |")
+    leak_free = result["graded_with_every_input_pre_dated"]
+    lines += ["", f"slates by status: {result['by_status']}",
+              f"graded with every input pre-dating the slate: "
+              f"{len(leak_free)} ({', '.join(leak_free) or 'none'})"]
+    return "\n".join(lines)
+
+
 def format_grade_table(result: Mapping[str, Any]) -> str:
     """The per-slate table: one line per slate-side, the leader per metric."""
     lines = [f"# {result['label']}", "",
@@ -878,8 +1140,24 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                         "slate, per slate and per side, observed outcomes only")
     p.add_argument("--date", action="append",
                    help="with --grade-projection, grade only this date (repeatable)")
+    p.add_argument("--ablate-f4-quality", action="store_true",
+                   help="R441, with --grade-projection: the F1 x F4-quality 2x2 on "
+                        "each slate that has an opposing-probable join, every cell "
+                        "naming its inputs and whether the Savant snapshot post-dates "
+                        "the slate. Off by default: the plain grade builds neither")
+    p.add_argument("--savant-csv", type=Path, default=ABLATION_SAVANT,
+                   help="with --ablate-f4-quality, the Savant pitching snapshot")
     args = p.parse_args(argv)
 
+    if args.ablate_f4_quality and not args.grade_projection:
+        p.error("--ablate-f4-quality is a flag of --grade-projection")
+    if args.grade_projection and args.ablate_f4_quality:
+        result = ablate_f4_quality(args.date, savant_csv=args.savant_csv)
+        if args.json:
+            args.json.write_text(json.dumps(result, indent=2, default=str) + "\n",
+                                 encoding="utf-8")
+        print(format_ablation_table(result))
+        return 0
     if args.grade_projection:
         result = grade_projection(args.date)
         if args.json:

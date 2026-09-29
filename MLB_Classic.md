@@ -157,7 +157,7 @@ One current game total, source, and timestamp are required per game. Team totals
 F5 is computed, not eyeballed. `slate_intake_manager.compute_f5_factor(...)` derives hitter and pitcher F5 from `f5_park_factors.csv` and `f5_weather_adjustments.csv`:
 
 - Hitter F5 = park `Run_Factor_Applied` × wind hitter factor.
-- Pitcher F5 = wind pitcher factor × delay pitcher factor (park factor for pitchers is intentionally 1.0; park run environment is carried on the hitter side only).
+- Pitcher F5 = wind pitcher factor × delay pitcher factor (park factor for pitchers is intentionally 1.0 here; a pitcher's park is carried by the park-inclusive opponent total in his F1, R433).
 - Wind applies only when direction is `out` or `in`, speed meets the venue threshold, and the roof is not closed. Speed bands: 8–12, 13–17, 18+.
 - The same call returns `hr_environment`, the postponement-driven `game_exposure_cap`, and `exclude_game`.
 
@@ -175,7 +175,7 @@ All projection construction and confirmed-lineup refreshes use `projection_build
 
 `Base × F1 × F2 × F3 × F4 × F5`
 
-- F1: market scoring environment.
+- F1: market scoring environment. A hitter's F1 is his team's de-parked implied total over the slate mean; a pitcher's (R433) is the slate's harmonic-mean implied total over his OPPONENT's park-inclusive implied total (harmonic so the arms average exactly 1.0), times a win-share term, clipped once to 0.85-1.15. Park-inclusive because pitcher F5 carries no park term, so the ballpark is priced once, here. An arm whose game has no usable total stays 1.0, is left out of the applied count and is named in the brief. Showdown keeps pitchers at 1.0.
 - F2: opportunity and confirmed batting order.
 - F3: player skill.
 - F4: matchup quality.
@@ -224,10 +224,10 @@ The v2.23.0 block above left pitchers at the uniform 1.42 pending a K-rate input
 
 F4 was structurally absent: it defaulted to 1.0 unless hand-typed per row, leaving the two strongest matchup signals outside the projection. `projection_builder.compute_f4_factors` emits a `{Player_ID: F4}` map for hitters as (opposing-SP quality) x (platoon hand prior):
 
-- Quality: the opposing probable's Savant xwOBA-against over the league mean of the supplied pitching table, PA-shrunk with the same 50/100 discipline, clipped 0.90-1.10. The mlb-lineups feed's `probable_pitcher.id` is an MLBAM id and joins the Savant table directly, no name match. The component applies team-wide even when batter hands are unavailable, so TBD lineups still receive it.
+- Quality: the opposing probable's Savant xwOBA-against over the league mean of the supplied pitching table, PA-shrunk with the same 50/100 discipline, clipped 0.90-1.10. The league mean is taken over the STARTER population of the reference table (GS >= 1 and at least half of appearances started, joined from `statsapi_season_pitching.csv`; R443), not over every Savant row and not over the slate's probables, and falls back to the all-row mean, named in the report, below 30 starters. The clip is unchanged and the report counts where it binds. The mlb-lineups feed's `probable_pitcher.id` is an MLBAM id and joins the Savant table directly, no name match. The component applies team-wide even when batter hands are unavailable, so TBD lineups still receive it.
 - Platoon: labeled priors in `F4_PLATOON_PRIOR` (LHB vs RHP 1.04, LHB vs LHP 0.94, RHB vs LHP 1.03, RHB vs RHP 0.99, switch 1.02 both ways), 1.0 when either hand is unknown. These are standard platoon-split priors, not calibrated values; override the table per slate if a better split exists.
 
-Combined clip 0.85-1.15. Inputs come from `live_data_adapters.extract_opposing_probables` and `extract_batter_hands` (both v1.1), which reuse the status map's name+team salary match. Consumed via `run_slate(f4_by_player_id=...)`; applied only to rows lacking an explicit F4, so a hand-supplied factor always wins; applied rows are tagged in Notes and surfaced under `projection_enrichment["f4"]`. Applied before F1/F5 it does not double count the implied total or tonight's park. Pitcher F4 stays 1.0 in this version (the opposing-lineup aggregation waits for a team-level input: team K% and wOBA vs LHP/RHP; the v2.24.0 pitcher K-rate input drives ceilings, not F4), and F3 remains 1.0-default with the xwOBA Base correction carrying the skill signal. Deterministic labeled prior, never a win-rate, ROI, or probability claim.
+Combined clip 0.85-1.15. Inputs come from `live_data_adapters.extract_opposing_probables` and `extract_batter_hands` (both v1.1), which reuse the status map's name+team salary match. Consumed via `run_slate(f4_by_player_id=...)`; applied only to rows lacking an explicit F4, so a hand-supplied factor always wins; applied rows are tagged in Notes and surfaced under `projection_enrichment["f4"]`. Multiplication commutes, so applying F4 first says nothing about independence from F1: posted totals move with the probable pitcher, so F1 already carries the opposing arm and F4's quality term prices him again (R441). The overlap is graded by `replay_slate.py --grade-projection --ablate-f4-quality`, not assumed; on the one slate with real odds it cannot settle a shrink (post-dated Savant, R251 open). Pitcher F4 stays 1.0 in this version (the opposing-lineup aggregation waits for a team-level input: team K% and wOBA vs LHP/RHP; the v2.24.0 pitcher K-rate input drives ceilings, not F4), and F3 remains 1.0-default with the xwOBA Base correction carrying the skill signal. Deterministic labeled prior, never a win-rate, ROI, or probability claim.
 
 ### Projected batting order and platoon mispricing screen (v2.22.0)
 

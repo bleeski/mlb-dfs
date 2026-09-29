@@ -509,6 +509,7 @@ def stage_slate(
     )
     from mlb_engine.projections.projection_builder import (
         compute_f4_factors, load_savant_expected_stats,
+        starter_ids_from_pitching_stats,
     )
 
     slate_dir = Path(slates_dir) / date
@@ -646,6 +647,9 @@ def stage_slate(
         pool["opposing_probables"],
         pitching_table,
         pool["batter_hands"],
+        # R443: the quality ratio centers on the reference table's starters.
+        starter_ids=(starter_ids_from_pitching_stats(fangraphs_pitching)
+                     if fangraphs_pitching.exists() else None),
     )
 
     # Odds packet: parsed for the checkpoint and the brief. Not a run_slate

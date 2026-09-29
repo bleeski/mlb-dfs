@@ -953,7 +953,15 @@ EXPECTED_SUITE_COUNTS = {
     # no feed, DK confirms and a legal replacement is found, a started game's
     # player is counted team_locked, partial DK coverage confirms nobody, an
     # explicit feed is the source, --dead-from-feed reads DK's orders).
-    "tests.test_core": 1841,
+    # R433+R441+R443, 2026-09-29: 1841 -> 1874, the 33 that pin the pitcher market
+    # factor (14: the 5.33 against 3.87 separation, the frame and Ceiling, the win
+    # share, an unpriced game left out and named, the park priced once, the clip
+    # count, the arms averaging exactly 1.0, a non-positive total or own team as
+    # opponent, a stale win probability, hitters-only `non_neutral_f1`,
+    # `build_f1_map`, an arm's team never joining the hitters' mean, the brief
+    # count and its unpriced list, Showdown's constant), the starter-centered F4
+    # mean (8) and the F1 x F4 ablation grade (11).
+    "tests.test_core": 1874,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps

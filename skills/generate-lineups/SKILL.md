@@ -792,8 +792,10 @@ derived too (R205): each book that posts a complete two-way is de-vigged, the
 probabilities are averaged, and the price carried forward is the vig-free one
 implying that average. `moneyline_books` holds what each book actually posted;
 quote that, not the consensus, if Ben asks what the market said. Hitter F1 is the team's implied
-total over the slate's mean, clipped to 0.85-1.15; pitcher F1 stays 1.0 in v1 so
-the opposing-team total is not counted twice. `enrichment.f1_implied_total_by_team`
+total over the slate's mean, clipped to 0.85-1.15; a pitcher's F1 (R433) is the slate's
+harmonic-mean total over his opponent's park-inclusive total times a win-share term, clipped once,
+and `enrichment.counts.f1_pitchers_priced` says how many arms were priced. An arm
+whose game has no total stays 1.0 and is named. `enrichment.f1_implied_total_by_team`
 carries the numbers if Ben asks which games the build liked.
 
 On F5: park factors apply from `data/reference/` with no forecast at all, which

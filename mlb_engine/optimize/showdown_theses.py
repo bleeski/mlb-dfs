@@ -435,8 +435,10 @@ def apply_f1_prior(df: pd.DataFrame,
     number is still the prior the solver ranks on, untouched by any factor.
 
     ``build_f1_factors`` already pins a pitcher to ``F1_PITCHER_NEUTRAL`` when
-    his id is passed as a pitcher, so this function multiplies whatever it is
-    handed and does not re-derive who is an arm.
+    his id is passed as a pitcher WITHOUT a matchup map (Showdown passes none;
+    Classic's R433 pricing is opt-in through ``pitcher_matchup_by_id``), so this
+    function multiplies whatever it is handed and does not re-derive who is an
+    arm.
 
     Two properties of a TWO-TEAM slate are worth stating where the code is,
     because they bound what this can do:
