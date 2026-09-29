@@ -2,13 +2,13 @@
  "code": {
   "contest_allocator": "v1.12",
   "execution_pipeline": "v1.17",
-  "git_dirty": false,
-  "git_sha": "526be410e99b156bffadadb89ab12a13fe7cf3a7"
+  "git_dirty": true,
+  "git_sha": "cca02f1199fd282e5b4a226378e186734e1ac370"
  },
  "controls": {},
  "date": "2026-09-29",
  "egress": "egress: statsapi unreachable, odds unreachable, savant unreachable, mlb-lineups unreachable, fangraphs unreachable (curl), open-meteo unreachable",
- "egress_source": "session_start 2026-09-29T16:24:11+00:00",
+ "egress_source": "session_start 2026-09-29T18:29:44+00:00",
  "entries": [
   {
    "contest_id": "195970831",
@@ -169,22 +169,22 @@
    "entry_id": "5274217927",
    "filled": true,
    "roster_ids": [
-    "44321109",
-    "44321370",
-    "44321199",
-    "44321176",
+    "44321319",
+    "44321357",
+    "44321166",
+    "44321158",
     "44321118",
-    "44321123",
-    "44321142",
+    "44321129",
+    "44321159",
     "44321117",
-    "44321223",
+    "44321211",
     "44321138"
    ]
   }
  ],
  "entries_binding": {
-  "source": "outputs/2026-09-29/DKEntries_1400_4g_REVIEW_phi_hedge.csv",
-  "source_sha256": "7fdaa3806ed357b15e21811f08ed79ab3e0123bad50286bcc810a59abfdd4543",
+  "source": "outputs/2026-09-29/DKEntries_1400_4g.csv",
+  "source_sha256": "52d158c395b677d40622995e98de69bdfd5aa9875a933e461f49143459c7e16c",
   "status": "bound"
  },
  "host": {
@@ -195,7 +195,7 @@
  "kind": "delivery",
  "labels": "deterministic review proxies and labeled priors only; never ROI, win rate, cash rate, or probability",
  "manifest_row": {
-  "certification": "review_grade_uncertified",
+  "certification": "certified",
   "contest_ids": [
    "195970831",
    "196052739"
@@ -205,24 +205,28 @@
    "MLB $200K Postseason Opener [$50K to 1st]"
   ],
   "contest_type": "classic",
-  "delivered_file": "outputs/2026-09-29/DKEntries_1400_4g_REVIEW_phi_hedge.csv",
+  "delivered_file": "outputs/2026-09-29/DKEntries_1400_4g.csv",
   "entries": 9,
-  "failing_gates": [
-   "portfolio_caps_passed"
-  ],
-  "notes": "pre-lock operator refinement of run 20260929T165713Z_0efaf97e (Ben chose it, 2026-09-29 13:07 ET): entry 5274217927 reseated from Tolle/Imai HOU4+SD4 to bank lineup Schlittler/Painter PHI4 (job 44321109+44321370|PHI) as the Sale-gets-hit hedge; Schlittler and Vargas 4/9 over the 3/9 player cap; verify_export and preflight exit 0 at 13:05 ET; review-grade, never certified",
+  "notes": "ENTERED file: certified run 20260929T165713Z_0efaf97e (preflight exit 0 at 12:57 ET). Ben uploaded this, not the PHI-hedge variant 7fdaa380 (standings 14:27 ET). Label restored after promote_run inherited the variant row's.",
+  "preflight": {
+   "checked_utc": "2026-09-29T18:34:26.015739+00:00",
+   "failures": [],
+   "verdict": "review_ready",
+   "version": "1.1"
+  },
   "projection_tier": "enriched",
-  "recorded_utc": "2026-09-29T17:07:23.860641+00:00",
+  "re_promoted_from": "20260929T165713Z_0efaf97e",
+  "recorded_utc": "2026-09-29T18:34:38.419125+00:00",
   "run_id": "20260929T165713Z_0efaf97e",
-  "sha256": "7fdaa3806ed357b15e21811f08ed79ab3e0123bad50286bcc810a59abfdd4543",
+  "sha256": "52d158c395b677d40622995e98de69bdfd5aa9875a933e461f49143459c7e16c",
   "slate_tag": "1400_4g",
-  "status": "candidate",
+  "status": "upload_ready",
   "strategy_state": {
    "counts": {},
    "state": "unknown"
   }
  },
- "recorded_utc": "2026-09-29T17:07:24.224290+00:00",
+ "recorded_utc": "2026-09-29T18:34:38.682289+00:00",
  "relaxations": {},
  "run": {
   "certification": {
