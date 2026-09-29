@@ -1827,10 +1827,10 @@ def compute_f5_factor(
     Composition rules, stated so they are auditable rather than implied:
     - hitter_f5 = park Run_Factor_Applied x wind hitter factor.
     - pitcher_f5 = wind pitcher factor x delay pitcher factor. The park
-      component for pitchers is intentionally 1.0: the run environment already
-      moves through opposing hitters, and inventing an inverse-park pitcher
-      factor would double count. Operators may layer pitcher park judgment in
-      F4 explicitly.
+      component for pitchers is intentionally 1.0 HERE: R433 prices a pitcher's
+      park once, in his F1, through the opponent's park-inclusive implied total
+      (``projection_builder.build_f1_factors`` with a pitcher matchup map), so
+      an inverse-park factor here would double count it.
     - Wind applies only when direction is out/in, speed meets the venue
       threshold, and the roof is not closed. Cross/variable/not_material wind
       and dome/closed-roof games take no wind adjustment.

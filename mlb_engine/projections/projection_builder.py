@@ -634,8 +634,12 @@ def build_k_rate_ceiling_multipliers(
 # hitter facing a soft-contact ace is pulled down and one facing a loud-contact
 # arm is pulled up. The platoon priors are labeled priors from the standard
 # platoon-split literature, not calibrated values; override the table per slate
-# if a better split exists. Applied BEFORE F1/F5 it does not double count the
-# implied total or the park. Pitcher F4 remains 1.0 in this version. All
+# if a better split exists. Multiplication commutes, so the order F4 is applied
+# in proves nothing about F1 and F4 being independent: posted totals move with the
+# probable pitcher, so F1 already carries the opposing arm and F4's quality term
+# prices him again (R441). How much that overlap matters is graded, not assumed:
+# `tools/replay_slate.py --grade-projection --ablate-f4-quality` (one slate so far,
+# post-dated Savant; it cannot settle a shrink). Pitcher F4 remains 1.0 in this version. All
 # outputs are deterministic review inputs, never ROI or win-rate claims.
 
 # ---------------------------------------------------------------------------
@@ -657,9 +661,34 @@ def build_k_rate_ceiling_multipliers(
 # little signal, overstating it invents some.
 F1_MARGIN_RUNS_PER_PROB_GAP = 2.4
 F1_HITTER_CLIP = (0.85, 1.15)
-# Pitcher F1 stays 1.0 in v1. The opposing-team total is already the input to a
-# pitcher's matchup elsewhere, and applying it here too would double count it.
+# R433. Pitcher F1 was 1.0 in v1 on the argument that the opposing-team total
+# was "already the input to a pitcher's matchup elsewhere". It was not: F4 never
+# sees an arm (``team_by_player_id`` is hitters only), F5's pitcher factor is
+# wind x delay with no park term, and nothing else read the opponent's total,
+# so an arm at Coors and an arm in a pitcher's park projected alike. A pitcher's
+# F1 is now built HERE, once, when the caller supplies the matchup map
+# (``pitcher_matchup_by_id``; Classic does, Showdown does not and keeps the
+# constant). Two terms, multiplied and clipped ONCE (F18's lesson: two
+# separately clipped terms can leave the band):
+#   run prevention = the slate's HARMONIC-mean implied total / the OPPONENT's
+#     implied total (the inverse of the hitter ratio). Harmonic, not the
+#     arithmetic mean the hitter ratio uses: an arithmetic centre over an
+#     inverse ratio averages above 1.0 (Jensen), a standing tilt of arms over
+#     bats; the harmonic centre makes the arms' run term average exactly 1.0
+#     over the slate's teams. The total is PARK-INCLUSIVE, not
+#     de-parked: F1 de-parks a hitter's total because hitter F5 multiplies the
+#     park, but pitcher F5 carries no park term on purpose ("park moves through
+#     opposing hitters"), so a de-parked pitcher total would price the ballpark
+#     nowhere. The raw total prices it once.
+#   win share = 1 + slope x (own devigged win probability - 0.5). DK pays 4 for a
+#     win; roughly 0.6 of a favorite's wins go to the starter of record and a
+#     starter's Base is about ten points, so a unit of win probability is worth
+#     about 4 x 0.6 / 10 = 0.24 of Base. Rounded to 0.25: a 60% favorite +0.025.
+# A pitcher whose game has no usable total stays at 1.0, is left OUT of the map
+# (so it is never counted as applied) and is named in ``pitchers_unpriced``.
 F1_PITCHER_NEUTRAL = 1.0
+F1_PITCHER_CLIP = (0.85, 1.15)
+F1_PITCHER_WIN_SLOPE = 0.25
 
 
 def devig_two_way(price_a: Optional[float], price_b: Optional[float]) -> Optional[Tuple[float, float]]:
@@ -723,6 +752,9 @@ def build_f1_factors(
     pitcher_ids: Optional[Iterable[str]] = None,
     clip: Tuple[float, float] = F1_HITTER_CLIP,
     park_run_factor_by_game_id: Optional[Mapping[str, float]] = None,
+    pitcher_matchup_by_id: Optional[Mapping[str, Tuple[str, str]]] = None,
+    pitcher_clip: Tuple[float, float] = F1_PITCHER_CLIP,
+    pitcher_win_slope: float = F1_PITCHER_WIN_SLOPE,
 ) -> Tuple[Dict[str, float], Dict[str, Any]]:
     """Return ({Player_ID: F1}, report) from posted game totals and moneylines.
 
@@ -756,9 +788,19 @@ def build_f1_factors(
     ``park_adjusted: False``, so a caller that has no venue data still gets a
     usable F1 and the report says which basis it used.
 
+    R433. ``pitcher_matchup_by_id`` maps a pitcher's Player_ID to ``(own DK team,
+    opposing DK team)``. Supplied, each pitcher in ``pitcher_ids`` is priced from
+    the opponent's PARK-INCLUSIVE implied total (the slate's harmonic-mean total
+    over it, so a soft opponent lifts him and the arms average 1.0) times a
+    win-share term, clipped once to
+    ``pitcher_clip``; a pitcher with no usable total stays neutral, is omitted
+    from the returned map and is named in ``pitchers_unpriced``. Absent, every
+    pitcher is pinned to ``F1_PITCHER_NEUTRAL`` exactly as before (Showdown).
+
     Every emitted F1 is a labeled deterministic prior, never a run projection,
     an edge, or a probability claim.
     """
+    price_pitchers = pitcher_matchup_by_id is not None
     park_factors = {
         str(k).strip().upper(): float(v)
         for k, v in (park_run_factor_by_game_id or {}).items()
@@ -776,6 +818,8 @@ def build_f1_factors(
     games_used: Dict[str, Any] = {}
     games_without_moneyline: List[str] = []
     games_without_park_factor: List[str] = []
+    win_prob_by_team: Dict[str, float] = {}
+    game_id_by_team: Dict[str, str] = {}
     for game_id, entry in (odds_by_game_id or {}).items():
         if "@" not in str(game_id):
             continue
@@ -796,6 +840,13 @@ def build_f1_factors(
             games_without_park_factor.append(str(game_id))
         divisor = park if park else 1.0
         totals_by_team[away], totals_by_team[home] = split
+        game_id_by_team[away] = game_id_by_team[home] = str(game_id)
+        _probs = devig_two_way(moneyline.get(away), moneyline.get(home))
+        if _probs is not None:
+            win_prob_by_team[away], win_prob_by_team[home] = _probs
+        else:
+            win_prob_by_team.pop(away, None)
+            win_prob_by_team.pop(home, None)
         deparked_by_team[away] = split[0] / divisor
         deparked_by_team[home] = split[1] / divisor
         park_factor_by_team[away] = park_factor_by_team[home] = divisor
@@ -826,8 +877,9 @@ def build_f1_factors(
             "the posted game total and moneyline, not published by the book, and "
             "are divided by the venue's park run factor so the ballpark is priced "
             "once, in F5. Labeled prior, never a run projection, ROI, win rate, "
-            "or probability claim. Pitcher F1 stays 1.0 in v1 so the "
-            "opposing-team total is not double counted."
+            "or probability claim. Pitcher F1 is neutral unless the caller "
+            "supplies a pitcher matchup map; then it is the opponent's park-"
+            "inclusive implied total inverted, times a win-share term (R433)."
         ) if park_adjusted else (
             "Deterministic F1 prior: implied team total over the slate mean, "
             "clipped, with NO park adjustment because no park factor map was "
@@ -835,7 +887,8 @@ def build_f1_factors(
             "this build. Implied totals are derived from the posted game total "
             "and moneyline, not published by the book. Labeled prior, never a "
             "run projection, ROI, win rate, or probability claim. Pitcher F1 "
-            "stays 1.0 in v1 so the opposing-team total is not double counted."
+            "is neutral unless the caller supplies a pitcher matchup map "
+            "(R433)."
         ),
     }
     if not totals_by_team:
@@ -844,6 +897,8 @@ def build_f1_factors(
         report["f1_ratio_denominator"] = None
         report["non_neutral_f1"] = 0
         report["hitters_scored"] = 0
+        report["pitcher_pricing"] = "priced" if price_pitchers else "not_requested"
+        report["pitchers_priced"] = 0
         return {}, report
 
     # Normalize against the teams actually ON this slate, not every game the
@@ -879,12 +934,58 @@ def build_f1_factors(
 
     low, high = clip
     pitchers = {str(p) for p in (pitcher_ids or [])}
+    matchups = {str(k): v for k, v in (pitcher_matchup_by_id or {}).items()}
+    p_low, p_high = pitcher_clip
     f1_by_player: Dict[str, float] = {}
     teams_without_odds: set = set()
+    pitchers_unpriced: List[Dict[str, Any]] = []
+    pitchers_without_moneyline: List[str] = []
+    pitchers_priced = 0
+    pitcher_clip_low = pitcher_clip_high = 0
+    _positive = [totals_by_team[k] for k in sorted(basis_teams) if totals_by_team[k] > 0]
+    pitcher_center = (len(_positive) / sum(1.0 / t for t in _positive)) if _positive else None
+    if price_pitchers:
+        report["pitcher_center_implied_total"] = (
+            round(pitcher_center, 3) if pitcher_center is not None else None)
+        for pid in sorted(pitchers):
+            pair = matchups.get(pid)
+            own, opp = (str(pair[0]).strip().upper(), str(pair[1]).strip().upper()) \
+                if pair and len(pair) == 2 else ("", "")
+            reason = None
+            if not own or not opp:
+                reason = "the pool row carries no team or opponent"
+            elif own == opp:
+                reason = "the pool row names the same team as his own and his opponent"
+            elif opp not in totals_by_team:
+                reason = "the opponent's game carries no usable total"
+            elif totals_by_team[opp] <= 0:
+                reason = "the opponent's implied total is not positive"
+            elif game_id_by_team.get(own) != game_id_by_team.get(opp):
+                reason = "the pitcher's team and his opponent are not in one priced game"
+            elif pitcher_center is None:
+                reason = "no team on the slate has a positive implied total"
+            if reason:
+                pitchers_unpriced.append(
+                    {"id": pid, "team": own, "opponent": opp, "reason": reason})
+                continue
+            run_prevention = pitcher_center / totals_by_team[opp]
+            p_own = win_prob_by_team.get(own)
+            if p_own is None:
+                pitchers_without_moneyline.append(pid)
+                win_term = 1.0
+            else:
+                win_term = 1.0 + float(pitcher_win_slope) * (p_own - 0.5)
+            raw = run_prevention * win_term
+            value = float(min(p_high, max(p_low, raw)))
+            pitcher_clip_low += int(raw < p_low)
+            pitcher_clip_high += int(raw > p_high)
+            f1_by_player[pid] = value
+            pitchers_priced += 1
     for pid, team in (team_by_player_id or {}).items():
         pid = str(pid)
         if pid in pitchers:
-            f1_by_player[pid] = F1_PITCHER_NEUTRAL
+            if not price_pitchers:
+                f1_by_player[pid] = F1_PITCHER_NEUTRAL
             continue
         team_total = deparked_by_team.get(str(team).strip().upper())
         if team_total is None or ratio_denominator <= 0:
@@ -895,11 +996,30 @@ def build_f1_factors(
 
     report["hitters_scored"] = len(f1_by_player) - len(pitchers & set(f1_by_player))
     report["teams_without_odds"] = sorted(teams_without_odds)
+    # R433. `pitchers_priced` counts arms whose factor came from a game price,
+    # never the constant; `pitchers_non_neutral` is the subset that landed off
+    # 1.0. An unpriced arm is in `pitchers_unpriced` and absent from the map.
+    report["pitcher_pricing"] = "priced" if price_pitchers else "not_requested"
+    report["pitchers_priced"] = pitchers_priced
+    report["pitchers_non_neutral"] = sum(
+        1 for pid in pitchers if pid in f1_by_player
+        and abs(f1_by_player[pid] - 1.0) > 1e-9) if price_pitchers else 0
+    report["pitchers_unpriced"] = pitchers_unpriced
+    report["pitchers_without_moneyline"] = pitchers_without_moneyline
+    if price_pitchers:
+        report["pitcher_basis"] = "opponent_park_inclusive_implied_total"
+        report["pitcher_win_slope"] = float(pitcher_win_slope)
+        report["pitcher_clip"] = [p_low, p_high]
+        report["pitcher_clip_binding"] = {"floor": pitcher_clip_low, "cap": pitcher_clip_high}
+    # HITTERS only: `inert_factors` reads this key to say F1 scored rows and
+    # moved none, and a priced arm must not hide a slate whose hitters all sit
+    # at 1.0. `pitchers_non_neutral` counts the arms.
     report["non_neutral_f1"] = sum(
-        1 for v in f1_by_player.values() if abs(float(v) - 1.0) > 1e-9)
-    if f1_by_player and report["non_neutral_f1"] == 0:
+        1 for pid, v in f1_by_player.items()
+        if pid not in pitchers and abs(float(v) - 1.0) > 1e-9)
+    if report["hitters_scored"] and report["non_neutral_f1"] == 0:
         report["warning"] = (
-            f"F1 computed for {len(f1_by_player)} players but every value is "
+            f"F1 computed for {report['hitters_scored']} hitters but every value is "
             "neutral 1.0; no team's implied total differed from the slate mean")
     return f1_by_player, report
 
@@ -911,6 +1031,33 @@ F4_PLATOON_PRIOR: Dict[Tuple[str, str], float] = {
 }
 F4_QUALITY_CLIP = (0.90, 1.10)
 F4_COMBINED_CLIP = (0.85, 1.15)
+# R443. Fewer starters than this in the reference table and the starter-centered
+# mean is noisier than the all-row one it replaces (early April), so it is not
+# used and the report says why.
+F4_STARTER_MIN_POPULATION = 30
+
+
+def starter_ids_from_pitching_stats(path: str | Path) -> set:
+    """MLBAM ids of the arms who are STARTERS in a season pitching-stats CSV.
+
+    R443. A starter is an arm with GS >= 1 who started at least half of his
+    appearances (``GS * 2 >= G``), so a reliever with one stray start is not
+    the population a slate's probables come from. Reads ``MLBAM_ID``, ``G`` and
+    ``GS`` from ``statsapi_season_pitching.csv``; any missing column, a missing
+    file or an unreadable one yields the empty set and the caller falls back to
+    the all-row mean, named in the F4 report. Never raises.
+    """
+    try:
+        table = pd.read_csv(path)
+    except Exception:
+        return set()
+    if not {"MLBAM_ID", "G", "GS"}.issubset(table.columns):
+        return set()
+    games = pd.to_numeric(table["G"], errors="coerce")
+    starts = pd.to_numeric(table["GS"], errors="coerce")
+    ids = pd.to_numeric(table["MLBAM_ID"], errors="coerce")
+    keep = ids.notna() & (starts >= 1) & (starts * 2 >= games)
+    return {str(int(v)) for v in ids[keep]}
 
 
 def platoon_hand_factor(bat_side: Optional[str], pitch_hand: Optional[str]) -> float:
@@ -952,6 +1099,7 @@ def compute_f4_factors(
     combined_clip: Tuple[float, float] = F4_COMBINED_CLIP,
     pa_full: int = XWOBA_PA_FULL,
     pa_min: int = XWOBA_PA_MIN,
+    starter_ids: Optional[Iterable[str]] = None,
 ) -> Tuple[Dict[str, float], Dict[str, Any]]:
     """Return ({hitter DK Player_ID: F4}, report) for the supplied hitters.
 
@@ -967,8 +1115,24 @@ def compute_f4_factors(
     team-wide even when batter hands are unavailable, so TBD lineups still
     receive the matchup-quality signal. A team with no opposing probable stays
     neutral and is reported. Every emitted F4 is a labeled deterministic prior.
+
+    R443. The quality ratio is centered on a league mean. Over every valid
+    Savant row that mean includes relievers (0.3312 on the 2026-09-25 table
+    against 0.3179 over GS >= 10 starters), which pushed the median starter to
+    0.963 and left one starter in five at the 0.90 floor. ``starter_ids`` (MLBAM
+    ids, see ``starter_ids_from_pitching_stats``) centers the mean on the
+    starter POPULATION of the reference table, not on the slate's ~12 probables,
+    so a two-game slate has no noisy mean. Absent, or fewer than
+    ``F4_STARTER_MIN_POPULATION`` of them in the table, the all-row mean is used
+    and ``league_mean_basis`` says so. The clip is unchanged; the report counts
+    where it binds, over the slate's sides and over the same starter population
+    the mean was taken over.
     """
     league_mean: Optional[float] = None
+    league_mean_all_rows: Optional[float] = None
+    league_mean_basis = "all_rows"
+    league_mean_basis_note: Optional[str] = None
+    starter_population: Dict[str, Any] = {"used": False}
     sp_row_by_id: Dict[str, Tuple[float, float]] = {}
     sp_id_by_name: Dict[str, str] = {}
     if pitching_table is not None and len(pitching_table):
@@ -978,7 +1142,40 @@ def compute_f4_factors(
         pa = pd.to_numeric(table["pa"], errors="coerce")
         valid = est.notna() & (est > 0)
         if bool(valid.any()):
-            league_mean = float(est[valid].mean())
+            league_mean_all_rows = float(est[valid].mean())
+            league_mean = league_mean_all_rows
+        if starter_ids is not None and league_mean is not None:
+            wanted = {str(v).strip() for v in starter_ids}
+            in_population = valid & table["player_id"].isin(wanted)
+            found = int(in_population.sum())
+            if found >= F4_STARTER_MIN_POPULATION:
+                league_mean = float(est[in_population].mean())
+                league_mean_basis = "starters"
+                floor_n = cap_n = scored_n = 0
+                for e, p in zip(est[in_population], pa[in_population]):
+                    if pd.isna(p) or float(p) < pa_min:
+                        continue
+                    scored_n += 1
+                    factor = opposing_sp_quality_factor(
+                        float(e), league_mean, float(p),
+                        clip=quality_clip, pa_full=pa_full, pa_min=pa_min)
+                    floor_n += int(factor <= quality_clip[0] + 1e-12)
+                    cap_n += int(factor >= quality_clip[1] - 1e-12)
+                starter_population = {
+                    "used": True, "arms": found, "arms_scored": scored_n,
+                    "at_floor": floor_n, "at_cap": cap_n,
+                    "mean": round(league_mean, 4),
+                    "all_rows_mean": round(league_mean_all_rows, 4)}
+            else:
+                league_mean_basis = "all_rows_fallback"
+                league_mean_basis_note = (
+                    f"only {found} of the supplied starters are in the pitching "
+                    f"table (need {F4_STARTER_MIN_POPULATION}); the all-row mean "
+                    "is used")
+                starter_population = {"used": False, "arms": found}
+        elif starter_ids is not None:
+            league_mean_basis = "all_rows_fallback"
+            league_mean_basis_note = "no usable pitching table for the starter mean"
         for pid, e, p in zip(table["player_id"], est, pa):
             if not pd.isna(e):
                 sp_row_by_id[str(pid)] = (float(e), float(p) if not pd.isna(p) else 0.0)
@@ -1053,8 +1250,24 @@ def compute_f4_factors(
             platoon_applied += 1
         f4_by_player[str(pid)] = float(min(high, max(low, quality * hand_factor)))
 
+    quality_low, quality_high = quality_clip
     report: Dict[str, Any] = {
         "league_mean_est_woba": league_mean,
+        "league_mean_basis": league_mean_basis,
+        "league_mean_basis_note": league_mean_basis_note,
+        "league_mean_all_rows": league_mean_all_rows,
+        "starter_population": starter_population,
+        # R443. Where the quality clip binds on THIS slate: the sides whose
+        # factor is exactly the floor or the cap, named. (The reference
+        # population's count, taken over the same arms the mean was, is in
+        # `starter_population`; the two are different populations by design.)
+        "quality_clip_binding": {
+            "floor": sorted(t for t, v in quality_by_team.items()
+                            if v <= quality_low + 1e-12),
+            "cap": sorted(t for t, v in quality_by_team.items()
+                          if v >= quality_high - 1e-12),
+            "sides_total": len(quality_by_team),
+        },
         "quality_factor_by_team": quality_by_team,
         "opp_hand_by_team": opp_hand_by_team,
         "teams_without_opposing_probable": teams_without_probable,

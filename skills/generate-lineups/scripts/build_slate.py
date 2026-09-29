@@ -2791,8 +2791,11 @@ def build_f1_map(pool: dict, odds_by_game_id: dict,
     """Return ({Player_ID: F1}, report) from the slate's posted game lines.
 
     Game environment is the strongest exogenous signal in MLB DFS and the market
-    prices it for free. Pitchers are held at 1.0 in v1 so the opposing-team
-    total is not counted twice. Labeled prior, never a run projection.
+    prices it for free. R433: a pitcher's F1 is the opponent's park-inclusive
+    implied total inverted times his own win share, built in
+    ``build_f1_factors`` from the matchup map this function reads off the pool
+    rows; an arm with no priced game stays 1.0, is left out of the map and is
+    named in the report. Labeled prior, never a run projection.
 
     F18. The posted total already prices the ballpark and F5 multiplies the park
     run factor again, so the park was counted twice. Park ownership is decided:
@@ -2804,16 +2807,25 @@ def build_f1_map(pool: dict, odds_by_game_id: dict,
 
     team_by_player_id = dict(pool.get("team_by_player_id") or {})
     pitcher_ids = list((pool.get("pitcher_roles") or {}).keys())
-    # Pitchers are absent from team_by_player_id (it is hitters only), so add
-    # them explicitly to keep the F1 map total and its report honest.
-    salary_team = pool.get("team_by_player_id") or {}
-    for pid in pitcher_ids:
-        team_by_player_id.setdefault(str(pid), salary_team.get(str(pid), ""))
+    # Pitchers are absent from team_by_player_id (it is hitters only), so their
+    # team and opponent come off the pool rows, the way `build_f5_map` reads
+    # them. They are NOT added to `team_by_player_id`: that map defines the
+    # slate's teams for the hitters' mean, and an arm whose team has no hitter in
+    # the pool would otherwise move every hitter's F1. (Until R433 this added
+    # each arm under the empty string, which priced nothing and joined no team.)
+    _pitcher_id_set = {str(pid) for pid in pitcher_ids}
+    matchup_by_pitcher_id = {
+        str(row.get("Player_ID")): (str(row.get("Team") or ""),
+                                    str(row.get("Opponent") or ""))
+        for row in (pool.get("projection_rows") or [])
+        if str(row.get("Player_ID")) in _pitcher_id_set}
     if not odds_by_game_id:
-        return {}, {"skipped": "no odds packet available", "non_neutral_f1": 0}
+        return {}, {"skipped": "no odds packet available", "non_neutral_f1": 0,
+                    "pitchers_priced": 0}
     return build_f1_factors(
         odds_by_game_id, team_by_player_id, pitcher_ids=pitcher_ids,
-        park_run_factor_by_game_id=park_run_factor_by_game_id or None)
+        park_run_factor_by_game_id=park_run_factor_by_game_id or None,
+        pitcher_matchup_by_id=matchup_by_pitcher_id)
 
 
 def build_f5_map(pool: dict, args, venues_by_game_id: dict | None = None) -> tuple[dict, dict]:
@@ -3002,7 +3014,8 @@ def build_f5_map(pool: dict, args, venues_by_game_id: dict | None = None) -> tup
     return f5_by_player, report
 
 
-def build_f4_map(pool: dict, savant_pitching_csv) -> tuple[dict, dict]:
+def build_f4_map(pool: dict, savant_pitching_csv,
+                 starter_source_csv=None) -> tuple[dict, dict]:
     """Return ({Player_ID: F4}, report) for the pool's hitters, or ({}, report).
 
     F4 is the deterministic matchup prior: opposing-SP xwOBA-against quality
@@ -3012,6 +3025,7 @@ def build_f4_map(pool: dict, savant_pitching_csv) -> tuple[dict, dict]:
     """
     from mlb_engine.projections.projection_builder import (
         compute_f4_factors, load_savant_expected_stats,
+        starter_ids_from_pitching_stats,
     )
 
     team_by_player_id = pool.get("team_by_player_id") or {}
@@ -3026,9 +3040,19 @@ def build_f4_map(pool: dict, savant_pitching_csv) -> tuple[dict, dict]:
         except Exception as exc:
             return {}, {"skipped": f"savant pitching table unreadable: {exc}"}
 
+    # R443. The quality ratio is centered on the STARTER population of the
+    # reference table (statsapi GS/G), not on every Savant row. No source file
+    # or none readable keeps the all-row mean, and the report says which.
+    # An EMPTY set is passed as an empty set, not as None: an unreadable source
+    # or one without GS/G is then named by the F4 report ("only 0 of the
+    # supplied starters ...") instead of falling back silently.
+    starter_ids = (starter_ids_from_pitching_stats(starter_source_csv)
+                   if starter_source_csv else None)
     f4, report = compute_f4_factors(
         team_by_player_id, opposing, table, pool.get("batter_hands") or {},
+        starter_ids=starter_ids,
     )
+    report["starter_source"] = str(starter_source_csv) if starter_source_csv else None
     non_neutral = sum(1 for v in f4.values() if abs(float(v) - 1.0) > 1e-9)
     report["non_neutral_f4"] = non_neutral
     if f4 and non_neutral == 0:
@@ -3205,6 +3229,8 @@ def summarize_enrichment(reference_status: dict, enrichment: dict,
         "f4_platoon_applied": int(f4_report.get("platoon_component_applied") or 0),
         "f1_non_neutral": int(f1_report.get("non_neutral_f1") or 0),
         "f1_games_priced": int(f1_report.get("games_priced") or 0),
+        "f1_pitchers_priced": int(f1_report.get("pitchers_priced") or 0),
+        "f1_pitchers_unpriced": len(f1_report.get("pitchers_unpriced") or []),
         "f5_non_neutral": int(f5_report.get("non_neutral_f5") or 0),
         "f5_games_scored": int(f5_report.get("games_scored") or 0),
     }
@@ -3219,6 +3245,13 @@ def summarize_enrichment(reference_status: dict, enrichment: dict,
             warnings.append(f"f5: {f5_report[key]}")
     if (f1_report.get("odds") or {}).get("warning"):
         warnings.append(f"f1: {f1_report['odds']['warning']}")
+    unpriced_arms = f1_report.get("pitchers_unpriced") or []
+    if unpriced_arms:
+        warnings.append(
+            "f1: " + str(len(unpriced_arms)) + " pitcher(s) left at F1 = 1.0, no priced "
+            "game for them: " + "; ".join(
+                f"{a['id']} ({a['team'] or '?'} vs {a['opponent'] or '?'}: {a['reason']})"
+                for a in unpriced_arms))
     no_ml = f1_report.get("games_without_moneyline") or []
     if no_ml:
         warnings.append(
@@ -3350,8 +3383,12 @@ def summarize_enrichment(reference_status: dict, enrichment: dict,
         "value_guard": enrichment.get("value_guard"),
         "counts": counts,
         "f4_league_mean_est_woba": f4_report.get("league_mean_est_woba"),
+        "f4_league_mean_basis": f4_report.get("league_mean_basis"),
+        "f4_quality_clip_binding": f4_report.get("quality_clip_binding"),
+        "f4_starter_population": f4_report.get("starter_population"),
         "f1_odds": f1_report.get("odds"),
         "f1_league_mean_implied_total": f1_report.get("league_mean_implied_total"),
+        "f1_pitchers_unpriced": f1_report.get("pitchers_unpriced") or [],
         "f1_implied_total_by_team": f1_report.get("implied_total_by_team"),
         "f5_by_team": f5_report.get("f5_by_team"),
         "f5_retractable_unresolved": f5_report.get("retractable_unresolved") or [],
@@ -3651,7 +3688,9 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
                      attempt_controls, never_relax)
 
     reference = resolve_reference_data(args)
-    f4_by_player_id, f4_report = build_f4_map(pool, reference["savant_pitching"])
+    f4_by_player_id, f4_report = build_f4_map(
+        pool, reference["savant_pitching"],
+        starter_source_csv=reference["fangraphs_pitching"])
     if f4_report.get("warning"):
         print(f"enrichment warning: {f4_report['warning']}", file=sys.stderr)
 

@@ -6383,9 +6383,12 @@ class F1GameEnvironmentTests(unittest.TestCase):
         # Without a moneyline the split is even rather than invented.
         self.assertEqual(pb.implied_team_totals(8.5), (4.25, 4.25))
 
-    def test_pitchers_stay_neutral_in_v1(self):
-        """The opposing-team total already feeds a pitcher's matchup elsewhere;
-        applying it here too would double count it."""
+    def test_pitchers_stay_neutral_without_a_matchup_map(self):
+        """R433. Without ``pitcher_matchup_by_id`` a pitcher is pinned to the
+        constant, which is what Showdown still passes. The old reason ("the
+        opposing-team total already feeds a pitcher's matchup elsewhere") was
+        false: nothing read it. Classic prices arms through the matchup map,
+        see PitcherMarketFactorTests."""
         pb = self._pb()
         odds = {"COL@LAD": {"total": 12.0}, "SEA@SF": {"total": 6.5}}
         # Both games on the slate, so there is a real spread to normalize
@@ -6463,6 +6466,683 @@ class F1GameEnvironmentTests(unittest.TestCase):
             )
             self.assertEqual(enrichment["f1"]["applied_count"], 0)
             self.assertAlmostEqual(float(frame.loc[0, "F1"]), 1.30)
+
+
+class PitcherMarketFactorTests(unittest.TestCase):
+    """R433. Pitcher rows were priced blind to the market: F1 = F4 = F5 = 1.0 on
+    every arm, so a starter facing a 5.33 implied total and one facing 3.87
+    projected alike. F4 never sees an arm (``team_by_player_id`` is hitters
+    only) and pitcher F5 is wind x delay with no park term, so the "priced
+    elsewhere" note in the code had nothing behind it. A pitcher's F1 is now the
+    slate mean implied total over his OPPONENT's park-inclusive total, times a
+    win-share term, clipped once.
+    """
+
+    ODDS = {"ARI@COL": {"total": 10.66}, "CHC@SD": {"total": 7.74}}
+    TEAMS = {"h_ari": "ARI", "h_col": "COL", "h_chc": "CHC", "h_sd": "SD",
+             "pG": "COL", "pP": "SD"}
+    MATCHUPS = {"pG": ("COL", "ARI"), "pP": ("SD", "CHC")}
+
+    @staticmethod
+    def _pb():
+        from mlb_engine.projections import projection_builder as pb
+        return pb
+
+    def _f1(self, odds=None, matchups=None, **kwargs):
+        pb = self._pb()
+        return pb.build_f1_factors(
+            odds if odds is not None else self.ODDS, dict(self.TEAMS),
+            pitcher_ids=["pG", "pP"],
+            pitcher_matchup_by_id=matchups if matchups is not None else self.MATCHUPS,
+            **kwargs)
+
+    def test_two_arms_separate_by_the_opponents_implied_total(self):
+        """The row's acceptance: 5.33 against 3.87, the soft-opponent arm is
+        priced above the tough-opponent one, both inside the clip."""
+        pb = self._pb()
+        f1, report = self._f1()
+        low, high = pb.F1_PITCHER_CLIP
+        self.assertGreater(f1["pP"], f1["pG"])
+        for pid in ("pG", "pP"):
+            self.assertGreaterEqual(f1[pid], low)
+            self.assertLessEqual(f1[pid], high)
+        # No moneyline in this packet, so the run term stands alone: the HARMONIC
+        # mean of the four teams' totals (5.33 x2, 3.87 x2) over the opponent's.
+        # 5.33 vs 3.87 is a 1.38x spread, wider than the +-15% band, so both
+        # arms sit on a bound: separated, and the report counts both.
+        center = 4.0 / (2 / 5.33 + 2 / 3.87)
+        self.assertAlmostEqual(report["pitcher_center_implied_total"], round(center, 3))
+        self.assertLess(center / 5.33, low)
+        self.assertGreater(center / 3.87, high)
+        self.assertEqual((f1["pG"], f1["pP"]), (low, high))
+        self.assertEqual(report["pitcher_clip_binding"], {"floor": 1, "cap": 1})
+        self.assertEqual(report["pitchers_priced"], 2)
+        self.assertEqual(report["pitchers_non_neutral"], 2)
+        self.assertEqual(sorted(report["pitchers_without_moneyline"]), ["pG", "pP"])
+        self.assertEqual(report["pitchers_unpriced"], [])
+
+    def test_the_arms_reach_the_frame_with_equal_appg_and_a_moved_ceiling(self):
+        """Through ``_assemble_projection_frame``: equal APPG, so F1 is the only
+        thing separating Base_Projection and Ceiling; F4 and F5 stay 1.0, and
+        both arms are counted as applied because they were priced."""
+        f1, _ = self._f1()
+        import tempfile as _tf
+        with _tf.TemporaryDirectory() as tmp:
+            salary = Path(tmp) / "s.csv"
+            with salary.open("w", newline="", encoding="utf-8-sig") as fh:
+                writer = csv.writer(fh)
+                writer.writerow(["Position", "Name + ID", "Name", "ID",
+                                 "Roster Position", "Salary", "Game Info",
+                                 "TeamAbbrev", "AvgPointsPerGame"])
+                writer.writerow(["P", "Gordon (1)", "Gordon", "1", "P", 8000,
+                                 "ARI@COL 07/25/2026 07:05PM ET", "COL", 10.0])
+                writer.writerow(["P", "Phillips (2)", "Phillips", "2", "P", 7300,
+                                 "CHC@SD 07/25/2026 07:05PM ET", "SD", 10.0])
+            rows = [{"Player_ID": "1", "AvgPointsPerGame": 10.0},
+                    {"Player_ID": "2", "AvgPointsPerGame": 10.0}]
+            frame, enrichment = epi._assemble_projection_frame(
+                str(salary), rows, "emergency_proxy", None, None, None,
+                f1_by_player_id={"1": f1["pG"], "2": f1["pP"]})
+        gordon, phillips = frame.iloc[0], frame.iloc[1]
+        self.assertGreater(float(phillips["Base_Projection"]),
+                           float(gordon["Base_Projection"]))
+        self.assertGreater(float(phillips["Ceiling"]), float(gordon["Ceiling"]))
+        for row in (gordon, phillips):
+            self.assertEqual(float(row["F4"]), 1.0)
+            self.assertEqual(float(row["F5"]), 1.0)
+        self.assertEqual(sorted(enrichment["f1"]["applied_player_ids"]), ["1", "2"])
+
+    def test_the_win_share_moves_an_arm_and_stays_inside_the_clip(self):
+        pb = self._pb()
+        odds = {"AAA@BBB": {"total": 8.0, "moneyline": {"AAA": 180, "BBB": -220}},
+                "CCC@DDD": {"total": 8.0}}
+        teams = {"h1": "AAA", "h2": "BBB", "h3": "CCC", "h4": "DDD",
+                 "fav": "BBB", "dog": "AAA"}
+        matchups = {"fav": ("BBB", "AAA"), "dog": ("AAA", "BBB")}
+        kwargs = dict(pitcher_ids=["fav", "dog"], pitcher_matchup_by_id=matchups)
+        with_win, _ = pb.build_f1_factors(odds, teams, **kwargs)
+        no_win, _ = pb.build_f1_factors(odds, teams, pitcher_win_slope=0.0, **kwargs)
+        self.assertGreater(with_win["fav"], no_win["fav"])
+        self.assertLess(with_win["dog"], no_win["dog"])
+        p_fav = pb.devig_two_way(180, -220)[1]
+        away_total, home_total = pb.implied_team_totals(8.0, 180, -220)
+        center = 4.0 / (1 / away_total + 1 / home_total + 1 / 4.0 + 1 / 4.0)
+        expected = min(pb.F1_PITCHER_CLIP[1], (center / away_total)
+                       * (1.0 + pb.F1_PITCHER_WIN_SLOPE * (p_fav - 0.5)))
+        self.assertAlmostEqual(with_win["fav"], expected, places=6)
+
+    def test_a_game_with_no_usable_total_leaves_the_arm_unpriced_and_says_so(self):
+        """An unpriced game is NOT priced as neutral: the arm is left out of the
+        map (so it is never counted as applied), named with its reason, and the
+        frame gives it the existing ``F1=1.0 default`` note."""
+        odds = dict(self.ODDS)
+        teams = dict(self.TEAMS, pZ="ZZZ")
+        # pX names a team and an opponent that are each priced, but in two
+        # different games: no single game total is his matchup.
+        matchups = dict(self.MATCHUPS, pZ=("ZZZ", "YYY"), pN=("", ""), pX=("COL", "SD"))
+        pb = self._pb()
+        f1, report = pb.build_f1_factors(
+            odds, teams, pitcher_ids=["pG", "pP", "pZ", "pN", "pX"],
+            pitcher_matchup_by_id=matchups)
+        for pid in ("pZ", "pN", "pX"):
+            self.assertNotIn(pid, f1)
+        self.assertEqual(report["pitchers_priced"], 2)
+        by_id = {r["id"]: r["reason"] for r in report["pitchers_unpriced"]}
+        self.assertEqual(sorted(by_id), ["pN", "pX", "pZ"])
+        self.assertIn("no usable total", by_id["pZ"])
+        self.assertIn("no team or opponent", by_id["pN"])
+        self.assertIn("not in one priced game", by_id["pX"])
+        # A packet where no game carries a total prices nothing and says so.
+        none_f1, none_report = pb.build_f1_factors(
+            {"ARI@COL": {"total": None}}, teams, pitcher_ids=["pG", "pP"],
+            pitcher_matchup_by_id=matchups)
+        self.assertEqual(none_f1, {})
+        self.assertIn("skipped", none_report)
+        self.assertEqual(none_report["pitchers_priced"], 0)
+        self.assertEqual(none_report["pitcher_pricing"], "priced")
+        # And the frame says so: a default note, never an applied id.
+        import tempfile as _tf
+        with _tf.TemporaryDirectory() as tmp:
+            salary = Path(tmp) / "s.csv"
+            with salary.open("w", newline="", encoding="utf-8-sig") as fh:
+                writer = csv.writer(fh)
+                writer.writerow(["Position", "Name + ID", "Name", "ID",
+                                 "Roster Position", "Salary", "Game Info",
+                                 "TeamAbbrev", "AvgPointsPerGame"])
+                writer.writerow(["P", "Z (9)", "Z", "9", "P", 7000,
+                                 "ZZZ@YYY 07/25/2026 07:05PM ET", "ZZZ", 10.0])
+            frame, enrichment = epi._assemble_projection_frame(
+                str(salary), [{"Player_ID": "9", "AvgPointsPerGame": 10.0}],
+                "emergency_proxy", None, None, None,
+                f1_by_player_id={k: v for k, v in f1.items()} or None)
+        self.assertEqual(enrichment["f1"]["applied_player_ids"], [])
+        self.assertEqual(float(frame.loc[0, "F1"]), 1.0)
+        self.assertIn("F1=1.0 default", str(frame.loc[0, "Notes"]))
+
+    def test_the_park_is_priced_once_and_for_a_pitcher_it_is_priced_here(self):
+        """Hitter F1 de-parks the total because hitter F5 multiplies the park.
+        Pitcher F5 carries no park term, so a de-parked pitcher total would price
+        the ballpark nowhere: two games at the same posted total, one at Coors,
+        must give their arms the SAME F1 while their hitters differ."""
+        odds = {"ARI@COL": {"total": 10.0}, "CHC@SD": {"total": 10.0}}
+        park = {"ARI@COL": 1.19, "CHC@SD": 1.0}
+        f1, report = self._f1(odds=odds, park_run_factor_by_game_id=park)
+        self.assertAlmostEqual(f1["pG"], f1["pP"], places=9)
+        self.assertLess(f1["h_col"], f1["h_sd"])
+        self.assertEqual(report["pitcher_basis"], "opponent_park_inclusive_implied_total")
+
+    def test_the_clip_binding_count_is_reported(self):
+        odds = {"AAA@BBB": {"total": 20.0}, "CCC@DDD": {"total": 2.0}}
+        teams = {"a": "AAA", "b": "BBB", "c": "CCC", "d": "DDD", "pa": "AAA", "pc": "CCC"}
+        matchups = {"pa": ("AAA", "BBB"), "pc": ("CCC", "DDD")}
+        pb = self._pb()
+        f1, report = pb.build_f1_factors(odds, teams, pitcher_ids=["pa", "pc"],
+                                         pitcher_matchup_by_id=matchups)
+        self.assertEqual(f1["pa"], pb.F1_PITCHER_CLIP[0])
+        self.assertEqual(f1["pc"], pb.F1_PITCHER_CLIP[1])
+        self.assertEqual(report["pitcher_clip_binding"], {"floor": 1, "cap": 1})
+
+    def test_build_f1_map_reads_a_pitchers_team_and_opponent_off_the_pool_rows(self):
+        """``team_by_player_id`` is hitters only, so `build_f1_map` used to hand
+        every arm the empty string for a team. It reads the pool rows now."""
+        mod = BuildSlateScriptTests._module()
+        pool = {
+            "team_by_player_id": {k: v for k, v in self.TEAMS.items()
+                                  if k not in ("pG", "pP")},
+            "pitcher_roles": {"pG": "declared_probable_sp", "pP": "declared_probable_sp"},
+            "projection_rows": [
+                {"Player_ID": "pG", "Team": "COL", "Opponent": "ARI"},
+                {"Player_ID": "pP", "Team": "SD", "Opponent": "CHC"},
+                {"Player_ID": "h_col", "Team": "COL", "Opponent": "ARI"}],
+        }
+        f1, report = mod.build_f1_map(pool, dict(self.ODDS))
+        self.assertGreater(f1["pP"], f1["pG"])
+        self.assertEqual(report["pitchers_priced"], 2)
+        # No odds packet: an empty map that still carries the count.
+        empty, empty_report = mod.build_f1_map(pool, {})
+        self.assertEqual(empty, {})
+        self.assertEqual(empty_report["pitchers_priced"], 0)
+
+    def test_the_arms_average_exactly_one_over_the_slate(self):
+        """Arithmetic centering over an INVERSE ratio averages above 1.0 (Jensen),
+        a standing tilt of arms over bats. The harmonic centre removes it."""
+        pb = self._pb()
+        odds = {"AAA@BBB": {"total": 8.0}, "CCC@DDD": {"total": 9.0},
+                "EEE@FFF": {"total": 10.0}}
+        teams = {t.lower(): t for t in "AAA BBB CCC DDD EEE FFF".split()}
+        arms = {f"p{t}": (t, opp) for t, opp in
+                (("AAA", "BBB"), ("BBB", "AAA"), ("CCC", "DDD"), ("DDD", "CCC"),
+                 ("EEE", "FFF"), ("FFF", "EEE"))}
+        f1, report = pb.build_f1_factors(odds, teams, pitcher_ids=list(arms),
+                                         pitcher_matchup_by_id=arms)
+        self.assertEqual(report["pitcher_clip_binding"], {"floor": 0, "cap": 0})
+        self.assertAlmostEqual(sum(f1[p] for p in arms) / len(arms), 1.0, places=9)
+        totals = [4.0, 4.0, 4.5, 4.5, 5.0, 5.0]
+        arithmetic = sum((sum(totals) / 6) / t for t in totals) / 6
+        self.assertGreater(arithmetic, 1.005)   # what an arithmetic centre would do
+
+    def test_an_arm_is_unpriced_on_a_non_positive_total_or_when_his_team_is_his_opponent(self):
+        pb = self._pb()
+        # A 1.0 total with a lopsided moneyline splits to a negative implied total.
+        odds = {"AAA@BBB": {"total": 1.0, "moneyline": {"AAA": 900, "BBB": -2000}},
+                "CCC@DDD": {"total": 8.0}}
+        teams = {"a": "AAA", "b": "BBB", "c": "CCC", "d": "DDD"}
+        f1, report = pb.build_f1_factors(
+            odds, teams, pitcher_ids=["pB", "pS"],
+            pitcher_matchup_by_id={"pB": ("BBB", "AAA"), "pS": ("CCC", "CCC")})
+        self.assertNotIn("pB", f1)
+        self.assertNotIn("pS", f1)
+        by_id = {r["id"]: r["reason"] for r in report["pitchers_unpriced"]}
+        self.assertIn("not positive", by_id["pB"])
+        self.assertIn("same team", by_id["pS"])
+
+    def test_a_stale_win_probability_is_not_carried_from_another_key(self):
+        """A team under two odds keys: the later key has no moneyline, so the
+        earlier game's win probability must not survive for it."""
+        pb = self._pb()
+        odds = {"AAA@BBB": {"total": 8.0, "moneyline": {"AAA": 150, "BBB": -180}},
+                "BBB@CCC": {"total": 8.0}}
+        teams = {"a": "AAA", "b": "BBB", "c": "CCC"}
+        f1, report = pb.build_f1_factors(
+            odds, teams, pitcher_ids=["pB"], pitcher_matchup_by_id={"pB": ("BBB", "CCC")})
+        self.assertEqual(report["pitchers_without_moneyline"], ["pB"])
+
+    def test_priced_arms_do_not_hide_a_slate_whose_hitters_are_all_neutral(self):
+        """`non_neutral_f1` is HITTERS only: `inert_factors` reads it to say F1
+        scored rows and moved none."""
+        pb = self._pb()
+        odds = {"AAA@BBB": {"total": 8.0}, "CCC@DDD": {"total": 8.0}}
+        teams = {"a": "AAA", "b": "BBB", "c": "CCC", "d": "DDD"}
+        f1, report = pb.build_f1_factors(odds, teams)
+        self.assertEqual(report["non_neutral_f1"], 0)
+        self.assertIn("every value is neutral", report["warning"])
+        # Same slate with two arms priced off 1.0 by a moneyline the hitters
+        # ignore: the hitters are still all neutral and the warning still says so.
+        odds = {"AAA@BBB": {"total": 8.0, "moneyline": {"AAA": 150, "BBB": -180}},
+                "CCC@DDD": {"total": 8.0}}
+        odds["AAA@BBB"]["total"] = 8.0
+        f1, report = pb.build_f1_factors(
+            odds, {"a": "AAA", "b": "BBB", "c": "CCC", "d": "DDD"},
+            pitcher_ids=["pA", "pC"],
+            pitcher_matchup_by_id={"pA": ("AAA", "BBB"), "pC": ("CCC", "DDD")})
+        self.assertGreater(report["pitchers_non_neutral"], 0)
+        self.assertEqual(report["non_neutral_f1"], report["hitters_scored"] - sum(
+            1 for h in "abcd" if abs(f1[h] - 1.0) < 1e-9))
+
+    def test_an_arm_whose_team_has_no_hitters_does_not_move_a_hitters_f1(self):
+        """The slate mean is over the teams that have hitters in the pool.
+        `build_f1_map` must not add a pitcher's team to that set: a declared arm
+        for a team with no hitters (game ZZZ@YYY) would shift every hitter."""
+        mod = BuildSlateScriptTests._module()
+        hitters = {k: v for k, v in self.TEAMS.items() if k not in ("pG", "pP")}
+        rows = [{"Player_ID": "pG", "Team": "COL", "Opponent": "ARI"},
+                {"Player_ID": "pP", "Team": "SD", "Opponent": "CHC"}]
+        pool = {"team_by_player_id": hitters,
+                "pitcher_roles": {"pG": "declared_probable_sp", "pP": "declared_probable_sp"},
+                "projection_rows": rows}
+        odds = dict(self.ODDS, **{"ZZZ@YYY": {"total": 16.0}})
+        base, _ = mod.build_f1_map(pool, odds)
+        with_arm = dict(pool, pitcher_roles=dict(
+            pool["pitcher_roles"], pZ="declared_probable_sp"),
+            projection_rows=rows + [{"Player_ID": "pZ", "Team": "ZZZ", "Opponent": "YYY"}])
+        moved, report = mod.build_f1_map(with_arm, odds)
+        for hitter in hitters:
+            self.assertEqual(base[hitter], moved[hitter])
+        self.assertEqual(report["pitchers_priced"], 3)
+
+    def test_the_brief_counts_priced_pitchers(self):
+        mod = BuildSlateScriptTests._module()
+        _, report = self._f1()
+        summary = mod.summarize_enrichment(
+            {}, {}, {}, None, f1_report=report, f5_report={})
+        self.assertEqual(summary["counts"]["f1_pitchers_priced"], 2)
+        self.assertEqual(summary["counts"]["f1_pitchers_unpriced"], 0)
+        self.assertEqual(summary["f1_pitchers_unpriced"], [])
+        # An unpriced arm reaches the brief by name, in a warning and a list.
+        odds = dict(self.ODDS)
+        _, gap = self._pb().build_f1_factors(
+            odds, dict(self.TEAMS, pZ="ZZZ"), pitcher_ids=["pG", "pZ"],
+            pitcher_matchup_by_id={"pG": ("COL", "ARI"), "pZ": ("ZZZ", "YYY")})
+        summary = mod.summarize_enrichment({}, {}, {}, None, f1_report=gap, f5_report={})
+        self.assertEqual(summary["counts"]["f1_pitchers_unpriced"], 1)
+        self.assertEqual(summary["f1_pitchers_unpriced"][0]["id"], "pZ")
+        self.assertTrue(any("pZ (ZZZ vs YYY" in w for w in summary["warnings"]))
+
+    def test_showdown_keeps_the_constant(self):
+        """Showdown passes no matchup map (`build_showdown_f1`), so an arm
+        stays pinned to the constant there."""
+        pb = self._pb()
+        f1, report = pb.build_f1_factors(
+            self.ODDS, dict(self.TEAMS), pitcher_ids=["pG", "pP"])
+        self.assertEqual((f1["pG"], f1["pP"]), (1.0, 1.0))
+        self.assertEqual(report["pitchers_priced"], 0)
+        self.assertEqual(report["pitcher_pricing"], "not_requested")
+
+
+class F4StarterPopulationTests(unittest.TestCase):
+    """R443. The F4 quality ratio was centered on a league mean over EVERY valid
+    Savant row, relievers included, so the median starter sat at 0.963 and one
+    in five qualified starters at the 0.90 floor. The mean is now the starter
+    population's, and the report says where the clip binds."""
+
+    @staticmethod
+    def _pb():
+        from mlb_engine.projections import projection_builder as pb
+        return pb
+
+    @staticmethod
+    def _table(starter_est=0.320, reliever_est=0.380, starters=40, relievers=60):
+        rows = [{"player_id": str(1000 + i), "pa": 600, "woba": starter_est,
+                 "est_woba": starter_est} for i in range(starters)]
+        rows += [{"player_id": str(5000 + i), "pa": 600, "woba": reliever_est,
+                  "est_woba": reliever_est} for i in range(relievers)]
+        return pd.DataFrame(rows)
+
+    def _f4(self, table, probable_id, **kwargs):
+        pb = self._pb()
+        return pb.compute_f4_factors(
+            {"h": "AAA"}, {"AAA": {"id": probable_id, "name": "x", "hand": "R"}},
+            table, {"h": "R"}, **kwargs)
+
+    def test_the_default_is_the_all_row_mean_and_says_so(self):
+        table = self._table()
+        _, report = self._f4(table, "1000")
+        self.assertEqual(report["league_mean_basis"], "all_rows")
+        self.assertAlmostEqual(report["league_mean_est_woba"], 0.356, places=6)
+        self.assertEqual(report["starter_population"], {"used": False})
+
+    def test_the_starter_mean_centers_an_average_starter_on_one(self):
+        """An average starter is 1.0, where the all-row mean (which the
+        relievers pull up) called him a 10% discount and hit the floor."""
+        pb = self._pb()
+        table = self._table()
+        starters = {str(1000 + i) for i in range(40)}
+        f4_all, _ = self._f4(table, "1000")
+        f4_start, report = self._f4(table, "1000", starter_ids=starters)
+        self.assertEqual(report["league_mean_basis"], "starters")
+        self.assertAlmostEqual(report["league_mean_est_woba"], 0.320, places=6)
+        self.assertAlmostEqual(report["quality_factor_by_team"]["AAA"], 1.0, places=9)
+        self.assertLess(f4_all["h"], f4_start["h"])
+        self.assertAlmostEqual(report["league_mean_all_rows"], 0.356, places=6)
+        # The hitter's F4 is the quality term times the platoon prior (R vs R).
+        self.assertAlmostEqual(f4_start["h"], pb.platoon_hand_factor("R", "R"), places=9)
+
+    def test_too_few_starters_fall_back_to_the_all_row_mean_and_name_why(self):
+        table = self._table()
+        few = {str(1000 + i) for i in range(5)}
+        _, report = self._f4(table, "1000", starter_ids=few)
+        self.assertEqual(report["league_mean_basis"], "all_rows_fallback")
+        self.assertIn("only 5", report["league_mean_basis_note"])
+        self.assertAlmostEqual(report["league_mean_est_woba"], 0.356, places=6)
+
+    def test_a_two_game_slate_takes_the_population_mean_not_its_own_arms(self):
+        """The mean is over the reference table's starters, so a slate of two
+        probables (the noisy-mean case) moves nothing about it."""
+        pb = self._pb()
+        table = self._table()
+        starters = {str(1000 + i) for i in range(40)}
+        teams = {"h1": "AAA", "h2": "BBB"}
+        opp = {"AAA": {"id": "1000", "name": "a", "hand": "R"},
+               "BBB": {"id": "5000", "name": "b", "hand": "R"}}
+        _, report = pb.compute_f4_factors(teams, opp, table, {}, starter_ids=starters)
+        self.assertAlmostEqual(report["league_mean_est_woba"], 0.320, places=6)
+        self.assertEqual(report["starter_population"]["arms"], 40)
+
+    def test_the_clip_binding_count_is_reported_over_both_populations(self):
+        table = self._table(starters=35)
+        # Half the starters are far too good to price, half far too loud.
+        table.loc[:9, ["est_woba", "woba"]] = 0.200   # 10 aces
+        table.loc[10:19, ["est_woba", "woba"]] = 0.450  # 10 hittable arms
+        starters = {str(1000 + i) for i in range(35)}
+        pb = self._pb()
+        teams = {"h1": "AAA", "h2": "BBB", "h3": "CCC"}
+        opp = {"AAA": {"id": "1000", "name": "ace", "hand": "R"},
+               "BBB": {"id": "1010", "name": "loud", "hand": "R"},
+               "CCC": {"id": "1030", "name": "mid", "hand": "R"}}
+        _, report = pb.compute_f4_factors(teams, opp, table, {}, starter_ids=starters)
+        population = report["starter_population"]
+        self.assertEqual((population["at_floor"], population["at_cap"]), (10, 10))
+        self.assertEqual(population["arms"], 35)
+        self.assertEqual(population["arms_scored"], 35)
+        # An arm under the PA minimum is neutral, so it is not "scored".
+        table.loc[25, ["pa"]] = 10
+        _, thin = pb.compute_f4_factors(teams, opp, table, {}, starter_ids=starters)
+        self.assertEqual(thin["starter_population"]["arms"], 35)
+        self.assertEqual(thin["starter_population"]["arms_scored"], 34)
+        binding = report["quality_clip_binding"]
+        self.assertEqual((binding["floor"], binding["cap"]), (["AAA"], ["BBB"]))
+        self.assertEqual(binding["sides_total"], 3)
+
+    def test_starters_are_arms_who_started_at_least_half_their_games(self):
+        pb = self._pb()
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "statsapi.csv"
+            path.write_text(
+                "Name,MLBAM_ID,Team,G,GS,IP,TBF,SO,K/9\n"
+                "Starter,1,AAA,30,30,180,700,200,10\n"
+                "Half,2,AAA,30,15,100,400,90,8\n"
+                "StrayStart,3,AAA,40,1,60,240,60,9\n"
+                "Reliever,4,AAA,50,0,55,220,60,9\n"
+                "NoId,,AAA,30,30,180,700,200,10\n", encoding="utf-8")
+            self.assertEqual(pb.starter_ids_from_pitching_stats(path), {"1", "2"})
+            self.assertEqual(pb.starter_ids_from_pitching_stats(Path(tmp) / "no.csv"), set())
+            bare = Path(tmp) / "bare.csv"
+            bare.write_text("Name,MLBAM_ID\nX,1\n", encoding="utf-8")
+            self.assertEqual(pb.starter_ids_from_pitching_stats(bare), set())
+
+    def test_an_unreadable_starter_source_falls_back_and_says_so(self):
+        """An empty starter set is not the same as no source: the fallback is
+        named, never silent."""
+        mod = BuildSlateScriptTests._module()
+        table = self._table()
+        with tempfile.TemporaryDirectory() as tmp:
+            savant = Path(tmp) / "pitching.csv"
+            table.to_csv(savant, index=False)
+            statsapi = Path(tmp) / "statsapi.csv"
+            statsapi.write_text("Name,MLBAM_ID\nX,1000\n", encoding="utf-8")  # no G/GS
+            pool = {"team_by_player_id": {"h": "AAA"},
+                    "opposing_probables": {"AAA": {"id": "1000", "name": "x", "hand": "R"}},
+                    "batter_hands": {"h": "R"}}
+            _, report = mod.build_f4_map(pool, str(savant), starter_source_csv=str(statsapi))
+        self.assertEqual(report["league_mean_basis"], "all_rows_fallback")
+        self.assertIn("only 0", report["league_mean_basis_note"])
+
+    def test_build_f4_map_centers_on_the_starters_when_given_the_statsapi_file(self):
+        mod = BuildSlateScriptTests._module()
+        table = self._table()
+        with tempfile.TemporaryDirectory() as tmp:
+            savant = Path(tmp) / "pitching.csv"
+            table.to_csv(savant, index=False)
+            statsapi = Path(tmp) / "statsapi.csv"
+            lines = ["Name,MLBAM_ID,Team,G,GS,IP,TBF,SO,K/9"]
+            lines += [f"S{i},{1000 + i},AAA,30,30,180,700,200,10" for i in range(40)]
+            lines += [f"R{i},{5000 + i},AAA,50,0,55,220,60,9" for i in range(60)]
+            statsapi.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            pool = {"team_by_player_id": {"h": "AAA"},
+                    "opposing_probables": {"AAA": {"id": "1000", "name": "x", "hand": "R"}},
+                    "batter_hands": {"h": "R"}}
+            _, centered = mod.build_f4_map(pool, str(savant), starter_source_csv=str(statsapi))
+            _, default = mod.build_f4_map(pool, str(savant))
+        self.assertEqual(centered["league_mean_basis"], "starters")
+        self.assertEqual(centered["starter_source"], str(statsapi))
+        self.assertEqual(default["league_mean_basis"], "all_rows")
+        self.assertIsNone(default["starter_source"])
+        summary = mod.summarize_enrichment({}, {}, centered, None)
+        self.assertEqual(summary["f4_league_mean_basis"], "starters")
+        self.assertIn("floor", summary["f4_quality_clip_binding"])
+
+
+class F4AblationGradeTests(unittest.TestCase):
+    """R441. Is F4's opposing-starter quality term redundant once F1 (a game
+    total that already moves with the probable pitcher) is present? The grade is
+    a 2x2 (F1 on/off x F4-quality on/off, platoon on in every arm) on the R408
+    archived slates, hitters only, per slate, never pooled. Its honest result on
+    this archive is "not yet": no slate has real odds, opposing probables and a
+    Savant snapshot that pre-dates it together, and every cell says which input
+    is missing or post-dated.
+    """
+
+    @staticmethod
+    def _mod():
+        return ProjectionBackfillGradeTests._mod()
+
+    def _need(self, mod, date):
+        if not (mod.ARCHIVE / date).is_dir():
+            self.skipTest(f"vendored data/archive/{date} absent")
+
+    def test_the_flag_belongs_to_grade_projection_and_is_off_by_default(self):
+        mod = self._mod()
+        captured = io.StringIO()
+        with self.assertRaises(SystemExit):
+            with contextlib.redirect_stderr(captured):
+                mod.main(["--ablate-f4-quality"])
+        self.assertIn("is a flag of --grade-projection", captured.getvalue())
+        self.assertIn("--ablate-f4-quality", inspect.getsource(mod.main))
+        # The plain grade still builds neither F1 nor F4 (R408's pinned default).
+        self._need(mod, "2026-06-03")
+        plain = mod.grade_projection(["2026-06-03"])["slates"][0]["live_factors"]
+        self.assertFalse(plain["odds_F1"])
+        self.assertFalse(plain["matchup_F4"])
+
+    def test_a_slate_with_real_odds_and_probables_grades_all_four_arms(self):
+        mod = self._mod()
+        self._need(mod, "2026-07-19")
+        result = mod.ablate_f4_quality(["2026-07-19"])
+        slate = result["slates"][0]
+        self.assertEqual(slate["status"], "graded")
+        self.assertEqual(sorted(slate["arms"]), sorted(a for a, _, _ in mod.ABLATION_ARMS))
+        for arm in slate["arms"].values():
+            self.assertTrue(arm["graded"])
+            self.assertEqual(arm["n"], 72)
+        # The day's pull holds 16 games, 15 with a posted total; the slate plays 4.
+        self.assertEqual(slate["inputs"]["odds"]["games"], 15)
+        self.assertEqual(slate["inputs"]["odds"]["slate_games_priced"], 4)
+        effect = slate["quality_effect"]
+        self.assertEqual(sorted(effect["with_f1_absent"]),
+                         ["spearman", "tail_hits", "top_decile_hits"])
+        # The two on-arms differ from the two off-arms only through F4 quality:
+        # the quality effect is the arithmetic difference of the printed cells.
+        arms = slate["arms"]
+        # Each switch moves the cell it is meant to move.
+        self.assertNotEqual(arms["f1_off_q_on"]["spearman"], arms["f1_off_q_off"]["spearman"])
+        self.assertNotEqual(arms["f1_on_q_off"]["spearman"], arms["f1_off_q_off"]["spearman"])
+        self.assertNotEqual(arms["f1_on_q_on"]["spearman"], arms["f1_on_q_off"]["spearman"])
+        self.assertAlmostEqual(
+            effect["with_f1_absent"]["spearman"],
+            round(arms["f1_off_q_on"]["spearman"] - arms["f1_off_q_off"]["spearman"], 4))
+        self.assertAlmostEqual(
+            effect["with_f1_present"]["spearman"],
+            round(arms["f1_on_q_on"]["spearman"] - arms["f1_on_q_off"]["spearman"], 4))
+
+    def test_every_cell_names_its_inputs_and_flags_a_post_dated_savant(self):
+        """07-19 has real posted totals and a Savant snapshot six days LATER;
+        07-30 has a snapshot that pre-dates it and no odds. Neither can settle
+        the shrink, and the result says so as a count."""
+        mod = self._mod()
+        self._need(mod, "2026-07-19")
+        self._need(mod, "2026-07-30")
+        result = mod.ablate_f4_quality(["2026-07-19", "2026-07-30"])
+        by_date = {s["slate_date"]: s for s in result["slates"]}
+        early, late = by_date["2026-07-19"], by_date["2026-07-30"]
+        self.assertTrue(early["inputs"]["savant"]["post_dated"])
+        self.assertEqual(early["inputs"]["savant"]["vintage"], "2026-07-25")
+        self.assertTrue(early["inputs"]["odds"]["available"])
+        self.assertFalse(late["inputs"]["savant"]["post_dated"])
+        self.assertFalse(late["inputs"]["odds"]["available"])
+        self.assertEqual(late["status"], "f1_absent_only")
+        self.assertFalse(late["arms"]["f1_on_q_on"]["graded"])
+        self.assertIsNone(late["quality_effect"]["with_f1_present"])
+        self.assertIsNotNone(late["quality_effect"]["with_f1_absent"])
+        self.assertEqual(result["graded_with_every_input_pre_dated"], [])
+        table = mod.format_ablation_table(result)
+        self.assertIn("post_dated=True", table)
+        self.assertIn("post_dated=False", table)
+        self.assertIn("graded with every input pre-dating the slate: 0", table)
+
+    def test_the_api_team_code_is_mapped_to_dk_so_no_pool_team_goes_unpriced(self):
+        """The odds history says `AZ`, the salary file `ARI`: an unmapped key left
+        a whole team at F1 = 1.0 with the game still counted as priced."""
+        mod = self._mod()
+        self._need(mod, "2026-07-19")
+        odds, _ = mod.load_odds_history("2026-07-19")
+        self.assertIn("STL@ARI", odds)
+        self.assertFalse(any("AZ" in game.split("@") for game in odds))
+        slate = mod.ablate_f4_quality(["2026-07-19"])["slates"][0]
+        self.assertEqual(slate["inputs"]["odds"]["pool_teams_without_a_posted_total"], [])
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "2026-01-02-am.json").write_text(json.dumps({"snapshots": [
+                {"games": [{"away_team": "STL", "home_team": "AZ",
+                            "draftkings": {"point": 9.0}}]}]}), encoding="utf-8")
+            keyed, _ = mod.load_odds_history("2026-01-02", Path(tmp))
+        self.assertEqual(sorted(keyed), ["STL@ARI"])
+        # A pull that prices only one of the slate's four games names the six
+        # teams left at F1 = 1.0, so a partly-priced arm is never silent.
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "2026-07-19-am.json").write_text(json.dumps({"snapshots": [
+                {"games": [{"away_team": "WSH", "home_team": "ATH",
+                            "draftkings": {"point": 9.0}}]}]}), encoding="utf-8")
+            partial = mod.ablate_f4_quality(["2026-07-19"], odds_dir=Path(tmp))["slates"][0]
+        self.assertEqual(partial["inputs"]["odds"]["pool_teams_without_a_posted_total"],
+                         ["ARI", "DET", "LAA", "SEA", "SF", "STL"])
+
+    def test_a_same_day_savant_snapshot_is_post_dated(self):
+        """A file stamped the slate's own date can hold that slate's outcomes."""
+        mod = self._mod()
+        self._need(mod, "2026-07-19")
+        with tempfile.TemporaryDirectory() as tmp:
+            same_day = Path(tmp) / "expected_stats_pitching_frozen_2026-07-19.csv"
+            same_day.write_bytes(mod.ABLATION_SAVANT.read_bytes())
+            slate = mod.ablate_f4_quality(["2026-07-19"], savant_csv=same_day)["slates"][0]
+        self.assertTrue(slate["inputs"]["savant"]["post_dated"])
+
+    def test_names_two_salary_rows_share_are_not_graded_and_a_none_cell_does_not_crash(self):
+        from mlb_engine.field.field_miner import normalize_name
+        mod = self._mod()
+        self.assertEqual(mod.duplicate_name_norms(["A Smith", "B Jones", "A Smith", None]),
+                         {normalize_name("A Smith")})
+        self._need(mod, "2026-07-19")
+        # A scoped fake: every name reads as duplicated, so nothing may be graded
+        # (this is what proves `ablate_slate` consumes the helper).
+        with unittest.mock.patch.object(
+                mod, "duplicate_name_norms",
+                side_effect=lambda names: {normalize_name(str(n or "")) for n in names}):
+            slate = mod.ablate_f4_quality(["2026-07-19"])["slates"][0]
+        self.assertTrue(all(not a["graded"] for a in slate["arms"].values()))
+        table = mod.format_ablation_table({
+            "label": "x", "by_status": {}, "graded_with_every_input_pre_dated": [],
+            "slates": [{"slate_date": "d", "salary_file": "f.csv", "status": "graded",
+                        "reasons": [], "arms": {},
+                        "quality_effect": {"with_f1_absent": {"spearman": None,
+                                                              "top_decile_hits": 1,
+                                                              "tail_hits": 1},
+                                           "with_f1_present": None},
+                        "inputs": {"savant": {"vintage": "v", "post_dated": True},
+                                   "odds": {"available": False, "reason": "r"}}}]})
+        self.assertIn("| d |", table)
+
+    def test_a_slate_with_no_probable_join_is_not_graded_and_says_why(self):
+        mod = self._mod()
+        self._need(mod, "2026-06-03")
+        slate = mod.ablate_f4_quality(["2026-06-03"])["slates"][0]
+        self.assertEqual(slate["status"], "not_graded")
+        self.assertIn("F4 quality is 1.0 on every side", slate["reasons"][0])
+        self.assertEqual(slate["arms"], {})
+
+    def test_the_grade_is_deterministic(self):
+        mod = self._mod()
+        self._need(mod, "2026-07-19")
+        first = json.dumps(mod.ablate_f4_quality(["2026-07-19"]), sort_keys=True, default=str)
+        second = json.dumps(mod.ablate_f4_quality(["2026-07-19"]), sort_keys=True, default=str)
+        self.assertEqual(first, second)
+
+    def test_the_odds_loader_prefers_dk_falls_back_to_fd_and_names_an_absence(self):
+        mod = self._mod()
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "2026-01-02-am.json").write_text(json.dumps({
+                "slate_date": "2026-01-02",
+                "snapshots": [{"fetched_at": "2026-01-02T14:00:00Z", "games": [
+                    {"away_team": "AAA", "home_team": "BBB",
+                     "draftkings": {"point": 8.0}, "fanduel": {"point": 9.0}},
+                    {"away_team": "CCC", "home_team": "DDD",
+                     "draftkings": {}, "fanduel": {"point": 7.5}},
+                    {"away_team": "EEE", "home_team": "FFF"}]}]}), encoding="utf-8")
+            odds, note = mod.load_odds_history("2026-01-02", Path(tmp))
+            self.assertEqual({k: v["total"] for k, v in odds.items()},
+                             {"AAA@BBB": 8.0, "CCC@DDD": 7.5})
+            self.assertTrue(note["available"])
+            self.assertIn("no moneyline", note["kind"])
+            missing, missing_note = mod.load_odds_history("2026-01-03", Path(tmp))
+            self.assertEqual(missing, {})
+            self.assertFalse(missing_note["available"])
+
+    def test_a_savant_file_that_states_no_date_counts_as_post_dated(self):
+        mod = self._mod()
+        self.assertEqual(mod.savant_vintage(Path("x_frozen_2026-07-25.csv")), "2026-07-25")
+        self.assertIsNone(mod.savant_vintage(Path("expected_stats_pitching.csv")))
+        self._need(mod, "2026-07-30")
+        with tempfile.TemporaryDirectory() as tmp:
+            undated = Path(tmp) / "expected_stats_pitching.csv"
+            undated.write_bytes(mod.ABLATION_SAVANT.read_bytes())
+            slate = mod.ablate_f4_quality(["2026-07-30"], savant_csv=undated)["slates"][0]
+        self.assertIsNone(slate["inputs"]["savant"]["vintage"])
+        self.assertTrue(slate["inputs"]["savant"]["post_dated"])
+
+    def test_the_off_arm_drops_only_the_quality_term(self):
+        """Platoon stays on in every arm: F4 without a pitching table equals F4
+        with the quality clip pinned to 1.0."""
+        from mlb_engine.projections import projection_builder as pb
+        table = pd.DataFrame([{"player_id": "1", "pa": 600, "woba": 0.30, "est_woba": 0.30},
+                              {"player_id": "2", "pa": 600, "woba": 0.36, "est_woba": 0.36}])
+        teams = {"h1": "AAA", "h2": "BBB"}
+        opp = {"AAA": {"id": "1", "name": "a", "hand": "R"},
+               "BBB": {"id": "2", "name": "b", "hand": "L"}}
+        hands = {"h1": "L", "h2": "R"}
+        off, _ = pb.compute_f4_factors(teams, opp, None, hands)
+        pinned, _ = pb.compute_f4_factors(teams, opp, table, hands, quality_clip=(1.0, 1.0))
+        on, _ = pb.compute_f4_factors(teams, opp, table, hands)
+        self.assertEqual(off, pinned)
+        self.assertNotEqual(off["h1"], 1.0)   # the platoon half is live
+        self.assertNotEqual(on, off)
 
 
 class BankConsolidationTests(unittest.TestCase):
