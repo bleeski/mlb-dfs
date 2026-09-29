@@ -555,11 +555,18 @@ def _template_specs(shape: Mapping[str, Any]) -> List[Dict[str, Any]]:
         def win_close(s=side, o=other, sps=sp_side, spo=sp_other):
             return {
                 "name": f"{s} win close - low-scoring win",
-                "why": (f"{s} wins by a run or two. {o} still scores, so two "
-                        f"cheaper {o} bats stay live rather than one punt."),
+                # R437. What this template says is what `solve_ladder` enforces:
+                # `min_per_team` is a solver row, so the roster carries at least
+                # two of each side's players. The earlier wording ("two cheaper
+                # bats stay live") rested on the suppression multiplier alone,
+                # which left 5-1 the realized split on every one of these.
+                "why": (f"{s} wins by a run or two. {o} still scores, so the "
+                        f"roster carries at least two {o} bats rather than one "
+                        f"punt."),
                 "cpt_ladder": ([sps] if sps else []) + _hitters(shape, s),
                 "excludes": [spo] if spo else [],
                 "mult": _suppress(_hitters(shape, o), SUPPRESS_CLOSE),
+                "min_per_team": 2,
             }
 
         def shootout(s=side, o=other, sps=sp_side, spo=sp_other):
@@ -649,9 +656,15 @@ def _template_specs(shape: Mapping[str, Any]) -> List[Dict[str, Any]]:
                     "score, and the four bats are cheap because runs are scarce."),
             # Captain comes from the two starters ONLY, never a bottom-order bat.
             # "Pitchers duel" is about the two arms; a hitter captaining it is a
-            # different story wearing this thesis's name. When both starters are
-            # already at the captain cap the walk below forces one past it
-            # (counted honestly in cap_relaxed) rather than reaching for a bat.
+            # different story wearing this thesis's name. R263 (a), correcting
+            # this comment: when both starters were ALREADY at the captain cap the
+            # walk forced one past it (counted in cap_relaxed) and then
+            # `solve_ladder`'s own cap enforcement, or the pool widening when a
+            # contest partition is present, handed the seat to a bat anyway --
+            # the "rather than reaching for a bat" this comment promised did not
+            # happen on either path. `_captain_walk_order` now asks the neutral
+            # templates for their captains before the directional ones spend the
+            # arms, which is what keeps the duel's captain a starter.
             "cpt_ladder": list(both_sp),
             # R156. No hitter lock here on purpose, and that is a change from the
             # original version, which locked one top-band bat from each side "so
@@ -692,13 +705,18 @@ def _template_specs(shape: Mapping[str, Any]) -> List[Dict[str, Any]]:
         fb, db = shape["bands"][fav], shape["bands"][dog]
         return {
             "name": "Both offenses explode - no starters",
+            # R437. Three of each side is a solver row (`min_per_team`), which
+            # is what "even" means here. The lock set below is 2-1 and stays: it
+            # names bats, it does not hold a split, and the old wording claimed
+            # the split from it.
             "why": ("Highest-scoring branch on the board with no winner assumed. "
-                    "Both arms off and the split locked even, so neither side is "
-                    "favored by the roster."),
+                    "Both arms off and three players from each side, so neither "
+                    "side is favored by the roster."),
             "cpt_ladder": db["all"] + fb["all"],
             "locks": fb["all"][:2] + db["all"][:1],
             "excludes": both_sp,
             "mult": {},
+            "min_per_team": 3,
         }
 
     def ace_loses():
@@ -1513,6 +1531,23 @@ def build_thesis_ladder(df: pd.DataFrame, n_entries: int,
     weights = {i: w / total for i, w in weights.items()}
 
     counts = _largest_remainder(weights, int(n_entries))
+    # R211. Ben's 2026-08-22 rule: a pitchers duel with both starters live gets
+    # at least two entries, one per arm as captain, when the portfolio can pay
+    # for them. Gated on TWO live starters and read off the slate, never off
+    # `duel()` returning non-None: it never does, and a one-arm slate builds a
+    # one-arm "both starters" duel that a floor must not multiply.
+    #
+    # The Excluded column counts: its cell takes an arm out of every solve (at
+    # `build_showdown_lineup`, the single door), so an operator-excluded starter
+    # is not live even though `describe_slate` still lists him. Read off the same
+    # `excluded_flags` reader the solver uses, so there is one token rule.
+    from mlb_engine.optimize.optimizer_v3 import excluded_flags
+    _flags, _ = excluded_flags(df)
+    excluded_keys = set(df.loc[_flags, "Player_Key"]) if len(df) else set()
+    both_live = sum(1 for k in (shape.get("starters") or {}).values()
+                    if k and k not in excluded_keys) >= 2
+    counts, duel_floor = _apply_duel_floor(counts, weights, specs,
+                                           int(n_entries), both_live)
 
     cap = exposure_cap_count(max_cpt_exposure_pct, int(n_entries))
     cpt_counts: Dict[str, int] = {}
@@ -1577,10 +1612,26 @@ def build_thesis_ladder(df: pd.DataFrame, n_entries: int,
     # Round-robin the templates so a truncated build still spans game states
     # rather than filling every entry from the first template in the list.
     order = _round_robin(counts)
-    for slot, idx in enumerate(order):
+    # R263 build (a). Captains are CHOSEN in `walk` order and the theses are BUILT
+    # in slot order. The two used to be one loop, so the order in which templates
+    # spent the capped arms was the round-robin's own -- directional templates
+    # first, then `pitchers_duel` at spec index 10 -- and on a two-arm slate the
+    # duel, the one template whose captain is defined as "one of the two
+    # starters", arrived after both arms were at the cap. Slot j is still the
+    # entry `rows[j]` is filled from (R239), so nothing about which entry goes to
+    # which contest moves: only who is asked for a captain first.
+    walk = _captain_walk_order(order, specs)
+    arm_keys = {str(k) for k in (shape["starters"] or {}).values() if k}
+    chosen: Dict[int, Optional[str]] = {}
+    # R211. The captains each THESIS id has already used, in the order chosen.
+    # `cpt_counts` is global and says who is at a cap; this says who a given
+    # template has already put on the armband, so a second occurrence of one
+    # template takes a different captain before it repeats the first.
+    used_by_thesis: Dict[str, List[str]] = {}
+    for slot in walk:
+        idx = order[slot]
         spec = specs[idx]
         built = spec["build"]()
-        allocation[spec["id"]] = allocation.get(spec["id"], 0) + 1
         cid = None
         if partition["available"] and partition["contest_of_entry"] is not None:
             if slot < len(partition["contest_of_entry"]):
@@ -1619,7 +1670,10 @@ def build_thesis_ladder(df: pd.DataFrame, n_entries: int,
                     "reason": "every designated captain was at a captain or "
                               "player cap for this slot",
                 })
-        for cand in own_ladder:
+        # R211. Under the caps AND, on a repeat occurrence, not yet this
+        # template's captain; a template with nobody new to offer repeats.
+        already = used_by_thesis.get(str(spec["id"]), [])
+        for cand in _rotated_ladder(own_ladder, already, arm_keys):
             if cpt is not None:
                 break
             if _under_caps(cand, cid):
@@ -1656,9 +1710,24 @@ def build_thesis_ladder(df: pd.DataFrame, n_entries: int,
                 cap_relaxed += 1
         if cpt is not None:
             cpt_counts[cpt] = cpt_counts.get(cpt, 0) + 1
+            used_by_thesis.setdefault(str(spec["id"]), []).append(cpt)
             if cid is not None:
                 bucket = contest_cpt_counts.setdefault(cid, {})
                 bucket[cpt] = bucket.get(cpt, 0) + 1
+        chosen[slot] = cpt
+
+    # The walk records the sleeve's assignments in CHOSEN order; a reader of the
+    # brief expects slot order, so they are put back. (`pool_widened` rows carry
+    # no slot and stay in chosen order: no fixture reaches two of them, so an
+    # order for them would be untested code.)
+    sleeve_assigned.sort(key=lambda d: int(d["slot"]))
+    sleeve_unfilled.sort(key=lambda d: int(d["slot"]))
+    for slot, idx in enumerate(order):
+        spec = specs[idx]
+        built = spec["build"]()
+        allocation[spec["id"]] = allocation.get(spec["id"], 0) + 1
+        cpt = chosen[slot]
+        sleeve_here = slot in sleeve_slots
         # More entries than live templates means templates repeat. The rosters
         # still differ (the overlap bound guarantees it), but two rows sharing a
         # thesis name reads as a duplicate in the brief when it is not one, so
@@ -1691,12 +1760,20 @@ def build_thesis_ladder(df: pd.DataFrame, n_entries: int,
             "locks": locks,
             "excludes": [k for k in (built.get("excludes") or []) if k and k != cpt],
             "mult": {k: v for k, v in (built.get("mult") or {}).items()},
+            # R437. The template's split claim as a SOLVER row: at least this
+            # many players from each team, or None when the template makes no
+            # split claim. `solve_ladder` enforces it and relaxes it last.
+            "min_per_team": (int(built["min_per_team"])
+                             if built.get("min_per_team") else None),
         }
         theses.append(thesis)
 
     return {"theses": theses, "shape": {k: v for k, v in shape.items()
                                         if not k.startswith("_")},
             "allocation": allocation,
+            # R211. The duel floor as applied or declined, with the threshold and
+            # the reason, so a brief says why the duel has the slots it has.
+            "duel_floor": duel_floor,
             "captain_cap_count": cap,
             "captain_cap_relaxed": cap_relaxed,
             "contest_partition": partition,
@@ -1750,6 +1827,115 @@ def _largest_remainder(weights: Mapping[int, float], n: int) -> Dict[int, int]:
     return {i: c for i, c in base.items() if c > 0}
 
 
+DUEL_FLOOR_ENTRIES = 2
+
+
+def _apply_duel_floor(counts: Mapping[int, int], weights: Mapping[int, float],
+                      specs: Sequence[Mapping[str, Any]], n: int,
+                      both_live: bool):
+    """R211. Raise `pitchers_duel` to ``DUEL_FLOOR_ENTRIES`` slots when it is
+    affordable, borrowing from the over-allocated templates, and return
+    ``(counts, record)``.
+
+    Affordable means three things, all read off the slate. Both starters are
+    live (``both_live``): with one arm the duel is a one-arm lineup under a
+    two-arm name, and a floor would double it. The portfolio has more entries
+    than there are live templates (``n > len(specs)``, 14 with the usual 13),
+    which is the smallest n at which some template holds two slots and can lend
+    one; below that every extra duel slot zeroes a template that would otherwise
+    have one, and Ben's own wording is "if we have enough lineup slots". And a
+    donor exists: a template holding two or more, never taken below one, chosen
+    as the one furthest above its own exact share (``count - weight * n``), ties
+    to the later spec so the earlier ones keep theirs. Smaller portfolios keep
+    exactly the count the apportionment gave them, which is zero duel slots at
+    n <= 5 (the entry's "a 1-entry contest keeps its single slot" described a
+    slot the apportionment never gave).
+    """
+    out = dict(counts)
+    live = len(specs)
+    record: Dict[str, Any] = {
+        "floor": DUEL_FLOOR_ENTRIES, "threshold_entries": live + 1,
+        "live_templates": live, "entries": int(n),
+        "both_starters_live": bool(both_live),
+        "apportioned": None, "final": None, "applied": False, "reason": None,
+        "borrowed_from": [],
+    }
+    duel = next((i for i, sp in enumerate(specs) if sp["id"] == "pitchers_duel"), None)
+    if duel is None:
+        record["reason"] = "no pitchers_duel template on this slate"
+        return out, record
+    record["apportioned"] = int(out.get(duel, 0))
+    record["final"] = record["apportioned"]
+    if not both_live:
+        record["reason"] = "fewer than two live starters: the duel is not multiplied"
+    elif n <= live:
+        record["reason"] = (f"{n} entries do not exceed the {live} live templates: "
+                            f"a second duel slot would zero a template")
+    elif record["apportioned"] >= DUEL_FLOOR_ENTRIES:
+        record["reason"] = "the apportionment already gave the duel the floor"
+    else:
+        while out.get(duel, 0) < DUEL_FLOOR_ENTRIES:
+            donors = [i for i, c in out.items() if i != duel and c >= 2]
+            if not donors:
+                break
+            donor = max(donors, key=lambda i: (out[i] - weights.get(i, 0.0) * n, i))
+            out[donor] -= 1
+            out[duel] = out.get(duel, 0) + 1
+            record["borrowed_from"].append(str(specs[donor]["id"]))
+        record["final"] = int(out.get(duel, 0))
+        record["applied"] = record["final"] > record["apportioned"]
+        record["reason"] = ("raised to the floor" if record["applied"]
+                            else "no template held two slots to lend")
+    return {i: c for i, c in out.items() if c > 0}, record
+
+
+def _captain_walk_order(order: Sequence[int],
+                        specs: Sequence[Mapping[str, Any]]) -> List[int]:
+    """R263 build (a). The SLOT indices in the order captains are chosen.
+
+    Neutral templates (``side is None``: the duel, both-explode, ace-loses and
+    the bullpen game) are asked first, directional templates second, each group
+    in slot order. Two of the neutral templates name a declared arm as their
+    captain by definition (`pitchers_duel`: "one of the two starters ONLY";
+    `ace_loses`: the ace), and on a two-arm slate the directional `win_big` and
+    `win_close` templates lead their own ladders with the same two arms, so the
+    capped arm seats were being spent on the directional templates before the
+    neutral ones were asked. A directional template that finds its arm full walks
+    on to its own side's bats and its label stays true; the duel that finds both
+    arms full ships a bat as its captain and its label does not. This is order
+    only: the cap, the ladders and the slot each thesis occupies are unchanged.
+    """
+    return sorted(range(len(order)),
+                  key=lambda slot: (0 if specs[order[slot]]["side"] is None else 1,
+                                    slot))
+
+
+def _rotated_ladder(own_ladder: Sequence[str], already: Sequence[str],
+                    arm_keys: Sequence[str]) -> List[str]:
+    """R211. The order a template's captain candidates are tried in when the
+    template has ALREADY put ``already`` on the armband once or more.
+
+    First the candidates it has not used, but only those of the same KIND as the
+    head of its ladder (a declared arm, or a bat); then the whole ladder in its
+    own order, which is the repeat. The kind guard is the point. A directional
+    template that leads with its side's starter (`win_big`, `win_close`) would
+    otherwise give its second occurrence to a bat, and the delivered
+    pitcher-captain share is R263's strongest construction signal: measured on
+    MIN@CHC at n=21 an unguarded rotation took it from 10 of 21 to 7 of 21 with
+    the ceiling unmoved. Rotation therefore never trades an arm for a bat. It
+    rotates the duel's two arms against each other, and it rotates a bat-led
+    template through its own bats, and where a template has no unused captain of
+    its head's kind it repeats, exactly as before.
+    """
+    if not already or not own_ladder:
+        return list(own_ladder)
+    arms = set(arm_keys)
+    head_is_arm = own_ladder[0] in arms
+    fresh = [c for c in own_ladder
+             if c not in already and (c in arms) == head_is_arm]
+    return fresh + [c for c in own_ladder if c not in fresh]
+
+
 def _round_robin(counts: Mapping[int, int]) -> List[int]:
     remaining = dict(counts)
     order: List[int] = []
@@ -1782,6 +1968,14 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
     thesis infeasible. The captain lock goes before the thesis itself because a
     thesis with a different captain is still that game state; a missing lineup is
     a blank reserved row, and a blank row blocks certification.
+
+    R437. A template's split floor (``min_per_team``) is part of the THESIS, so
+    it gives way after those three and before the portfolio floor rungs: one rung
+    at full strength minus only the split, then the floor and cap rungs, which
+    run without it and count it when they break it. It is never the reason a
+    slot goes blank, because every rung that carried it is followed by one that
+    does not; before this change the split was a label, so a floor that can only
+    add a refusal was not an option.
 
     R153, on where the player cap sits. Overlap gives way first because two
     lineups differing by one bat are one lineup and that is the cheapest thing to
@@ -1828,6 +2022,15 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
     out: List[Optional[Dict[str, Any]]] = []
     overlap_relaxed = cpt_relaxed = infeasible = both_relaxed = 0
     player_relaxed = contest_cap_relaxed = 0
+    # R437. The FIFTH control, on the same footing as the other four: a
+    # template's split floor (`min_per_team`) giving way. Counted only when the
+    # lineup that came back actually breaks the floor -- a rung that drops the
+    # row and happens to return a lineup that meets it relaxed nothing, the same
+    # rule `_record_lock_relaxation` applies to a captain who replaced himself.
+    split_relaxed = 0
+    split_slots = 0
+    split_relaxed_detail: List[Dict[str, str]] = []
+    all_teams = sorted({str(t) for t in df["Team"].dropna().unique()})
     # R223. The FOURTH counter, and the one R153's landing claim assumed existed.
     # `cpt_relaxed` counts captain LOCK substitutions; nothing counted the captain
     # CAP giving way, because until now nothing made it give way on the record --
@@ -1988,6 +2191,21 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
         })
         return 1
 
+    def _book_floor_rung(thesis: Mapping[str, Any], solved: Mapping[str, Any],
+                         over: Sequence[str], cpt_lock: Optional[str]) -> None:
+        """Count what the portfolio floor rung dropped, in every place it is
+        true (R153). Shared by the floor rung that still carries a template's
+        split floor and the one that does not, so the two book identically."""
+        nonlocal player_relaxed, overlap_relaxed, cpt_relaxed, both_relaxed
+        if over:
+            player_relaxed += 1
+        if max_shared_players is not None:
+            overlap_relaxed += 1
+        substituted = _record_lock_relaxation(thesis, solved) if cpt_lock else 0
+        cpt_relaxed += substituted
+        if max_shared_players is not None:
+            both_relaxed += substituted
+
     for slot, thesis in enumerate(theses):
         work = df.copy()
         mult = thesis.get("mult") or {}
@@ -2138,7 +2356,17 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
                     "held": str(reserved_remaining[k]),
                 })
         util_kw = {"util_excludes": util_blocked or None}
-        kw = dict(locks=locks or None, time_limit=time_limit)
+        # R437. The template's split floor rides `kw`, so rungs 1-6 (overlap,
+        # player cap, captain lock, alone and together) all keep it. `kw_free` is
+        # the same call without it, for the rungs at and below the split rung.
+        split_floor = ({t: int(thesis["min_per_team"]) for t in all_teams}
+                       if thesis.get("min_per_team") else None)
+        if split_floor:
+            split_slots += 1
+        kw = dict(locks=locks or None, time_limit=time_limit,
+                  min_per_team=split_floor)
+        kw_free = dict(kw, min_per_team=None)
+        split_free = False
         # R158. One latch per slot. Every rung below is additionally guarded on
         # `not latch["stopped"]`, so the ladder stops descending the moment the
         # solver reports a clock expiry rather than an infeasibility. Without that
@@ -2208,6 +2436,35 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
                 both_relaxed += substituted
                 overlap_relaxed += 1
                 cpt_relaxed += substituted
+        # R437 (review). The portfolio floor rung WITH the template's split floor:
+        # overlap, player cap and captain lock all dropped at once, the split
+        # still held. Rungs 1-6 above try those three alone and in pairs; this is
+        # the three together, so the split gives way only after every
+        # combination of them has been tried with it on. Booked exactly as the
+        # floor rung below books, because it drops exactly what that one drops.
+        if (lu is None and not latch["stopped"] and split_floor and (
+                over or cpt_lock or cpt_excludes
+                or max_shared_players is not None)):
+            lu = _rung(latch, df=work,
+                       cpt_excludes=cpt_excludes,
+                       forbidden_sets=prior or None,
+                       excludes=without_cap, **kw)
+            if lu is not None:
+                _book_floor_rung(thesis, lu, over, cpt_lock)
+        # R437. The split rung: rung 1's strength with only the template's split
+        # floor removed. Reached only after overlap, player cap and captain lock
+        # have each been tried alone, in pairs and all together WITH the floor,
+        # so the split is the last of the thesis-level controls to give way; the
+        # portfolio floor rungs below then run without it. Not counted here --
+        # whether the returned lineup breaks the floor is decided once, after the
+        # cascade.
+        if lu is None and not latch["stopped"] and split_floor:
+            lu = _rung(latch, df=work, cpt_lock=cpt_lock, cpt_excludes=cpt_excludes,
+                       forbidden_sets=prior or None,
+                       excludes=with_cap,
+                       max_shared_players=max_shared_players, **util_kw, **kw_free)
+            if lu is not None:
+                split_free = True
         # R153. The floor rung: every portfolio control off, the thesis's own
         # excludes still honoured. Counted in every place it is true, matching
         # build_showdown_bank, because these counters answer "how many lineups were
@@ -2233,16 +2490,10 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
             lu = _rung(latch, df=work,
                        cpt_excludes=cpt_excludes,
                        forbidden_sets=prior or None,
-                       excludes=without_cap, **kw)
+                       excludes=without_cap, **kw_free)
             if lu is not None:
-                if over:
-                    player_relaxed += 1
-                if max_shared_players is not None:
-                    overlap_relaxed += 1
-                substituted = _record_lock_relaxation(thesis, lu) if cpt_lock else 0
-                cpt_relaxed += substituted
-                if max_shared_players is not None:
-                    both_relaxed += substituted
+                split_free = True
+                _book_floor_rung(thesis, lu, over, cpt_lock)
         # R223. The PORTFOLIO captain cap gives way here, and is COUNTED when it
         # does. `cpt_full` is the portfolio captain cap; `over_set` is the player
         # cap reaching the captain slot, since a captain is a roster spot. Both
@@ -2255,8 +2506,9 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
             lu = _rung(latch, df=work,
                        cpt_excludes=sorted(contest_full) or None,
                        forbidden_sets=prior or None,
-                       excludes=without_cap, **kw)
+                       excludes=without_cap, **kw_free)
             if lu is not None:
+                split_free = True
                 cpt_cap_relaxed += 1
                 if over:
                     player_relaxed += 1
@@ -2273,8 +2525,9 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
         # when the gates passed.
         if lu is None and not latch["stopped"] and contest_full:
             lu = _rung(latch, df=work, forbidden_sets=prior or None,
-                       excludes=without_cap, **kw)
+                       excludes=without_cap, **kw_free)
             if lu is not None:
+                split_free = True
                 contest_cap_relaxed += 1
                 # R223. This rung passes NO captain exclusions at all, so the
                 # portfolio cap gave way here too and is counted here too. These
@@ -2287,6 +2540,20 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
                 if max_shared_players is not None:
                     overlap_relaxed += 1
                 cpt_relaxed += _record_lock_relaxation(thesis, lu) if cpt_lock else 0
+        # R437. The split is counted where it is TRUE: a rung without the floor
+        # produced this lineup AND the lineup breaks it. Read off the returned
+        # roster, so a relaxation that happened to land on a 4-2 is not booked.
+        if lu is not None and split_free and split_floor:
+            by_team = Counter(
+                str(p.get("team")) for p in (lu.get("players") or []))
+            if any(by_team.get(t, 0) < split_floor[t] for t in split_floor):
+                split_relaxed += 1
+                split_relaxed_detail.append({
+                    "thesis": tname,
+                    "claimed": f"at least {thesis['min_per_team']} per team",
+                    "realized": "-".join(str(c) for c in sorted(
+                        (by_team.get(t, 0) for t in split_floor), reverse=True)),
+                })
         if latch["time_limited"]:
             time_limited_accepted += 1
         if lu is None:
@@ -2393,6 +2660,12 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
         diagnostics.update({
             "max_shared_players": max_shared_players,
             "overlap_relaxed": overlap_relaxed,
+            # R437. The fifth control: a template's split floor giving way, and
+            # how many slots carried one, so a zero reads as "held" and not as
+            # "no template asked".
+            "min_per_team_relaxed": split_relaxed,
+            "min_per_team_slots": split_slots,
+            "min_per_team_relaxed_detail": list(split_relaxed_detail),
             "captain_lock_relaxed": cpt_relaxed,
             # R113. One entry per lock relaxation, naming the thesis and the
             # requested-vs-actual captain, so a caution citing this counter can
@@ -2541,6 +2814,9 @@ def construction_shadow(
     df: pd.DataFrame,
     report: Mapping[str, Any],
     max_cpt_exposure_pct: Optional[float] = None,
+    theses: Optional[Sequence[Mapping[str, Any]]] = None,
+    contest_of_entry: Optional[Sequence[str]] = None,
+    max_cpt_per_contest: Optional[int] = None,
 ) -> Dict[str, Any]:
     """R263's shadow report: pitcher-CPT share, team-split mix, and the band check.
 
@@ -2560,8 +2836,26 @@ def construction_shadow(
     there is 95% of the structural maximum rather than 8 points short of a
     target. A bullpen game raises the ceiling by adding eligible arms; nothing
     else does except the cap itself, which is out of R263's scope.
+
+    R263 build (a). The ceiling is the SMALLER of two bounds. The portfolio bound
+    above is the per-player cap over the whole set. The per-contest bound is
+    ``sum over contests of min(n_j, arms x per_contest_cap_count(n_j, bar))``: in
+    one contest of 9 or more entries the per-contest bar of 2 binds first, and a
+    21-entry contest that realized 4 pitcher captains printed a ceiling of 47.6%
+    when its real ceiling was 19.0%. It needs ``contest_of_entry`` (slot j's
+    contest, the vector the ladder was built with) and ``max_cpt_per_contest``;
+    without them the ceiling is the portfolio bound alone, as before.
+
+    ``theses`` (optional) adds the ladder's own ask beside the delivered result,
+    so the artifact carries a before and an after without a second solve: what
+    the apportionment named as captain and as split floor, and what the solved
+    lineups carried. Every figure is over the same ``n`` (the solved entries), so
+    the two columns share one denominator and a difference between them is a
+    count of entries, never a change of base.
     """
-    rows = [r for r in (report.get("lineups") or []) if r.get("solved")]
+    all_rows = list(report.get("lineups") or [])
+    solved_idx = [i for i, r in enumerate(all_rows) if r.get("solved")]
+    rows = [all_rows[i] for i in solved_idx]
     n = len(rows)
     out: Dict[str, Any] = {
         "label": "R263 CONSTRUCTION SHADOW — observed cohort comparison; steers "
@@ -2600,10 +2894,60 @@ def construction_shadow(
         per_player = exposure_cap_count(max_cpt_exposure_pct, n)
         if per_player is not None:
             ceiling = min(n, len(pitcher_names) * int(per_player))
+            out["pitcher_cpt_ceiling_portfolio_pct"] = round(100.0 * ceiling / n, 1)
+            out["pitcher_cpt_ceiling_basis"] = "portfolio captain cap"
+            if contest_of_entry is not None and max_cpt_per_contest:
+                # R263 (a). Entries per contest among the SOLVED rows, slot j to
+                # contest j, so the bound reads the same rows the share does.
+                per_contest_n = Counter(
+                    str(contest_of_entry[i]) for i in solved_idx
+                    if i < len(contest_of_entry))
+                if not per_contest_n or sum(per_contest_n.values()) != n:
+                    # Said, not skipped: the ceiling below is the portfolio
+                    # bound alone, and a reader must not take it for both.
+                    out["pitcher_cpt_ceiling_basis"] = (
+                        "portfolio captain cap (the contest partition does not "
+                        "cover every solved entry, so the per-contest bound is "
+                        "not computed)")
+                if per_contest_n and sum(per_contest_n.values()) == n:
+                    by_contest = sum(
+                        min(nj, len(pitcher_names) * per_contest_cap_count(
+                            nj, int(max_cpt_per_contest)))
+                        for nj in per_contest_n.values())
+                    out["pitcher_cpt_ceiling_per_contest_pct"] = round(
+                        100.0 * min(n, by_contest) / n, 1)
+                    if by_contest < ceiling:
+                        ceiling = by_contest
+                        out["pitcher_cpt_ceiling_basis"] = "per-contest captain cap"
             out["pitcher_cpt_ceiling_pct"] = round(100.0 * ceiling / n, 1)
             if ceiling:
                 out["pitcher_cpt_share_of_ceiling_pct"] = round(
                     100.0 * sum(cpt_is_p) / ceiling, 1)
+    if theses is not None:
+        # R263 (a) and R437: the ladder's ask, over the same solved slots. A
+        # captain is a pitcher when his key is on a battingless row, the same
+        # definition `pitcher_names` used, so the two columns count one thing.
+        pitcher_keys = {
+            str(k) for k, bo in zip(df["Player_Key"], df["Batting_Order"])
+            if pd.isna(bo)}
+        asked = [str((theses[i] or {}).get("cpt")) in pitcher_keys
+                 if i < len(theses) else False for i in solved_idx]
+        out["pitcher_cpt_apportioned_entries"] = sum(1 for a in asked if a)
+        out["pitcher_cpt_apportioned_pct"] = round(
+            100.0 * sum(1 for a in asked if a) / n, 1)
+        # A slot whose ladder named an arm and whose solved lineup seated a bat:
+        # the cap, or a relaxation rung, took the armband. Zero on a clean ladder.
+        out["pitcher_cpt_lost_to_a_bat_entries"] = sum(
+            1 for a, got in zip(asked, cpt_is_p) if a and not got)
+        floors = [(int((theses[i] or {}).get("min_per_team") or 0)
+                   if i < len(theses) else 0) for i in solved_idx]
+        held = 0
+        for want, r in zip(floors, rows):
+            if want and min((r.get("team_split") or {"": 0}).values()) >= want:
+                held += 1
+        out["split_floor_slots"] = sum(1 for w in floors if w)
+        out["split_floor_held"] = held
+        out["split_floor_unmet"] = out["split_floor_slots"] - held
     patterns = [_split_pattern(r.get("team_split") or {}) for r in rows]
     mix = Counter(p for p in patterns if p)
     out["team_split_mix"] = dict(sorted(mix.items(), key=lambda kv: -kv[1]))

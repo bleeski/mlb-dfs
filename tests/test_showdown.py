@@ -831,7 +831,13 @@ class ShowdownThesisLadderTests(unittest.TestCase):
         different story wearing this thesis's name. ``cpt_ladder`` is
         restricted to the two starters, so the apportionment walk either picks
         one of them or, once both are at the captain cap, forces one past it
-        (counted in ``captain_cap_relaxed``) rather than reaching for a bat.
+        (counted in ``captain_cap_relaxed``).
+
+        R263 (a), Session 119: this reads the APPORTIONED captain, and the
+        sentence this docstring used to end on ("rather than reaching for a bat")
+        was not true of the delivered one -- `solve_ladder`'s own cap
+        enforcement handed the seat to a bat after the walk forced an arm past
+        the cap. `CaptainArmRotationTests` asserts the SOLVED duel captain.
         """
         ladder = st.build_thesis_ladder(self.df, 25, moneyline={"MIN": -150, "CHC": 130})
         both_sp = {v for v in ladder["shape"]["starters"].values() if v}
@@ -1682,9 +1688,13 @@ class ConstructionShadowTests(unittest.TestCase):
         self.assertEqual(
             sh["pitcher_cpt_entries"],
             round(sh["pitcher_cpt_share_pct"] * 19 / 100.0))
-        # The mix is a share of the solved set, so it sums to 100.
+        # The mix is a share of the solved set, so it sums to 100. Each share is
+        # rounded to one place, so three of them can total 100.1: the tolerance
+        # is the rounding (0.05 per share), not `places=1`, which read the old
+        # two-pattern mix and failed on the three-pattern one R437 produces
+        # (Session 119; 12 + 6 + 1 of 19 -> 63.2 + 31.6 + 5.3).
         self.assertAlmostEqual(sum(sh["team_split_mix_pct"].values()), 100.0,
-                               places=1)
+                               delta=0.15)
 
     def test_the_shadow_steers_nothing_and_says_so_in_the_artifact(self):
         """`steers: False` is in the block, not only in a comment, because the
@@ -7421,3 +7431,832 @@ class ShowdownManifestCountTests(_ShowdownExitDoorHarness, unittest.TestCase):
         ladder_row = next(x for x in rows if not x.get("lineage"))
         self.assertEqual(base_row["entries"], total_rows, base_row)
         self.assertEqual(ladder_row["entries"], total_rows, ladder_row)
+
+
+class TemplateSplitEnforcementTests(_ShowdownExitDoorHarness, unittest.TestCase):
+    """R437, roadmap Session 119 (b). A template's team-split claim is a SOLVER
+    row (`min_per_team`), enforced in `build_showdown_lineup`, carried by
+    `solve_ladder` through the overlap, player-cap and captain-lock rungs, and
+    relaxed after them, counted, so it can add a counted relaxation and never a
+    blank row. Before this the claim rode suppression multipliers alone: on the
+    MIN@CHC fixture at n=21, `{'5-1': 18, '4-2': 2, '3-3': 1}`, and `win_close`
+    and `both_explode` shipped rationale strings the rosters did not carry.
+
+    Every assertion reads the SOLVED lineup's team counts, never the apportioned
+    thesis: `test_pitchers_duel_captain_is_always_one_of_the_two_starters` reads
+    the apportionment and passes while the delivered duel captain is a bat.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.df = st.apply_base_prior(sd.melt_showdown_salary_csv(SAL),
+                                      pitcher_hand={"MIN": "R", "CHC": "R"})
+
+    def _ladder(self, n, moneyline=None, **kw):
+        ml = moneyline or {"MIN": -150, "CHC": 130}
+        ladder = st.build_thesis_ladder(self.df, n, moneyline=ml, **kw)
+        diag: dict = {}
+        solved = st.solve_ladder(self.df, ladder["theses"], time_limit=6,
+                                 diagnostics=diag, **{
+                                     k: v for k, v in kw.items()
+                                     if k in ("contest_of_entry", "max_cpt_per_contest")})
+        report = st.portfolio_report(self.df, ladder["theses"], solved)
+        return ladder, solved, diag, report
+
+    @staticmethod
+    def _counts(lu):
+        return collections.Counter(p["team"] for p in lu["players"])
+
+    def test_only_the_two_split_templates_carry_a_floor(self):
+        ladder = st.build_thesis_ladder(self.df, 21,
+                                        moneyline={"MIN": -150, "CHC": 130})
+        floors = collections.defaultdict(set)
+        for t in ladder["theses"]:
+            floors[t["template"].split("_", 1)[-1] if t["template"].startswith(
+                ("favorite_", "underdog_")) else t["template"]].add(t["min_per_team"])
+        self.assertEqual(floors["win_close"], {2})
+        self.assertEqual(floors["both_explode"], {3})
+        for tid, vals in floors.items():
+            if tid not in ("win_close", "both_explode"):
+                self.assertEqual(vals, {None}, tid)
+
+    def test_the_solver_row_is_what_holds_the_split(self):
+        """Unconstrained the fixture's best lineup is 4-2, so a 3-3 result is the
+        row and not the projection. Teeth: dropping `thesis_floor` from the
+        both-teams row in `build_showdown_lineup` returns the 4-2."""
+        free = sd.build_showdown_lineup(self.df)
+        self.assertEqual(sorted(self._counts(free).values()), [2, 4])
+        even = sd.build_showdown_lineup(self.df, min_per_team={"MIN": 3, "CHC": 3})
+        self.assertEqual(sorted(self._counts(even).values()), [3, 3])
+        two = sd.build_showdown_lineup(self.df, min_per_team={"MIN": 2, "CHC": 2})
+        self.assertGreaterEqual(min(self._counts(two).values()), 2)
+
+    def test_a_thesis_floor_never_lowers_the_contract_floor(self):
+        """`max`, not a replacement: a floor of 0 or a team the pool lacks leaves
+        DK's own both-teams row (min 1) standing."""
+        lu = sd.build_showdown_lineup(self.df, min_per_team={"MIN": 0, "ZZZ": 5})
+        self.assertGreaterEqual(min(self._counts(lu).values()), 1)
+        self.assertEqual(set(self._counts(lu)), {"MIN", "CHC"})
+
+    def test_realized_splits_meet_the_claim_at_every_entry_count_and_moneyline(self):
+        """The SOLVED lineup carries what the rationale names. `win_close` holds
+        at least two of each side and `both_explode` is 3-3, at n=7, 14 and 21
+        and under both moneyline orientations."""
+        for ml in ({"MIN": -150, "CHC": 130}, {"MIN": 150, "CHC": -174}):
+            for n in (7, 14, 21):
+                ladder, solved, diag, _ = self._ladder(n, ml)
+                self.assertTrue(all(lu is not None for lu in solved), (ml, n))
+                for t, lu in zip(ladder["theses"], solved):
+                    want = t["min_per_team"]
+                    if not want:
+                        continue
+                    got = self._counts(lu)
+                    self.assertEqual(set(got), {"MIN", "CHC"}, (ml, n, t["name"]))
+                    self.assertGreaterEqual(min(got.values()), want,
+                                            (ml, n, t["name"], dict(got)))
+                    if t["template"] == "both_explode":
+                        self.assertEqual(sorted(got.values()), [3, 3])
+                self.assertEqual(diag["min_per_team_relaxed"], 0, (ml, n))
+                self.assertGreater(diag["min_per_team_slots"], 0, (ml, n))
+
+    def test_the_floor_adds_no_refusal_and_no_other_relaxation(self):
+        """The acceptance property for 'relaxed last', stated against the
+        baseline rather than against zero: on the fixture at n in {1, 7, 14, 19,
+        21}, and in one contest partition of 7s, the same theses solved WITH and
+        WITHOUT their floors give the same solved count and the same value on
+        every relaxation counter that existed before the floor, the roster set is
+        still unique (F-3), and the floor itself never gave way. (In the
+        partition case the baseline already books one captain-lock substitution,
+        so 'equal' is the claim and 'zero' would not be. The claim is these
+        sizes: at n=3 the floor DOES cost one counted player-cap relaxation, and
+        `test_a_three_entry_portfolio_spends_the_player_cap_before_the_split`
+        pins that.)"""
+        part = ["c1"] * 7 + ["c2"] * 7 + ["c3"] * 7
+        cases = [(n, {}) for n in (1, 7, 14, 19, 21)]
+        cases.append((21, {"contest_of_entry": part, "max_cpt_per_contest": 2}))
+        keys = ("overlap_relaxed", "player_relaxed", "captain_lock_relaxed",
+                "cpt_cap_relaxed", "contest_cap_relaxed", "both_relaxed", "infeasible")
+        for n, kw in cases:
+            ladder = st.build_thesis_ladder(
+                self.df, n, moneyline={"MIN": -150, "CHC": 130}, **kw)
+            solve_kw = {k: v for k, v in kw.items()
+                        if k in ("contest_of_entry", "max_cpt_per_contest")}
+            with_diag: dict = {}
+            with_floor = st.solve_ladder(self.df, ladder["theses"], time_limit=6,
+                                         diagnostics=with_diag, **solve_kw)
+            bare = [dict(t, min_per_team=None) for t in ladder["theses"]]
+            bare_diag: dict = {}
+            without = st.solve_ladder(self.df, bare, time_limit=6,
+                                      diagnostics=bare_diag, **solve_kw)
+            self.assertEqual(sum(lu is not None for lu in with_floor),
+                             sum(lu is not None for lu in without), (n, kw))
+            self.assertTrue(all(lu is not None for lu in with_floor), (n, kw))
+            for key in keys:
+                self.assertEqual(with_diag[key], bare_diag[key], (n, kw, key))
+            self.assertEqual(with_diag["min_per_team_relaxed"], 0, (n, kw))
+            report = st.portfolio_report(self.df, ladder["theses"], with_floor)
+            self.assertTrue(report["all_unique_rosters"], (n, kw))
+
+    def test_an_unsatisfiable_floor_gives_way_counted_and_never_blank(self):
+        """A floor no roster can meet (six of each team) is dropped, the slot
+        still solves, and the relaxation is counted with the split the lineup
+        actually carries. Every other counter stays 0: the split is the only
+        thing that gave way, because the split rung sits at rung-1 strength."""
+        thesis = {"template": "impossible", "name": "impossible split", "cpt": None,
+                  "locks": [], "excludes": [], "mult": {}, "min_per_team": 6}
+        diag: dict = {}
+        solved = st.solve_ladder(self.df, [thesis], time_limit=6, diagnostics=diag)
+        self.assertIsNotNone(solved[0])
+        self.assertEqual(diag["min_per_team_relaxed"], 1)
+        (row,) = diag["min_per_team_relaxed_detail"]
+        self.assertEqual(row["claimed"], "at least 6 per team")
+        self.assertEqual(row["realized"], "4-2")
+        for key in ("overlap_relaxed", "player_relaxed", "captain_lock_relaxed",
+                    "cpt_cap_relaxed", "contest_cap_relaxed", "infeasible"):
+            self.assertEqual(diag[key], 0, key)
+
+    def test_a_relaxation_that_lands_on_the_split_is_not_counted(self):
+        """R153's `_record_lock_relaxation` rule, one control over: a rung that
+        drops the floor and returns a lineup that meets it relaxed nothing. The
+        wrapper refuses every solve that carries the floor and answers the
+        floor-free ones with a real 3-3, so the slot reaches the split rung and
+        comes back meeting a claim of 2."""
+        real = sd.build_showdown_lineup
+
+        def wrapper(**kw):
+            if kw.get("min_per_team"):
+                kw["status_out"].update(proven_infeasible=True, status="infeasible")
+                return None
+            kw["min_per_team"] = {"MIN": 3, "CHC": 3}
+            return real(**kw)
+
+        thesis = {"template": "a", "name": "a", "cpt": None, "locks": [],
+                  "excludes": [], "mult": {}, "min_per_team": 2}
+        diag: dict = {}
+        with unittest.mock.patch.object(st, "build_showdown_lineup", wrapper):
+            out = st.solve_ladder(self.df, [thesis], time_limit=6, diagnostics=diag)
+        self.assertEqual(sorted(self._counts(out[0]).values()), [3, 3])
+        self.assertEqual(diag["min_per_team_relaxed"], 0)
+        self.assertEqual(diag["min_per_team_relaxed_detail"], [])
+
+    def test_overlap_gives_way_before_the_split(self):
+        """The second thesis locks five of the first lineup's six, so overlap 5
+        breaks the bound of 4. Every rung that keeps the floor and drops the
+        overlap bound solves it: overlap is booked, the split is not."""
+        base = {"cpt": None, "excludes": [], "mult": {}, "min_per_team": 2}
+        one = st.solve_ladder(self.df, [dict(base, template="a", name="a", locks=[])],
+                              max_player_exposure_pct=None,
+                              max_cpt_exposure_pct=None, time_limit=6)[0]
+        by_team = collections.Counter(p["team"] for p in one["players"])
+        drop = next(p for p in one["players"]
+                    if by_team[p["team"]] > 2 and p["role"] == "UTIL")
+        keep = [p["player_key"] for p in one["players"] if p is not drop]
+        self.assertEqual(len(keep), 5)
+        diag: dict = {}
+        out = st.solve_ladder(
+            self.df,
+            [dict(base, template="a", name="a", locks=[]),
+             dict(base, template="b", name="b", locks=keep)],
+            max_player_exposure_pct=None, max_cpt_exposure_pct=None,
+            time_limit=6, diagnostics=diag)
+        self.assertTrue(all(lu is not None for lu in out))
+        self.assertEqual(diag["overlap_relaxed"], 1)
+        self.assertEqual(diag["min_per_team_relaxed"], 0)
+        self.assertGreaterEqual(min(self._counts(out[1]).values()), 2)
+
+    def test_the_rung_order_puts_the_split_after_the_thesis_rungs(self):
+        """Ordering, read off the solver calls themselves. Slot 0 solves for real
+        so slot 1 has a prior lineup, a capped player set and a captain lock;
+        every later call is refused, so the ladder walks every rung. The floor is
+        carried by each rung that drops overlap, player cap or captain lock alone
+        or in pairs AND by the rung that drops all three together, then dropped
+        at one rung that holds all three, and absent from every rung after it.
+        Teeth: moving the split rung above the three-together rung, passing the
+        floor to the portfolio floor rungs, or removing the with-floor floor rung
+        breaks one of the assertions below."""
+        real = sd.build_showdown_lineup
+        calls: list = []
+
+        def fake(**kw):
+            calls.append(dict(kw))
+            if len(calls) == 1:
+                return real(**kw)
+            kw["status_out"].update(proven_infeasible=True, status="infeasible")
+            return None
+
+        ranked = list(self.df.sort_values("Base", ascending=False)["Player_Key"])
+        first = sd.build_showdown_lineup(self.df)
+        star = next(k for k in ranked if k not in set(first["player_keys"]))
+        base = {"template": "t", "cpt": star, "locks": [], "excludes": [],
+                "mult": {}, "min_per_team": 2}
+        with unittest.mock.patch.object(st, "build_showdown_lineup", fake):
+            st.solve_ladder(self.df, [dict(base, name="t0", cpt=None),
+                                      dict(base, name="t1")],
+                            max_player_exposure_pct=0.5, time_limit=1)
+        second = calls[1:]                                  # slot 1's rungs
+        floors = [c.get("min_per_team") for c in second]
+        first_free = next(i for i, f in enumerate(floors) if f is None)
+        self.assertGreater(first_free, 0)
+        self.assertTrue(all(f for f in floors[:first_free]))
+        self.assertTrue(all(f is None for f in floors[first_free:]))
+        before = second[:first_free]
+        # the split rung itself holds overlap, the captain lock and the player cap
+        drop = second[first_free]
+        self.assertIsNotNone(drop.get("max_shared_players"))
+        self.assertEqual(drop.get("cpt_lock"), star)
+        self.assertTrue(drop.get("excludes"))
+        # a rung with the floor on dropped overlap, the lock and the player cap
+        # TOGETHER: this is the one a split that gave way too early would skip
+        self.assertTrue(any(
+            c.get("max_shared_players") is None and not c.get("cpt_lock")
+            and not c.get("excludes") for c in before), "no rung dropped all "
+            "three with the floor still on")
+        # and rungs that dropped only overlap, or only the lock, kept it too
+        self.assertTrue(any(c.get("max_shared_players") is None and c.get("cpt_lock")
+                            for c in before))
+        self.assertTrue(any(c.get("max_shared_players") is not None
+                            and not c.get("cpt_lock") for c in before))
+
+    def test_the_portfolio_floor_rung_books_what_it_drops_with_or_without_the_split(self):
+        """The floor rung drops overlap, the player cap and the captain lock
+        together, and books all three. It now runs twice for a template that
+        carries a floor: once with the floor still on (booked, the split
+        untouched) and once without (booked, plus the split when the lineup
+        breaks it). A solver that only accepts the floor-rung SHAPE (no overlap
+        bound, no captain lock, no exclusions) isolates each. Teeth: a booking
+        helper that books nothing leaves both at zero."""
+        real = sd.build_showdown_lineup
+        ranked = list(self.df.sort_values("Base", ascending=False)["Player_Key"])
+        first = real(df=self.df)
+        star = next(k for k in ranked if k not in set(first["player_keys"]))
+
+        def scenario(with_floor, floor):
+            calls = [0]
+
+            def fake(**kw):
+                calls[0] += 1
+                if calls[0] == 1:
+                    return real(**kw)
+                floor_shape = (kw.get("max_shared_players") is None
+                               and not kw.get("cpt_lock") and not kw.get("excludes"))
+                if floor_shape and bool(kw.get("min_per_team")) == with_floor:
+                    return real(**kw)
+                kw["status_out"].update(proven_infeasible=True, status="infeasible")
+                return None
+
+            base = {"template": "t", "excludes": [], "mult": {}, "locks": [],
+                    "min_per_team": floor}
+            diag: dict = {}
+            with unittest.mock.patch.object(st, "build_showdown_lineup", fake):
+                out = st.solve_ladder(
+                    self.df, [dict(base, name="t0", cpt=None, min_per_team=None),
+                              dict(base, name="t1", cpt=star)],
+                    max_player_exposure_pct=0.5, time_limit=1, diagnostics=diag)
+            return out, diag
+
+        held, d_held = scenario(True, 3)
+        self.assertIsNotNone(held[1])
+        self.assertEqual(sorted(self._counts(held[1]).values()), [3, 3])
+        self.assertEqual((d_held["overlap_relaxed"], d_held["player_relaxed"]), (1, 1))
+        self.assertEqual(d_held["min_per_team_relaxed"], 0)
+
+        # an unmeetable floor (four of each team is eight players), so the
+        # floor-free lineup necessarily breaks it and the split is booked
+        free, d_free = scenario(False, 4)
+        self.assertIsNotNone(free[1])
+        self.assertEqual((d_free["overlap_relaxed"], d_free["player_relaxed"]), (1, 1))
+        self.assertEqual(d_free["min_per_team_relaxed"], 1)
+        self.assertEqual(d_free["min_per_team_relaxed_detail"][0]["claimed"],
+                         "at least 4 per team")
+        for d in (d_held, d_free):
+            self.assertEqual(d["both_relaxed"], d["captain_lock_relaxed"])
+
+    def test_a_three_entry_portfolio_spends_the_player_cap_before_the_split(self):
+        """The R153 order on a real solve. At n=3 the player cap is 1 of 3 and a
+        `win_close` floor of two of each side cannot be met inside it, so the
+        PLAYER cap gives way first (counted, `clean` false) and the split still
+        holds. The floor is not free at this size, and the order is why."""
+        for ml in ({"MIN": -150, "CHC": 130}, {"MIN": 150, "CHC": -174}):
+            ladder = st.build_thesis_ladder(self.df, 3, moneyline=ml)
+            diag: dict = {}
+            solved = st.solve_ladder(self.df, ladder["theses"], time_limit=6,
+                                     diagnostics=diag)
+            self.assertTrue(all(lu is not None for lu in solved), ml)
+            self.assertEqual(diag["player_cap_count"], 1, ml)
+            self.assertEqual(diag["player_relaxed"], 1, ml)
+            self.assertEqual(diag["min_per_team_relaxed"], 0, ml)
+            for t, lu in zip(ladder["theses"], solved):
+                if t["min_per_team"]:
+                    self.assertGreaterEqual(min(self._counts(lu).values()), 2, ml)
+
+    def test_the_why_strings_claim_only_what_the_solver_enforces(self):
+        shape = dict(st.describe_slate(self.df, moneyline={"MIN": -150, "CHC": 130}))
+        shape["_base"] = dict(zip(self.df["Player_Key"], self.df["Base"]))
+        shape["_team"] = dict(zip(self.df["Player_Key"], self.df["Team"]))
+        specs = {s["id"]: s["build"]() for s in st._template_specs(shape)}
+        close = specs["favorite_win_close"]
+        self.assertEqual(close["min_per_team"], 2)
+        self.assertIn("at least two", close["why"])
+        self.assertNotIn("cheaper", close["why"])
+        explode = specs["both_explode"]
+        self.assertEqual(explode["min_per_team"], 3)
+        self.assertIn("three players from each side", explode["why"])
+        self.assertNotIn("locked even", explode["why"])
+
+    def test_the_brief_counts_the_floor_and_the_caution_names_it(self):
+        """The brief carries the counter beside the other four, on the ladder
+        path, and the caution clause fires off it alone."""
+        r = self._build(self._root("brief"))
+        self.assertEqual(r.code, 0, r.err[-3000:])
+        rel = r.brief["counted_relaxations"]
+        self.assertEqual(rel["min_per_team_relaxed_slots"], 0)
+        self.assertGreater(rel["min_per_team_slots_carrying_floor"], 0)
+        self.assertEqual(rel["min_per_team_relaxed_detail"], [])
+        self.assertTrue(rel["clean"], rel)
+
+    def test_a_relaxed_floor_makes_the_portfolio_unclean(self):
+        """A portfolio is clean when the relaxation counts are zero. The wrapper
+        books one split relaxation after the real solve, and the brief must read
+        it: the counter, the detail, the caution, and `clean` false. Teeth:
+        dropping `split_relaxed` from the `clean` expression in `run_showdown`
+        leaves this green on every other assertion except the last."""
+        real = st.solve_ladder
+
+        def booked(*a, **kw):
+            out = real(*a, **kw)
+            diag = kw.get("diagnostics")
+            if diag is not None:
+                diag["min_per_team_relaxed"] = 1
+                diag["min_per_team_relaxed_detail"] = [
+                    {"thesis": "t", "claimed": "at least 2 per team",
+                     "realized": "5-1"}]
+            return out
+
+        r = self._build(self._root("booked"), patches=[(st, "solve_ladder", booked)])
+        self.assertEqual(r.code, 0, r.err[-3000:])
+        rel = r.brief["counted_relaxations"]
+        self.assertEqual(rel["min_per_team_relaxed_slots"], 1)
+        self.assertEqual(rel["min_per_team_relaxed_detail"][0]["realized"], "5-1")
+        self.assertIn("template split floor relaxed on 1 slot(s)", r.brief["caution"])
+        self.assertFalse(rel["clean"], rel)
+
+    def test_the_caution_clause_fires_off_its_own_counter(self):
+        mod = self._module()
+        text = mod.showdown_relaxation_caution(
+            6, 0, 0, [], 4, 0, 0, split_relaxed=1,
+            split_relaxed_detail=[{"thesis": "t", "claimed": "at least 2 per team",
+                                   "realized": "5-1"}])
+        self.assertIn("template split floor relaxed on 1 slot(s)", text)
+        self.assertIn("asked at least 2 per team, built 5-1", text)
+        self.assertEqual(mod.showdown_relaxation_caution(6, 0, 0, [], 4, 0, 0), "")
+
+
+class CaptainArmRotationTests(unittest.TestCase):
+    """R263 build (a) and R211's per-thesis rotation, roadmap Session 119.
+
+    Captains are CHOSEN neutral-templates-first and BUILT in slot order, so the
+    duel keeps a starter as captain when the directional templates' arm-led
+    ladders have spent the capped arms, and a repeat occurrence of one template
+    takes a captain it has not used. Every assertion on a captain reads the
+    SOLVED lineup: the apportioned `cpt` is what
+    `test_pitchers_duel_captain_is_always_one_of_the_two_starters` reads, and it
+    passes while the delivered duel captain is a bat.
+    """
+
+    ML = ({"MIN": -150, "CHC": 130}, {"MIN": 150, "CHC": -174})
+
+    def setUp(self):
+        self.df = st.apply_base_prior(sd.melt_showdown_salary_csv(SAL),
+                                      pitcher_hand={"MIN": "R", "CHC": "R"})
+        self.arms = {k for k, bo in zip(self.df["Player_Key"], self.df["Batting_Order"])
+                     if pd.isna(bo)}
+
+    def _solve(self, n, ml, **kw):
+        ladder = st.build_thesis_ladder(self.df, n, moneyline=ml, **kw)
+        diag: dict = {}
+        solved = st.solve_ladder(
+            self.df, ladder["theses"], time_limit=6, diagnostics=diag,
+            **{k: v for k, v in kw.items()
+               if k in ("contest_of_entry", "max_cpt_per_contest")})
+        return ladder, solved, diag
+
+    def test_the_walk_asks_the_neutral_templates_first_in_slot_order(self):
+        specs = [{"side": "MIN"}, {"side": "CHC"}, {"side": None}, {"side": "MIN"},
+                 {"side": None}]
+        order = [0, 1, 2, 3, 4, 0, 2]
+        walk = st._captain_walk_order(order, specs)
+        self.assertEqual(sorted(walk), list(range(len(order))))       # a permutation
+        self.assertEqual(walk, [2, 4, 6, 0, 1, 3, 5])
+        # nothing but neutrals: slot order, i.e. exactly the old walk
+        self.assertEqual(st._captain_walk_order([2, 4, 2], specs), [0, 1, 2])
+
+    def test_slot_order_is_untouched_so_no_entry_changes_contest(self):
+        """Slot j is `rows[j]` (R239). The theses must list in ROUND-ROBIN order
+        of the allocation, not in the order captains were chosen. Teeth: building
+        the theses in walk order lists the neutral templates first and fails."""
+        for n in (13, 21):
+            ladder = st.build_thesis_ladder(self.df, n, moneyline=self.ML[0])
+            shape = dict(st.describe_slate(self.df, moneyline=self.ML[0]))
+            shape["_base"] = dict(zip(self.df["Player_Key"], self.df["Base"]))
+            shape["_team"] = dict(zip(self.df["Player_Key"], self.df["Team"]))
+            specs = [s for s in st._template_specs(shape) if s["build"]() is not None]
+            counts = {i: ladder["allocation"][s["id"]] for i, s in enumerate(specs)
+                      if s["id"] in ladder["allocation"]}
+            want = [specs[i]["id"] for i in st._round_robin(counts)]
+            self.assertEqual([t["template"] for t in ladder["theses"]], want, n)
+            self.assertEqual(want[0], "favorite_win_big")      # directional first
+
+    def test_the_delivered_duel_captain_is_a_starter_at_every_entry_count(self):
+        """The defect, on the SOLVED lineup. Before the walk was reordered the
+        second duel slot planned a starter past the cap and shipped a bat (Ryan
+        Kreidler at n=19-21), recorded in `cpt_cap_reassigned` and nowhere a
+        reader of the thesis name would look. Teeth: an identity walk restores
+        that and fails here."""
+        for ml in self.ML:
+            for n in (14, 16, 19, 20, 21, 24):
+                ladder, solved, diag = self._solve(n, ml)
+                for t, lu in zip(ladder["theses"], solved):
+                    if t["template"] == "pitchers_duel":
+                        self.assertIn(lu["captain"]["player_key"], self.arms,
+                                      (ml, n, t["name"], lu["captain"]["name"]))
+                self.assertEqual(diag["cpt_cap_reassigned"], [], (ml, n))
+                self.assertEqual(ladder["captain_cap_relaxed"], 0, (ml, n))
+
+    def test_the_duel_keeps_its_arm_under_a_contest_partition_of_sevens(self):
+        """Ben's shape: contests of 7. The delivery path always passes a
+        partition, and there the walk WIDENED to a bat (the rider's 'pool
+        widened' path) rather than forcing the arm."""
+        part = ["c1"] * 7 + ["c2"] * 7 + ["c3"] * 7
+        for ml in self.ML:
+            ladder, solved, diag = self._solve(
+                21, ml, contest_of_entry=part, max_cpt_per_contest=2)
+            for t, lu in zip(ladder["theses"], solved):
+                if t["template"] == "pitchers_duel":
+                    self.assertIn(lu["captain"]["player_key"], self.arms, ml)
+            self.assertEqual(ladder["captain_pool_widened"], [], ml)
+
+    def test_the_pitcher_captain_share_stays_at_its_ceiling_where_it_was(self):
+        """The honest claim for (a): it moves which thesis holds the armband, not
+        how many armbands there are. At n=14, 19, 20 and 21 the share was at the
+        structural ceiling and is still there; the caps are unmoved."""
+        for n in (14, 19, 20, 21):
+            ladder, solved, diag = self._solve(n, self.ML[0])
+            report = st.portfolio_report(self.df, ladder["theses"], solved)
+            sh = st.construction_shadow(self.df, report, max_cpt_exposure_pct=0.25,
+                                        theses=ladder["theses"])
+            self.assertEqual(sh["pitcher_cpt_share_pct"], sh["pitcher_cpt_ceiling_pct"], n)
+            self.assertEqual(diag["cpt_cap_count"], sd.exposure_cap_count(0.25, n))
+
+    # -- the shadow's ceiling and its two columns -----------------------------
+
+    def test_the_ceiling_reads_the_per_contest_cap_in_one_large_contest(self):
+        """21 entries in ONE contest at a per-contest bar of 2: two arms x 2 = 4
+        pitcher captains, 19.0%, and the block used to print 47.6%. Teeth:
+        dropping the per-contest bound restores 47.6."""
+        one = ["c1"] * 21
+        ladder, solved, _ = self._solve(21, self.ML[0], contest_of_entry=one,
+                                        max_cpt_per_contest=2)
+        report = st.portfolio_report(self.df, ladder["theses"], solved)
+        sh = st.construction_shadow(
+            self.df, report, max_cpt_exposure_pct=0.25, theses=ladder["theses"],
+            contest_of_entry=one, max_cpt_per_contest=2)
+        self.assertEqual(sh["pitcher_cpt_ceiling_portfolio_pct"], 47.6)
+        self.assertEqual(sh["pitcher_cpt_ceiling_per_contest_pct"], 19.0)
+        self.assertEqual(sh["pitcher_cpt_ceiling_pct"], 19.0)
+        self.assertEqual(sh["pitcher_cpt_ceiling_basis"], "per-contest captain cap")
+        self.assertEqual(sh["pitcher_cpt_entries"], 4)
+        self.assertEqual(sh["pitcher_cpt_share_of_ceiling_pct"], 100.0)
+
+    def test_the_ceiling_says_when_the_partition_does_not_cover_the_entries(self):
+        """A partition shorter than the solved set cannot give a per-contest
+        bound, and the block says so rather than printing the portfolio bound
+        under a basis that reads as both. Teeth: dropping the note leaves the
+        bare 'portfolio captain cap' label."""
+        ladder, solved, _ = self._solve(14, self.ML[0])
+        report = st.portfolio_report(self.df, ladder["theses"], solved)
+        sh = st.construction_shadow(
+            self.df, report, max_cpt_exposure_pct=0.25, theses=ladder["theses"],
+            contest_of_entry=["c1"] * 7, max_cpt_per_contest=2)
+        self.assertEqual(sh["pitcher_cpt_ceiling_pct"], 42.9)
+        self.assertIn("does not cover every solved entry",
+                      sh["pitcher_cpt_ceiling_basis"])
+        self.assertNotIn("pitcher_cpt_ceiling_per_contest_pct", sh)
+
+    def test_the_sleeve_records_stay_in_slot_order(self):
+        """The walk chooses neutral slots first, so a sleeve that designates a
+        neutral slot beside directional ones is recorded out of order unless it
+        is put back: slots [0, 2, 10, 12] must read 0, 2, 10, 12. Teeth: removing
+        the sort reads 10, 12, 0, 2."""
+        df = _sleeve_frame()
+        sl = st.resolve_captain_sleeve(df, {"entries": 4, "from": _COLD}, 16)
+        sl = dict(sl, slots=[0, 2, 10, 12])
+        ladder = st.build_thesis_ladder(df, 16, moneyline=self.ML[0],
+                                        captain_sleeve=sl)
+        slots = [int(a["slot"]) for a in ladder["captain_sleeve"]["assigned"]]
+        self.assertEqual(slots, sorted(slots))
+        self.assertIn(10, slots)
+
+    def test_the_ceiling_is_the_portfolio_bound_in_contests_of_seven(self):
+        """Ben's contest size: 2 x min(7, 4) x 3 = 12 >= the portfolio's 10, so the
+        per-contest bound does not bind and the ceiling is unchanged."""
+        part = ["c1"] * 7 + ["c2"] * 7 + ["c3"] * 7
+        ladder, solved, _ = self._solve(21, self.ML[0], contest_of_entry=part,
+                                        max_cpt_per_contest=2)
+        report = st.portfolio_report(self.df, ladder["theses"], solved)
+        sh = st.construction_shadow(
+            self.df, report, max_cpt_exposure_pct=0.25, theses=ladder["theses"],
+            contest_of_entry=part, max_cpt_per_contest=2)
+        self.assertEqual(sh["pitcher_cpt_ceiling_pct"], 47.6)
+        self.assertEqual(sh["pitcher_cpt_ceiling_basis"], "portfolio captain cap")
+        self.assertGreaterEqual(sh["pitcher_cpt_ceiling_per_contest_pct"], 47.6)
+
+    def test_without_a_partition_the_ceiling_is_what_it_was(self):
+        ladder, solved, _ = self._solve(19, self.ML[0])
+        report = st.portfolio_report(self.df, ladder["theses"], solved)
+        sh = st.construction_shadow(self.df, report, max_cpt_exposure_pct=0.25)
+        self.assertEqual(sh["pitcher_cpt_ceiling_pct"], 42.1)
+        self.assertNotIn("pitcher_cpt_ceiling_per_contest_pct", sh)
+        self.assertNotIn("pitcher_cpt_apportioned_pct", sh)
+
+    def test_the_apportioned_and_delivered_columns_share_one_denominator(self):
+        """`entries_solved` is the base of both, so 'lost to a bat' is a count of
+        ENTRIES. Run on the pre-(a) walk (an identity walk, patched in) the block
+        counts the duel's lost armband; on the shipped walk it counts none."""
+        ladder, solved, _ = self._solve(21, self.ML[0])
+        report = st.portfolio_report(self.df, ladder["theses"], solved)
+        sh = st.construction_shadow(self.df, report, max_cpt_exposure_pct=0.25,
+                                    theses=ladder["theses"])
+        self.assertEqual(sh["entries_solved"], 21)
+        self.assertEqual(sh["pitcher_cpt_apportioned_pct"],
+                         round(100.0 * sh["pitcher_cpt_apportioned_entries"] / 21, 1))
+        self.assertEqual(sh["pitcher_cpt_lost_to_a_bat_entries"], 0)
+        with unittest.mock.patch.object(
+                st, "_captain_walk_order",
+                lambda order, specs: list(range(len(order)))):
+            ladder0, solved0, _ = self._solve(21, self.ML[0])
+        report0 = st.portfolio_report(self.df, ladder0["theses"], solved0)
+        sh0 = st.construction_shadow(self.df, report0, max_cpt_exposure_pct=0.25,
+                                     theses=ladder0["theses"])
+        self.assertGreaterEqual(sh0["pitcher_cpt_lost_to_a_bat_entries"], 1)
+        self.assertEqual(sh0["entries_solved"], sh["entries_solved"])
+
+    # -- R211 rotation --------------------------------------------------------
+
+    def test_rotation_prefers_an_unused_captain_of_the_heads_kind(self):
+        arms = {"A", "B"}
+        # a duel's two arms rotate against each other
+        self.assertEqual(st._rotated_ladder(["A", "B"], [], arms), ["A", "B"])
+        self.assertEqual(st._rotated_ladder(["A", "B"], ["A"], arms), ["B", "A"])
+        self.assertEqual(st._rotated_ladder(["A", "B"], ["A", "B"], arms), ["A", "B"])
+        # a bat-led ladder rotates through its own bats
+        self.assertEqual(st._rotated_ladder(["x", "y", "z"], ["x"], arms),
+                         ["y", "z", "x"])
+        # an arm-led directional ladder REPEATS its arm and never gives the
+        # repeat to a bat: the pitcher-captain share is R263's signal
+        self.assertEqual(st._rotated_ladder(["A", "x", "y"], ["A"], arms),
+                         ["A", "x", "y"])
+        self.assertEqual(st._rotated_ladder([], ["A"], arms), [])
+
+    def test_a_repeat_of_a_bat_led_template_takes_a_different_captain(self):
+        """End to end, on the solved lineups: every template whose ladder leads
+        with a bat and that holds two or more slots seats DISTINCT captains, so
+        `(variant 2, X captain)` names a captain the first occurrence did not
+        have. Teeth: an identity rotation repeats the head of the ladder."""
+        seen = 0
+        for n in (21, 24, 27):
+            ladder, solved, _ = self._solve(n, self.ML[0])
+            by_tid = collections.defaultdict(list)
+            for t, lu in zip(ladder["theses"], solved):
+                by_tid[t["template"]].append(lu["captain"]["player_key"])
+            for tid, caps in by_tid.items():
+                if len(caps) >= 2 and not tid.endswith("win_big") \
+                        and not tid.endswith("win_close") and tid != "ace_loses":
+                    seen += 1
+                    self.assertEqual(len(set(caps)), len(caps), (n, tid, caps))
+        self.assertGreater(seen, 0, "no bat-led template repeated at these n")
+
+    def test_an_arm_led_template_never_gives_its_repeat_to_a_bat(self):
+        """The guard the measurement forced: unguarded rotation took the MIN@CHC
+        pitcher-captain share at n=21 from 10 of 21 to 7 of 21 (ceiling 10)."""
+        for n in (19, 21):
+            ladder, solved, _ = self._solve(n, self.ML[0])
+            n_arm = sum(1 for lu in solved if lu["captain"]["player_key"] in self.arms)
+            self.assertEqual(n_arm, 2 * sd.exposure_cap_count(0.25, n), n)
+
+
+class PitchersDuelFloorTests(_ShowdownExitDoorHarness, unittest.TestCase):
+    """R211, roadmap Session 119 (c). Ben's rule, 2026-08-22: a pitchers-duel
+    thesis with both starters live has at least two entries, one per arm as
+    captain, "if we have enough lineup slots".
+
+    The threshold is DEV's call and it is `n > live templates` (14 with the usual
+    13): the smallest portfolio in which some template holds two slots and can
+    lend one, so the floor never zeroes a template that would otherwise have one.
+    Below it the apportionment stands untouched (zero duel slots at n <= 5; the
+    entry's "a 1-entry contest keeps its single slot" described a slot the
+    apportionment never gave). The flip itself needs the walk of build (a): the
+    flipped arm is usually already at the 0.25 captain cap, and only the neutral
+    templates being asked first keeps a seat for it.
+    """
+
+    ML = ({"MIN": -150, "CHC": 130}, {"MIN": 150, "CHC": -174})
+
+    def setUp(self):
+        super().setUp()
+        self.df = st.apply_base_prior(sd.melt_showdown_salary_csv(SAL),
+                                      pitcher_hand={"MIN": "R", "CHC": "R"})
+        self.arms = {k for k, bo in zip(self.df["Player_Key"], self.df["Batting_Order"])
+                     if pd.isna(bo)}
+
+    def _duels(self, n, ml, df=None, **kw):
+        df = self.df if df is None else df
+        ladder = st.build_thesis_ladder(df, n, moneyline=ml, **kw)
+        diag: dict = {}
+        solved = st.solve_ladder(
+            df, ladder["theses"], time_limit=6, diagnostics=diag,
+            **{k: v for k, v in kw.items()
+               if k in ("contest_of_entry", "max_cpt_per_contest")})
+        duels = [(t, lu) for t, lu in zip(ladder["theses"], solved)
+                 if t["template"] == "pitchers_duel"]
+        return ladder, solved, diag, duels
+
+    def test_the_second_duel_seats_the_other_arm_as_captain(self):
+        """Realized, on the solved lineups: at n=14..24 under both moneyline
+        orientations the two duel lineups have DIFFERENT starters as captain,
+        each rosters both starters, and neither is a substituted bat. Teeth:
+        dropping the floor leaves one slot at n=14-18; identity rotation gives
+        both slots the same arm; an identity walk gives the second one a bat."""
+        for ml in self.ML:
+            for n in (14, 15, 16, 17, 18, 19, 20, 21, 24):
+                ladder, solved, diag, duels = self._duels(n, ml)
+                self.assertGreaterEqual(len(duels), 2, (ml, n))
+                caps = [lu["captain"]["player_key"] for _, lu in duels]
+                self.assertEqual(set(caps[:2]), self.arms, (ml, n, caps))
+                for _, lu in duels:
+                    self.assertTrue(self.arms <= set(lu["player_keys"]), (ml, n))
+                self.assertEqual(diag["cpt_cap_reassigned"], [], (ml, n))
+
+    def test_the_two_duel_lineups_are_two_lineups_not_one_with_the_armband_moved(self):
+        """F-3. Overlap counts the PLAYER, not the role, so the same six with the
+        captain swapped is a duplicate and the solver may not return it: the two
+        duel rosters differ by at least two players, and the portfolio's rosters
+        are unique."""
+        for ml in self.ML:
+            ladder, solved, diag, duels = self._duels(16, ml)
+            (_, a), (_, b) = duels[:2]
+            self.assertLessEqual(len(set(a["player_keys"]) & set(b["player_keys"])),
+                                 sd.DEFAULT_MAX_SHARED_PLAYERS)
+            report = st.portfolio_report(self.df, ladder["theses"], solved)
+            self.assertTrue(report["all_unique_rosters"], ml)
+            self.assertEqual(diag["overlap_relaxed"], 0, ml)
+
+    def test_the_floor_takes_a_slot_from_an_over_allocated_template_only(self):
+        """No template that held a slot without the floor is zeroed by it, the
+        total is still n, and the donor is named in the record."""
+        for ml in self.ML:
+            for n in (14, 15, 16, 17, 18):
+                with unittest.mock.patch.object(
+                        st, "_apply_duel_floor",
+                        lambda counts, weights, specs, n_, live: (dict(counts), None)):
+                    bare = st.build_thesis_ladder(self.df, n, moneyline=ml)
+                floored = st.build_thesis_ladder(self.df, n, moneyline=ml)
+                self.assertEqual(len(floored["theses"]), n)
+                for tid, c in bare["allocation"].items():
+                    self.assertGreaterEqual(floored["allocation"].get(tid, 0), 1
+                                            if c else 0, (ml, n, tid))
+                rec = floored["duel_floor"]
+                if bare["allocation"].get("pitchers_duel", 0) < 2:
+                    self.assertTrue(rec["applied"], (ml, n, rec))
+                    self.assertEqual(floored["allocation"]["pitchers_duel"], 2)
+                    self.assertEqual(len(rec["borrowed_from"]), 2 - rec["apportioned"])
+                    for donor in rec["borrowed_from"]:
+                        self.assertGreater(bare["allocation"][donor], 1)
+                        self.assertEqual(floored["allocation"][donor],
+                                         bare["allocation"][donor] - 1)
+
+    def test_below_the_threshold_the_apportionment_stands(self):
+        """n <= 13 keeps exactly what the apportionment gave, including no duel
+        slot at all at n <= 5 and at n=1 (the Solo Shot)."""
+        for n in (1, 2, 5, 7, 9, 13):
+            ladder = st.build_thesis_ladder(self.df, n, moneyline=self.ML[0])
+            rec = ladder["duel_floor"]
+            self.assertFalse(rec["applied"], (n, rec))
+            self.assertEqual(rec["final"], rec["apportioned"], n)
+            self.assertEqual(ladder["allocation"].get("pitchers_duel", 0),
+                             rec["apportioned"], n)
+            self.assertEqual(rec["threshold_entries"], 14)
+            self.assertIn("do not exceed the 13 live templates", rec["reason"])
+        one = st.build_thesis_ladder(self.df, 1, moneyline=self.ML[0])
+        self.assertEqual(one["allocation"].get("pitchers_duel", 0), 0)
+        self.assertEqual(len(one["theses"]), 1)
+
+    def test_the_threshold_is_live_templates_plus_one(self):
+        specs = [{"id": f"t{i}"} for i in range(12)] + [{"id": "pitchers_duel"}]
+        weights = {i: 1 / 13 for i in range(13)}
+        # 13 live templates, 13 entries, one each: no donor, not affordable
+        counts, rec = st._apply_duel_floor({i: 1 for i in range(13)}, weights,
+                                           specs, 13, True)
+        self.assertEqual(counts[12], 1)
+        self.assertFalse(rec["applied"])
+        # 14 entries: one template holds two, the duel is raised to 2
+        counts, rec = st._apply_duel_floor({**{i: 1 for i in range(13)}, 3: 2,
+                                            }, weights, specs, 14, True)
+        self.assertEqual(counts[12], 2)
+        self.assertEqual(counts[3], 1)
+        self.assertTrue(rec["applied"])
+        self.assertEqual(sum(counts.values()), 14)
+
+    def test_the_donor_is_the_template_furthest_above_its_own_share(self):
+        """Two templates hold more than one slot; the one with the larger excess
+        over its exact share lends, and a tie goes to the LATER spec so the
+        earlier templates keep theirs. Teeth: choosing the smallest excess lends
+        from the template that is already under-served."""
+        specs = [{"id": f"t{i}"} for i in range(12)] + [{"id": "pitchers_duel"}]
+        n = 15
+        weights = {i: 0.05 for i in range(13)}
+        weights[0], weights[1] = 0.10, 0.20
+        base = {i: 1 for i in range(13)}
+        base[0], base[1] = 2, 2          # sum 15
+        # exact: t0 1.5 (count 2, excess +.5), t1 3.0 (count 2, excess -1.0)
+        counts, rec = st._apply_duel_floor(dict(base), weights, specs, n, True)
+        self.assertEqual(counts[0], 1)
+        self.assertEqual(counts[1], 2)
+        self.assertEqual(rec["borrowed_from"], ["t0"])
+        # a tie in excess goes to the later spec
+        weights = {i: 1 / 13 for i in range(13)}
+        counts, rec = st._apply_duel_floor(dict(base), weights, specs, n, True)
+        self.assertEqual(rec["borrowed_from"], ["t1"])
+
+    def test_one_live_starter_is_not_multiplied(self):
+        """A bullpen game, an IL starter or a declared arm the pool lacks leaves
+        ONE live starter, and `duel()` builds a one-arm lineup under a two-arm
+        name (filed, not changed here). The floor must not double it."""
+        one_arm = self.df[self.df["Player_Key"] != "Matthew Boyd|CHC"].reset_index(drop=True)
+        ladder = st.build_thesis_ladder(one_arm, 20, moneyline=self.ML[0])
+        rec = ladder["duel_floor"]
+        self.assertFalse(rec["both_starters_live"])
+        self.assertFalse(rec["applied"])
+        self.assertIn("fewer than two live starters", rec["reason"])
+        with unittest.mock.patch.object(
+                st, "_apply_duel_floor",
+                lambda counts, weights, specs, n_, live: (dict(counts), None)):
+            bare = st.build_thesis_ladder(one_arm, 20, moneyline=self.ML[0])
+        self.assertEqual(ladder["allocation"], bare["allocation"])
+
+    def test_an_operator_excluded_starter_is_not_a_live_starter(self):
+        """The Excluded cell removes an arm from every solve, so an excluded
+        starter is not live even though the frame still lists him. Before this
+        the floor read the frame, borrowed a slot at n=14 and built a second duel
+        whose captain the solve could not seat (a bat took the armband)."""
+        d2 = self.df.copy()
+        d2.loc[d2["Player_Key"] == "Taj Bradley|MIN", "Excluded"] = True
+        ladder = st.build_thesis_ladder(d2, 14, moneyline=self.ML[0])
+        rec = ladder["duel_floor"]
+        self.assertFalse(rec["both_starters_live"])
+        self.assertFalse(rec["applied"])
+        self.assertEqual(rec["borrowed_from"], [])
+        # the same slate with nobody excluded does apply it at this size
+        again = st.build_thesis_ladder(self.df, 14, moneyline=self.ML[0])
+        self.assertTrue(again["duel_floor"]["applied"])
+
+    def test_a_large_portfolio_already_over_the_floor_is_left_alone(self):
+        """n=150 (the apportionment only; solving 150 lineups here would test the
+        clock): the natural duel count is well above 2 and the floor stands down."""
+        ladder = st.build_thesis_ladder(self.df, 150, moneyline=self.ML[0])
+        rec = ladder["duel_floor"]
+        self.assertFalse(rec["applied"])
+        self.assertGreaterEqual(rec["apportioned"], 2)
+        self.assertEqual(ladder["allocation"]["pitchers_duel"], rec["apportioned"])
+        self.assertEqual(len(ladder["theses"]), 150)
+
+    def test_the_duel_rotation_survives_a_contest_partition_of_sevens(self):
+        """Delivery's shape: three contests of 7. The flipped arm is per-contest
+        capped at 2, and the two duels sit in different contests, so both keep a
+        starter as captain."""
+        part = ["c1"] * 7 + ["c2"] * 7 + ["c3"] * 7
+        for ml in self.ML:
+            ladder, solved, diag, duels = self._duels(
+                21, ml, contest_of_entry=part, max_cpt_per_contest=2)
+            caps = {lu["captain"]["player_key"] for _, lu in duels[:2]}
+            self.assertEqual(caps, self.arms, ml)
+            self.assertEqual(diag["contest_cap_relaxed"], 0, ml)
+            self.assertEqual(diag["cpt_cap_relaxed"], 0, ml)
+
+    def test_the_brief_records_the_threshold_and_the_reason(self):
+        """The fixture's entries file has 14 rows and this build carries no
+        moneyline, so the apportionment gives the duel one slot and the floor
+        raises it to two. The brief says so, with the threshold."""
+        r = self._build(self._root("floor"))
+        self.assertEqual(r.code, 0, r.err[-3000:])
+        rec = r.brief["construction"]["duel_floor"]
+        self.assertEqual(rec["threshold_entries"], 14)
+        self.assertEqual(rec["live_templates"], 13)
+        self.assertEqual(rec["entries"], 14)
+        self.assertTrue(rec["both_starters_live"])
+        self.assertEqual(rec["floor"], 2)
+        self.assertTrue(rec["applied"], rec)
+        self.assertEqual(rec["final"], 2)
+        self.assertTrue(rec["borrowed_from"])
+        duels = [x for x in r.brief["construction"]["lineups"]
+                 if x.get("template") == "pitchers_duel"]
+        self.assertEqual(len(duels), 2)

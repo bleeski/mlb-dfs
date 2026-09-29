@@ -980,6 +980,7 @@ def build_showdown_lineup(
     time_limit: int = 20,
     status_out: Optional[Dict[str, Any]] = None,
     operator_locks: bool = True,
+    min_per_team: Optional[Mapping[str, int]] = None,
 ) -> Optional[Dict[str, Any]]:
     """Solve one legal Showdown lineup maximizing projected points (CPT at 1.5x).
     Returns None if infeasible. Deterministic scipy.milp; a review proxy.
@@ -1008,7 +1009,17 @@ def build_showdown_lineup(
     its rounded form is checked against the same constraint matrix the solver was
     given. Accepted, it is tagged ``optimality='time_limited'``; rejected, that is
     recorded as ``incumbent_rejected``. The record says "time limit at gap X" or
-    "proven infeasible", never both."""
+    "proven infeasible", never both.
+
+    R437. ``min_per_team`` maps a team to the number of its players the roster
+    must carry, and it is a THESIS floor, not a DK rule: it joins the both-teams
+    rows below as a higher lower bound (``max`` of the contract's own floor and
+    this one), so a template's split claim is a constraint the solver enforces
+    rather than a label suppression multipliers may or may not honour. It never
+    lowers the contract's floor, and a team it names that is absent from the
+    pool is skipped rather than refused (the both-teams pre-check above owns
+    that refusal). ``solve_ladder`` is the only caller that passes it, and the
+    only place that relaxes it."""
     from scipy.optimize import Bounds, LinearConstraint, milp
     from scipy.sparse import coo_matrix
 
@@ -1113,10 +1124,16 @@ def build_showdown_lineup(
     add(salary_coefs, -np.inf, float(contract.salary_cap))     # salary cap
 
     if contract.min_players_per_team > 0:                      # both-teams rule
+        thesis_floor = {str(t): int(v) for t, v in (min_per_team or {}).items()}
         for team in sorted(work["Team"].unique()):
             idxs = [i for i in range(n) if work.iloc[i]["Team"] == team]
+            # R437. The thesis's own floor rides the SAME row as the contract's,
+            # so there is one both-teams row per team and one place a split is
+            # enforced. `max`, never a replacement: a thesis cannot lower DK's.
+            floor = max(int(contract.min_players_per_team),
+                        thesis_floor.get(str(team), 0))
             add({**{cpt(i): 1.0 for i in idxs}, **{util(i): 1.0 for i in idxs}},
-                float(contract.min_players_per_team), np.inf)
+                float(floor), np.inf)
 
     # R54(c). A lock naming a key the melt does not carry -- a typo, a stale key,
     # or a player the melt dropped on Status or on a missing CPT/UTIL row -- used

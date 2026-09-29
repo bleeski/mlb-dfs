@@ -5375,6 +5375,8 @@ def showdown_relaxation_caution(
     player_structurally_feasible: bool = True,
     player_structural_floor=None,
     player_cap_pct=None,
+    split_relaxed: int = 0,
+    split_relaxed_detail=None,
 ) -> str:
     """The Showdown ladder's relaxation NOTEs, one clause per counter that
     actually fired, each naming its own mechanism.
@@ -5414,6 +5416,18 @@ def showdown_relaxation_caution(
         notes += (f" NOTE: {both_relaxed} slot(s) needed BOTH the overlap bound "
                   "and the captain lock dropped at once; those are the least "
                   "controlled lineups in the bank (R54).")
+    # R437. The template's split floor, its own clause off its own counter. It is
+    # the last thesis-level control to give way, and the lineup it gave way on is
+    # named with the split it actually carries, because the thesis text above it
+    # in the brief still says what the template asked for.
+    if split_relaxed:
+        detail = "; ".join(
+            f"{d.get('thesis', '?')}: asked {d.get('claimed', '?')}, "
+            f"built {d.get('realized', '?')}"
+            for d in (split_relaxed_detail or [])) or "no detail captured"
+        notes += (f" NOTE: the template split floor relaxed on {split_relaxed} "
+                  f"slot(s) ({detail}); those lineups do not carry the split "
+                  "their rationale names.")
     # R153. The player-exposure cap's own clauses. Kept separate from the captain
     # ones for R113's reason: they are different mechanisms with different
     # remedies, and captain_exposure.by_player cannot show a player-cap event.
@@ -6089,8 +6103,12 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         max_overlap = report.get("max_pairwise_overlap")
         # R263 shadow, Ben's dated decision of 2026-08-28. Counted off the solved
         # lineups, printed beside the caps below, steers nothing.
+        # R263 (a) and R437: the ladder's own ask and the contest partition ride
+        # in so the ceiling reads `max_cpt_per_contest` and the block carries the
+        # apportioned column beside the delivered one.
         construction_shadow = st.construction_shadow(
-            priced, report, max_cpt_exposure_pct=cpt_cap)
+            priced, report, max_cpt_exposure_pct=cpt_cap, theses=theses,
+            contest_of_entry=contest_of_entry, max_cpt_per_contest=cpt_per_contest)
         # R153.
         player_counts = report.get("player_exposure") or {}
         player_cap_count = solve_diag.get("player_cap_count")
@@ -6104,6 +6122,10 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                              + list(solve_diag.get("contest_cpt_reassigned") or []))
         player_locks_dropped = list(solve_diag.get("player_cap_locks_dropped") or [])
         contest_cap_relaxed = solve_diag.get("contest_cap_relaxed") or 0
+        # R437. The fifth counter: a template's split floor giving way.
+        split_relaxed = solve_diag.get("min_per_team_relaxed") or 0
+        split_relaxed_detail = list(solve_diag.get("min_per_team_relaxed_detail") or [])
+        split_slots = solve_diag.get("min_per_team_slots") or 0
         # R223. The fourth counter, and the withdrawal count beside it.
         cpt_cap_relaxed = solve_diag.get("cpt_cap_relaxed") or 0
         cap_reassignments_withdrawn = solve_diag.get("cap_reassignments_withdrawn") or 0
@@ -6166,6 +6188,12 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         # undefined; the per_contest REPORT still runs on this path, so a breach
         # here is visible even though no control prevented it.
         contest_cap_relaxed = 0
+        # R437. Template split floors live on theses and this path has none.
+        # Stated as 0 rather than left undefined: `clean` below reads it on both
+        # paths, and an unbound name here would fail every Classic-fallback build.
+        split_relaxed = 0
+        split_relaxed_detail = []
+        split_slots = 0
         # R223. The portfolio captain cap relaxation lives in `solve_ladder`,
         # which this path does not use; its single cap mechanism is already
         # reported as `captain_relaxed_slots` above. Stated as 0 rather than left
@@ -6506,6 +6534,13 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
             # APPORTIONMENT step (R113's split) and on the bank path is that
             # path's single cap mechanism.
             "cpt_cap_relaxed_slots": cpt_cap_relaxed,
+            # R437. A template's split floor (`min_per_team`) giving way, counted
+            # only where the delivered lineup actually breaks it. `..._slots_
+            # carrying_floor` says how many slots asked, so a 0 above reads as
+            # "held" and not as "no template asked".
+            "min_per_team_relaxed_slots": split_relaxed,
+            "min_per_team_slots_carrying_floor": split_slots,
+            "min_per_team_relaxed_detail": split_relaxed_detail,
             # R223. NOT a relaxation and deliberately outside `clean`: a
             # reassignment record withdrawn because a lower rung re-seated the
             # captain it named. It is reported so the reader knows a record was
@@ -6524,6 +6559,7 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
             "clean": (not (relaxed_slots or overlap_relaxed or both_relaxed
                            or player_relaxed or ignored_locks
                            or contest_cap_relaxed or cpt_cap_relaxed
+                           or split_relaxed
                            or captain_budget_inversions)
                       and not (per_contest.get("over_cap") or [])
                       # R426. A ladder lineup equal to a held complete row is
@@ -6584,6 +6620,8 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
             "favorite_basis": ladder_meta.get("favorite_basis"),
             "win_share": (ladder_meta.get("shape") or {}).get("win_share"),
             "allocation": ladder_meta.get("allocation"),
+            # R211. The duel floor: applied or declined, the threshold, why.
+            "duel_floor": ladder_meta.get("duel_floor"),
             "bullpen_teams": (ladder_meta.get("shape") or {}).get("bullpen_teams"),
             "platoon_unresolved_teams": list(
                 (priced.attrs.get("platoon_unresolved_teams") or [])),
@@ -6615,6 +6653,8 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                             or player_cap_pct >= player_structural_floor),
                         player_structural_floor=player_structural_floor,
                         player_cap_pct=player_cap_pct,
+                        split_relaxed=split_relaxed,
+                        split_relaxed_detail=split_relaxed_detail,
                     )
                     # R54(c). Loudest of the four, because it is not a relaxation
                     # the solver chose: it is an instruction that did not arrive.
