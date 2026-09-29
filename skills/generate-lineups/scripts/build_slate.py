@@ -1483,6 +1483,24 @@ def _merge_bank_slice_reports(reports: list) -> dict:
             examples.extend(list(r.get("raised_examples") or []))
         if examples:
             merged["raised_examples"] = examples[:3]
+        # R453 (found by its own review). `merged` is the LAST slice's report,
+        # and so was the brief's `anti_correlation`: `applied`, `observed` and
+        # `solves_observed` described one slice of a bank the brief calls
+        # "measured from the bank's own solves" (R293). A five-stack slice
+        # that ran at 0 beside a four-stack slice that ran at 2 read as
+        # agreement, and a starved last slice erased every earlier slice's
+        # evidence. Read off every slice: the distinct values, the solves
+        # summed, `applied` a number only when they agree.
+        observed_by_slice = [r["anti_correlation"] for r in reports
+                             if isinstance(r.get("anti_correlation"), dict)]
+        if len(observed_by_slice) > 1:
+            from mlb_engine.optimize.optimizer_v3 import anti_correlation_report
+            pooled = anti_correlation_report(
+                sorted({v for a in observed_by_slice for v in (a.get("observed") or [])}),
+                requested=observed_by_slice[-1].get("requested"))
+            pooled["solves_observed"] = sum(
+                int(a.get("solves_observed") or 0) for a in observed_by_slice)
+            merged["anti_correlation"] = pooled
     merged["slices"] = [
         {"stack_min_requested": r.get("stack_min_requested"),
          "built_this_slice": r.get("built_this_slice"),
@@ -1490,7 +1508,13 @@ def _merge_bank_slice_reports(reports: list) -> dict:
          "jobs_total": r.get("jobs_total"),
          "job_list_exhausted": r.get("job_list_exhausted"),
          "stop_reason": r.get("stop_reason"),
-         "max_candidates": r.get("max_candidates")}
+         "max_candidates": r.get("max_candidates"),
+         # R453. The slice's own bucket and what its cap counted, so a reader
+         # (and the brief's disagreement line) can tell a slice the cap starved
+         # from one the clock or an empty grid ended.
+         "candidates_this_conditions": r.get("candidates_this_conditions"),
+         "cap_counted": r.get("cap_counted"),
+         "job_class": r.get("job_class")}
         for r in reports
     ]
     # R415. The last slice's `stop_reason` is not the bank's, and neither is a
@@ -1545,20 +1569,25 @@ BANK_STOP_REASON_ORDER = ("candidate_cap", "time_budget", "jobs_retryable",
 def bank_stop_reason(reports: list) -> Optional[str]:
     """The bank-level stop reason over the slices that share one cache.
 
-    Each slice's cap counts the WHOLE cache, and the five-stack slice and the
-    ordinary slices beside a consensus bucket carry a SHARE of the bank's cap.
-    So a slice reading ``candidate_cap`` means the bank's cap bound only when
-    the cache reached the largest cap of any slice still holding unanswered
-    jobs; below it, the slice with the full cap stopped for its own reason and
-    a re-run grows the bank. None when no slice reported a reason (a report
-    from before R415, or no slices), which callers read as unknown.
+    Each slice's cap counts what THIS build holds (R453: its own bucket plus
+    the buckets its earlier slices filled, never an earlier build's answers to
+    other questions), and the five-stack slice and the ordinary slices beside a
+    consensus bucket carry a SHARE of the bank's cap. So a slice reading
+    ``candidate_cap`` means the bank's cap bound only when that count reached
+    the largest cap of any slice still holding unanswered jobs; below it, the
+    slice with the full cap stopped for its own reason and a re-run grows the
+    bank. The count is the slice's ``cap_counted``; a report from before R453
+    carries only ``total_candidates``, which was the same number then. None
+    when no slice reported a reason (a report from before R415, or no
+    slices), which callers read as unknown.
     """
     seen = {r.get("stop_reason") for r in reports if r.get("stop_reason")}
     if "candidate_cap" in seen:
         open_caps = [int(r["max_candidates"]) for r in reports
                      if r.get("max_candidates") is not None
                      and not r.get("job_list_exhausted")]
-        total = max((int(r.get("total_candidates") or 0) for r in reports), default=0)
+        total = max((int(r.get("cap_counted", r.get("total_candidates")) or 0)
+                     for r in reports), default=0)
         if not open_caps or total >= max(open_caps):
             return "candidate_cap"
         seen.discard("candidate_cap")
@@ -3475,6 +3504,13 @@ def anti_correlation_brief_block(requested, bank_report, result) -> dict:
         "applied_source": source,
         "observed": list((measured or {}).get("observed") or []),
         "solves_observed": int((measured or {}).get("solves_observed") or 0),
+        # R453. Candidates in the served bank built under conditions buckets
+        # this build did not request (an earlier build's, on the shared cache).
+        # None on every path that has no such bank. Not a disagreement claim:
+        # the count cannot say what those buckets were built under.
+        "served_from_unrequested_buckets": (
+            (bank_report or {}).get("served_from_unrequested_buckets")
+            if source == "sliced_bank" else None),
         "engine_default": ANTI_CORRELATION_DEFAULT_MAX,
         "unit": "hitters facing ONE rostered SP; per-lineup worst case is "
                 "twice this on Classic",
@@ -3498,11 +3534,48 @@ def anti_correlation_brief_block(requested, bank_report, result) -> dict:
     # `applied` None and therefore `agrees_with_request` None, and that is
     # exactly R293's condition -- the string has to fire there or the null
     # above would have silenced the disagreement it was introduced to preserve.
+    problems = []
     if block["solves_observed"] and block["agrees_with_request"] is not True:
-        block["disagreement"] = (
+        problems.append(
             f"the build requested k={effective} and its bank's solves ran at "
             f"{block['observed']}; the delivered candidates are NOT all built "
             f"under the requested allowance")
+    # R453. A slice that stopped at the candidate cap holding NONE of its own
+    # candidates never solved the question it was asked, and the zero it leaves
+    # in `solves_observed` reads as "nothing to compare" -- which is the false
+    # silence this line exists to break. Narrow on purpose: it reads the
+    # slices of a sliced-door bank and nothing else. `solves_observed == 0` on
+    # its own means "no bank" on the direct path, and firing there would bring
+    # back the false reading the 1835_5g fragment removed.
+    if source == "sliced_bank":
+        starved = [s for s in ((bank_report or {}).get("slices") or [])
+                   if s.get("stop_reason") == "candidate_cap"
+                   and isinstance(s.get("candidates_this_conditions"), int)
+                   and s["candidates_this_conditions"] == 0]
+        if starved:
+            names = ", ".join(
+                str(s.get("job_class") or f"stack_min {s.get('stack_min_requested')}")
+                for s in starved)
+            problems.append(
+                f"the build requested k={effective} and the bank slice(s) [{names}] "
+                f"stopped at the candidate cap holding none of their own candidates, "
+                f"so nothing was solved for them under that allowance; raise "
+                f"--bank-max-candidates (counted {[s.get('cap_counted') for s in starved]} "
+                f"against {[s.get('max_candidates') for s in starved]})")
+    if problems:
+        block["disagreement"] = "; ".join(problems)
+    # R453. Stated beside the count rather than left for a reader to connect:
+    # `agrees_with_request` is a fact about THIS build's solves, and the served
+    # bank can still hold answers to other questions. Not a disagreement, since
+    # the signature cannot say what those buckets were built under.
+    unrequested = block["served_from_unrequested_buckets"]
+    if unrequested:
+        block["unmeasured"] = (
+            f"{unrequested} candidate(s) in the served bank sit in conditions buckets "
+            f"this run did not solve for (an earlier run's, on the shared cache; a "
+            f"sleeve bucket the bank already covered is counted here too); "
+            f"`applied` and `agrees_with_request` describe this run's own solves "
+            f"and say nothing about them")
     return block
 
 
@@ -3978,6 +4051,16 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
             _ordinary_budget = _bank_budget * (1.0 - float(consensus_request["budget_share"]))
             _ordinary_max = max(30, _total_max - int(consensus_request["max_candidates"]))
         _started_slices = time.monotonic()
+        # R453. The cap bounds what THIS build holds, not what an earlier
+        # build's other questions left in the shared cache: each call counts
+        # its own bucket plus the buckets this build already filled (the
+        # `other_held` argument, a {signature: count} map so a slice that
+        # shares a signature with an earlier one, stack sizes [4, 4], is not
+        # counted twice). On a fresh cache that is the union, exactly the
+        # count before R453; on a cache an earlier build filled to its cap, a
+        # new question (another anti-correlation allowance, a five-stack
+        # request, a cluster limit) is no longer starved to zero solves.
+        _held_by_build: dict = {}
         for _idx, _size in enumerate(_sizes):
             _left = _ordinary_budget - (time.monotonic() - _started_slices)
             if _idx == len(_sizes) - 1:
@@ -4006,9 +4089,12 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
                     args, "max_opposing_hitters_per_sp", None),
                 # R340. The argument no production caller has ever passed.
                 stack_min=int(_size),
+                other_held=dict(_held_by_build),
             )
             _rep["stack_min_requested"] = int(_size)
             _slice_reports.append(_rep)
+            _held_by_build[_rep.get("conditions_signature")] = int(
+                _rep.get("candidates_this_conditions") or 0)
         # R405(c). The limited bucket, after the ordinary slices it derives its
         # cluster from. Same leverage, anti-correlation and stack floor as the
         # ordinary call (the default four), so the only difference between the
@@ -4024,6 +4110,7 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
                 max_opposing_hitters_per_sp=getattr(
                     args, "max_opposing_hitters_per_sp", None),
                 stack_min=int(_sizes[-1]),
+                other_held=dict(_held_by_build),
             )
             if consensus_jobs.get("report"):
                 _lrep = dict(consensus_jobs["report"])
@@ -4035,6 +4122,11 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         # `slices` rather than reading as a fact about the whole bank.
         bank_report.pop("max_selected_from", None)
         bank_report.pop("job_class", None)
+        # R453. Same reason: how the last slice was counted. `cap_counted` stays
+        # as the LAST value beside `total_candidates` (what the whole build held
+        # at its last slice); each slice's own is under `slices`.
+        bank_report.pop("other_held", None)
+        bank_report.pop("cap_scope", None)
         bank_report["stack_request"] = bank_stack_request
         bank_report["consensus_limited_request"] = consensus_request
         bank_report["consensus_limited_jobs"] = {
@@ -4068,6 +4160,24 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
                 stack_min=int(_sizes[-1]))
         bank_report["classic_sleeves_request"] = sleeve_request
         bank_report["classic_sleeves_jobs"] = sleeve_jobs
+        # R453. `as_candidates` serves the union of every live bucket, so on a
+        # cache an earlier build shared, the allocator can be handed answers to
+        # questions THIS build never asked. Counted here, after the sleeves, and
+        # carried to the brief; the count says how many, never what they were
+        # built under (a conditions signature is a hash).
+        _requested_sigs = {r.get("conditions_signature") for r in _slice_reports}
+        for _srep in (sleeve_jobs.get("sleeves") or {}).values():
+            if isinstance(_srep, dict) and _srep.get("conditions_signature"):
+                _requested_sigs.add(_srep["conditions_signature"])
+        bank_report["served_from_unrequested_buckets"] = cache.count_outside_buckets(
+            _requested_sigs)
+        # R453. The cap bounds this build's own buckets, so the union `as_candidates`
+        # serves can pass the ceiling `_bank_cap` was clamped to when an earlier
+        # build's other question is still in the cache. The full-bank retry a
+        # refusal runs (R326) is the solve that ceiling was measured for.
+        from mlb_engine import repo_env as _repo_env  # noqa: PLC0415
+        bank_report["served_union_over_full_solve_ceiling"] = bool(
+            len(cache) > _repo_env.BANK_FULL_SOLVE_CEILING)
         deadline.mark("sliced_bank_built")
         candidates = tag_sleeves(cache.as_candidates(
             projections, requested_n=n_entries, contest_shapes=slice_shapes),
@@ -4097,7 +4207,8 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         if ((_thin_by_count or _thin_by_pairs)
                 and bank_report.get("bank_stop_reason") == "candidate_cap"
                 and not bank_report["job_list_exhausted"]):
-            print(f"BANK AT ITS CAP: {len(cache)} candidates against a "
+            print(f"BANK AT ITS CAP: {bank_report.get('cap_counted', len(cache))} "
+                  f"candidates against a "
                   f"{_total_max}-candidate cap ({_bank_cap['source']}); "
                   f"re-running the same command cannot grow it past the cap, so this build "
                   f"solves on the bank it has. Raise --bank-max-candidates to "

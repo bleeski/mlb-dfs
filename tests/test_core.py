@@ -22142,6 +22142,518 @@ class AutobuildFileInHandTests(unittest.TestCase):
         self.assertEqual(seen, ["2026-07-29"])
 
 
+class BankCapPerBucketTests(unittest.TestCase):
+    """R453. The sliced bank's candidate cap counts what THIS build holds, not
+    the union of every conditions bucket an earlier build left in the cache.
+
+    Before, a second build the same evening that changed
+    `--max-opposing-hitters-per-sp`, the five-stack request or the cluster
+    limit opened a new bucket on a cache the first build had filled to the cap,
+    got `attempted 0 built 0 stop candidate_cap`, and was served the old
+    bucket: in the reverse direction a k=0 build delivered lineups rostering
+    hitters against a rostered SP. `extend_bank(other_held=n)` counts the call's
+    own bucket plus `n` the caller already holds in its other buckets; the
+    default `None` still counts the whole cache, which is what a caller passing
+    a relative cap (`len(cache) + need`, the R406 sleeves) means.
+    """
+
+    @staticmethod
+    def _frame():
+        """Three games, six starters, eight hitters a side: 72 jobs a bucket,
+        with same-game opposing hitters so an allowance of 0 and of 2 solve to
+        different lineups."""
+        rows, pid, base = [], 20000, 21000
+        teams = []
+        for g in range(3):
+            a, b = f"A{g}", f"B{g}"
+            teams += [(a, b, f"{a}@{b}"), (b, a, f"{a}@{b}")]
+        for team, opp, gid in teams:
+            pid += 1
+            rows.append({"Player_ID": str(pid), "Name": f"P_{team}", "Team": team,
+                         "Opponent": opp, "Position": "P", "Salary": 9000.0,
+                         "Game_ID": gid, "Floor": 12.0, "Ceiling": 25.0 + (pid % 5),
+                         "Excluded": False, "Locked": False})
+        for team, opp, gid in teams:
+            for pos in ("C", "1B", "2B", "3B", "SS", "OF", "OF", "OF"):
+                base += 1
+                rows.append({"Player_ID": str(base), "Name": f"{team}_{pos}_{base}",
+                             "Team": team, "Opponent": opp, "Position": pos,
+                             "Salary": 3000.0, "Game_ID": gid, "Floor": 5.0,
+                             "Ceiling": 10.0 + (base % 7), "Excluded": False,
+                             "Locked": False})
+        return pd.DataFrame(rows)
+
+    @staticmethod
+    def _opposing(roster, frame):
+        """Most hitters facing ONE rostered SP, measured off the roster and the
+        frame, never off `extend_bank`'s own report."""
+        team = dict(zip(frame.Player_ID.astype(str), frame.Team))
+        opp = dict(zip(frame.Player_ID.astype(str), frame.Opponent))
+        pos = dict(zip(frame.Player_ID.astype(str), frame.Position))
+        sps = [p for p in roster if pos[p] == "P"]
+        hitters = [p for p in roster if pos[p] != "P"]
+        return max(sum(1 for h in hitters if team[h] == opp[sp]) for sp in sps)
+
+    def _bucket(self, cache, sig, frame):
+        return [self._opposing(e["roster"], frame) for e in cache.candidates
+                if bank_cache._key_conditions(e.get("job")) == sig]
+
+    def _extend(self, cache, frame, k, cap, **kw):
+        return bank_cache.extend_bank(
+            cache, frame, time_budget_s=120, max_candidates=cap,
+            max_opposing_hitters_per_sp=k, **kw)
+
+    # ---- both directions, the row's acceptance -----------------------------
+
+    def test_a_k2_build_after_a_k0_build_to_its_cap_solves_and_serves_k2_candidates(self):
+        frame = self._frame()
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = bank_cache.BankCache(Path(tmp) / "bank.json")
+            first = self._extend(cache, frame, 0, 27, other_held=0)
+            self.assertEqual((first["built_this_slice"], first["stop_reason"]),
+                             (27, "candidate_cap"))
+            second = self._extend(cache, frame, 2, 20, other_held=0)
+            self.assertGreater(second["attempted_this_slice"], 0,
+                               "the new question must get solves on a cap-bound cache")
+            self.assertEqual(second["built_this_slice"], 20)
+            self.assertEqual(second["candidates_this_conditions"], 20)
+            self.assertEqual(second["stop_reason"], "candidate_cap",
+                             "its OWN cap binds, and says so")
+            self.assertEqual(second["cap_counted"], 20)
+            self.assertEqual(second["total_candidates"], 47, "the union still serves both")
+            self.assertEqual(second["anti_correlation"]["observed"], [2])
+            served = self._bucket(cache, second["conditions_signature"], frame)
+            self.assertEqual(len(served), 20)
+            self.assertLessEqual(max(served), 2)
+            self.assertGreater(max(served), 0, "candidates built under k=2, not k=0 repeats")
+            self.assertNotEqual(first["conditions_signature"], second["conditions_signature"])
+
+    def test_a_k0_build_after_a_k2_build_to_its_cap_solves_and_serves_k0_candidates(self):
+        frame = self._frame()
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = bank_cache.BankCache(Path(tmp) / "bank.json")
+            first = self._extend(cache, frame, 2, 32, other_held=0)
+            self.assertEqual(first["built_this_slice"], 32)
+            second = self._extend(cache, frame, 0, 30, other_held=0)
+            self.assertEqual(second["built_this_slice"], 30)
+            self.assertGreater(second["attempted_this_slice"], 0)
+            self.assertEqual(second["anti_correlation"]["observed"], [0])
+            self.assertEqual(set(self._bucket(
+                cache, second["conditions_signature"], frame)), {0},
+                "every candidate the k=0 question added holds no hitter against a rostered SP")
+            # What this change does NOT do: the served bank is still the union,
+            # so the k=2 bucket is delivered beside it. The count is the fact
+            # the brief carries.
+            self.assertEqual(len(cache), 62)
+            self.assertEqual(cache.count_outside_buckets([second["conditions_signature"]]), 32)
+            self.assertGreater(max(self._bucket(
+                cache, first["conditions_signature"], frame)), 0)
+
+    def test_the_default_still_counts_the_whole_cache(self):
+        """A caller that passes no `other_held` gets the union count, which is
+        what a relative cap needs. Pinned so the fix cannot become a default
+        flip that quietly rewrites the sleeves."""
+        frame = self._frame()
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = bank_cache.BankCache(Path(tmp) / "bank.json")
+            self._extend(cache, frame, 0, 27)
+            starved = self._extend(cache, frame, 2, 20)
+            self.assertEqual((starved["attempted_this_slice"], starved["built_this_slice"],
+                              starved["stop_reason"]), (0, 0, "candidate_cap"))
+            self.assertEqual(starved["cap_scope"], "cache")
+            self.assertEqual(starved["cap_counted"], 27)
+            self.assertIsNone(starved["other_held"])
+
+    def test_a_relative_cap_still_adds_exactly_need_beside_a_large_bucket(self):
+        """The R406 sleeves pass `len(cache) + need`. Under the default count
+        that adds `need`, not `need` plus whatever another bucket holds."""
+        frame = self._frame()
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = bank_cache.BankCache(Path(tmp) / "bank.json")
+            self._extend(cache, frame, 0, 27)
+            sleeve = self._extend(cache, frame, 2, len(cache) + 5)
+            self.assertEqual(sleeve["built_this_slice"], 5)
+            self.assertEqual(sleeve["stop_reason"], "candidate_cap")
+            self.assertEqual(len(cache), 32)
+
+    # ---- the cap still binds where it should -------------------------------
+
+    def test_a_bucket_that_is_cap_bound_itself_still_stops_and_a_higher_cap_grows_it(self):
+        """R415's lever survives: the SAME question re-run on its own cap-bound
+        bucket gets zero solves, and raising the cap is what grows it."""
+        frame = self._frame()
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = bank_cache.BankCache(Path(tmp) / "bank.json")
+            first = self._extend(cache, frame, 0, 27, other_held=0)
+            again = self._extend(cache, frame, 0, 27, other_held=0)
+            self.assertEqual((again["attempted_this_slice"], again["built_this_slice"],
+                              again["stop_reason"], again["cap_counted"]),
+                             (0, 0, "candidate_cap", 27))
+            self.assertEqual(again["conditions_signature"], first["conditions_signature"])
+            raised = self._extend(cache, frame, 0, 40, other_held=0)
+            self.assertEqual(raised["built_this_slice"], 13)
+            self.assertEqual(raised["candidates_this_conditions"], 40)
+
+    def test_a_field_outside_the_signature_does_not_open_a_bucket(self):
+        frame = self._frame()
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = bank_cache.BankCache(Path(tmp) / "bank.json")
+            a = self._extend(cache, frame, 0, 10, other_held=0)
+            b = bank_cache.extend_bank(
+                cache, frame, time_budget_s=60, max_candidates=20,
+                max_opposing_hitters_per_sp=0, other_held=0, solver_time_limit_s=5)
+            self.assertEqual(a["conditions_signature"], b["conditions_signature"])
+            self.assertEqual(b["conditions_buckets_live"], 1)
+            self.assertEqual(b["candidates_this_conditions"], 20)
+
+    def test_a_cap_of_zero_and_of_one(self):
+        frame = self._frame()
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = bank_cache.BankCache(Path(tmp) / "bank.json")
+            zero = self._extend(cache, frame, 0, 0, other_held=0)
+            self.assertEqual((zero["attempted_this_slice"], zero["built_this_slice"],
+                              zero["stop_reason"]), (0, 0, "candidate_cap"))
+            one = self._extend(cache, frame, 0, 1, other_held=0)
+            self.assertEqual((one["built_this_slice"], one["stop_reason"]),
+                             (1, "candidate_cap"))
+            self.assertEqual(len(cache), 1)
+
+    def test_the_callers_other_buckets_count_and_a_negative_is_refused(self):
+        """A caller that holds `n` in its other buckets has `n` fewer to spend,
+        even when this bucket is empty: that is the share arithmetic."""
+        frame = self._frame()
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = bank_cache.BankCache(Path(tmp) / "bank.json")
+            full = self._extend(cache, frame, 0, 10, other_held=10)
+            self.assertEqual((full["attempted_this_slice"], full["built_this_slice"],
+                              full["candidates_this_conditions"], full["stop_reason"]),
+                             (0, 0, 0, "candidate_cap"))
+            part = self._extend(cache, frame, 0, 10, other_held=7)
+            self.assertEqual((part["built_this_slice"], part["cap_counted"]), (3, 10))
+            with self.assertRaises(ValueError):
+                self._extend(cache, frame, 0, 10, other_held=-1)
+
+    def test_two_slices_that_share_a_signature_are_not_counted_twice(self):
+        """Stack sizes can come out as [4, 4] (`five_stack_min_size` lowered to
+        the bank default), so a second slice can land in the first one's bucket.
+        As a bare count its bucket would be held twice and the slice starved at
+        half its cap; as a {signature: count} map its own entry is left out."""
+        frame = self._frame()
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = bank_cache.BankCache(Path(tmp) / "bank.json")
+            first = self._extend(cache, frame, 0, 30, other_held={})
+            sig = first["conditions_signature"]
+            self.assertEqual(first["candidates_this_conditions"], 30)
+            twice = self._extend(cache, frame, 0, 40, other_held=30)
+            self.assertEqual((twice["attempted_this_slice"], twice["built_this_slice"],
+                              twice["cap_counted"]), (0, 0, 60),
+                             "the integer form counts the shared bucket twice")
+            once = self._extend(cache, frame, 0, 40, other_held={sig: 30})
+            self.assertEqual(once["other_held"], 0, "its own entry is left out")
+            self.assertEqual((once["built_this_slice"], once["cap_counted"]), (10, 40))
+            # a DIFFERENT signature in the map still counts
+            other = self._extend(cache, frame, 2, 45, other_held={sig: 40})
+            self.assertEqual((other["other_held"], other["cap_counted"]), (40, 45))
+            self.assertEqual(other["built_this_slice"], 5)
+
+    def test_a_refused_other_held_touches_nothing(self):
+        frame = self._frame()
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = bank_cache.BankCache(Path(tmp) / "bank.json")
+            for bad in (-1, {"sigA": -1}):
+                with self.assertRaises(ValueError):
+                    self._extend(cache, frame, 0, 10, other_held=bad)
+            self.assertEqual(cache.conditions_index, {},
+                             "refused before the bucket was registered")
+            self.assertEqual(len(cache), 0)
+
+    def test_a_fresh_cache_builds_the_same_bank_with_or_without_other_held(self):
+        """The reason the argument is not a bare per-bucket count. build_slate
+        splits one cap across the five-stack and four-stack slices; counted per
+        bucket the union overshoots the cap, counted with `other_held` it is
+        the union the cap always bounded, candidate for candidate."""
+        frame = self._frame()
+
+        def run(mode):
+            with tempfile.TemporaryDirectory() as tmp:
+                cache = bank_cache.BankCache(Path(tmp) / "bank.json")
+                kw5 = {} if mode == "union" else {"other_held": 0}
+                five = self._extend(cache, frame, None, 30, stack_min=5, **kw5)
+                if mode == "union":
+                    kw4 = {}
+                elif mode == "bucket":
+                    kw4 = {"other_held": 0}
+                else:
+                    kw4 = {"other_held": five["candidates_this_conditions"]}
+                self._extend(cache, frame, None, 60, stack_min=4, **kw4)
+                return [tuple(e["roster"]) for e in cache.candidates]
+
+        union, held, bucket = run("union"), run("held"), run("bucket")
+        self.assertEqual(len(union), 60)
+        self.assertEqual(held, union, "identical rosters in identical order")
+        self.assertGreater(len(bucket), 60, "a bare per-bucket count overshoots the cap")
+
+    def test_no_player_is_removed_from_the_pool_by_the_cap(self):
+        """A cap reduces how many candidates a bucket adds and never which
+        players are legal: the frame handed to every solve is untouched, and a
+        capped and an uncapped build of the same bucket agree on their prefix."""
+        frame = self._frame()
+        before = frame.copy(deep=True)
+        with tempfile.TemporaryDirectory() as tmp:
+            capped = bank_cache.BankCache(Path(tmp) / "capped.json")
+            self._extend(capped, frame, 0, 10, other_held=0)
+            free = bank_cache.BankCache(Path(tmp) / "free.json")
+            self._extend(free, frame, 0, None)
+            self.assertEqual([e["roster"] for e in capped.candidates],
+                             [e["roster"] for e in free.candidates][:10])
+        pd.testing.assert_frame_equal(frame, before)
+
+    # ---- every caller that passes an absolute cap, enumerated (R233) -------
+
+    def test_every_cap_passing_caller_is_bucket_relative_or_named(self):
+        """The class is 'a caller passing an absolute `max_candidates` on the
+        shared cache', and there is one member (the sliced build door, twice).
+        A new one must decide its count, so this census fails on it."""
+        repo = Path(__file__).resolve().parents[1]
+        roots = [repo / "mlb_engine", repo / "tools", repo / "skills"]
+        found = {}
+        for root in roots:
+            for path in sorted(root.rglob("*.py")):
+                if any(part.startswith("_scratch") for part in path.parts):
+                    continue
+                src = path.read_text(encoding="utf-8")
+                if "extend_bank" not in src and "build_consensus_limited_jobs" not in src:
+                    continue
+                for node in ast.walk(ast.parse(src)):
+                    if not isinstance(node, ast.Call):
+                        continue
+                    fn = node.func
+                    name = fn.attr if isinstance(fn, ast.Attribute) else getattr(fn, "id", "")
+                    if name not in ("extend_bank", "build_consensus_limited_jobs"):
+                        continue
+                    kws = {k.arg: ast.get_source_segment(src, k.value) for k in node.keywords}
+                    if "max_candidates" not in kws:
+                        continue
+                    if "other_held" in kws:
+                        style = "bucket"
+                    elif "len(" in kws["max_candidates"]:
+                        style = "relative"
+                    else:
+                        style = "fresh_cache"
+                    found.setdefault(str(path.relative_to(repo)).replace("\\", "/"),
+                                     []).append((name, style))
+        self.assertEqual(found, {
+            "mlb_engine/pipeline/baseline.py": [("extend_bank", "fresh_cache")],
+            "mlb_engine/pipeline/execution_pipeline.py": [("extend_bank", "relative")] * 4,
+            "skills/generate-lineups/scripts/build_slate.py": [
+                ("extend_bank", "bucket"), ("build_consensus_limited_jobs", "bucket")],
+            "tools/benchmark_engine.py": [("extend_bank", "fresh_cache")],
+        })
+
+    # ---- the brief ---------------------------------------------------------
+
+    @staticmethod
+    def _build_slate():
+        return BankCapGrowthTests._build_slate()
+
+    def _sliced_report(self, slices, observed=()):
+        return {"anti_correlation": opt.anti_correlation_report(list(observed), requested=2),
+                "slices": slices}
+
+    def test_disagreement_fires_on_a_starved_slice_of_a_sliced_bank(self):
+        bs = self._build_slate()
+        starved = {"stack_min_requested": 4, "stop_reason": "candidate_cap",
+                   "candidates_this_conditions": 0, "cap_counted": 60,
+                   "max_candidates": 60, "job_class": None}
+        block = bs.anti_correlation_brief_block(2, self._sliced_report([starved]), {})
+        self.assertEqual(block["applied_source"], "sliced_bank")
+        self.assertEqual(block["solves_observed"], 0)
+        self.assertIn("nothing was solved for them", block["disagreement"])
+        self.assertIn("stack_min 4", block["disagreement"])
+        self.assertIn("--bank-max-candidates", block["disagreement"])
+        self.assertIn("counted [60] against [60]", block["disagreement"])
+        # the limited slice is named by its job class, and a healthy slice
+        # beside a starved one is not named at all
+        limited = dict(starved, job_class="consensus_limited", stack_min_requested=4)
+        healthy = {"stack_min_requested": 5, "stop_reason": "candidate_cap",
+                   "candidates_this_conditions": 30, "cap_counted": 30,
+                   "max_candidates": 30, "job_class": None}
+        both = bs.anti_correlation_brief_block(
+            2, self._sliced_report([healthy, limited]), {})["disagreement"]
+        self.assertIn("[consensus_limited]", both)
+        self.assertNotIn("stack_min 5", both)
+
+    def test_disagreement_is_silent_on_every_other_zero_solve_reading(self):
+        """Firing on `solves_observed == 0` alone would bring back the false
+        reading the 1835_5g fragment removed (the direct path has no bank)."""
+        bs = self._build_slate()
+        # the direct door and every unobserved source
+        for bank_report, result in (
+                (None, {}),
+                ({}, {}),
+                (None, {"bank_diagnostics": {
+                    "anti_correlation": opt.anti_correlation_report([], requested=2)}})):
+            block = bs.anti_correlation_brief_block(2, bank_report, result)
+            self.assertNotIn("disagreement", block, (bank_report, result))
+        # slices on a report the brief does not read as the sliced bank's: the
+        # solves came from the auto bank, so the source is not `sliced_bank`
+        starved = {"stack_min_requested": 4, "stop_reason": "candidate_cap",
+                   "candidates_this_conditions": 0, "cap_counted": 60, "max_candidates": 60}
+        auto = {"bank_diagnostics": {
+            "anti_correlation": opt.anti_correlation_report([], requested=2)}}
+        block = bs.anti_correlation_brief_block(2, {"slices": [starved]}, auto)
+        self.assertEqual(block["applied_source"], "auto_bank")
+        self.assertNotIn("disagreement", block)
+        # a sliced bank that ran no solves for a different reason
+        for other in ({"stop_reason": "time_budget", "candidates_this_conditions": 0},
+                      {"stop_reason": "candidate_cap", "candidates_this_conditions": 12},
+                      {"stop_reason": "candidate_cap", "candidates_this_conditions": None},
+                      {"stop_reason": "job_list_exhausted", "candidates_this_conditions": 0}):
+            block = bs.anti_correlation_brief_block(
+                2, self._sliced_report([{"stack_min_requested": 4, **other}]), {})
+            self.assertNotIn("disagreement", block, other)
+        # a sliced bank whose requesting slice did get solves
+        got = self._sliced_report(
+            [{"stack_min_requested": 4, "stop_reason": "candidate_cap",
+              "candidates_this_conditions": 20}], observed=[2, 2])
+        self.assertNotIn("disagreement", bs.anti_correlation_brief_block(2, got, {}))
+
+    def test_the_starved_slice_is_read_off_a_real_extend_bank_report(self):
+        """End to end for the field the line reads: a real starved call, merged
+        the way build_slate merges it, then the brief."""
+        bs = self._build_slate()
+        frame = self._frame()
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = bank_cache.BankCache(Path(tmp) / "bank.json")
+            rep = self._extend(cache, frame, 2, 10, other_held=10)
+        rep["stack_min_requested"] = 4
+        merged = bs._merge_bank_slice_reports([rep])
+        self.assertEqual(merged["slices"][0]["candidates_this_conditions"], 0)
+        self.assertEqual(merged["slices"][0]["cap_counted"], 10)
+        block = bs.anti_correlation_brief_block(2, merged, {})
+        self.assertIn("nothing was solved for them", block["disagreement"])
+        self.assertEqual(merged["bank_stop_reason"], "candidate_cap")
+
+    def test_the_brief_reads_every_slice_not_only_the_last(self):
+        """`_merge_bank_slice_reports` kept the last slice's `anti_correlation`,
+        so a five-stack slice at k=0 beside a four-stack slice at k=2 read as
+        agreement, and a starved last slice erased the earlier slices' solves."""
+        bs = self._build_slate()
+        acr = opt.anti_correlation_report
+        five = {"stack_min_requested": 5, "anti_correlation": acr([0, 0, 0], requested=2)}
+        four = {"stack_min_requested": 4, "anti_correlation": acr([2, 2], requested=2)}
+        merged = bs._merge_bank_slice_reports([five, four])["anti_correlation"]
+        self.assertEqual(merged["observed"], [0, 2])
+        self.assertEqual(merged["solves_observed"], 5)
+        self.assertIsNone(merged["applied"])
+        self.assertIsNone(merged["agrees_with_request"])
+        self.assertEqual(merged["requested"], 2)
+        block = bs.anti_correlation_brief_block(
+            2, bs._merge_bank_slice_reports([five, four]), {})
+        self.assertIn("solves ran at [0, 2]", block["disagreement"])
+        # a starved LAST slice keeps the earlier slice's evidence
+        starved = {"stack_min_requested": 4, "anti_correlation": acr([], requested=2)}
+        kept = bs._merge_bank_slice_reports([
+            {"stack_min_requested": 5, "anti_correlation": acr([2, 2], requested=2)},
+            starved])["anti_correlation"]
+        self.assertEqual((kept["applied"], kept["solves_observed"], kept["observed"]),
+                         (2, 2, [2]))
+        # one slice, or slices with no report, pass through untouched
+        one = bs._merge_bank_slice_reports([five])
+        self.assertEqual(one["anti_correlation"]["observed"], [0])
+        self.assertNotIn("anti_correlation", bs._merge_bank_slice_reports(
+            [{"stop_reason": "job_list_exhausted"}, {"stop_reason": "job_list_exhausted"}]))
+
+    def test_a_nonzero_unrequested_count_carries_its_own_reading(self):
+        bs = self._build_slate()
+        sliced = {"anti_correlation": opt.anti_correlation_report([0], requested=0),
+                  "slices": [], "served_from_unrequested_buckets": 32}
+        block = bs.anti_correlation_brief_block(0, sliced, {})
+        self.assertTrue(block["agrees_with_request"])
+        self.assertNotIn("disagreement", block, "a count is not a disagreement claim")
+        self.assertIn("32 candidate(s)", block["unmeasured"])
+        self.assertIn("did not solve for", block["unmeasured"])
+        self.assertIn("say nothing about them", block["unmeasured"])
+        sliced["served_from_unrequested_buckets"] = 0
+        self.assertNotIn("unmeasured", bs.anti_correlation_brief_block(0, sliced, {}))
+        self.assertNotIn("unmeasured", bs.anti_correlation_brief_block(0, None, {}))
+
+    def test_the_existing_disagreement_text_is_unchanged_when_it_stands_alone(self):
+        bs = self._build_slate()
+        block = bs.anti_correlation_brief_block(
+            3, {"anti_correlation": opt.anti_correlation_report([0, 0], requested=3)}, None)
+        self.assertEqual(
+            block["disagreement"],
+            "the build requested k=3 and its bank's solves ran at [0]; the delivered "
+            "candidates are NOT all built under the requested allowance")
+
+    def test_the_brief_carries_the_count_served_from_buckets_it_did_not_request(self):
+        bs = self._build_slate()
+        sliced = {"anti_correlation": opt.anti_correlation_report([0], requested=0),
+                  "slices": [], "served_from_unrequested_buckets": 32}
+        self.assertEqual(bs.anti_correlation_brief_block(
+            0, sliced, {})["served_from_unrequested_buckets"], 32)
+        self.assertIsNone(bs.anti_correlation_brief_block(
+            0, None, {"bank_diagnostics": {
+                "anti_correlation": opt.anti_correlation_report([0], requested=0)}}
+        )["served_from_unrequested_buckets"])
+        self.assertIsNone(bs.anti_correlation_brief_block(
+            0, None, {})["served_from_unrequested_buckets"])
+        # a count on a report whose solves the brief reads from another source
+        # is not this bank's fact
+        stray = bs.anti_correlation_brief_block(
+            0, {"served_from_unrequested_buckets": 9},
+            {"bank_diagnostics": {
+                "anti_correlation": opt.anti_correlation_report([0], requested=0)}})
+        self.assertEqual(stray["applied_source"], "auto_bank")
+        self.assertIsNone(stray["served_from_unrequested_buckets"])
+
+    def test_candidate_cap_is_not_reported_for_a_bank_that_was_never_cap_bound(self):
+        """The share-capped five-stack slice reads candidate_cap while the
+        four-stack slice stopped on the clock. A stale bucket inflating the
+        union must not turn that into a capped bank (the R415 lever would then
+        send the operator to raise a cap that never bound)."""
+        bs = self._build_slate()
+        five = {"stop_reason": "candidate_cap", "max_candidates": 30,
+                "job_list_exhausted": False, "cap_counted": 30, "total_candidates": 530}
+        four = {"stop_reason": "time_budget", "max_candidates": 60,
+                "job_list_exhausted": False, "cap_counted": 45, "total_candidates": 545}
+        self.assertEqual(bs.bank_stop_reason([five, four]), "time_budget")
+        four_capped = dict(four, stop_reason="candidate_cap", cap_counted=60)
+        self.assertEqual(bs.bank_stop_reason([five, four_capped]), "candidate_cap")
+        # a report from before R453 carries only the union, which was the count
+        legacy_four = {k: v for k, v in four.items() if k != "cap_counted"}
+        legacy_five = {k: v for k, v in five.items() if k != "cap_counted"}
+        self.assertEqual(bs.bank_stop_reason([legacy_five, legacy_four]), "candidate_cap")
+
+    def test_the_sliced_door_passes_the_argument_and_the_brief_reads_the_count(self):
+        src = (Path(__file__).resolve().parents[1] / "skills" / "generate-lineups"
+               / "scripts" / "build_slate.py").read_text(encoding="utf-8")
+        self.assertEqual(src.count("other_held=dict(_held_by_build),"), 2,
+                         "the ordinary slices and the consensus-limited slice")
+        self.assertIn("bank_report[\"served_from_unrequested_buckets\"] = "
+                      "cache.count_outside_buckets(", src)
+        self.assertIn('_held_by_build[_rep.get("conditions_signature")] = int(\n'
+                      '                _rep.get("candidates_this_conditions") or 0)', src,
+                      "each ordinary slice's own bucket count feeds the next call")
+        self.assertIn('_requested_sigs.add(_srep["conditions_signature"])', src,
+                      "a sleeve's bucket is one this build requested")
+        self.assertIn('bank_report.pop("other_held", None)', src)
+        self.assertIn('bank_report.pop("cap_scope", None)', src)
+        self.assertIn('bank_report["served_union_over_full_solve_ceiling"] = bool(', src)
+
+    def test_count_outside_buckets_counts_keyless_and_other_buckets(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = bank_cache.BankCache(Path(tmp) / "bank.json")
+            roster = lambda n: [f"p{n}_{i}" for i in range(10)]  # noqa: E731
+            cache.add(roster(0), 1.0, job="a|b||sigA")
+            cache.add(roster(1), 1.0, job="a|b||sigB")
+            cache.add(roster(2), 1.0)
+            self.assertEqual(cache.count_outside_buckets(["sigA"]), 2)
+            self.assertEqual(cache.count_outside_buckets(["sigA", "sigB"]), 1)
+            self.assertEqual(cache.count_outside_buckets([]), 3)
+
+
 class AutobuildBankCapTests(unittest.TestCase):
     """R415. autobuild raises a capped bank's cap on a refusal, as search effort.
 
