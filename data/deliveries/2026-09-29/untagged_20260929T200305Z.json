@@ -1,0 +1,36 @@
+{
+ "code": {
+  "contest_allocator": "v1.12",
+  "execution_pipeline": "v1.17",
+  "git_dirty": false,
+  "git_sha": "b1429b5afaa2420fe549a3f1ee14a6a55da4339b"
+ },
+ "date": "2026-09-29",
+ "exit_code": 3,
+ "host": {
+  "call_budget_s": 630.0,
+  "declared_ceiling_s": 900.0,
+  "host": "claude_code"
+ },
+ "kind": "refusal",
+ "labels": "a refusal is an observed build outcome, never a claim about the slate",
+ "recorded_utc": "2026-09-29T20:03:05.824399+00:00",
+ "refusal": {
+  "argv": [
+   "--date",
+   "2026-09-29",
+   "--parent-entries",
+   "outputs/2026-09-29/DKEntries_1400_4g.csv",
+   "--salary",
+   "data/slates/2026-09-29/a789b883-DKSalaries_MLB.csv",
+   "--lineups",
+   "data/slates/2026-09-29/lineups_feed_1602.json",
+   "--postures",
+   "195970831=wta_satellite,196052739=large_gpp",
+   "--budget",
+   "120"
+  ]
+ },
+ "schema_version": 1,
+ "slate_tag": ""
+}
