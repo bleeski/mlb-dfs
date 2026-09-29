@@ -41,7 +41,7 @@ import sys
 import time
 import urllib.request
 from pathlib import Path
-from typing import Any, Mapping, Optional
+from typing import Any, List, Mapping, Optional
 
 # F19: pinned before anything else runs, because the interpreter reads
 # PYTHONHASHSEED at startup and setting it later does nothing. This is the
@@ -8622,17 +8622,37 @@ def main() -> int:
                           "first_lock_local": signature["first_lock"]}
         if feed_note is not None:
             brief["lineups_feed"] = feed_note
-        out = Path(args.brief) if args.brief else (
-            REPO / "outputs" / args.date / f"build_brief{suffix}.json")
-        out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_text(json.dumps(brief, indent=1), encoding="utf-8")
-        # A second, slate-tagged copy so evidence survives a same-date rebuild even
-        # when the prior-slate preserve step did not run (same draftgroup, rerun).
-        if not args.brief:
-            out.with_name(f"build_brief{suffix}_{signature['tag']}.json").write_text(
-                json.dumps(brief, indent=1), encoding="utf-8")
+        write_brief_files(brief, brief_arg=args.brief,
+                          outputs_dir=REPO / "outputs" / args.date,
+                          suffix=suffix, tag=signature["tag"])
         print(json.dumps(brief, indent=1))
     return code
+
+
+def write_brief_files(brief: Mapping[str, Any], *, brief_arg: Optional[str],
+                      outputs_dir: Path, suffix: str, tag: str) -> List[Path]:
+    """R311(b). Write the build brief and return every path it wrote.
+
+    ``--brief <path>`` writes that one file and nothing else: the operator named
+    where the brief goes, so no copy is left in ``outputs/<date>/`` for a glob to
+    find. Without it the brief goes to ``build_brief<suffix>.json`` AND a
+    slate-tagged ``build_brief<suffix>_<tag>.json``, so evidence survives a
+    same-date rebuild when the prior-slate preserve step did not run (same
+    draftgroup, rerun). Neither name is an identity: a reader ties a brief to a
+    delivery by the ``run_id`` and ``delivered_sha256`` the brief carries
+    (``tools/retro.resolve_brief``), never by this filename or its position in
+    a sorted glob.
+    """
+    text = json.dumps(brief, indent=1)
+    out = Path(brief_arg) if brief_arg else outputs_dir / f"build_brief{suffix}.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(text, encoding="utf-8")
+    written = [out]
+    if not brief_arg:
+        tagged = out.with_name(f"build_brief{suffix}_{tag}.json")
+        tagged.write_text(text, encoding="utf-8")
+        written.append(tagged)
+    return written
 
 
 def _main_recording_refusals() -> int:

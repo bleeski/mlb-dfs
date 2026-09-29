@@ -23,7 +23,8 @@ WHAT IT READS. The R369 delivery record is the anchor, because it is tracked
 and survives the container. The brief is read beside it out of `outputs/<date>/`
 and is EPHEMERAL, which is exactly right for this tool: the retro runs in the
 session that built the slate, minutes after the hand-over, while the brief is
-still on disk. When it is gone the sections that need it say so by name rather
+still on disk. It is tied to the delivery by the `run_id` (else the
+`delivered_sha256`) both carry (R311(b)), never by its filename. When it is gone the sections that need it say so by name rather
 than coming back empty, because an empty section reads as "nothing was
 degraded".
 """
@@ -36,7 +37,7 @@ import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Optional, Sequence
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 REPO = Path(__file__).resolve().parents[1]
 if str(REPO) not in sys.path:
@@ -62,27 +63,112 @@ _FILE_SUFFIXES = ("json", "csv", "py", "md", "txt", "html", "log", "yml", "yaml"
 # inputs
 # ---------------------------------------------------------------------------
 
-def find_brief(root: Path, date: str, slate_tag: str) -> Optional[Path]:
-    """The brief for this delivery, most specific first.
+def _brief_run_ids(data: Mapping[str, Any]) -> frozenset:
+    """Every run a brief answers for: its own ``run_id`` and, on a baseline
+    brief written by a same-bytes rerun, the run of the live row it reused.
 
-    `build_slate.py` writes `build_brief<suffix>.json` and a second
-    slate-tagged copy `build_brief<suffix>_<tag>.json`, so evidence survives a
-    same-date rebuild. The tagged copy is preferred for that reason: on a date
-    with two draftgroups the bare name is whichever build ran last.
+    A rerun that rebuilds identical baseline bytes reuses the earlier row and
+    its file (`execution_pipeline._live_lineage_row_for_bytes`), so the delivery
+    record keeps the ORIGINAL run's id while the brief the rerun writes over
+    that file carries the NEW one and names the original in
+    ``baseline.reused_row.run_id``.
+    """
+    ids = {str(data.get("run_id") or "").strip()}
+    baseline = data.get("baseline")
+    reused = baseline.get("reused_row") if isinstance(baseline, Mapping) else None
+    if isinstance(reused, Mapping):
+        ids.add(str(reused.get("run_id") or "").strip())
+    return frozenset(i for i in ids if i)
+
+
+def resolve_brief(root: Path, date: str, run_id: Any, sha256: Any, *,
+                  lineage: Any) -> Tuple[Optional[Path], str]:
+    """``(path, how)``: the brief for THIS delivery, keyed on identity.
+
+    R311(b). A brief's filename and its place in a sorted glob are not an
+    identity. This used to prefer a tag glob, then the bare ``build_brief.json``
+    (whichever build ran last), then ``sorted[0]`` of everything, and on a date
+    with two draftgroups that read the other draftgroup's certified brief. The
+    delivery record and the brief both carry the identity, so the record's keys
+    are compared against what each brief says about itself:
+
+    * the record has a ``run_id``: a brief matches when its ``run_id`` (or the
+      run of the baseline row it reused, ``_brief_run_ids``) is equal.
+      A brief that carries NO ``run_id`` (written before the field was stamped)
+      matches only when its ``delivered_sha256`` equals the record's, and only
+      when no brief matched by ``run_id``. A brief with a DIFFERENT ``run_id``
+      never matches, whatever its bytes: a rebuild that re-delivers the same
+      file is another build.
+    * the record has no ``run_id`` (Showdown writes no ``runs/`` directory): a
+      brief matches on ``delivered_sha256`` alone.
+
+    Files are read in sorted order, which is determinism and not selection:
+    nothing is chosen by position or mtime. Zero matches returns ``None`` and
+    the reason names every brief present and the key that matched none; several
+    DISTINCT matches (byte-identical copies are one match) return ``None`` and
+    name them, because picking one is the failure this replaces. Ties are
+    narrowed by the record's sha (when it has a ``run_id``) and then by
+    ``lineage``, the closed vocabulary ``""`` / ``"baseline"`` that the delivery
+    row and the brief both carry: a Showdown build whose thesis ladder is not
+    presented stamps the baseline's sha on its main brief, so one sha names two
+    briefs and only the lineage says which is the baseline's.
     """
     base = root / "outputs" / str(date)
     if not base.is_dir():
-        return None
-    tag = str(slate_tag or "").strip()
-    if tag:
-        tagged = sorted(base.glob(f"build_brief*_{tag}.json"))
-        if tagged:
-            return tagged[0]
-    for name in ("build_brief.json",):
-        if (base / name).is_file():
-            return base / name
-    any_brief = sorted(base.glob("build_brief*.json"))
-    return any_brief[0] if any_brief else None
+        return None, f"no outputs/{date}/ directory"
+    run = str(run_id or "").strip()
+    sha = str(sha256 or "").strip().lower()
+    if not run and not sha:
+        return None, ("the delivery record carries neither a run_id nor a "
+                      "sha256, so no brief can be tied to it")
+    kind = str(lineage or "").strip()
+    rows: List[Tuple[Path, frozenset, str, str, str]] = []
+    unreadable: List[str] = []
+    for path in sorted(base.glob("build_brief*.json")):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            unreadable.append(path.name)
+            continue
+        if not isinstance(data, dict):
+            unreadable.append(path.name)
+            continue
+        rows.append((path, _brief_run_ids(data),
+                     str(data.get("delivered_sha256") or "").strip().lower(),
+                     json.dumps(data, sort_keys=True, default=str),
+                     str(data.get("lineage") or "").strip()))
+    if run:
+        key = f"run_id {run}"
+        hits = [r for r in rows if run in r[1]]
+        how = f"matched by run_id {run}"
+        if not hits and sha:
+            key = f"run_id {run} or delivered_sha256 {sha[:12]}"
+            hits = [r for r in rows if not r[1] and r[2] == sha]
+            how = (f"matched by delivered_sha256 {sha[:12]}: the brief carries no "
+                   f"run_id (written before the field was stamped)")
+        elif len(hits) > 1 and sha:
+            narrowed = [r for r in hits if r[2] == sha]
+            hits = narrowed or hits
+    else:
+        key = f"delivered_sha256 {sha[:12]}"
+        hits = [r for r in rows if r[2] == sha]
+        how = f"matched by delivered_sha256 {sha[:12]} (the record has no run_id)"
+    if len({r[3] for r in hits}) > 1:
+        same_lineage = [r for r in hits if r[4] == kind]
+        hits = same_lineage or hits
+    distinct = sorted({r[3] for r in hits})
+    if len(distinct) == 1:
+        return hits[0][0], how
+    present = ", ".join(r[0].name for r in rows) or "none"
+    if unreadable:
+        present += f"; unreadable: {', '.join(unreadable)}"
+    if not hits:
+        return None, (f"no brief in outputs/{date}/ carries {key} "
+                      f"(present: {present}); a brief is tied to a delivery by "
+                      f"identity, never by name or order")
+    return None, (f"AMBIGUOUS: {len(distinct)} different briefs in outputs/{date}/ "
+                  f"carry {key} ({', '.join(r[0].name for r in hits)}); "
+                  f"pass --brief to name one")
 
 
 def _parse_utc(value: Any) -> Optional[datetime]:
@@ -488,7 +574,11 @@ def retro(record: Mapping[str, Any], root: Path, brief_path: Optional[Path] = No
     row = record.get("manifest_row") or {}
     date = str(record.get("date") or "")
     tag = str(row.get("slate_tag") or "")
-    path = brief_path if brief_path is not None else find_brief(root, date, tag)
+    if brief_path is not None:
+        path, how = brief_path, "given by --brief"
+    else:
+        path, how = resolve_brief(root, date, row.get("run_id"), row.get("sha256"),
+                                  lineage=row.get("lineage"))
     brief: Optional[Dict[str, Any]] = None
     brief_note = ""
     if path is not None and Path(path).is_file():
@@ -498,7 +588,8 @@ def retro(record: Mapping[str, Any], root: Path, brief_path: Optional[Path] = No
         except (OSError, ValueError) as exc:
             brief_note = f"{path} is unreadable ({exc})"
     else:
-        brief_note = (f"no build_brief under outputs/{date}/; `outputs/` is "
+        brief_note = (f"no build_brief under outputs/{date}/ tied to this "
+                      f"delivery (see brief_resolution); `outputs/` is "
                       f"gitignored and a cloud container is reclaimed at session "
                       f"end, so run this in the session that built the slate, or "
                       f"pass --brief")
@@ -515,6 +606,7 @@ def retro(record: Mapping[str, Any], root: Path, brief_path: Optional[Path] = No
         "record_path": str(record.get("_path") or ""),
         "delivered_sha256": row.get("sha256"),
         "brief": brief_note,
+        "brief_resolution": how,
         "clock": clock(record, brief, handover_utc),
         "degraded_inputs": degraded_inputs(record, brief),
         "hand_passed_numbers": hand_passed_numbers(record, brief),
@@ -534,6 +626,7 @@ def render(facts: Mapping[str, Any]) -> str:
                f"({facts.get('contest_type') or 'classic'})")
     out.append(f"record: {facts.get('record_path') or 'unknown'}")
     out.append(f"brief:  {facts.get('brief')}")
+    out.append(f"        {facts.get('brief_resolution')}")
     out.append("")
 
     block = facts.get("clock") or {}
