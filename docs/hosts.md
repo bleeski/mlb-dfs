@@ -22,7 +22,7 @@ the things a program cannot probe.
 | **Roles** | DEV, ARCHIVE, BUILD | DEV | BUILD, ARCHIVE |
 | **Shell** | bash | PowerShell | bash |
 | **Call budget** | `repo_env.call_budget_s()`, ~630s | ~900s | 130s inner, ~180s real |
-| **Classic bank cap** (sliced door, R415) | `repo_env.bank_max_candidates()`: 12 per entry x budget/130s, ~58 at 630s, clamped to 1,536 (reached at 27 entries) | ~50 per entry from its 540s profile, clamped to 1,536 | 12 per entry (384 at 32 entries), the pre-R415 value |
+| **Classic bank cap** (sliced door, R415) | `repo_env.bank_max_candidates()`: 12 per entry x budget/130s, ~58 at 630s, clamped to 1,536 (reached at 27 entries); counted per build, so a second build that asks a new question adds up to the cap again and the served union can pass the ceiling (R453) | ~50 per entry from its 540s profile, clamped to 1,536 | 12 per entry (384 at 32 entries), the pre-R415 value |
 | **Full gate in one call** | yes, 4m45s measured 2026-09-23 | yes, ~9 min | no, use the split gate (`docs/cowork_sandbox.md`) |
 | **`rm`** | works | works | NO: `mv` into `_to_delete/` |
 | **`/tmp`** | persists across calls | use `python`, not bash idioms | per-call |

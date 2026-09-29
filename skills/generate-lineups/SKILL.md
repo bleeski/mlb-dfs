@@ -1010,7 +1010,13 @@ this file is the whole answer; run it rather than diagnosing an import error.
 
 **On exit 10 the bank is thin, not wrong.** Run the identical command again; each
 pass adds to it. When `solve.bank_stop_reason` is `candidate_cap`, a re-run cannot
-grow it past the cap: raise `--bank-max-candidates` (R415). Shrink the bank, never the pool.
+grow it past the cap: raise `--bank-max-candidates` (R415). The cap counts what THIS build
+holds, so a re-run that changes `--max-opposing-hitters-per-sp`, the five-stack request or
+the cluster limit gets its own solves on a cache an earlier build filled (R453); the bank
+it delivers from is still the union: `solve.bank.served_from_unrequested_buckets` (also on
+`anti_correlation`, with an `unmeasured` note) counts the candidates in buckets this run did
+not solve for, and `solve.bank.served_union_over_full_solve_ceiling` reads true when that
+union passes the 1,536 the full-bank retry was measured for. Shrink the bank, never the pool.
 Inside the governor's window, or when a re-run has less than the bank floor to
 spend, a thin bank that covers every reserved row is solved instead of returned
 (R390): status `bank_thin_delivered`, label `review_grade_bank_thin_delivered`,

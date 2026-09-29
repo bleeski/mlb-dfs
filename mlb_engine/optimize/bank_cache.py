@@ -54,7 +54,7 @@ import json
 import os
 import time
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, Union
 
 from mlb_engine.allocate.contest_allocator import ENTRY_ROSTER_SLOTS
 from mlb_engine.optimize.optimizer_v3 import (
@@ -210,6 +210,20 @@ class BankCache:
         """The distinct conditions signatures currently held in memory, sorted."""
         return sorted({_key_conditions(c.get("job")) for c in self.candidates
                        if c.get("job")})
+
+    def count_outside_buckets(self, conditions_sigs: Iterable[str]) -> int:
+        """R453. Stored candidates built under a conditions bucket NOT in ``conditions_sigs``.
+
+        ``as_candidates`` serves the union of every live bucket, so a caller that
+        asked for some questions can be handed answers to others (an earlier
+        build's, on a shared cache). This is how many, and it says nothing about
+        WHAT those buckets were built under: the signature is a hash. A keyless
+        candidate (a cache written before job keys carried a signature) belongs
+        to no bucket and counts as outside.
+        """
+        asked = {str(sig) for sig in conditions_sigs}
+        return sum(1 for c in self.candidates
+                   if _key_conditions(c.get("job")) not in asked)
 
     def drop_stale_jobs(self, conditions_sig: str, projection_digest: str = "") -> int:
         """Forget candidates and attempts built under a different pool truth.
@@ -733,6 +747,24 @@ def _leverage_kwargs(leverage: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
     return out
 
 
+def _normalize_other_held(
+        other_held: Optional[Union[int, Mapping[str, int]]]
+) -> Optional[Union[int, Dict[str, int]]]:
+    """R453. ``extend_bank``'s ``other_held`` as ``None``, a count, or a
+    ``{conditions signature: count}`` map, refused when any count is negative.
+    Called before anything in the cache is touched."""
+    if other_held is None:
+        return None
+    if isinstance(other_held, Mapping):
+        out = {str(sig): int(n) for sig, n in other_held.items()}
+        if any(n < 0 for n in out.values()):
+            raise ValueError(f"other_held counts must be >= 0, got {dict(other_held)}")
+        return out
+    if int(other_held) < 0:
+        raise ValueError(f"other_held must be >= 0, got {other_held}")
+    return int(other_held)
+
+
 def extend_bank(
     cache: BankCache,
     projections_df,
@@ -750,8 +782,26 @@ def extend_bank(
     max_selected_from: Optional[Tuple[Sequence[str], int]] = None,
     job_class: Optional[str] = None,
     stack_teams: Optional[Sequence[str]] = None,
+    other_held: Optional[Union[int, Mapping[str, int]]] = None,
 ) -> Dict[str, Any]:
     """Generate candidates across (SP pair, stack team) until the budget runs out.
+
+    R453. ``max_candidates`` is a ceiling on what the CALLER holds, and
+    ``other_held`` says which candidates count toward it. ``None`` (the default)
+    counts the whole cache, every conditions bucket under this projection
+    digest, which is what a caller passing a RELATIVE cap (``len(cache) +
+    need``, the R406 sleeves) means. An integer counts this call's own bucket
+    plus that many the caller already holds in its other buckets; a
+    ``{conditions signature: count}`` map does the same and leaves out the entry
+    for THIS call's own bucket, so two slices that share a signature (stack
+    sizes ``[4, 4]``) are never counted twice. The sliced build door passes the
+    map: without it a build that asks a NEW question
+    (another ``--max-opposing-hitters-per-sp``, a five-stack request, a cluster
+    limit) on a cache an earlier build filled to the cap gets zero solves for it
+    and is served the old bucket, silently. The cap still bounds the caller's
+    own bank; it stops counting answers to questions the caller did not ask.
+    Nothing here reads the player pool: a cap reduces how many candidates a
+    bucket may add and never which players are legal.
 
     R405(c). ``max_selected_from=(ids, m)`` solves every job in this call with
     at most ``m`` of ``ids`` together (``build_single_lineup``'s argument, m >=
@@ -785,6 +835,7 @@ def extend_bank(
     relaxation of it is counted in the report.
     """
     started = time.monotonic()
+    held = _normalize_other_held(other_held)  # R453: refused before the cache is touched
     lock_sig = _lock_signature(locked_slot_assignments)
     excl = [str(x) for x in (excludes or [])]
     conditions_sig = ""  # computed below, once the stack bounds are settled
@@ -815,8 +866,22 @@ def extend_bank(
         target=target, leverage=leverage, max_selected_from=max_selected_from,
         stack_teams=stack_teams)
     pool_digest = projection_digest(projections_df)
+    # R453. What the caller holds in buckets other than this call's own.
+    others: Optional[int] = None
+    if isinstance(held, dict):
+        others = sum(n for sig, n in held.items() if sig != conditions_sig)
+    elif held is not None:
+        others = held
     cache.register_conditions(conditions_sig, pool_digest)
     superseded = cache.drop_stale_jobs(conditions_sig, projection_digest=pool_digest)
+
+    # R453. What counts toward `max_candidates`, fixed once: every add below
+    # lands in THIS bucket (the job key ends with `conditions_sig`), so the
+    # bucket-scoped count is this base plus `built`, never a per-job re-scan.
+    cap_scope = "cache" if others is None else "bucket"
+    own_held_at_entry = (0 if others is None else sum(
+        1 for c in cache.candidates
+        if _key_conditions(c.get("job")) == conditions_sig))
 
     # R291(d) / R164's third member. The job grid is enumerated from the LEGAL
     # pool, not from every salary row. `build_single_lineup` drops an excluded
@@ -935,6 +1000,13 @@ def extend_bank(
 
     built = 0
     attempted_now = 0
+
+    def _cap_counted() -> int:
+        """R453. The figure `max_candidates` is compared against right now."""
+        if others is None:
+            return len(cache)
+        return others + own_held_at_entry + built
+
     worst = 0.0
     timed_out_jobs = 0
     time_limited_accepted = 0
@@ -961,7 +1033,7 @@ def extend_bank(
         key = _job_key(pair, team, lock_sig, conditions_sig)
         if key in cache.attempted:
             continue
-        if max_candidates is not None and len(cache) >= max_candidates:
+        if max_candidates is not None and _cap_counted() >= max_candidates:
             exhausted = False
             stopped_by = "candidate_cap"
             break
@@ -1084,6 +1156,14 @@ def extend_bank(
         # happened to leave behind, and the gap between the two is the whole
         # defect -- 1,007 stored, 8 solved, on 2026-08-03.
         "total_candidates": len(cache),
+        # R453. What `max_candidates` was compared against, and which count it
+        # was: `cache` is the union of every bucket (a relative-cap caller),
+        # `bucket` is this call's own bucket plus `other_held`. A slice that
+        # reads `candidate_cap` with `candidates_this_conditions` 0 was starved
+        # by its caller's other buckets, never by an earlier build's.
+        "cap_scope": cap_scope,
+        "cap_counted": _cap_counted(),
+        "other_held": others,
         "jobs_total": len(jobs),
         "jobs_attempted": done_here,
         "job_list_exhausted": job_list_exhausted,
