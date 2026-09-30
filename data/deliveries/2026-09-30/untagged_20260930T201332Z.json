@@ -1,0 +1,58 @@
+{
+ "code": {
+  "contest_allocator": "v1.12",
+  "execution_pipeline": "v1.17",
+  "git_dirty": true,
+  "git_sha": "8bb24871924f093ed3c81d5008fa27452e283c19"
+ },
+ "date": "2026-09-30",
+ "exit_code": 5,
+ "host": {
+  "call_budget_s": 630.0,
+  "declared_ceiling_s": 900.0,
+  "host": "claude_code"
+ },
+ "kind": "refusal",
+ "labels": "a refusal is an observed build outcome, never a claim about the slate",
+ "recorded_utc": "2026-09-30T20:13:32.112961+00:00",
+ "refusal": {
+  "argv": [
+   "--date",
+   "2026-09-30",
+   "--parent-entries",
+   "runs/20260930T174941Z_ee8804ed/final/DKEntries.csv",
+   "--salary",
+   "/root/.claude/uploads/da6427ab-bd8d-5ef9-b692-c8a526fa65a1/e410cf2e-DKSalaries.csv",
+   "--lineups",
+   "/tmp/claude-0/-home-user-mlb-dfs/da6427ab-bd8d-5ef9-b692-c8a526fa65a1/scratchpad/lineups_feed.json",
+   "--entry-ids",
+   "5276514417,5276514472,5276520248,5276520574",
+   "--budget",
+   "60",
+   "--solver-budget",
+   "60"
+  ],
+  "last_usable_artifact": {
+   "contest_type": "classic",
+   "coverage": {
+    "filled": 10,
+    "reserved": 10
+   },
+   "date": "2026-09-30",
+   "label": "certified",
+   "lineage": "late_swap",
+   "path": "/home/user/mlb-dfs/outputs/2026-09-30/DKEntries_lateswap_1400_4g_5f755611.csv",
+   "preflight_command": "tools/preflight_upload.py --entries /home/user/mlb-dfs/outputs/2026-09-30/DKEntries_lateswap_1400_4g_5f755611.csv --parent runs/20260930T174941Z_ee8804ed/final/DKEntries.csv --expect-sha256 9dd53a69589d",
+   "referee": {
+    "error": null,
+    "exit": 2,
+    "ran": true,
+    "verdict": "blocked"
+   },
+   "run_id": "20260930T201331Z_5f755611",
+   "sha256": "9dd53a69589d744404330b593d648501b5d2fa15efa2f3c8bc8efa9db2f9cc6d"
+  }
+ },
+ "schema_version": 1,
+ "slate_tag": ""
+}
