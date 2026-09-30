@@ -19,6 +19,10 @@ from typing import List, Optional
 
 DEFAULT_INBOX = "data/standings/inbox"
 _DIGITS = re.compile(r"\d+")
+# R227(a): a DK export zip holds one standings CSV. The cap stops a corrupt or
+# mis-zipped folder from extracting hundreds of members into the inbox; it is
+# prevention against a bad download, not a defence against an adversary.
+MAX_CSV_MEMBERS = 64
 
 
 def infer_contest_id(name: str) -> str:
@@ -35,6 +39,8 @@ def extract_zip(zip_path: Path, dest: Optional[Path] = None, overwrite: bool = F
     out: List[Path] = []
     with zipfile.ZipFile(zip_path) as zf:
         members = [m for m in zf.infolist() if not m.is_dir() and m.filename.lower().endswith(".csv")]
+        if len(members) > MAX_CSV_MEMBERS:
+            raise ValueError(f"ZIP holds {len(members)} CSV members, above the {MAX_CSV_MEMBERS} cap")
         names = [m.filename.replace("\\", "/").rsplit("/", 1)[-1] for m in members]
         if len(names) != len(set(n.casefold() for n in names)):
             raise ValueError("ZIP contains colliding CSV basenames")

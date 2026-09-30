@@ -25,8 +25,8 @@ Design constraints, all deliberate:
   - one definition per fact. Batting order comes from the engine's own R143
     ranking (``merge_dk_starting_into_feed`` then
     ``build_status_map_from_lineups_feed``), the total split from
-    ``projection_builder.implied_team_totals``, actual %Drafted from
-    ``field_miner.own_by_player_norm``, the join key from
+    ``projection_builder.implied_team_totals``, actual ownership from
+    ``field_miner.rostered_by_player_norm`` (R341: the entry block, not DK's column), the join key from
     ``field_miner.normalize_name``, and the CPT/UTIL role collapse from
     ``slate_intake_manager.collapse_showdown_roles``. This tool re-derives
     none of them
@@ -781,7 +781,15 @@ def _flat_budget_pairs(joined_ids: Sequence[str],
 
 
 def actuals_from_standings(standings_csv: str | Path) -> Tuple[Dict[str, float], Dict[str, Any]]:
-    """{normalized name: actual %Drafted} from a DK standings export.
+    """{normalized name: actual % of complete lineups rostering the player}.
+
+    R341. The actuals are recomputed from the ENTRY BLOCK
+    (``field_miner.rostered_by_player_norm``), not read from DK's ``%Drafted``
+    column. The column carries one roster slot's usage per player and drops the
+    other slot of a multi-eligible bat (Ohtani 13.75 against 27.50 recomputed),
+    so grading a prior against it scores the prior against the players most
+    likely to be multi-eligible with their ownership cut in half. The function
+    keeps its name for its callers; the evidence block says which basis it is.
 
     R235(b). ``contest_type`` is READ off the miner's own parse, never
     re-derived here. This function used to call ``detect_contest_type`` a
@@ -795,11 +803,14 @@ def actuals_from_standings(standings_csv: str | Path) -> Tuple[Dict[str, float],
     fact where it had quietly grown a second implementation.
     """
     from mlb_engine.field.field_miner import (
-        own_by_player_norm, parse_standings_export,
+        own_by_player_norm, parse_standings_export, rostered_by_player_norm,
     )
     standings = parse_standings_export(str(standings_csv))
-    own = own_by_player_norm(standings["player_table"])
+    own, denominator = rostered_by_player_norm(standings["entries"])
     meta = {
+        "ownership_basis": "entry_block_recompute",
+        "rostered_denominator": denominator,
+        "dk_column_players": len(own_by_player_norm(standings["player_table"])),
         "path": str(standings_csv),
         "contest_type": str(standings.get("contest_type") or "unknown"),
         "contest_type_source": "field_miner.parse_standings_export",
@@ -1087,7 +1098,8 @@ def _grade_cli(args: argparse.Namespace) -> int:
         return 2
     actual, meta = actuals_from_standings(standings)
     if not actual:
-        print(f"REFUSED: {standings} yielded no %Drafted rows", file=sys.stderr)
+        print(f"REFUSED: {standings} yielded no complete lineups to recompute ownership from",
+              file=sys.stderr)
         return 2
     try:
         grade = grade_prediction(prediction, actual, args.archetype,

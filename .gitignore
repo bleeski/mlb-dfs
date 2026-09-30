@@ -177,3 +177,6 @@ docs/greenfield/*/schema_inventory.json
 # are this machine's and never history.
 .claude/settings.local.json
 CLAUDE.local.md
+
+# R227: a quarantined registry (load_json_or_quarantine moves it aside, never deletes it)
+*.corrupt-*

@@ -108,6 +108,13 @@ ROSTER_CONTRACTS = {
 # contest. Past this share the likelier explanation is that the roster contract
 # is wrong, and archiving would record a field that was never read.
 MAX_UNPARSED_ENTRY_SHARE = 0.20
+# R341: DK's %Drafted may sit BELOW the entry-block recompute (it drops half of a
+# player whose two slot counts tie) but never above it: over all 614 archived
+# mined JSONs, including 281 with unparsed entries, the largest excess is 0.01
+# point on DK's own denominator. One lost lineup moves a player by 100 / entries
+# points, so 0.1 catches a single lost lineup in a field up to 1,000 entries and
+# is ten times the observed noise. It is a structural gate, like the unparsed share.
+OWNERSHIP_PARSE_SUSPECT_PTS = 0.1
 AT_CAP_SALARY_LEFT = 100          # policy constant: "at the cap" band, dollars left
 SALARY_LEFT_BINS = (0, 100, 300, 700, 1500)  # bin edges for the salary-left histogram
 
@@ -348,6 +355,94 @@ def own_by_player_norm(player_table: Sequence[Mapping[str, Any]]) -> Dict[str, f
             continue
         rows[str(record.get("player_norm") or "")].append(float(pct))
     return {name: round(sum(values), 2) for name, values in sorted(rows.items())}
+
+
+def rostered_by_player_norm(entries: Sequence[Mapping[str, Any]]) -> Tuple[Dict[str, float], int]:
+    """({normalized name: % of complete lineups rostering the player}, denominator). R341.
+
+    Ownership truth is the ENTRY BLOCK, not DK's ``%Drafted`` column. DK's
+    right-hand table has one row per (player, roster slot) or one row per player
+    with the combined usage, and both sum correctly; but when a player used two
+    slots EQUALLY often DK keeps one row and drops the other, so the survivor is
+    exactly half the truth (Ohtani 13.75 against 27.50; over the 610 archived
+    standings, 309 of 309 short rows are exactly half and every player with
+    unequal slot counts sums right). Every other row matches this recompute to
+    within 0.0136 at every field size up to 47,562 entries, on DK's own
+    denominator (all entries, blank ones included). Counting lineups needs no
+    row and no slot, so it is exact under every export shape. A player counts once per lineup whichever role they fill (a
+    Showdown captain and a Showdown UTIL are one person).
+
+    The denominator is the complete lineups: a blank or unparsed entry rostered
+    nobody, so it is excluded here and counted by the caller (``n_all - n``).
+    DK's own denominator includes them, so on a contest with withdrawn entries
+    this figure sits above DK's scale by ``n_all / n`` (about 1.5 points on a
+    43% player in a 148-entry field with 5 blanks); the DK comparison in
+    ``diagnostics`` is made on DK's denominator for that reason. A player nobody rostered is absent, not 0.0, the same
+    convention as ``own_by_player_norm``. Returns ``({}, 0)`` on no complete
+    lineup rather than dividing by zero.
+    """
+    counts: Counter = Counter()
+    n = 0
+    for entry in entries or []:
+        if not entry.get("lineup_complete"):
+            continue
+        n += 1
+        for name in set(entry.get("players_norm") or ()):
+            counts[str(name)] += 1
+    if not n:
+        return {}, 0
+    return {name: round(100.0 * c / n, 2) for name, c in sorted(counts.items())}, n
+
+
+def lineup_identity_groups(
+    entries: Sequence[Mapping[str, Any]],
+    contest_type: str,
+    *,
+    strict: bool,
+) -> Tuple[Dict[Tuple[str, ...], List[str]], str]:
+    """({identity key: [entry ids]}, basis) for every duplication count. R225.
+
+    ONE identity function for the miner's three duplication sites
+    (``mine_contest``, ``summarize_own_entries``, ``update_registry``). A
+    Showdown lineup is a captain plus a person set: two entries with the same
+    six people and different captains differ in salary and in score, so they
+    are two lineups. Classic has no captain and ``players_norm`` is a complete
+    identity. The key for a Showdown entry is
+    ``("CPT", captain_norm, "PLAYERS", *players_norm)``, which is what
+    ``mine_contest`` has keyed on since R338, so stored ``duplication`` blocks
+    do not move. ``tools/preflight_upload.advisory`` keys the same identity over
+    its own cell shape (R444); the two agree on the KEY, not on the code.
+
+    ``strict`` is ``mine_contest``'s mode: it parses the lineups itself, so a
+    Showdown entry without a captain is a parser fault and raises. The archive
+    readers pass ``strict=False``: 91 of 249 archived Showdown JSONs (mined
+    2026-07-17 to 08-06, version 0.5-review) carry no ``captain_norm``, and for
+    those the only honest count is the person set, which OVERSTATES duplication.
+    The basis comes back as ``person_set_captain_absent`` so the caller labels
+    it instead of presenting it as a lineup count. A Showdown file with SOME
+    captains missing takes the same fallback for every entry, so one file never
+    mixes two identities.
+
+    ``basis``: ``captain_aware`` (Showdown, every entry carries a captain) or
+    ``person_set`` (Classic, where it is exact) or ``person_set_captain_absent``.
+    """
+    showdown = str(contest_type or "").lower() == "showdown"
+    missing = [str(e.get("entry_id")) for e in entries if showdown and not e.get("captain_norm")]
+    if missing and strict:
+        raise ValueError(
+            f"Showdown entry without a captain: {len(missing)} entries "
+            f"(first {missing[0]}). The parse marks CPT on every complete "
+            "Showdown lineup, so this is a parser fault, not a data gap.")
+    captain_aware = showdown and not missing
+    groups: Dict[Tuple[str, ...], List[str]] = defaultdict(list)
+    for e in entries:
+        people = tuple(e["players_norm"])
+        key = (("CPT", str(e["captain_norm"]), "PLAYERS", *people)
+               if captain_aware else people)
+        groups[key].append(str(e.get("entry_id")))
+    basis = ("captain_aware" if captain_aware
+             else "person_set_captain_absent" if showdown else "person_set")
+    return dict(groups), basis
 
 
 # ---------------------------------------------------------------------------
@@ -921,6 +1016,48 @@ def degraded_entry_flags(
     return out
 
 
+WINNER_OBSERVED = "OBSERVED"
+WINNER_TIED = "TIED"
+WINNER_UNKNOWN = "UNKNOWN_NO_RANK_ONE"
+
+
+def _rank_int(entry: Mapping[str, Any]) -> Optional[int]:
+    try:
+        return int(str(entry.get("rank")).strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def select_winner(entries: Sequence[Mapping[str, Any]]) -> Tuple[Optional[Mapping[str, Any]], str, int]:
+    """(winner entry or None, state, rank-1 row count). R226.
+
+    The winner is the VERIFIED rank-1 row, not the max-points entry among the
+    lineups that happened to parse. ``complete`` drops an unparseable lineup, so
+    the old selection shifted ``winning_points`` and ``winner_copies`` to the
+    runner-up whenever the rank-1 lineup was the unparseable one, and labelled
+    that an observed winner. Three states, none of them a substitution:
+
+    ``OBSERVED``            exactly one rank-1 row and it is a complete lineup with points.
+    ``TIED``                two or more rank-1 rows, at least one complete; the winner is
+                            the highest-points complete one, first in file order
+                            (DK's own order) on equal points.
+    ``UNKNOWN_NO_RANK_ONE`` no rank-1 row, or none of them is a complete lineup with
+                            points. The winner is None: the archive says it does
+                            not know rather than naming the runner-up.
+
+    No instance exists in the 610 archived standings at HEAD (rank 1 is always
+    the max-points complete entry, 47 ties resolve to the first row), so this
+    changes no stored number; it closes the path by which one could appear.
+    """
+    rank_one = [e for e in entries if _rank_int(e) == 1]
+    usable = [e for e in rank_one if e.get("lineup_complete") and e.get("points") is not None]
+    if not usable:
+        return None, WINNER_UNKNOWN, len(rank_one)
+    best = max(e["points"] for e in usable)
+    winner = next(e for e in usable if e["points"] == best)
+    return winner, (WINNER_OBSERVED if len(rank_one) == 1 else WINNER_TIED), len(rank_one)
+
+
 def mine_contest(
     standings: Dict[str, Any],
     salary_map: Optional[Dict[str, Dict[str, Any]]] = None,
@@ -971,6 +1108,12 @@ def mine_contest(
 
     complete = [e for e in entries if e["lineup_complete"]]
     unmatched_names: Counter = Counter()
+    # R341: ownership recomputed from the entry block, beside (never instead of)
+    # DK's column. ``own_by_norm`` (DK's, summed to player grain) is stripped
+    # before the JSON is written (``main``'s ``slim``), so on disk DK's column is
+    # ``player_table`` and the ``pct_drafted`` cells; ``rostered_by_norm`` is NOT
+    # in the strip list and is archived.
+    rostered, rostered_denominator = rostered_by_player_norm(complete)
 
     for e in complete:
         sal_used, team_counts, sp = 0, Counter(), []
@@ -1014,29 +1157,44 @@ def mine_contest(
             if fully_joined and top else None)
         e["primary_stack_size"] = (top[0][1] if top else 0) if fully_joined else None
         owned = [own[normalize_name(n)] for _, n in e["lineup"] if normalize_name(n) in own]
+        # R341, deliberately NOT moved: ``chalk_score`` is the mean of DK's column
+        # (``own``), archived per entry and accumulated into the registry's
+        # ``avg_chalk_score``; changing the basis under an unversioned key would
+        # mix two bases in one average. ``rostered_by_norm`` + ``players_norm``
+        # recompute it on the entry-block basis for anyone who wants that.
         e["chalk_score"] = round(statistics.fmean(owned), 2) if owned else None
         e["n_cheap"] = sum(
             1 for _, n in e["lineup"]
             if smap.get(normalize_name(n), {}).get("salary", 10 ** 9) <= cheap_threshold
         ) if has_salary else None
 
-    # Captain is scoring-bearing; interchangeable UTIL order is not.
-    def duplication_key(entry):
-        captain = tuple(normalize_name(name) for slot, name in entry["lineup"] if slot == "CPT")
-        return ("CPT", *captain, "PLAYERS", *entry["players_norm"]) if captain else entry["players_norm"]
-
-    dup_groups: Dict[Tuple[str, ...], List[str]] = defaultdict(list)
-    for e in complete:
-        dup_groups[duplication_key(e)].append(e["entry_id"])
+    # Captain is scoring-bearing; interchangeable UTIL order is not. One identity
+    # function for every miner duplication count (R225).
+    dup_groups, _dup_basis = lineup_identity_groups(complete, contest_type, strict=True)
     copies_hist = Counter(len(v) for v in dup_groups.values())
     n_dup_entries = sum(len(v) for v in dup_groups.values() if len(v) > 1)
     max_copies = max((len(v) for v in dup_groups.values()), default=0)
-    winner = min(
-        (e for e in complete if e["points"] is not None),
-        key=lambda e: (-(e["points"] or 0.0)),
-        default=None,
-    )
-    winner_copies = len(dup_groups.get(duplication_key(winner), [])) if winner else 0
+    winner, winner_state, winner_rank1_rows = select_winner(entries)
+    winner_copies = 0
+    if winner:
+        winner_key = next(k for k, ids in dup_groups.items() if str(winner["entry_id"]) in ids)
+        winner_copies = len(dup_groups[winner_key])
+
+    # R341: realized primary-stack team share. The denominator is every fully
+    # joined complete lineup, including those with no primary stack (""), so the
+    # shares and ``no_primary_stack`` sum to 100.
+    primary_stack_team_share: Optional[Dict[str, Any]] = None
+    if has_salary:
+        joined_lineups = [e for e in complete if e.get("primary_stack_size") is not None]
+        team_counts_all = Counter(e["primary_stack_team"] for e in joined_lineups
+                                  if e.get("primary_stack_team"))
+        n_joined_lineups = len(joined_lineups)
+        primary_stack_team_share = {
+            "denominator": n_joined_lineups,
+            "no_primary_stack": n_joined_lineups - sum(team_counts_all.values()),
+            "teams": {t: round(100.0 * c / n_joined_lineups, 2)
+                      for t, c in sorted(team_counts_all.items())} if n_joined_lineups else {},
+        }
 
     # Field-frequency tables.
     sp_pair_freq = Counter(e["sp_pair"] for e in complete if len(e["sp_pair"]) == 2)
@@ -1048,9 +1206,12 @@ def mine_contest(
         )
     else:
         stack_hist, salary_left_hist, at_cap_n = Counter(), Counter(), None
+    # R341: ranked on the recompute. DK's column understates every player it
+    # lists at one of two slots, so ranking on it reorders the chalk. A
+    # recomputed name the table never listed falls back to its own spelling.
     top_owned = sorted(
-        ((disp[nm], pct) for nm, pct in own.items()),
-        key=lambda t: -t[1],
+        ((disp.get(nm, nm), nm, pct) for nm, pct in rostered.items()),
+        key=lambda t: (-t[2], t[1]),
     )[:5]
 
     # R39: the captain table, per contest, so the measurement is standing rather
@@ -1069,6 +1230,7 @@ def mine_contest(
             # 3.18 comparison is captain-share against roster-share, so both
             # numbers have to sit on the same row or the reader recomputes it.
             "pct_drafted": own.get(nm),
+            "pct_rostered": rostered.get(nm),
         }
         for nm, count in captain_freq.most_common(8)
     ]
@@ -1078,6 +1240,7 @@ def mine_contest(
         winner_captain = {
             "player": disp.get(wc, wc),
             "pct_drafted": own.get(wc),
+            "pct_rostered": rostered.get(wc),
             "captain_share_pct": (round(100.0 * captain_freq[wc] / n_captained, 1)
                                   if n_captained else None),
             # 22 of 85 in the 3.18 sample, so it is neither rare nor the norm;
@@ -1103,6 +1266,27 @@ def mine_contest(
         own_recompute_max_diff, own_denominator = min(candidates)
     else:
         own_recompute_max_diff, own_denominator = None, None
+
+    # R341: where DK's column parts from the recompute, per player, on DK's OWN
+    # denominator (every entry, blank ones included) so that only DK's omission
+    # shows and withdrawn entries cannot. DK only ever UNDERSTATES (it drops one
+    # of a player's two slot rows when the slots tie, leaving exactly half), so an
+    # understatement is the expected condition and a player DK lists ABOVE the
+    # recompute is the parse-failure signal: a parse that lost lineups lowers the
+    # recompute at every player at once.
+    on_dk_scale = {nm: (100.0 * c / n_all if n_all else 0.0) for nm, c in roster_counts.items()}
+    dk_gaps = sorted(
+        ((round(on_dk_scale.get(nm, 0.0) - pct, 2), nm) for nm, pct in own.items()),
+        key=lambda t: (-t[0], t[1]))
+    dk_understated = [
+        {"player": disp.get(nm, nm), "pct_drafted": own.get(nm),
+         "pct_rostered": rostered.get(nm, 0.0),
+         "pct_of_all_entries": round(on_dk_scale.get(nm, 0.0), 2), "gap_pts": gap}
+        for gap, nm in dk_gaps if gap > 1.5][:10]
+    dk_overstated_max = max((-gap for gap, _ in dk_gaps), default=None)
+    dk_overstated_max = round(max(dk_overstated_max, 0.0), 2) if dk_overstated_max is not None else None
+    ownership_parse_suspect = bool(dk_overstated_max is not None
+                                   and dk_overstated_max > OWNERSHIP_PARSE_SUSPECT_PTS)
 
     # v0.4 verification split. Two distinct questions were previously conflated:
     #   (a) is OUR parse structurally sound? Hard gate; a real parse bug blocks
@@ -1159,6 +1343,7 @@ def mine_contest(
         and not mostly_unparsed
         and not contest_type_mismatch
         and not salary_join_collapsed
+        and not ownership_parse_suspect
     )
     denom_used = n_all if own_denominator == "all_entries" else n_complete
     recomputed_total_pct = round(100.0 * observed_slots / denom_used, 1) if denom_used else None
@@ -1196,6 +1381,13 @@ def mine_contest(
             f"{MAX_UNPARSED_ENTRY_SHARE:.0%} tolerance. Withdrawn and zeroed entries "
             "are expected at low rates; this is too many to be that. "
             "Do not archive anything downstream of this parse.")
+    elif ownership_parse_suspect:
+        verification_note = (
+            f"PARSE FAILURE: DK's %Drafted lists a player {dk_overstated_max} pts ABOVE the "
+            "count over the parsed lineups, on DK's own denominator. DK's table can sit below "
+            "that count (it drops a player's second slot row when his slots tie) but never "
+            f"above it (tolerance {OWNERSHIP_PARSE_SUSPECT_PTS} pt), so lineups were lost or "
+            "misparsed. Do not archive anything downstream of this parse.")
     elif not parse_structural_ok:
         verification_note = ("PARSE FAILURE: structural check failed "
                              f"(slots {observed_slots} vs expected {expected_slots}, "
@@ -1226,6 +1418,9 @@ def mine_contest(
             "entries_unparsed": unparsed,
             "winning_points": winner["points"] if winner else None,
             "winning_entry_id": winner["entry_id"] if winner else None,
+            # R226: OBSERVED / TIED / UNKNOWN_NO_RANK_ONE, never the runner-up.
+            "winner_state": winner_state,
+            "winner_rank1_rows": winner_rank1_rows,
             "multi_entry_flag": any(e["declared_max_entries"] > 1 for e in entries),
         },
         "duplication": {
@@ -1247,7 +1442,15 @@ def mine_contest(
                 {"pair": list(p), "count": c, "field_share_pct": round(100.0 * c / n_complete, 1)}
                 for p, c in sp_pair_freq.most_common(8)
             ] if n_complete else [],
-            "top_owned": [{"player": n, "pct_drafted": v} for n, v in top_owned],
+            # R341: ``pct_rostered`` is the recompute over complete lineups;
+            # ``pct_drafted`` is DK's column for the same player, None when the
+            # export lists no share, kept so the two can be read side by side.
+            "top_owned": [{"player": n, "pct_rostered": v, "pct_drafted": own.get(nm)}
+                          for n, nm, v in top_owned],
+            # R341: realized primary-stack team share, over fully joined complete
+            # lineups. Observed counts, never a prediction; None without a salary
+            # join, because the team of a hitter comes from the salary file.
+            "primary_stack_team_share": primary_stack_team_share,
             # R39. Empty on Classic, which has no captain slot.
             "captain_table": captain_table,
             "winner_captain": winner_captain,
@@ -1259,6 +1462,14 @@ def mine_contest(
             "ownership_recompute_max_diff_pts": own_recompute_max_diff,
             "ownership_recompute_denominator": own_denominator,
             "ownership_recompute_ok": dk_table_agrees,
+            # R341. The check the runbook reads is ON DK: a gap where DK sits
+            # below the recompute is DK's missing slot (expected on a multi-
+            # eligible bat); DK above the recompute is the parse failure.
+            "rostered_denominator": rostered_denominator,
+            "rostered_entries_excluded": n_all - n_complete,
+            "dk_understated_players": dk_understated,
+            "dk_overstated_max_pts": dk_overstated_max,
+            "ownership_parse_suspect": ownership_parse_suspect,
             "parse_structural_ok": parse_structural_ok,
             # The individual reasons, so the caller can pin an exit code per
             # failure mode instead of re-deriving it from the note text.
@@ -1294,6 +1505,10 @@ def mine_contest(
         ],
         "player_table": ptable,
         "own_by_norm": own,
+        # R341: the entry-block recompute, % of complete lineups. Additive; a
+        # reader that wants ownership reads this and falls back to
+        # ``rostered_by_player_norm(entries)`` on an older file.
+        "rostered_by_norm": rostered,
         "fpts_by_norm": fpts,
     }
 
@@ -1351,7 +1566,8 @@ def score_duplication_risk(
         features["modal_field_stack"] = modal_stack
         if modal_stack is not None and max_stack is not None and max_stack == int(modal_stack):
             flags.append("modal_stack_size")
-        own = field.get("own_by_norm", {})
+        # R341: the entry-block recompute when the mined file carries it.
+        own = field.get("rostered_by_norm") or field.get("own_by_norm", {})
         owned = [own[normalize_name(n)] for n in player_names if normalize_name(n) in own]
         features["chalk_score_vs_field"] = round(statistics.fmean(owned), 2) if owned else None
         sp_pairs = {tuple(x["pair"]): x["field_share_pct"] for x in field.get("construction", {}).get("sp_pair_top", [])}
@@ -1525,23 +1741,18 @@ def summarize_own_entries(
                 "note": "none of the supplied entry ids appear in this contest's "
                         "standings; check the contest id"}
 
-    def _rank(entry) -> Optional[int]:
-        try:
-            return int(str(entry.get("rank")).strip())
-        except (TypeError, ValueError):
-            return None
-
-    ranks = [r for r in (_rank(e) for e in mine) if r is not None]
+    ranks = [r for r in (_rank_int(e) for e in mine) if r is not None]
     points = [e["points"] for e in mine if e.get("points") is not None]
     # Duplication against the field, which is the number that matters in a
     # satellite: clearing the cut line undbuplicated is the whole game.
-    groups: Dict[Tuple[str, ...], List[str]] = defaultdict(list)
-    for entry in all_entries:
-        groups[tuple(entry["players_norm"])].append(str(entry.get("entry_id")))
-    dup_counts = []
-    for entry in mine:
-        copies = len(groups.get(tuple(entry["players_norm"]), []))
-        dup_counts.append(copies)
+    # R225: the same identity function ``mine_contest`` counts with, so the two
+    # agree inside one JSON. On a Showdown file the person set alone counted
+    # three different captains over the same six people as copies (50 entries
+    # where the captain-aware answer is 2, mined_194237511.json).
+    groups, dup_basis = lineup_identity_groups(
+        all_entries, str(mined.get("contest_type") or ""), strict=False)
+    entry_group = {eid: key for key, ids in groups.items() for eid in ids}
+    dup_counts = [len(groups[entry_group[str(entry.get("entry_id"))]]) for entry in mine]
     fees = (float(entry_fee) * len(mine)) if entry_fee is not None else None
     return {
         "matched": len(mine),
@@ -1557,6 +1768,10 @@ def summarize_own_entries(
         "best_points": max(points) if points else None,
         "winning_points": (mined.get("meta") or {}).get("winning_points"),
         "own_lineups_duplicated_by_field": sum(1 for c in dup_counts if c > 1),
+        # R225: captain_aware, person_set (Classic, exact), or
+        # person_set_captain_absent (an archived Showdown file with no captain_norm:
+        # an upper bound on the copies, not a lineup count).
+        "duplication_basis": dup_basis,
         "max_copies_of_an_own_lineup": max(dup_counts) if dup_counts else None,
         "entry_fee": entry_fee,
         "fees_total": fees,
@@ -1603,10 +1818,21 @@ def update_registry(registry_path: Optional[str], mined: Dict[str, Any]) -> Dict
     already include it and this pass adds nothing.
     """
     registry_path = registry_path or default_registry_path()
+    # R341 review: NOT quarantined here. A mine folds into a 600-contest registry
+    # mid-tranche, and renaming it aside would restart the registry at one
+    # contest while the real one sat in a side file; a malformed registry
+    # refuses (main prints the NOTICE and the mine continues), as it always did.
     reg: Dict[str, Any] = {}
     if os.path.exists(registry_path):
-        with open(registry_path, "r", encoding="utf-8") as fh:
-            reg = json.load(fh)
+        try:
+            with open(registry_path, "r", encoding="utf-8-sig") as fh:
+                reg = json.load(fh)
+        except ValueError as exc:
+            raise ValueError(
+                f"{registry_path} is not readable JSON ({exc}); it is left in place. "
+                "Restore it from git or run tools/rebuild_registry.py before mining more.") from exc
+        if not isinstance(reg, dict):
+            raise ValueError(f"{registry_path} is valid JSON but not an object; left in place.")
     reg.setdefault("_label", "opponent-recurrence registry; observed field behavior; "
                              "record-only, never a prediction")
     users = reg.setdefault("users", {})
@@ -1633,10 +1859,14 @@ def update_registry(registry_path: Optional[str], mined: Dict[str, Any]) -> Dict
         return reg
     mined_contests.append(cid)
     dup_ids = set()
-    # Recompute duplicated entry ids from players_norm groups.
-    groups: Dict[Tuple[str, ...], List[str]] = defaultdict(list)
-    for e in mined["entries"]:
-        groups[tuple(e["players_norm"])].append(e["entry_id"])
+    # R225: recompute duplicated entry ids with the shared identity function. A
+    # Showdown file archived without captains falls back to the person set, which
+    # overstates, so the contest is named in ``dup_person_set_contests`` rather
+    # than counted as if it were a lineup count.
+    groups, dup_basis = lineup_identity_groups(
+        mined["entries"], str(mined.get("contest_type") or ""), strict=False)
+    if dup_basis == "person_set_captain_absent":
+        reg.setdefault("dup_person_set_contests", []).append(cid)
     for ids in groups.values():
         if len(ids) > 1:
             dup_ids.update(ids)
@@ -1678,14 +1908,67 @@ def _finalize_registry_averages(users: Dict[str, Any]) -> None:
         u["avg_chalk_score"] = round(u["sum_chalk"] / u["n_chalk"], 2) if u["n_chalk"] else None
 
 
-def _write_registry(registry_path: str, reg: Dict[str, Any]) -> None:
-    """tmp + os.replace. A kill mid-write used to leave a truncated registry."""
-    target = Path(registry_path)
+def write_json_atomic(path: str, obj: Any, *, indent: Optional[int] = 1,
+                      trailing_newline: bool = False) -> None:
+    """tmp + fsync + os.replace. A kill mid-write leaves the old file or the new one.
+
+    R227. The shared writer for the two registries (``_write_registry`` here,
+    ``contest_library.save_registry``): the first was hardened against a
+    truncated file and had no ``fsync``, the second was a bare ``write_text``.
+    The temp file sits beside the target so the replace stays on one volume,
+    and it is removed if the write raises.
+    """
+    target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
     tmp = target.with_name(f".{target.name}.{os.getpid()}.tmp")
-    with tmp.open("w", encoding="utf-8") as fh:
-        json.dump(reg, fh, indent=1, sort_keys=True)
-    os.replace(tmp, target)
+    try:
+        with tmp.open("w", encoding="utf-8") as fh:
+            json.dump(obj, fh, indent=indent, sort_keys=True)
+            if trailing_newline:
+                fh.write("\n")
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp, target)
+    finally:
+        if tmp.exists():
+            tmp.unlink()
+
+
+def load_json_or_quarantine(path: str) -> Tuple[Dict[str, Any], Optional[str]]:
+    """({object}, quarantine path or None). R227.
+
+    Used by ``contest_library.load_registry``, a read an operator reaches with
+    ``--registry``; the opponent registry is NOT loaded this way (see
+    ``update_registry``). A missing file is ``({}, None)``. A file that is not valid JSON, or is valid
+    JSON that is not an object, is MOVED aside to ``<name>.corrupt-<UTC stamp>``
+    (never deleted, never overwritten) and ``({}, <that path>)`` comes back, so
+    the next write cannot destroy the only copy of what was there and the caller
+    can say so. An unreadable file (permissions) still raises: moving it aside
+    would not be safe to assume.
+    """
+    target = Path(path)
+    if not target.exists():
+        return {}, None
+    try:
+        obj = json.loads(target.read_text(encoding="utf-8-sig"))
+    except ValueError:  # JSONDecodeError and UnicodeDecodeError are both ValueErrors
+        obj = None
+    if isinstance(obj, dict):
+        return obj, None
+    from datetime import datetime, timezone
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    dest = target.with_name(f"{target.name}.corrupt-{stamp}")
+    n = 0
+    while dest.exists():
+        n += 1
+        dest = target.with_name(f"{target.name}.corrupt-{stamp}-{n}")
+    os.replace(target, dest)
+    return {}, str(dest)
+
+
+def _write_registry(registry_path: str, reg: Dict[str, Any]) -> None:
+    """The opponent registry, atomically (see ``write_json_atomic``)."""
+    write_json_atomic(registry_path, reg)
 
 
 # ---------------------------------------------------------------------------
@@ -1761,6 +2044,17 @@ def structural_exit_code(diagnostics: Mapping[str, Any]) -> int:
     return EXIT_STRUCTURAL_OTHER
 
 
+def _own_pct(row: Mapping[str, Any]) -> Optional[float]:
+    """The entry-block recompute when the row carries it, else DK's column (R341).
+
+    A mined JSON written before R341 has only ``pct_drafted``; a fresh one has
+    both. The recompute wins because the column drops a multi-eligible player's
+    other slot.
+    """
+    value = row.get("pct_rostered")
+    return value if value is not None else row.get("pct_drafted")
+
+
 def emit_ledger_block(mined: Dict[str, Any]) -> str:
     m, d, c, g = mined["meta"], mined["duplication"], mined["construction"], mined["diagnostics"]
     cov = mined.get("coverage", "full")
@@ -1780,12 +2074,28 @@ def emit_ledger_block(mined: Dict[str, Any]) -> str:
                      f"Suppressed exit code {override['exit_code_suppressed']}. "
                      f"Treat every number below as unverified.")
     lines.append("")
+    # R226: a winner that is not a single verified rank-1 row is named, never
+    # printed as a bare score. Files mined before R226 carry no state and read
+    # as they always did.
+    wstate = m.get("winner_state")
+    if wstate == WINNER_UNKNOWN:
+        winner_txt = ("winning score UNKNOWN (no rank-1 row parsed into a complete lineup; "
+                      "the runner-up is not substituted)")
+    elif wstate == WINNER_TIED:
+        winner_txt = (f"winning score {m['winning_points']} (TIED: {m.get('winner_rank1_rows')} "
+                      "rank-1 rows; the first highest-points complete row is named)")
+    else:
+        winner_txt = f"winning score {m['winning_points']}"
     lines.append(f"- Entries {m['entries_total']} ({m['entries_complete_lineups']} complete lineups); "
-                 f"winning score {m['winning_points']}; multi-entry contest: {m['multi_entry_flag']}.")
+                 f"{winner_txt}; multi-entry contest: {m['multi_entry_flag']}.")
+    if wstate == WINNER_UNKNOWN:
+        dup_winner_txt = "the winning lineup is unknown, so its copies are not counted"
+    else:
+        dup_winner_txt = (f"the winning lineup had {d['winner_copies']} cop"
+                          f"{'y' if d['winner_copies'] == 1 else 'ies'}")
     lines.append(f"- Duplication: {d['distinct_lineups']} distinct lineups; "
                  f"{d['share_duplicated_pct']}% of entries sat in a duplicated lineup; "
-                 f"max copies {d['max_copies']}; the winning lineup had {d['winner_copies']} cop"
-                 f"{'y' if d['winner_copies'] == 1 else 'ies'}. "
+                 f"max copies {d['max_copies']}; {dup_winner_txt}. "
                  f"Copies histogram: {d['copies_histogram']}.")
     # Every table below this line is a salary join. On a contest-type mismatch
     # the join matched on name across two different contests, so the numbers are
@@ -1833,12 +2143,12 @@ def emit_ledger_block(mined: Dict[str, Any]) -> str:
     if c.get("captain_table"):
         top_cpt = ", ".join(
             f"{x['player']} {x['captain_share_pct']}% CPT"
-            + (f" / {x['pct_drafted']}% rostered" if x["pct_drafted"] is not None else "")
+            + (f" / {_own_pct(x)}% rostered" if _own_pct(x) is not None else "")
             for x in c["captain_table"][:4])
         lines.append(f"- Captain field share (top): {top_cpt}.")
         wc = c.get("winner_captain")
         if wc:
-            owned = (f"{wc['pct_drafted']}% rostered" if wc["pct_drafted"] is not None
+            owned = (f"{_own_pct(wc)}% rostered" if _own_pct(wc) is not None
                      else "ownership unknown")
             lines.append(
                 f"- Winning entry captained {wc['player']} ({owned}, "
@@ -1879,19 +2189,23 @@ def emit_ledger_block(mined: Dict[str, Any]) -> str:
             f"{own['best_rank']}/{own['field_size']} "
             f"({own['best_finish_percentile']}th pct), median "
             f"{own['median_finish_percentile']}th pct; best {own['best_points']} pts "
-            f"against a winning {own['winning_points']}; "
+            f"against a winning {own['winning_points'] if own['winning_points'] is not None else 'UNKNOWN'}; "
             f"{own['own_lineups_duplicated_by_field']} own lineup(s) duplicated by "
             f"the field (max {own['max_copies_of_an_own_lineup']} copies){net}. "
             f"Observed outcomes, never a graded prediction.")
     elif own:
         lines.append(f"- Self vs field: {own.get('note')}")
     if c["top_owned"]:
-        lines.append("- Chalk (top-5 %Drafted): " + ", ".join(
-            f"{t['player']} {t['pct_drafted']}%" for t in c["top_owned"]) + ".")
+        lines.append("- Chalk (top-5 % of complete lineups rostering, recomputed from the "
+                     "entries): " + ", ".join(
+            f"{t['player']} {_own_pct(t)}%" for t in c["top_owned"]) + ".")
     join_txt = (f"salary join {g['salary_join_rate_pct']}% of complete entries fully joined; "
                 if g["salary_join_rate_pct"] is not None else "salary join n/a (standings_only); ")
     parse_txt = "parse OK" if g.get("parse_structural_ok", True) else "PARSE FAILED"
-    if g.get("dk_table_agrees", g.get("ownership_recompute_ok")):
+    if g.get("ownership_parse_suspect"):
+        dk_txt = (f"DK %Drafted ABOVE the recompute by {g.get('dk_overstated_max_pts')} pts "
+                  "(lineups lost or misparsed)")
+    elif g.get("dk_table_agrees", g.get("ownership_recompute_ok")):
         dk_txt = "DK %Drafted agrees"
     else:
         dk_txt = (f"DK %Drafted table short {g.get('dk_table_deficit_pts')} pts "
@@ -1991,7 +2305,8 @@ def _selftest() -> int:
     assert mined["own_by_norm"][normalize_name("Ryan O'Hearn")] == 100.0
     top_names = [t["player"] for t in mined["construction"]["top_owned"]]
     assert len(top_names) == len(set(top_names)), "top_owned must be player-grain, not split rows"
-    assert {"player": "Ryan O'Hearn", "pct_drafted": 100.0} in mined["construction"]["top_owned"]
+    assert {"player": "Ryan O'Hearn", "pct_rostered": 100.0,
+            "pct_drafted": 100.0} in mined["construction"]["top_owned"]
     risk = score_duplication_risk([n for _, n in base], smap, field=mined)
     assert "features" in risk and "flags" in risk and "probab" not in json.dumps(risk["flags"])
     reg = update_registry(reg_path, mined)
@@ -2304,7 +2619,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
               f"{mined['meta']['entries_complete_lineups']} complete entries, "
               f"{mined['duplication']['distinct_lineups']} distinct lineups, "
               f"{join_txt}, "
-              f"ownership recompute {'OK' if g['ownership_recompute_ok'] else 'CHECK'}")
+              f"ownership: " + ("DK ABOVE the recompute, PARSE SUSPECT"
+                                if g.get("ownership_parse_suspect") else
+                                "DK agrees" if g["ownership_recompute_ok"] else
+                                "DK short on multi-slot players (expected)"))
     if args.standings and not args.no_archive_move:
         moved = archive_mined_standings(
             args.standings, args.slate_date or mined.get("slate_date") or "")

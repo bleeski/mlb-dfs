@@ -1858,6 +1858,8 @@ a restated priority.
 
 ### R10. Ownership and duplication, wired and graded (P1, M, gated) | was G3, absorbing RC 1.8/2.5/2.10
 
+**Rider 2026-09-30 (DEV, Session 42 landed R341 and R225).** Read ownership from `rostered_by_norm` (archived) or `field_miner.rostered_by_player_norm(entries)` (any JSON): DK's `pct_drafted` stays as DK's column and drops a player's half when his two slot counts tie. Showdown duplication cells read the captain-aware counts; the 91 captainless Showdown JSONs (2026-07-17 to 08-06) and 61 of the 83 pre-R338 stored `duplication` blocks need an ARCHIVE re-mine first (fragment `ledger/inbox/2026-09-30_DEV_miner-truth-remine-needs.md`), so "Showdown cells blocked until R225" is now "blocked until that re-mine, for those files only". Team stack share is not derivable from the archive (no team on `player_table`, `primary_stack_team` in 0 of 614 entries): it needs a re-mine with a salary file, and `construction.primary_stack_team_share` carries it from now on.
+
 **Rider 2026-09-15 (DEV, from the 2026-09-14/15 standings mine; roadmap CC-9, after R341 and R342).** Four measured facts shape the fit. (1) The variance is at the team-stack level: median within-contest R^2 for batter ownership 0.166 on log salary alone, 0.388 adding the team's share of the field's primary stacks (51 Classic contests >= 100 entries, 16 slates) -- a decomposition of realized ownership, not a forecast, and it says the model's shape is HIERARCHICAL: predict each team's stack share (a 12-to-30 number vector per slate), then allocate within the team by price and slot. R341 puts realized team stack share in the archive block so this grade needs no new data. (2) A per-player popularity residual persists across slates (split-half Pearson 0.42-0.49, Spearman 0.36-0.43, n 197-346; Pages +14.8, Ohtani +14.1, Buxton +10.6; Gilbert -10.1, Dominguez -9.7, Goldschmidt -7.7): one exponentially weighted term over the archive, docstring caveat that it is not yet separated from team popularity. (3) Field size is a one-parameter transfer, measured: `own_large ~= 0.76 x own_small + 2.0` (slope IQR 0.68-0.81, r 0.906) over 17 slate pairs with >= 5x field spread; recorded as a labeled prior with its sample so a cross-archetype prior is usable rather than merely forbidden, and never assumed outside 5x spreads. (4) The target is `pct_rostered` (R341), never DK's column. Two more control halves join the two already filed here, all after the bar: **avoid the field's chalkiest stacked team** -- 4+ primary stacks on the team holding the field's largest stack share (Q5, median 18.6%) carry top-1% lift 0.246 [0.021, 0.719] and top-20% 0.407, the only quintile clearly below 1.0 in both bands, while Q1 (coldest) is 1.795 [0.959, 2.596] and NOT supported, so the control is an avoidance cap on the predicted-chalkiest team, not a cold-team quota; and a **chalk-anchor floor** for Classic top-band entries -- the top 1%'s highest-owned player sits at within-contest percentile 0.518 while its other nine sit at 0.447 (one anchor plus a low-owned remainder, the "chalk-positive core, one or two sub-10% pieces" shape R37 already carries), and Ben's deliveries sit at 0.366 on the anchor. Showdown is the opposite and imports nothing from this: every finishing band above the median is MORE owned than the field (top 1% 0.527 vs bottom half 0.442). The pre-lock prior's own grade (46.5% of budget on zero-owned players; a role gate cut holdout error 40.8%) is R342 and precedes this fit.
 
 **Rider 2026-08-28 (DEV, carried forward from R205 at its landing rather than
@@ -7433,119 +7435,26 @@ for a Classic slate whose bank does not fit the device VM, with the
 
 ## Workstream 7 — Archival and ledger tooling
 
-### R225. Showdown duplication counting is captain-blind at all three miner sites, and Tier 2's grading substrate inherits it (P1, S; PRECONDITION ON R10) | new 2026-08-24, from the greenfield seventh edition (GF7-S1) and independently from the outside spec (D20); VERIFIED-read at all three sites, coordinator-re-read, re-read here
+### R225. CLOSED 2026-09-30 -- SHIPPED (roadmap Session 42), entry migrated to CHANGELOG.md
 
-**Rider 2026-09-26 (Session 113, R444): the referee site landed.** `preflight_upload.advisory` (now the same function `tools/verify_export.py` calls) keys its `partition_duplicate_lineups` input on `(captain_person, frozenset(all persons))` on Showdown and the bare person-set on Classic -- identity-equivalent to this entry's `(players_norm, captain_norm)` / `(captain, sorted utils)` shape, landed because R444 promoted `duplicates_within_contest` to a hard failure and a captain-blind key there would have manufactured a false positive out of a legal same-six-people-different-captain double-up. `top_exposure`/`overlap_histogram` stay person-keyed (exposure counts the PERSON whichever role they fill), so only the duplicate-partition input changed. **What is left is the two open `field_miner.py` sites (`summarize_own_entries`, `update_registry`) and the one-identity-function shape this entry still asks for** -- the preflight and miner sites now agree on the KEY but remain two separate implementations of it.
+One identity function, `field_miner.lineup_identity_groups` (Showdown: captain plus person set; Classic: `players_norm`), counts duplication at all three miner sites (`mine_contest` strict, `summarize_own_entries` and `update_registry` non-strict); the referee site landed in R444 and keeps its own implementation of the same key. An archived Showdown file with no `captain_norm` (91 of 249) falls back to the person set and says so (`duplication_basis`, `dup_person_set_contests`); 83 pre-R338 stored `duplication` blocks stay captain-blind until ARCHIVE re-mines them (fragment `2026-09-30_DEV_miner-truth-remine-needs`). Corrections to the filed text: the no-re-mine claim holds for 158 of 249 Showdown JSONs only; `summarize_own_entries` read 50 copies where the captain-aware answer is 2 (mined_194237511). R10's Showdown cells are unblocked on captain-aware counts. Gate: PASS  v2.26.0  45 modules  3069 tests  5 skipped (full line in CHANGELOG.md, 2026-09-30)
 
-**Rider 2026-09-25 (the code review, model area): HEAD numbers for the two open miner sites.** `summarize_own_entries` (`field_miner.py:1540,1543`) and `update_registry` (`:1639`) still key on the person set; `mine_contest`'s key at `:1026` is captain-aware, so two sites disagree inside one JSON. Over the archive 83 Showdown mined contests differ. `mined_194237511.json` (11,650 entries): person-set duplication 8,800 entries against captain-aware 7,508; the largest person-set group is 50 entries holding three captains (Mahle 42, Acuna 2, Drohan 6), and `summarize_own_entries(d, ["5228264262"])` (captain Acuna) reports `max_copies_of_an_own_lineup: 50` against a captain-aware 2. R225's one identity function at both sites; XS.
+### R226. CLOSED 2026-09-30 -- SHIPPED (roadmap Session 42), entry migrated to CHANGELOG.md
 
+`field_miner.select_winner` takes the verified rank-1 row: `OBSERVED`, `TIED` (highest-points complete rank-1 row, first in file order) or `UNKNOWN_NO_RANK_ONE` (winner None, no runner-up substituted); `meta.winner_state` and `meta.winner_rank1_rows`; the ledger block names a non-OBSERVED winner. No live instance existed (610 standings: 563 OBSERVED, 47 TIED, 0 differ from the old pick), so no stored number moved. Gate: PASS  v2.26.0  45 modules  3069 tests  5 skipped (full line in CHANGELOG.md, 2026-09-30)
 
-**LANDED 2026-09-11 in R338's commit one; the record is that date's CHANGELOG entry.** ONE of four sites shipped: `mine_contest`'s duplication key is `("CPT", captain, "PLAYERS", *players_norm)` when a CPT slot exists, and `winner_copies` uses it. **What is left is the other two miner sites, preflight's advisory (`preflight_upload.py:2330-2345`), and the one-identity-function shape this entry asks for.**
+### R227. (b) only: `execution_pipeline._write_json` and `_write_assignments` are direct truncate-writes of manifest-hashed, promotion-required files (P3, S; needs Ben's nod, plan-mode file) | new 2026-08-24; (a) and the registry half CLOSED 2026-09-30 (Session 42, entry in CHANGELOG.md)
 
-**Rider 2026-09-08 (ed12, F28): a FOURTH site, in the referee.** `preflight_upload.advisory` (`:2330-2345`) builds its duplicate signature from the sorted person set exactly as the three miner sites (`field_miner.py:958-969`) do, while `captain_norm` is parsed at `:304` and unused. Same fix: an exact key `(captain, sorted utils)` that refuses a captain inside the utils or a wrong count, beside a person-set overlap measure; archival names without ids are labelled approximate with collisions retained. Roadmap: Session 11.
+**Closed 2026-09-30 (Session 42).** `write_json_atomic` and `load_json_or_quarantine` (`field_miner.py`) now back `contest_library.save_registry`/`load_registry` and the opponent registry's write and load; rider (a) landed as `extract_inbox_zips.MAX_CSV_MEMBERS = 64` only (the byte cap, basename-collision refusal and bounded read already existed from the 2026-09-09 patch).
 
-**Rider 2026-08-28 (ARCHIVE):** independently confirmed twice more — the root
-greenfield standings doc re-derived the defect from DK lineup semantics without
-reading this board, and ledger 3.21's code read pins it (`players_norm` keys
-`dup_groups` at :770 while `captain_norm` rides every entry unused by the key).
-3.21's own duplication tables hash the raw Lineup string (CPT-aware) and serve
-as interim corrected counts: SD 1k-10k fields run 49% of entries duplicated,
-mean max copies 32, winner duplicated in 16-28% of contests — versus ~1% and
-1% in the <100 Classic satellites we mostly enter.
+**What is open, corrected by reading the tree.** The entry called these "run-directory DIAGNOSTICS, bounded". They are not: `_write_json` writes `final/diagnostics.json` (`execution_pipeline.py:301`, `:905`) and `final/late_swap_requirements.json` (`:1155`), `_write_assignments` writes `final/assignments.csv` (`:752`); each is registered with a sha256 after the write, `diagnostics` and `assignments` are required roles at promotion (`build_state_manager.py:458`), and `diagnostics.json` is read by `execution_pipeline.py:439`, `late_swap_manager.py:294` and `tools/late_swap.py:269,478`. A kill mid-write leaves a truncated file the manifest never hashed; every non-production reader catches `(OSError, ValueError)` and degrades, so the harm is a quiet loss, not a wrong file.
 
-**What.** `field_miner.py:770`, `:1244`, `:1343`. `players_norm` is a sorted,
-position-blind tuple by design (`:264`, and the R39 comment says so). All three
-duplication computations key on it alone:
-
-    dup_groups[e["players_norm"]].append(e["entry_id"])          # :770
-    groups[tuple(entry["players_norm"])].append(...)             # :1244
-    groups[tuple(e["players_norm"])].append(e["entry_id"])       # :1343
-
-so two Showdown entries with the same six PEOPLE and different CAPTAINS count as
-copies. They are not copies: different captain, different salary, different score.
-Classic is unaffected — `players_norm` is a complete identity there.
-
-**Why this outranks its severity class.** It is the first defect found INSIDE the
-archive, and the archive is the one asset in this project no vendor publishes.
-Every Showdown duplication number in ledger 3.17 that R10's entry cites is inflated
-by construction: the 27.2% median duplicated share, the "winning lineup duplicated
-40% of the time", the own 27/109. R10's bar READS duplication from the miner, so
-grading any Showdown cell against these counts grades against a construction
-artifact. R10's currently unblocked satellite cell is Classic, which bounds the
-damage to Showdown cells and to `dup_entries` in the opponent registry (R226's
-neighbour, and R198's rework inherits it).
-
-**Fix.** One identity function used at all three sites: key Showdown groupings on
-`(players_norm, captain_norm)` and Classic on `players_norm`, with a contest-type
-switch and a refusal when a Showdown entry carries no `captain_norm`.
-**`captain_norm` already rides every parsed entry, so the corrected counts are
-re-derivable from the archived `mined_*.json` files with NO re-mine.** ARCHIVE adds
-a one-sentence caveat to ledger 3.17's Showdown duplication rows at the next pass,
-and removes it when the recount lands. R10 gains "Showdown cells blocked until R225"
-in its gating line.
-
-### R226. The contest "winner" is the max-points complete entry, not the verified rank-1 row (P2, XS) | new 2026-08-24, from the greenfield seventh edition (GF7-S8) and independently from the outside spec (D21); VERIFIED-read, and cheaper than the outside spec assumes
-
-**Rider 2026-09-25 (the code review, model area): no instance at HEAD.** `parse_standings_export` over every `data/archive/*/contest-standings-*.csv` (610 parsed): the rank-1 entry is the max-points complete entry in every contest; 47 rank-1 ties all resolve to the first row in file order, which is DK's rank order. The 4 mined JSONs whose `winning_entry_id` matched no rank-1 row are `0.3-review`/`0.4-review` records with no `rank` field. The fix stays cheap and correct; the priority is P3 on this evidence, not a live archive error.
+**PLAN for Ben (the file is on the plan-mode list; nothing below is built).** (1) Make `build_state_manager._atomic_write_json` public, add the `fsync` the landed writer has, and route `_write_json` through it. (2) Write `assignments.csv` to a string and through the same writer. (3) Keep the raise-on-`OSError` behaviour `tests/test_core.py:30047` pins; leave `final/DKEntries.csv` alone (hash-bound, re-validated after `shutil.copy2`). (4) Tests: a killed replace leaves the old file whole and no temp behind, for each of the three writers; mutation-check. No optimizer or allocator line moves; the gate's golden histogram is expected unmoved. Ask: a yes or a no.
 
 
-**What.** `field_miner.py:775-779`:
+### R341. CLOSED 2026-09-30 -- SHIPPED (roadmap Session 42), entry migrated to CHANGELOG.md
 
-    winner = min((e for e in complete if e["points"] is not None),
-                 key=lambda e: (-(e["points"] or 0.0)), default=None)
-
-`complete` excludes entries whose lineup would not parse. So an unparseable
-WINNING lineup silently shifts `winning_points` and `winner_copies` to second
-place, and the winner-construction statistics that flow from it describe the runner
-up.
-
-**Why.** Winner construction is a Tier 2 input and it is labelled as an observed
-outcome. An observed outcome that is silently the second-best observation is the
-truthful-labels rule broken inside the archive, same family as R225 and worth
-landing with it.
-
-**Fix.** Cheaper than the outside spec's remediation assumes: **rank is already
-parsed at `:256` and already stored at `:1025`** (`parse_standings_export` reads the
-rank column; the comment at `:1021` records that it "was parsed and then dropped
-here" and that G4 restored it), and `:1234` already coerces it. So verify rank 1
-rather than reconstruct it: select the rank-1 row, take max points among ties, and
-emit a winner state — `OBSERVED`, `TIED`, or `UNKNOWN_NO_RANK_ONE` — instead of
-silently substituting. No re-mine: the archived JSONs carry rank.
-
-### R227. `contest_library`'s registry is a naked truncate-write with a crashing load, on a file its own sibling was hardened to protect (P2, XS) | new 2026-08-24, from the greenfield seventh edition (GF7-S2) and independently from the outside spec (D23); VERIFIED-read at `contest_library.py:177-189`. Absorbs two adjacent hardening notes from the outside spec.
-
-**What.** `save_registry` (`:185-189`) is
-`Path(path).write_text(json.dumps(...))` — direct truncate, no temp file, no
-replace. `load_registry` (`:177-182`) is a bare `json.loads` that raises on a
-malformed file with no quarantine. `field_miner.py:1385-1392`'s `_write_registry`
-was hardened for exactly this kill vector; this sibling was not.
-
-**Why.** A kill mid-write, a full disk, or a concurrent session destroys the
-registry, and the next load crashes rather than quarantining. The outside spec (D23)
-calls this inconsistent with the helper already in the repo, which is the right
-framing: the fix is a copy, not a design.
-
-**Fix.** Copy `_write_registry`'s tmp-plus-`os.replace` body (with `fsync`);
-quarantine on decode error rather than raising. **Two riders adopted here from the
-outside spec, both severity-reduced at adjudication:** (a) D26, `extract_inbox_zips.extract_zip`
-reads each CSV member fully with no member-count, size, ratio or basename-collision
-limit. Filed as prevention, NOT as Security: these zips are DK exports Ben
-downloads himself, so the threat is a corrupt or oversized export, not an
-adversary. Add a member cap, a byte cap and a duplicate-basename refusal. (b) D24,
-`execution_pipeline._write_json` and `_write_assignments` (`:202-221`) are direct
-truncate-writes. Bounded: these are run-directory DIAGNOSTICS; the certified
-`final/DKEntries.csv` is written on a different path (`:461`) and is hash-bound by
-the manifest. Route them through the same atomic writer while it is open.
-
-
-### R341. Ownership truth is the ENTRY BLOCK, not DK's `%Drafted` column: archive the recomputed per-player ownership and realized team stack share, and re-read the runbook's self-check as a check on DK (P1, S; roadmap CC-7) | new 2026-09-15, merged from ARCHIVE fragment `2026-09-14_ARCHIVE_ownership-truth-is-the-entry-block-not-dk-column.md` and ask 1 of DEV fragment `2026-09-14_DEV_ownership-model-should-be-hierarchical-with-a-player-prior.md`; mechanism verified by exact recomputation in the second pass, tree sites VERIFIED here
-
-**Rider 2026-09-25 (the code review, model area): the HEAD count.** Scanning `data/archive/*/mined_*.json`: `ownership_recompute_ok False` on 120 of 614 mined contests (worst `mined_194485712.json`, Showdown, 35.81 points, 148 entries; `mined_192464820.json`, Classic, 22.58 points, 31 entries). `field_miner.py:955` archives `own_by_player_norm(ptable)` from DK's column at `:1296`, and `tools/ownership_pred.py:801` grades against the same column; the recompute is a diagnostic only. The vendored 06-03 record agrees to 0.42, so the fixture does not exhibit it.
-
-
-- **What.** DK emits one ownership row per player carrying the usage of ONE roster slot; a player eligible at two positions loses the other slot's usage from the column entirely. Ohtani (row labelled 1B) 13.75% vs 27.50% recomputed, field 80; Stott 12.71 vs 25.42; Schwarber 11.86 vs 23.73. 66 of 11,564 Classic player-contest rows understated by more than 1.5 points (median 3.28, max 13.75), never overstated, touching 42 of 118 Classic and 6 of 117 Showdown contests: rare per player, common per contest. For single-eligibility players the recompute reproduces `%Drafted` to within 0.02 at every field size including 47,562 entries, so it is exact, not an estimate. Some exports key the block per roster slot and others per player with combined usage; summing rows by player is correct under both. The miner computes the recompute already, for its self-check (`field_miner.py:992-1039`, `own_recompute_max_diff`), and archives the DK value as `pct_drafted` (`:316`, `:1005`).
-- **Three consumers inherit the bias.** (1) `docs/cowork_archival_runbook.md` step 7: "ownership recompute self-check within 1.5 points of `%Drafted`; if it fails, the parse is wrong; fix before archiving" -- on 42 of 118 Classic contests a CORRECT parse fails it and the instruction sends a session to fix a right parser or force the archive. (2) `extract_winner_archetype`'s `chalk_index` (mean `%Drafted` of the winner's players from the embedded table) reads low on any slate with a popular multi-eligible bat. (3) Anything graded or fit on the archived column (R306 step 1's grade, R10's fit, R342's target) carries a bias concentrated on exactly the players most likely to be multi-eligible.
-- **Fix.** Archive the recomputed per-player ownership as `pct_rostered` (denominator = complete lineups, blank entries excluded and counted), keep the DK column as `dk_pct_drafted`; emit realized **team stack share** per contest in the `construction` block (the quantity R10's hierarchical fit predicts; free here); `chalk_index`, `ownership_grade_archive.py` and `ownership_pred.py grade` read `pct_rostered`; rewrite step 7 so the check is on DK -- a gap concentrated on multi-eligible players is the expected condition, a gap on a single-eligibility player is the parse failure. Re-derivable from the archived `player_table` and `entries[]`, no re-mine. Precondition for CC-8 and CC-9.
+`field_miner.rostered_by_player_norm` counts ownership over the complete lineups; `mine_contest` archives `rostered_by_norm` and `pct_rostered` beside DK's `pct_drafted` (kept), with `dk_understated_players`, `ownership_parse_suspect` and the rest in `diagnostics`; `actuals_from_standings` (R306's grade, `ownership_pred.py grade`) reads it; runbook step 7 checks DK instead of the parse; `construction.primary_stack_team_share` on a mine with a salary join. Corrections to the filed text: DK drops a row only when a player's two slot counts tie, leaving exactly half (309 of 309); `own_by_norm` is stripped before the JSON is written; `chalk_index` does not exist in code; team stack share is not re-derivable from the archive. Declined: the per-entry `chalk_score` stays on DK's column (its only reader, the registry's `avg_chalk_score`, accumulates across mines). R10 (Session 44) reads `rostered_by_norm` / `pct_rostered`. Gate: PASS  v2.26.0  45 modules  3069 tests  5 skipped (full line in CHANGELOG.md, 2026-09-30)
 
 ### R337. One archived test-delivery manifest, `outputs/2026-07-18/upload_manifest.json`, was overwritten by the thirteenth edition's test runs before publication was isolated, and no byte-exact original is on disk (P2, XS; ARCHIVE's, needs Ben's backup) | number minted 2026-09-09 by the edition and kept because its artifacts cite it; re-filed in board grammar 2026-09-10 (it was P1 and sat above the preamble)
 
