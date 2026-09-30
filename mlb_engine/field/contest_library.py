@@ -190,18 +190,39 @@ def empty_registry() -> Dict[str, Any]:
 
 
 def load_registry(path: Optional[str]) -> Dict[str, Any]:
-    if not path or not Path(path).exists():
+    """The registry at ``path``, an empty one when absent, a quarantined one when malformed.
+
+    R227. A file that is not a JSON object is moved aside to
+    ``<name>.corrupt-<UTC stamp>`` by ``field_miner.load_json_or_quarantine``
+    (never deleted) and an empty registry comes back with a warning on stderr,
+    instead of a ``JSONDecodeError`` out of ``build_waterfall``.
+    """
+    if not path:
         return empty_registry()
-    reg = json.loads(Path(path).read_text(encoding="utf-8"))
+    from mlb_engine.field.field_miner import load_json_or_quarantine
+    reg, quarantined = load_json_or_quarantine(path)
+    if quarantined:
+        print(f"WARNING: {path} was unreadable and is quarantined at {quarantined}; "
+              "using an empty contest registry.", file=sys.stderr)
+        return empty_registry()
+    if not reg and not Path(path).exists():
+        return empty_registry()
     reg.setdefault("contests", {})
     return reg
 
 
 def save_registry(path: str, registry: Mapping[str, Any]) -> None:
+    """Write the registry atomically: tmp + fsync + os.replace (R227).
+
+    The same writer ``field_miner._write_registry`` uses. No caller exists at
+    HEAD (``data/reference/contest_library.json`` was last written before the
+    tracked history), so this closes the kill-mid-write path before the first
+    caller appears.
+    """
+    from mlb_engine.field.field_miner import write_json_atomic
     reg = dict(registry)
     reg["updated"] = _today()
-    Path(path).parent.mkdir(parents=True, exist_ok=True)
-    Path(path).write_text(json.dumps(reg, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+    write_json_atomic(path, reg, indent=1, trailing_newline=True)
 
 
 def record_observation(

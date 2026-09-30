@@ -168,8 +168,21 @@ Per contest:
    - Salary join rate reported and unmatched names investigated (full tier
      only; call-ups and suffix variants are the usual causes). At the
      `standings_only` tier, confirm the coverage tag is in the archive block.
-   - Ownership recompute self-check within 1.5 points of `%Drafted`
-     (ledger 3.7). If it fails, the parse is wrong; fix before archiving.
+   - Ownership: the entry block is the truth and `%Drafted` is what is checked
+     (R341). The mine archives `rostered_by_norm` (percent of COMPLETE lineups
+     rostering each player) and keeps DK's column in `player_table`. DK drops
+     one of a player's two slot rows when he filled both slots equally often, so
+     the surviving row is exactly half (Ohtani 13.75 against 27.50); that is
+     DK's omission, not a parse failure, and `ownership_recompute_ok False`
+     alone does not block archiving (it read False on 120 of 614 mined contests
+     with a correct parse). Read `diagnostics.dk_understated_players` (DK below
+     the recompute: expected, and each is half). DK ABOVE the recompute by more
+     than 0.1 point on any player is now a structural gate
+     (`ownership_parse_suspect`; the largest excess over 614 archived files is
+     0.01): lineups were lost or misparsed, the mine exits 3 with "PARSE
+     FAILURE: DK's %Drafted lists a player ... ABOVE", and nothing is written, so
+     fix the parse first. Both compare on DK's own denominator (all entries);
+     `rostered_entries_excluded` counts the entries the truth column excludes.
    - Duplication table present: distinct lineups, share duplicated, max
      copies, winner copies.
    - Contest JSON complete: fee, paid places, cash line, seats where

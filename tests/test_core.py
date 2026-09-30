@@ -7304,8 +7304,12 @@ class FieldMinerContractTests(unittest.TestCase):
             writer = csv.writer(fh)
             writer.writerow(self.HEADER)
             for i, lineup in enumerate(lineups):
+                # One player-table row, on the first line: DK's right-hand table is one
+                # block, and a row repeated on every entry line summed to 206% for a
+                # 5-entry field, which R341's ownership gate correctly calls a bad parse.
+                right = ["Aaron Judge", "OF", "41.2%", "18.5"] if i == 0 else ["", "", "", ""]
                 writer.writerow([str(i + 1), str(9000 + i), f"u{i}", "0", "120.5",
-                                 lineup, "", "Aaron Judge", "OF", "41.2%", "18.5"])
+                                 lineup, "", *right])
         from mlb_engine.field import field_miner as fm
         return fm.parse_standings_export(str(path))
 
@@ -7508,6 +7512,411 @@ class FieldMinerContractTests(unittest.TestCase):
             self.assertEqual(result["contest_type"], "showdown")
             self.assertEqual(result["meta"]["roster_size"], 6)
             self.assertTrue(result["diagnostics"]["parse_structural_ok"])
+
+
+def fm_emit(mined):
+    from mlb_engine.field import field_miner as fm
+    return fm.emit_ledger_block(mined)
+
+
+class FieldMinerTruthTests(unittest.TestCase):
+    """R341 + R225 + R226 + R227: what the miner archives is what the entries say.
+
+    Ownership is the entry block and not DK's column (R341); one identity
+    function counts every duplicate (R225); the winner is the verified rank-1
+    row (R226); the registries are written atomically and read defensively
+    (R227).
+    """
+
+    HEADER = ["Rank", "EntryId", "EntryName", "TimeRemaining", "Points", "Lineup",
+              "", "Player", "Roster Position", "%Drafted", "FPTS"]
+    # Hitters: Raleigh Olson Marte Ramirez Witt Judge Soto Tucker; pitchers Cole Skubal.
+    BASE = {"2B": "Ketel Marte", "3B": "Jose Ramirez"}
+
+    @classmethod
+    def _classic(cls, **swap):
+        """A complete Classic cell; ``swap`` replaces a slot's name (``_2B=``)."""
+        slots = dict(cls.BASE)
+        slots.update({k.lstrip("_"): v for k, v in swap.items()})
+        return ("P Gerrit Cole P Tarik Skubal C Cal Raleigh 1B Matt Olson "
+                f"2B {slots['2B']} 3B {slots['3B']} SS Bobby Witt Jr. OF Aaron Judge "
+                "OF Juan Soto OF Kyle Tucker")
+
+    @staticmethod
+    def _showdown(captain, utils=("Juan Soto", "Gerrit Cole", "Anthony Volpe",
+                                  "Cody Bellinger", "Jose Ramirez")):
+        return f"CPT {captain} " + " ".join(f"UTIL {n}" for n in utils)
+
+    def _csv(self, tmp, entries, table=(), name="contest-standings-1.csv"):
+        """``entries``: (rank, entry_id, user, points, lineup). ``table``: (player, pos, pct)."""
+        path = Path(tmp) / name
+        rows = []
+        for i in range(max(len(entries), len(table))):
+            left = (list(entries[i][:1]) + [entries[i][1], f"{entries[i][2]} (1/1)", "0",
+                                             entries[i][3], entries[i][4]]
+                    if i < len(entries) else [""] * 6)
+            right = (["", table[i][0], table[i][1], f"{table[i][2]}%", "5.0"]
+                     if i < len(table) else ["", "", "", "", ""])
+            rows.append(left + right)
+        with path.open("w", newline="", encoding="utf-8-sig") as fh:
+            writer = csv.writer(fh)
+            writer.writerow(self.HEADER)
+            writer.writerows(rows)
+        return path
+
+    def _mine(self, tmp, entries, table=(), salary_map=None):
+        from mlb_engine.field import field_miner as fm
+        standings = fm.parse_standings_export(str(self._csv(tmp, entries, table)))
+        return fm.mine_contest(standings, salary_map, contest_id="T1", slate_date="2026-09-30")
+
+    @staticmethod
+    def _archived(mined):
+        """What the JSON on disk holds: tuples become lists, as in data/archive/."""
+        return json.loads(json.dumps(mined, default=list))
+
+    # A player at 2B in two entries and 3B in two: DK's table lists one row at
+    # half (the two slots tie, so DK drops the other), the truth is all four.
+    def _dropped_slot_entries(self):
+        return [("1", "9001", "a", "100.0", self._classic(_2B="Jose Altuve")),
+                ("2", "9002", "b", "90.0", self._classic(_2B="Jose Altuve")),
+                ("3", "9003", "c", "80.0", self._classic(_3B="Jose Altuve")),
+                ("4", "9004", "d", "70.0", self._classic(_3B="Jose Altuve"))]
+
+    def test_ownership_is_counted_over_the_entries_not_read_from_dks_column(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            mined = self._mine(tmp, self._dropped_slot_entries(),
+                               [("Jose Altuve", "2B", 50.0), ("Aaron Judge", "OF", 100.0)])
+        self.assertEqual(100.0, mined["rostered_by_norm"]["jose altuve"])
+        self.assertEqual(50.0, mined["own_by_norm"]["jose altuve"],
+                         "DK's column stays available, unchanged, beside the recompute")
+        gap = mined["diagnostics"]["dk_understated_players"]
+        self.assertEqual(["Jose Altuve"], [g["player"] for g in gap])
+        self.assertEqual((50.0, 100.0, 50.0),
+                         (gap[0]["pct_drafted"], gap[0]["pct_rostered"], gap[0]["gap_pts"]))
+        self.assertFalse(mined["diagnostics"]["ownership_parse_suspect"],
+                         "DK below the recompute is DK's omission, never a parse failure")
+        self.assertFalse(mined["diagnostics"]["ownership_recompute_ok"],
+                         "the legacy key keeps its meaning")
+        chalk = {t["player"]: t for t in mined["construction"]["top_owned"]}
+        self.assertEqual((100.0, 50.0), (chalk["Jose Altuve"]["pct_rostered"],
+                                         chalk["Jose Altuve"]["pct_drafted"]))
+
+    def test_dk_above_the_recompute_is_the_parse_failure_signal(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            mined = self._mine(tmp, self._dropped_slot_entries(),
+                               [("Phantom Player", "OF", 80.0), ("Aaron Judge", "OF", 100.0)])
+        diag = mined["diagnostics"]
+        self.assertEqual(80.0, diag["dk_overstated_max_pts"])
+        self.assertTrue(diag["ownership_parse_suspect"])
+        self.assertFalse(diag["parse_structural_ok"],
+                         "a structural gate, so main() blocks before the registry is touched")
+        self.assertIn("ABOVE", diag["verification_note"])
+        self.assertIn("ABOVE the recompute", fm_emit(mined))
+
+    def test_the_parse_suspect_tolerance_is_a_tenth_of_a_point_not_a_point_and_a_half(self):
+        """One lost lineup moves a player by 100 / entries points: 1.0 in a
+        100-entry field. The archive's largest DK excess is 0.01 (614 files)."""
+        from mlb_engine.field import field_miner as fm
+        self.assertEqual(0.1, fm.OWNERSHIP_PARSE_SUSPECT_PTS)
+        entries = [("1", f"90{i:02d}", f"u{i}", "50.0", self._classic()) for i in range(10)]
+        for dk, suspect in ((100.0, False), (100.05, False), (101.0, True)):
+            with tempfile.TemporaryDirectory() as tmp:
+                mined = self._mine(tmp, entries, [("Aaron Judge", "OF", dk)])
+            self.assertEqual(suspect, mined["diagnostics"]["ownership_parse_suspect"], dk)
+
+    def test_blank_entries_leave_the_denominator_and_are_counted(self):
+        entries = self._dropped_slot_entries()[:3] + [("4", "9004", "d", "0", "")]
+        with tempfile.TemporaryDirectory() as tmp:
+            mined = self._mine(tmp, entries, [("Aaron Judge", "OF", 75.0)])
+        diag = mined["diagnostics"]
+        self.assertEqual((3, 1), (diag["rostered_denominator"], diag["rostered_entries_excluded"]))
+        self.assertEqual(100.0, mined["rostered_by_norm"]["aaron judge"])
+        # DK's 75.0 is 3 of ALL 4 entries, so on DK's scale nothing is missing.
+        self.assertEqual([], diag["dk_understated_players"])
+        self.assertFalse(diag["ownership_parse_suspect"])
+
+    def test_one_person_counts_once_whichever_role_they_fill(self):
+        from mlb_engine.field import field_miner as fm
+        entries = [{"lineup_complete": True, "players_norm": ("a", "a", "b")},
+                   {"lineup_complete": True, "players_norm": ("a", "c")},
+                   {"lineup_complete": False, "players_norm": ("z",)}]
+        self.assertEqual(({"a": 100.0, "b": 50.0, "c": 50.0}, 2),
+                         fm.rostered_by_player_norm(entries))
+        self.assertEqual(({}, 0), fm.rostered_by_player_norm([]))
+
+    def test_the_ownership_grader_reads_the_entry_block(self):
+        from tools.ownership_pred import actuals_from_standings
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._csv(tmp, self._dropped_slot_entries(),
+                             [("Jose Altuve", "2B", 50.0)])
+            own, meta = actuals_from_standings(path)
+        self.assertEqual(100.0, own["jose altuve"])
+        self.assertEqual("entry_block_recompute", meta["ownership_basis"])
+        self.assertEqual(4, meta["rostered_denominator"])
+
+    def test_the_real_archive_contests_the_entry_named(self):
+        """Kuroda-Grauer filled 2B and 3B seven times each and DK kept one row."""
+        from mlb_engine.field import field_miner as fm
+        for cid, name, dk, truth in (("192464820", "joshua kuroda grauer", 22.58, 45.16),
+                                     ("194485712", "gerrit cole", 35.81, 74.13)):
+            # 192464820 is archived twice (2026-07-18 and 2026-07-19); both copies
+            # carry the same entries, so every copy must agree.
+            paths = sorted((REPO / "data" / "archive").glob(f"*/mined_{cid}.json"))
+            self.assertTrue(paths, cid)
+            for path in paths:
+                mined = json.loads(path.read_text(encoding="utf-8"))
+                self.assertEqual(dk, fm.own_by_player_norm(mined["player_table"])[name])
+                self.assertEqual(truth, fm.rostered_by_player_norm(mined["entries"])[0][name])
+
+    def test_readers_prefer_the_recompute_and_fall_back_to_dks_column(self):
+        from mlb_engine.field import field_miner as fm
+        self.assertEqual(74.13, fm._own_pct({"pct_rostered": 74.13, "pct_drafted": 35.81}))
+        self.assertEqual(35.81, fm._own_pct({"pct_drafted": 35.81}),
+                         "a mined file from before R341 carries only DK's column")
+        self.assertIsNone(fm._own_pct({"pct_rostered": None, "pct_drafted": None}))
+        names = ["Aaron Judge", "Juan Soto"]
+        field = {"rostered_by_norm": {"aaron judge": 80.0, "juan soto": 60.0},
+                 "own_by_norm": {"aaron judge": 40.0, "juan soto": 30.0}}
+        self.assertEqual(70.0, fm.score_duplication_risk(
+            names, None, field=field)["features"]["chalk_score_vs_field"])
+        self.assertEqual(35.0, fm.score_duplication_risk(
+            names, None, field={"own_by_norm": field["own_by_norm"]}
+        )["features"]["chalk_score_vs_field"])
+
+    def test_realized_primary_stack_share_needs_a_salary_join(self):
+        entries = [("1", "9001", "a", "100.0", self._classic()),
+                   ("2", "9002", "b", "90.0", self._classic())]
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertIsNone(self._mine(tmp, entries)["construction"]["primary_stack_team_share"])
+            smap = {}
+            for i, name in enumerate(["cal raleigh", "matt olson", "ketel marte", "jose ramirez",
+                                      "bobby witt", "aaron judge", "juan soto", "kyle tucker"]):
+                smap[name] = {"salary": 4000, "team": "NYY" if i < 5 else "BOS", "name": name}
+            for name in ("gerrit cole", "tarik skubal"):
+                smap[name] = {"salary": 9000, "team": "DET", "name": name}
+            mined = self._mine(tmp, entries, salary_map=smap)
+        self.assertEqual({"denominator": 2, "no_primary_stack": 0, "teams": {"NYY": 100.0}},
+                         mined["construction"]["primary_stack_team_share"])
+
+    def test_same_six_people_with_different_captains_are_two_lineups(self):
+        from mlb_engine.field import field_miner as fm
+        utils_a = ("Juan Soto", "Gerrit Cole", "Anthony Volpe", "Cody Bellinger", "Jose Ramirez")
+        six = ["aaron judge", *[n.lower() for n in utils_a]]
+        entries = [
+            {"entry_id": "1", "captain_norm": "aaron judge", "players_norm": tuple(sorted(six))},
+            {"entry_id": "2", "captain_norm": "juan soto", "players_norm": tuple(sorted(six))},
+            {"entry_id": "3", "captain_norm": "aaron judge", "players_norm": tuple(sorted(six))},
+        ]
+        groups, basis = fm.lineup_identity_groups(entries, "showdown", strict=True)
+        self.assertEqual("captain_aware", basis)
+        self.assertEqual([1, 2], sorted(len(v) for v in groups.values()))
+        self.assertEqual(["1", "3"], sorted(max(groups.values(), key=len)))
+        # Classic has no captain: the person set is the whole identity.
+        classic_groups, classic_basis = fm.lineup_identity_groups(
+            [dict(e, captain_norm=None) for e in entries], "classic", strict=True)
+        self.assertEqual(("person_set", [3]),
+                         (classic_basis, sorted(len(v) for v in classic_groups.values())))
+
+    def _showdown_contest(self):
+        judge, soto = "Aaron Judge", "Juan Soto"
+        rest_a = ("Juan Soto", "Gerrit Cole", "Anthony Volpe", "Cody Bellinger", "Jose Ramirez")
+        rest_b = ("Aaron Judge", "Gerrit Cole", "Anthony Volpe", "Cody Bellinger", "Jose Ramirez")
+        return [("1", "8001", "dupa", "90.0", self._showdown(judge, rest_a)),
+                ("2", "8002", "dupb", "80.0", self._showdown(judge, rest_a)),
+                ("3", "8003", "othercap", "70.0", self._showdown(soto, rest_b)),
+                ("4", "8004", "loner", "60.0", self._showdown(
+                    "Gerrit Cole", ("Aaron Judge", "Juan Soto", "Anthony Volpe",
+                                    "Cody Bellinger", "Jose Ramirez")))]
+
+    def test_all_three_miner_sites_count_the_same_showdown_lineups(self):
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            mined = self._archived(self._mine(tmp, self._showdown_contest()))
+            dup = mined["duplication"]
+            self.assertEqual((3, 2, 2), (dup["distinct_lineups"], dup["max_copies"],
+                                         dup["entries_in_duplicated_lineups"]))
+            # Same six people as entry 1, different captain: NOT a copy.
+            self.assertEqual(1, fm.summarize_own_entries(mined, ["8003"])["max_copies_of_an_own_lineup"])
+            own = fm.summarize_own_entries(mined, ["8001", "8003"])
+            self.assertEqual(2, own["max_copies_of_an_own_lineup"])
+            self.assertEqual(1, own["own_lineups_duplicated_by_field"])
+            self.assertEqual("captain_aware", own["duplication_basis"])
+            reg = fm.update_registry(str(Path(tmp) / "reg.json"), mined)
+        self.assertEqual({"dupa": 1, "dupb": 1, "othercap": 0, "loner": 0},
+                         {u: reg["users"][u]["dup_entries"] for u in reg["users"]})
+        self.assertNotIn("dup_person_set_contests", reg)
+
+    def test_a_captainless_showdown_file_is_labelled_not_miscounted(self):
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            mined = self._archived(self._mine(tmp, self._showdown_contest()))
+            for e in mined["entries"]:
+                e.pop("captain_norm")            # a 0.5-review file mined before R39
+            own = fm.summarize_own_entries(mined, ["8003"])
+            self.assertEqual("person_set_captain_absent", own["duplication_basis"])
+            self.assertEqual(4, own["max_copies_of_an_own_lineup"],
+                             "all four entries share six people: the person set is an upper "
+                             "bound (the captain-aware answer is 1) and says so")
+            reg = fm.update_registry(str(Path(tmp) / "reg.json"), mined)
+            self.assertEqual(["T1"], reg["dup_person_set_contests"])
+            with self.assertRaises(ValueError):
+                fm.lineup_identity_groups(mined["entries"], "showdown", strict=True)
+
+    def test_the_real_showdown_file_the_entry_measured(self):
+        from mlb_engine.field import field_miner as fm
+        (path,) = sorted((REPO / "data" / "archive").glob("*/mined_194237511.json"))
+        mined = json.loads(path.read_text(encoding="utf-8"))
+        own = fm.summarize_own_entries(mined, ["5228264262"])      # captain Acuna
+        self.assertEqual(2, own["max_copies_of_an_own_lineup"], "was 50 on the person set")
+        self.assertEqual("captain_aware", own["duplication_basis"])
+
+    def test_an_unparseable_rank_one_lineup_is_unknown_not_the_runner_up(self):
+        entries = [("1", "7001", "a", "200.0", "P Gerrit Cole P Tarik Skubal"),   # partial lineup
+                   ("2", "7002", "b", "150.0", self._classic()),
+                   ("3", "7003", "c", "100.0", self._classic(_2B="Jose Altuve"))]
+        with tempfile.TemporaryDirectory() as tmp:
+            mined = self._mine(tmp, entries)
+        self.assertEqual("UNKNOWN_NO_RANK_ONE", mined["meta"]["winner_state"])
+        self.assertIsNone(mined["meta"]["winning_points"], "150.0 is the runner-up")
+        self.assertIsNone(mined["meta"]["winning_entry_id"])
+        self.assertEqual(0, mined["duplication"]["winner_copies"])
+        from mlb_engine.field import field_miner as fm
+        block = fm.emit_ledger_block(mined)
+        self.assertIn("winning score UNKNOWN", block)
+        self.assertNotIn("winning score None", block)
+        self.assertIn("winning lineup is unknown", block)
+
+    def test_winner_states_observed_and_tied(self):
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            one = self._mine(tmp, [("1", "7001", "a", "150.0", self._classic()),
+                                   ("2", "7002", "b", "100.0", self._classic(_2B="Jose Altuve"))])
+            tie = self._mine(tmp, [("1", "7001", "a", "150.0", self._classic()),
+                                   ("1", "7002", "b", "150.0", self._classic(_2B="Jose Altuve")),
+                                   ("3", "7003", "c", "100.0", self._classic())])
+        self.assertEqual(("OBSERVED", "7001", 1),
+                         (one["meta"]["winner_state"], one["meta"]["winning_entry_id"],
+                          one["meta"]["winner_rank1_rows"]))
+        self.assertEqual(("TIED", "7001", 2),
+                         (tie["meta"]["winner_state"], tie["meta"]["winning_entry_id"],
+                          tie["meta"]["winner_rank1_rows"]))
+        # Equal rank-1 rows with unequal points: the higher-points row wins.
+        rows = [{"rank": "1", "entry_id": "a", "points": 10.0, "lineup_complete": True},
+                {"rank": "1", "entry_id": "b", "points": 12.0, "lineup_complete": True}]
+        self.assertEqual("b", fm.select_winner(rows)[0]["entry_id"])
+        # No rank column at all is unknown, not a guess from the points.
+        self.assertEqual((None, "UNKNOWN_NO_RANK_ONE", 0),
+                         fm.select_winner([{"rank": "", "entry_id": "a", "points": 10.0,
+                                            "lineup_complete": True}]))
+
+    def test_save_registry_is_atomic_and_fsynced(self):
+        from mlb_engine.field import contest_library as cl
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "contest_library.json"
+            cl.save_registry(str(path), {"contests": {"old": {}}})
+            before = path.read_text(encoding="utf-8")
+            with unittest.mock.patch("os.replace", side_effect=OSError("killed")):
+                with self.assertRaises(OSError):
+                    cl.save_registry(str(path), {"contests": {"new": {}}})
+            self.assertEqual(before, path.read_text(encoding="utf-8"),
+                             "a kill between write and replace leaves the old registry whole")
+            self.assertEqual([path.name], sorted(p.name for p in Path(tmp).iterdir()),
+                             "and no temp file is left behind")
+            with unittest.mock.patch("os.fsync", wraps=os.fsync) as synced:
+                cl.save_registry(str(path), {"contests": {"newer": {}}})
+            self.assertTrue(synced.called)
+            self.assertTrue(path.read_text(encoding="utf-8").endswith("}\n"))
+            self.assertIn("newer", json.loads(path.read_text(encoding="utf-8"))["contests"])
+
+    def test_a_malformed_registry_is_quarantined_not_raised(self):
+        from mlb_engine.field import contest_library as cl
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "contest_library.json"
+            for n, bad in enumerate(['{"contests": {"half', "[1, 2]", ""]):
+                path.write_text(bad, encoding="utf-8")
+                with contextlib.redirect_stderr(io.StringIO()) as err:
+                    reg = cl.load_registry(str(path))
+                self.assertEqual({}, reg["contests"])
+                self.assertIn("quarantined", err.getvalue())
+                self.assertFalse(path.exists())
+                self.assertEqual(n + 1, len(list(Path(tmp).glob("contest_library.json.corrupt-*"))),
+                                 "each quarantine is a new file; none overwrites an earlier one")
+            self.assertEqual(
+                sorted(['{"contests": {"half', "[1, 2]", ""]),
+                sorted(p.read_text(encoding="utf-8")
+                       for p in Path(tmp).glob("contest_library.json.corrupt-*")))
+            self.assertEqual({}, cl.load_registry(str(path))["contests"])       # absent: empty
+            self.assertEqual({}, cl.load_registry(None)["contests"])
+
+    def test_the_opponent_registry_refuses_a_malformed_file_and_leaves_it_in_place(self):
+        """Mid-tranche, renaming a 600-contest registry aside would restart it at one
+        contest; it refuses instead (main prints the NOTICE and the mine goes on)."""
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            mined = self._archived(self._mine(tmp, self._dropped_slot_entries()))
+            path = Path(tmp) / "reg.json"
+            for bad in ("{truncated", "[1]"):
+                path.write_text(bad, encoding="utf-8")
+                with self.assertRaises(ValueError) as caught:
+                    fm.update_registry(str(path), mined)
+                self.assertIn("left in place", str(caught.exception))
+                self.assertEqual(bad, path.read_text(encoding="utf-8"))
+            self.assertEqual([], list(Path(tmp).glob("reg.json.corrupt-*")))
+            path.write_text("\ufeff{}", encoding="utf-8")                 # a BOM is not corruption
+            self.assertEqual(["T1"], fm.update_registry(str(path), mined)["contests_mined"])
+
+    def test_a_bom_registry_is_read_not_quarantined(self):
+        from mlb_engine.field import contest_library as cl
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "contest_library.json"
+            path.write_text('\ufeff{"contests": {"k": {}}}', encoding="utf-8")
+            self.assertEqual({"k": {}}, cl.load_registry(str(path))["contests"])
+            self.assertEqual([], list(Path(tmp).glob("*.corrupt-*")))
+
+    def test_an_unknown_winner_with_no_contest_id_refuses_the_registry_not_the_mine(self):
+        from mlb_engine.field import field_miner as fm
+        entries = [("1", "7001", "a", "200.0", "P Gerrit Cole"),
+                   ("2", "7002", "b", "150.0", self._classic())]
+        with tempfile.TemporaryDirectory() as tmp:
+            mined = self._archived(self._mine(tmp, entries))
+            mined["contest_id"] = ""
+            with self.assertRaises(ValueError) as caught:
+                fm.update_registry(str(Path(tmp) / "reg.json"), mined)
+            self.assertIn("no contest identity", str(caught.exception))
+
+    def test_rank_one_is_an_integer_and_anything_else_is_unknown(self):
+        from mlb_engine.field import field_miner as fm
+        def row(rank):
+            return [{"rank": rank, "entry_id": "a", "points": 9.0, "lineup_complete": True}]
+        self.assertEqual("OBSERVED", fm.select_winner(row(" 1 "))[1])
+        for bad in ("1.0", "T1", "", None):
+            self.assertEqual("UNKNOWN_NO_RANK_ONE", fm.select_winner(row(bad))[1], bad)
+
+    def test_an_integer_entry_id_does_not_break_the_winner_lookup(self):
+        from mlb_engine.field import field_miner as fm
+        entries = [{"rank": "1", "entry_id": 7, "points": 9.0, "lineup_complete": True,
+                    "players_norm": ("a", "b"), "lineup": [("P", "a"), ("P", "b")],
+                    "captain_norm": None, "username": "u", "declared_max_entries": 1,
+                    "lineup_str": ""}]
+        standings = {"entries": entries, "player_table": [], "contest_type": "classic"}
+        self.assertEqual(7, fm.mine_contest(standings, None, contest_id="T")["meta"]["winning_entry_id"])
+
+    def test_an_inbox_zip_with_too_many_members_is_refused(self):
+        import zipfile
+        from tools import extract_inbox_zips as eiz
+        with tempfile.TemporaryDirectory() as tmp:
+            for n_members, ok in ((eiz.MAX_CSV_MEMBERS, True), (eiz.MAX_CSV_MEMBERS + 1, False)):
+                zpath = Path(tmp) / f"contest-standings-{n_members}.zip"
+                with zipfile.ZipFile(zpath, "w") as zf:
+                    for i in range(n_members):
+                        zf.writestr(f"m{n_members}_{i}.csv", "Rank\n1\n")
+                dest = Path(tmp) / f"out{n_members}"
+                if ok:
+                    self.assertEqual(n_members, len(eiz.extract_zip(zpath, dest)))
+                else:
+                    with self.assertRaises(ValueError):
+                        eiz.extract_zip(zpath, dest)
+                    self.assertFalse(dest.exists() and any(dest.iterdir()))
 
 
 class PctFloorAndClockPipelineTests(unittest.TestCase):
@@ -12177,10 +12586,10 @@ class MinerMoneyHonestyTests(unittest.TestCase):
         with path.open("w", newline="", encoding="utf-8-sig") as fh:
             writer = csv.writer(fh)
             writer.writerow(self.HEADER)
-            for i in range(6):
+            for i in range(6):   # DK's table is ONE block: one Judge row, on the first line
                 writer.writerow([str(i + 1), str(9000 + i), f"u{i}", "0",
-                                 f"{120 - i}.5", self.CLASSIC, "", "Aaron Judge",
-                                 "OF", "41.2%", "18.5"])
+                                 f"{120 - i}.5", self.CLASSIC, "",
+                                 *(["Aaron Judge", "OF", "41.2%", "18.5"] if i == 0 else ["", "", "", ""])])
         return path
 
     def _run(self, tmp, *extra):
@@ -12416,7 +12825,7 @@ class MinerOutputPathTests(unittest.TestCase):
             for i in range(6):
                 writer.writerow([str(i + 1), str(9000 + i), f"u{i}", "0",
                                  f"{120 - i}.5", MinerMoneyHonestyTests.CLASSIC,
-                                 "", "Aaron Judge", "OF", "41.2%", "18.5"])
+                                 "", *(["Aaron Judge", "OF", "41.2%", "18.5"] if i == 0 else ["", "", "", ""])])
         return path
 
     def _run(self, tmp, *extra):
@@ -12496,10 +12905,10 @@ class MinerSalaryJoinFloorTests(unittest.TestCase):
         with path.open("w", newline="", encoding="utf-8-sig") as fh:
             writer = csv.writer(fh)
             writer.writerow(self.HEADER)
-            for i in range(6):
+            for i in range(6):   # DK's table is ONE block: one Judge row, on the first line
                 writer.writerow([str(i + 1), str(9000 + i), f"u{i}", "0",
-                                 f"{120 - i}.5", self.CLASSIC, "", "Aaron Judge",
-                                 "OF", "41.2%", "18.5"])
+                                 f"{120 - i}.5", self.CLASSIC, "",
+                                 *(["Aaron Judge", "OF", "41.2%", "18.5"] if i == 0 else ["", "", "", ""])])
         return path
 
     def _salary_csv(self, tmp, names, name="DKSalaries.csv"):
@@ -12615,7 +13024,7 @@ class MinerRegistryDefaultTests(unittest.TestCase):
             for i in range(6):
                 writer.writerow([str(i + 1), str(9000 + i), f"u{i}", "0",
                                  f"{120 - i}.5", MinerMoneyHonestyTests.CLASSIC,
-                                 "", "Aaron Judge", "OF", "41.2%", "18.5"])
+                                 "", *(["Aaron Judge", "OF", "41.2%", "18.5"] if i == 0 else ["", "", "", ""])])
         return path
 
     def test_the_documented_invocation_advances_the_registry(self):
@@ -12839,8 +13248,8 @@ class MinerManifestFirstSalaryTests(unittest.TestCase):
             w.writerow(MinerMoneyHonestyTests.HEADER)
             for i in range(6):
                 w.writerow([str(i + 1), str(9000 + i), f"u{i}", "0", f"{120 - i}.5",
-                            MinerMoneyHonestyTests.CLASSIC, "", "Aaron Judge",
-                            "OF", "41.2%", "18.5"])
+                            MinerMoneyHonestyTests.CLASSIC, "",
+                            *(["Aaron Judge", "OF", "41.2%", "18.5"] if i == 0 else ["", "", "", ""])])
         return fm.parse_standings_export(str(path))
 
     def _salary(self, path, rows):
@@ -12997,9 +13406,13 @@ class MinerCaptainTests(unittest.TestCase):
         from mlb_engine.field import field_miner as fm
         path = Path(tmp) / "contest-standings-888888888.csv"
         rows = []
+        all_points = [points[i] if points else 100.0 - i for i in range(len(captains))]
         for i, cpt in enumerate(captains):
-            pts = points[i] if points else 100.0 - i
-            rows.append([str(i + 1), str(9000 + i), f"u{i}", "0", f"{pts}",
+            pts = all_points[i]
+            # R226: DK ranks by points, and the winner is the rank-1 row, so the
+            # fixture's rank column follows its points instead of its row order.
+            rank = 1 + sum(1 for other in all_points if other > pts)
+            rows.append([str(rank), str(9000 + i), f"u{i}", "0", f"{pts}",
                          self._sd(cpt, self.UTILS), "", cpt, "CPT", "20.0%", "18.5"])
         with path.open("w", newline="", encoding="utf-8-sig") as fh:
             w = csv.writer(fh)
@@ -21115,28 +21528,31 @@ class OwnershipPriorShadowLoopTests(unittest.TestCase):
                 tool.grade_prediction(pred, {"h1 nyy": 10.0}, "wta_satellite")
             self.assertIn("wta_satellite", str(caught.exception))
 
-    def test_actuals_come_from_the_one_aggregation_mine_contest_uses(self):
-        """DK's right-hand table is grained per (player, roster position) and the
-        rows SUM. Two functions summing one table is how two surfaces end up
-        disagreeing about one contest's chalk, so the rule lives in field_miner
-        and both callers read it."""
+    def test_actuals_come_from_the_entry_block_not_dks_column(self):
+        """R341. The actuals are counted over the complete lineups through the ONE
+        function ``mine_contest`` archives with, and not read from DK's right-hand
+        table, which drops one of a player's two slot rows when the slots tie
+        (the survivor is half). ``own_by_player_norm`` still sums the table's rows
+        and is pinned below; it is no longer what the grader joins against."""
         from mlb_engine.field import field_miner
         tool = self._tool()
         with tempfile.TemporaryDirectory() as tmp:
             standings = self._standings_csv(
                 tmp, {"Ryan O'Hearn": [("1B", 18.0), ("OF", 12.0)],
                       "Adley Rutschman": [("C", 12.5)]})
-            actual, meta = tool.actuals_from_standings(standings)
             parsed = field_miner.parse_standings_export(str(standings))
-            self.assertEqual(field_miner.own_by_player_norm(parsed["player_table"]),
-                             actual)
-            self.assertEqual(30.0, actual["ryan ohearn"],
-                             "1B in some entries and OF in others; the rows SUM "
-                             "to his field share and neither row is it")
-            self.assertEqual(2, meta["players_with_a_share"])
+            self.assertEqual(30.0, field_miner.own_by_player_norm(
+                parsed["player_table"])["ryan ohearn"],
+                "1B in some entries and OF in others; the rows SUM to his column share")
+            actual, meta = tool.actuals_from_standings(standings)
+            self.assertEqual({}, actual,
+                             "this fixture's one lineup is partial, so there is no entry block "
+                             "to count; the column is not a fallback")
+            self.assertEqual(0, meta["rostered_denominator"])
+            self.assertEqual(2, meta["dk_column_players"])
             source = (REPO / "tools" / "ownership_pred.py").read_text(
                 encoding="utf-8")
-            self.assertIn("own_by_player_norm", source)
+            self.assertIn("rostered_by_player_norm", source)
 
     def test_the_default_path_dates_the_slate_off_game_info_not_the_clock(self):
         """A tool run at 00:30 UTC on a 19:10 ET slate is on the next calendar

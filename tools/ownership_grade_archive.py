@@ -277,7 +277,7 @@ def grade_one(record: Mapping[str, Any], names: Mapping[str, str]) -> Dict[str, 
 
     actual, meta = actuals_from_standings(str(standings_path))
     if not actual:
-        out["refused"] = "the standings export yielded no %Drafted rows"
+        out["refused"] = "the standings export yielded no complete lineups to recompute ownership from"
         return out
     try:
         grade = grade_prediction(prediction, actual, archetype,
