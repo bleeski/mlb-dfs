@@ -36,7 +36,7 @@ Usage:
         [--budget 30] [--solver-budget 15] [--lineups <fresh feed.json>] \
         [--entry-ids 123,456] [--dry-run] \
         [--postures <contest_id>=cash,...] [--accept-downgrade]
-        [--declare-pitcher ID[=ROLE] ...]
+        [--declare-pitcher ID[=ROLE[:ip=N]] ...]
 
 The money-and-entry wall still applies: this writes a CSV. Nothing here uploads,
 enters a contest, or moves money. Lineups move only at Ben's manual upload.
@@ -72,6 +72,7 @@ if str(REPO) not in sys.path:
 
 from mlb_engine.intake.live_data_adapters import (  # noqa: E402
     build_slate_pool, build_status_map_from_lineups_feed, dk_starting_only_feed,
+    workload_prior_lines,
 )
 from mlb_engine.entries.dk_entries_manager import (  # noqa: E402
     assert_contest_geometry, parse_dk_entry_rows,
@@ -184,7 +185,7 @@ def _declared_pitcher_parser():
 
 
 def resolve_swap_declared_pitchers(root: Path, date: str, swap_parent,
-                                   explicit: dict) -> tuple[dict, str]:
+                                   explicit: dict, *, record=None) -> tuple[dict, str]:
     """R468. ``(declared, source)``: the arms this swap's pool carries.
 
     `late_swap.py` built its pool with no `declared_pitchers`, and the pool
@@ -205,44 +206,13 @@ def resolve_swap_declared_pitchers(root: Path, date: str, swap_parent,
     values merge over the inherited ones: a declaration only adds an arm to
     the legal pool. An id that is not a DK player id is dropped by name:
     preflight's parser refuses one, which after a written swap is a referee
-    crash.
+    crash. ``record`` is `_parent_declaration_record`'s answer when the
+    caller already resolved it (R470: one resolution per swap).
     """
     inherited: dict = {}
-    raw = None
-    manifest = (swap_parent or {}).get("manifest") or {}
-    recorded = (manifest.get("metadata") or {}).get("declared_pitchers")
-    if swap_parent is None:
-        note = "no parent run resolved, so none inherited"
-    elif not swap_parent.get("current_matches_parent_export"):
-        note = ("the resolved run's export is not this file's parent, so none "
-                "inherited")
-    elif isinstance(recorded, dict):
-        raw = recorded
-        note = (f"from the parent swap run {manifest.get('run_id')}'s record"
-                if recorded else f"the parent swap run {manifest.get('run_id')} "
-                                 f"carried none")
-    else:
-        tools_dir = str(Path(__file__).resolve().parent)
-        if tools_dir not in sys.path:
-            sys.path.insert(0, tools_dir)
-        import retro  # noqa: PLC0415 - a tool module, loaded on the one path that reads it
-        run_id = (swap_parent.get("manifest") or {}).get("run_id")
-        brief, how = retro.resolve_brief(
-            Path(root), date, run_id, swap_parent.get("parent_export_sha256"),
-            lineage="")
-        if brief is None:
-            note = f"none inherited: {how}"
-        else:
-            try:
-                raw = json.loads(brief.read_text(encoding="utf-8")).get(
-                    "declared_pitchers") or {}
-            except (OSError, ValueError, AttributeError) as exc:
-                raw = {}
-                note = f"none inherited: {brief.name} unreadable ({exc})"
-            else:
-                note = (f"from the parent build's brief {brief.name} ({how})"
-                        if raw else f"the parent build's brief {brief.name} "
-                                    f"declared none")
+    record, where = record or _parent_declaration_record(root, date, swap_parent)
+    raw = None if record is None else record.get("declared_pitchers") or {}
+    note = where if record is None else (f"from {where}" if raw else f"{where} declared none")
     if isinstance(raw, dict):
         pairs = {str(k).strip(): str(v).strip() for k, v in raw.items()
                  if str(k).strip() and str(v).strip()}
@@ -250,6 +220,83 @@ def resolve_swap_declared_pitchers(root: Path, date: str, swap_parent,
         dropped = sorted(set(pairs) - set(inherited))
         if dropped:
             note = f"{note}; dropped, not a DK player id: {', '.join(dropped)}"
+    merged = {**inherited, **dict(explicit or {})}
+    if explicit:
+        note = f"{note}; from --declare-pitcher: {', '.join(sorted(explicit))}"
+    return dict(sorted(merged.items())), note
+
+
+def _parent_declaration_record(root: Path, date: str, swap_parent) -> tuple:
+    """``(record, where)``: the parent's declarations as recorded, or None and
+    why none were inherited. A parent swap run's own manifest record first
+    (a swap writes no brief), else the parent build's brief by identity
+    (`retro.resolve_brief`). Only a parent whose export IS this file lends."""
+    manifest = (swap_parent or {}).get("manifest") or {}
+    meta = manifest.get("metadata") or {}
+    if swap_parent is None:
+        return None, "no parent run resolved, so none inherited"
+    if not swap_parent.get("current_matches_parent_export"):
+        return None, ("the resolved run's export is not this file's parent, so "
+                      "none inherited")
+    if isinstance(meta.get("declared_pitchers"), dict):
+        return ({"declared_pitchers": meta.get("declared_pitchers"),
+                 "declared_pitcher_workload": meta.get("declared_pitcher_workload")},
+                f"the parent swap run {manifest.get('run_id')}'s record")
+    tools_dir = str(Path(__file__).resolve().parent)
+    if tools_dir not in sys.path:
+        sys.path.insert(0, tools_dir)
+    import retro  # noqa: PLC0415 - a tool module, loaded on the one path that reads it
+    brief, how = retro.resolve_brief(
+        Path(root), date, manifest.get("run_id"), swap_parent.get("parent_export_sha256"),
+        lineage="")
+    if brief is None:
+        return None, f"none inherited: {how}"
+    try:
+        data = json.loads(brief.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        return None, f"none inherited: {brief.name} unreadable ({exc})"
+    if not isinstance(data, dict):
+        return None, f"none inherited: {brief.name} is not an object"
+    return ({"declared_pitchers": data.get("declared_pitchers"),
+             "declared_pitcher_workload": data.get("declared_pitcher_workload")},
+            f"the parent build's brief {brief.name} ({how})")
+
+
+def resolve_swap_declared_workload(root: Path, date: str, swap_parent,
+                                   explicit: dict, *, redeclared=(),
+                                   record=None) -> tuple[dict, str]:
+    """R470. ``(workload, source)``: the typed innings (``:ip=N``) this swap's
+    pool stamps, from the same record R468 reads the roles from, explicit
+    values merged over them. An arm re-declared on this swap's command line
+    (``redeclared``) sheds its inherited innings: a new role with no ``:ip=``
+    takes that role's own prior, not the parent's number. A role's own prior
+    (a declared bulk arm's default) needs nothing carried: the pool derives
+    it from the role. An inherited value that is not a finite positive
+    number, or whose id is not a DK player id, is dropped by name."""
+    import math
+    record, where = record or _parent_declaration_record(root, date, swap_parent)
+    raw = (record or {}).get("declared_pitcher_workload") or {}
+    inherited: dict = {}
+    dropped: list[str] = []
+    if isinstance(raw, dict):
+        for pid, ip in raw.items():
+            try:
+                value = float(ip)
+            except (TypeError, ValueError):
+                value = float("nan")
+            if str(pid).strip().isdigit() and math.isfinite(value) and value > 0:
+                inherited[str(pid).strip()] = value
+            else:
+                dropped.append(str(pid))
+    note = (f"from {where}" if inherited else
+            (where if record is None else f"{where} typed none"))
+    if dropped:
+        note = f"{note}; dropped, not a DK player id with positive innings: {', '.join(sorted(dropped))}"
+    shed = sorted(set(inherited) & {str(k) for k in redeclared} - set(explicit or {}))
+    for pid in shed:
+        inherited.pop(pid)
+    if shed:
+        note = f"{note}; re-declared here without ip, so the role's own prior: {', '.join(shed)}"
     merged = {**inherited, **dict(explicit or {})}
     if explicit:
         note = f"{note}; from --declare-pitcher: {', '.join(sorted(explicit))}"
@@ -1187,7 +1234,7 @@ def main() -> int:
                          "and the slate's floors instead of inheriting the "
                          "parent run's realized controls (R268(a))")
     ap.add_argument("--declare-pitcher", dest="declare_pitcher", action="append",
-                    default=None, metavar="ID[=ROLE]",
+                    default=None, metavar="ID[=ROLE[:ip=N]]",
                     help="R468. Carry a pitcher the pool would otherwise leave "
                          "out (a PLR or bulk arm), in build_slate.py's grammar. "
                          "The default is the parent build's own declarations, "
@@ -1399,11 +1446,29 @@ def main() -> int:
                  else ", NOT this file's bytes: --allow-parent-mismatch")
               + f"; latest promoted {swap_parent.get('latest_promoted_run_id')})")
 
+    # R470. The parent's declaration record, resolved once for both readers.
+    parent_record = _parent_declaration_record(REPO, args.date, swap_parent)
     declared_pitchers, declared_source = resolve_swap_declared_pitchers(
-        REPO, args.date, swap_parent, explicit_declared)
+        REPO, args.date, swap_parent, explicit_declared, record=parent_record)
     print("declared pitchers: "
           + (", ".join(f"{k}={v}" for k, v in declared_pitchers.items()) or "none")
           + f" ({declared_source})")
+    # R470. The typed innings, from the same record, for declared arms only.
+    declared_workload, workload_source = resolve_swap_declared_workload(
+        REPO, args.date, swap_parent,
+        (_build_slate_module().declared_pitcher_workload(args.declare_pitcher)
+         if args.declare_pitcher else {}),
+        redeclared=explicit_declared, record=parent_record)
+    orphaned = sorted(set(declared_workload) - set(declared_pitchers))
+    if orphaned:
+        declared_workload = {k: v for k, v in declared_workload.items()
+                             if k in declared_pitchers}
+        workload_source = (f"{workload_source}; dropped, not a declared pitcher: "
+                           f"{', '.join(orphaned)}")
+    if declared_pitchers or declared_workload or orphaned:
+        print("declared workload: "
+              + (", ".join(f"{k} ip={v}" for k, v in declared_workload.items()) or "none typed")
+              + f" ({workload_source})")
 
     status = build_status_map_from_lineups_feed(feed, str(salary))
     # R325. A feed game dated to another day than the salary file's is not
@@ -1423,8 +1488,11 @@ def main() -> int:
     # lineup (the same reasoning as FEED_AGE_WARN_MINUTES above), so the
     # staleness prints here instead of failing the gate.
     pool = build_slate_pool(str(salary), feed, stale_platoon_policy="warn",
-                            declared_pitchers=declared_pitchers or None)
+                            declared_pitchers=declared_pitchers or None,
+                            declared_workload=declared_workload or None)
     kwargs = pool["run_slate_kwargs"]
+    for line in workload_prior_lines(pool.get("pool_report")):
+        print(line)
     if pool.get("platoon_source"):
         print(f"platoon fallback: {pool['platoon_source']}")
     for warning in pool["pool_report"].get("warnings") or []:
@@ -1620,7 +1688,8 @@ def main() -> int:
         portfolio_controls=controls,
         # R468. On the swap run's own manifest, so a swap of this file finds
         # what this one carried: a swap writes no brief.
-        metadata={"declared_pitchers": dict(declared_pitchers)},
+        metadata={"declared_pitchers": dict(declared_pitchers),
+                  "declared_pitcher_workload": dict(declared_workload)},
         # R29(2): the downgrade check below can still refuse this file, and a
         # refused run must not leave the latest-run pointer naming it. Promotion
         # happens after the mirror, at the bottom of this function.

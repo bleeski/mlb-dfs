@@ -2348,8 +2348,12 @@ def parse_declared_pitcher_args(values: Sequence[str]) -> Dict[str, str]:
     for raw in values or ():
         text = str(raw).strip()
         pid, _, role = text.partition("=")
-        pid, role = _digits(pid), role.strip()
-        if not pid:
+        # R470. The role is what precedes any `:ip=N` option; the options are
+        # the build's, never a role. An option before any `=` (`ID:ip=3`) is
+        # refused, as build_slate refuses it, rather than read as role `3`.
+        malformed = ":" in pid
+        pid, role = _digits(pid), role.partition(":")[0].strip()
+        if not pid or malformed:
             raise ValueError(
                 f"--declare-pitcher wants a DK player ID, optionally ID=role, "
                 f"got {raw!r}. Example: 43815489=viable_bulk_or_alt_sp. A bare "
