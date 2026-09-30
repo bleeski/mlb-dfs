@@ -17,6 +17,11 @@ run that never promoted, or an UNCERTIFIED build (`review_grade.md`). A file mat
 no run is refused at exit 3 before any bank slice; `--allow-parent-mismatch` is for
 that case alone. The swap inherits the portfolio controls its parent recorded
 (R268(a)), and `--rederive-controls` re-derives them from postures and floors.
+It also carries the parent build's declared pitchers (R468), read from that build's
+brief and printed as `declared pitchers: ... (source)`; `--declare-pitcher ID[=ROLE]`
+adds or overrides one, in `build_slate.py`'s grammar. Without them an entry holding a
+declared PLR or bulk arm in a locked slot has no candidate and the whole swap refuses
+(1400_4g, 2026-09-29: `+0 targeted candidates`, then `no compatible candidate`).
 
 ## The command
 

@@ -40172,3 +40172,275 @@ class RepairDkStartingTests(unittest.TestCase):
         self.assertEqual([d["name"] for d in result["dead_derived_from_feed"]],
                          ["EEE Ives"], (result, err))
         self.assertEqual(result["confirmation_source"], "dk_starting")
+
+
+class LateSwapDeclaredPitcherTests(unittest.TestCase):
+    """R468 (roadmap Session 137). A late swap carries the declared pitchers
+    of the build it refines.
+
+    `late_swap.py` built its pool with no `declared_pitchers`, and the pool
+    holds feed probables plus declared arms and nothing else, so a PLR or
+    bulk arm the build declared was absent from the swap's frame. An entry
+    holding him in a locked slot got `+0 targeted candidates` and the
+    allocator refused `no compatible candidate`, which fails the whole swap:
+    on 2026-09-29 (1400_4g) every 16:03 ET swap exited 3 on Painter, and the
+    later windows ran by hand. The parent's declarations live in its build
+    brief (R268(a) reads `runs/<id>/`, which records none), found by identity
+    the way `retro.resolve_brief` finds any delivery's brief.
+
+    The fixture is that slate's shape at test scale: four teams, T1@T2
+    started (23:05Z) and T3@T4 not (01:05Z), a parent whose rosters include
+    T1 Pen1 declared `viable_bulk_or_alt_sp`, and the clock between the two.
+    """
+
+    DATE = "2026-07-10"
+    NOW = datetime(2026, 7, 10, 23, 30, tzinfo=timezone.utc)
+
+    @staticmethod
+    def _tool():
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "late_swap_r468", REPO / "tools" / "late_swap.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        slate = self.root / "data" / "slates" / self.DATE
+        slate.mkdir(parents=True)
+        self.salary = slate / "DKSalaries.csv"
+        pool_salary_csv(self.salary)
+        with self.salary.open(newline="", encoding="utf-8") as fh:
+            rows = list(csv.reader(fh))
+        for row in rows[1:]:
+            if row[8] in ("T3", "T4"):
+                row[6] = row[6].replace("07:05PM", "09:05PM")
+        with self.salary.open("w", newline="", encoding="utf-8") as fh:
+            csv.writer(fh).writerows(rows)
+        feed = pool_lineups_feed(t4_confirmed=True)
+        feed["games"][1]["game_date_utc"] = "2026-07-11T01:05:00Z"
+        feed["fetched_at"] = "2026-07-10T23:20:00Z"
+        (slate / "lineups_feed.json").write_text(json.dumps(feed), encoding="utf-8")
+        ids = {row[2]: row[3] for row in rows[1:]}
+        self.pen = ids["T1 Pen1"]
+        self.declared = {self.pen: "viable_bulk_or_alt_sp"}
+        pool = lda.build_slate_pool(str(self.salary), feed,
+                                    declared_pitchers=self.declared)
+        frame, _ = epi._assemble_projection_frame(
+            str(self.salary), pool["run_slate_kwargs"]["projection_rows"],
+            "emergency_proxy", None, None, None)
+        hitter = lambda team, i: ids[f"{team} Hitter{i}"]
+        # P P C 1B 2B 3B SS OF OF OF; Hitter1-5 are C 1B 2B 3B SS, 6-8 OF.
+        with_pen = [self.pen, ids["T3 Ace"], *(hitter("T1", i) for i in (1, 2, 3, 4)),
+                    *(hitter("T3", i) for i in (5, 6, 7, 8))]
+        second = [ids["T2 Ace"], ids["T4 Ace"], *(hitter("T2", i) for i in (1, 2, 3)),
+                  *(hitter("T4", i) for i in (4, 5, 6, 7, 8))]
+        third = [ids["T2 Ace"], ids["T3 Ace"], *(hitter("T3", i) for i in (1, 2, 3, 4)),
+                 *(hitter("T2", i) for i in (5, 6, 7, 8))]
+        template = self.root / "DKEntries_template.csv"
+        with template.open("w", newline="", encoding="utf-8") as fh:
+            writer = csv.writer(fh)
+            writer.writerow(HEADER)
+            for i in range(3):
+                writer.writerow([str(7001 + i), "MLB Test GPP", "800", "$1",
+                                 *([""] * 10), "", ""])
+        gates = {g: True for g in (
+            "salary_gate_passed", "entry_grid_gate_passed", "lineup_gate_passed",
+            "pitcher_audit_gate_passed", "weather_gate_passed", "odds_gate_passed",
+            "projection_schema_gate_passed", "optimizer_gate_passed")}
+        parent = run_initial_build(
+            runs_root=self.root / "runs", salary_csv=self.salary, entries_csv=template,
+            projections=frame,
+            candidates=[candidate("A", with_pen, 100, "T3"), candidate("B", second, 99, "T4"),
+                        candidate("C", third, 98, "T2")],
+            entry_requirements=[{"entry_id": str(7001 + i), "contest_id": "800",
+                                 "contest_name": "MLB Test GPP",
+                                 "contest_shape": "large_wta"} for i in range(3)],
+            workflow_gates=gates, portfolio_controls=pipeline_controls())
+        self.assertTrue(parent["passed"], parent.get("errors"))
+        self.parent = parent
+        self.parent_file = Path(parent["output_path"])
+        self.pen_entry = next(
+            entry for entry, roster in _entry_rosters(self.parent_file).items()
+            if self.pen in roster)
+        self.ls = self._tool()
+        self.ls._build_slate_module()
+        self.ls.REPO = self.root
+        from mlb_engine.entries import upload_manifest as um
+        self._um_root = um.REPO_ROOT
+        um.REPO_ROOT = self.root
+        self.addCleanup(setattr, um, "REPO_ROOT", self._um_root)
+        now = self.NOW
+
+        class _Frozen(dtmod.datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return now if tz is not None else now.replace(tzinfo=None)
+
+        self.ls.dt = types.SimpleNamespace(
+            datetime=_Frozen, timezone=dtmod.timezone, timedelta=dtmod.timedelta,
+            date=dtmod.date)
+        self.referee_calls = []
+
+        def _referee(*args, **kwargs):
+            self.referee_calls.append((args, kwargs))
+            return {"exit": 0, "ran": True, "failures": [], "warnings": [],
+                    "error": None, "argv": [], "verdict": "upload_ready"}
+
+        self.ls.run_post_swap_preflight = _referee
+
+    def _brief(self, declared=None):
+        out = self.root / "outputs" / self.DATE
+        out.mkdir(parents=True, exist_ok=True)
+        (out / "build_brief_test.json").write_text(json.dumps({
+            "run_id": self.parent["run_id"],
+            "delivered_sha256": sha256_file(self.parent_file),
+            "declared_pitchers": self.declared if declared is None else declared,
+        }), encoding="utf-8")
+
+    def _run(self, *extra):
+        argv = ["late_swap.py", "--date", self.DATE, "--parent-entries",
+                str(self.parent_file), "--postures", "800=large_gpp",
+                "--budget", "20", *extra]
+        old = sys.argv
+        sys.argv = argv
+        out, err = io.StringIO(), io.StringIO()
+        try:
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                code = self.ls.main()
+        finally:
+            sys.argv = old
+        return code, out.getvalue(), err.getvalue()
+
+    def test_a_parent_with_a_locked_declared_arm_swaps_and_certifies(self):
+        """The row's acceptance: the parent's brief declares the arm, the swap
+        inherits it, the pinned entry gets candidates, and the whole file
+        certifies."""
+        self._brief()
+        code, out, err = self._run()
+        self.assertEqual(code, 0, err[-1500:])
+        self.assertIn("gates: workflow_valid=True selection=True allocation=True", out)
+        self.assertNotIn("no compatible candidate", err)
+        self.assertIn(f"declared pitchers: {self.pen}=viable_bulk_or_alt_sp", out)
+        self.assertIn("from the parent build's brief", out)
+        self.assertRegex(out, rf"entry {self.pen_entry}: pinned .*\+[1-9]\d* targeted")
+        delivered = self.root / "outputs" / self.DATE
+        swapped = [p for p in delivered.glob("DKEntries_*lateswap*.csv")]
+        self.assertEqual(len(swapped), 1, sorted(p.name for p in delivered.iterdir()))
+        self.assertIn(self.pen, _entry_rosters(swapped[0])[self.pen_entry],
+                      "the locked declared arm must stay in his entry")
+
+    def test_without_a_declaration_the_swap_refuses_as_it_did_on_1400_4g(self):
+        """The failure this item closes, kept visible: no brief, no flag, the
+        arm is absent, and the pinned entry has nothing to take."""
+        code, out, err = self._run()
+        self.assertEqual(code, 3)
+        self.assertRegex(out, rf"entry {self.pen_entry}: pinned .*\+0 targeted")
+        self.assertIn(f"no compatible candidate for Entry ID {self.pen_entry}", err)
+        self.assertIn("declared pitchers: none", out)
+
+    def test_an_explicit_declaration_carries_the_arm_without_a_brief(self):
+        code, out, err = self._run("--declare-pitcher",
+                                   f"{self.pen}=viable_bulk_or_alt_sp")
+        self.assertEqual(code, 0, err[-1500:])
+        self.assertIn("from --declare-pitcher", out)
+
+    def test_the_referee_and_the_printed_command_carry_the_declarations(self):
+        """A swap writes no brief, so preflight cannot find the parent's
+        declarations by the swapped file's sha: the swap hands them over."""
+        self._brief()
+        code, out, err = self._run()
+        self.assertEqual(code, 0, err[-1500:])
+        self.assertEqual(len(self.referee_calls), 1)
+        self.assertEqual(self.referee_calls[0][1].get("declared_pitchers"), self.declared)
+        verify = [line for line in out.splitlines() if line.startswith("verify at upload:")]
+        self.assertEqual(len(verify), 1, out[-800:])
+        self.assertIn(f"--declare-pitcher {self.pen}=viable_bulk_or_alt_sp", verify[0])
+
+    def test_the_in_process_referee_receives_each_declaration(self):
+        """`run_post_swap_preflight` builds preflight's argv; driven with a
+        stand-in `preflight_upload` so the argv itself is what is checked."""
+        seen = []
+        fake = types.ModuleType("preflight_upload")
+        fake.main = lambda argv: (seen.append(list(argv)), 0)[1]
+        with unittest.mock.patch.dict(sys.modules, {"preflight_upload": fake}):
+            ls = self._tool()
+            ls.run_post_swap_preflight(
+                self.parent_file, self.parent_file, self.salary, "a" * 64,
+                declared_pitchers={"222": "declared_probable_sp", "111": "viable_bulk_or_alt_sp"})
+        self.assertEqual(len(seen), 1)
+        argv = seen[0]
+        pairs = [argv[i + 1] for i, tok in enumerate(argv) if tok == "--declare-pitcher"]
+        self.assertEqual(pairs, ["111=viable_bulk_or_alt_sp", "222=declared_probable_sp"])
+
+    def test_explicit_values_merge_over_the_inherited_ones(self):
+        self._brief(declared={self.pen: "viable_bulk_or_alt_sp", "999": "declared_probable_sp"})
+        from mlb_engine.swap.late_swap_manager import resolve_parent_run
+        parent = resolve_parent_run(self.root / "runs", self.parent_file)
+        merged, source = self.ls.resolve_swap_declared_pitchers(
+            self.root, self.DATE, parent, {"999": "viable_bulk_or_alt_sp", "777": "declared_probable_sp"})
+        self.assertEqual(merged, {self.pen: "viable_bulk_or_alt_sp", "999": "viable_bulk_or_alt_sp",
+                                  "777": "declared_probable_sp"})
+        self.assertIn("parent build's brief", source)
+        self.assertIn("--declare-pitcher", source)
+
+    def test_a_mismatched_parent_lends_no_declarations(self):
+        """Like R268(a)'s controls: only a parent whose export IS this file
+        lends what it shipped."""
+        self._brief()
+        from mlb_engine.swap.late_swap_manager import resolve_parent_run
+        parent = dict(resolve_parent_run(self.root / "runs", self.parent_file))
+        parent["current_matches_parent_export"] = False
+        merged, source = self.ls.resolve_swap_declared_pitchers(self.root, self.DATE, parent, {})
+        self.assertEqual(merged, {})
+        self.assertIn("not this file's parent", source)
+
+    def test_a_malformed_declaration_is_exit_4_before_the_pool(self):
+        code, out, err = self._run("--declare-pitcher", "=viable_bulk_or_alt_sp")
+        self.assertEqual(code, 4)
+        self.assertIn("--declare-pitcher", err)
+        self.assertNotIn("bank after the general slice", out)
+
+    def test_the_grammar_is_build_slates_own_parser(self):
+        self.assertIs(self.ls._declared_pitcher_parser(),
+                      self.ls._build_slate_module().parse_declared_pitchers)
+
+    def test_a_swap_of_a_swap_keeps_the_declarations(self):
+        """The later windows are where 1400_4g needed this. A swap writes no
+        brief, so the second swap's parent (the first swap's run) has none:
+        each swap run records what it carried, and the next one reads it."""
+        self._brief()
+        code, out, err = self._run()
+        self.assertEqual(code, 0, err[-1500:])
+        first = next((self.root / "outputs" / self.DATE).glob("DKEntries_*lateswap*.csv"))
+        self.parent_file = first
+        code, out, err = self._run()
+        self.assertEqual(code, 0, err[-1500:])
+        self.assertIn(f"declared pitchers: {self.pen}=viable_bulk_or_alt_sp", out)
+        self.assertIn("from the parent swap run", out)
+        self.assertNotIn("no compatible candidate", err)
+
+    def test_a_non_numeric_declaration_is_exit_4_before_the_pool(self):
+        """build_slate's parser takes any non-empty id and the pool skips an
+        unknown one with a warning; preflight's parser needs a DK id and raises,
+        which after a written swap is a referee crash at exit 3. Refused here."""
+        code, out, err = self._run("--declare-pitcher", "Painter=viable_bulk_or_alt_sp")
+        self.assertEqual(code, 4)
+        self.assertIn("Painter", err)
+        self.assertNotIn("bank after the general slice", out)
+
+    def test_a_non_numeric_id_in_the_parent_brief_is_dropped_by_name(self):
+        self._brief(declared={**self.declared, "Painter": "viable_bulk_or_alt_sp"})
+        from mlb_engine.swap.late_swap_manager import resolve_parent_run
+        parent = resolve_parent_run(self.root / "runs", self.parent_file)
+        merged, source = self.ls.resolve_swap_declared_pitchers(self.root, self.DATE, parent, {})
+        self.assertEqual(merged, self.declared)
+        self.assertIn("Painter", source)
+
+
+def _entry_rosters(path) -> dict:
+    from mlb_engine.entries.dk_entries_manager import parse_dk_entry_rows
+    return {row.entry_id: list(row.roster_cells) for row in parse_dk_entry_rows(path)}
