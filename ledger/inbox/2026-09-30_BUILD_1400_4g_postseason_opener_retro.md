@@ -29,3 +29,11 @@ Result: 0 of 9 cashed. Opener best 104.9 (cash line 120.5, winner 211.8); Pocket
 - Postseason PLR/bulk arms: treat as near-zero floor; do not roster in a P slot without a named workload (IP) source.
 - Tooling: late_swap cannot carry declared arms (backlog fragment 2026-09-29_BUILD_late-swap-drops-declared-arms.md),
   so the 5 PM and 8 PM windows ran by hand, outside the engine's projection discipline.
+
+## Ben's follow-up (2026-09-30): a chalk-core seat per contest
+The certified file held exactly one Sale + Schlittler lineup (Pocket 5268245030); the Opener held none, and the 8 PM
+swap removed the Pocket one. Proposal: every contest with 2+ entries seats at least one lineup on the projection's
+consensus SP pair, differentiated through its bats. The field's winning cores here were chalk arms (Schlittler 57%)
+paired with a mid-owned second arm (King 16%) and low-owned bats (Rice 2%). The engine already has a `projection`
+sleeve; the ask is that `distinct_sp_pairs` / pitcher caps never leave a contest with zero consensus-pair entries,
+and that a late swap never removes the last one.
