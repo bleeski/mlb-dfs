@@ -2,6 +2,31 @@
 
 What changed in the engine, the tools and the contracts, when, and why.
 
+## 2026-09-30 — R468: late swap carries the declared pitchers of the build it refines, so a slate built on `--declare-pitcher` arms can be swapped at all (roadmap Session 137)
+
+**Scope.**
+- `tools/late_swap.py`: `--declare-pitcher` (new), `_declared_pitcher_parser`, `resolve_swap_declared_pitchers`, `declared_pitcher_argv` (new); `main` passes the resolved declarations to `build_slate_pool`, records them on the swap run (`metadata.declared_pitchers`) and hands them to `deliver_swap`; `run_post_swap_preflight` and the printed preflight command carry `--declare-pitcher` per arm.
+- `tests/test_core.py`: `LateSwapDeclaredPitcherTests` (12, new) and the `_entry_rosters` helper; `tools/audit.py` pin 1949 -> 1961.
+- `skills/generate-lineups/references/late_swap.md`: the inheritance and the flag, in one paragraph.
+- Board: `docs/backlog.md` (R468 collapsed to a CLOSED stub), `docs/ROADMAP.md` (Session 137 Complete, **NEXT** -> Session 138, a ledger row, the filing row's SHA `6bdaf04`).
+
+**What was wrong.** `late_swap.py` built its pool with `build_slate_pool(str(salary), feed, stale_platoon_policy="warn")`, and the pool holds feed probables plus declared arms and nothing else, so a PLR or bulk arm the build declared was absent from the swap's frame. An entry holding him in a locked slot got `+0 targeted candidates` (a pin missing from the frame is `locked_player_unavailable`), and the allocator's pre-solve compatibility check refused `no compatible candidate for Entry ID ...`, which fails the whole swap. On 2026-09-29 (1400_4g) all three 16:03 ET runs exited 3 on Painter (44321370, locked in two entries), and the 17:00 and 20:00 windows ran by hand. The fragment's "joint MILP proven infeasible for every entry" was, on the unscoped run, that pre-solve refusal; R268(a) reads `runs/<id>/final/diagnostics.json`, which records no declarations, so the parent's live only in its build brief.
+
+**What shipped.**
+- The default is what the parent build declared: the run R268(b) resolves by the file's bytes, its brief found by identity through `retro.resolve_brief` (run_id, else `delivered_sha256`), the resolver every delivery's brief goes through. Like R268(a)'s controls, only a parent whose export IS this file lends them.
+- `--declare-pitcher ID[=ROLE]` is parsed by `build_slate.py`'s own `parse_declared_pitchers` (loaded only when the flag is given) and merges over the inherited set; a non-numeric id is refused at exit 4 before any input is read, and one in an inherited brief is dropped by name.
+- A swap writes no brief, so each swap run records what it carried on its own manifest (`metadata.declared_pitchers`, through `run_late_swap`'s existing `metadata` passthrough into `create_run`); a swap of a swap reads that first.
+- The in-process referee and the printed `verify at upload:` command carry `--declare-pitcher` per arm: preflight resolves declarations by the swapped file's own sha against sibling briefs, finds none for a swap, and would fail a rostered declared arm as absent from his team's lineup.
+- Printed: `declared pitchers: <id>=<role>, ... (<source>)`.
+
+**Tests.** `LateSwapDeclaredPitcherTests` drives `late_swap.main()` on the 1400_4g shape at test scale: four teams, T1@T2 started and T3@T4 not, a parent whose rosters include T1 Pen1 declared `viable_bulk_or_alt_sp`, the clock frozen between the games, the referee stubbed and its call captured. With the parent brief the swap exits 0 and certifies (`workflow_valid=True selection=True allocation=True`), the pinned entry gets targeted candidates and keeps the arm; without it, exit 3 on `+0 targeted` and `no compatible candidate for Entry ID 7002`, the 1400_4g failure. Also: an explicit flag alone; the referee's kwargs and the printed command; the real `run_post_swap_preflight` argv against a stand-in `preflight_upload`; explicit merged over inherited; a mismatched parent lends none; a swap of a swap; a malformed and a non-numeric flag at exit 4; a non-numeric inherited id dropped by name; one grammar. Nine mutations (the pool call, the referee argv, the printed command, the mismatch guard, the merge order, the `deliver_swap` hand-off, the swap-run record, the id check, the inherited filter) each turn one test red. 269 swap, preflight and retro tests pass.
+
+**Code review** (`/code-review` medium, two findings, both fixed): a swap of a swap found no brief and lost the arm (now the swap-run record); a non-numeric id passed the build's parser and crashed preflight's after the file was written (now exit 4, and dropped from an inherited brief).
+
+**R233 enumeration: one grammar.** `grep -rn "def parse_declared\|parse_declared_pitcher_args(\|parse_declared_pitchers(" --include=*.py mlb_engine tools skills`: `build_slate.py:7727` `parse_declared_pitchers` (the build, and now late swap through `_build_slate_module()`); `preflight_upload.py:2332` `parse_declared_pitcher_args` (the deliberate copy, kept: preflight imports no engine module by design; `verify_export.py:226` uses it); `slate_intake_manager.py:1389` `parse_declared_pitchers_text` is a different input (pitcher names from a lineup paste), not the flag.
+
+**Gate.** `PASS  v2.26.0  45 modules  3081 tests  5 skipped  {test_core 1961/1961 (4 skipped) skipped_in_place; test_showdown 425/425 (1 skipped) skipped_in_place}`, the five known host skips (no Classic salary file on disk), no sixth; test_core 1949 -> 1961.
+
 ## 2026-09-30 — R468-R474 filed: seven items from the 2026-09-29 1400_4g postseason slate (0 of 9 cashed), each premise-checked, in Ben's order as roadmap Sessions 137-143
 
 **Scope.**

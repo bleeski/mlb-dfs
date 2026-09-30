@@ -26,7 +26,8 @@ parent. R268(b): the parent is resolved by the file's own bytes, before any bank
 slice (`resolve_parent_run`): a promoted run, a certified-but-unpromoted one, or
 a review-grade build (R388(d)). The flag is for a file matching no run at all.
 R268(a): the swap inherits the controls its parent recorded; ``--rederive-controls``
-re-derives them from postures and floors as before.
+re-derives them from postures and floors as before. R468: it carries the parent
+build's declared pitchers the same way, from that build's brief.
 
 Usage:
     python tools/late_swap.py --date 2026-07-22 \
@@ -35,6 +36,7 @@ Usage:
         [--budget 30] [--solver-budget 15] [--lineups <fresh feed.json>] \
         [--entry-ids 123,456] [--dry-run] \
         [--postures <contest_id>=cash,...] [--accept-downgrade]
+        [--declare-pitcher ID[=ROLE] ...]
 
 The money-and-entry wall still applies: this writes a CSV. Nothing here uploads,
 enters a contest, or moves money. Lineups move only at Ben's manual upload.
@@ -173,6 +175,93 @@ def _build_slate_module():
         spec.loader.exec_module(module)
         _BUILD_SLATE_MODULE = module
     return _BUILD_SLATE_MODULE
+
+
+def _declared_pitcher_parser():
+    """R468. `build_slate.py`'s own `parse_declared_pitchers`, so the swap and
+    the build read ``--declare-pitcher`` with one grammar, not two copies."""
+    return _build_slate_module().parse_declared_pitchers
+
+
+def resolve_swap_declared_pitchers(root: Path, date: str, swap_parent,
+                                   explicit: dict) -> tuple[dict, str]:
+    """R468. ``(declared, source)``: the arms this swap's pool carries.
+
+    `late_swap.py` built its pool with no `declared_pitchers`, and the pool
+    holds feed probables plus declared arms and nothing else, so an arm the
+    build declared was absent from the swap's frame. An entry holding him in a
+    locked slot got `+0 targeted candidates` and the allocator refused `no
+    compatible candidate`, which fails the whole swap: every 16:03 ET swap on
+    2026-09-29 (1400_4g) exited 3 on Painter, and the later windows ran by hand.
+
+    The default is what the parent BUILD declared. R268(a) reads the run's
+    `final/diagnostics.json`, which records no declarations; the build's brief
+    does (`declared_pitchers`, beside `run_id` and `delivered_sha256`), so the
+    brief is found by identity with `retro.resolve_brief`, the resolver every
+    delivery's brief goes through. A swap writes no brief, so each swap run
+    records what it carried (`metadata.declared_pitchers` on its run manifest)
+    and a swap of a swap reads that first. Like R268(a)'s controls, only a
+    parent whose export IS this file lends them. Explicit ``--declare-pitcher``
+    values merge over the inherited ones: a declaration only adds an arm to
+    the legal pool. An id that is not a DK player id is dropped by name:
+    preflight's parser refuses one, which after a written swap is a referee
+    crash.
+    """
+    inherited: dict = {}
+    raw = None
+    manifest = (swap_parent or {}).get("manifest") or {}
+    recorded = (manifest.get("metadata") or {}).get("declared_pitchers")
+    if swap_parent is None:
+        note = "no parent run resolved, so none inherited"
+    elif not swap_parent.get("current_matches_parent_export"):
+        note = ("the resolved run's export is not this file's parent, so none "
+                "inherited")
+    elif isinstance(recorded, dict):
+        raw = recorded
+        note = (f"from the parent swap run {manifest.get('run_id')}'s record"
+                if recorded else f"the parent swap run {manifest.get('run_id')} "
+                                 f"carried none")
+    else:
+        tools_dir = str(Path(__file__).resolve().parent)
+        if tools_dir not in sys.path:
+            sys.path.insert(0, tools_dir)
+        import retro  # noqa: PLC0415 - a tool module, loaded on the one path that reads it
+        run_id = (swap_parent.get("manifest") or {}).get("run_id")
+        brief, how = retro.resolve_brief(
+            Path(root), date, run_id, swap_parent.get("parent_export_sha256"),
+            lineage="")
+        if brief is None:
+            note = f"none inherited: {how}"
+        else:
+            try:
+                raw = json.loads(brief.read_text(encoding="utf-8")).get(
+                    "declared_pitchers") or {}
+            except (OSError, ValueError, AttributeError) as exc:
+                raw = {}
+                note = f"none inherited: {brief.name} unreadable ({exc})"
+            else:
+                note = (f"from the parent build's brief {brief.name} ({how})"
+                        if raw else f"the parent build's brief {brief.name} "
+                                    f"declared none")
+    if isinstance(raw, dict):
+        pairs = {str(k).strip(): str(v).strip() for k, v in raw.items()
+                 if str(k).strip() and str(v).strip()}
+        inherited = {k: v for k, v in pairs.items() if k.isdigit()}
+        dropped = sorted(set(pairs) - set(inherited))
+        if dropped:
+            note = f"{note}; dropped, not a DK player id: {', '.join(dropped)}"
+    merged = {**inherited, **dict(explicit or {})}
+    if explicit:
+        note = f"{note}; from --declare-pitcher: {', '.join(sorted(explicit))}"
+    return dict(sorted(merged.items())), note
+
+
+def declared_pitcher_argv(declared) -> list[str]:
+    """``--declare-pitcher ID=ROLE`` per arm, in id order, for preflight."""
+    out: list[str] = []
+    for pid, role in sorted((declared or {}).items()):
+        out += ["--declare-pitcher", f"{pid}={role}"]
+    return out
 
 
 def swap_certification(result: dict, downgraded: list, parent_label=None) -> str:
@@ -731,7 +820,7 @@ POST_SWAP_REFEREE_FAILED = 5
 
 
 def run_post_swap_preflight(entries: Path, parent, salary: Path, sha: str,
-                            feed_path=None, as_of=None) -> dict:
+                            feed_path=None, as_of=None, declared_pitchers=None) -> dict:
     """CLAUDE.md's pre-upload sentence, run on the swap's own bytes (R174 rider).
 
     This tool wrote, recorded and promoted the file, then PRINTED the preflight
@@ -755,6 +844,10 @@ def run_post_swap_preflight(entries: Path, parent, salary: Path, sha: str,
         argv += ["--feed", str(feed_path)]
     if as_of:
         argv += ["--as-of", str(as_of)]
+    # R468. A swap writes no brief, so preflight cannot find the parent's
+    # declarations by the swapped file's sha; a declared arm still rostered
+    # would fail as "not in his team's confirmed lineup or probables".
+    argv += declared_pitcher_argv(declared_pitchers)
     buf, errbuf = io.StringIO(), io.StringIO()
     try:
         import preflight_upload
@@ -780,7 +873,7 @@ def run_post_swap_preflight(entries: Path, parent, salary: Path, sha: str,
 
 def deliver_swap(args, result: dict, out: Path, salary: Path, swap_parent,
                  contest_shapes: dict, after_rosters: dict, downgraded: list,
-                 controls: dict, feed_path=None) -> int:
+                 controls: dict, feed_path=None, declared_pitchers=None) -> int:
     """Everything after a passing joint solve: present, promote, record, ship.
 
     R414. Split out of `main()` so a test can drive every later-failure
@@ -827,7 +920,9 @@ def deliver_swap(args, result: dict, out: Path, salary: Path, swap_parent,
     # below on success, and carried in `_LAST_USABLE` for `_deliver_after_
     # exception`'s brief on exit 7) rather than one only the success path saw.
     preflight_command = (f"tools/preflight_upload.py --entries {provisional} "
-                        f"--parent {args.parent_entries} --expect-sha256 {sha[:12]}")
+                        f"--parent {args.parent_entries} --expect-sha256 {sha[:12]}"
+                        + "".join(f" --declare-pitcher {pid}={role}" for pid, role
+                                  in sorted((declared_pitchers or {}).items())))
     bs.note_last_usable({
         "path": str(provisional), "sha256": sha,
         "label": certification, "coverage": bs._coverage(provisional),
@@ -935,7 +1030,8 @@ def deliver_swap(args, result: dict, out: Path, salary: Path, swap_parent,
     # an exit that says these bytes are not upload-ready and why.
     referee = run_post_swap_preflight(
         dest, args.parent_entries, salary, delivered_sha or sha,
-        feed_path=feed_path, as_of=getattr(args, "preflight_as_of", None))
+        feed_path=feed_path, as_of=getattr(args, "preflight_as_of", None),
+        declared_pitchers=declared_pitchers)
     bs._LAST_USABLE["referee"] = {k: referee.get(k) for k in
                                   ("exit", "ran", "error", "verdict")}
     if not referee["ran"]:
@@ -1032,6 +1128,14 @@ def main() -> int:
                     help="re-derive portfolio controls from this file's postures "
                          "and the slate's floors instead of inheriting the "
                          "parent run's realized controls (R268(a))")
+    ap.add_argument("--declare-pitcher", dest="declare_pitcher", action="append",
+                    default=None, metavar="ID[=ROLE]",
+                    help="R468. Carry a pitcher the pool would otherwise leave "
+                         "out (a PLR or bulk arm), in build_slate.py's grammar. "
+                         "The default is the parent build's own declarations, "
+                         "read from its brief; these merge over them. Without "
+                         "it an entry holding a declared arm in a locked slot "
+                         "has no candidate and the whole swap refuses.")
     ap.add_argument("--ignore-unresolved-postures", action="store_true",
                     help="proceed when a contest name matches no archetype, "
                          "accepting the fallback posture. Recorded on stderr.")
@@ -1081,6 +1185,22 @@ def main() -> int:
               f"not enforce (R405: its bank holds no cluster-limited jobs), so "
               f"the swap cannot hold it. Nothing was read and no swap was "
               f"attempted.", file=sys.stderr)
+        return 4
+    # R468. Parsed here, before any input is read, with the build's parser
+    # (loaded only when the flag is given: it is an 8,900-line script).
+    try:
+        explicit_declared = (_declared_pitcher_parser()(args.declare_pitcher)
+                             if args.declare_pitcher else {})
+    except ValueError as exc:
+        print(f"{exc}. Nothing was read and no swap was attempted.",
+              file=sys.stderr)
+        return 4
+    not_ids = sorted(pid for pid in explicit_declared if not pid.isdigit())
+    if not_ids:
+        print(f"--declare-pitcher takes a DK player ID (digits), got "
+              f"{', '.join(not_ids)}; the post-swap referee refuses anything "
+              f"else. Nothing was read and no swap was attempted.",
+              file=sys.stderr)
         return 4
 
     slate = REPO / "data" / "slates" / args.date
@@ -1221,6 +1341,12 @@ def main() -> int:
                  else ", NOT this file's bytes: --allow-parent-mismatch")
               + f"; latest promoted {swap_parent.get('latest_promoted_run_id')})")
 
+    declared_pitchers, declared_source = resolve_swap_declared_pitchers(
+        REPO, args.date, swap_parent, explicit_declared)
+    print("declared pitchers: "
+          + (", ".join(f"{k}={v}" for k, v in declared_pitchers.items()) or "none")
+          + f" ({declared_source})")
+
     status = build_status_map_from_lineups_feed(feed, str(salary))
     # R325. A feed game dated to another day than the salary file's is not
     # evidence about this one, and the status map replaced its start time with
@@ -1238,7 +1364,8 @@ def main() -> int:
     # a T-minus swap on that reference's age is the process preventing the
     # lineup (the same reasoning as FEED_AGE_WARN_MINUTES above), so the
     # staleness prints here instead of failing the gate.
-    pool = build_slate_pool(str(salary), feed, stale_platoon_policy="warn")
+    pool = build_slate_pool(str(salary), feed, stale_platoon_policy="warn",
+                            declared_pitchers=declared_pitchers or None)
     kwargs = pool["run_slate_kwargs"]
     if pool.get("platoon_source"):
         print(f"platoon fallback: {pool['platoon_source']}")
@@ -1433,6 +1560,9 @@ def main() -> int:
                         "lineup_gate_passed": bool(status.get("confirmed_teams")),
                         },
         portfolio_controls=controls,
+        # R468. On the swap run's own manifest, so a swap of this file finds
+        # what this one carried: a swap writes no brief.
+        metadata={"declared_pitchers": dict(declared_pitchers)},
         # R29(2): the downgrade check below can still refuse this file, and a
         # refused run must not leave the latest-run pointer naming it. Promotion
         # happens after the mirror, at the bottom of this function.
@@ -1513,7 +1643,8 @@ def main() -> int:
     # a full swap behind it.
     return deliver_swap(args, result, out, salary, swap_parent, contest_shapes,
                         after_rosters, downgraded, controls,
-                        feed_path=(feed_path if dk_feed is None else None))
+                        feed_path=(feed_path if dk_feed is None else None),
+                        declared_pitchers=declared_pitchers)
 
 
 def _argv_date(argv) -> str:
