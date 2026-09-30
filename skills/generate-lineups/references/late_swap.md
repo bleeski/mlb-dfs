@@ -22,6 +22,9 @@ brief and printed as `declared pitchers: ... (source)`; `--declare-pitcher ID[=R
 adds or overrides one, in `build_slate.py`'s grammar. Without them an entry holding a
 declared PLR or bulk arm in a locked slot has no candidate and the whole swap refuses
 (1400_4g, 2026-09-29: `+0 targeted candidates`, then `no compatible candidate`).
+A declared bulk arm is projected at a bulk arm's workload in the swap exactly as in
+the build (R470): the role carries the default, and any typed `:ip=N` is inherited
+from the parent's `declared_pitcher_workload` and printed as `declared workload:`.
 The swap also refuses at exit 3 when it would remove a contest's last lineup on the
 consensus SP pair its parent recorded (R469, `references/chalk_core_seat.md`);
 `--accept-downgrade` takes it and the file ships review-grade.

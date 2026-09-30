@@ -112,6 +112,51 @@ DK_STARTING_LONG_RELIEVER_TOKENS = frozenset({"PLR"})
 # role always meant. That is the answer to the entry's open question.
 BARRED_OPENER_ROLE = "declared_opener"
 
+# R470. A declared bulk or opener arm's workload, as a labeled PRIOR. Every
+# pitcher was projected off season APPG whatever his role, so a declared
+# `viable_bulk_or_alt_sp` arm carried a starter's workload into the objective.
+# On 2026-09-29 (1400_4g, postseason) the certified file held four P slots on
+# declared bulk arms (Painter x2, Fedde, Imai) and the retro records 0 from each;
+# Imai's APPG included his July starts. A bulk arm behind an opener typically
+# covers innings 2-4, so the default is 3.0 expected IP against a starter's 5.5
+# (factor 0.545). `--declare-pitcher ID=ROLE:ip=N` overrides it for any role,
+# capped at the reference so the prior never inflates an arm. Ben chose these
+# numbers on 2026-09-30. A deterministic scale on Base, never a probability.
+BULK_ARM_EXPECTED_IP = 3.0
+STARTER_REFERENCE_IP = 5.5
+BULK_ARM_ROLES = frozenset({"viable_bulk_or_alt_sp"})
+
+
+def declared_arm_workload(role: Any, ip: Any = None) -> Tuple[float, Optional[float], str]:
+    """``(factor, ip_used, source)`` for one declared arm (R470): 1.0 for a
+    starter's workload, else ip / `STARTER_REFERENCE_IP`, capped at 1.0."""
+    if ip is not None:
+        ip_used, source = float(ip), "--declare-pitcher ip="
+    elif str(role or "") in BULK_ARM_ROLES:
+        ip_used, source = BULK_ARM_EXPECTED_IP, "bulk_default"
+    else:
+        return 1.0, None, "starter_workload"
+    factor = min(max(ip_used, 0.0), STARTER_REFERENCE_IP) / STARTER_REFERENCE_IP
+    return factor, ip_used, source
+
+
+def workload_prior_lines(pool_report: Any) -> List[str]:
+    """R470. One printable line per declared arm the workload prior touched,
+    for the build's and the swap's pool review (the pool report's
+    ``declared_arm_workload`` lists every declared arm)."""
+    lines: List[str] = []
+    for arm in (pool_report or {}).get("declared_arm_workload") or []:
+        if arm.get("ip_source") == "starter_workload":
+            continue
+        ip = arm.get("ip")
+        lines.append(
+            f"workload prior: {arm.get('name')} ({arm.get('player_id')}, {arm.get('role')}) "
+            + (f"ip {float(ip):g} of {float(arm.get('reference_ip') or 0):g} "
+               if ip is not None else "")
+            + f"-> x{float(arm.get('factor', 1.0)):.3f} ({arm.get('ip_source')}; a labeled prior)")
+    return lines
+
+
 THE_ODDS_API_BASE = "https://api.the-odds-api.com/v4"
 ODDS_API_IO_BASE = "https://api.odds-api.io/v3"
 
@@ -1697,6 +1742,7 @@ def build_slate_pool(
     now: Optional[datetime] = None,
     lock_buffer_minutes: int = 5,
     stale_platoon_policy: str = "block",
+    declared_workload: Optional[Mapping[str, float]] = None,
 ) -> Dict[str, Any]:
     """Restrict the slate to the players who can actually take the field.
 
@@ -2452,6 +2498,7 @@ def build_slate_pool(
             continue
         pitcher_roles[str(pid)] = "declared_probable_sp"
         keep[str(pid)] = _pool_row(sp, batting_order=None)
+    declared_arm_rows: List[Dict[str, Any]] = []
     for pid, role in (declared_pitchers or {}).items():
         sp = by_id.get(str(pid))
         if sp is None:
@@ -2467,6 +2514,27 @@ def build_slate_pool(
             continue
         pitcher_roles[str(pid)] = str(role or "declared_probable_sp")
         keep.setdefault(str(pid), _pool_row(sp, batting_order=None))
+        # R470. The workload prior rides the arm's own row, so every caller
+        # of the assembler carries it; a starter's workload stamps nothing,
+        # and neither does a declared id that is not P-eligible (a hitter's
+        # Base is never an arm's workload).
+        factor, ip_used, ip_source = declared_arm_workload(
+            pitcher_roles[str(pid)], (declared_workload or {}).get(str(pid)))
+        if factor < 1.0 and not is_pitcher(sp):
+            warnings.append(
+                f"{sp.team} {sp.name} ({pid}): declared as {pitcher_roles[str(pid)]}, "
+                f"but not P-eligible on the salary file; no workload prior applied")
+            factor, ip_source = 1.0, "not_p_eligible"
+        if factor < 1.0:
+            keep[str(pid)]["Workload_Factor"] = factor
+        declared_arm_rows.append({
+            "player_id": str(pid), "name": sp.name, "team": sp.team,
+            "role": pitcher_roles[str(pid)], "ip": ip_used, "ip_source": ip_source,
+            "reference_ip": STARTER_REFERENCE_IP, "factor": factor})
+    # R470. Typed innings for an id nothing declared reach no row; named.
+    for pid in sorted(set(map(str, declared_workload or {})) - set(map(str, declared_pitchers or {}))):
+        warnings.append(f"--declare-pitcher ip= for {pid}, which is not a declared "
+                        f"pitcher; no workload prior applied")
     # R104. An explicit declaration is the documented way past the PO bar, so an
     # arm the operator declared is no longer a barred arm. Reconciled here rather
     # than guarded above, because declared_pitchers is read after the probables.
@@ -2667,6 +2735,10 @@ def build_slate_pool(
             # the pitcher-audit gate, this one is the audit trail for the bar.
             "non_rosterable_arms": sorted(non_rosterable_arms,
                                           key=lambda a: (a["team"], a["player_id"])),
+            # R470. Every declared arm with the workload prior applied to it
+            # (factor 1.0 for a starter's workload), a labeled prior.
+            "declared_arm_workload": sorted(declared_arm_rows,
+                                            key=lambda a: (a["team"], a["player_id"])),
             "unmatched_feed_players": status.get("unmatched_feed_players"),
             "partial_lineup_teams": status.get("partial_lineup_teams") or [],
             "platoon_age_days": platoon_age_days,

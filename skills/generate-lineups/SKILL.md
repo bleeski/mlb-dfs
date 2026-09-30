@@ -145,6 +145,10 @@ python <repo>/tools/autobuild.py \
   --stop-after-minutes 12   # + --declare-pitcher <id>[=<role>] per PLR/PO arm (R345)
 ```
 
+A `viable_bulk_or_alt_sp` declaration projects the arm at 3.0 of a starter's
+5.5 IP (R470, a labeled prior); `<id>=<role>:ip=N` sets the innings for any role,
+capped at 5.5, and the brief lists each arm's factor under `declared_arm_workload`.
+
 `--per-build-seconds` is left off on purpose: it defaults to this host's call
 budget over six (105s on a 630s container, 21s on Cowork). Pass it only to
 override that.

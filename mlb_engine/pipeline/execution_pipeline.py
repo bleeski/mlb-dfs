@@ -5936,6 +5936,10 @@ def _assemble_projection_frame(
             # removes a row from the pool.
             "Excluded": bool(r.get("Excluded", False)),
             "Excluded_Source": r.get("Excluded_Source") or "absent_or_blank",
+            # R470. Only when the pool stamped one, so a frame with no declared
+            # bulk arm keeps its columns byte-identical.
+            **({"Workload_Factor": float(r["Workload_Factor"])}
+               if not _is_blank(r.get("Workload_Factor")) else {}),
         })
 
     frame = pd.DataFrame(assembled)
@@ -6249,6 +6253,19 @@ def _assemble_projection_frame(
                 "every pitcher sat at F1=F4=F5=1.0 (R127).",
     }
 
+    # R470. A declared bulk arm's workload prior (`live_data_adapters.
+    # declared_arm_workload`), applied to Base after the xwOBA restatement and
+    # the ceiling multipliers and before `build_projections`, so Floor and
+    # Ceiling scale with it and Ceiling >= Floor holds. Never an exclusion.
+    # Tagged in Notes like the ceiling multipliers, so the row says why its
+    # Base no longer reads as APPG.
+    if "Workload_Factor" in frame.columns:
+        _wf = pd.to_numeric(frame["Workload_Factor"], errors="coerce").fillna(1.0).clip(0.0, 1.0)
+        frame["Base"] = pd.to_numeric(frame["Base"], errors="coerce") * _wf
+        frame["Workload_Factor"] = _wf
+        for idx in frame.index[_wf < 1.0]:
+            frame.at[idx, "Notes"] = (
+                str(frame.at[idx, "Notes"]) + f"; workload_prior: {_wf.at[idx]:.3f}").lstrip("; ")
     projections, _audit = build_projections(frame, mode=projection_mode, source_metadata=source_metadata)
     if "Ownership_Tier" not in projections.columns:
         projections["Ownership_Tier"] = "Mid"

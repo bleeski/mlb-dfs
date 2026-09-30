@@ -950,6 +950,8 @@ def _write_baseline_brief(args, salary: Path, block: Mapping[str, Any]) -> dict:
             "label": block.get("label"),
             "run_id": block.get("run_id"),
             "declared_pitchers": parse_declared_pitchers(args.declare_pitcher),
+            # R470. The typed innings, so a swap of the baseline inherits them.
+            "declared_pitcher_workload": declared_pitcher_workload(args.declare_pitcher),
             "slate": {"tag": signature["tag"], "games": len(signature["games"]),
                       "first_lock_local": signature["first_lock"]},
             "baseline": {k: v for k, v in block.items() if k != "brief"},
@@ -3603,7 +3605,7 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
                 feed: dict, deadline) -> tuple[int, dict]:
     """``deadline`` is the build's one ``mlb_engine.pipeline.deadline.Deadline``
     (R98(3)); every budget in here is a slice of it."""
-    from mlb_engine.intake.live_data_adapters import build_slate_pool
+    from mlb_engine.intake.live_data_adapters import build_slate_pool, workload_prior_lines
     from mlb_engine.optimize.bank_cache import BankCache, extend_bank, pool_signature
     from mlb_engine.optimize.classic_sleeves import (  # R406
         environment_teams_of, tag_sleeves)
@@ -3639,6 +3641,8 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
     pool = build_slate_pool(str(salary), feed, platoon_json=resolve_platoon_json(args),
                             declared_pitchers=parse_declared_pitchers(
                                 args.declare_pitcher) or None,
+                            declared_workload=declared_pitcher_workload(
+                                args.declare_pitcher) or None,
                             stale_platoon_policy="warn")
     report = pool["pool_report"]
     clock = pool.get("clock") or {}
@@ -3659,6 +3663,8 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
     hard = [b for b in blockers if b not in soft]
     for b in soft:
         print(f"pool (soft): {b}", file=sys.stderr)
+    for line in workload_prior_lines(report):
+        print(line, file=sys.stderr)
     if hard and not args.ignore_pool_blockers:
         for b in hard:
             print(f"POOL BLOCKER: {b}", file=sys.stderr)
@@ -4871,6 +4877,8 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         payload["pool_blockers_overridden"] = (
             hard if (hard and args.ignore_pool_blockers) else [])
         payload["declared_pitchers"] = parse_declared_pitchers(args.declare_pitcher)
+        payload["declared_pitcher_workload"] = declared_pitcher_workload(args.declare_pitcher)
+        payload["declared_arm_workload"] = report.get("declared_arm_workload") or []
         payload["non_rosterable_arms"] = report.get("non_rosterable_arms") or []
         return 3, payload
 
@@ -5003,6 +5011,10 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         # what the build owes is a record of the answer it was given, next to the
         # arms it refused on its own.
         "declared_pitchers": parse_declared_pitchers(args.declare_pitcher),
+        # R470. The typed innings (a late swap inherits them) and every
+        # declared arm with the workload prior applied.
+        "declared_pitcher_workload": declared_pitcher_workload(args.declare_pitcher),
+        "declared_arm_workload": report.get("declared_arm_workload") or [],
         "non_rosterable_arms": report.get("non_rosterable_arms") or [],
         "run_id": result.get("run_id"),
         # R40. The resolved objective, per contest, recorded in the artifact
@@ -7815,6 +7827,71 @@ SOFT_POOL_BLOCKER_RE = _re.compile(
     r"|projected long reliever)", _re.IGNORECASE)
 
 
+#: R470. The options a declaration may carry after its role: ``:ip=N`` (the
+#: workload prior's expected innings). A quoted value may hold a colon; an
+#: unterminated quote reads as nothing and is refused.
+_DECLARE_OPTION_RE = _re.compile(
+    r':(?P<key>[a-z_]+)=(?:"(?P<quoted>[^"]*)"|(?P<bare>[^:"]*))')
+_DECLARE_OPTIONS = ("ip",)
+
+
+def parse_declared_pitcher_options(values) -> dict:
+    """``ID[=ROLE[:ip=N]]`` -> {id: {role, ip}}.
+
+    R470. The options ride after the role, so every reader of the
+    ``{id: role}`` contract (`parse_declared_pitchers`, the brief's
+    ``declared_pitchers``, preflight's resolver) sees a clean role. An option
+    before any ``=`` (``ID:ip=N``, which would read as the id ``ID:ip``), an
+    unknown or repeated option, or an ``ip`` that is not a finite positive
+    number is a `CliValueError`, refused at exit 4 before anything is staged.
+    """
+    import math
+    out: dict = {}
+    for raw in (values or []):
+        text = str(raw).strip()
+        if not text:
+            continue
+        pid, _, rest = text.partition("=")
+        pid = pid.strip()
+        if not pid:
+            raise CliValueError(f"--declare-pitcher {raw!r}: no player ID before '='")
+        if ":" in pid:
+            raise CliValueError(
+                f"--declare-pitcher {raw!r}: options follow the role, "
+                f"ID=ROLE:ip=N (a bare starter is ID=declared_probable_sp:ip=N)")
+        role, sep, opts = rest.partition(":")
+        spec = {"role": role.strip() or "declared_probable_sp", "ip": None}
+        tail, pos, seen = sep + opts, 0, set()
+        while pos < len(tail):
+            match = _DECLARE_OPTION_RE.match(tail, pos)
+            if not match:
+                raise CliValueError(
+                    f"--declare-pitcher {raw!r}: cannot read {tail[pos:]!r}; the "
+                    f"options are {', '.join(':' + k + '=...' for k in _DECLARE_OPTIONS)}")
+            key = match.group("key")
+            value = (match.group("quoted") if match.group("quoted") is not None
+                     else match.group("bare")).strip()
+            if key not in _DECLARE_OPTIONS:
+                raise CliValueError(
+                    f"--declare-pitcher {raw!r}: unknown option {key!r}; the options "
+                    f"are {', '.join(_DECLARE_OPTIONS)}")
+            if key in seen:
+                raise CliValueError(f"--declare-pitcher {raw!r}: {key} given twice")
+            seen.add(key)
+            try:
+                ip = float(value)
+            except ValueError:
+                ip = float("nan")
+            if not (math.isfinite(ip) and ip > 0):
+                raise CliValueError(
+                    f"--declare-pitcher {raw!r}: ip={value!r} is not a positive "
+                    f"number of innings")
+            spec["ip"] = ip
+            pos = match.end()
+        out[pid] = spec
+    return out
+
+
 def parse_declared_pitchers(values) -> dict:
     """``--declare-pitcher 43755567=viable_bulk_or_alt_sp`` -> {id: role}.
 
@@ -7828,17 +7905,14 @@ def parse_declared_pitchers(values) -> dict:
     the role set, and a typo'd role surfaces as a pitcher-audit gate failure
     naming the arm, which is louder than an argparse error at T-10.
     """
-    out: dict = {}
-    for raw in (values or []):
-        text = str(raw).strip()
-        if not text:
-            continue
-        pid, _, role = text.partition("=")
-        pid = pid.strip()
-        if not pid:
-            raise CliValueError(f"--declare-pitcher {raw!r}: no player ID before '='")
-        out[pid] = role.strip() or "declared_probable_sp"
-    return out
+    return {pid: spec["role"]
+            for pid, spec in parse_declared_pitcher_options(values).items()}
+
+
+def declared_pitcher_workload(values) -> dict:
+    """R470. ``{id: ip}`` for the declarations that type ``:ip=N``."""
+    return {pid: spec["ip"] for pid, spec in parse_declared_pitcher_options(values).items()
+            if spec.get("ip") is not None}
 
 ASSUMABLE_GATES = ("salary_gate_passed", "entry_grid_gate_passed",
                    "lineup_gate_passed", "pitcher_audit_gate_passed",
@@ -8068,7 +8142,7 @@ def main() -> int:
                          f"import, certify and write)")
     ap.add_argument("--brief", help="write the brief JSON here")
     ap.add_argument("--declare-pitcher", dest="declare_pitcher", action="append",
-                    default=[], metavar="ID[=ROLE]",
+                    default=[], metavar="ID[=ROLE[:ip=N]]",
                     help="R104. Repeatable. State that a DK player ID is a "
                          "startable arm, e.g. --declare-pitcher 43755567 or "
                          "--declare-pitcher 43755567=viable_bulk_or_alt_sp. This "
@@ -8085,7 +8159,12 @@ def main() -> int:
                          "pool. R347: on Showdown a PO arm does not need it. He "
                          "is kept as `declared_opener` -- rosterable, never a "
                          "declared starter -- and the brief names him under "
-                         "pool.openers_kept.")
+                         "pool.openers_kept. R470: a viable_bulk_or_alt_sp arm "
+                         "is projected at a bulk arm's workload (3.0 of a "
+                         "starter's 5.5 IP, a labeled prior); `:ip=N` sets the "
+                         "expected innings for any role, capped at 5.5, and "
+                         "the brief lists each arm's factor under "
+                         "declared_arm_workload. Classic only.")
     ap.add_argument("--ignore-pool-blockers", action="store_true",
                     help="build despite a HARD pool blocker. The override is "
                          "printed and recorded in the brief. Reach for this only "

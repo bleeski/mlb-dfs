@@ -40888,3 +40888,265 @@ class LateSwapConsensusPairGuardTests(unittest.TestCase):
         code, out, err = harness._run()
         self.assertEqual(code, 3)
         self.assertEqual(len(seen), 1)
+
+
+class DeclaredArmWorkloadTests(unittest.TestCase):
+    """R470 (roadmap Session 139). A declared bulk or opener arm is projected
+    on a starter's workload no longer.
+
+    Every pitcher, whatever his role, was projected off season APPG (Base =
+    APPG, restated by xwOBA, times F1 and F5), so a declared
+    `viable_bulk_or_alt_sp` arm carried a starter's workload into the
+    objective. On 2026-09-29 (1400_4g) the certified file held four P slots on
+    declared bulk arms (Painter x2, Fedde, Imai), and the retro records 0 from
+    each; Imai's APPG included his July starts. A labeled workload prior now
+    scales the arm's Base by expected innings over a starter's reference,
+    before `build_projections`, so Floor and Ceiling move together. Never an
+    exclusion: the arm stays in the legal pool.
+    """
+
+    @staticmethod
+    def _bs():
+        return LostWindowFlagValueTests._module()
+
+    # -- the grammar ---------------------------------------------------------- #
+
+    def test_the_options_grammar_and_the_role_contract(self):
+        bs = self._bs()
+        values = ["1=viable_bulk_or_alt_sp:ip=2.5", "2", '3=declared_probable_sp:ip="4"']
+        self.assertEqual(bs.parse_declared_pitchers(values),
+                         {"1": "viable_bulk_or_alt_sp", "2": "declared_probable_sp",
+                          "3": "declared_probable_sp"},
+                         "the {id: role} contract every reader relies on is unchanged")
+        options = bs.parse_declared_pitcher_options(values)
+        self.assertEqual(options["1"], {"role": "viable_bulk_or_alt_sp", "ip": 2.5})
+        self.assertEqual(options["3"]["ip"], 4.0)
+        self.assertEqual(bs.declared_pitcher_workload(values), {"1": 2.5, "3": 4.0})
+        for bad in ("1=viable_bulk_or_alt_sp:ip=abc", "1=viable_bulk_or_alt_sp:ip=0",
+                    "1=viable_bulk_or_alt_sp:ip=inf", "1=viable_bulk_or_alt_sp:ip=nan",
+                    "1=viable_bulk_or_alt_sp:ip=2:ip=4", "1=viable_bulk_or_alt_sp:foo=1",
+                    '1=viable_bulk_or_alt_sp:ip="2', "1:ip=3",
+                    # R471 adds the evidence note, with the place it is recorded.
+                    '1=declared_probable_sp:evidence="K line"'):
+            with self.assertRaises(bs.CliValueError, msg=bad):
+                bs.parse_declared_pitcher_options([bad])
+
+    def test_an_option_before_the_role_refuses_at_exit_4_before_staging(self):
+        """`ID:ip=3` would read as the id `ID:ip`, skipped off the salary file,
+        so the arm would not be declared at all. Refused through the one
+        `validate_cli_values` site, like every other bad flag value."""
+        harness = LostWindowFlagValueTests(
+            "test_a_declared_pitcher_with_no_id_refuses_before_the_pool_build")
+        harness.setUp()
+        self.addCleanup(harness.doCleanups)
+        harness._assert_refused(["--declare-pitcher", "43706740:ip=3"],
+                                "--declare-pitcher", "options follow the role")
+
+    def test_preflight_reads_the_role_without_the_suffix(self):
+        sys.path.insert(0, str(REPO / "tools"))
+        import preflight_upload
+        self.assertEqual(
+            preflight_upload.parse_declared_pitcher_args(
+                ["43321370=viable_bulk_or_alt_sp:ip=3", '44321112=declared_probable_sp:ip="2.5"']),
+            {"43321370": "viable_bulk_or_alt_sp", "44321112": "declared_probable_sp"})
+        with self.assertRaises(ValueError, msg="read as role '3' before this fix"):
+            preflight_upload.parse_declared_pitcher_args(["43321370:ip=3"])
+
+    # -- the prior ----------------------------------------------------------- #
+
+    def _pool(self, declared, workload=None):
+        with tempfile.TemporaryDirectory() as tmp:
+            salary = Path(tmp) / "salary.csv"
+            pool_salary_csv(salary)
+            with salary.open(newline="", encoding="utf-8") as fh:
+                ids = {row[2]: row[3] for row in list(csv.reader(fh))[1:]}
+            pool = lda.build_slate_pool(str(salary), pool_lineups_feed(),
+                                        declared_pitchers={ids[k]: v for k, v in declared.items()},
+                                        declared_workload=({ids[k]: v for k, v in workload.items()}
+                                                           if workload else None))
+            frame, _ = epi._assemble_projection_frame(
+                str(salary), pool["run_slate_kwargs"]["projection_rows"],
+                "emergency_proxy", None, None, None)
+        return ids, pool, frame
+
+    def test_a_declared_bulk_arm_is_scaled_to_the_bulk_prior(self):
+        ids, pool, frame = self._pool({"T1 Pen1": "viable_bulk_or_alt_sp"})
+        _ids, _pool0, plain = self._pool({"T1 Pen1": "declared_probable_sp"})
+        pen = ids["T1 Pen1"]
+        row = frame.set_index("Player_ID").loc[pen]
+        base = plain.set_index("Player_ID").loc[pen]
+        factor = lda.BULK_ARM_EXPECTED_IP / lda.STARTER_REFERENCE_IP
+        self.assertAlmostEqual(row["Workload_Factor"], factor)
+        for col in ("Base", "Floor", "Ceiling"):
+            self.assertAlmostEqual(row[col], base[col] * factor, places=6, msg=col)
+        self.assertGreaterEqual(row["Ceiling"], row["Floor"])
+        self.assertIn(pen, set(frame["Player_ID"]), "a prior, never an exclusion")
+        self.assertIn("workload_prior: 0.545", row["Notes"], "the row says why Base moved")
+        self.assertNotIn("workload_prior", base["Notes"])
+        listed = {a["player_id"]: a for a in pool["pool_report"]["declared_arm_workload"]}
+        self.assertEqual(listed[pen]["ip_source"], "bulk_default")
+        self.assertAlmostEqual(listed[pen]["factor"], factor)
+
+    def test_an_explicit_ip_overrides_any_role_and_is_capped_at_a_starter(self):
+        ids, pool, frame = self._pool({"T1 Pen1": "declared_probable_sp", "T2 Pen1": "viable_bulk_or_alt_sp"},
+                                      workload={"T1 Pen1": 4.0, "T2 Pen1": 9.0})
+        rows = frame.set_index("Player_ID")
+        self.assertAlmostEqual(rows.loc[ids["T1 Pen1"], "Workload_Factor"],
+                               4.0 / lda.STARTER_REFERENCE_IP)
+        self.assertAlmostEqual(rows.loc[ids["T2 Pen1"], "Workload_Factor"], 1.0,
+                               msg="an ip above a starter's never inflates an arm")
+        listed = {a["player_id"]: a for a in pool["pool_report"]["declared_arm_workload"]}
+        self.assertEqual(listed[ids["T1 Pen1"]]["ip_source"], "--declare-pitcher ip=")
+        self.assertEqual((listed[ids["T2 Pen1"]]["ip"], listed[ids["T2 Pen1"]]["factor"]), (9.0, 1.0),
+                         "the brief records the typed innings and the capped factor")
+
+    def test_a_bare_declaration_and_every_undeclared_row_are_untouched(self):
+        ids, pool, frame = self._pool({"T1 Pen1": "declared_probable_sp"})
+        self.assertNotIn("Workload_Factor", frame.columns,
+                         "no declared arm owes a factor, so the frame is byte-identical")
+        self.assertEqual(pool["pool_report"]["declared_arm_workload"][0]["factor"], 1.0)
+
+    def test_a_declared_id_that_is_not_p_eligible_is_never_scaled(self):
+        """A hitter's id pasted as a bulk arm must not cut his hitting Base;
+        typed innings for an id nothing declared reach no row. Both named."""
+        ids, pool, frame = self._pool({"T1 Hitter1": "viable_bulk_or_alt_sp"},
+                                      workload={"T3 Pen2": 2.0})
+        _ids, _p, plain = self._pool({})
+        hitter = ids["T1 Hitter1"]
+        self.assertNotIn("Workload_Factor", frame.columns)
+        self.assertAlmostEqual(frame.set_index("Player_ID").loc[hitter, "Base"],
+                               plain.set_index("Player_ID").loc[hitter, "Base"])
+        listed = {a["player_id"]: a for a in pool["pool_report"]["declared_arm_workload"]}
+        self.assertEqual((listed[hitter]["factor"], listed[hitter]["ip_source"]),
+                         (1.0, "not_p_eligible"))
+        warnings = " | ".join(pool["pool_report"]["warnings"])
+        self.assertIn(f"({hitter}): declared as viable_bulk_or_alt_sp, but not P-eligible", warnings)
+        self.assertIn(f"ip= for {ids['T3 Pen2']}, which is not a declared pitcher", warnings)
+
+    def test_the_printed_line_names_each_factored_arm(self):
+        ids, pool, _frame = self._pool({"T1 Pen1": "viable_bulk_or_alt_sp", "T2 Pen1": "declared_probable_sp"})
+        lines = lda.workload_prior_lines(pool["pool_report"])
+        self.assertEqual(lines, [f"workload prior: T1 Pen1 ({ids['T1 Pen1']}, viable_bulk_or_alt_sp) "
+                                 f"ip 3 of 5.5 -> x0.545 (bulk_default; a labeled prior)"],
+                         "a starter's workload prints nothing")
+
+    def test_the_baseline_brief_records_the_typed_innings(self):
+        """A swap of a delivered baseline reads that brief (R468's resolver),
+        so the typed innings ride it as they ride the enhanced brief."""
+        bs = self._bs()
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "outputs" / "2026-07-29"
+            out.mkdir(parents=True)
+            delivered = out / "DKEntries_1910_6g_BASELINE_r1.csv"
+            delivered.write_text("x\n", encoding="utf-8")
+            args = types.SimpleNamespace(date="2026-07-29", declare_pitcher=[
+                "43706740=viable_bulk_or_alt_sp:ip=2.5"])
+            got = bs._write_baseline_brief(
+                args, REPO / "tests" / "fixtures" / "slates" / "DKSalaries_frozen_2026-07-29.csv",
+                {"path": str(delivered), "sha256": "ab", "run_id": "r1"})
+            self.assertTrue(got["written"], got)
+            brief = json.loads(Path(got["path"]).read_text(encoding="utf-8"))
+        self.assertEqual(brief["declared_pitcher_workload"], {"43706740": 2.5})
+        self.assertEqual(brief["declared_pitchers"], {"43706740": "viable_bulk_or_alt_sp"})
+
+    def test_run_classic_records_the_factors_and_hands_them_to_the_solve(self):
+        """Through `run_classic` with the real pool build (only `run_slate` is
+        faked): the prior reaches the rows the solve is handed, and the
+        payload lists every declared arm with its factor."""
+        harness = DeadlineGovernorWiringTests("test_the_anti_correlation_flag_reaches_the_controls_the_validator_grades")
+        harness.setUp()
+        self.addCleanup(harness.doCleanups)
+        bulk, typed = "43706740", "43706750"
+        code, payload, _calls, _err = harness._run(30, args_overrides={"declare_pitcher": [
+            f"{bulk}=viable_bulk_or_alt_sp", f"{typed}=declared_probable_sp:ip=2.75"]})
+        self.assertEqual(code, 3)
+        listed = {a["player_id"]: a for a in payload["declared_arm_workload"]}
+        self.assertEqual((listed[bulk]["ip"], listed[bulk]["ip_source"]),
+                         (lda.BULK_ARM_EXPECTED_IP, "bulk_default"))
+        self.assertAlmostEqual(listed[typed]["factor"], 2.75 / lda.STARTER_REFERENCE_IP)
+        self.assertEqual(payload["declared_pitcher_workload"], {typed: 2.75})
+        self.assertEqual(payload["declared_pitchers"],
+                         {bulk: "viable_bulk_or_alt_sp", typed: "declared_probable_sp"})
+        rows = {str(r.get("Player_ID") or r.get("ID")): r
+                for r in harness.solve_kwargs[0]["projection_rows"]}
+        self.assertAlmostEqual(rows[bulk]["Workload_Factor"],
+                               lda.BULK_ARM_EXPECTED_IP / lda.STARTER_REFERENCE_IP)
+        self.assertAlmostEqual(rows[typed]["Workload_Factor"], 2.75 / lda.STARTER_REFERENCE_IP)
+
+    # -- late swap carries the typed innings (R468's record) ------------------ #
+
+    def test_a_late_swap_inherits_the_parents_typed_innings(self):
+        harness = LateSwapDeclaredPitcherTests("test_the_grammar_is_build_slates_own_parser")
+        harness.setUp()
+        self.addCleanup(harness.doCleanups)
+        out_dir = harness.root / "outputs" / harness.DATE
+        out_dir.mkdir(parents=True, exist_ok=True)
+        (out_dir / "build_brief_test.json").write_text(json.dumps({
+            "run_id": harness.parent["run_id"],
+            "delivered_sha256": sha256_file(harness.parent_file),
+            "declared_pitchers": harness.declared,
+            "declared_pitcher_workload": {harness.pen: 2.0},
+        }), encoding="utf-8")
+        code, out, err = harness._run()
+        self.assertEqual(code, 0, err[-1500:])
+        self.assertIn(f"declared workload: {harness.pen} ip=2.0", out)
+        self.assertIn(f"{harness.pen}, {harness.declared[harness.pen]}) ip 2 of 5.5 -> x0.364 "
+                      f"(--declare-pitcher ip=; a labeled prior)", out,
+                      "the swap prints the prior where its pool is reviewed")
+        manifests = [json.loads(p.read_text()) for p in (harness.root / "runs").glob("*/manifest.json")]
+        swap = next(m for m in manifests if m.get("mode") == "late_swap")
+        self.assertEqual(swap["metadata"]["declared_pitcher_workload"], {harness.pen: 2.0})
+        frame = pd.read_csv(harness.root / "runs" / swap["run_id"] / "final" / "projections.csv",
+                            dtype={"Player_ID": str})
+        self.assertAlmostEqual(
+            float(frame.set_index("Player_ID").loc[harness.pen, "Workload_Factor"]),
+            2.0 / lda.STARTER_REFERENCE_IP, msg="the swap's pool applied the typed innings")
+
+    def test_a_swap_that_re_declares_an_arm_drops_the_parents_innings(self):
+        """The parent typed ip=2 on a bulk arm; the operator re-declares him a
+        starter on the swap with no ip. His new role's prior applies (a
+        starter's workload), never the parent's 2 innings."""
+        harness = LateSwapDeclaredPitcherTests("test_the_grammar_is_build_slates_own_parser")
+        harness.setUp()
+        self.addCleanup(harness.doCleanups)
+        out_dir = harness.root / "outputs" / harness.DATE
+        out_dir.mkdir(parents=True, exist_ok=True)
+        (out_dir / "build_brief_test.json").write_text(json.dumps({
+            "run_id": harness.parent["run_id"],
+            "delivered_sha256": sha256_file(harness.parent_file),
+            "declared_pitchers": harness.declared,
+            "declared_pitcher_workload": {harness.pen: 2.0},
+        }), encoding="utf-8")
+        code, out, err = harness._run("--declare-pitcher", f"{harness.pen}=declared_probable_sp")
+        self.assertEqual(code, 0, err[-1500:])
+        self.assertIn("declared workload: none typed", out)
+        self.assertIn(f"re-declared here without ip, so the role's own prior: {harness.pen}", out)
+        manifests = [json.loads(p.read_text()) for p in (harness.root / "runs").glob("*/manifest.json")]
+        swap = next(m for m in manifests if m.get("mode") == "late_swap")
+        self.assertEqual(swap["metadata"]["declared_pitcher_workload"], {})
+        frame = pd.read_csv(harness.root / "runs" / swap["run_id"] / "final" / "projections.csv",
+                            dtype={"Player_ID": str})
+        self.assertNotIn("Workload_Factor", frame.columns, "a starter's workload stamps nothing")
+
+    def test_the_swap_workload_resolver_merges_and_drops_bad_values(self):
+        harness = LateSwapDeclaredPitcherTests("test_the_grammar_is_build_slates_own_parser")
+        harness.setUp()
+        self.addCleanup(harness.doCleanups)
+        harness._brief()
+        from mlb_engine.swap.late_swap_manager import resolve_parent_run
+        parent = dict(resolve_parent_run(harness.root / "runs", harness.parent_file))
+        parent["manifest"] = {**parent["manifest"], "metadata": {
+            **(parent["manifest"].get("metadata") or {}),
+            "declared_pitchers": {}, "declared_pitcher_workload": {"111": 2.5, "abc": 3.0, "222": -1}}}
+        merged, note = harness.ls.resolve_swap_declared_workload(
+            harness.root, harness.DATE, parent, {"333": 4.0})
+        self.assertEqual(merged, {"111": 2.5, "333": 4.0})
+        self.assertIn("parent swap run", note)
+        self.assertIn("dropped, not a DK player id with positive innings: 222, abc", note)
+        parent["manifest"]["metadata"]["declared_pitcher_workload"] = {"111": 2.5, "444": 2.0}
+        merged, note = harness.ls.resolve_swap_declared_workload(
+            harness.root, harness.DATE, parent, {"333": 4.0},
+            redeclared={"111": "declared_probable_sp", "333": "viable_bulk_or_alt_sp"})
+        self.assertEqual(merged, {"333": 4.0, "444": 2.0},
+                         "an arm re-declared without ip takes its new role's prior, not the parent's number")
+        self.assertIn("re-declared here without ip, so the role's own prior: 111", note)
