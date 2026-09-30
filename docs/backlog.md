@@ -663,7 +663,7 @@ repair one, so finding 2's guard has to sit at the PRIOR and not at the cap.
 ### R211. CLOSED 2026-09-29 -- SHIPPED as roadmap Session 119 (c), entry in CHANGELOG.md; the declined half (arm-led directional repeats) is R463 (4)
 
 
-### R210. Three Showdown tool gaps: the probe errors out, QA section 1 reads Classic-shaped fields, and `--postures` IS a silent no-op (P2, S) | new 2026-08-23, merged from BUILD fragment `2026-08-21_BUILD_showdown-tool-gaps.md`; (c) upgraded from "may be" to VERIFIED 2026-08-29, second sighting
+### R210. Three Showdown tool gaps: the probe errors out, QA section 1 reads Classic-shaped fields, and `--postures` IS a silent no-op (P2, S; **(c) CLOSED 2026-09-30, Session 52 (R238): Showdown reads `--postures`**) | new 2026-08-23, merged from BUILD fragment `2026-08-21_BUILD_showdown-tool-gaps.md`; (c) upgraded from "may be" to VERIFIED 2026-08-29, second sighting
 
 - **What:** **(a)** `tools/solver_probe.py` errors on a Showdown salary CSV —
   `_assemble_projection_frame` raises `ValueError: projection_rows is empty` on
@@ -830,109 +830,13 @@ say in the report that it is necessary and not sufficient. (b) Add the epsilon, 
 share the helper and bring it under
 `test_cap_count_arithmetic_is_floor_and_both_copies_agree`.
 
-### R238. Showdown resolves no contest shape: every archetype reads UNRESOLVED, the ownership companion has nothing to condition on, and the Showdown half of the archive accumulates with no archetype key (P1, S-M) | new 2026-08-27, merged from BUILD fragments `2026-08-27_BUILD_showdown_f1_and_archetype_gaps.md` §2 and `2026-08-27_BUILD_showdown_entry_to_contest_assignment_is_positional.md`; corroborated by the outside spec ed8 (F-39)
+### R238. CLOSED 2026-09-30 -- SHIPPED (roadmap Session 52), entry migrated to CHANGELOG.md
 
-**What.** `run_showdown` never calls `_resolve_contest_postures`, so the brief
-carries no `contest_shape`, `qa_portfolio` section 4 prints `archetype
-UNRESOLVED` for every contest id (9 of 9 on 1905_1g_sd, 8 of 8 on texcws_sd),
-and R10's conditioning key is absent from every Showdown build the archive
-accumulates. Two of the nine names on 1905_1g_sd are also absent from
-`dk_contest_archetypes.csv`, so name inference would not have covered them.
+`run_showdown` now identifies each contest (`showdown_contest_identity`, the resolver `run_classic` calls, fed `parse_dk_entry_rows` rows) and writes `brief["contests"]`, the list `qa_portfolio` section 4 reads, plus `contest_identity` and per-contest `contest_shape`/`posture`/`posture_source`. `--postures` is carried, an unmatched key and an unidentified title are named, and the label steers nothing. Three claims in the filed text were wrong or moot and are corrected in the CHANGELOG entry: the archive's conditioning key is read from the contest name at grade time, not from the brief; F1 was wired into Showdown by R334(a); and the fix's reader is `brief["contests"]`, not `per_contest`. Gate: PASS  v2.26.0  45 modules  3046 tests  5 skipped (full line in CHANGELOG.md, 2026-09-30)
 
-**Rider added 2026-09-01, from BUILD fragment
-`2026-09-01_BUILD_showdown_f1_and_archetype.md` §2 — THIRD sighting, and this one
-sharpens the cost.** On 1940_1g_sd the operator supplied `--postures` on the
-command line with **eight contest IDs named explicitly** (five `wta_satellite`,
-one `small_gpp`, one `single_entry`, one `large_gpp`). The build ACCEPTED them
-without blocking and `grep -c contest_shape` on the delivered brief returns **0**,
-so `qa_portfolio` reported all 8 as UNRESOLVED and declined to condition ownership
-on an archetype — correctly, since it will not default. **The earlier sightings
-were "inference had nothing to infer from"; this one is "the answer was supplied
-and thrown away"**, which is a worse failure and it is silent: accepting a flag
-whose value never reaches the artifact is R242's shape, and an operator who typed
-the archetypes has every reason to believe they took. Carry the posture into the
-brief's `per_contest` rows; it is known at build time.
+### R239(a). CLOSED 2026-09-30 -- SHIPPED for the thesis ladder (roadmap Session 52), entry migrated to CHANGELOG.md
 
-**The F1 half of that fragment is CLOSED by measurement, not built** (the sibling
-fragment did the arithmetic while checking something else). On a one-game slate
-the F1 tilt is bounded by construction: delivered odds total 10.0, consensus
-no-vig CHC .5298 / MIL .4702, implied team totals 5.10 and 4.90 against a slate
-mean of 5.00, so hitter F1 would be **CHC 1.021 / MIL 0.979** — a ±2% tilt, against
-platoon corrections reaching ±15% on the same build. Wiring F1 into
-`price_showdown_pool` is not worth it for a one-game slate. What IS owed is one
-sentence in the Showdown brief saying F1 is out of scope and why, so the next
-reviewer is not left inferring it from an absent `enrichment` key — which is R237's
-"absence of a key is not an answer" on a third surface. That sentence rides here.
-
-**Why.** A top-heavy single-entry contest and a one-ticket satellite want
-different things from the same bank, and today the build cannot tell them
-apart. This is the INPUT for R239's shape-aware half and for any per-contest
-review surface; it is also why the washout axis binds invisibly one level below
-the portfolio. The intake fact to state rather than discover:
-`dk_contest_paid_places.json` covers 0 of 108 (3.19), so field size and paid
-places per contest ride the archetypes CSV and the DKEntries file, not a feed.
-
-**Fix.** Call the Classic posture resolver on the Showdown path with the same
-CLI override (`--postures <id>=<shape>`), write `contest_shape` per contest
-into the brief, and give qa section 4 its key. Unmatched names keep Classic's
-behavior (block with the named row, per the Quick Card rule). No solver change.
-
-### R239(a), remainder. Entry-to-contest assignment is still POSITIONAL: theses are not dealt to contests (P1, S-M; depends on nothing further, but see the warning below) | new 2026-08-27, FOUR sightings; (b) and (c) SHIPPED 2026-08-29, see CHANGELOG.md; **this entry rewritten that date to its remainder**
-
-**Rider 2026-09-25 (the code review, Showdown area; `review_showdown/r3_splits_cpt.py`): one measured deal on the fixture's 7+7 partition.** `BS` about L5154 (`contest_of_entry = [r["contest_id"] for r in rows[:n_entries]]`), L5430 (`zip(rows, bank)`), `_round_robin` in spec-index order: slots 0-6 (contest 192413131) receive all five favorite templates plus two underdog; slots 7-13 (192413132) receive three underdog, three neutral and one favorite, so each satellite carries a side lean by position alone. `run_showdown` (L5052-6251) contains zero reads of `postures` or `contest_shape`; `validate_cli_values` parses the flag's syntax only, so a Showdown `--postures` is accepted and discarded (R210(c)).
-
-**What SHIPPED on 2026-08-29, so the next reader does not rebuild it.**
-- **(c)**, the per-contest slice: `per_contest` in the brief on both build paths,
-  `counted_relaxations.clean` answering to it, `qa_portfolio` refusing a clean
-  verdict without it.
-- **(b)**, the cap that binds where the slot is spent: `max_cpt_per_contest`, a
-  named control defaulting to 2, enforced in BOTH `build_thesis_ladder`'s
-  apportionment and `solve_ladder`'s exclusion list, on every rung including the
-  floor. Plus the Gale-Ryser precondition (b)(ii), which R239 did not have.
-- The seam that both needed: the entry-to-contest partition threaded from
-  `run_showdown` into both ladder functions.
-
-**Three corrections to this entry's own text, made while building it.**
-1. **The R233 enumeration was wrong.** This entry said of the six
-   `exposure_cap_count` call sites: "No copy is deliberately kept; all six take
-   the same correction in (b)." All six are deliberately KEPT. They compute the
-   PORTFOLIO captain and player caps, which R153 established and which are
-   correct against the entered total. The defect was never a wrong denominator
-   in those six; it was that no per-contest cap existed. The fix is a fourth
-   control beside them.
-2. **`max_cpt_per_contest` is a named control, not `max(1, floor(pct * n))`.**
-   Deriving it gives 1 for every contest up to seven entries, which is full
-   distinctness arriving as an accident of arithmetic. R247 measured what
-   tightening a cap costs. Ben set it at 2; whether it becomes 1 is his Tier 4
-   call and is a one-value change.
-3. **A FLAT cap of 2 does not kill the 100% case it was chosen to kill.** In a
-   2-entry contest `min(2, 2) = 2` permits both entries on one captain. The bar
-   is `max(1, min(m, n - 1))`.
-
-**What REMAINS: (a), the round-robin deal.** `run_showdown` still assigns with
-`zip(rows, bank)`, so which CONSTRUCTION lands in which contest is still an
-artifact of two orderings that know nothing about each other. The per-contest
-captain cap now stops the worst consequence (one contest's entries sharing the
-highest-leverage slot), but it does not make the deal deliberate: team shape,
-game script and thesis family are still distributed by position. Deal theses to
-contests round-robin across game states so every multi-entry contest carries
-entries live under either script; until shapes resolve, order reserved rows so
-the largest buy-in draws from the most differentiated end of the bank.
-
-**The warning that survives, restated.** (a) was once noted as able to "land
-first and alone". That is still wrong, and (b) landing does not make it right:
-dealing cannot create diversity the bank does not contain. The Gale-Ryser
-precondition now shipped is the test for exactly that, and the 08-28 bank failed
-it at k=3 (14 > 13) with fully distinct captains required. (a) must read the
-feasibility verdict rather than assume a deal is available. Its shape
-conditioning still consumes R238.
-
-**Measured evidence for (a), still open.** texcws_sd's two 7-entry satellites
-each inherited one side (CWS 5/2 and TEX 5/2); hounyy_sd's $1 Solo Shot drew bank
-#21 while the $0.10 Dime Time pair drew #1 and #2; and the 08-26 proof, where two
-different control sets produced an IDENTICAL 20-entry Dime Time slice with all
-diversification landing on entries 21-39. None of those is a captain finding, so
-none is closed by (b).
+The ladder deals templates to contests (`deal_order_across_contests`), so a multi-entry contest carries entries live under either side; template multiset, `allocation`, `rows[j]` and `contest_of_entry` are unchanged. What remains is filed as R467 (the points-max bank's deal; needs Ben's call, D-10). Declined, with reasons, in the CHANGELOG: ordering rows by buy-in (needs the same call), and shape-conditioned dealing (no measurement says a shape wants a different side mix; the shape is a label). Gate: PASS  v2.26.0  45 modules  3046 tests  5 skipped (full line in CHANGELOG.md, 2026-09-30)
 
 ### R240. No punt-captain template: below $5,800 the ladder never captains anyone, so a whole class of broad-field finish is unreachable at any cap value (P2, S-M; decision-first, Ben's) | new 2026-08-27, from `2026-08-26_BUILD_contest_aware_allocation_at_onset.md` §4(d)
 
@@ -1326,6 +1230,12 @@ checkpoint has both objects in scope roughly 240 lines above.
 
 
 ## Workstream 2 — Strategy controls and the evidence that moves them
+
+### R467. The points-max bank hands each contest the ranks its file position implies (P2, S) | new 2026-09-30, found closing R239(a) (Session 52) | Roadmap: Session 136
+
+- **What.** Session 52 dealt the thesis ladder's templates to contests (`showdown_theses.deal_order_across_contests`). The path with no posted batting order builds a ranked points-max bank instead (`build_showdown_bank`), and `run_showdown` still assigns it with `zip(rows, bank)`, so a contest's ranks are set by where its reserved rows sit in the file. A bank rank has no side to deal by, so the ladder's rule does not apply as written. Measured evidence from the R239(a) entry, not re-measured here: hounyy_sd's $1 Solo Shot drew bank #21 while the $0.10 Dime Time pair drew #1 and #2. Pinned as the current behavior: `test_showdown.ShowdownContestShapeTests.test_the_points_max_path_carries_identity_and_says_it_dealt_nothing` (the brief says `thesis_deal.applied` is false and why).
+- **Why.** Which contest holds the best lineups is decided by row order, which nobody chose. On the ladder path the same fact was fixed; here the fix is a strategy call (spread the top ranks proportionally, or let the larger buy-in draw first), because "the most differentiated end of the bank", the phrase R239(a) used, names no measurable end.
+- **Fix.** After D-10: deal the bank's ranks across contests with the same proportional rule (`Fraction(filled + 1, size)`, ties to first appearance, or to the larger buy-in if D-10 says so; `entry_fee` is on `parse_dk_entry_rows` rows). Assign `bank` to rows through the dealt slots, keep the lineups themselves unchanged, and write the deal into `construction.thesis_deal`. Test: the same lineup set is delivered, the top ranks are spread in proportion to contest size, a one-contest file is untouched.
 
 ### R466. A late-swap delivery record resolves to no brief in `retro`, because the swap writes none and its record carries its own run and sha (P3, XS) | new 2026-09-29, found closing R311(b) (Session 130) | Roadmap: Session 135
 
@@ -2393,7 +2303,7 @@ without the total anchor. The full batted-ball venue transform (§2.3's
 six-step chain) stays the L-shaped refinement behind the existing pull
 condition; the v1 instrument is unchanged.
 
-### R254. Captain mispricing screen: the Showdown apex lever (P1, S-M once deps land) | new 2026-08-27, from Ben's greenfield instruction; depends R225 (captain-truth), R238 (archetype key), R252
+### R254. Captain mispricing screen: the Showdown apex lever (P1, S-M once deps land) | new 2026-08-27, from Ben's greenfield instruction; depends R225 (captain-truth), R238 (archetype key, SHIPPED 2026-09-30), R252
 
 **Rider 2026-09-03, from BUILD fragment
 `2026-09-03_BUILD_captain-leverage-and-qa-as-research-arm.md` part 2(a), merged
@@ -2736,7 +2646,7 @@ scenario no candidate covers becomes an ask to the bank generator for a
 legal lineup that covers it — the candidate-bank contract extended, not
 replaced.
 
-### R263, remainder. The Showdown captain/split HARD bands and the satellite chalk floor (P1, gated on R238/R239 and on R10) | filed 2026-08-28; decision answered and shadow build SHIPPED the same day
+### R263, remainder. The Showdown captain/split HARD bands and the satellite chalk floor (P1, gated on R10; R238 and R239(a) SHIPPED 2026-09-30, Session 52) | filed 2026-08-28; decision answered and shadow build SHIPPED the same day
 
 **Build (a) SHIPPED 2026-09-29 (roadmap Session 119), text MIGRATED to CHANGELOG.md.** The captains are now CHOSEN neutral-templates-first (`_captain_walk_order`) and BUILT in slot order, so the duel keeps a starter as captain (on the MIN@CHC fixture at n=19-21 its second slot planned a starter past the cap and shipped a bat; at n=7 the ONE duel slot did) and the apportionment's captain-cap relaxation went from 1 to 0 at n=7/19/20/21. The filed diagnosis was narrower than written: only the favorite's `win_big`/`win_close` and `ace_loses` share an arm (the ace, who is the favorite's on this fixture), and both arms were over-demanded at n=19, not one. Nothing raised the share, because it was already AT the structural ceiling at n=14/19/20/21: the lever moves which thesis holds the armband, not how many armbands exist. Flipping the second duel to the other arm (R211) costs one arm seat where that arm has thin demand (n=16 at -150/+130: 7 of 16 against 8 of 16 without the flip). `construction_shadow`'s ceiling now reads `max_cpt_per_contest` (one 21-entry contest: ceiling 19.0%, was 47.6%) and prints the apportioned share beside the delivered one on the same denominator. **Still open here:** the HARD bands and the satellite chalk floor, gated as below on R238/R239 and R10; the R156 comment that was false at both walk sites is corrected. No cap moved and every band is still shadow.
 

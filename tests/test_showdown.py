@@ -7853,7 +7853,10 @@ class CaptainArmRotationTests(unittest.TestCase):
     def test_slot_order_is_untouched_so_no_entry_changes_contest(self):
         """Slot j is `rows[j]` (R239). The theses must list in ROUND-ROBIN order
         of the allocation, not in the order captains were chosen. Teeth: building
-        the theses in walk order lists the neutral templates first and fails."""
+        the theses in walk order lists the neutral templates first and fails.
+        Drives NO partition (`contest_of_entry=None`), where the R239(a) deal
+        does not run; with a partition the same slots hold the dealt templates
+        (`ShowdownContestShapeTests` pins that side)."""
         for n in (13, 21):
             ladder = st.build_thesis_ladder(self.df, n, moneyline=self.ML[0])
             shape = dict(st.describe_slate(self.df, moneyline=self.ML[0]))
@@ -8299,3 +8302,327 @@ class PitchersDuelFloorTests(_ShowdownExitDoorHarness, unittest.TestCase):
         duels = [x for x in r.brief["construction"]["lineups"]
                  if x.get("template") == "pitchers_duel"]
         self.assertEqual(len(duels), 2)
+
+
+# --------------------------------------------------------------------------- #
+# R238 + R239(a), roadmap Session 52
+# --------------------------------------------------------------------------- #
+_SD_SAT = "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (MIN @ CHC)"
+# DK's own title from the 2026-09 deliveries: matches no archetype row.
+_SD_TRIPLE = "MLB Showdown $1 Triple Up [Top 9 Win $3] (MIN @ CHC)"
+
+
+class ShowdownContestShapeTests(_ShowdownExitDoorHarness, unittest.TestCase):
+    """R238: a Showdown build identifies each contest and says so in the brief.
+
+    Before this, `run_showdown` never called the resolver: `--postures` was
+    parsed, validated and discarded (the 1940_1g_sd sighting: eight contest ids
+    named on the command line, `grep -c contest_shape` on the brief 0), and
+    `qa_portfolio` section 4 printed `archetype UNRESOLVED` for every contest.
+
+    R239(a): a multi-contest ladder deals its templates to contests instead of
+    handing each contest a contiguous run of the round-robin (on the 7+7 MIN_CHC
+    partition one satellite held all five favorite templates, the other three
+    underdog ones).
+
+    Every test that reads the brief runs the PRODUCTION `run_showdown` through
+    the exit door on the vendored MIN_CHC slate; the deal's unit tests call
+    `build_thesis_ladder` and `deal_order_across_contests` directly.
+    """
+
+    def _entries(self, root, layout):
+        """MIN_CHC's DKEntries with each of its 14 reserved rows re-pointed at
+        ``layout[i] = (contest_id, contest_name)``. The embedded player pool to
+        the right of the entry columns is untouched."""
+        import re
+        with ENT.open(newline="", encoding="utf-8-sig") as fh:
+            rows = list(csv.reader(fh))
+        k = 0
+        for row in rows[1:]:
+            if row and re.fullmatch(r"\d+", row[0].strip()):
+                row[2], row[1] = layout[k]
+                k += 1
+        self.assertEqual(k, len(layout))
+        dest = root / "entries_in.csv"
+        with dest.open("w", newline="", encoding="utf-8") as fh:
+            csv.writer(fh).writerows(rows)
+        return dest
+
+    def _eight_contests(self, root):
+        ids = [f"900{i}" for i in range(1, 9)]
+        sizes = [2, 2, 2, 2, 2, 2, 1, 1]
+        layout = [(cid, _SD_SAT) for cid, n in zip(ids, sizes) for _ in range(n)]
+        return ids, self._entries(root, layout)
+
+    # ---- R238: the answer that was supplied is carried, not thrown away
+
+    def test_eight_operator_postures_reach_the_brief_and_every_slice(self):
+        """The 1940_1g_sd shape: eight contest ids named in `--postures` (five
+        wta_satellite, one small_gpp, one single_entry, one large_gpp). Every
+        title here would infer `satellite`, so a row that carries the operator's
+        shape proves the operator's value won and was written."""
+        root = self._root("eight")
+        ids, entries_csv = self._eight_contests(root)
+        posture = dict(zip(ids, ["wta_satellite"] * 5 + ["wta_satellite", "small_gpp",
+                                                         "single_entry"]))
+        posture[ids[5]], posture[ids[6]], posture[ids[7]] = (
+            "small_gpp", "single_entry", "large_gpp")
+        arg = ",".join(f"{k}={v}" for k, v in posture.items())
+        r = self._build(root, entries_csv=entries_csv, args_extra={"postures": arg})
+        self.assertEqual(r.code, 0, r.err[-3000:])
+        shape_of = {"wta_satellite": "large_wta", "small_gpp": "small_field_gpp",
+                    "single_entry": "single_entry_gpp", "large_gpp": "large_field_gpp"}
+        contests = {c["contest_id"]: c for c in r.brief["contests"]}
+        self.assertEqual(sorted(contests), sorted(ids))
+        for cid in ids:
+            row = contests[cid]
+            self.assertEqual(row["posture"], posture[cid], cid)
+            self.assertEqual(row["posture_source"], "operator_supplied", cid)
+            self.assertEqual(row["contest_shape"], shape_of[posture[cid]], cid)
+            slice_ = r.brief["per_contest"]["by_contest"][cid]
+            self.assertEqual(slice_["contest_shape"], row["contest_shape"], cid)
+            self.assertEqual(slice_["posture"], posture[cid], cid)
+            self.assertEqual(slice_["posture_source"], "operator_supplied", cid)
+        self.assertEqual([c["blank_rows"] for c in r.brief["contests"]],
+                         [2, 2, 2, 2, 2, 2, 1, 1])
+        self.assertEqual(r.brief["contest_identity"]["operator_postures_unmatched"], [])
+
+    def test_a_posture_named_by_contest_title_applies_too(self):
+        """`_resolve_contest_postures` reads a key as an id first and a name
+        second. A name key that matches must not be reported as unmatched."""
+        r = self._build(self._root("byname"),
+                        args_extra={"postures": f"{_SD_SAT}=cash"})
+        self.assertEqual(r.code, 0, r.err[-3000:])
+        self.assertEqual({c["contest_shape"] for c in r.brief["contests"]}, {"cash"})
+        self.assertEqual(r.brief["contest_identity"]["operator_postures_unmatched"], [])
+
+    def test_a_posture_that_names_no_contest_is_reported_not_swallowed(self):
+        """The resolver iterates entry rows, so a key that matches none of them
+        is never read. Same shape as the bug being fixed, one level down."""
+        r = self._build(self._root("typo"), args_extra={
+            "postures": "999=cash,192413131=small_gpp"})
+        self.assertEqual(r.code, 0, r.err[-3000:])
+        ident = r.brief["contest_identity"]
+        self.assertEqual(ident["operator_postures_unmatched"], ["999"])
+        self.assertIn("999", r.err)
+        by_id = {c["contest_id"]: c for c in r.brief["contests"]}
+        self.assertEqual(by_id["192413131"]["posture"], "small_gpp")
+        self.assertEqual(by_id["192413132"]["posture_source"], "name_inference")
+
+    def test_an_unidentified_contest_is_named_not_defaulted_and_not_refused(self):
+        """Classic refuses it because the shape changes the objective. Showdown
+        builds by neither, so the file ships, and the contest is labelled
+        unidentified: `contest_shape` and `posture` are None (the resolver's
+        fall-through large_gpp is kept only as `fallback_*`), so section 4 will
+        not price a crowd nobody identified."""
+        root = self._root("triple")
+        layout = ([("7001", _SD_TRIPLE)] * 7) + ([("7002", _SD_SAT)] * 7)
+        r = self._build(root, entries_csv=self._entries(root, layout))
+        self.assertEqual(r.code, 0, r.err[-3000:])
+        by_id = {c["contest_id"]: c for c in r.brief["contests"]}
+        row = by_id["7001"]
+        self.assertEqual(row["posture_source"], "unresolved")
+        self.assertIsNone(row["contest_shape"])
+        self.assertIsNone(row["posture"])
+        self.assertEqual(row["fallback_shape"], "large_field_gpp")
+        self.assertEqual(by_id["7002"]["contest_shape"], "satellite")
+        slice_ = r.brief["per_contest"]["by_contest"]["7001"]
+        self.assertIsNone(slice_["contest_shape"])
+        self.assertEqual(slice_["posture_source"], "unresolved")
+        self.assertEqual([u["contest_id"] for u in
+                          r.brief["contest_identity"]["unresolved"]], ["7001"])
+        self.assertIn("7001", r.err)
+        self.assertIn("--postures 7001=<posture>", r.err)
+
+    def test_the_label_steers_nothing_and_says_so(self):
+        """The same file under three different postures delivers the same
+        lineups, and every row says it carries no profile and steers nothing.
+        A Classic scoring profile on a Showdown row would claim an objective
+        this build never applied."""
+        seen = {}
+        for name, arg in (("a", None), ("b", "192413131=cash,192413132=cash"),
+                          ("c", "192413131=mme,192413132=single_entry")):
+            r = self._build(self._root(name),
+                            args_extra={"postures": arg} if arg else {})
+            self.assertEqual(r.code, 0, r.err[-3000:])
+            seen[name] = [(x["captain"], tuple(x["utils"]))
+                          for x in r.brief["construction"]["lineups"]]
+            for c in r.brief["contests"]:
+                self.assertIsNone(c["profile"])
+                self.assertIs(c["steers"], False)
+            self.assertIs(r.brief["contest_identity"]["steers_construction"], False)
+        self.assertEqual(seen["a"], seen["b"])
+        self.assertEqual(seen["a"], seen["c"])
+
+    def test_qa_section_four_reads_what_the_build_writes(self):
+        """The writer/reader pair, through the real reader. Section 4 keys on
+        `brief["contests"][i]["contest_id"]` and `["contest_shape"]`; a build
+        that wrote only `per_contest` left every contest UNRESOLVED."""
+        from tools.qa_portfolio import section_leverage
+        root = self._root("qa")
+        layout = ([("7001", _SD_TRIPLE)] * 7) + ([("7002", _SD_SAT)] * 7)
+        r = self._build(root, entries_csv=self._entries(root, layout))
+        self.assertEqual(r.code, 0, r.err[-3000:])
+        hdr = ["Entry ID", "Contest Name", "Contest ID", "Entry Fee",
+               "CPT", "UTIL", "UTIL", "UTIL", "UTIL", "UTIL"]
+        body = [[str(100 + i), name, cid, "$0.01", "c1", "u1", "u2", "u3", "u4", "u5"]
+                for i, (cid, name) in enumerate(
+                    [("7001", _SD_TRIPLE)] * 2 + [("7002", _SD_SAT)] * 2)]
+        prior = {"schema": "ownership_pred/v1", "prior_version": "t",
+                 "slate_date": "2026-07-18", "slate_tag": "t",
+                 "salary_file": {"sha256": ""},
+                 "inputs": {k: {"applied": True} for k in (
+                     "batting_order", "implied_totals", "probable_sp",
+                     "base_projection")},
+                 "archetypes": {"wta_satellite": {
+                     "own_pct_by_player_id": {}, "tier_by_player_id": {"c1": "High"}}}}
+        text = "\n".join(section_leverage(
+            r.brief, {}, hdr, body, prior, Path("/tmp/pred.json"), "test", SAL))
+        self.assertIn("satellite -> wta_satellite [COLLAPSED]", text)
+        self.assertEqual(text.count("archetype UNRESOLVED"), 1, text)
+        unresolved = [l for l in text.splitlines() if "archetype UNRESOLVED" in l][0]
+        self.assertIn("7001", unresolved)
+
+    def test_the_points_max_path_carries_identity_and_says_it_dealt_nothing(self):
+        root = self._root("pm")
+        sal = self._points_max_salary(root / "pm_salary.csv")
+        r = self._build(root, salary_csv=sal)
+        self.assertEqual(r.code, 0, r.err[-3000:])
+        self.assertEqual(r.brief["construction"]["mode"], "points_max_bank")
+        self.assertEqual(len(r.brief["contests"]), 2)
+        deal = r.brief["construction"]["thesis_deal"]
+        self.assertIs(deal["applied"], False)
+        self.assertIn("no thesis", deal["reason"])
+
+    # ---- R239(a): the deal, through the production path
+
+    def test_the_brief_shows_each_contest_holding_both_sides_after_the_deal(self):
+        r = self._build(self._root("deal"))
+        self.assertEqual(r.code, 0, r.err[-3000:])
+        deal = r.brief["construction"]["thesis_deal"]
+        self.assertIs(deal["applied"], True)
+        self.assertIs(deal["changed"], True)
+        before, after = deal["positional"], deal["dealt"]
+        self.assertEqual(sorted(before), ["192413131", "192413132"])
+        # The measured 7+7 deal: one satellite held every favorite template.
+        self.assertGreaterEqual(
+            abs(before["192413131"]["favorite"] - before["192413132"]["favorite"]), 3)
+        for cid, row in after.items():
+            self.assertEqual(len(row["slots"]), 7, cid)
+            self.assertGreaterEqual(row["favorite"], 1, cid)
+            self.assertGreaterEqual(row["underdog"], 1, cid)
+        for side in ("favorite", "underdog", "neutral"):
+            self.assertLessEqual(abs(after["192413131"][side]
+                                     - after["192413132"][side]), 1, side)
+        self.assertIs(r.brief["per_contest"]["clean"], True)
+
+    # ---- R239(a): the deal itself
+
+    @staticmethod
+    def _ladder(entries, vec, **kw):
+        df = sd.melt_showdown_salary_csv(str(SAL))
+        return st.build_thesis_ladder(
+            df, entries, moneyline={"MIN": -150, "CHC": 130},
+            contest_of_entry=vec, **kw)
+
+    def test_the_deal_moves_slots_and_nothing_else(self):
+        vec = ["A"] * 7 + ["B"] * 7
+        on = self._ladder(14, vec)
+        off = self._ladder(14, vec, deal_across_contests=False)
+        self.assertEqual(on["contest_partition"]["contest_of_entry"], vec)
+        self.assertEqual(off["contest_partition"]["contest_of_entry"], vec)
+        self.assertEqual(on["allocation"], off["allocation"])
+        self.assertEqual(sorted(t["template"] for t in on["theses"]),
+                         sorted(t["template"] for t in off["theses"]))
+        self.assertNotEqual([t["template"] for t in on["theses"]],
+                            [t["template"] for t in off["theses"]])
+        # Off is the positional placement the entry measured.
+        a_off = [t["template"] for t in off["theses"][:7]]
+        self.assertEqual(sum(t.startswith("favorite") for t in a_off), 5)
+        self.assertIs(off["thesis_deal"]["applied"], False)
+
+    def test_the_deal_is_deterministic_and_keeps_every_contest_size(self):
+        for sizes in ((7, 7), (5, 5, 4), (2, 12), (1, 13), (3, 3, 3, 3, 2)):
+            vec = [f"c{i}" for i, n in enumerate(sizes) for _ in range(n)]
+            one = self._ladder(14, vec)
+            two = self._ladder(14, vec)
+            self.assertEqual([t["template"] for t in one["theses"]],
+                             [t["template"] for t in two["theses"]], sizes)
+            self.assertEqual(one["contest_partition"]["sizes"],
+                             {f"c{i}": n for i, n in enumerate(sizes)}, sizes)
+            dealt = one["thesis_deal"]["dealt"]
+            for cid, row in dealt.items():
+                self.assertEqual(len(row["slots"]),
+                                 one["contest_partition"]["sizes"][cid], (sizes, cid))
+            # Each side reaches a contest in proportion to its SIZE: no contest
+            # holds more of a side than the ceiling of its share of that side.
+            for side in ("favorite", "underdog", "neutral"):
+                total = sum(row[side] for row in dealt.values())
+                for cid, row in dealt.items():
+                    quota = math.ceil(len(row["slots"]) * total / 14)
+                    self.assertLessEqual(row[side], quota, (sizes, cid, side))
+
+    def test_one_contest_and_no_partition_are_untouched(self):
+        base = [t["template"] for t in self._ladder(
+            14, None, deal_across_contests=False)["theses"]]
+        none = self._ladder(14, None)
+        self.assertEqual(base, [t["template"] for t in none["theses"]])
+        self.assertIs(none["thesis_deal"]["applied"], False)
+        self.assertIn("no contest partition", none["thesis_deal"]["reason"])
+        one = self._ladder(14, ["A"] * 14)
+        self.assertEqual(base, [t["template"] for t in one["theses"]])
+        self.assertIs(one["thesis_deal"]["applied"], False)
+        self.assertIn("one contest", one["thesis_deal"]["reason"])
+        short = self._ladder(14, ["A"] * 6 + ["B"] * 6)
+        self.assertIs(short["thesis_deal"]["applied"], False)
+        self.assertIn("covers 12 of 14", short["thesis_deal"]["reason"])
+
+    def test_the_per_contest_captain_cap_binds_on_the_dealt_slots(self):
+        """The deal runs before the captain walk, so the cap sees the placement
+        that ships, and the feasibility verdict is still read on the result."""
+        vec = ["A"] * 7 + ["B"] * 7
+        ladder = self._ladder(14, vec, max_cpt_per_contest=2)
+        self.assertIs(ladder["captain_assignment_feasibility"]["feasible"], True)
+        bar = sd.per_contest_cap_count(7, 2)
+        for cid in ("A", "B"):
+            caps = collections.Counter(
+                t["cpt"] for t, c in zip(ladder["theses"], vec) if c == cid)
+            self.assertLessEqual(max(caps.values()), bar, (cid, caps))
+
+    def test_a_repeated_template_lands_in_different_contests_when_it_can(self):
+        """Three contests of two, one side, each template twice, the copies
+        adjacent in the round-robin: positionally the first contest takes both
+        copies of the first template. The deal must split them."""
+        specs = [{"id": t, "side": "CHC"} for t in ("T1", "T2", "T3")]
+        order = [0, 0, 1, 1, 2, 2]
+        vec = ["A", "A", "B", "B", "C", "C"]
+        _, off = st.deal_order_across_contests(order, specs, "CHC", vec, enabled=False)
+        self.assertIs(off["applied"], False)
+        self.assertEqual(
+            st._deal_summary(order, specs, "CHC", vec)["A"]["templates"], ["T1", "T1"])
+        # The second order interleaves the copies: only sorting by template id
+        # makes them adjacent for the deal.
+        for ordering in (order, [0, 1, 2, 0, 1, 2]):
+            new, rec = st.deal_order_across_contests(ordering, specs, "CHC", vec)
+            self.assertTrue(rec["applied"])
+            for cid, row in rec["dealt"].items():
+                self.assertEqual(len(set(row["templates"])), 2,
+                                 (ordering, cid, row["templates"]))
+            self.assertEqual(sorted(new), sorted(ordering))
+
+    def test_one_entry_contests_do_not_all_draw_the_neutral_tail(self):
+        """A single entry cannot hold a proportion. Dealt by the proportional
+        pass alone it takes the END of the side-sorted sequence, which is all
+        neutral templates, so the lean would be set by contest size."""
+        for sizes, want in (((2, 2, 2, 2, 2, 2, 1, 1), 2),
+                            ((1, 1, 1, 1, 1, 1, 1, 7), 3)):
+            vec = [f"c{i}" for i, n in enumerate(sizes) for _ in range(n)]
+            ladder = self._ladder(14, vec)
+            dealt = ladder["thesis_deal"]["dealt"]
+            single_sides = []
+            for cid, row in dealt.items():
+                if len(row["slots"]) == 1:
+                    single_sides.append(
+                        [k for k in ("favorite", "underdog", "neutral") if row[k]][0])
+            self.assertGreaterEqual(len(set(single_sides)), want, (sizes, single_sides))
+            self.assertLess(single_sides.count("neutral"), len(single_sides), sizes)

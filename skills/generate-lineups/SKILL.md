@@ -1385,6 +1385,19 @@ cannot hold no matter what the solver does. The engine reports that and does not
 widen the cap, because raising an exposure cap is a strategy change and CLAUDE.md
 makes it Ben's.
 
+**Contest identity and the deal (R238, R239(a)).** `brief["contests"]` has one row
+per contest in the entries file (`posture`, `posture_source`, `contest_shape`,
+`entries_in_file`, `blank_rows` = incomplete rows this build fills) and
+`contest_identity` says what `--postures` did: `operator_postures_unmatched` lists a
+key that matches no contest id or title, `unresolved` lists a title nothing
+identified. Both are LABELS: `steers` is false on every row, no posture or shape
+reaches the ladder, and an unidentified contest is named (its `contest_shape` is
+null, never a default) and not refused. Each `per_contest` slice carries the same
+identity. `construction.thesis_deal` gives each contest's favorite / underdog /
+neutral count before and after the ladder dealt its templates to contests
+(`applied: false` with a reason on the points-max path, one contest, or no
+partition); the template multiset and `rows[j]` do not move.
+
 The defaults live in `mlb_engine/optimize/showdown.py`. The Showdown suite is
 `tests/test_showdown.py`, and `tools/audit.py` gates it with every other suite
 in `EXPECTED_SUITE_COUNTS`.

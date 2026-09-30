@@ -28,6 +28,14 @@ VERSION history
                    emitted `captain` block, joined through the UTIL id) and the
                    sleeve's `prior_own_below` selector resolves against it
                    instead of refusing by name
+  0.6  2026-09-30  R239(a): the entry-to-contest deal. A multi-contest ladder
+                   no longer hands each contest a contiguous run of the
+                   round-robin, which gave one contest all five favorite
+                   templates and the other three underdog ones: which template
+                   sits in which slot is now dealt so every contest carries
+                   each side (favorite, underdog, neutral) in proportion to its
+                   size. The template multiset is unchanged; only slot
+                   placement moves.
   0.4  2026-09-21  R381: the captain leverage sleeve. A per-entry captain
                    DESIGNATION over the first k ladder slots, resolved from an
                    explicit list of people, apportioned under all three caps and
@@ -39,6 +47,7 @@ from __future__ import annotations
 
 import math
 from collections import Counter
+from fractions import Fraction
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 import numpy as np
@@ -57,7 +66,7 @@ from mlb_engine.optimize.showdown import (
     player_cap_structural_floor,
 )
 
-VERSION = "0.5"
+VERSION = "0.6"
 
 # PA-share prior by batting-order slot. Deterministic, not fitted to any slate.
 ORDER_FACTOR = {1: 1.08, 2: 1.06, 3: 1.05, 4: 1.03, 5: 1.00,
@@ -1219,8 +1228,10 @@ def resolve_captain_sleeve(df: pd.DataFrame, spec: Optional[Mapping[str, Any]],
     The designated slots are the FIRST ``entries`` ladder slots, which R239
     already makes meaningful: slot j and ``rows[j]`` are the same entry, so the
     sleeve names actual reserved rows rather than a floating count. They are
-    also the first slots of ``_round_robin``, so they span up to ``entries``
-    distinct templates instead of concentrating the sleeve in one game state.
+    also the first slots of ``_round_robin`` before R239(a); with a
+    multi-contest partition the deal reorders which template sits in each slot
+    (the set of sleeve slots is unchanged, the first ``entries`` rows), so the
+    templates under the sleeve are the dealt ones, not the first round-robin's.
 
     Nothing here is a lift, an edge, an ROI or a win rate. The sleeve is a
     designation; what it produced is counted and reported, never graded.
@@ -1345,6 +1356,7 @@ def per_contest_report(df: pd.DataFrame,
                        lineups: Sequence[Optional[Mapping[str, Any]]],
                        contest_of_entry: Optional[Sequence[str]],
                        max_cpt_per_contest: int = DEFAULT_MAX_CPT_PER_CONTEST,
+                       contest_meta: Optional[Mapping[str, Mapping[str, Any]]] = None,
                        ) -> Dict[str, Any]:
     """R239(c). What was entered, sliced by the contest that pays it.
 
@@ -1363,6 +1375,14 @@ def per_contest_report(df: pd.DataFrame,
     ``clean`` here means every contest held the per-contest captain bar. It is
     deliberately NOT the same question as the portfolio's `counted_relaxations`,
     and the caller ANDs the two rather than replacing one with the other.
+
+    R238. ``contest_meta`` maps a contest id to its resolved identity
+    (``posture``, ``contest_shape``, ``posture_source``); each row carries it
+    under the same keys, so a per-contest slice says what the contest was
+    identified as and where that came from. A contest the map does not name
+    carries ``contest_shape: None`` and ``posture_source: None``, never a
+    default: an absent identity is not an answer. Labels only, nothing here
+    reads them for a decision.
     """
     if contest_of_entry is None:
         return {"available": False,
@@ -1402,8 +1422,12 @@ def per_contest_report(df: pd.DataFrame,
                     for p, c in sorted(cpts.items(), key=lambda kv: (-kv[1], kv[0]))
                     if c > cap]
         over_cap.extend(breaches)
+        meta = (contest_meta or {}).get(cid) or {}
         by_contest[cid] = {
             "n": n,
+            "contest_shape": meta.get("contest_shape"),
+            "posture": meta.get("posture"),
+            "posture_source": meta.get("posture_source"),
             "cap": cap,
             "distinct_captains": len(cpts),
             "captain_counts": dict(sorted(cpts.items(), key=lambda kv: (-kv[1], kv[0]))),
@@ -1492,6 +1516,7 @@ def build_thesis_ladder(df: pd.DataFrame, n_entries: int,
                         contest_of_entry: Optional[Sequence[str]] = None,
                         max_cpt_per_contest: int = DEFAULT_MAX_CPT_PER_CONTEST,
                         captain_sleeve: Optional[Mapping[str, Any]] = None,
+                        deal_across_contests: bool = True,
                         ) -> Dict[str, Any]:
     """Generate ``n_entries`` thesis specs, allocated across game states and with
     captains rotated so no captain exceeds the cap.
@@ -1504,6 +1529,15 @@ def build_thesis_ladder(df: pd.DataFrame, n_entries: int,
     threaded first and alone deliberately: R239's own note says do that, and the
     partition has to exist here before the per-contest captain cap can bind at
     the moment a captain slot is filled rather than be evaluated after the fact.
+
+    R239(a), 2026-09-30. With a multi-contest partition the templates are DEALT
+    to contests (``deal_order_across_contests``) before any captain is chosen,
+    so the per-contest captain cap binds on the dealt slots and
+    ``captain_assignment_feasibility`` reports on the result. Slot j is still
+    ``rows[j]``: only which template sits in slot j moves, never the multiset
+    (``allocation`` is identical with the deal on and off). ``thesis_deal``
+    carries the per-contest side mix before and after. ``deal_across_contests=
+    False`` restores the positional placement.
 
     R381 (CC-5, R307 batch 1). ``captain_sleeve`` is a resolved
     ``resolve_captain_sleeve`` block, and it binds HERE rather than in
@@ -1623,6 +1657,11 @@ def build_thesis_ladder(df: pd.DataFrame, n_entries: int,
     # Round-robin the templates so a truncated build still spans game states
     # rather than filling every entry from the first template in the list.
     order = _round_robin(counts)
+    # R239(a). Dealt BEFORE the captain walk reads `order`, so the per-contest
+    # cap and `_captain_walk_order` both see the placement that ships.
+    order, thesis_deal = deal_order_across_contests(
+        order, specs, fav, partition.get("contest_of_entry"),
+        enabled=bool(deal_across_contests))
     # R263 build (a). Captains are CHOSEN in `walk` order and the theses are BUILT
     # in slot order. The two used to be one loop, so the order in which templates
     # spent the capped arms was the round-robin's own -- directional templates
@@ -1788,6 +1827,8 @@ def build_thesis_ladder(df: pd.DataFrame, n_entries: int,
             "captain_cap_count": cap,
             "captain_cap_relaxed": cap_relaxed,
             "contest_partition": partition,
+            # R239(a). Which side each contest's slots carry, before and after.
+            "thesis_deal": thesis_deal,
             # R239(b). The per-contest cap and what it cost to hold.
             "max_cpt_per_contest": per_contest_cap,
             # NOT a relaxation: the cap held and the ladder reached past a
@@ -1956,6 +1997,131 @@ def _round_robin(counts: Mapping[int, int]) -> List[int]:
             remaining[i] -= 1
         remaining = {i: c for i, c in remaining.items() if c > 0}
     return order
+
+
+def _side_group(spec: Mapping[str, Any], favorite: Any) -> str:
+    side = spec.get("side")
+    if side is None:
+        return "neutral"
+    return "favorite" if side == favorite else "underdog"
+
+
+def _deal_summary(order: Sequence[int], specs: Sequence[Mapping[str, Any]],
+                  favorite: Any, vec: Sequence[str]) -> Dict[str, Dict[str, Any]]:
+    """Per contest, in first-appearance order: its slots, its templates and how
+    many of them lean favorite, underdog or neither."""
+    out: Dict[str, Dict[str, Any]] = {}
+    for slot, (idx, cid) in enumerate(zip(order, vec)):
+        row = out.setdefault(str(cid), {"slots": [], "templates": [],
+                                        "favorite": 0, "underdog": 0, "neutral": 0})
+        row["slots"].append(slot)
+        row["templates"].append(str(specs[idx]["id"]))
+        row[_side_group(specs[idx], favorite)] += 1
+    return out
+
+
+def deal_order_across_contests(order: Sequence[int],
+                               specs: Sequence[Mapping[str, Any]],
+                               favorite: Any,
+                               contest_of_entry: Optional[Sequence[str]],
+                               enabled: bool = True,
+                               ) -> "tuple[List[int], Dict[str, Any]]":
+    """R239(a). Deal the ladder's templates to contests instead of by position.
+
+    ``order`` is the round-robin of template indices, slot j -> ``order[j]``,
+    and slot j is entered into ``contest_of_entry[j]``. Left alone, each
+    contest takes a contiguous run of that round-robin, and the round-robin
+    walks template indices in spec order, which groups by side: on the 7+7
+    MIN_CHC partition one satellite held all five favorite templates and the
+    other three underdog ones, so each carried a side lean by position alone.
+
+    The deal keeps every contest's SIZE and the template MULTISET, and moves
+    only which template sits in which slot. The templates are sorted by side
+    (favorite, underdog, neutral) and then by template id, so a side is one
+    consecutive run and the copies of a template are adjacent; the run is then
+    dealt one at a time to the contest whose fill would stay lowest relative to
+    its size (ties to first appearance in the vector). A side's run therefore
+    spreads across contests in proportion to their sizes and the cycle carries on
+    across side boundaries rather than restarting. Adjacent copies of one
+    template tend to go to different contests; that is not guaranteed (two
+    contests can still both take one of two copies of a template that neither
+    can avoid). One-entry contests are dealt first, one side each in rotation,
+    because a single entry cannot hold a proportion and would otherwise always
+    draw the neutral tail. Each
+    contest's slots are then filled ascending, so ``rows[j]`` still pairs with
+    slot j. Deterministic, no randomness.
+
+    This cannot create diversity the bank lacks. It spreads the sides the
+    ladder already holds; the captain-assignment precondition
+    (``captain_assignment_feasible``) is a separate verdict and is still read
+    on the result.
+
+    Returns ``(order, record)``. ``record["applied"]`` is False with a reason
+    when there is nothing to deal, and the input order comes back untouched.
+    """
+    order = list(order)
+    record: Dict[str, Any] = {
+        "applied": False, "changed": False, "method": "side_balanced",
+        "reason": "", "positional": None, "dealt": None}
+    if not enabled:
+        record["reason"] = ("the deal was switched off; slots keep their "
+                            "positional contests")
+        return order, record
+    if contest_of_entry is None:
+        record["reason"] = "no contest partition supplied; nothing to deal by"
+        return order, record
+    vec = [str(c) for c in contest_of_entry][:len(order)]
+    if len(vec) < len(order):
+        record["reason"] = (f"contest vector covers {len(vec)} of {len(order)} "
+                            "slots; slots keep their positional contests")
+        return order, record
+    contests = list(dict.fromkeys(vec))
+    positional = _deal_summary(order, specs, favorite, vec)
+    record["positional"] = positional
+    if len(contests) < 2:
+        record["reason"] = "one contest holds every entry; nothing to deal across"
+        record["dealt"] = positional
+        return order, record
+    size = Counter(vec)
+    slots_of = {c: [j for j, v in enumerate(vec) if v == c] for c in contests}
+    rank = {"favorite": 0, "underdog": 1, "neutral": 2}
+    sequence = sorted(
+        range(len(order)),
+        key=lambda p: (rank[_side_group(specs[order[p]], favorite)],
+                       str(specs[order[p]]["id"]), p))
+    filled = {c: 0 for c in contests}
+    dealt: Dict[str, List[int]] = {c: [] for c in contests}
+    # A one-entry contest can carry one side only, and the proportional pass
+    # below would hand every such contest the END of the sequence, which is all
+    # neutral templates. So the singles are dealt first, cycling through the
+    # sides in file order (favorite, underdog, neutral, skipping a side with
+    # nothing left), each taking the first template of its side.
+    singles = [c for c in contests if size[c] == 1]
+    cycle = ["favorite", "underdog", "neutral"]
+    for k, c in enumerate(singles):
+        for step in range(len(cycle)):
+            side = cycle[(k + step) % len(cycle)]
+            hit = next((p for p in sequence
+                        if _side_group(specs[order[p]], favorite) == side), None)
+            if hit is not None:
+                dealt[c].append(order[hit])
+                filled[c] = 1
+                sequence.remove(hit)
+                break
+    for p in sequence:
+        room = [c for c in contests if filled[c] < size[c]]
+        pick = min(room, key=lambda c: (Fraction(filled[c] + 1, size[c]),
+                                        contests.index(c)))
+        dealt[pick].append(order[p])
+        filled[pick] += 1
+    new_order: List[int] = [-1] * len(order)
+    for c in contests:
+        for slot, idx in zip(slots_of[c], dealt[c]):
+            new_order[slot] = idx
+    record["applied"] = True
+    record["changed"] = new_order != order
+    record["dealt"] = _deal_summary(new_order, specs, favorite, vec)
+    return new_order, record
 
 
 # --------------------------------------------------------------------------- #

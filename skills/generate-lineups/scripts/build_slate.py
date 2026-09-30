@@ -5611,6 +5611,107 @@ def showdown_relaxation_caution(
     return notes
 
 
+def showdown_contest_identity(entries: Path, postures_arg, rows) -> tuple:
+    """R238. Which contest each Showdown reserved row belongs to, identified.
+
+    Returns ``(identity, contests, meta)``. ``contests`` is the list
+    ``qa_portfolio`` section 4 reads (``brief["contests"]``, keyed by
+    ``contest_id``, one row per contest in the entries file); ``meta`` maps a
+    contest id to the ``posture``/``contest_shape``/``posture_source`` that
+    ``per_contest_report`` carries on each slice.
+
+    Until this existed ``run_showdown`` never called the resolver, so an
+    operator's ``--postures`` was parsed, validated and discarded, and section 4
+    printed ``archetype UNRESOLVED`` for every contest. The resolver is the one
+    ``run_classic`` calls, fed the same ``parse_dk_entry_rows`` rows. Showdown's
+    own reserved-row dicts carry no fee and are not attribute rows, so they
+    cannot feed it.
+
+    This is a LABEL and steers nothing: the Showdown ladder reads no posture and
+    no shape, so ``profile`` is None on every row and ``steers_construction`` is
+    False, in the artifact rather than only here. Classic refuses an
+    unidentified contest because the shape changes the objective the portfolio
+    is built to; Showdown has no such objective, so an unidentified contest is
+    named and the build carries on. It is not defaulted either: its
+    ``contest_shape`` and ``posture`` are None (the resolver's fall-through
+    ``large_gpp`` is recorded as ``fallback_*``, never as an identity), so
+    section 4 declines to condition ownership on a crowd nobody identified.
+
+    Never raises: a resolver failure is recorded in ``identity["reason"]`` and
+    the build proceeds without labels.
+    """
+    identity: dict = {
+        "applied": False, "reason": "",
+        "steers_construction": False,
+        "label": ("contest identity is a label on the brief; the Showdown "
+                  "ladder reads no posture and no shape, so nothing here "
+                  "changed which lineups were built"),
+        "operator_postures": {}, "operator_postures_unmatched": [],
+        "unresolved": [],
+    }
+    contests: list = []
+    meta: dict = {}
+    try:
+        supplied = parse_postures_arg(postures_arg)
+        identity["operator_postures"] = dict(sorted(supplied.items()))
+        from mlb_engine.entries.dk_entries_manager import parse_dk_entry_rows
+        from mlb_engine.pipeline.execution_pipeline import _resolve_contest_postures
+        entry_rows = parse_dk_entry_rows(str(entries))
+        resolved = _resolve_contest_postures(entry_rows, supplied, None)
+    except Exception as exc:  # noqa: BLE001 - a label must never cost a delivery
+        identity["reason"] = f"{type(exc).__name__}: {exc}"
+        print(f"contest identity unavailable, the brief carries no contest "
+              f"labels: {identity['reason']}", file=sys.stderr)
+        return identity, contests, meta
+
+    in_file: dict = {}
+    for r in entry_rows:
+        in_file[str(r.contest_id)] = in_file.get(str(r.contest_id), 0) + 1
+    blank: dict = {}
+    for r in rows:
+        blank[str(r["contest_id"])] = blank.get(str(r["contest_id"]), 0) + 1
+    known = {str(r.contest_id) for r in entry_rows} | {
+        str(r.contest_name) for r in entry_rows}
+    identity["operator_postures_unmatched"] = sorted(
+        k for k in identity["operator_postures"] if k not in known)
+    if identity["operator_postures_unmatched"]:
+        print(f"--postures names {identity['operator_postures_unmatched']}, "
+              f"which match no contest id or name in the entries file; those "
+              f"values were not applied", file=sys.stderr)
+    for cid, rec in sorted(resolved.items()):
+        unresolved = rec.get("posture_source") == "unresolved"
+        row = {
+            "contest_id": str(cid),
+            "contest_name": rec.get("contest_name"),
+            "posture": None if unresolved else rec.get("posture"),
+            "posture_source": rec.get("posture_source"),
+            "matched_pattern": rec.get("matched_pattern"),
+            "contest_shape": None if unresolved else rec.get("contest_shape"),
+            "profile": None,
+            "steers": False,
+            "entries_in_file": in_file.get(str(cid), 0),
+            # Incomplete reserved rows: the ones this build fills.
+            "blank_rows": blank.get(str(cid), 0),
+        }
+        if unresolved:
+            row["fallback_posture"] = rec.get("posture")
+            row["fallback_shape"] = rec.get("contest_shape")
+            identity["unresolved"].append({
+                "contest_id": str(cid), "contest_name": rec.get("contest_name"),
+                "remedy": f"--postures {cid}=<posture>, or add the title's "
+                          f"pattern to data/reference/dk_contest_archetypes.csv"})
+            print(f"contest {cid} '{rec.get('contest_name')}' matched no "
+                  f"archetype; the brief labels it unidentified rather than "
+                  f"defaulting it (Showdown steers by neither). Supply "
+                  f"--postures {cid}=<posture> to label it.", file=sys.stderr)
+        contests.append(row)
+        meta[str(cid)] = {"posture": row["posture"],
+                          "contest_shape": row["contest_shape"],
+                          "posture_source": row["posture_source"]}
+    identity["applied"] = True
+    return identity, contests, meta
+
+
 def showdown_excluded_block(df) -> dict:
     """What the salary file's Excluded column removes from a Showdown pool.
 
@@ -5749,6 +5850,11 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                           "date": args.date}, indent=1))
         return 4, {}
 
+    # R238. Identified once, from the operator's --postures and the entries
+    # file's own titles, and carried into the brief; steers nothing.
+    contest_identity, contests_block, contest_meta = showdown_contest_identity(
+        entries, getattr(args, "postures", None), rows)
+
     overrides = args.controls_override or {}
     cpt_cap = overrides.get("max_cpt_exposure_pct", sd.DEFAULT_MAX_CPT_EXPOSURE_PCT)
     share_cap = overrides.get("max_shared_players", sd.DEFAULT_MAX_SHARED_PLAYERS)
@@ -5819,7 +5925,8 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
     # contest fact existed here before any bank was built and nothing downstream
     # ever saw it. This vector is aligned to the SAME order used by
     # `zip(rows, bank)` below, which is what makes ladder slot j and rows[j] the
-    # same entry. Passed through; nothing reads it for a decision yet.
+    # same entry. R239(b) reads it for the per-contest captain cap and R239(a)
+    # for the deal of templates to contests; both live in `build_thesis_ladder`.
     contest_of_entry = [r["contest_id"] for r in rows[:n_entries]]
 
     # R249. The supplied prior, read before either build path so a file the
@@ -6415,7 +6522,8 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
     per_contest = st.per_contest_report(
         priced if use_ladder else df, bank, contest_of_entry,
         max_cpt_per_contest=overrides.get("max_cpt_per_contest",
-                                          sd.DEFAULT_MAX_CPT_PER_CONTEST))
+                                          sd.DEFAULT_MAX_CPT_PER_CONTEST),
+        contest_meta=contest_meta)
 
     captain_exposure = {
         key: {"count": count, "pct": round(100.0 * count / n_entries, 1)}
@@ -6654,6 +6762,10 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         # 0.25 cap while one 2-entry contest carried a single captain across both
         # entries.
         "per_contest": per_contest,
+        # R238. The list `qa_portfolio` section 4 reads, and the block that says
+        # what it is (a label, applied or why not, what --postures did).
+        "contests": contests_block,
+        "contest_identity": contest_identity,
         "counted_relaxations": {
             "captain_relaxed_slots": relaxed_slots,
             "overlap_relaxed_slots": overlap_relaxed,
@@ -6779,9 +6891,17 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
             "odds": odds_note,
             "lineups": report.get("lineups"),
             "player_exposure": report.get("player_exposure"),
+            # R239(a). Which side each contest's slots carry, before and after
+            # the deal.
+            "thesis_deal": ladder_meta.get("thesis_deal"),
         } if use_ladder else {
             "mode": "points_max_bank",
             "reason": ladder_gate_reason,
+            "thesis_deal": {
+                "applied": False, "changed": False,
+                "reason": ("the points-max bank carries no thesis and no side to "
+                           "deal by; contests take bank ranks in file order"),
+            },
         }),
         "caution": (f"showdown.py is v{sd.VERSION} and Phase 3 is not complete. "
                     "Per-lineup checks, template preservation, the captain "
