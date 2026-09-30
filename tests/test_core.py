@@ -4072,7 +4072,9 @@ class R293BankOnEveryRungTests(unittest.TestCase):
         # in `build_sleeve_jobs` (chalk-fails, environment, salary-only), each
         # forwarding it by name. R422, 2026-09-25: a sixth there, the tail
         # sleeve's depth jobs, forwarding it by name.
-        ("mlb_engine/pipeline/execution_pipeline.py", "extend_bank"): (6, 6),
+        # R469, 2026-09-30: a seventh, `build_consensus_pair_jobs`' pinned-pair
+        # slice (all three doors call it), forwarding it by name.
+        ("mlb_engine/pipeline/execution_pipeline.py", "extend_bank"): (7, 7),
         # R389(a), 2026-09-24: the baseline core's probe and distinct-fill
         # solves, and its one in-memory grid pass; each forwards it by name.
         ("mlb_engine/pipeline/baseline.py", "build_single_lineup"): (2, 2),
@@ -22860,7 +22862,8 @@ class BankCapPerBucketTests(unittest.TestCase):
                                      []).append((name, style))
         self.assertEqual(found, {
             "mlb_engine/pipeline/baseline.py": [("extend_bank", "fresh_cache")],
-            "mlb_engine/pipeline/execution_pipeline.py": [("extend_bank", "relative")] * 4,
+            # R469: the fifth is the pinned-pair slice, relative like the sleeves.
+            "mlb_engine/pipeline/execution_pipeline.py": [("extend_bank", "relative")] * 5,
             "skills/generate-lineups/scripts/build_slate.py": [
                 ("extend_bank", "bucket"), ("build_consensus_limited_jobs", "bucket")],
             "tools/benchmark_engine.py": [("extend_bank", "fresh_cache")],
@@ -25641,15 +25644,17 @@ class FiveStackQuotaLadderTests(unittest.TestCase):
         # R207 grew it to five: the interaction probe's solve, which relaxes
         # nothing either and must see the refused solve's own ladder states,
         # or it would probe a model the refusal was not about.
-        self.assertEqual(len(recursive), 5,
-                         "three relaxation ladders plus R326's full-bank retry: "
-                         "engine-default reuse cap, five-stack quota, primary-"
-                         "stack floor, and the retry that widens the SEARCH "
-                         "before any of them moves a STRATEGY control; plus "
-                         "R207's interaction probe")
+        # R469 grew it to six: the chalk-core seat's rung, between the quota
+        # and the floor, and every re-entry now carries its state too.
+        self.assertEqual(len(recursive), 6,
+                         "four relaxation ladders plus R326's full-bank retry: "
+                         "engine-default reuse cap, five-stack quota, consensus-"
+                         "pair seat, primary-stack floor, and the retry that widens "
+                         "the SEARCH before any of them moves a STRATEGY control; "
+                         "plus R207's interaction probe")
         for call in recursive:
             passed = {kw.arg for kw in call.keywords}
-            for state in ("_floor_state", "_reuse_state", "_quota_state"):
+            for state in ("_floor_state", "_reuse_state", "_quota_state", "_seat_state"):
                 self.assertIn(state, passed,
                               f"re-entry at line {call.lineno} drops {state}")
 
@@ -31788,8 +31793,9 @@ class AllocatorTruthTests(unittest.TestCase):
         reentries = [n for n in ast.walk(func)
                      if isinstance(n, ast.Return) and isinstance(n.value, ast.Call)
                      and getattr(n.value.func, "id", "") == "select_and_assign_entries"]
-        self.assertEqual(len(reentries), 5,
-                         f"expected four ladder re-entries and the probe's solve, "
+        # R469 made it six: the chalk-core seat's rung, guarded the same way.
+        self.assertEqual(len(reentries), 6,
+                         f"expected five ladder re-entries and the probe's solve, "
                          f"found {len(reentries)}")
         probing = [n for n in reentries
                    if any(k.arg == "_probe" and getattr(k.value, "value", None) is True
@@ -31798,7 +31804,7 @@ class AllocatorTruthTests(unittest.TestCase):
         ladder_guards = [n for n in ast.walk(func) if isinstance(n, ast.If)
                          and "not _probe" in ast.unparse(n.test)
                          and "proven_infeasible" in ast.unparse(n.test)]
-        self.assertEqual(len(ladder_guards), 5,
+        self.assertEqual(len(ladder_guards), 6,
                          "every ladder re-entry and the probe itself skip probe mode")
         guards = [n for n in ast.walk(func)
                   if isinstance(n, ast.If)
@@ -31810,7 +31816,7 @@ class AllocatorTruthTests(unittest.TestCase):
             test = ast.unparse(node.test)
             if "proven_infeasible" in test and "not slate_blocked" in test:
                 guarded += 1
-        self.assertEqual(guarded, 5,
+        self.assertEqual(guarded, 6,
                          "a re-entry is not guarded on both conjuncts")
         # And the verdict it reads is computed from the failing checks, not
         # inlined per guard, so the three cannot disagree.
@@ -40444,3 +40450,441 @@ class LateSwapDeclaredPitcherTests(unittest.TestCase):
 def _entry_rosters(path) -> dict:
     from mlb_engine.entries.dk_entries_manager import parse_dk_entry_rows
     return {row.entry_id: list(row.roster_cells) for row in parse_dk_entry_rows(path)}
+
+
+class ConsensusPairSeatTests(unittest.TestCase):
+    """R469 (roadmap Session 138), Ben's rule of 2026-09-30: every Classic
+    contest with two or more entries seats at least one lineup on the
+    projection's consensus SP pair, differentiated through its bats.
+
+    On 2026-09-29 (1400_4g) the Opener held no Sale + Schlittler lineup: at a
+    0.43 pitcher cap on 9 entries both arms sat at the cap of 3, and another
+    build under the same caps seated two in the Opener, so the zero was the
+    objective's choice, not a cap's. No control asked for the pair. The
+    control is a count, resolved per contest from each entry's posture (the
+    posture merge is one portfolio dict, so a posture default would let a
+    cash contest switch the seat off for everyone), typed through the units
+    gate, floored into the pitcher and pair caps on the existing floor path,
+    seated by one allocator row per contest, and relaxed and counted rather
+    than refused when it cannot be met: an S control never costs the file.
+    """
+
+    # -- the pair ------------------------------------------------------------ #
+
+    @staticmethod
+    def _arms(*rows):
+        return pd.DataFrame([
+            {"Player_ID": pid, "Name": pid, "Team": team, "Opponent": "", "Position": "P",
+             "Salary": 9000.0, "Game_ID": game, "Base_Projection": base,
+             "Ceiling": ceil, "Floor": 5.0, "Excluded": excl, "Locked": False}
+            for pid, team, game, base, ceil, excl in rows])
+
+    def test_the_pair_is_the_top_two_arms_by_projection_that_are_not_opponents(self):
+        frame = self._arms(("A", "T1", "g1", 20.0, 30.0, False),
+                           ("C", "T3", "g2", 19.0, 28.0, False),
+                           ("D", "T4", "g2", 10.0, 20.0, False))
+        out = ca.consensus_sp_pair(frame)
+        self.assertEqual(out["pair"], ["A", "C"])
+        self.assertEqual(out["basis"], "Base_Projection")
+
+    def test_opposing_top_two_pair_the_first_with_the_next_non_opponent(self):
+        frame = self._arms(("A", "T1", "g1", 20.0, 30.0, False),
+                           ("B", "T2", "g1", 19.0, 29.0, False),
+                           ("C", "T3", "g2", 18.0, 28.0, False))
+        out = ca.consensus_sp_pair(frame)
+        self.assertEqual(out["pair"], ["A", "C"])
+        self.assertEqual(out["skipped_opponent"], "B")
+
+    def test_an_excluded_arm_is_never_the_pair_and_ties_break_by_ceiling(self):
+        frame = self._arms(("A", "T1", "g1", 25.0, 30.0, True),
+                           ("X", "T5", "g3", 20.0, 31.0, False),
+                           ("C", "T3", "g2", 20.0, 28.0, False))
+        self.assertEqual(ca.consensus_sp_pair(frame)["pair"], ["X", "C"])
+
+    def test_fewer_than_two_legal_arms_is_no_pair(self):
+        out = ca.consensus_sp_pair(self._arms(("A", "T1", "g1", 20.0, 30.0, False)))
+        self.assertIsNone(out["pair"])
+
+    # -- the value, per contest ------------------------------------------------ #
+
+    @staticmethod
+    def _reqs(spec):
+        out = []
+        for contest, posture, n in spec:
+            for i in range(n):
+                out.append({"entry_id": f"{contest}{i + 1}", "contest_id": contest,
+                            "contest_shape": "large_wta", "posture": posture})
+        return out
+
+    def test_each_contest_takes_its_own_postures_value(self):
+        reqs = self._reqs([("A", "large_gpp", 3), ("B", "cash", 2), ("C", "mme", 1),
+                           ("D", "wta_satellite", 2), ("E", "single_entry", 2)])
+        self.assertEqual(ca.consensus_pair_seat_demand(reqs),
+                         {"A": 1, "B": 0, "C": 0, "D": 1, "E": 0})
+
+    def test_an_override_sets_every_multi_entry_contest_and_fixed_rows_count(self):
+        reqs = self._reqs([("A", "large_gpp", 3), ("B", "cash", 2), ("C", "mme", 1)])
+        self.assertEqual(
+            ca.consensus_pair_seat_demand(
+                reqs, {"min_consensus_pair_entries_per_contest": 2},
+                fixed_rows_by_contest={"C": 1}),
+            {"A": 2, "B": 2, "C": 2})
+        self.assertEqual(ca.consensus_pair_seat_demand(reqs, fixed_rows_by_contest={"C": 1})["C"], 1,
+                         "a contest's untouched rows count toward the two-entry threshold")
+
+    def test_the_count_is_typed_through_the_units_gate(self):
+        for bad in (1.5, True, -1, "2", float("nan")):
+            with self.assertRaises(ValueError, msg=repr(bad)):
+                ca.assert_count_control(bad, key="min_consensus_pair_entries_per_contest")
+        self.assertEqual(ca.assert_count_control(2.0), 2)
+        postures = {"900": {"posture": "large_gpp", "contest_shape": "large_wta",
+                            "posture_source": "test"}}
+        with self.assertRaisesRegex(ValueError, "min_consensus_pair_entries_per_contest"):
+            epi._merged_controls_for_build(
+                postures, {"min_consensus_pair_entries_per_contest": 0.5})
+        merged = epi._merged_controls_for_build(
+            postures, {"min_consensus_pair_entries_per_contest": 2.0})
+        self.assertEqual(merged["min_consensus_pair_entries_per_contest"], 2)
+
+    def test_build_slate_refuses_a_fractional_count_at_exit_4(self):
+        runner = LostWindowFlagValueTests("test_an_unknown_posture_refuses_before_the_pool_build")
+        runner.setUp()
+        self.addCleanup(runner.tmp.cleanup)
+        code, payload, reached = runner._run(
+            ["--controls-override", '{"min_consensus_pair_entries_per_contest": 0.5}'])
+        self.assertEqual(code, 4)
+        self.assertFalse(reached)
+        self.assertEqual(payload.get("status"), "controls_override_bad_units")
+        self.assertEqual(payload["controls"][0]["control"],
+                         "min_consensus_pair_entries_per_contest")
+
+    # -- the allocator row ---------------------------------------------------- #
+
+    @staticmethod
+    def _bank(pair_lineups=3, pair=("PA", "PB")):
+        out = []
+        for i in range(8):
+            roster = [f"S{i}a", f"S{i}b"] + [f"H{i}_{j}" for j in range(8)]
+            out.append(candidate(f"top{i}", roster, 100 - i))
+        for i in range(pair_lineups):
+            roster = [pair[0], pair[1]] + [f"Q{i}_{j}" for j in range(8)]
+            out.append(candidate(f"pair{i}", roster, 50 - i))
+        return out
+
+    @staticmethod
+    def _seated(result, pair=("PA", "PB")):
+        by_contest = defaultdict(int)
+        for row in result["assignments"]:
+            if set(pair) <= set(row["lineup_ids"]):
+                by_contest[row["contest_id"]] += 1
+        return dict(by_contest)
+
+    def test_the_row_seats_one_pair_lineup_in_each_multi_entry_contest(self):
+        reqs = self._reqs([("A", "large_gpp", 3), ("B", "cash", 2), ("C", "mme", 1)])
+        plain = select_and_assign_entries(self._bank(), reqs, {})
+        self.assertTrue(plain["passed"], plain.get("errors"))
+        self.assertEqual(self._seated(plain), {}, "the objective alone never picks the pair here")
+        seated = select_and_assign_entries(self._bank(), reqs, {"consensus_sp_pair": ["PA", "PB"]})
+        self.assertTrue(seated["passed"], seated.get("errors"))
+        self.assertEqual(self._seated(seated), {"A": 1})
+        report = seated["consensus_pair_seats"]
+        self.assertEqual(report["status"], "applied")
+        self.assertEqual(report["required_by_contest"], {"A": 1, "B": 0, "C": 0})
+        self.assertEqual(report["seated_by_contest"], {"A": 1, "B": 0, "C": 0})
+        self.assertEqual(report["relaxations"], 0)
+
+    def test_a_contest_whose_untouched_row_holds_the_pair_needs_no_new_seat(self):
+        reqs = self._reqs([("A", "large_gpp", 2)])
+        fixed = {"row_count": 1, "entry_ids": ["A9"], "rosters": [],
+                 "player_counts": {}, "pitcher_counts": {}, "primary_stack_counts": {},
+                 "sp_pair_counts": {}, "game_counts": {}, "team_counts": {},
+                 "signatures_by_contest": {"A": [sorted(["PA", "PB"] + [f"Z{j}" for j in range(8)])]},
+                 "stacks_derived": False}
+        out = select_and_assign_entries(self._bank(), reqs, {"consensus_sp_pair": ["PA", "PB"]},
+                                        fixed_exposure=fixed)
+        self.assertTrue(out["passed"], out.get("errors"))
+        self.assertEqual(self._seated(out), {})
+        self.assertEqual(out["consensus_pair_seats"]["fixed_on_pair_by_contest"], {"A": 1})
+
+    def test_no_pair_lineup_in_the_bank_relaxes_and_counts_and_still_delivers(self):
+        reqs = self._reqs([("A", "large_gpp", 3)])
+        out = select_and_assign_entries(self._bank(pair_lineups=0), reqs,
+                                        {"consensus_sp_pair": ["PA", "PB"]})
+        self.assertTrue(out["passed"], out.get("errors"))
+        report = out["consensus_pair_seats"]
+        self.assertEqual(report["relaxations"], 1)
+        self.assertEqual(report["relaxed"][0]["contest_id"], "A")
+        self.assertIn("no compatible candidate on the pair", report["relaxed"][0]["reason"])
+
+    def test_a_proven_infeasible_seat_steps_the_ladder_and_is_counted(self):
+        """Two contests each need a seat and the bank holds one pair lineup that
+        an operator's reuse cap lets be used once: the joint MILP is proven
+        infeasible, the seat steps (after the five-stack quota, before the
+        primary-stack floor) and the file still delivers."""
+        reqs = self._reqs([("A", "large_gpp", 2), ("B", "large_gpp", 2)])
+        out = select_and_assign_entries(self._bank(pair_lineups=1), reqs,
+                                        {"consensus_sp_pair": ["PA", "PB"],
+                                         "max_candidate_reuse": 1})
+        self.assertTrue(out["passed"], out.get("errors"))
+        report = out["consensus_pair_seats"]
+        self.assertEqual(report["status"], "relaxed_by_ladder")
+        self.assertEqual(report["relaxations"], 1)
+        self.assertEqual(report["relaxation_steps"][0]["trigger"],
+                         "proven_infeasible_with_consensus_pair_seats")
+
+    def test_the_seat_goes_to_the_contests_projection_sleeve_entries(self):
+        entries = [{"entry_id": eid, "contest_id": "A"} for eid in ("a1", "a2", "a3")]
+        applied = {"status": "applied",
+                   "sleeve_by_entry": {"a1": "salary_only", "a2": "projection",
+                                       "a3": "chalk_fails"}}
+        self.assertEqual(ca._consensus_pair_eligible_entries([0, 1, 2], entries, applied), [1])
+        self.assertEqual(ca._consensus_pair_eligible_entries([0, 1, 2], entries, {"status": "off"}),
+                         [0, 1, 2])
+        none_in_projection = {"status": "applied",
+                              "sleeve_by_entry": {"a1": "salary_only", "a2": "chalk_fails",
+                                                  "a3": "environment"}}
+        self.assertEqual(ca._consensus_pair_eligible_entries([0, 1, 2], entries,
+                                                             none_in_projection), [0, 1, 2])
+
+    def test_the_prefilter_keeps_the_pair_lineups_the_objective_ranks_last(self):
+        """A bank past the prefilter's keep target (max(6E, 40)) is cut by score,
+        and a seat exists because the pair's lineups do not win on score: the
+        reserve keeps them, or the seat would relax on a lineup the caller
+        handed in."""
+        bank = []
+        for i in range(60):
+            roster = [f"S{i}a", f"S{i}b"] + [f"H{i}_{j}" for j in range(8)]
+            bank.append(candidate(f"top{i}", roster, 200 - i))
+        for i in range(2):
+            bank.append(candidate(f"pair{i}", ["PA", "PB"] + [f"Q{i}_{j}" for j in range(8)], 1 - i))
+        # Two seats in one contest need two DISTINCT pair lineups (the
+        # same-contest duplicate ban), and the prefilter's own coverage loop
+        # keeps only one representative per SP pair: the reserve is the rest.
+        reqs = self._reqs([("A", "large_gpp", 3)])
+        out = select_and_assign_entries(bank, reqs, {"consensus_sp_pair": ["PA", "PB"],
+                                                     "min_consensus_pair_entries_per_contest": 2})
+        self.assertTrue(out["passed"], out.get("errors"))
+        self.assertTrue(out["allocation_solver_report"]["candidate_prefilter"]["applied"])
+        self.assertEqual(self._seated(out), {"A": 2})
+        self.assertEqual(out["consensus_pair_seats"]["relaxations"], 0)
+
+    def test_the_seat_steps_after_the_quota_and_before_the_floor(self):
+        src = Path(ca.__file__).read_text(encoding="utf-8")
+        q = src.index("proven_infeasible_with_five_stack_quota")
+        s = src.index("proven_infeasible_with_consensus_pair_seats")
+        f = src.index("proven_infeasible_with_floor")
+        self.assertLess(q, s)
+        self.assertLess(s, f)
+
+    def test_the_seat_is_ladder_relaxed_and_a_never_relax_on_it_is_refused(self):
+        self.assertIn("min_consensus_pair_entries_per_contest", ca.LADDER_RELAXED_CONTROLS)
+        from mlb_engine.pipeline import deadline_governor as dg
+        self.assertIn("min_consensus_pair_entries_per_contest", dg.NEVER_RELAX_NOT_HONOURED)
+
+    # -- feasibility: the pair, the demand, the cap floors ---------------------- #
+
+    @staticmethod
+    def _slate():
+        rows = []
+        pid = 70000
+        for g in range(5):
+            for side, team in enumerate((f"T{2 * g + 1}", f"T{2 * g + 2}")):
+                opp = f"T{2 * g + 2 - side}"
+                game = f"T{2 * g + 1}@T{2 * g + 2}"
+                pid += 1
+                rows.append({"Player_ID": str(pid), "Name": f"P_{team}", "Team": team,
+                             "Opponent": opp, "Position": "P", "Salary": 9000.0,
+                             "Game_ID": game, "Base_Projection": 30.0 - pid % 100,
+                             "Floor": 10.0, "Ceiling": 40.0 - pid % 100,
+                             "Excluded": False, "Locked": False})
+                for pos in ("C", "1B", "2B", "3B", "SS", "OF", "OF", "OF"):
+                    pid += 1
+                    rows.append({"Player_ID": str(pid), "Name": f"{team}_{pos}_{pid}",
+                                 "Team": team, "Opponent": opp, "Position": pos,
+                                 "Salary": 3500.0, "Game_ID": game,
+                                 "Base_Projection": 8.0, "Floor": 4.0, "Ceiling": 12.0,
+                                 "Excluded": False, "Locked": False})
+        return pd.DataFrame(rows)
+
+    def _feasibility(self, spec):
+        reqs = self._reqs(spec)
+        postures = {c: {"posture": p, "contest_shape": "large_wta", "posture_source": "test"}
+                    for c, p, _ in spec}
+        return postures, reqs, epi._slate_feasibility(postures, reqs, self._slate())
+
+    def test_slate_feasibility_names_the_pair_and_floors_both_caps_to_the_seats(self):
+        _, _, info = self._feasibility([(c, "large_gpp", 2) for c in "ABCD"])
+        self.assertTrue(info["available"], info.get("note"))
+        self.assertEqual(info["consensus_sp_pair"], ["70001", "70019"])
+        self.assertEqual(info["consensus_pair_seats_required"], 4)
+        self.assertEqual(info["floor_sp_pair_repetition"], 4, "ceil(8/40)=1 raised to the 4 seats")
+        self.assertEqual(info["floor_pitcher_exposure_count"], 4, "ceil(16/10)=2 raised to 4")
+        _, _, cash = self._feasibility([(c, "cash", 2) for c in "ABCD"])
+        self.assertEqual(cash["consensus_pair_seats_required"], 0)
+        self.assertEqual(cash["floor_sp_pair_repetition"], 1)
+
+    def test_the_merge_floors_the_caps_and_never_relax_holds_them(self):
+        postures, _, info = self._feasibility([(c, "large_gpp", 2) for c in "ABCD"])
+        floors = epi.feasibility_floors_from(info)
+        prov: dict = {}
+        merged = epi._merged_controls_for_build(
+            postures, None, feasibility_floors=floors, provenance_out=prov)
+        self.assertGreaterEqual(merged["max_sp_pair_repetition"], 4)
+        self.assertEqual(prov["max_sp_pair_repetition"], "derived_floor")
+        held = epi._merged_controls_for_build(
+            postures, None, feasibility_floors=floors,
+            never_relax=frozenset({"max_sp_pair_repetition"}))
+        self.assertLess(held["max_sp_pair_repetition"], 4)
+        report = epi._feasibility_report(info, {**held, "consensus_sp_pair": info["consensus_sp_pair"]})
+        check = next(c for c in report["checks"] if c["name"] == "consensus_pair_seat_capacity")
+        self.assertTrue(check["passed"], "advisory: never a slate impossibility")
+        self.assertIsNone(check["remedy"])
+        self.assertNotIn("remedy_typed", check)
+        self.assertEqual([s["control"] for s in check["seat_shortfall"]],
+                         ["max_sp_pair_repetition"])
+        self.assertIn("relaxes the seat", check["note"])
+        self.assertEqual(ca.failing_feasibility_checks(report["checks"]),
+                         [c for c in report["checks"] if c.get("passed") is False
+                          and c["name"] != "consensus_pair_seat_capacity"])
+        report_ok = epi._feasibility_report(info, {**merged, "consensus_sp_pair": info["consensus_sp_pair"]})
+        ok = next(c for c in report_ok["checks"] if c["name"] == "consensus_pair_seat_capacity")
+        self.assertEqual(ok["seat_shortfall"], [])
+
+    def test_an_operator_pair_is_the_pair_the_sliced_bank_builds_and_a_bad_one_is_ignored(self):
+        bs = LostWindowFlagValueTests._module()
+        frame = self._slate()
+        self.assertEqual(bs.sliced_door_consensus_pair({"consensus_sp_pair": ["70010", "70028"]}, frame),
+                         ["70010", "70028"])
+        self.assertEqual(bs.sliced_door_consensus_pair({"consensus_sp_pair": "7001070028"}, frame),
+                         ca.consensus_sp_pair(frame)["pair"])
+        out = select_and_assign_entries(self._bank(), self._reqs([("A", "large_gpp", 2)]),
+                                        {"consensus_sp_pair": "PAPB"})
+        self.assertTrue(out["passed"], out.get("errors"))
+        self.assertNotIn("consensus_pair_seats", out, "a malformed pair seats nothing")
+
+    def test_the_pair_rides_the_controls_and_survives_the_run_record(self):
+        _, _, info = self._feasibility([("A", "large_gpp", 2)])
+        controls = epi.attach_consensus_pair({"max_sp_pair_repetition": 2}, info)
+        self.assertEqual(controls["consensus_sp_pair"], info["consensus_sp_pair"])
+        self.assertEqual(epi.recorded_controls(controls)["consensus_sp_pair"],
+                         info["consensus_sp_pair"])
+        kept = epi.attach_consensus_pair({"consensus_sp_pair": ["X", "Y"]}, info)
+        self.assertEqual(kept["consensus_sp_pair"], ["X", "Y"], "an explicit pair wins")
+
+    # -- the bank ------------------------------------------------------------- #
+
+    def test_the_pair_bank_slice_pins_both_arms_and_differs_in_the_bats(self):
+        frame = diverse_projection_frame()
+        arms = frame[frame["Position"] == "P"].set_index("Team")["Player_ID"]
+        pair = [str(arms["T1"]), str(arms["T3"])]
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = bank_cache.BankCache(Path(tmp) / "bank.json")
+            report = epi.build_consensus_pair_jobs(cache, frame, pair=pair, seats=2,
+                                                   time_budget_s=20.0)
+            self.assertGreaterEqual(report["built"], 2, report)
+            cands = cache.as_candidates(frame, requested_n=4)
+        on_pair = [c for c in cands if set(pair) <= {str(x) for x in (c.get("sp_ids") or [])}]
+        self.assertGreaterEqual(len(on_pair), 2)
+        self.assertGreater(len({tuple(sorted(c["player_ids"])) for c in on_pair}), 1)
+        self.assertEqual(epi.build_consensus_pair_jobs(None, frame, pair=None, seats=2,
+                                                       time_budget_s=1.0)["attempted"], False)
+
+    # -- the brief -------------------------------------------------------------- #
+
+    def test_the_brief_exposure_block_names_the_pair_and_the_seats(self):
+        bs = LostWindowFlagValueTests._module()
+        block = bs.consensus_pair_exposure({"consensus_pair_seats": {
+            "status": "applied", "pair": ["PA", "PB"], "basis": "Base_Projection",
+            "required_by_contest": {"A": 1, "B": 0}, "seated_by_contest": {"A": 1, "B": 0},
+            "relaxed": [], "relaxations": 0}}, names={"PA": "Sale", "PB": "Schlittler"})
+        self.assertEqual(block["pair_names"], ["Sale", "Schlittler"])
+        self.assertIn("construction rule", block["label"])
+        line = bs.format_consensus_pair_line(block)
+        self.assertIn("Sale + Schlittler", line)
+        self.assertIn("A 1/1", line)
+        self.assertIn("UNAVAILABLE", bs.format_consensus_pair_line(None))
+
+
+class LateSwapConsensusPairGuardTests(unittest.TestCase):
+    """R469, the swap's half of Ben's rule: a late swap never removes the last
+    consensus-pair lineup in a contest without `--accept-downgrade`.
+
+    The allocator's seat row does not run inside a swap (`run_late_swap`
+    builds requirements that carry no posture), so the guard is the post-solve
+    comparison of the parent's file against the swapped one, over the pair the
+    PARENT recorded in its controls. The 1400_4g removal was a hand edit that
+    never passed through here; R472's printed verdict covers that path.
+    """
+
+    PAIR = ["P1", "P2"]
+
+    @staticmethod
+    def _tool():
+        return LateSwapDeclaredPitcherTests._tool()
+
+    def _rosters(self):
+        on = self.PAIR + [f"H{j}" for j in range(8)]
+        off = ["P3", "P4"] + [f"H{j}" for j in range(8)]
+        parent = {"e1": on, "e2": off, "e3": on, "e4": off}
+        contest = {"e1": "A", "e2": "A", "e3": "B", "e4": "B"}
+        return parent, contest, on, off
+
+    def test_a_contest_that_loses_its_last_pair_lineup_is_named(self):
+        ls = self._tool()
+        parent, contest, on, off = self._rosters()
+        after = {**parent, "e1": off}
+        self.assertEqual(ls.consensus_pair_seats_lost(parent, after, contest, self.PAIR),
+                         [{"contest_id": "A", "entries": ["e1"]}])
+        self.assertEqual(ls.consensus_pair_seats_lost(parent, parent, contest, self.PAIR), [])
+        moved = {**parent, "e1": off, "e2": on}
+        self.assertEqual(ls.consensus_pair_seats_lost(parent, moved, contest, self.PAIR), [],
+                         "the contest still holds one: the seat moved, it was not lost")
+        self.assertEqual(ls.consensus_pair_seats_lost(parent, after, contest, None), [])
+
+    def _guard(self, accept, pair=PAIR):
+        ls = self._tool()
+        parent, contest, on, off = self._rosters()
+        after = {**parent, "e1": off}
+        downgraded: list = []
+        args = types.SimpleNamespace(accept_downgrade=accept)
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = ls.consensus_pair_guard(args, pair, parent, after, contest, downgraded)
+        return code, downgraded, out.getvalue(), err.getvalue()
+
+    def test_the_guard_refuses_at_exit_3_naming_the_entry(self):
+        code, downgraded, out, err = self._guard(accept=False)
+        self.assertEqual(code, 3)
+        self.assertIn("contest A: parent entries e1", err)
+        self.assertIn("--accept-downgrade", err)
+        self.assertEqual(downgraded, [])
+
+    def test_accept_downgrade_takes_it_and_labels_the_file_review_grade(self):
+        code, downgraded, out, err = self._guard(accept=True)
+        self.assertIsNone(code)
+        self.assertEqual(len(downgraded), 1)
+        self.assertIn("last consensus-pair lineup removed", downgraded[0])
+        ls = self._tool()
+        self.assertEqual(ls.swap_certification({"workflow_valid": True}, downgraded),
+                         ls.DOWNGRADE_LABEL)
+
+    def test_a_parent_with_no_recorded_pair_says_so_and_never_refuses(self):
+        code, downgraded, out, err = self._guard(accept=False, pair=None)
+        self.assertIsNone(code)
+        self.assertIn("the parent recorded no consensus pair", out)
+
+    def test_main_runs_the_guard_on_every_swap(self):
+        """R468's harness: a real swap reaches the guard and prints its line."""
+        harness = LateSwapDeclaredPitcherTests("test_the_grammar_is_build_slates_own_parser")
+        harness.setUp()
+        self.addCleanup(harness.doCleanups)
+        harness._brief()
+        code, out, err = harness._run()
+        self.assertEqual(code, 0, err[-1500:])
+        self.assertIn("chalk-core seat: the parent recorded no consensus pair", out)
+        # And main honours what the guard decides: a refusal is the swap's exit.
+        seen = []
+        harness.ls.consensus_pair_guard = lambda *a, **k: (seen.append(a[1]), 3)[1]
+        code, out, err = harness._run()
+        self.assertEqual(code, 3)
+        self.assertEqual(len(seen), 1)

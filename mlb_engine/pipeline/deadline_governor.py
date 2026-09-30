@@ -230,6 +230,10 @@ NEVER_RELAX_NOT_HONOURED: Dict[str, str] = {
                                 "five-stack quota (LADDER_RELAXED_CONTROLS)",
     "five_stack_min_size": "the allocator's re-entry ladder relaxes the "
                            "five-stack quota (LADDER_RELAXED_CONTROLS)",
+    # R469, 2026-09-30. The chalk-core seat relaxes on the same ladder and when
+    # the bank holds no pair lineup, counted either way.
+    "min_consensus_pair_entries_per_contest": "the allocator relaxes the seat "
+                                              "and counts it (LADDER_RELAXED_CONTROLS)",
     "max_cpt_exposure_pct": "Showdown's solver relaxes it per slot under "
                             "R153's order and counts it (optimize/showdown.py)",
     "max_cpt_per_contest": "Showdown's solver relaxes the captain lock per "

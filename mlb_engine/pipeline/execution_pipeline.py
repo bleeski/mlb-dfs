@@ -173,8 +173,9 @@ from mlb_engine.pipeline.build_state_manager import (
     update_run_certification, verify_inputs_unmoved,
 )
 from mlb_engine.allocate.contest_allocator import (
-    CONSENSUS_CLUSTER_MIN_MEMBERS,
-    TEAM_EXPOSURE_MIN_HITTERS, assert_fraction_cap, fraction_for_count,
+    CONSENSUS_CLUSTER_MIN_MEMBERS, CONSENSUS_PAIR_JOB_CLASS, CONSENSUS_PAIR_SEAT_CONTROL,
+    TEAM_EXPOSURE_MIN_HITTERS, assert_count_control, assert_fraction_cap,
+    consensus_pair_seat_demand, consensus_sp_pair, fraction_for_count,
     select_and_assign_entries,
 )
 from mlb_engine.contest_shapes import (
@@ -968,6 +969,8 @@ def execute_portfolio(
                 "consensus_cluster": allocation.get("consensus_cluster"),
                 # R406, the same.
                 "classic_sleeves": allocation.get("classic_sleeves"),
+                # R469, the same.
+                "consensus_pair_seats": allocation.get("consensus_pair_seats"),
                 "workflow_valid": True,
                 "selection_certified": certification["selection_certified"],
                 "allocation_certified": certification["allocation_certified"],
@@ -999,6 +1002,8 @@ def execute_portfolio(
             "consensus_cluster": allocation.get("consensus_cluster"),
             # R406, the same.
             "classic_sleeves": allocation.get("classic_sleeves"),
+            # R469, the same.
+            "consensus_pair_seats": allocation.get("consensus_pair_seats"),
             "workflow_valid": bool(promotion["passed"]),
             "selection_certified": certification["selection_certified"],
             "allocation_certified": certification["allocation_certified"],
@@ -2895,6 +2900,55 @@ def build_sleeve_jobs(
             "elapsed_s": round(_t.monotonic() - started, 3)}
 
 
+def build_consensus_pair_jobs(
+    cache: Any,
+    projections: Any,
+    *,
+    pair: Optional[Sequence[str]],
+    seats: int,
+    time_budget_s: float,
+    max_opposing_hitters_per_sp: Optional[int] = None,
+    prior_candidates: Optional[Sequence[Mapping[str, Any]]] = None,
+    **extend_kwargs: Any,
+) -> Dict[str, Any]:
+    """R469. Give the bank lineups on the consensus pair, differing in their bats.
+
+    The bank does not guarantee one: both builders rank pairs by combined
+    Ceiling, drop same-game pairs and stop on budget, so the allocator's seat
+    row could be asked for a lineup that was never built. This pins P1 and P2
+    to the pair (``extend_bank``'s own ``locked_slot_assignments``, which
+    restricts the pair grid to that one pair) and runs its stack jobs, sized to
+    twice the seats less what the bank (and ``prior_candidates``, a door's
+    in-memory bank) already holds on the pair. Search effort only: every player
+    stays legal. One helper for every bank door, R406's rule.
+    """
+    from mlb_engine.optimize.bank_cache import extend_bank
+    pair_ids = [str(x) for x in (pair or [])][:2]
+    need = 2 * max(0, int(seats or 0))
+    if cache is None or len(set(pair_ids)) != 2 or not need:
+        return {"attempted": False,
+                "reason": "no consensus pair, or no contest owes a seat"}
+    wanted = set(pair_ids)
+    held = sum(1 for entry in cache.candidates
+               if wanted <= {str(p) for p in (entry.get("roster") or [])})
+    held += sum(1 for c in (prior_candidates or [])
+                if wanted <= {str(p) for p in (c.get("lineup_ids") or c.get("player_ids") or [])})
+    if held >= need:
+        return {"attempted": False, "pair": pair_ids, "need": need, "already_held": held,
+                "reason": "the bank already holds enough lineups on the pair"}
+    rep = extend_bank(cache, projections,
+                      locked_slot_assignments={"P1": pair_ids[0], "P2": pair_ids[1]},
+                      max_candidates=len(cache) + (need - held),
+                      time_budget_s=max(1.0, float(time_budget_s)),
+                      max_opposing_hitters_per_sp=max_opposing_hitters_per_sp,
+                      job_class=CONSENSUS_PAIR_JOB_CLASS, **extend_kwargs)
+    return {"attempted": True, "pair": pair_ids, "need": need, "already_held": held,
+            "built": rep.get("built_this_slice"),
+            "job_list_exhausted": rep.get("job_list_exhausted"),
+            "stop_reason": rep.get("stop_reason"),
+            "conditions_signature": rep.get("conditions_signature")}
+
+
 
 def _stacked_on_teams(cache: Any, projections: Any, teams: Sequence[str],
                       min_size: int = 4) -> int:
@@ -3049,6 +3103,49 @@ def _direct_door_sleeves(
         added += 1
     jobs = {**jobs, "candidates_added": added}
     return out, jobs
+
+def _direct_door_consensus_pair(
+    candidates: Sequence[Mapping[str, Any]],
+    projections: Any,
+    pair: Sequence[str],
+    seats: int,
+    *,
+    requested_n: int,
+    contest_shapes: Optional[Sequence[str]],
+    time_budget_s: float,
+    **extend_kwargs: Any,
+) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    """R469. The direct door's pair slice, in a throwaway cache like its
+    sleeves (`_direct_door_sleeves`): the direct bank is in memory. Appended
+    with ids that cannot collide and rosters that are not served twice."""
+    import tempfile as _tf
+    from mlb_engine.allocate.contest_allocator import _candidate_ordered_roster
+    from mlb_engine.optimize.bank_cache import BankCache
+    out = [dict(c) for c in candidates]
+    seen = set()
+    for c in out:
+        try:
+            seen.add(tuple(sorted(_candidate_ordered_roster(c))))
+        except ValueError:
+            continue
+    with _tf.TemporaryDirectory(prefix="pair_bank_") as tmp:
+        cache = BankCache(Path(tmp) / "pair.json")
+        jobs = build_consensus_pair_jobs(
+            cache, projections, pair=pair, seats=seats, time_budget_s=time_budget_s,
+            prior_candidates=out, **extend_kwargs)
+        extra = cache.as_candidates(projections, requested_n=requested_n,
+                                    contest_shapes=contest_shapes)
+    added = 0
+    for c in extra:
+        sig = tuple(sorted(str(p) for p in (c.get("roster_slot_ids") or [])))
+        if sig in seen:
+            continue
+        seen.add(sig)
+        c["candidate_id"] = c["lineup_id"] = f"cp{c['candidate_id']}"
+        out.append(c)
+        added += 1
+    return out, {**jobs, "candidates_added": added}
+
 
 def _payout_breadth_by_shape_from_csv(archetypes_path: Optional[str]) -> Dict[str, float]:
     """Read the optional payout_breadth column from the archetype CSV, aggregated
@@ -4471,7 +4568,11 @@ def _merged_controls_for_build(
     for key, value in list(coerced_override.items()):
         if value is None:
             continue
-        if key in _fraction_control_keys:
+        if key == CONSENSUS_PAIR_SEAT_CONTROL:
+            # R469. A COUNT, through the integer branch of the same gate: a 0.5
+            # or a bool would otherwise reach the allocator as a lower bound.
+            coerced_override[key] = assert_count_control(value, key=key)
+        elif key in _fraction_control_keys:
             coerced_override[key] = assert_fraction_cap(value, key=key)
         elif key in _fraction_control_dict_keys:
             if not isinstance(value, Mapping):
@@ -4814,11 +4915,26 @@ def _exclusion_block(
     return block
 
 
+def attach_consensus_pair(controls: Mapping[str, Any],
+                          feasibility_inputs: Mapping[str, Any]) -> Dict[str, Any]:
+    """R469. The merged controls with ``consensus_sp_pair`` from the slate's
+    feasibility inputs, unless the controls already name one (an operator's
+    or a parent's, R268(a)). It rides the controls so every door that hands
+    them to the allocator carries it, and `recorded_controls` keeps it, which
+    is how a late swap inherits the pair its parent seated."""
+    out = dict(controls or {})
+    pair = (feasibility_inputs or {}).get("consensus_sp_pair")
+    if pair and not out.get("consensus_sp_pair"):
+        out["consensus_sp_pair"] = [str(x) for x in pair]
+    return out
+
+
 def _slate_feasibility(
     posture_by_contest: Mapping[str, Mapping[str, Any]],
     entry_requirements: Sequence[Mapping[str, Any]],
     projections: Any,
     excluded_player_ids: Optional[Sequence[str]] = None,
+    seat_override: Any = None,
 ) -> Dict[str, Any]:
     """Cheap, pre-solve structural feasibility inputs for the checkpoint.
 
@@ -4841,6 +4957,8 @@ def _slate_feasibility(
         "floor_pitcher_exposure_count": None, "floor_pitcher_exposure_pct": None,
         "floor_stack_exposure_count": None, "floor_stack_exposure_pct": None,
         "floor_player_exposure_count": None, "floor_player_exposure_pct": None,
+        "consensus_sp_pair": None, "consensus_pair_basis": None,
+        "consensus_pair_seats_by_contest": {}, "consensus_pair_seats_required": 0,
         "available": False, "note": "",
     }
     try:
@@ -4963,6 +5081,39 @@ def _slate_feasibility(
                     info["floor_consensus_cluster_share_pct"] = 1.0
             except Exception:  # noqa: BLE001 - advisory, never blocks
                 info["legal_hitter_count"] = None
+
+        # R469. The chalk-core seat's pair and its demand, and the arithmetic
+        # the caps owe it: every seat puts both arms and the pair in one more
+        # lineup, so the pitcher, player and pair caps are floored UP to the
+        # seats required, on this floor path (a `--never-relax` cap is not
+        # moved, and the allocator then relaxes the seat and counts it). Its
+        # own guard, like R405's: a frame the pair cannot be read from must not
+        # take the other floors with it.
+        try:
+            pair_info = consensus_sp_pair(projections, excludes=excluded_player_ids)
+            info["consensus_sp_pair"] = pair_info.get("pair")
+            info["consensus_pair_basis"] = pair_info.get("basis")
+            if pair_info.get("pair"):
+                demand = consensus_pair_seat_demand(
+                    entry_requirements,
+                    ({CONSENSUS_PAIR_SEAT_CONTROL: seat_override}
+                     if seat_override is not None else None),
+                    posture_by_contest=posture_by_contest)
+                seats = int(sum(demand.values()))
+                info["consensus_pair_seats_by_contest"] = demand
+                info["consensus_pair_seats_required"] = seats
+                if seats and entries > 1:
+                    info["floor_sp_pair_repetition"] = max(
+                        int(info["floor_sp_pair_repetition"] or 1), seats)
+                    pc = max(int(info["floor_pitcher_exposure_count"] or 0), seats)
+                    info["floor_pitcher_exposure_count"] = pc
+                    info["floor_pitcher_exposure_pct"] = min(1.0, pc / entries)
+                    pl = max(int(info["floor_player_exposure_count"] or 0), pc)
+                    info["floor_player_exposure_count"] = pl
+                    info["floor_player_exposure_pct"] = min(1.0, pl / entries)
+        except Exception as exc:  # noqa: BLE001 - advisory, never blocks
+            info["consensus_sp_pair"] = None
+            info["consensus_pair_note"] = f"pair unavailable: {type(exc).__name__}: {exc}"
 
         info["available"] = True
     except Exception as exc:  # defensive: never block the checkpoint on this
@@ -5163,6 +5314,36 @@ def _feasibility_report(feas: Mapping[str, Any], controls: Mapping[str, Any]) ->
                                              fraction_for_count(int(floor_player), entries, 3),
                                              count=int(floor_player))})
 
+    # R469. The seats against the caps they spend. ADVISORY and never
+    # `passed: False`: a cap held below the seats (only `--never-relax` or an
+    # explicit override can do that once the floor applied) makes the allocator
+    # relax the seat and count it, so it is no slate impossibility and every
+    # reader of failed checks (the allocator's binds, autobuild's remedies,
+    # `typed_refusal_remedy`, the FEASIBILITY line) must not see one. The
+    # shortfall is named in its own field.
+    seats = int(feas.get("consensus_pair_seats_required") or 0)
+    if seats and controls.get("consensus_sp_pair"):
+        caps = {
+            "max_sp_pair_repetition": (None if controls.get("max_sp_pair_repetition") is None
+                                       else int(controls["max_sp_pair_repetition"])),
+            "max_pitcher_exposure_pct": _cap_count_local(controls.get("max_pitcher_exposure_pct")),
+            "max_player_exposure_pct": _cap_count_local(controls.get("max_player_exposure_pct")),
+        }
+        short = [k for k, cap in caps.items() if cap is not None and cap < seats]
+        detail = (f"{seats} consensus-pair seat(s) required "
+                  f"({feas.get('consensus_pair_seats_by_contest')}), pair "
+                  f"{list(controls.get('consensus_sp_pair') or [])}; caps as counts "
+                  + ", ".join(f"{k} {v}" for k, v in caps.items()))
+        report["checks"].append({
+            "name": "consensus_pair_seat_capacity", "passed": True, "advisory": True,
+            "detail": detail, "remedy": None,
+            "seat_shortfall": [
+                {"control": k, "cap": caps[k], "seats": seats,
+                 "to": (seats if k == "max_sp_pair_repetition"
+                        else fraction_for_count(seats, entries, 3))} for k in short],
+            **({"note": ("a held cap is below the seats: the allocator relaxes the "
+                         "seat and counts it")} if short else {})})
+
     largest = feas.get("largest_contest_entries") or 0
     report["checks"].append({
         "name": "same_contest_unique_capacity", "passed": True,
@@ -5342,6 +5523,20 @@ def _plan_joint_allocation(
                             cache.as_candidates(None))["member_ids"],
                         time_budget_s=max(1.0, _left), salary_cache=_plan_salary_cache,
                         excludes=excl or None, solver_time_limit_s=solver_time_limit_s,
+                        max_opposing_hitters_per_sp=controls.get(
+                            "max_opposing_hitters_per_sp"),
+                        stack_min=_plan_stack_request["bank_stack_min_size"])
+                # R469, the plan leg's pair slice, for the sleeves' reason: the
+                # build's bank carries it and the allocator seats on it.
+                _plan_pair = controls.get("consensus_sp_pair")
+                _plan_seats = (sum(consensus_pair_seat_demand(entries, controls).values())
+                               if _plan_pair else 0)
+                if _plan_pair and _plan_seats and report.get("job_list_exhausted"):
+                    _left = float(budget_s) - (time.monotonic() - started)
+                    verdict["consensus_pair_jobs"] = build_consensus_pair_jobs(
+                        cache, bank_projections, pair=_plan_pair, seats=_plan_seats,
+                        time_budget_s=max(1.0, _left), excludes=excl or None,
+                        solver_time_limit_s=solver_time_limit_s,
                         max_opposing_hitters_per_sp=controls.get(
                             "max_opposing_hitters_per_sp"),
                         stack_min=_plan_stack_request["bank_stack_min_size"])
@@ -6515,7 +6710,10 @@ def run_slate(
     # mixed portfolio does not inherit an infeasible cap; the explicit override still
     # wins. Then assert feasibility of the resolved controls on the checkpoint.
     feasibility_inputs = _slate_feasibility(
-        posture_by_contest, entry_requirements, projections, excluded_player_ids
+        posture_by_contest, entry_requirements, projections, excluded_player_ids,
+        # R469. The operator's seat count, so the cap floors are sized to it.
+        seat_override=dict(portfolio_controls_override or {}).get(
+            CONSENSUS_PAIR_SEAT_CONTROL),
     )
     # R37(2)(a)+(b), Ben's dated decision of 2026-08-28. Resolved once and passed
     # to BOTH merges, so `merged_default` and `controls` are the same portfolio's
@@ -6566,6 +6764,10 @@ def run_slate(
     controls, input_confidence = apply_input_confidence(
         controls, input_confidence, floors=floors, override_keys=override_keys,
         relax=input_confidence_relax)
+    # R469. The consensus pair rides the resolved controls to every door that
+    # hands them to the allocator (the plan leg, the direct bank, the joint
+    # solve) and into the run record a late swap inherits.
+    controls = attach_consensus_pair(controls, feasibility_inputs)
     control_provenance = _control_provenance_block(
         controls, provenance, input_confidence, never_relax, control_moves)
     moved_keys = set(control_provenance["moved"])
@@ -6985,8 +7187,25 @@ def run_slate(
                 solver_time_limit_s=solver_time_limit_s,
                 max_opposing_hitters_per_sp=controls.get("max_opposing_hitters_per_sp"),
                 leverage=leverage)
+        # R469. The pair slice, through the helper every door calls.
+        pair_jobs: Dict[str, Any] = {"attempted": False,
+                                     "reason": "no consensus pair, or no contest owes a seat"}
+        _pair = controls.get("consensus_sp_pair")
+        _seats = (sum(consensus_pair_seat_demand(entry_requirements, controls).values())
+                  if _pair else 0)
+        if _pair and _seats:
+            candidates, pair_jobs = _direct_door_consensus_pair(
+                candidates, bank_projections, _pair, _seats,
+                requested_n=n, contest_shapes=sorted(shape_counts) or None,
+                time_budget_s=(max(5.0, 0.1 * float(bank_time_budget_s))
+                               if bank_time_budget_s else 20.0),
+                excludes=bank_excludes or None,
+                solver_time_limit_s=solver_time_limit_s,
+                max_opposing_hitters_per_sp=controls.get("max_opposing_hitters_per_sp"),
+                leverage=leverage)
         bank_diag = {
             "source": "build_diverse_candidate_bank", "mode": mode, "requested_n": n,
+            "consensus_pair_jobs": pair_jobs,
             # R406. What the sleeves were asked for and what they built.
             "classic_sleeves_request": sleeve_request,
             "classic_sleeves_jobs": sleeve_jobs,

@@ -707,6 +707,9 @@ brief read 15 distinct primary stacks.
 python skills/generate-lineups/scripts/build_slate.py ...     --controls-override '{"max_consensus_cluster_share_pct": 1.0}'   # off for one build
 ```
 
+The chalk-core seat (R469, one consensus-pair lineup per multi-entry contest) is
+`references/chalk_core_seat.md`.
+
 Where to read it: the brief's `exposure.consensus_cluster` (members and shares,
 the delivered member-count histogram, the share at k or more, and the
 `objective_median` price, bank and delivered side by side), the `consensus:`
