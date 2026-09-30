@@ -534,6 +534,18 @@ class GoldenProductionReplayTests(unittest.TestCase):
                  "posture": _postures[str(r.contest_id)]["posture"],
                  "contest_shape": _postures[str(r.contest_id)]["contest_shape"]}
                 for r in _rows]
+            # R469, 2026-09-30. The sliced door builds the pinned-pair slice
+            # before the sleeves: the projection's consensus SP pair, sized to
+            # twice the seats the postures owe. Mirrored with the same helper
+            # and the same two derivations build_slate calls.
+            from mlb_engine.allocate.contest_allocator import (
+                consensus_pair_seat_demand, consensus_sp_pair)
+            from mlb_engine.pipeline.execution_pipeline import build_consensus_pair_jobs
+            _pair = consensus_sp_pair(projections).get("pair")
+            pair_jobs = build_consensus_pair_jobs(
+                cache, projections, pair=_pair,
+                seats=sum(consensus_pair_seat_demand(_sleeve_entries).values()),
+                time_budget_s=60)
             sleeve_request = resolve_sleeve_bank_request(_sleeve_entries, {}, projections)
             assert sleeve_request["active"], sleeve_request
             salary_cache = BankCache(Path(tmp) / "bank_salary_only.json")
@@ -650,6 +662,15 @@ class GoldenProductionReplayTests(unittest.TestCase):
                         k: (cert.get("classic_sleeves") or {}).get(k)
                         for k in ("status", "entries_by_sleeve", "candidates_by_sleeve",
                                   "relaxations")
+                    },
+                    # R469. The chalk-core seat: the pair, the slice that built
+                    # its lineups, and what each contest owed and seated.
+                    "consensus_pair": {
+                        "jobs": {k: pair_jobs.get(k)
+                                 for k in ("attempted", "pair", "need", "built")},
+                        "seats": {k: (cert.get("consensus_pair_seats") or {}).get(k)
+                                  for k in ("status", "pair", "required_by_contest",
+                                            "seated_by_contest", "relaxations")},
                     },
                 },
                 "assignments": summary["assignments"],

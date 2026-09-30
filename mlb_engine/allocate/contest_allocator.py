@@ -735,6 +735,167 @@ def consensus_member_count(hitter_ids: Iterable[str],
 
 
 # ---------------------------------------------------------------------------
+# R469, Ben's rule of 2026-09-30: a chalk-core seat per contest.
+#
+# Every Classic contest with two or more entries seats at least one lineup on
+# the projection's consensus SP pair, differentiated through its bats. On
+# 2026-09-29 (1400_4g) the Opener held no Sale + Schlittler lineup: both arms sat
+# at the 0.43 pitcher cap of 3 of 9, and another build under the same caps seated
+# two in the Opener, so the zero was the objective's choice, not a cap's. The
+# field's winning cores that night were a chalk arm (57%) with a mid-owned second
+# arm and low-owned bats: observed outcomes, one slate, a construction rule and
+# never a claim about what the pair will score.
+#
+# A COUNT resolved PER CONTEST, not a posture default in `STRATEGY_DEFAULTS`: the
+# posture merge is one portfolio dict and a silent posture retires a floor, so a
+# cash contest in a mixed file would have switched the seat off for every other
+# contest. Each entry carries its contest's posture into this module
+# (`_resolve_classic_sleeves` reads it the same way). An operator value applies to
+# every contest with two or more rows.
+# ---------------------------------------------------------------------------
+
+CONSENSUS_PAIR_SEAT_CONTROL = "min_consensus_pair_entries_per_contest"
+CONSENSUS_PAIR_SEATS_BY_POSTURE = {
+    "large_gpp": 1, "wta_satellite": 1, "small_gpp": 1, "mme": 1,
+    "single_entry": 0, "cash": 0,
+}
+CONSENSUS_PAIR_JOB_CLASS = "consensus_pair"
+
+
+def assert_count_control(value: Any, *, key: Optional[str] = None) -> int:
+    """The units rule for a COUNT control, beside `assert_fraction_cap`.
+
+    R469. The units gate checked fractions only, and a count typed as 0.5, a
+    bool (an int subclass) or a string would otherwise reach the allocator row
+    as a lower bound nobody chose. An integral float (``2.0``, which JSON can
+    produce) is accepted as its int; everything else raises naming the key.
+    """
+    name = key or "count control"
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{name} takes a non-negative whole number, not "
+                         f"{type(value).__name__} ({value!r})")
+    if isinstance(value, float) and (value != value or not value.is_integer()):
+        raise ValueError(f"{name} takes a non-negative whole number, not {value!r}")
+    if value < 0:
+        raise ValueError(f"{name} takes a non-negative whole number, not {value!r}")
+    return int(value)
+
+
+def consensus_sp_pair(projections: Any,
+                      excludes: Optional[Iterable[str]] = None) -> Dict[str, Any]:
+    """R469. ``{"pair", "basis", "ranked", "skipped_opponent"}`` off the frame.
+
+    The rostered-legal arms (Excluded and `excludes` dropped through the
+    optimizer's one reading of that column) ranked by the projection
+    (``Base_Projection``, the enriched median; ``Base`` or ``Ceiling`` when the
+    frame carries neither), ties by Ceiling then id. The pair is the top two
+    unless they face each other, and then #1 with the next arm who does not:
+    the bank builders drop same-game pairs by design, so an opposing pair is
+    one the bank could never seat. ``pair`` is None under two legal arms.
+    """
+    out: Dict[str, Any] = {"pair": None, "basis": None, "ranked": [],
+                           "skipped_opponent": None}
+    try:
+        from mlb_engine.optimize.optimizer_v3 import _eligible_sp_ids_for_anchor_caps
+        legal = {str(x) for x in _eligible_sp_ids_for_anchor_caps(
+            projections, excludes=list(excludes or []))}
+    except Exception:  # noqa: BLE001 - a frame this cannot read has no pair
+        return out
+    basis = next((c for c in ("Base_Projection", "Base", "Ceiling")
+                  if c in getattr(projections, "columns", [])), None)
+    if basis is None or len(legal) < 2:
+        out["basis"] = basis
+        return out
+
+    def _num(value: Any) -> float:
+        try:
+            v = float(value)
+        except (TypeError, ValueError):
+            return float("-inf")
+        return v if v == v else float("-inf")
+
+    rows = []
+    for row in projections.to_dict("records"):
+        pid = str(row.get("Player_ID") or "").strip()
+        if pid in legal:
+            rows.append((pid, _num(row.get(basis)), _num(row.get("Ceiling")),
+                         str(row.get("Game_ID") or "")))
+    rows.sort(key=lambda r: (-r[1], -r[2], r[0]))
+    out["basis"] = basis
+    out["ranked"] = [{"player_id": r[0], basis: r[1], "game_id": r[3]} for r in rows[:4]]
+    first = rows[0]
+    for pid, _b, _c, game in rows[1:]:
+        if first[3] and game == first[3]:
+            out["skipped_opponent"] = out["skipped_opponent"] or pid
+            continue
+        out["pair"] = [first[0], pid]
+        break
+    return out
+
+
+def consensus_pair_seat_demand(
+    entries: Sequence[Mapping[str, Any]],
+    controls: Optional[Mapping[str, Any]] = None,
+    *,
+    fixed_rows_by_contest: Optional[Mapping[str, int]] = None,
+    posture_by_contest: Optional[Mapping[str, Any]] = None,
+) -> Dict[str, int]:
+    """R469. ``{contest_id: seats required}`` for every contest present.
+
+    A contest with fewer than two rows (the entries being solved plus its
+    untouched rows) needs none. Otherwise an operator's
+    ``min_consensus_pair_entries_per_contest`` sets the value, and absent one the
+    contest's posture does (`CONSENSUS_PAIR_SEATS_BY_POSTURE`; an unknown
+    posture needs none). One function for the feasibility floors and the
+    allocator row, so the two cannot count a different demand.
+    """
+    rows: Counter = Counter()
+    posture_of: Dict[str, str] = {}
+    for entry in entries or []:
+        cid = str(entry.get("contest_id") or "")
+        if not cid:
+            continue
+        rows[cid] += 1
+        if entry.get("posture") and cid not in posture_of:
+            posture_of[cid] = str(entry.get("posture"))
+    for cid, n in (fixed_rows_by_contest or {}).items():
+        if str(cid):
+            rows[str(cid)] += int(n or 0)
+    for cid, info in (posture_by_contest or {}).items():
+        posture = info.get("posture") if isinstance(info, Mapping) else info
+        if posture:
+            posture_of[str(cid)] = str(posture)
+    override = (controls or {}).get(CONSENSUS_PAIR_SEAT_CONTROL)
+    count = (assert_count_control(override, key=CONSENSUS_PAIR_SEAT_CONTROL)
+             if override is not None else None)
+    out: Dict[str, int] = {}
+    for cid in sorted(rows):
+        if rows[cid] < 2:
+            out[cid] = 0
+        elif count is not None:
+            out[cid] = count
+        else:
+            out[cid] = int(CONSENSUS_PAIR_SEATS_BY_POSTURE.get(posture_of.get(cid, ""), 0))
+    return out
+
+
+def _consensus_pair_eligible_entries(entry_idxs: Sequence[int],
+                                     entries: Sequence[Mapping[str, Any]],
+                                     sleeve_report: Mapping[str, Any]) -> List[int]:
+    """R469. Which of a contest's entries may carry its seat: the ones R406
+    placed in the `projection` sleeve when sleeves applied and the contest has
+    one, else all of them (a seat in another sleeve's world is still a seat)."""
+    idxs = list(entry_idxs)
+    if (sleeve_report or {}).get("status") != "applied":
+        return idxs
+    sleeve_of = sleeve_report.get("sleeve_by_entry") or {}
+    in_projection = [e for e in idxs
+                     if sleeve_of.get(str(entries[e].get("entry_id") or ""),
+                                      "projection") == "projection"]
+    return in_projection or idxs
+
+
+# ---------------------------------------------------------------------------
 # v1.11 (F13) allocator solver semantics
 #
 # The allocator returned one string, "entry-level joint MILP infeasible or timed
@@ -1132,6 +1293,10 @@ BANK_LEVEL_PREFIX = "BANK-LEVEL count against the candidates handed in"
 # reporting a stale check as the bind. The alternative was recomputing the floors
 # in this module, which is the duplicate-arithmetic failure R167 is filed on.
 CHECKED_CONTROLS = frozenset({
+    # R469, 2026-09-30. The seat-capacity check reads the pair; no ladder moves
+    # the pair (the seat's rung relaxes the SEAT through its own state), so the
+    # two sets stay disjoint.
+    "consensus_sp_pair",
     "max_sp_pair_repetition", "max_shared_players",
     "max_pitcher_exposure_pct", "max_primary_stack_exposure_pct",
     "max_player_exposure_pct",
@@ -1158,6 +1323,9 @@ CHECKED_CONTROLS = frozenset({
 })
 LADDER_RELAXED_CONTROLS = frozenset({
     "max_candidate_reuse", "five_stack_share_quota", "primary_stack_min_size",
+    # R469, 2026-09-30. The chalk-core seat steps on a proven infeasibility
+    # (after the quota, before the floor), counted.
+    CONSENSUS_PAIR_SEAT_CONTROL,
 })
 
 
@@ -1170,6 +1338,7 @@ def failing_feasibility_checks(
     failure -- conflating "not checked" with "checked and failed" is R237's rule,
     and here it would invent a slate impossibility out of a missing input and
     send the operator to raise a control that was never binding.
+
     """
     out: List[Mapping[str, Any]] = []
     for check in (feasibility_checks or []):
@@ -3297,6 +3466,7 @@ def select_and_assign_entries(
     interaction_probe_budget_s: Optional[float] = None,
     interaction_probe_not_after: Optional[float] = None,
     _probe: bool = False,
+    _seat_state: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Select one candidate for every exact Entry ID in a single SciPy MILP.
 
@@ -3625,6 +3795,40 @@ def select_and_assign_entries(
             for e in range(E):
                 full_compatible[e][k] = False
 
+    # R469. The chalk-core seat, planned here for the reason R405's cap is:
+    # the prefilter below has to KEEP the pair's lineups, and a score-ordered
+    # fill drops exactly them (a seat exists because the objective alone would
+    # not pick one). A contest's untouched rows on the pair count toward its
+    # seats, and toward its two-row threshold.
+    _raw_pair = controls.get("consensus_sp_pair")
+    seat_pair = ([str(x) for x in _raw_pair][:2]
+                 if isinstance(_raw_pair, (list, tuple)) else [])
+    seat_pair_key = tuple(sorted(seat_pair))
+    seat_report: Dict[str, Any] = {"status": "not_requested"}
+    seat_need: Dict[str, int] = {}
+    if len(set(seat_pair)) == 2:
+        fixed_sigs = dict((fixed_exposure or {}).get("signatures_by_contest") or {})
+        fixed_on_pair = {
+            str(cid): sum(1 for sig in sigs if set(seat_pair) <= {str(x) for x in sig})
+            for cid, sigs in sorted(fixed_sigs.items())}
+        demand = consensus_pair_seat_demand(
+            entries, controls,
+            fixed_rows_by_contest={str(c): len(v) for c, v in fixed_sigs.items()})
+        if any(demand.values()):
+            steps = list((_seat_state or {}).get("relaxation_steps") or [])
+            seat_report = {
+                "status": ("relaxed_by_ladder" if (_seat_state or {}).get("relaxed")
+                           else "applied"),
+                "pair": list(seat_pair),
+                "control": CONSENSUS_PAIR_SEAT_CONTROL,
+                "required_by_contest": demand,
+                "fixed_on_pair_by_contest": {c: n for c, n in fixed_on_pair.items() if n},
+                "relaxed": [], "relaxation_steps": steps,
+            }
+            if not (_seat_state or {}).get("relaxed"):
+                seat_need = {c: m - fixed_on_pair.get(c, 0) for c, m in demand.items()
+                             if m - fixed_on_pair.get(c, 0) > 0}
+
     # F13: the pairwise overlap block is K-squared. An unfiltered bank is what
     # pushes this solve into its own time limit, and a time limit here used to
     # read as "infeasible". Prefiltering reduces search effort; it never touches
@@ -3674,6 +3878,13 @@ def select_and_assign_entries(
                 continue
             _idx = [k for k in range(len(candidates)) if _sleeve in _cs[k]]
             prefilter_reserves[f"sleeve_{_sleeve}"] = (_idx, min(len(_idx), 2 * _n))
+    if seat_need:
+        _on_pair = [k for k, c in enumerate(candidates)
+                    if tuple(sorted(set(_candidate_pitcher_ids(c) or all_rosters[k][:2])))
+                    == seat_pair_key]
+        if _on_pair:
+            prefilter_reserves["consensus_pair"] = (
+                _on_pair, min(len(_on_pair), 2 * sum(seat_need.values())))
     kept_idx, prefilter_report = _prefilter_candidates(
         candidates, entries, full_compatible, keep_target,
         reserve=prefilter_reserves or None,
@@ -3882,6 +4093,34 @@ def select_and_assign_entries(
                       if stack_sizes[k] >= int(quota_report["min_size"])]
         add({x_idx(e, k): 1.0 for e in range(E) for k in qualifying},
             float(quota_report["applied_need"]), np.inf)
+
+    # R469. One lower-bound row per contest owing a seat: its eligible entries
+    # (the `projection` sleeve's when it has any) on candidates of the pair. A
+    # contest with no compatible pair candidate is RELAXED AND COUNTED, never
+    # refused: the seat is an S control and a lower bound the bank cannot meet
+    # must not cost the file (R37(2)(b)'s rule for the quota).
+    seat_rows = 0
+    for cid in sorted(seat_need):
+        members = list(by_contest_entries.get(cid, []))
+        idxs = _consensus_pair_eligible_entries(members, entries, sleeve_report)
+        qual = [(e, k) for e in idxs for k in range(K)
+                if sp_pairs[k] == seat_pair_key and compatible[e][k]]
+        if not qual and idxs != members:
+            qual = [(e, k) for e in members for k in range(K)
+                    if sp_pairs[k] == seat_pair_key and compatible[e][k]]
+        if not qual:
+            seat_report["relaxed"].append({
+                "contest_id": cid, "needed": seat_need[cid],
+                "reason": "no compatible candidate on the pair in the bank the solve "
+                          "received; the seat is relaxed and counted, not refused"})
+            continue
+        lower = min(seat_need[cid], len({e for e, _k in qual}))
+        add({x_idx(e, k): 1.0 for e, k in qual}, float(lower), np.inf)
+        seat_rows += 1
+    if seat_report.get("status") != "not_requested":
+        seat_report["rows_added"] = seat_rows
+        seat_report["relaxations"] = (len(seat_report["relaxed"])
+                                      + len(seat_report["relaxation_steps"]))
 
     game_caps = dict(controls.get("max_game_exposure_pct_by_game") or {})
     game_by_player = {str(k): str(v)
@@ -4266,6 +4505,7 @@ def select_and_assign_entries(
                 _floor_state=_floor_state,
                 _reuse_state=_reuse_state,
                 _quota_state=_quota_state,
+                _seat_state=_seat_state,
                 _search_state={
                     "full_bank": True,
                     "restricted_candidates_kept": prefilter_report["candidates_kept"],
@@ -4317,6 +4557,7 @@ def select_and_assign_entries(
                 # control this solve already proved infeasible and buys an extra
                 # round trip per rung.
                 _quota_state=_quota_state,
+                _seat_state=_seat_state,
                 # R326: and the search scope's, for the same reason.
                 _search_state=_search_state,
             )
@@ -4365,9 +4606,42 @@ def select_and_assign_entries(
                         "relaxations": int(quota_report.get("relaxations") or 0) + 1,
                         "relaxation_steps": q_stepped,
                     },
+                    _seat_state=_seat_state,
                     # R326: and the search scope's, for the same reason.
                     _search_state=_search_state,
                 )
+
+        # R469. The seat steps after the five-stack quota and before the
+        # primary-stack floor. The quota is the thinnest-evidenced lower bound
+        # (one dated decision whose lift has moved three ways); the seat is one
+        # slate's observed outcome and Ben's explicit rule; the floor has three
+        # tranches behind it. One step, off, counted and named: a seat the joint
+        # solve cannot carry is a construction preference and never the file.
+        if (proven_infeasible and (not slate_blocked) and not _probe and seat_rows):
+            return select_and_assign_entries(
+                _all_candidates, entry_requirements, portfolio_controls,
+                bank_report=bank_report, fixed_exposure=fixed_exposure,
+                feasibility_inputs=feasibility_inputs,
+                feasibility_checks=feasibility_checks,
+                interaction_probe_budget_s=interaction_probe_budget_s,
+                interaction_probe_not_after=interaction_probe_not_after,
+                _floor_state=_floor_state,
+                _reuse_state=_reuse_state,
+                _quota_state=_quota_state,
+                _search_state=_search_state,
+                _seat_state={
+                    "relaxed": True,
+                    "relaxation_steps": list(seat_report.get("relaxation_steps") or []) + [{
+                        "from": dict(sorted(seat_need.items())),
+                        "to": None,
+                        "reason": ("entry-level joint MILP proven infeasible with the "
+                                   "consensus-pair seats active; the seat is one of the "
+                                   "controls whose interaction the solver could not "
+                                   "satisfy"),
+                        "trigger": "proven_infeasible_with_consensus_pair_seats",
+                    }],
+                },
+            )
 
         # R37. The one re-entry. A PROVEN infeasibility with the floor active is
         # the case the ladder exists for, and relaxing beats refusing because a
@@ -4406,6 +4680,7 @@ def select_and_assign_entries(
                     _reuse_state=_reuse_state,
                     # R37(2)(b): and the quota's state, for the same reason.
                     _quota_state=_quota_state,
+                    _seat_state=_seat_state,
                     _floor_state={
                         "rung_index": rung_idx + 1,
                         "relaxations": int(floor_report.get("relaxations") or 0) + 1,
@@ -4457,6 +4732,7 @@ def select_and_assign_entries(
                     feasibility_inputs=feasibility_inputs,
                     feasibility_checks=feasibility_checks,
                     _floor_state=_floor_state, _quota_state=_quota_state,
+                    _seat_state=_seat_state,
                     _reuse_state=(exhausted_reuse
                                   if trial.get("max_candidate_reuse") is None
                                   else _reuse_state),
@@ -4492,6 +4768,9 @@ def select_and_assign_entries(
                if floor_report.get("status") != "not_requested" else {}),
             **({"five_stack_quota": quota_report}
                if quota_report.get("status") != "not_requested" else {}),
+            # R469. Known before the solve, so it rides the refusal too.
+            **({"consensus_pair_seats": seat_report}
+               if seat_report.get("status") != "not_requested" else {}),
         }
 
     # A time-limited incumbent satisfies every constraint in the matrix; it is
@@ -4714,6 +4993,22 @@ def select_and_assign_entries(
                           "proxies, never a probability or an edge")
         sleeve_block = {"classic_sleeves": public}
 
+    # R469. What the DELIVERED set seats on the pair, per contest, counted off
+    # the assignments on the R37 precedent: the row is a lower bound and the
+    # solver may exceed it.
+    seat_block: Dict[str, Any] = {}
+    if seat_report.get("status") != "not_requested":
+        seated = {c: 0 for c in seat_report["required_by_contest"]}
+        for e, k in enumerate(chosen_k):
+            if sp_pairs[k] == seat_pair_key:
+                cid = str(entries[e].get("contest_id") or "")
+                seated[cid] = seated.get(cid, 0) + 1
+        seat_block = {"consensus_pair_seats": {
+            **seat_report, "seated_by_contest": seated,
+            "label": ("a construction rule over the projection's consensus SP "
+                      "pair (Ben, 2026-09-30); never a claim about outcomes"),
+        }}
+
     floor_warnings: List[str] = []
     _qr = quota_block.get("five_stack_quota") if quota_block else None
     if _qr:
@@ -4774,6 +5069,7 @@ def select_and_assign_entries(
         **reuse_block,
         **cluster_block,
         **sleeve_block,
+        **seat_block,
         "passed": True,
         "assignments": assignments,
         "selection_certified": True,

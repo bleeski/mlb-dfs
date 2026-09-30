@@ -1367,6 +1367,23 @@ def fraction_or_problem(value: Any) -> tuple:
     return coerced, None
 
 
+# R469. The COUNT controls in --controls-override: a whole number, not a
+# fraction, so they take the integer branch of the same units gate.
+COUNT_CONTROL_KEYS = ("min_consensus_pair_entries_per_contest",)
+
+
+def count_or_problem(value: Any) -> tuple:
+    """``(int, None)`` or ``(None, why it is not a count)``: the operator-facing
+    mirror of ``contest_allocator.assert_count_control``, no engine import."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None, "not a whole number"
+    if isinstance(value, float) and (value != value or not value.is_integer()):
+        return None, "not a whole number"
+    if value < 0:
+        return None, "negative"
+    return int(value), None
+
+
 def distinct_sp_pairs(candidates: list):
     """How many distinct SP PAIRS this bank holds, or None if it cannot be read.
 
@@ -3596,6 +3613,7 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         resolve_bank_stack_request, resolve_consensus_limited_request,
         build_consensus_limited_jobs, resolve_sleeve_bank_request,
         build_sleeve_jobs, sleeve_candidates, BANK_SLEEVE_BUDGET_SHARE,
+        build_consensus_pair_jobs,
         BANK_FIVE_STACK_BUDGET_MIN_SHARE,
         BANK_FIVE_STACK_BUDGET_MAX_SHARE,
     )
@@ -4138,6 +4156,24 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
                 "report"].get("job_list_exhausted")
         bank_report["budget_floored"] = bank_budget_floored
         bank_report["bank_cap"] = _bank_cap
+        # R469. The consensus-pair slice, before the sleeves and in this cache
+        # (a pinned pair is its own conditions bucket). The pair and the seats
+        # come from the functions run_slate's feasibility inputs call, over the
+        # same frame and the same entries' postures, so the bank is asked for
+        # the pair the allocator's row seats. A bounded share of the slice
+        # budget: a handful of pinned solves, never the bank.
+        from mlb_engine.allocate.contest_allocator import (  # noqa: PLC0415
+            consensus_pair_seat_demand)
+        _cp_pair = sliced_door_consensus_pair(args.controls_override, projections)
+        _cp_seats = (sum(consensus_pair_seat_demand(
+            _sleeve_entries, args.controls_override or {}).values()) if _cp_pair else 0)
+        consensus_pair_jobs = build_consensus_pair_jobs(
+            cache, projections, pair=_cp_pair, seats=_cp_seats,
+            time_budget_s=max(2.0, min(10.0, 0.1 * float(slice_budget))),
+            leverage=leverage,
+            max_opposing_hitters_per_sp=getattr(args, "max_opposing_hitters_per_sp", None),
+            stack_min=int(_sizes[-1]))
+        bank_report["consensus_pair_jobs"] = consensus_pair_jobs
         # R406. The sleeves, last: chalk-fails and environment in this cache
         # (their own buckets), salary-only in a sibling file, because a
         # different frame is a different projection digest and would purge
@@ -4169,6 +4205,8 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         for _srep in (sleeve_jobs.get("sleeves") or {}).values():
             if isinstance(_srep, dict) and _srep.get("conditions_signature"):
                 _requested_sigs.add(_srep["conditions_signature"])
+        if consensus_pair_jobs.get("conditions_signature"):  # R469
+            _requested_sigs.add(consensus_pair_jobs["conditions_signature"])
         bank_report["served_from_unrequested_buckets"] = cache.count_outside_buckets(
             _requested_sigs)
         # R453. The cap bounds this build's own buckets, so the union `as_candidates`
@@ -4898,6 +4936,18 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         exposure["classic_sleeves"]["request_from"] = (
             "the first solve's bank, reused by this solve (R416)")
     print(f"sleeves: {format_sleeves_line(exposure['classic_sleeves'])}", file=sys.stderr)
+    # R469. The chalk-core seat: the pair, what each contest owed and seated,
+    # and what relaxed. From the allocation, like the cluster above.
+    try:
+        _pair_names = dict(zip(projections["Player_ID"].astype(str),
+                               projections["Name"].astype(str)))
+    except Exception:  # noqa: BLE001 - names are a courtesy, ids still print
+        _pair_names = {}
+    exposure["consensus_pair"] = consensus_pair_exposure(result, names=_pair_names)
+    if exposure["consensus_pair"] is not None:
+        exposure["consensus_pair"]["jobs"] = (_bank_record or {}).get("consensus_pair_jobs")
+    print(f"chalk-core seat: {format_consensus_pair_line(exposure['consensus_pair'])}",
+          file=sys.stderr)
     # R247(a). Read before approving, on the same footing as the frontier line.
     # The block itself lives inside the frontier (it is computed where the
     # entered set and the Ceiling column are both in hand); it is echoed here
@@ -7455,6 +7505,47 @@ def showdown_degraded_entries(assignments, bank) -> dict:
     )
 
 
+def sliced_door_consensus_pair(override: dict | None, projections) -> list | None:
+    """R469. The pair the sliced door's bank slice is built on: an operator's
+    ``consensus_sp_pair`` when it names two ids (`attach_consensus_pair` keeps
+    it for the allocator, so the bank must build the same one), else the
+    projection's, from the function `run_slate`'s feasibility inputs call."""
+    from mlb_engine.allocate.contest_allocator import consensus_sp_pair  # noqa: PLC0415
+    typed = (override or {}).get("consensus_sp_pair")
+    if isinstance(typed, (list, tuple)) and len({str(x) for x in typed}) == 2:
+        return [str(x) for x in typed]
+    return consensus_sp_pair(projections).get("pair")
+
+
+def consensus_pair_exposure(result: dict | None, names: dict | None = None) -> dict | None:
+    """R469. The brief's chalk-core seat block, off the allocation's report:
+    the pair (named), the basis, what each contest owed, what the file seats,
+    and every relaxation. None when the allocator reported no block."""
+    seats = (result or {}).get("consensus_pair_seats")
+    if not seats:
+        return None
+    pair = [str(x) for x in seats.get("pair") or []]
+    return {
+        **dict(seats),
+        "pair_names": [str((names or {}).get(pid) or pid) for pid in pair],
+        "label": ("a construction rule over the projection's consensus SP pair "
+                  "(Ben, 2026-09-30); never a claim about outcomes"),
+    }
+
+
+def format_consensus_pair_line(block: dict | None) -> str:
+    """One review line for R469: the pair and `contest seated/owed` per contest."""
+    if not block:
+        return "UNAVAILABLE (the allocator reported no consensus_pair_seats block)"
+    names = " + ".join(block.get("pair_names") or block.get("pair") or [])
+    owed = block.get("required_by_contest") or {}
+    seated = block.get("seated_by_contest") or {}
+    per = ", ".join(f"{cid} {int(seated.get(cid, 0))}/{int(owed.get(cid, 0))}"
+                    for cid in sorted(owed))
+    return (f"{names} ({block.get('status')}): {per}; "
+            f"relaxations {int(block.get('relaxations') or 0)}")
+
+
 def format_consensus_cluster_line(cluster: dict | None) -> str:
     """One review line for R405's block: the cluster and what the file carries.
 
@@ -8327,6 +8418,16 @@ def main() -> int:
                                   "problem": problem})
             else:
                 by_game[gid] = coerced
+    for key in COUNT_CONTROL_KEYS:
+        value = override.get(key)
+        if value is None:
+            continue
+        coerced, problem = count_or_problem(value)
+        if problem:
+            bad_units.append({"control": key, "value": value,
+                              "problem": f"{problem}; a COUNT control"})
+        else:
+            override[key] = coerced
     if bad_units:
         print(json.dumps({
             "status": "controls_override_bad_units",

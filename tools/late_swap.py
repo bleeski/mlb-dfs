@@ -264,6 +264,64 @@ def declared_pitcher_argv(declared) -> list[str]:
     return out
 
 
+def consensus_pair_seats_lost(parent_rosters: dict, after_rosters: dict,
+                              contest_by_entry: dict, pair) -> list:
+    """R469. Contests whose parent file held a lineup on the consensus pair and
+    whose swapped file holds none, each with the parent entries that held it.
+
+    The allocator's seat row does not run inside a swap (`run_late_swap` builds
+    requirements that carry no posture), so this post-solve comparison is the
+    swap's half of Ben's rule of 2026-09-30: a late swap never removes the last
+    consensus-pair lineup in a contest. A seat that MOVED to another entry of
+    the same contest is not lost. A hand edit never passes through here; the
+    rule for that path is printed by `tools/standings_read.py` (R472).
+    """
+    wanted = {str(x) for x in (pair or [])}
+    if len(wanted) != 2:
+        return []
+    before: dict = {}
+    after: dict = {}
+    for eid, roster in (parent_rosters or {}).items():
+        if wanted <= {str(p) for p in roster}:
+            before.setdefault(str(contest_by_entry.get(eid) or ""), []).append(str(eid))
+    for eid, roster in (after_rosters or {}).items():
+        if wanted <= {str(p) for p in roster}:
+            cid = str(contest_by_entry.get(eid) or "")
+            after[cid] = after.get(cid, 0) + 1
+    return [{"contest_id": cid, "entries": sorted(eids)}
+            for cid, eids in sorted(before.items()) if cid and not after.get(cid)]
+
+
+def consensus_pair_guard(args, pair, parent_rosters: dict, after_rosters: dict,
+                         contest_by_entry: dict, downgraded: list):
+    """R469. Exit 3 when the swap removes a contest's last consensus-pair
+    lineup and ``--accept-downgrade`` was not given; with it, each loss joins
+    ``downgraded`` so the file ships review-grade (`swap_certification`).
+    Returns None to continue. ``pair`` is the one the PARENT recorded."""
+    if not pair:
+        print("chalk-core seat: the parent recorded no consensus pair (a build "
+              "before R469, or a mismatched parent); the guard does not run")
+        return None
+    lost = consensus_pair_seats_lost(parent_rosters, after_rosters,
+                                     contest_by_entry, pair)
+    print(f"chalk-core seat: pair {'/'.join(str(x) for x in pair)} (the parent's "
+          f"record); " + (f"{len(lost)} contest(s) lose their last pair lineup"
+                          if lost else "no contest loses its last pair lineup"))
+    if lost and not args.accept_downgrade:
+        print("late swap refused: it removes the last consensus-pair lineup in "
+              "these contests (Ben's rule, 2026-09-30):", file=sys.stderr)
+        for row in lost:
+            print(f"  contest {row['contest_id']}: parent entries "
+                  f"{', '.join(row['entries'])}", file=sys.stderr)
+        print("nothing was mirrored to outputs/. Re-run with --accept-downgrade to "
+              "take it anyway; the file then ships review-grade.", file=sys.stderr)
+        return 3
+    for row in lost:
+        downgraded.append(f"{','.join(row['entries'])} [contest {row['contest_id']}: "
+                          f"last consensus-pair lineup removed]")
+    return None
+
+
 def swap_certification(result: dict, downgraded: list, parent_label=None) -> str:
     """The manifest label for a delivered swap (R388(e)): failing gates win,
     then an accepted downgrade, then `certified`.
@@ -1628,6 +1686,18 @@ def main() -> int:
               f"with --accept-downgrade to take it anyway (a forced swap off a "
               f"scratch is a legitimate downgrade).", file=sys.stderr)
         return 3
+    # R469. The chalk-core seat, over the pair the PARENT seated (its recorded
+    # controls, inherited or read off the run when this swap re-derives).
+    parent_pair = (inherited or {}).get("consensus_sp_pair")
+    if not parent_pair and swap_parent is not None and swap_parent.get(
+            "current_matches_parent_export"):
+        parent_pair = (parent_realized_controls(swap_parent["run_dir"]) or {}).get(
+            "consensus_sp_pair")
+    guard = consensus_pair_guard(
+        args, parent_pair, parent_rosters, after_rosters,
+        {str(r.entry_id): str(r.contest_id) for r in reserved_rows}, downgraded)
+    if guard is not None:
+        return guard
     if downgraded:
         print("downgrade accepted by --accept-downgrade: " + "; ".join(downgraded),
               file=sys.stderr)
