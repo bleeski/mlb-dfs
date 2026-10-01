@@ -62,7 +62,7 @@ from mlb_engine.swap.late_swap_manager import (
     CONFIRMED_STARTER, PROJECTED_STARTER, UNKNOWN, PlayerLineupStatus,
 )
 from mlb_engine.intake.slate_intake_manager import (
-    DK_ORDER_SLOTS, normalize_name)
+    DK_ORDER_SLOTS, DK_STARTING_OPENER_TOKENS, normalize_name)
 # R289: the ONE reading of the Excluded column, imported rather than restated.
 # The front door decides pool MEMBERSHIP, so a second token rule here would be
 # the F21 defect in the one place it costs the most.
@@ -95,7 +95,8 @@ STALE_PLATOON_POLICIES = ("block", "warn")
 # resolve, which is non-deterministic and must not live inside a replayable
 # build, so intake SURFACES it as a named soft blocker per arm and the operator
 # decides via declared_pitchers (build_slate.py's repeatable --declare-pitcher).
-DK_STARTING_OPENER_TOKENS = frozenset({"PO"})
+# R471. The opener set is defined once, in `slate_intake_manager` (imported
+# below with the other intake names), so the CLI check reads the same set.
 DK_STARTING_LONG_RELIEVER_TOKENS = frozenset({"PLR"})
 
 # R104. The role a barred opener carries. Deliberately absent from
@@ -2492,8 +2493,10 @@ def build_slate_pool(
                 f"{sp.team} {sp.name} ({pid}): DK Starting={sp.starting} "
                 f"(probable opener); BARRED from pitcher slots, role "
                 f"{BARRED_OPENER_ROLE}, absent from the frame. If DK is wrong, "
-                f"declare him via declared_pitchers ({pid}=declared_probable_sp), "
-                f"and declare the bulk arm behind him the same way."
+                f"declare him via declared_pitchers with the evidence you read "
+                f"(--declare-pitcher '{pid}=declared_probable_sp:evidence=\"...\"', "
+                f"R471: his strikeout prop against his season norm), and declare "
+                f"the bulk arm behind him the same way."
             )
             continue
         pitcher_roles[str(pid)] = "declared_probable_sp"

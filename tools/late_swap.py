@@ -36,7 +36,7 @@ Usage:
         [--budget 30] [--solver-budget 15] [--lineups <fresh feed.json>] \
         [--entry-ids 123,456] [--dry-run] \
         [--postures <contest_id>=cash,...] [--accept-downgrade]
-        [--declare-pitcher ID[=ROLE[:ip=N]] ...]
+        [--declare-pitcher ID[=ROLE[:ip=N][:evidence="..."]] ...]
 
 The money-and-entry wall still applies: this writes a CSV. Nothing here uploads,
 enters a contest, or moves money. Lineups move only at Ben's manual upload.
@@ -240,7 +240,8 @@ def _parent_declaration_record(root: Path, date: str, swap_parent) -> tuple:
                       "none inherited")
     if isinstance(meta.get("declared_pitchers"), dict):
         return ({"declared_pitchers": meta.get("declared_pitchers"),
-                 "declared_pitcher_workload": meta.get("declared_pitcher_workload")},
+                 "declared_pitcher_workload": meta.get("declared_pitcher_workload"),
+                 "declared_pitcher_evidence": meta.get("declared_pitcher_evidence")},
                 f"the parent swap run {manifest.get('run_id')}'s record")
     tools_dir = str(Path(__file__).resolve().parent)
     if tools_dir not in sys.path:
@@ -258,7 +259,8 @@ def _parent_declaration_record(root: Path, date: str, swap_parent) -> tuple:
     if not isinstance(data, dict):
         return None, f"none inherited: {brief.name} is not an object"
     return ({"declared_pitchers": data.get("declared_pitchers"),
-             "declared_pitcher_workload": data.get("declared_pitcher_workload")},
+             "declared_pitcher_workload": data.get("declared_pitcher_workload"),
+             "declared_pitcher_evidence": data.get("declared_pitcher_evidence")},
             f"the parent build's brief {brief.name} ({how})")
 
 
@@ -301,6 +303,19 @@ def resolve_swap_declared_workload(root: Path, date: str, swap_parent,
     if explicit:
         note = f"{note}; from --declare-pitcher: {', '.join(sorted(explicit))}"
     return dict(sorted(merged.items())), note
+
+
+def resolve_swap_declared_evidence(record, explicit: dict, declared) -> dict:
+    """R471. ``{id: note}``: the evidence behind this swap's declarations, the
+    parent's recorded notes with this command line's merged over them, kept
+    for declared arms only. A swap of a swap reads its parent's manifest
+    record, so a note typed at the build survives every swap after it."""
+    raw = (record or {}).get("declared_pitcher_evidence") or {}
+    inherited = ({str(k).strip(): str(v).strip() for k, v in raw.items()
+                  if str(k).strip() and str(v).strip()}
+                 if isinstance(raw, dict) else {})
+    merged = {**inherited, **dict(explicit or {})}
+    return dict(sorted((k, v) for k, v in merged.items() if k in set(declared or {})))
 
 
 def declared_pitcher_argv(declared) -> list[str]:
@@ -1234,13 +1249,16 @@ def main() -> int:
                          "and the slate's floors instead of inheriting the "
                          "parent run's realized controls (R268(a))")
     ap.add_argument("--declare-pitcher", dest="declare_pitcher", action="append",
-                    default=None, metavar="ID[=ROLE[:ip=N]]",
+                    default=None, metavar='ID[=ROLE[:ip=N][:evidence="..."]]',
                     help="R468. Carry a pitcher the pool would otherwise leave "
                          "out (a PLR or bulk arm), in build_slate.py's grammar. "
                          "The default is the parent build's own declarations, "
                          "read from its brief; these merge over them. Without "
                          "it an entry holding a declared arm in a locked slot "
-                         "has no candidate and the whole swap refuses.")
+                         "has no candidate and the whole swap refuses. R471: "
+                         "an arm declared here that DK tags Starting=PO needs "
+                         ":evidence=\"...\" (typed here or recorded by the "
+                         "parent), else exit 4.")
     ap.add_argument("--ignore-unresolved-postures", action="store_true",
                     help="proceed when a contest name matches no archetype, "
                          "accepting the fallback posture. Recorded on stderr.")
@@ -1459,6 +1477,37 @@ def main() -> int:
         (_build_slate_module().declared_pitcher_workload(args.declare_pitcher)
          if args.declare_pitcher else {}),
         redeclared=explicit_declared, record=parent_record)
+    # R471. The build's wall, at the swap's door: an arm declared on THIS
+    # command line that DK tags PO carries evidence, typed here or recorded by
+    # the parent. Inherited declarations are not re-judged: they passed the
+    # build's check, or predate it, and refusing them would block a repair on
+    # no new fact (R272).
+    declared_evidence = resolve_swap_declared_evidence(
+        parent_record[0],
+        (_build_slate_module().declared_pitcher_evidence(args.declare_pitcher)
+         if args.declare_pitcher else {}),
+        declared_pitchers)
+    if explicit_declared:
+        po_arms = _build_slate_module().po_declarations_without_evidence(
+            salary, explicit_declared, declared_evidence)
+        if po_arms:
+            print(f"{_build_slate_module().po_evidence_refusal_error(po_arms)}. Read "
+                  f"from {salary}'s Starting column. Nothing was swapped.",
+                  file=sys.stderr)
+            return 4
+    # R471. An inherited arm the swap's salary file tags PO with no recorded
+    # note is named, not refused: the tag may have posted after the build.
+    inherited_only = {k: v for k, v in declared_pitchers.items()
+                      if k not in explicit_declared}
+    for arm in (_build_slate_module().po_declarations_without_evidence(
+            salary, inherited_only, declared_evidence) if inherited_only else []):
+        print(f"WARN declared arm {arm['name']} ({arm['player_id']}, {arm['team']}) "
+              f"is inherited from the parent and DK tags him Starting=PO on "
+              f"{salary.name}, with no recorded evidence; check his strikeout prop, "
+              f"and re-declare him with :evidence=\"...\" or drop him")
+    if declared_evidence:
+        print("declared evidence: "
+              + "; ".join(f"{k}: {v}" for k, v in declared_evidence.items()))
     orphaned = sorted(set(declared_workload) - set(declared_pitchers))
     if orphaned:
         declared_workload = {k: v for k, v in declared_workload.items()
@@ -1689,7 +1738,8 @@ def main() -> int:
         # R468. On the swap run's own manifest, so a swap of this file finds
         # what this one carried: a swap writes no brief.
         metadata={"declared_pitchers": dict(declared_pitchers),
-                  "declared_pitcher_workload": dict(declared_workload)},
+                  "declared_pitcher_workload": dict(declared_workload),
+                  "declared_pitcher_evidence": dict(declared_evidence)},
         # R29(2): the downgrade check below can still refuse this file, and a
         # refused run must not leave the latest-run pointer naming it. Promotion
         # happens after the mirror, at the bottom of this function.

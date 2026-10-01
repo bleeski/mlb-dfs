@@ -40919,17 +40919,20 @@ class DeclaredArmWorkloadTests(unittest.TestCase):
                           "3": "declared_probable_sp"},
                          "the {id: role} contract every reader relies on is unchanged")
         options = bs.parse_declared_pitcher_options(values)
-        self.assertEqual(options["1"], {"role": "viable_bulk_or_alt_sp", "ip": 2.5})
+        self.assertEqual(options["1"], {"role": "viable_bulk_or_alt_sp", "ip": 2.5,
+                                        "evidence": None})
         self.assertEqual(options["3"]["ip"], 4.0)
         self.assertEqual(bs.declared_pitcher_workload(values), {"1": 2.5, "3": 4.0})
         for bad in ("1=viable_bulk_or_alt_sp:ip=abc", "1=viable_bulk_or_alt_sp:ip=0",
                     "1=viable_bulk_or_alt_sp:ip=inf", "1=viable_bulk_or_alt_sp:ip=nan",
                     "1=viable_bulk_or_alt_sp:ip=2:ip=4", "1=viable_bulk_or_alt_sp:foo=1",
-                    '1=viable_bulk_or_alt_sp:ip="2', "1:ip=3",
-                    # R471 adds the evidence note, with the place it is recorded.
-                    '1=declared_probable_sp:evidence="K line"'):
+                    '1=viable_bulk_or_alt_sp:ip="2', "1:ip=3"):
             with self.assertRaises(bs.CliValueError, msg=bad):
                 bs.parse_declared_pitcher_options([bad])
+        # R471 added the evidence note (DeclaredPitcherEvidenceTests).
+        self.assertEqual(
+            bs.parse_declared_pitcher_options(['1=declared_probable_sp:evidence="K line"'])["1"],
+            {"role": "declared_probable_sp", "ip": None, "evidence": "K line"})
 
     def test_an_option_before_the_role_refuses_at_exit_4_before_staging(self):
         """`ID:ip=3` would read as the id `ID:ip`, skipped off the salary file,
@@ -41150,3 +41153,345 @@ class DeclaredArmWorkloadTests(unittest.TestCase):
         self.assertEqual(merged, {"333": 4.0, "444": 2.0},
                          "an arm re-declared without ip takes its new role's prior, not the parent's number")
         self.assertIn("re-declared here without ip, so the role's own prior: 111", note)
+
+
+class DeclaredPitcherEvidenceTests(unittest.TestCase):
+    """R471 (roadmap Session 140). A declaration over DK's `PO` tag carries
+    the operator's evidence.
+
+    R104 bars a DK `Starting=PO` arm from pitcher slots and names a
+    declaration as the way past, so the operator's word alone overrode DK's
+    opener tag. On 2026-09-29 (1400_4g) Luzardo was `PO`; the feed probables
+    and the headlines named him the starter, the session declared him, the
+    certified file rostered him in 3 of 9, and he opened (a strikeout line of
+    2.5 against Sale's 7.5). On Classic a declaration whose salary `Starting`
+    is `PO` now carries `:evidence="..."`, or `validate_cli_values` refuses at
+    exit 4 `cli_value_invalid` naming the arm. A validity wall: no flag skips
+    it. The note is the operator's assertion, recorded in the brief, never a
+    correction of DK's tag.
+
+    The fixture is the vendored 1910_6g salary file, where Yohan Ramirez
+    (43711655, PIT) is `PO`, Nolan McLean (43711180) `SP` and Hunter Barco
+    (43711603) `PLR`.
+    """
+
+    SALARY = REPO / "tests" / "fixtures" / "slates" / "DKSalaries_1910_6g_frozen_2026-07-30.csv"
+    PO_ARM, SP_ARM, PLR_ARM = "43711655", "43711180", "43711603"
+
+    @staticmethod
+    def _bs():
+        return LostWindowFlagValueTests._module()
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+
+    def _salary_with(self, starting: dict, source=None) -> Path:
+        """A copy of ``source`` (default the 1910_6g file) with the named
+        ids' `Starting` cells set."""
+        with (source or self.SALARY).open(newline="", encoding="utf-8-sig") as fh:
+            rows = list(csv.reader(fh))
+        col, idc = rows[0].index("Starting"), rows[0].index("ID")
+        for row in rows[1:]:
+            if row[idc] in starting:
+                row[col] = starting[row[idc]]
+        path = self.root / f"salary_{len(list(self.root.glob('salary_*')))}.csv"
+        with path.open("w", newline="", encoding="utf-8") as fh:
+            csv.writer(fh).writerows(rows)
+        return path
+
+    def _run(self, declared, salary=None):
+        """build_slate.main(), run_classic and run_showdown patched to record
+        (LostWindowFlagValueTests' harness on this file)."""
+        import contextlib
+        import io
+        mod = self._bs()
+        reached = {"build": False}
+
+        def fake(*_a, **_k):
+            reached["build"] = True
+            return 3, {}
+
+        salary = salary or self.SALARY
+        argv = ["build_slate.py", "--salary", str(salary), "--entries", str(salary),
+                "--past-slate-replay"]
+        for value in declared:
+            argv += ["--declare-pitcher", value]
+        out = io.StringIO()
+        work = self.root / "repo"
+        work.mkdir(exist_ok=True)
+        with unittest.mock.patch.object(mod, "REPO", work), \
+                unittest.mock.patch.object(mod, "run_classic", fake), \
+                unittest.mock.patch.object(mod, "run_showdown", fake), \
+                unittest.mock.patch.object(sys, "argv", argv):
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+                code = mod.main()
+        try:
+            payload = json.loads(out.getvalue())
+        except ValueError:
+            payload = {}
+        staged = list(work.glob("data/slates/*/DKSalaries*.csv"))
+        return code, payload, reached["build"], staged
+
+    # -- the grammar ---------------------------------------------------------- #
+
+    def test_the_evidence_option_and_the_role_contract(self):
+        bs = self._bs()
+        values = ['1=declared_probable_sp:evidence="K line 2.5: an opener\'s, vs 6.1"',
+                  "2=viable_bulk_or_alt_sp:ip=3:evidence=K line 4.5 vs season 4.8",
+                  "3=declared_probable_sp:ip=5"]
+        self.assertEqual(bs.parse_declared_pitchers(values),
+                         {"1": "declared_probable_sp", "2": "viable_bulk_or_alt_sp",
+                          "3": "declared_probable_sp"},
+                         "the {id: role} contract every reader relies on is unchanged")
+        self.assertEqual(bs.declared_pitcher_evidence(values),
+                         {"1": "K line 2.5: an opener's, vs 6.1",
+                          "2": "K line 4.5 vs season 4.8"},
+                         "a quoted note may hold a colon; a bare one may hold spaces")
+        self.assertEqual(bs.declared_pitcher_workload(values), {"2": 3.0, "3": 5.0})
+        for bad, needle in (('1=declared_probable_sp:evidence=""', "evidence is empty"),
+                            ("1=declared_probable_sp:evidence=", "evidence is empty"),
+                            ('1=declared_probable_sp:evidence="  "', "evidence is empty"),
+                            ("1=declared_probable_sp:evidence=a:evidence=b", "given twice"),
+                            ("1=declared_probable_sp:evidence=at 12:30", "double-quoted"),
+                            ('1=declared_probable_sp:evidence="K line', "cannot read")):
+            with self.assertRaises(bs.CliValueError, msg=bad) as ctx:
+                bs.parse_declared_pitcher_options([bad])
+            self.assertIn(needle, str(ctx.exception), bad)
+
+    def test_preflight_reads_the_role_without_the_evidence(self):
+        sys.path.insert(0, str(REPO / "tools"))
+        import preflight_upload
+        self.assertEqual(
+            preflight_upload.parse_declared_pitcher_args(
+                [f'{self.PO_ARM}=declared_probable_sp:evidence="K 5.5: a starter\'s line"']),
+            {self.PO_ARM: "declared_probable_sp"})
+
+    # -- the build's door ------------------------------------------------------ #
+
+    def test_a_po_arm_declared_without_evidence_refuses_at_exit_4(self):
+        """The reproduction: before R471 this reached the build."""
+        for value in (self.PO_ARM, f"{self.PO_ARM}=viable_bulk_or_alt_sp:ip=2"):
+            code, payload, reached, staged = self._run([value])
+            self.assertEqual(code, 4, value)
+            self.assertFalse(reached, f"{value}: the build was reached")
+            self.assertEqual(staged, [], f"{value}: the salary file was staged")
+            self.assertEqual(payload["status"], "cli_value_invalid")
+            self.assertEqual(payload["flag"], "--declare-pitcher")
+            self.assertEqual(payload["po_arms_without_evidence"], [
+                {"player_id": self.PO_ARM, "name": "Yohan Ramirez", "team": "PIT",
+                 "dk_starting": "PO"}])
+            for needle in ("Yohan Ramirez (43711655, PIT) Starting=PO", ':evidence="',
+                           "strikeout prop"):
+                self.assertIn(needle, payload["error"], value)
+
+    def test_every_po_arm_is_named_in_id_order(self):
+        salary = self._salary_with({self.SP_ARM: "PO"})
+        code, payload, reached, _staged = self._run(
+            [self.PO_ARM, self.SP_ARM, self.PLR_ARM], salary=salary)
+        self.assertEqual((code, reached), (4, False))
+        self.assertEqual([a["player_id"] for a in payload["po_arms_without_evidence"]],
+                         [self.SP_ARM, self.PO_ARM], "one refusal names both, sorted by id")
+
+    def test_evidence_on_one_po_arm_does_not_cover_another(self):
+        salary = self._salary_with({self.SP_ARM: "PO"})
+        code, payload, reached, _staged = self._run(
+            [f'{self.PO_ARM}=declared_probable_sp:evidence="K 5.5 vs 5.0"', self.SP_ARM],
+            salary=salary)
+        self.assertEqual((code, reached), (4, False))
+        self.assertEqual([a["player_id"] for a in payload["po_arms_without_evidence"]],
+                         [self.SP_ARM])
+
+    def test_a_po_arm_with_evidence_reaches_the_build(self):
+        """The positive control: without it, refusing every PO declaration
+        passes every test above and retires the documented way past R104."""
+        code, payload, reached, _staged = self._run(
+            [f'{self.PO_ARM}=declared_probable_sp:evidence="K line 4.5 vs season 4.8"'])
+        self.assertTrue(reached, payload)
+        self.assertEqual(code, 3, "the patched build's own exit")
+
+    def test_a_non_po_arm_declared_bare_reaches_the_build(self):
+        code, payload, reached, _staged = self._run([self.SP_ARM, self.PLR_ARM])
+        self.assertTrue(reached, payload)
+        self.assertEqual(code, 3)
+
+    def test_showdown_is_not_checked(self):
+        """R347: a Showdown pool takes no declaration and keeps a PO arm as
+        `declared_opener`, so the wall is Classic's."""
+        bs = self._bs()
+        source = REPO / "tests" / "fixtures" / "showdown" / "DKSalaries_showdown_MIN_CHC.csv"
+        salary = self._salary_with({"43628708": "PO"}, source=source)
+        self.assertEqual(bs.detect_contest_type(salary, salary), "showdown")
+        args = types.SimpleNamespace(
+            date="2026-07-18", salary=str(salary), entries_csv=str(salary),
+            declare_pitcher=["43628708"], controls_override=None, leverage=None,
+            postures=None, assume_gates=None, captain_sleeve=None)
+        self.assertIsNone(bs.validate_cli_values(args))
+        self.assertEqual([a["player_id"] for a in bs.po_declarations_without_evidence(
+            salary, {"43628708": "declared_probable_sp"}, {})], ["43628708"],
+            "the arm IS PO on this file; only the Classic guard lets it through")
+
+    def test_no_salary_file_defers_to_missing_inputs(self):
+        bs = self._bs()
+        args = types.SimpleNamespace(
+            date="2026-07-30", salary=str(self.root / "absent.csv"),
+            entries_csv=str(self.SALARY), declare_pitcher=[self.PO_ARM],
+            controls_override=None, leverage=None, postures=None, assume_gates=None,
+            captain_sleeve=None)
+        self.assertIsNone(bs.validate_cli_values(args))
+
+    def test_an_unreadable_salary_file_defers_to_the_pool_build(self):
+        """A file the engine's parser refuses builds nothing: the pool reads it
+        with the same parser and refuses it by name, so the check steps aside
+        rather than crash main() at exit 1 before any refusal is printed."""
+        bs = self._bs()
+        bad = self.root / "bad.csv"
+        bad.write_text("Name,Salary\nX,1\n", encoding="utf-8")
+        from mlb_engine.intake.slate_intake_manager import parse_dk_salary_csv
+        with self.assertRaises(ValueError):
+            parse_dk_salary_csv(str(bad))
+        args = types.SimpleNamespace(
+            date="2026-07-30", salary=str(bad), entries_csv=str(bad),
+            declare_pitcher=[self.PO_ARM], controls_override=None, leverage=None,
+            postures=None, assume_gates=None, captain_sleeve=None)
+        self.assertIsNone(bs.validate_cli_values(args))
+
+    def test_one_token_set_serves_the_bar_and_the_check(self):
+        from mlb_engine.intake import slate_intake_manager as sim
+        self.assertIs(lda.DK_STARTING_OPENER_TOKENS, sim.DK_STARTING_OPENER_TOKENS)
+        src = (REPO / "mlb_engine" / "intake" / "live_data_adapters.py").read_text(encoding="utf-8")
+        self.assertNotIn("DK_STARTING_OPENER_TOKENS = ", src, "a second definition")
+
+    # -- the brief ------------------------------------------------------------ #
+
+    def test_every_brief_site_that_records_the_roles_records_the_notes(self):
+        """Five sites record `declared_pitchers` (the baseline brief, Classic's
+        refusal and delivered briefs, Showdown's refusal and delivered
+        briefs); each records `declared_pitcher_evidence` beside it."""
+        import re as _re
+        src = (REPO / "skills" / "generate-lineups" / "scripts" / "build_slate.py").read_text(encoding="utf-8")
+        roles = _re.findall(r'"declared_pitchers"\]?\s*[:=]\s*parse_declared_pitchers\(', src)
+        notes = _re.findall(r'"declared_pitcher_evidence"\]?\s*[:=]\s*declared_pitcher_evidence\(', src)
+        self.assertEqual(len(roles), 5)
+        self.assertEqual(len(notes), len(roles))
+
+    def test_the_baseline_brief_records_the_note(self):
+        bs = self._bs()
+        out = self.root / "outputs" / "2026-07-30"
+        out.mkdir(parents=True)
+        delivered = out / "DKEntries_1910_6g_BASELINE_r1.csv"
+        delivered.write_text("x\n", encoding="utf-8")
+        args = types.SimpleNamespace(date="2026-07-30", declare_pitcher=[
+            f'{self.PO_ARM}=declared_probable_sp:evidence="K line 4.5 vs season 4.8"',
+            self.SP_ARM])
+        got = bs._write_baseline_brief(args, self.SALARY,
+                                       {"path": str(delivered), "sha256": "ab", "run_id": "r1"})
+        self.assertTrue(got["written"], got)
+        brief = json.loads(Path(got["path"]).read_text(encoding="utf-8"))
+        self.assertEqual(brief["declared_pitcher_evidence"],
+                         {self.PO_ARM: "K line 4.5 vs season 4.8"})
+        self.assertEqual(brief["declared_pitchers"],
+                         {self.PO_ARM: "declared_probable_sp", self.SP_ARM: "declared_probable_sp"})
+
+    def test_run_classic_records_the_note_on_its_payload(self):
+        harness = DeadlineGovernorWiringTests(
+            "test_the_anti_correlation_flag_reaches_the_controls_the_validator_grades")
+        harness.setUp()
+        self.addCleanup(harness.doCleanups)
+        code, payload, _calls, _err = harness._run(30, args_overrides={"declare_pitcher": [
+            '43706740=viable_bulk_or_alt_sp:evidence="bulk behind an opener"']})
+        self.assertEqual(code, 3)
+        self.assertEqual(payload["declared_pitcher_evidence"],
+                         {"43706740": "bulk behind an opener"})
+
+    # -- late swap's door ----------------------------------------------------- #
+
+    def _swap(self):
+        harness = LateSwapDeclaredPitcherTests("test_the_grammar_is_build_slates_own_parser")
+        harness.setUp()
+        self.addCleanup(harness.doCleanups)
+        with harness.salary.open(newline="", encoding="utf-8") as fh:
+            rows = list(csv.reader(fh))
+        ids = {row[2]: row[3] for row in rows[1:]}
+        harness.po_arm = ids["T4 Pen1"]
+        rows[0].append("Starting")
+        for row in rows[1:]:
+            row.append("PO" if row[3] == harness.po_arm else "")
+        harness.po_salary = harness.root / "DKSalaries_po.csv"
+        with harness.po_salary.open("w", newline="", encoding="utf-8") as fh:
+            csv.writer(fh).writerows(rows)
+        return harness
+
+    @staticmethod
+    def _swap_manifests(harness):
+        manifests = [json.loads(p.read_text()) for p in (harness.root / "runs").glob("*/manifest.json")]
+        return [m for m in manifests if m.get("mode") == "late_swap"]
+
+    def test_a_swap_refuses_an_explicit_po_declaration_without_evidence(self):
+        harness = self._swap()
+        harness._brief()
+        code, _out, err = harness._run("--salary", str(harness.po_salary),
+                                       "--declare-pitcher", harness.po_arm)
+        self.assertEqual(code, 4, err[-1500:])
+        self.assertIn(f"T4 Pen1 ({harness.po_arm}, T4) Starting=PO", err)
+        self.assertIn("Nothing was swapped", err)
+        self.assertEqual(self._swap_manifests(harness), [], "a swap run was written")
+
+    def test_a_swap_carries_the_parents_note_and_it_covers_a_re_declaration(self):
+        """The parent build declared the PO arm with evidence; the swap
+        re-declares him with a new role and no note. The parent's note
+        covers him, and the swap's manifest carries it so a swap of this
+        swap does too."""
+        harness = self._swap()
+        out_dir = harness.root / "outputs" / harness.DATE
+        out_dir.mkdir(parents=True, exist_ok=True)
+        (out_dir / "build_brief_test.json").write_text(json.dumps({
+            "run_id": harness.parent["run_id"],
+            "delivered_sha256": sha256_file(harness.parent_file),
+            "declared_pitchers": {**harness.declared, harness.po_arm: "declared_probable_sp"},
+            "declared_pitcher_evidence": {harness.po_arm: "K line 5.5 vs season 5.2"},
+        }), encoding="utf-8")
+        code, out, err = harness._run("--salary", str(harness.po_salary), "--declare-pitcher",
+                                      f"{harness.po_arm}=viable_bulk_or_alt_sp")
+        self.assertEqual(code, 0, err[-1500:])
+        self.assertIn(f"declared evidence: {harness.po_arm}: K line 5.5 vs season 5.2", out)
+        swaps = self._swap_manifests(harness)
+        self.assertEqual(len(swaps), 1)
+        self.assertEqual(swaps[0]["metadata"]["declared_pitcher_evidence"],
+                         {harness.po_arm: "K line 5.5 vs season 5.2"})
+
+    def test_an_inherited_po_declaration_is_not_re_judged(self):
+        """A parent that declared a PO arm with no note (a pre-R471 build)
+        still swaps: the swap adds no fact, and blocking it blocks a repair.
+        The swap also declares a non-PO arm of its own, so the check runs and
+        must read only what this command line declared."""
+        harness = self._swap()
+        harness._brief(declared={**harness.declared, harness.po_arm: "declared_probable_sp"})
+        with harness.po_salary.open(newline="", encoding="utf-8") as fh:
+            ids = {row[2]: row[3] for row in list(csv.reader(fh))[1:]}
+        code, out, err = harness._run("--salary", str(harness.po_salary),
+                                      "--declare-pitcher", ids["T3 Pen1"])
+        self.assertEqual(code, 0, err[-1500:])
+        self.assertIn(f"{harness.po_arm}=declared_probable_sp", out, "the PO arm was inherited")
+        self.assertIn(f"WARN declared arm T4 Pen1 ({harness.po_arm}, T4) is inherited from "
+                      f"the parent and DK tags him Starting=PO", out, "named, not silent")
+        self.assertEqual(out.count("WARN declared arm"), 1, "only the inherited PO arm")
+
+    def test_the_swap_evidence_resolver_merges_and_keeps_declared_arms(self):
+        ls = LateSwapDeclaredPitcherTests._tool()
+        record = {"declared_pitcher_evidence": {"111": "a", "222": "b", "333": "  "}}
+        self.assertEqual(
+            ls.resolve_swap_declared_evidence(record, {"222": "typed"},
+                                              {"111": "r", "222": "r", "333": "r"}),
+            {"111": "a", "222": "typed"}, "explicit over inherited; a blank note is no note")
+        self.assertEqual(ls.resolve_swap_declared_evidence(record, {}, {"111": "r"}), {"111": "a"},
+                         "a note for an arm no longer declared is dropped")
+        self.assertEqual(ls.resolve_swap_declared_evidence(None, {}, {"111": "r"}), {})
+        # A swap of a swap reads the parent swap run's manifest record.
+        parent = {"current_matches_parent_export": True, "manifest": {
+            "run_id": "swap1", "metadata": {"declared_pitchers": {"111": "r"},
+                                            "declared_pitcher_evidence": {"111": "a"}}}}
+        got, where = ls._parent_declaration_record(Path("."), "2026-07-10", parent)
+        self.assertEqual(got["declared_pitcher_evidence"], {"111": "a"})
+        self.assertIn("swap1", where)

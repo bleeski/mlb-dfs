@@ -25,6 +25,11 @@ declared PLR or bulk arm in a locked slot has no candidate and the whole swap re
 A declared bulk arm is projected at a bulk arm's workload in the swap exactly as in
 the build (R470): the role carries the default, and any typed `:ip=N` is inherited
 from the parent's `declared_pitcher_workload` and printed as `declared workload:`.
+An arm declared on the swap's own command line that DK tags `PO` needs
+`:evidence="..."` (R471), or the swap refuses at exit 4 before anything is swapped;
+the parent's recorded notes (`declared_pitcher_evidence`) count, are printed as
+`declared evidence:`, and ride the swap's manifest. Inherited declarations are not
+re-judged.
 The swap also refuses at exit 3 when it would remove a contest's last lineup on the
 consensus SP pair its parent recorded (R469, `references/chalk_core_seat.md`);
 `--accept-downgrade` takes it and the file ships review-grade.
