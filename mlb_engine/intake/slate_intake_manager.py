@@ -437,6 +437,12 @@ def collapse_showdown_roles(
 # they came to disagree about the same posted side.
 DK_ORDER_SLOTS = 9
 
+# DraftKings' Starting token for a probable opener. Defined here, in the
+# stdlib-only parser that reads the column, so `build_slate.validate_cli_values`
+# (R471), which runs before the dependency check, reads the same set the R104
+# bar in `live_data_adapters` does; that module re-exports it.
+DK_STARTING_OPENER_TOKENS = frozenset({"PO"})
+
 # The fields DK must spell the same way on a person's CPT and UTIL rows.
 # ``TeamAbbrev`` is in the person key already, and is checked anyway: the key is
 # built from a normalized name plus the team, so a caller passing a different

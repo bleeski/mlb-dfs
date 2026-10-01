@@ -952,6 +952,8 @@ def _write_baseline_brief(args, salary: Path, block: Mapping[str, Any]) -> dict:
             "declared_pitchers": parse_declared_pitchers(args.declare_pitcher),
             # R470. The typed innings, so a swap of the baseline inherits them.
             "declared_pitcher_workload": declared_pitcher_workload(args.declare_pitcher),
+            # R471. The operator's note behind each declaration that has one.
+            "declared_pitcher_evidence": declared_pitcher_evidence(args.declare_pitcher),
             "slate": {"tag": signature["tag"], "games": len(signature["games"]),
                       "first_lock_local": signature["first_lock"]},
             "baseline": {k: v for k, v in block.items() if k != "brief"},
@@ -4878,6 +4880,7 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
             hard if (hard and args.ignore_pool_blockers) else [])
         payload["declared_pitchers"] = parse_declared_pitchers(args.declare_pitcher)
         payload["declared_pitcher_workload"] = declared_pitcher_workload(args.declare_pitcher)
+        payload["declared_pitcher_evidence"] = declared_pitcher_evidence(args.declare_pitcher)
         payload["declared_arm_workload"] = report.get("declared_arm_workload") or []
         payload["non_rosterable_arms"] = report.get("non_rosterable_arms") or []
         return 3, payload
@@ -5014,6 +5017,9 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         # R470. The typed innings (a late swap inherits them) and every
         # declared arm with the workload prior applied.
         "declared_pitcher_workload": declared_pitcher_workload(args.declare_pitcher),
+        # R471. The operator's note behind each declaration that has one; a
+        # declaration over DK's PO tag cannot reach here without one.
+        "declared_pitcher_evidence": declared_pitcher_evidence(args.declare_pitcher),
         "declared_arm_workload": report.get("declared_arm_workload") or [],
         "non_rosterable_arms": report.get("non_rosterable_arms") or [],
         "run_id": result.get("run_id"),
@@ -6206,6 +6212,9 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                    # a delivery, and the operator's declaration is an input to
                    # the attempt whether or not it produced a file.
                    "declared_pitchers": parse_declared_pitchers(
+                       args.declare_pitcher),
+                   # R471. Recorded on both contest types, like the roles.
+                   "declared_pitcher_evidence": declared_pitcher_evidence(
                        args.declare_pitcher)}
         if governor is not None:
             payload["deadline"] = governor.stamp()
@@ -6656,6 +6665,9 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         # dropping him was the defect, and `pool.openers_kept` on this brief is
         # where a reader sees it did not.
         "declared_pitchers": parse_declared_pitchers(args.declare_pitcher),
+        # R471. The notes ride beside the roles here too; Showdown does not
+        # check them (its pool takes no declaration).
+        "declared_pitcher_evidence": declared_pitcher_evidence(args.declare_pitcher),
         # R249. The whole point of the item is that the operator's previous
         # workaround -- editing the APPG column of the salary file -- moved
         # captains and was recorded NOWHERE. A fix that is also invisible has
@@ -7828,22 +7840,24 @@ SOFT_POOL_BLOCKER_RE = _re.compile(
 
 
 #: R470. The options a declaration may carry after its role: ``:ip=N`` (the
-#: workload prior's expected innings). A quoted value may hold a colon; an
-#: unterminated quote reads as nothing and is refused.
+#: workload prior's expected innings) and, R471, ``:evidence="..."`` (the
+#: operator's note behind declaring an arm DK tags ``PO``). A quoted value may
+#: hold a colon; an unterminated quote reads as nothing and is refused.
 _DECLARE_OPTION_RE = _re.compile(
-    r':(?P<key>[a-z_]+)=(?:"(?P<quoted>[^"]*)"|(?P<bare>[^:"]*))')
-_DECLARE_OPTIONS = ("ip",)
+    r':(?P<key>[a-z_]+)=(?:"(?P<quoted>[^"]*)"|(?P<bare>[^:"]*)(?=:|$))')
+_DECLARE_OPTIONS = ("ip", "evidence")
 
 
 def parse_declared_pitcher_options(values) -> dict:
-    """``ID[=ROLE[:ip=N]]`` -> {id: {role, ip}}.
+    """``ID[=ROLE[:ip=N][:evidence="..."]]`` -> {id: {role, ip, evidence}}.
 
     R470. The options ride after the role, so every reader of the
     ``{id: role}`` contract (`parse_declared_pitchers`, the brief's
     ``declared_pitchers``, preflight's resolver) sees a clean role. An option
     before any ``=`` (``ID:ip=N``, which would read as the id ``ID:ip``), an
-    unknown or repeated option, or an ``ip`` that is not a finite positive
-    number is a `CliValueError`, refused at exit 4 before anything is staged.
+    unknown or repeated option, an ``ip`` that is not a finite positive
+    number, or an empty ``evidence`` is a `CliValueError`, refused at exit 4
+    before anything is staged.
     """
     import math
     out: dict = {}
@@ -7860,14 +7874,18 @@ def parse_declared_pitcher_options(values) -> dict:
                 f"--declare-pitcher {raw!r}: options follow the role, "
                 f"ID=ROLE:ip=N (a bare starter is ID=declared_probable_sp:ip=N)")
         role, sep, opts = rest.partition(":")
-        spec = {"role": role.strip() or "declared_probable_sp", "ip": None}
+        spec = {"role": role.strip() or "declared_probable_sp", "ip": None,
+                "evidence": None}
         tail, pos, seen = sep + opts, 0, set()
         while pos < len(tail):
             match = _DECLARE_OPTION_RE.match(tail, pos)
             if not match:
                 raise CliValueError(
                     f"--declare-pitcher {raw!r}: cannot read {tail[pos:]!r}; the "
-                    f"options are {', '.join(':' + k + '=...' for k in _DECLARE_OPTIONS)}")
+                    f"options are {', '.join(':' + k + '=...' for k in _DECLARE_OPTIONS)}, "
+                    f"and a value holding ':' is double-quoted, with the whole "
+                    f"token single-quoted in a shell so the double quotes "
+                    f"arrive: '{pid}=ROLE:evidence=\"vs SEA: K 2.5\"'")
             key = match.group("key")
             value = (match.group("quoted") if match.group("quoted") is not None
                      else match.group("bare")).strip()
@@ -7878,6 +7896,16 @@ def parse_declared_pitcher_options(values) -> dict:
             if key in seen:
                 raise CliValueError(f"--declare-pitcher {raw!r}: {key} given twice")
             seen.add(key)
+            pos = match.end()
+            if key == "evidence":
+                # R471. The operator's assertion, recorded verbatim; never a
+                # re-judgement of DK's token, which the salary file owns.
+                if not value:
+                    raise CliValueError(
+                        f"--declare-pitcher {raw!r}: evidence is empty; say what "
+                        f"you read, e.g. evidence=\"K line 5.5 vs season 6.1\"")
+                spec["evidence"] = value
+                continue
             try:
                 ip = float(value)
             except ValueError:
@@ -7887,7 +7915,6 @@ def parse_declared_pitcher_options(values) -> dict:
                     f"--declare-pitcher {raw!r}: ip={value!r} is not a positive "
                     f"number of innings")
             spec["ip"] = ip
-            pos = match.end()
         out[pid] = spec
     return out
 
@@ -7913,6 +7940,55 @@ def declared_pitcher_workload(values) -> dict:
     """R470. ``{id: ip}`` for the declarations that type ``:ip=N``."""
     return {pid: spec["ip"] for pid, spec in parse_declared_pitcher_options(values).items()
             if spec.get("ip") is not None}
+
+
+def declared_pitcher_evidence(values) -> dict:
+    """R471. ``{id: note}`` for the declarations that carry ``:evidence=``."""
+    return {pid: spec["evidence"]
+            for pid, spec in parse_declared_pitcher_options(values).items()
+            if spec.get("evidence")}
+
+
+def po_declarations_without_evidence(salary_path, declared, evidence) -> list:
+    """R471. The declared arms DK tags ``PO`` that carry no evidence note.
+
+    R104 bars a DK ``Starting=PO`` arm from pitcher slots and names a
+    declaration as the way past, so a declaration alone overrode DK's opener
+    tag. On 2026-09-29 (1400_4g) Luzardo was ``PO``, the feed and the headlines
+    named him the starter, the session declared him, and he was an opener (a
+    strikeout line of 2.5 against Sale's 7.5); DK's tag was right for all three
+    arms it named that day. A declaration over ``PO`` now carries the
+    operator's evidence, recorded in the brief.
+
+    Reads the salary file with the engine's own stdlib parser, so this runs
+    before the dependency check. ``declared`` and ``evidence`` are id-keyed;
+    returns one row per arm in id order, ``[]`` when every PO declaration has a
+    note. An id not on the file is the pool's to name, not this check's.
+    """
+    from mlb_engine.intake.slate_intake_manager import (  # noqa: PLC0415
+        DK_STARTING_OPENER_TOKENS, parse_dk_salary_csv)
+    wanted = {str(k) for k in (declared or {})} - {
+        str(k) for k, v in (evidence or {}).items() if str(v or "").strip()}
+    if not wanted:
+        return []
+    return sorted(
+        ({"player_id": sp.player_id, "name": sp.name, "team": sp.team,
+          "dk_starting": sp.starting}
+         for sp in parse_dk_salary_csv(str(salary_path))
+         if sp.player_id in wanted and sp.starting in DK_STARTING_OPENER_TOKENS),
+        key=lambda row: row["player_id"])
+
+
+def po_evidence_refusal_error(arms) -> str:
+    """R471. One sentence naming every PO arm declared without evidence."""
+    named = "; ".join(f"{a['name']} ({a['player_id']}, {a['team']})" for a in arms)
+    return (f"DK tags {named} Starting=PO (probable opener), and a declaration "
+            f"overrides that bar only with the evidence behind it: add "
+            f":evidence=\"...\" after the role, e.g. "
+            f"{arms[0]['player_id']}=declared_probable_sp:evidence=\"K line 5.5 vs "
+            f"season 6.1\". Check his strikeout prop first: a line far below his "
+            f"season norm is an opener's line (Luzardo, 2026-09-29: 2.5 against "
+            f"Sale's 7.5). DK's tag stands until you state otherwise")
 
 ASSUMABLE_GATES = ("salary_gate_passed", "entry_grid_gate_passed",
                    "lineup_gate_passed", "pitcher_audit_gate_passed",
@@ -8054,6 +8130,38 @@ def validate_cli_values(args) -> dict | None:
                          "build and before the bank. Nothing was staged and no "
                          "run directory was created."),
             }
+    # R471. A declaration over DK's PO tag carries its evidence. A validity
+    # wall: no flag skips it. Classic only, because Showdown never hands its
+    # declarations to the pool (R347 keeps a PO arm there as declared_opener).
+    # Needs both files: when either is missing, `missing_inputs` refuses next.
+    values = getattr(args, "declare_pitcher", None)
+    salary = getattr(args, "salary", None)
+    entries = getattr(args, "entries_csv", None)
+    arms = []
+    if (values and salary and entries and Path(salary).is_file()
+            and Path(entries).is_file()):
+        try:
+            if detect_contest_type(Path(salary), Path(entries)) == "classic":
+                arms = po_declarations_without_evidence(
+                    salary, parse_declared_pitchers(values),
+                    declared_pitcher_evidence(values))
+        except (OSError, ValueError, csv.Error):
+            # A salary file this parser cannot read builds nothing: the pool
+            # reads it with the same parser and refuses it there, by name.
+            arms = []
+    if arms:
+        return {
+            "status": "cli_value_invalid",
+            "date": getattr(args, "date", None),
+            "flag": "--declare-pitcher",
+            "error": po_evidence_refusal_error(arms),
+            "po_arms_without_evidence": arms,
+            "note": ("read from the salary file's Starting column, which is "
+                     "authoritative; the evidence is the operator's assertion, "
+                     "recorded in the brief as declared_pitcher_evidence, and "
+                     "never a correction of DK's tag. Nothing was staged and "
+                     "no run directory was created."),
+        }
     return None
 
 
@@ -8142,7 +8250,7 @@ def main() -> int:
                          f"import, certify and write)")
     ap.add_argument("--brief", help="write the brief JSON here")
     ap.add_argument("--declare-pitcher", dest="declare_pitcher", action="append",
-                    default=[], metavar="ID[=ROLE[:ip=N]]",
+                    default=[], metavar='ID[=ROLE[:ip=N][:evidence="..."]]',
                     help="R104. Repeatable. State that a DK player ID is a "
                          "startable arm, e.g. --declare-pitcher 43755567 or "
                          "--declare-pitcher 43755567=viable_bulk_or_alt_sp. This "
@@ -8164,7 +8272,12 @@ def main() -> int:
                          "starter's 5.5 IP, a labeled prior); `:ip=N` sets the "
                          "expected innings for any role, capped at 5.5, and "
                          "the brief lists each arm's factor under "
-                         "declared_arm_workload. Classic only.")
+                         "declared_arm_workload. Classic only. R471: on "
+                         "Classic, declaring an arm DK tags Starting=PO needs "
+                         ":evidence=\"...\" (what you read, e.g. his "
+                         "strikeout prop against his season norm); without it "
+                         "the build refuses at exit 4 cli_value_invalid. The "
+                         "note is recorded under declared_pitcher_evidence.")
     ap.add_argument("--ignore-pool-blockers", action="store_true",
                     help="build despite a HARD pool blocker. The override is "
                          "printed and recorded in the brief. Reach for this only "

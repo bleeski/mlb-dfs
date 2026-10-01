@@ -148,6 +148,14 @@ python <repo>/tools/autobuild.py \
 A `viable_bulk_or_alt_sp` declaration projects the arm at 3.0 of a starter's
 5.5 IP (R470, a labeled prior); `<id>=<role>:ip=N` sets the innings for any role,
 capped at 5.5, and the brief lists each arm's factor under `declared_arm_workload`.
+On Classic, declaring an arm DK tags `Starting=PO` needs the evidence you read
+(R471): `<id>=<role>:evidence="K line 5.5 vs season 6.1"`. Without it the build
+refuses at exit 4 `cli_value_invalid` naming the arm, and no flag skips it. Check
+the arm's strikeout prop first: a line far below his season norm is an opener's
+(Luzardo, 2026-09-29: 2.5 against Sale's 7.5, and DK's `PO` was right). The note is
+your assertion, recorded under `declared_pitcher_evidence`; DK's tag stands until
+you state otherwise. A late swap checks the arms its own command line declares and
+inherits the parent's notes.
 
 `--per-build-seconds` is left off on purpose: it defaults to this host's call
 budget over six (105s on a 630s container, 21s on Cowork). Pass it only to
@@ -266,7 +274,8 @@ no byproducts (R28):
   `--past-slate-replay`; a live build never needs it.
 - **`missing_inputs`** — the salary or entries path does not exist.
 - **`cli_value_invalid`** — a flag VALUE this build cannot use: an unknown
-  posture or gate name, a `--declare-pitcher` with no id, or a
+  posture or gate name, a `--declare-pitcher` with no id, a Classic
+  `--declare-pitcher` on a DK `PO` arm with no `:evidence=` (R471), or a
   `--controls-override` / `--leverage` that parsed as JSON but is not an object.
   Checked in `main()` before anything is staged, so a typo in `--postures`
   costs one line, not the bank spend.

@@ -741,7 +741,7 @@ def _supervise(ctx: Dict[str, Any]) -> int:
     # the child through --passthrough already; this makes it a named flag the
     # SKILL.md recipe can show, and the decision log records it.
     ap.add_argument("--declare-pitcher", dest="declare_pitcher", action="append",
-                    default=None, metavar="ID[=ROLE]",
+                    default=None, metavar='ID[=ROLE[:ip=N][:evidence="..."]]',
                     help="forwarded verbatim to build_slate's --declare-pitcher "
                          "(repeatable; a bare ID means declared_probable_sp). "
                          "Recorded in the decision log as an operator input, "
