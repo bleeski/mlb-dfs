@@ -20,6 +20,12 @@ R-number comes from scanning this file AND CHANGELOG.md.
 
 ## Workstream 1 — Showdown correctness and certification
 
+### R484. The Showdown door has no way to keep the relievers once a side posts, so an elimination-game slate where the field builds bullpen arms cannot be built that way without benching hitters (P2, S; S) | new 2026-10-02, from the BUILD fragment `docs/backlog_inbox/2026-10-01_BUILD_showdown-reliever-pool-in-elimination-games.md` (a), consumed by the 2026-10-02 board rebuild (Session 144); its (b) is R467's rider | Roadmap: Session 153
+
+- **What.** Once a side posts, the Showdown pool keeps the confirmed nine and the probables; every other salary row is absent (CLAUDE.md build contract 1). In an elimination game the bullpen carries the late innings and the field captains or rosters relievers; the 2026-10-01 2000_1g_sd build could widen the pool only by hand. The fragment asks for a door flag (`--keep-arms`) that keeps every non-OUT pitcher once a side posts, never benches a hitter, records `pool.operator_widening` in the brief, and gives a Base-less arm a declared prior (R470's `:ip=N` grammar is the model).
+- **Why.** Band 1 (judgment, labelled): pitcher captaincy is the strongest replicated Showdown signal (65.5% of winners), and in a bullpen game the arm that finishes is not a probable; the fragment cites the slate, not an archive figure, so the impact is a judgment until a graded Showdown slate with relievers in the field's top cohort exists. S.
+- **Fix.** `build_slate.py` Showdown door: `--keep-arms` widens the pool to every non-OUT pitcher of both sides after the OUT filter, with `Base` from the declared prior or APPG and the brief recording the widening and each kept arm; the ladder's captain templates may name a kept arm; `references/showdown.md` documents the flag and when to use it.
+- **Acceptance.** `UT test_showdown.KeepArmsPoolTests` (new): a posted side with `--keep-arms` keeps its relievers and all nine hitters; without the flag the pool is unchanged; the brief carries `pool.operator_widening`; a kept arm with no APPG takes the declared prior (+3 showdown). `LINT`, `GATE`.
 ### R463. Showdown thesis labels claim what the solver does not enforce: `shootout`'s "bats still producing", `(variant N, X captain)` naming the APPORTIONED captain, and arm-led directional repeats that share a captain (P2, S) | new 2026-09-29, found landing Session 119 (R437's and R211's premise checks, the independent review) | Roadmap: Session 131
 
 - **What.** Three label-versus-solver mismatches remain, each reproduced on the MIN@CHC fixture while Session 119 landed, none in that session's scope. (2), the one-arm duel, was fixed 2026-09-29 (Ben agreed the recommendation): `duel()` returns None unless both starters are live and neither is Excluded, so a bullpen, IL, opener or excluded-arm slate has no duel and its slot goes to the other templates (MIN@CHC with Boyd's row removed: duel slots 1 -> 0 at n=7, 14 and 20, every entry still solved); the text migrated to CHANGELOG.md. Numbering is kept.
@@ -447,6 +453,8 @@ the batch's named rider and did not get pulled.
 
 ### R122, REWRITTEN 2026-09-01 to its surviving remainder. The platoon factor dies at the HITTER intake, per player and silently, and the field that exists to report it is keyed on the PITCHER (P1, XS-S) | new 2026-08-14; **the ed6 rider and the LHP-only face are both CLOSED**, see below
 
+> **Rider 2026-10-02 (Session 144, Phase 3, the board rebuild).** premise re-verified at HEAD e4588bc, HOLDS, and SPLIT: the flat 1.00 factor at `showdown_theses.py:131-134` goes into `Base_Prior` and then `Base` (:139-142) and reaches the ladder solver; no per-hitter unresolved field exists. (report) name the unresolved hitters: band 3, XS. (solver) the riders' per-hitter shrunk split, Showdown only: band 1 (1940_1g_sd Turang 4 -> 2 entries and off captain, not re-run), S-M. Both stay in Session 33; the row names the parts.
+
 **Rider 2026-09-09, from BUILD fragment
 `2026-09-08_BUILD_2210_1g_sd_appg-is-blind-to-opponent-quality.md` (addendum):
 the fix shape below is right about READING a per-hitter split and wrong about
@@ -572,6 +580,8 @@ tightening 4 -> 3 returned `overlap_relaxed_slots: 2` and `max_pairwise_overlap:
 anyway. No defect; recorded so nobody re-derives it under a clock.
 
 ### R123. The Showdown ladder has no per-player exposure cap, relaxes the captain cap untargeted, and deals contests in ladder order (P1, S-M) | new 2026-08-14, merged from the same fragment, findings 2-4
+
+> **Rider 2026-10-02 (Session 144, Phase 3, the board rebuild).** STALE, rewritten to its remainder by the 2026-10-02 premise check: (a)'s per-player cap LANDED as R153 (`showdown_theses.py:2132`, `:2226`, default 0.50); (b)'s reporting LANDED (`cpt_cap_reassigned`, `lock_relaxation_detail`); (c) LANDED as R239(a) (`deal_across_contests=True`, `build_slate.py:6150`); the effective integer caps are in diagnostics on both paths (`:2881`, `showdown.py:1558`). What remains is bookkeeping: refuse a 0.0 cap (`exposure_cap_count(0.0, 12)` returns None, `showdown.py:1307`); name the raised-to-1 event (0.25 at n=3 gives 1, unnamed); name and target the captain who takes an all-at-cap overflow slot (`:1747-1760`, the one construction residue, no archive figure). Band 3, XS-S. Roadmap: Session 64 (moved out of Session 62).
 
 - **(a) Per-player exposure cap + small-sample guard.** `solve_ladder`
   (`showdown_theses.py:484`) accepts no per-player cap; the only lever is
@@ -715,6 +725,8 @@ repair one, so finding 2's guard has to sit at the PRIOR and not at the cap.
 
 ### R208. Showdown never merges a confirmed batting order from `--lineups`: R143 has no Showdown equivalent, and the fallback bank has its own ceiling (P1, S-M) | new 2026-08-23, merged from BUILD fragment `2026-08-22_BUILD_showdown-batting-order-not-merged-from-feed.md`; both halves observed on 1335_1g_sd
 
+> **Rider 2026-10-02 (Session 144, Phase 3, the board rebuild).** premise re-verified at HEAD e4588bc, PARTLY: the merge is still absent (`showdown.py:427-428` takes `Batting_Order` from DK `Starting` only; `build_slate.py:5878` melts the staged DK file; `--lineups` reaches Showdown only through `showdown_handedness` :5211). Corrections: 'basis declared_starters with posted 0' is FALSE since R36 F8; the bank ceiling is FALSE at HEAD (`build_showdown_bank` builds 19 of 19 in 7s on the reconstructed shape). The HEAD consequence is a 71-person `all_healthy` pool with a player outside the confirmed 20 in 19 of 19 lineups (68 of 114 slots). The 1335_1g_sd file shipped (hand-derived), and the shape is ~1 of 54 Showdown slates, so this is band 1 (construction on a non-confirmed bat), not the exception band. S-M.
+
 - **What:** `Pool_Basis` and `Batting_Order` in `melt_showdown_salary_csv`
   (`showdown.py` ~160-209) are derived ONLY from the DK salary file's own
   `Starting` column — there is no Showdown equivalent of R143's
@@ -841,6 +853,8 @@ share the helper and bring it under
 The ladder deals templates to contests (`deal_order_across_contests`), so a multi-entry contest carries entries live under either side; template multiset, `allocation`, `rows[j]` and `contest_of_entry` are unchanged. What remains is filed as R467 (the points-max bank's deal; needs Ben's call, D-10). Declined, with reasons, in the CHANGELOG: ordering rows by buy-in (needs the same call), and shape-conditioned dealing (no measurement says a shape wants a different side mix; the shape is a label). Gate: PASS  v2.26.0  45 modules  3046 tests  5 skipped (full line in CHANGELOG.md, 2026-09-30)
 
 ### R240. No punt-captain template: below $5,800 the ladder never captains anyone, so a whole class of broad-field finish is unreachable at any cap value (P2, S-M; decision-first, Ben's) | new 2026-08-27, from `2026-08-26_BUILD_contest_aware_allocation_at_onset.md` §4(d)
+
+> **Rider 2026-10-02 (Session 144, Phase 3, the board rebuild).** Roadmap: Session 149 (2026-10-02), its own row with `Needs: D-7`; band 1 (a whole class of broad-field finish the ladder never captains), S.
 
 **What.** At `max_cpt_exposure_pct` 0.08 — forcing 16 distinct captains across
 39 entries — the ladder still never captained Wells ($3,400), Trammell
@@ -1027,6 +1041,8 @@ manifest is what Ben checks a sha256 against before entering a contest, and a
 replay row for a played slate is a second answer to "what was delivered".
 
 ### R284. A leverage cap binds at BUILD and not at REFINE: `late_swap.py` calls `extend_bank` twice with no `leverage` (P2, S) | new 2026-09-01, from R246's class-A R233 enumeration; verified in tree by AST, with production callers
+
+> **Rider 2026-10-02 (Session 144, Phase 3, the board rebuild).** premise re-verified at HEAD e4588bc: HOLDS but DORMANT for leverage. Neither `extend_bank` call (`late_swap.py:1580`, `:1614`) passes leverage and `run_late_swap` has none, but `--leverage` defaults to None (`build_slate.py:8390`), autobuild never passes it, and 0 of 127 delivery records carry it, so no leveraged delivered parent exists for the gap to bite on. The `stack_min` rider is LIVE on every swap (the swap builds at the default 4 while the build passed its own value). Split: (stack_min) ranks in band 1 inside Session 29; (leverage) rides band 3 until a leveraged build is delivered. S report-only, M enforced.
 
 **Rider 2026-09-23 (from R405's plan): the consensus-cluster cap is a second control late swap does not carry.** R405 (Session 93) strips `max_consensus_cluster_share_pct` from the swap's controls and reports the parent's cluster. An enforced cap would bind against a swap bank with no cluster-limited jobs and against untouched rows that may already exceed it. Enforcing it at refine needs the same two fixes as leverage: the swap's `extend_bank` calls carry the limited jobs, and `_untouchable_cap_conflicts` counts fixed rows.
 
@@ -1233,9 +1249,17 @@ checkpoint has both objects in scope roughly 240 lines above.
 
 ## Workstream 2 — Strategy controls and the evidence that moves them
 
+### R483. The five-stack floor and quota bands both retire on a MIXED entered set, because the merge needs unanimity across the entered contests, so a seven-contest file with one satellite among GPPs builds with neither band (P1, S; S) | new 2026-10-02, from the BUILD fragment `2026-09-15_BUILD_shape-bands-inert-on-mixed-entered-set.md` that exists only on the branch `ben/reference-refresh-2026-09-22` (2006c74, never merged), via the 2026-10-02 board rebuild (Session 144) | Roadmap: Session 152
+
+- **What.** R340 made R37(2)'s floor-5 and quota bands live from every door, but the portfolio merge at `execution_pipeline.py:2408-2411` applies a band only when every entered contest agrees on it; the fragment measured both bands inert on the 2026-09-15 1310_4g set (mixed shapes), with the brief silent about it. The fragment's (b), a `shape_bands` brief block, may be stale: `checkpoint['shape_bands']` is now written at `execution_pipeline.py:6745`; verify before building and fold what is missing (per-contest rows, `floor_5_binds_portfolio`, `quota_binds_portfolio`) into (a).
+- **Why.** Band 1: stack shape is the strongest Classic construction signal in the archive (5-2-1 at +13 to +17pp on 3g+ slates, both halves; our mix 0.4% against a field at 25.7%), and the bands exist to move it; a rule that stands down whenever the entered set is mixed, which the 2026-09-24 file (seven contests, four shapes) and most postseason files are, moves nothing. DEV arbitrates the merge rule: apply each band to the contests whose shape asked for it, with the SKILL.md override escape documented.
+- **Fix.** Replace unanimity with per-contest application at the merge (`EP:2408-2411`): a band binds on the entries of the contests whose posture requests it, and the brief's `shape_bands` block names which contests carried which band and which did not. SKILL.md documents the override escape. `qa_portfolio`'s stack-shape axis is R276's rider, not this entry.
+- **Acceptance.** `UT test_core.ShapeBandsMixedSetTests` (new): a two-contest set (one satellite, one large GPP) applies the five-stack quota to the GPP entries alone and the brief says so; a unanimous set is unchanged; the band never applies to a contest whose posture did not ask (+3 core). `GOLD` unmoved (golden sets are unanimous; verify); `PROBE`, `LINT`, `GATE`.
 ### R469. CLOSED 2026-09-30 (Session 138). A chalk-core seat per contest: `min_consensus_pair_entries_per_contest` (1 on large_gpp, wta_satellite, small_gpp, mme; 0 on single_entry, cash), per contest from its posture, through an integer units branch; the pair is the top two rostered-legal SPs by `Base_Projection`, not opponents, carried in the controls; caps floored to the seats; a pinned-pair bank slice on every door; one allocator row per contest (projection sleeve first), relaxed and counted, never refused; the brief's `exposure.consensus_pair`; late swap refuses removing a contest's last pair lineup without `--accept-downgrade`. Goldens re-frozen deliberately (seat-only move). Full text and gate line: `CHANGELOG.md` 2026-09-30.
 
 ### R467. The points-max bank hands each contest the ranks its file position implies (P2, S) | new 2026-09-30, found closing R239(a) (Session 52) | Roadmap: Session 136
+
+> **Rider 2026-10-02 (Session 144, Phase 3, the board rebuild).** the 2026-10-01 BUILD fragment `showdown-reliever-pool-in-elimination-games` (b), consumed here: `--captain-sleeve` takes the FIRST N reserved rows while the ladder deals favorite-side templates to those rows first, so an underdog sleeve captain fills a favorite template. Same mechanism as this entry's deal rule (D-10): deal the sleeve rows after the proportional deal, or let the sleeve name its rows. Fold into the fix.
 
 - **What.** Session 52 dealt the thesis ladder's templates to contests (`showdown_theses.deal_order_across_contests`). The path with no posted batting order builds a ranked points-max bank instead (`build_showdown_bank`), and `run_showdown` still assigns it with `zip(rows, bank)`, so a contest's ranks are set by where its reserved rows sit in the file. A bank rank has no side to deal by, so the ladder's rule does not apply as written. Measured evidence from the R239(a) entry, not re-measured here: hounyy_sd's $1 Solo Shot drew bank #21 while the $0.10 Dime Time pair drew #1 and #2. Pinned as the current behavior: `test_showdown.ShowdownContestShapeTests.test_the_points_max_path_carries_identity_and_says_it_dealt_nothing` (the brief says `thesis_deal.applied` is false and why).
 - **Why.** Which contest holds the best lineups is decided by row order, which nobody chose. On the ladder path the same fact was fixed; here the fix is a strategy call (spread the top ranks proportionally, or let the larger buy-in draw first), because "the most differentiated end of the bank", the phrase R239(a) used, names no measurable end.
@@ -1248,6 +1272,8 @@ checkpoint has both objects in scope roughly 240 lines above.
 - **Fix.** The manifest's supersession chain already names a swap row's parent (preflight's `--parent` auto-resolve reads it). Walk it in `retro()`, resolve the PARENT row's brief with `resolve_brief`, and label the section as the parent's, so the retro never presents the parent's brief as the swap's own. Test: a swap record whose parent has a brief resolves to it, labeled; one whose parent has none names that.
 
 ### R465. The sliced door serves the union of every live conditions bucket, so a build can be handed lineups built under questions it did not ask, and the brief can count them but not name them; across builds the union also grows by up to one cap per distinct question (P1, S) | new 2026-09-29, found closing R453 (Session 125) | Roadmap: Session 134
+
+> **Rider 2026-10-02 (Session 144, Phase 3, the board rebuild).** Roadmap: Session 134 (2026-10-02), widened to the three controls that exist but never reach the solver (R465, R455, R197); the sweep banded this entry 1 on its own text (the served set ignores the requested k while the brief says `agrees_with_request`).
 
 - **What.** After R453 the requesting bucket gets its solves, and `BankCache.as_candidates` still serves the union of every live bucket. Reproduced offline on the R453 frame (`extend_bank` on a temp cache, ten hitters measured off each served roster): k=2 to 32 candidates, then a k=0 build at cap 30 builds 30 (all with no hitter against a rostered SP) and serves 62, of which the 32 built under a k=2 request hold a hitter against a rostered SP in 30 (`{0: 2, 1: 22, 2: 8}`). The brief now reads `applied: 0`, `agrees_with_request: true`, `served_from_unrequested_buckets: 32` and an `unmeasured` note, all true, and none of it names the k the 32 were built under: a conditions signature is a hash and `conditions_index` maps signature to projection digest only. The union also grows by one cap per distinct question (`resolve_bank_cap` 1,536 at 27+ entries on this host, so up to 3,072 after one k change); R415 measured the full-bank joint MILP at its 30s limit with gap 3.2% at 3,052 candidates, and the certify path is bounded by the prefilter (about 6 per entry). Not measured: `as_candidates` scoring time and the allocator prefilter over a union that size.
 - **Why.** Truthful labels. The operator who asked for k=0 reads `agrees_with_request: true` and believes k=0 held for the file, and the allocator can seat a k=2 lineup. R453 removed the silence about the requesting bucket; this is the same reading one step later.
@@ -1276,6 +1302,8 @@ A pattern whose curated text begins with whitespace matches only as a whole toke
 
 ### R455. `Locked` is a core projection schema column with no reader: a `Locked=True` cell locks nobody, silently (P3, XS) | new 2026-09-25, found by the 2026-09-25 code review (optimizer area; `review_optimizer/locked_col.py`) | Roadmap: Session 80
 
+> **Rider 2026-10-02 (Session 144, Phase 3, the board rebuild).** Roadmap: Session 134 (2026-10-02; moved out of Session 80). A `Locked=True` cell locks nobody, a control that exists but never reaches the solver; measured: Otto Kemp `Locked=True` leaves him out with the objective unchanged, `locks=[43205996]` seats him.
+
 - **What.** `optimizer_v3.py:492` requires it in `CORE_PROJECTION_FIELDS`, `projection_builder.py:158-159` defaults it False, `MLB_Classic.md:170` lists it in the contract; a repo-wide grep finds no reader. Locks reach the solver only through the `locks` and `locked_slot_assignments` arguments. Measured: `Locked=True` on Otto Kemp leaves him out of the lineup with the objective unchanged; `locks=[43205996]` seats him. No production writer sets it True, so this is the same operator-edit path R289 hardened for `Excluded`.
 - **Fix.** Read it in `_prepare_single_lineup_df` beside `Excluded` (one reader, counted like `excluded_flags`), or drop it from the contract.
 
@@ -1285,11 +1313,15 @@ A pattern whose curated text begins with whitespace matches only as a whole toke
 
 ### R441. F1 and F4 both price the opposing starter; the ablation grade landed and says "not yet", so the shrink and the re-grade remain (P2, S; needs R251's frozen inputs) | new 2026-09-25, from BUILD fragment `2026-09-23_BUILD_what-if-our-priors-are-wrong.md` and the 2026-09-25 code review (model area); grade SHIPPED 2026-09-29 as roadmap Session 116 (b), entry in CHANGELOG.md | Roadmap: Session 132
 
+> **Rider 2026-10-02 (Session 144, Phase 3, the board rebuild).** from `MLB_Classic.md` §6 (line ~230), unfiled until now: the pitcher-side F4 stays 1.0 because the opposing-lineup matchup aggregation waits for a team-level input (team K% and wOBA vs LHP/RHP) that nothing supplies or captures. Gate `data:` that input; build it only when this entry's hitter-side re-grade says F4 earns its term. Band 3.
+
 - **Shipped (Session 116 (b)).** `tools/replay_slate.py --grade-projection --ablate-f4-quality`: the F1 x F4-quality 2x2 (platoon on in every arm), hitters, per slate, each cell naming its odds source and Savant vintage against the slate date. The `Applied BEFORE F1/F5` sentence is gone from `projection_builder.py` and `MLB_Classic.md`.
 - **What the grade says.** Nothing settled. Of the nine R408 slates only 2026-07-19 has real posted totals and probables, and its Savant snapshot (2026-07-25) is six days after it; 07-29 and 07-30 have a pre-dated snapshot and no odds; the other six cannot build the quality term or the F1-on arms. Quality's Spearman effect: with F1 absent +0.009 (07-19), -0.017 and -0.050 (07-24, post-dated), +0.034 and +0.019 (07-29, 07-30); with F1 present -0.025 (07-19, n = 72). No slate has every input real and pre-dated.
 - **Open.** (1) Re-run the grade on R251's frozen per-slate inputs (odds WITH moneylines, the Savant snapshot as of the slate, probables), the only way to a leak-free 2x2. (2) If it says so, the shrink: F4's quality term toward 1.0 on market-priced teams, or only its platoon half there (`compute_f4_factors` and `build_slate.build_f4_map`, passing the F1 report in). The ablation is hitters only; a pitcher-side grade (his xwOBA-against Base correction against the market total that already embeds him, the R433 analogue) needs the pitcher n the archive does not have (4 to 21 per slate).
 
 ### R434. No engine lever for "one lineup in a named contrarian stack": `--stack-sleeve` beside `--captain-sleeve` (P2, S) | new 2026-09-25, from BUILD fragment `2026-09-24_BUILD_mcp-feed-shape-and-odds-egress.md` §4; Ben's 2026-09-23 "what if our priors are wrong" reapplied on 1410_4g | Roadmap: Session 117
+
+> **Rider 2026-10-02 (Session 144, Phase 3, the board rebuild).** premise re-verified at HEAD e4588bc, PARTLY: no stack sleeve exists (zero `stack_sleeve` hits; no secondary-stack bank job in `BC` or `CS`), but 'no engine lever' is unscoped: R422(b), landed 2026-09-25, the day after 1410_4g, seats bottom-third primary tail stacks through `CA`'s mask (2 seats on that slate), so the gap is the SECONDARY role only. `--captain-sleeve` is Showdown-only (`BS:8345` -> `showdown_theses.py:1650`) and never reaches `CA`; model the lever on `CA:1693-1760`. The incident is verified (entry 5267953193 hand-solved, shipped review-grade d98252ad); the 0 of 12, 3.13 and 0.40 figures are unchecked (the record says 0.5). Band 1 with reduced impact; S.
 
 - **What.** On 1410_4g Ben wanted one entry carrying a MIA secondary stack (MIA 0 of 12 at a 3.13 implied total). R406's sleeves seated no MIA stack, so the session hand-solved entry 5267953193 with `optimizer_v3.build_single_lineup` (MIA >= 3 locked, CWS 4 primary), enforced the portfolio caps by hand, and recorded it through `record_delivery` (review-grade, `refinement=True`): sha256 d98252ad, verify_export and preflight both exit 0, the consensus cluster at 5 of 12 against the build's 0.40 cap (S, relaxed inside T-30 and recorded).
 - **Why.** The construction is legal and Ben asks for it; running it around certification costs the caps their joint enforcement and the record its lineage.
@@ -1385,6 +1417,8 @@ with the before/after bank histogram in the changelog entry. Gate
 `PASS  v2.26.0  40 modules  2129 tests`.
 
 ### R342. Separate AVAILABILITY from POPULARITY in the ownership prior, graded on held-out dates before it reaches `--leverage` or the sleeve (P1, S-M; roadmap CC-8) | new 2026-09-15, from `outputs/standings_research_2026-09-14/REPORT.md` section 1 (68 saved pre-lock Classic predictions, SHA-matched to their salary snapshots, generated before first pitch); precedes R10's fit and does not replace it
+
+> **Rider 2026-10-02 (Session 144, Phase 3, the board rebuild).** premise re-verified at HEAD e4588bc, HOLDS: (a) is unbuilt (`resolve_leverage`, `apply_leverage_ownership` EP:6463 and `attach_predicted_ownership` pass the map through raw; the cap still sums it at `optimizer_v3.py:1176-1181`; the two named test classes do not exist). Figures, both to be quoted: the 40.8% complete-pool MAE cut is in the gitignored `outputs/standings_research_2026-09-14/REPORT.md:98`, not the ledger, and measures the whole pool; the error on ROSTERED players fell 6.8% (9.23 -> 8.60). The %Drafted claim in the earlier rider is stale since R341 (actuals recompute from entries). (a) XS, (b) S-M. Chain: R341 (landed) -> R342(a) -> R342(b) -> the ARCHIVE re-mine -> R10 -> R209.
 
 **Rider 2026-09-25 (the code review, model area): the cap this prior feeds binds at about half its face value, and an XS interim exists.** On the build-path configuration (1910_6g: `build_prediction` with the feed and the odds packet, so batting order, implied totals and probable SP all live) 445 of 564 scored players are outside the build pool and carry 358.2 of the 800 hitter points and 167.7 of the 200 pitcher points, 53% of the budget (top off-pool: Oneil Cruz 5.1%, Juan Soto 5.0%); on the archive-grade configuration (06-03, no feed, no odds) 480 of 1000. `resolve_leverage` forwards `own_pct_by_player_id` raw (`build_slate.py:4573-4640`), `attach_predicted_ownership(..., overwrite=True)` renormalizes nothing (`execution_pipeline.py:6209-6230`), and `optimizer_v3.py:1176-1181` sums `Projected_Ownership_Pct` against `max_cumulative_ownership_pct`, so a cap of 150 admits a lineup the same prior renormalized to the pool would call about 300. **Interim (XS, ships alone, needs nothing):** renormalize the map to the frame's rows inside `apply_leverage_ownership` and record the pre/post budget in the brief. **And the grade cannot see the error:** `actuals_from_standings` is DK's `%Drafted` rows (drafted players only), the undrafted predictions become the integer `predicted_not_in_contest` and enter no error term, `_flat_budget_pairs` divides 800/200 by ALL salary-file hitters and pitchers (bench included) so `beats_flat_budget` is nearly free (140/150, 89/95, 18/18, 8/8 in the 2026-09-03 fragments), and `ownership_grade_archive.py:262-264` passes no odds, so `tilts inert: implied_totals` is on every graded row. The fix's grade therefore scores the pool with the zero tail, computes the flat baseline over the same universe, and passes the archived odds packet or stamps the tilt inert in the fragment header. On 06-03 `191020573`: joined 47, MAE 14.07, signed -10.02, Spearman 0.266, flat_budget 15.64 at 800/80 per hitter and 200/101 per pitcher against a mean actual of 21.09.
 
@@ -1702,6 +1736,8 @@ precondition on R10, and a session taking either should read the other first.
 
 ### R37(2)(c). The five-stack half, remainder: the 4-2-x secondary cap (P1, M) | stages 1, (a) and (b) all landed; (c) is the whole of what is left
 
+> **Rider 2026-10-02 (Session 144, Phase 3, the board rebuild).** premise re-verified at HEAD e4588bc, PARTLY: no cap on secondary-stack size exists (`bank_secondary_size`, `optimizer_v3.py:4338`, `:4602-4611`, is unwritten bank shaping, not a cap), but 'the only secondary control the mine supports sizing' is unscoped (the rider checked five-man stacks only) and the -2.2pp figure is the oldest point of a WEAKENING series: -0.9pp [-1.3, -0.5] in ledger 3.20, crossing zero in the 2026-09-14 mine, while 4-3-1 does not cross (-3.8pp [-6.6, -0.9]). Gate: Session 122's 12-slate grade (no post-R340 slate is archived yet) and D-6. R449 (Session 65) is the same stack-identification seam and goes first. Band 1, low (impact uncertain); M.
+
 **Rider 2026-09-15 (DEV, from the mine; roadmap CC-22, after CC-1).** Two things change the sizing question. First, R340: the floor and the quota (a)(b) have been filtering a bank that never held a five-stack (107/107 four-stacks on 1907_8g), so the 12-slate review checkpoint has been reading a no-op since 08-28 and starts counting only after CC-1 lands; the revert conditions above are otherwise unchanged. Second, inside the five family the secondary arrangement is INDISTINGUISHABLE at top 1% in the archive: 5-2-1 lift 1.040 [0.995, 1.101], 5-3 0.937 [0.833, 1.044], 5-1-1-1 0.979 [0.846, 1.147] over 146,161 entries, all three CIs containing 1.0 and each other; the first pass's slate-size reversal (5-3 positive on 2-3-game slates, 5-2-1 on 4+) is exploratory. So (c)'s 4-2-x cap is the only secondary control worth sizing, it is sized after the primary is buildable, and a build spending solve time shaping the secondary is spending it on something the archive cannot see. The slate-size dependence of the FOUR-stack penalty (top-1% lift 1.099 on <= 6-team slates, 1.002 on 7-12, 0.946 on 13-20; the five-stack 1.10-1.14 throughout) is the one-line decision on (a)'s scope listed under "Decisions owed": whether floor 5 extends beyond `payout_breadth <= 0.02` on 7g+ slates. "Do not target 5-3" stands, with the archive now saying why.
 
 **(a) and (b) SHIPPED 2026-08-28 and their text MIGRATED to CHANGELOG.md.** Ben's
@@ -1861,6 +1897,8 @@ no-not-yet stands; what would change it is still more finishes to grade, not
 a restated priority.
 
 ### R10. Ownership and duplication, wired and graded (P1, M, gated) | was G3, absorbing RC 1.8/2.5/2.10
+
+> **Rider 2026-10-02 (Session 144, Phase 3, the board rebuild).** premise re-verified at HEAD e4588bc, HOLDS: no part of the fit exists and there are no `ownership_prior_*.json` artifacts. Correction: the 'leverage objective' does not exist; R209 (Session 56) consumes this entry, not the reverse; what reads a prior today is R154's two constraints plus the field-pressure term through `_ownership_pct_for_row`, only with `--leverage`. None of the 614 archived mines carries `rostered_by_norm` or `primary_stack_team_share`, so the team-stack-share term needs the ARCHIVE re-mine with salary files (`ledger/inbox/2026-09-30_DEV_miner-truth-remine-needs.md` (a)) BEFORE this builds, and the fit must beat the flat 12% baseline in the satellite cell before it goes live. M.
 
 **Rider 2026-09-30 (DEV, Session 42 landed R341 and R225).** Read ownership from `rostered_by_norm` (archived) or `field_miner.rostered_by_player_norm(entries)` (any JSON): DK's `pct_drafted` stays as DK's column and drops a player's half when his two slot counts tie. Showdown duplication cells read the captain-aware counts; the 91 captainless Showdown JSONs (2026-07-17 to 08-06) and 61 of the 83 pre-R338 stored `duplication` blocks need an ARCHIVE re-mine first (fragment `ledger/inbox/2026-09-30_DEV_miner-truth-remine-needs.md`), so "Showdown cells blocked until R225" is now "blocked until that re-mine, for those files only". Team stack share is not derivable from the archive (no team on `player_table`, `primary_stack_team` in 0 of 614 entries): it needs a re-mine with a salary file, and `construction.primary_stack_team_share` carries it from now on.
 
@@ -2092,6 +2130,8 @@ entry.
 
 ### R197. `_low_owned_hitter_count` reads a key no writer writes, so it is identically 0 while R154's constraint counts the real thing (P2, XS) | new 2026-08-23, merged from ARCHIVE fragment `2026-08-22_ARCHIVE_low-owned-diagnostic-false-signal.md`; VERIFIED-repro by the filing session
 
+> **Rider 2026-10-02 (Session 144, Phase 3, the board rebuild).** Roadmap: Session 134 (2026-10-02; moved out of Session 47). R246 made `--leverage` live, and this entry's 2026-09-09 rider shows the dead low-owned counter on a live leverage build, so the defect is live, not latent: a control that exists but never reaches the solver.
+
 - **What:** `optimizer_v3._low_owned_hitter_count` counts rows where
   `Ownership_Tier == 'Low'`. Every writer of `Ownership_Tier` in the tree
   writes the literal `"Mid"` and that is the complete set
@@ -2183,6 +2223,8 @@ delivered file.
 `run_slate` discards the per-player Base/F1–F5/Floor/Ceiling audit table `build_projections` returns (`execution_pipeline.py:2571`, `projections, _audit = ...`); writing it to `runs/<run_id>/final/projection_factor_audit.csv` gives post-slate grading the exact join the ledger currently lacks — direct support for R10's grading bar. Pass the Savant/odds/archetype files through `additional_input_paths` so `verify_inputs_unmoved` covers everything that moved the numbers. Add one golden-replay assertion over a REAL run's manifest row so result-shape drift cannot silently recur: this is the residual guard R64 asked for and did NOT ship when R64 landed 2026-08-04, and it is the only part of that item still open. R64 fixed the two readers; nothing yet pins the result SHAPE they read.
 
 ### R13. The stakes decision (decision, after data) | was G7
+
+> **Rider 2026-10-02 (Session 144, Phase 3, the board rebuild).** Roadmap: Session 90 (2026-10-02). This entry IS D-1; it sits in the Deferred pool with the trigger 'Ben's answer' and is not a row.
 
 **Rider 2026-09-15 (DEV).** The number exists for one leg. Across the 2026 MLB Classic and Showdown entries in Ben's 2026-09-15 export (1,046 entries, 2026-04-11 to 09-14): listed fees $196.40, cash winnings $1.67, ticket face value $175.00 -- and by block, before 08-14: 727 entries, $136.60 fees, $100 tickets; 08-14 to 08-27: 183 entries, $34.80, $65; 08-28 to 09-14: 136 entries, $25.00, $1.67 cash + $10 tickets. Labeled arithmetic with ticket face value, not realized profit; redemption, expiry and downstream results are not in the export. The GPP leg has no number because the export omits every GPP entry (R30 rider); the third channel (promotional value) stays invisible as the 07-29 line says. `python tools/net_to_date.py` after R30(e) prints the satellite leg with cash and tickets separated.
 
@@ -2725,6 +2767,14 @@ replaced.
 
 ## Workstream 3 — Intake and pool truth
 
+### R482. A partially posted side on the paste path gets its empty seats filled from the platoon reference, then top APPG, at parity with posted starters and with no penalty, so a bench bat who is not playing can be built into certified entries; the decision has lived only in MLB_Classic.md §6 since R133 closed (P1, S + one Ben decision; S) | new 2026-10-02, from MLB_Classic.md:237-253 (the "R133(2) seeded ninth, OPEN, awaiting Ben" paragraph) via the 2026-10-02 board rebuild (Session 144), premise checked by a `dfs-premise` agent (`claims/engine_2026-10-02/premise/R133-2.md`, gitignored; the facts are repeated here) | Roadmap: Session 151, Needs D-11
+
+- **What.** `build_slate_pool` (`live_data_adapters.py:2236-2297`, unchanged since R60's be75d7b): a partial side's posted starters are seeded first, then platoon-reference rows fill the empty seats, then top-APPG rows (:2275); posted rows and fills alike get `batting_order=None` (:2243), and no fill or seed weight exists anywhere (status `posted_partial_plus_platoon`). The partial shape arises on the PASTE path (`paste_lineups.py:867`: mlb.com posts nine, DK rosters fewer) and from DK `Starting` sides that are complete but hold a shelved player (degraded, R159(a), :947/:1007); the statsapi path marks the side confirmed with its eight and fills nothing (`fetch_slate_bundle.py:180`, `build_slate.py:2327`).
+- **Evidence.** 1840_3g (2026-08-12): on the archived inputs at HEAD the platoon reference ranks Valencia (bench C, not playing) at slot 4 (F2 1.06) above Dingler (posted C, batted 2nd) at slot 6 (F2 1.00), so the fill outranked the posted catcher; certified file fadcd669 carried Valencia in 6 of 18 entries; it was superseded by df7cd44e (0 of 18), rebuilt from a hand-edited `_detfix` feed that marked DET confirmed with its eight, which is option (c) applied by hand. `MLB_Classic.md:244` says APPG picked him; it was the platoon reference (the APPG step never ran). Reach: 3 of 3 archived posted-partial paste slates seeded a non-posted bat (DET 08-12, SEA 08-14, LAD 08-19), striking 0 of 47 delivered entries; 96 local briefs 08-20 to 09-16 show no further case; slates after 09-16 are unchecked. Since R133 the only mitigation is preflight's soft name-the-player warning (`preflight_upload.py:2696`).
+- **Why the exception band.** An ordinary paste slate reaches it and it has already put a non-playing bat into certified entries (33% of a file). Ben's F-3 class of control (an operator preference the engine must carry) is missing here, so the fix is one decision plus a small edit.
+- **D-11 (Ben).** For a side mlb.com posted that DK lists only partly, should the unknown seat (a) take a fill at a weight penalty, (b) get no ninth, or (c) be marked confirmed with its rosterable posted starters, keeping their posted slots for F2? And is the `dk_unrostered` case (seat occupant known; statsapi already says confirmed) answered separately from mid-post and degraded sides? DEV's recommendation: (c), because the hand fix that shipped df7cd44e was exactly (c) and it keeps F2 on the posted slots; answer `dk_unrostered` as (c) and leave mid-post/degraded on today's fill with the preflight warning promoted to a named count in the brief.
+- **Fix (after D-11).** Implement the chosen option in `build_slate_pool`'s partial branch; carry `fill_source` per row into the pool report and the brief (`pool.partial_side_fills: {team, seats, source}`); the preflight warning becomes a brief count; `MLB_Classic.md` §6 records the decision and drops the "OPEN, awaiting Ben" paragraph (the one place it lived).
+- **Acceptance.** `UT test_core.PartialSideFillTests` (new): the archived 1840_3g inputs produce the chosen shape (under (c): DET confirmed-8, no Valencia, F2 on posted slots); a mid-post side and a degraded side take the documented path; the brief names every fill (+4 core). `GOLD` unmoved (no golden slate carries a partial paste side); `PROBE`, `LINT`, `GATE`.
 ### R476. A finite negative historical APPG becomes a negative Base, and the baseline refuses the whole slate on one such arm (P0, S; P) | new 2026-10-02, from the independent code review `docs/2026-10-02_code_review_codex.md` F-01 (Codex, pinned 9adc891; re-adjudicated at HEAD 9adc891 by Session 144, premise checked by a `dfs-premise` agent and reproduced by the session) | Roadmap: Session 145
 
 - **What.** `execution_pipeline._assemble_projection_frame` (EP:5895-5897) takes `Base` from the salary row's `AvgPointsPerGame` unclipped (`base_from_appg = True`, coerced at :5909), and `projection_builder.validate_projection_factors` (:95-96) rejects any negative Base with `Base contains negative values`, raised from `build_projections` (:118-120) at EP:6269. The baseline path (`run_baseline`, EP:7510 -> `baseline.unenriched_frame`, EP:7554 `savant_*=None`), the degrade fallback (BS:3879) and `--no-enrichment` all enter that block with no clip. One eligible arm with a negative season APPG therefore loses the baseline for every reserved row: BS:916-920 catches the exception and records `baseline.status="error"`.
@@ -2823,6 +2873,226 @@ repro table, the twelve premise corrections and the fourteen mutations are in
 CHANGELOG.md.
 
 ### R317. The platoon reference's only automated refresh is 403'd by a CLIENT FINGERPRINT rather than by the network, and a PARTIAL refresh silences the 7-day staleness check for all thirty teams (P1 for (b), XS-S each) | new 2026-09-06, merged from BUILD fragment `2026-09-04_BUILD_fangraphs-platoon-refresh-procedure.md` (RETAINED in the inbox, see below) and DEV fragment `2026-09-06_DEV_fangraphs-reachable-by-curl-not-urllib.md`, which supersedes that fragment's caveat 1; (a) and (b) VERIFIED, (c) measured on two live pages
+
+> **Rider 2026-10-02 (Session 144, Phase 3, fragment consumed).** The BUILD fragment `docs/backlog_inbox/2026-09-04_BUILD_fangraphs-platoon-refresh-procedure.md` (its three asks already filed as (b), (c) and (d) of this entry) was consumed by the board rebuild; its procedure text follows verbatim so nothing is lost.
+>
+> > **RETAINED — DO NOT DELETE ON AN INBOX SWEEP.** Merged as **R317** on
+> > 2026-09-06 and KEPT on the 2026-08-09 precedent: `docs/backlog.md` names this
+> > file as the sole carrier of the step-0 staleness checker, the roster-grid
+> > extraction script, the per-team HTML synthesis and the `reference`-claim
+> > sequence, none of which exist anywhere else, and a session needs them TODAY
+> > because R317(a) and (c) are not built. It is consumed and deleted in the
+> > commit that ships R317(c), at which point the refresh is one command.
+> > **Caveat 1 below is DEAD** — superseded by
+> > `2026-09-06_DEV_fangraphs-reachable-by-curl-not-urllib.md` (merged into
+> > R317(a)): the block is a urllib client fingerprint, not a proxy gate, and
+> > `curl` returns 200 from this VM. Read R317 before running any of this.
+>
+> # How to refresh the FanGraphs platoon reference when it is stale
+>
+> Recorded by a BUILD session on the 1810_3g slate, 2026-09-04, at Ben's request.
+> This is a PROCEDURE a future session can follow with no context, plus the code
+> change that would make it one command. It supersedes
+> `2026-09-04_BUILD_fangraphs-platoon-browser-path-works.md`, which said the same
+> things as a findings report; DEV should merge this one and drop that one.
+>
+> The file in question is `data/reference/fangraphs_platoon_lineups.json`. It
+> supplies the projected batting order for any team that has NOT posted a lineup,
+> via `live_data_adapters.build_slate_pool`. On a slate with a TBD team it decides
+> which nine bats are in the pool and what F2 batting-order weight each gets, so a
+> stale file is not a cosmetic problem: it seeds the pool with players who are no
+> longer in the order. Measured on this slate, at the bottom.
+>
+> ## Step 0. Decide whether it is actually stale
+>
+> Do NOT trust the top-level `collected_date`. A partial refresh sets it to today
+> even when most teams are months old (see Caveat 3). Run this instead; it reports
+> the OLDEST TEAM, which is the number that matters:
+>
+> ```bash
+> cd $REPO && python3 - <<'PY'
+> import json, datetime, pathlib
+> d=json.loads(pathlib.Path('data/reference/fangraphs_platoon_lineups.json').read_text())
+> today=datetime.date.today()
+> age=lambda s:(today-datetime.date.fromisoformat(s)).days if s else None
+> ages={t['abbrev']:age(t.get('carried_forward_from') or t.get('page_updated') or d['collected_date'])
+>       for t in d['teams']}
+> oldest=max(ages.values())
+> print(f"top-level collected_date : {d['collected_date']} ({age(d['collected_date'])}d)")
+> print(f"OLDEST TEAM in the file  : {oldest}d ({', '.join(a for a,v in sorted(ages.items()) if v==oldest)})")
+> print(f"teams over 7d            : {sorted(a for a,v in ages.items() if v>7) or 'none'}")
+> print("VERDICT:", "FRESH" if oldest<=7 else f"STALE -- refresh (oldest team {oldest}d)")
+> PY
+> ```
+>
+> Verified output on this slate after the full refresh: `OLDEST TEAM 0d`,
+> `teams over 7d: none`, `VERDICT: FRESH`.
+>
+> The 7-day bar is the engine's own (`stale_platoon_policy`), and it ages against
+> the SLATE, not the file's collection date. Two shortcuts before you refresh
+> anything: a slate where every team has POSTED reads no platoon reference at all,
+> and a team you can source from DK's `Starting` column never touches it either
+> (R143). So the only teams that matter are the TBD ones on tonight's slate. If
+> those are fresh, ship and refresh later.
+>
+> ## Step 1. Two URLs carry all thirty teams (Ben, 2026-09-04)
+>
+>     https://www.fangraphs.com/roster-resource/roster-grid?platoon=vsr
+>     https://www.fangraphs.com/roster-resource/roster-grid?platoon=vsl
+>
+> This is the important finding. `fetch_fangraphs_platoon.py` walks its 30-entry
+> `TEAMS` table and loads `/roster-resource/platoon-lineups/<slug>` once per team,
+> so a full refresh is 30 page loads. The roster-grid pages do it in TWO. Both
+> were verified this session: each returns all 30 teams at nine slots each, and
+> the `platoon` parameter genuinely switches the order (PIT leads Horwitz on
+> `vsr`, Griffin on `vsl`).
+>
+> ## Step 2. Load each page in the built-in browser and extract
+>
+> `--fetch` does not work from the sandbox (Caveat 1), so the pages are read in
+> the Cowork built-in browser. Navigate, wait ~8s for the tables to render, then
+> run this in the page. It returns every team's nine slots as JSON:
+>
+> ```js
+> function grid(){const out={};
+>  for(const t of [...document.querySelectorAll('table')].filter(x=>x.rows.length>50)){
+>   const rows=[...t.rows].map(r=>[...r.cells].map(c=>c.textContent.replace(/\s+/g,' ').trim()));
+>   const abbr=rows.find(r=>r.length>=5&&r.every(c=>/^[A-Z]{2,3}$/.test(c)));
+>   if(!abbr) continue;
+>   const si=rows.findIndex(r=>r.length===1&&/^Starting Lineup$/i.test(r[0]));
+>   if(si<0) continue;
+>   const slots=[];
+>   for(let i=si+1;i<rows.length&&slots.length<9;i++){
+>    const r=rows[i];
+>    if(r.length<abbr.length*4) break;
+>    if(!/^[1-9]$/.test(r[0])) break;
+>    slots.push(r);
+>   }
+>   abbr.forEach((ab,k)=>{out[ab]=slots.map(r=>[+r[k*4],r[k*4+1],r[k*4+2],r[k*4+3]]);});
+>  }
+>  return out;}
+> JSON.stringify(grid())
+> ```
+>
+> Why it is shaped that way, so it can be repaired when FanGraphs moves something.
+> Six tables with more than 50 rows, one per division. Inside each: a row of five
+> team abbreviations, a repeated `Role | Pos | Name | B/T` header, a single-cell
+> `Starting Lineup` section marker, then the nine slot rows. **Teams sit SIDE BY
+> SIDE**, four columns each, so a slot row holds 5 x 4 = 20 cells and team `k`
+> occupies `[k*4 .. k*4+3]`. Bench, Rotation and Bullpen follow below in the same
+> shape, which is why the loop stops at the first row whose first cell is not 1-9.
+>
+> ## Step 3. Write per-team HTML and run the existing parser
+>
+> No code change is needed today: the parser already accepts saved pages via
+> `--from-dir`, and it only needs the vsR/vsL heading phrase plus a table whose
+> first four cells are slot, position, name, bats. So synthesize one minimal file
+> per team and let the real tool do the parsing, merging and schema work.
+>
+> ```python
+> # slug map comes from the tool itself, so it cannot drift:
+> #   from tools/fetch_fangraphs_platoon.py import TEAMS  ->  (slug, name, abbrev, league, div)
+> # vsr / vsl are the two JSON blobs from Step 2, keyed by FANGRAPHS abbrev.
+> import html, pathlib
+> XW={'CHW':'CWS','KCR':'KC','SDP':'SD','SFG':'SF','TBR':'TB','WSN':'WSH'}  # FG -> DK
+> slug_by_dk={a:s for s,_n,a,_l,_d in TEAMS}
+> out=pathlib.Path('data/slates/<date>/fangraphs_pages'); out.mkdir(parents=True, exist_ok=True)
+> for fg_ab in vsr:
+>     dk=XW.get(fg_ab, fg_ab)
+>     parts=[f"<html><body><p>Updated: {page_updated}</p>"]
+>     for side, blob in (("R", vsr), ("L", vsl)):
+>         rows=blob[fg_ab]
+>         assert [r[0] for r in rows]==list(range(1,10)), (fg_ab, side)
+>         parts.append(f"<h3>Go-To Starting Lineup vs{side}</h3><table>")
+>         for s,pos,nm,bt in rows:
+>             bats=bt.split('/')[0].strip()          # the grid ships "B/T"; the page shipped bats alone
+>             parts.append("<tr>"+"".join(f"<td>{html.escape(str(x))}</td>" for x in (s,pos,nm,bats))+"</tr>")
+>         parts.append("</table>")
+>     (out/f"{slug_by_dk[dk]}.html").write_text("".join(parts)+"</body></html>", encoding='utf-8')
+> ```
+>
+> Then, holding the `reference` claim, because `data/reference/` is ARCHIVE's
+> write set and this file is a one-writer surface:
+>
+> ```bash
+> python tools/claim.py take reference --role ARCHIVE
+> cat data/reference/fangraphs_platoon_lineups.json > data/reference/_backup_fangraphs_platoon_lineups_<olddate>.json
+> python tools/fetch_fangraphs_platoon.py --from-dir data/slates/<date>/fangraphs_pages --check --json   # dry run first
+> python tools/fetch_fangraphs_platoon.py --from-dir data/slates/<date>/fangraphs_pages --json
+> python tools/claim.py release reference
+> ```
+>
+> `--check` prints `parsed N, failed 0` and writes nothing. Refresh ALL THIRTY
+> whenever you refresh at all (`--only` exists but see Caveat 3). Back up by `cat`,
+> not `cp`: this mount grants create and truncate but not unlink (R109).
+>
+> ## Step 4. Verify, and know which check you have left
+>
+> `parsed 30, failed 0` proves the parse ran, not that the numbers are right. The
+> real check is that the two FanGraphs views agree. This session pulled all 30
+> teams the slow per-team way, then pulled both grid pages, and diffed:
+>
+>     vs_RHP identical: 30/30   mismatched: 0   not-found: 0
+>     vs_LHP identical: 30/30   mismatched: 0
+>
+> That is 540 slots, position and name, in slot order, from two independently
+> rendered views. **Note what changes once you SOURCE from the grid: the grid is
+> no longer an independent check, and the per-team pages become the cross-check.**
+> Spot-check two or three teams against `/platoon-lineups/<slug>` after a grid
+> refresh rather than claiming corroboration you did not run.
+>
+> ## Caveats
+>
+> 1. **`--fetch` cannot run from the sandbox, and the reason is not FanGraphs.**
+>    There is no route to fangraphs.com: `Tunnel connection failed: 403 Forbidden`
+>    on CONNECT, the same proxy gate that blocks `statsapi.mlb.com` and
+>    `api.the-odds-api.com`. That is R147's lesson in a new place -- report "no
+>    network", not "check the site". The built-in browser reaches it fine.
+> 2. **The parser is verified against RENDERED table structure, three times now,
+>    and still not against raw server-rendered FanGraphs HTML,** which is what
+>    `--fetch` from Ben's Windows machine would feed it. That distinction belongs
+>    in the file's VERIFICATION STATUS paragraph, which currently claims neither.
+> 3. **A partial refresh silences the staleness check for all thirty.**
+>    `merge_preserving` correctly stamps each carried-forward team with
+>    `carried_forward_from`, but the top-level `collected_date` still becomes
+>    today, and `build_slate.py`'s 7-day check reads the top-level stamp. Six teams
+>    were refreshed on this slate at 17:03 and the warning went quiet for the 24
+>    that were a month old. Harmless here (the one TBD team was among the six) and
+>    not harmless on a slate whose TBD team is one of the 24: the build would seed
+>    a projected nine from month-old data with nothing printed. Candidate fix: age
+>    the check per team against `carried_forward_from` where present, or carry a
+>    second top-level stamp naming the oldest team in the file. Until then, refresh
+>    all thirty, and use the Step 0 checker rather than the warning.
+> 4. **Abbreviations and handedness differ between the two sources.** The grid uses
+>    FanGraphs abbrevs (CHW, KCR, SDP, SFG, TBR, WSN) against DK's (CWS, KC, SD,
+>    SF, TB, WSH), and ships a combined `B/T` column where the per-team page shipped
+>    bats alone. Both are handled above; both are silent corruption if missed.
+> 5. **Only a COMPLETE 1-9 counts.** Assert the slot sequence per team per side, as
+>    Step 3 does. A short side is a projection, not a posted order, and it must fall
+>    through rather than arrive looking complete.
+>
+> ## The code change worth making
+>
+> Add `--from-grid <vsr.json> <vsl.json>` (or have the tool drive the browser
+> itself) so a refresh is two page loads and one command instead of thirty loads
+> and a hand-assembly step. Everything it needs is in Steps 2-3: the cell-block
+> arithmetic, the FG->DK crosswalk, the `B/T` split, and the 1-9 assertion. Keep
+> `--from-dir` -- it is what made this session possible with no code change at all,
+> and it is the only path that works while the sandbox has no network.
+>
+> ## Why this matters, measured on this slate
+>
+> PIT was the one unposted side on 1810_3g. The reference file was 30 days old
+> (collected 2026-08-05). Its projected order vs RHP held three players no longer
+> in it (Endy Rodriguez, Jacob Gonzalez, Ronny Simon) and was missing three now in
+> it (Konnor Griffin, Oneil Cruz, Rafael Flores Jr.); only slots 2 and 3 were
+> unchanged. Rebuilding on the refreshed file at identical controls moved the apex
+> review proxy 1056.83 -> 1085.38, the worst entry 134.03 -> 147.37, and
+> worst-triple concentration 4/7 -> 3/7. PIT went from one primary stack to two and
+> CIN from zero to one, which fits the market: PIT's 4.58 implied total was second
+> on the slate and was being under-stacked because half its projected order was
+> players who no longer bat there. Same three gates, same single control override.
+> Both are deterministic review proxies, not probability claims.
 
 **Rider 2026-09-25 (the code review, intake area; `review_intake/r6_staleness.py`): (b) reproduced, with two corrections to the text.** A refresh reaching ATL only leaves `carried_forward_from: 2026-06-20` on 29 teams, sets the top-level `collected_date` to today, and the engine reads `platoon_age_days: 0` with BLOCKERS empty against the old file's `40 days old` blocker. (1) The stamp is read by the engine at `live_data_adapters.py:1868-1874` through `platoon_order_adapter.py:178`, not by `build_slate.py` (its `collected_date` sites are RotoWire writers). (2) "Nothing printed" is half-right: the per-team `stale_teams` WARNING (`platoon_order_adapter.py:196`, `page_updated` against the new top-level date, `STALE_DAYS_WARN = 10`) still fires for every carried team; what is silenced is the BLOCK. `carried_forward_from` is read by nothing in `mlb_engine/`, `tools/` or `skills/`. Fix: age per DEPENDENT team as `carried_forward_from or collected_date` over `platoon_used_teams`, block on the max. XS-S.
 
@@ -3324,6 +3594,8 @@ Route every inbound abbrev through `to_dk_abbrev` at parse time (merge_feeds, Ro
 
 ### R279. Three sites derive "confirmed" from a feed that stops carrying it after first pitch, and the observed tier that answers them is built but unwired (P1, M; money boundary) | new 2026-08-31, from R270(b)'s class-B R233 enumeration; the tier shipped the same day
 
+> **Rider 2026-10-02 (Session 144, Phase 3, the board rebuild).** premise re-verified at HEAD e4588bc, PARTLY: all three named sites still derive 'confirmed' from the schedule hydrate (`live_data_adapters.py:1217`, `fetch_slate_bundle.py:180`, `preflight_upload.py` `check_feed` :2555, no leg filter at :2540) and there are two more origins (`build_slate.fetch_lineups` :2327; `verify_export.py:336/339` calls `check_feed`). R270's boxscore tier reaches none of them: its only consumer is `tools/repair_entry.py`, `fetch_boxscore` (:1452) has no callers, nothing writes `boxscores.json`. The Nootbaar slot was already locked when `did_not_start` could fire, so the fix confirms a dead slot without recovering it: band 2 (top), not the exception band. Session 27's targets add `PF` and `fetch_slate_bundle.py` and drop `EP` (zero hits). M.
+
 - **What:** R270(b) shipped the observed-fact tier
   (`live_data_adapters.parse_boxscore_feed` / `build_observed_starters` /
   `observed_starter_state`) and gave it one consumer, the repair filter. Three
@@ -3409,6 +3681,8 @@ Hypothesis-generated mlb.com renders (random posted-side subsets, `1. TBD` place
 Kept, not wired and not deleted: `tools/ownership_grade_archive` (R306) is a live caller. `contest_library.infer_from_name` now reads a title through the engine's matcher, ranking and cap parse; preflight's copy stops stripping the guard and the parity test pins it on titles that can tell.
 
 ### R106. `build_slate.py --postures` cannot express ticket_count, so the operator's deciding fact cannot reach the resolver (P2, S) | new 2026-08-10, from BUILD fragment 2026-08-08 (1505_3g); not in the spec
+
+> **Rider 2026-10-02 (Session 144, Phase 3, the board rebuild).** Roadmap: Session 148 (2026-10-02; moved out of Session 79): `--postures` cannot express `ticket_count`, so the operator's deciding fact cannot reach the resolver (1505_3g, one ticket vs five); routing, band 1.
 
 - **What:** `--postures` takes `<contest>=<posture>` strings only and
   `parse_postures_arg` returns `dict[str, str]`. `satellite_shape_for()`
@@ -3723,6 +3997,8 @@ Turbo) is recorded on R196 as the family's fourth occurrence, not here.
 
 ### R251. Freeze the skill and market inputs per slate, or every slate is grading data lost forever (P1, S-M; the capture half rides the NEXT session that touches a slate) | new 2026-08-27, from Ben's greenfield instruction; the R135 argument applied to inputs; lands with R83, same discipline
 
+> **Rider 2026-10-02 (Session 144, Phase 3, the board rebuild).** the 2026-08-28 ed9 critique §1.3 correction, accepted then and never placed here: every snapshot carries `observed_at` AND `valid_for`, a content hash, its source, a schema version and the availability state it was taken in (salary-post, first-market, lineup-confirmation, final-lock). The (a) capture half reads this.
+
 **Rider 2026-09-03: R309(b) is this entry's shape applied to a hand-applied
 research factor, and the two land together.** A `0.85` factor was applied to
 McClanahan on 2005_1g_sd off a sourced FanGraphs fact; the factor survives in
@@ -3812,6 +4088,8 @@ A crash inside a governor-rung or R407 re-solve stranded solve 1's mirrored UNCE
 
 
 ### R428. Late swap re-ranks open slots on an unenriched projection: the swap drops the whole enrichment stack, not the three inputs its docstring names (P1, S) | new 2026-09-25, from BUILD fragment `2026-09-23_BUILD_late-swap-ranks-unenriched.md` (1905_10g, 20:55 ET) | Roadmap: Session 115
+
+> **Rider 2026-10-02 (Session 144, Phase 3, the board rebuild).** premise re-verified at HEAD e4588bc, HOLDS: `late_swap.py:1552-1555` passes None x3 (no f1/f4/f5, no FanGraphs), unchanged since 2026-07-22; `_score_roster` (:1786-1787) compares incumbent to replacement on that frame; `run_late_swap` (EP:1090-1423) does not re-enrich; R468-R471 changed pool rows only. No figure for how far the ranking moves (the 1905_10g swap never ran). Repriced M: the files are `LS:1534-1556, 857-890, 1715-1800`, `EP:5720-5800, 6666`, `BS:3856`.
 
 - **What.** `tools/late_swap.py` (about L739) builds the swap's projection frame as `_assemble_projection_frame(salary, rows, "emergency_proxy", None, None, None, ...)`: no Savant batting or pitching file, no F1, F4 or F5 maps. The swap ranks candidates, and compares incumbent to chosen, on AvgPointsPerGame x batting order only. The parent build used all six factors plus the odds paste (`f1_games_priced` 10, `f4_platoon_applied` 153). The docstring (about L99) says a swap "does not re-derive weather, odds, or a pitcher audit"; in fact it drops the stack. On 1905_10g seven of ten games were locked and 81 of 320 slots open across three games, none holding an absent player; the swap was not run because its "improvement" would have been measured against a weaker model, worst for LAA@ATH (29 of the 81 slots, the highest open total at 9.5, invisible without F1).
 - **Measured by the 2026-09-25 code review (delivery area; `review_delivery/repro_swap_frame.py`, 06-03 slate, DK-Starting feed).** `late_swap.py:905-906` passes `_assemble_projection_frame(str(salary), rows, "emergency_proxy", None, None, None, ...)`; per the signature (`execution_pipeline.py:5483-5495`) the Nones are `savant_batting_csv`, `savant_pitching_csv`, `source_metadata`, and `f1_by_player_id`, `f4_by_player_id`, `f5_by_player_id`, `fangraphs_pitching_csv` are never passed. The frame: 36 rows, F1/F3/F4/F5 all `{1.0: 36}`, F2 the only live factor, `enrichment[xwoba]`, `[ceiling]`, `[pitcher_ceiling]` all null. `_score_roster` (`:573-603`) reads that frame and the net-downgrade refusal at `:1143` compares incumbent to chosen on it, so an incumbent seated for its market total or platoon edge can be "improved" into an APPG-max roster with the refusal never firing; `:1234` records `projection_tier="proxy"`, which is truthful.
@@ -4473,6 +4751,8 @@ Session 15 gave every Classic build one frozen `Deadline(end, reserve)` (`mlb_en
 
 ### R115. SP-pair coverage: the bank freezes at `requested_n`, the resume path cannot engage, and no control can floor arm diversity (P1, M) | new 2026-08-14, merged from BUILD fragment `2026-08-13_BUILD_bank-cache-freezes-at-first-slice.md` + ledger fragments 2026-08-13 (1507_3g); mechanisms verified in tree by the audit
 
+> **Rider 2026-10-02 (Session 144, Phase 3, the board rebuild).** from the 2026-08-22 ed6 critique §2.1, never filed: seeded SP-pair lineups bypass the SP-exposure-cap excludes on BOTH coverage paths (`optimizer_v3.py:2847-2848`) and only `hard_all_pairs` writes a coverage note. Verify at HEAD before building; XS; band 2 (a seeded pair over the cap is a shared failure point the cap was meant to bound).
+
 - **What, three verified mechanisms behind the 08-13 1310_6g lost window (11
   blocked runs, `runs/20260813T162034Z_40da1d56` onward):** (1)
   `build_diverse_candidate_bank`'s growth target collapses to `requested_n`
@@ -4638,6 +4918,8 @@ class -- a refusal that does not name the move that clears it -- and it rides
 their slot rather than this decision-first entry.
 
 ### R66. Silent shape/posture defaults on the API paths (P2, S) | audit 2026-08-04, verified in tree
+
+> **Rider 2026-10-02 (Session 144, Phase 3, the board rebuild).** Roadmap: Session 148 (2026-10-02; moved out of Session 21): `run_late_swap(contest_shapes=None)` scoring every entry on the pure-ceiling `large_wta` profile is a routing defect (contests routed to the right shape and posture), band 1.
 
 **Rider 2026-09-25 (the code review, allocator area; `review_allocator/repro_shapes.py` (d)).** Two more silences at the same boundary: a Mapping override carrying only `contest_shape`/`ticket_count` and no `posture` resolves `posture large_gpp` at `execution_pipeline.py:1466`; an unknown posture string (`'wta'`) is accepted unvalidated at `:1459-1462` and builds on `large_gpp` caps under `posture_source="operator_supplied"`, so no blocker fires. Fix: validate posture strings against `STRATEGY_DEFAULTS` at this boundary and derive the posture from `contest_shape` when a Mapping names only the shape. XS, rides Session 21 (c).
 
@@ -4971,6 +5253,8 @@ before supervisor-owned flags. `autobuild.py` had zero tests and has seven.
 
 ### R195. An explicit `--postures <id>=wta_satellite` reintroduces the pre-R1a `large_wta` mapping for a satellite contest (P1, XS) | new 2026-08-23, merged from BUILD fragment `2026-08-20_BUILD_postures-satellite-shape-bug.md`; mechanism traced to the line
 
+> **Rider 2026-10-02 (Session 144, Phase 3, the board rebuild).** Roadmap: Session 148 (2026-10-02; moved out of Session 72). The XS fix moves production golden bytes: `tests/golden/golden_replay_production_2026-06-03.json` freezes the misroute (191020573/191020574 recorded `large_wta` where inference gives `satellite`), so the chunk re-freezes `GOLD` deliberately with the histogram before and after; `SATELLITE_TYPE_TOKENS` is still `{'satellite'}` at HEAD.
+
 **Rider 2026-09-25 (the code review, allocator area; `review_allocator/repro_shapes.py` (a)): reproduced, and the PRODUCTION golden baseline freezes the misroute.** `execution_pipeline.py:1462` turns the string override into `inferred_type="wta_satellite"`, `:1978` `SATELLITE_TYPE_TOKENS` holds only `"satellite"`, `:1930-1932` maps `wta_satellite` to `large_wta`; `tests/test_golden_replay.py:382` passes the string for both satellites and `tests/golden/golden_replay_production_2026-06-03.json` records `contest_shape: large_wta` for 191020573 and 191020574 (auto inference gives `satellite`). So the fix moves the production golden (both satellites' shape and `contest_fit_by_shape`, possibly the assignment) and needs the recorded re-freeze; `tools/late_swap.py:848` inherits the path through `_resolve_contest_postures`.
 
 
@@ -5228,6 +5512,13 @@ supervisor takes this class; noted on its entry via this number.
 
 ## Workstream 5 — Delivery, manifest, and preflight evidence
 
+### R481. `tools/autobuild.py` still stops on S and P failures between T-30 and T-6 and names no file at its pre-attempt exits, so the delivery-first policy CLAUDE.md says it encodes is pre-R386 in exactly the window that matters (P1, S; P) | new 2026-10-02, from CLAUDE.md:39 ("still pre-R386") via the 2026-10-02 board rebuild (Session 144), premise checked by a `dfs-premise` agent (evidence `claims/engine_2026-10-02/premise/autobuild-pre-R386.md`, gitignored; the facts are repeated here) | Roadmap: Session 150
+
+- **What.** autobuild never relaxes an S stop or lets a P stop pass on its own: S exit 3 at `autobuild.py` L1278 (strategy check), L1291, L1315, L1337 (no remedy, the R157 case; L1188's pool blocker is MIXED); P exit 5 at L993, L1009, L1090, exit 3 at L1357 (max attempts spent), exit 4 at L841 (classification drift); the child's exit 4 (L1166) has a P half (R392). Its only uses of `--deliver-by` clamp its own clock and forward the flag (7 hits, none at a stop site). build_slate's governor exists only with `--deliver-by` (BS L8515-8535) and delivers S refusals (`badly_shaped` via `classic_refusal_class`) only from T-6, so from T-30 down to T-6 the session clears S and P stops by hand, and at every clock on SKILL.md's autobuild recipe (L142-146), which omits the flag. L1304 (a never-relax control) stops correctly and stays.
+- **What is already right (R419).** On every stop that does not deliver, `main()` prints the file in hand as a FILE line, or `null`, labelled review-grade; exit codes unchanged. Still no file is named at the six exits before the first attempt, at child exit 4 or at a pool block, because the last two happen before `publish_baseline` (BS L3674/L1166 < L3786).
+- **Why.** R386 (Ben, 2026-09-22): inside T-30 a session relaxes S failures and records P failures and ships the file review-grade; V is a wall. The incidents are 2138_4g (2026-08-14, undelivered) and 1940_9g (2026-09-01, no file), both before the baseline (R389(b)) and R419; whether a file has been lost since 2026-09-26 is unchecked (the newest decision log on disk is `outputs/2026-09-16`). Band 2: a stop that names no file is the washout.
+- **Fix.** Inside the effective deadline (first lock minus F-1's 5 minutes, or `--deliver-by`), an S stop presents the file in hand review-grade and continues to the next attempt or exits 7 with it; a P stop records and ships; the pre-attempt exits and the pool block run `publish_baseline` first when the pool is legal, so a FILE line exists at every exit; `--deliver-by` stops being the only key to the governor (F-4: every build is deadline-aware). Relaxing the caps themselves stays Session 20 (R203/R244/R391(b)). Retire the `CLAUDE.md:39` "pre-R386" sentence in the same commit, replacing it with the one-line fact.
+- **Acceptance.** `UT test_core.AutobuildDeadlinePolicyTests` (new): at T-20 an S stop ships review-grade and continues; a P stop records and ships; a pre-attempt exit on a legal pool names the baseline file; a V stop still refuses with no file; outside the deadline the behaviour is unchanged (+5 core). `LINT`, `GATE`.
 ### R477. Artifact keys are written with the host's path separator, so a Windows-built run's export is bound under `final\DKEntries.csv` and `promote_run` refuses to re-promote it from any host (P1, S; P) | new 2026-10-02, from the independent code review `docs/2026-10-02_code_review_codex.md` F-02 (Codex, pinned 9adc891; re-adjudicated at HEAD by Session 144 with a `dfs-premise` agent; the review's class V and priority P0 modified to P and P1, the mechanism widened) | Roadmap: Session 146
 
 - **What.** `build_state_manager.register_artifact` keys the run manifest with `str(relative)` (BSM:195 `relative_path`, :200 the dict key) and `snapshot_run_inputs` writes `str(destination.relative_to(run_path))` (:165); on Windows both read `final\DKEntries.csv`. `tools/promote_run.py:201` looks up the literal key `final/DKEntries.csv`, finds nothing, and refuses at :211-218 with `records no sha256 for final/DKEntries.csv ... exits 4 rather than 0` (exit 2) unless `--force-unbound`, which needs Ben and discards the binding. The lookup is a dict key, so the refusal follows the manifest, not the host running the tool.
@@ -5236,6 +5527,8 @@ supervisor takes this class; noted on its entry via this number.
 - **Fix.** Write every new relative artifact key and `relative_path` with `Path.as_posix()` at BSM:165/:195/:200 (the house convention: `delivery_record.py:97` and `autobuild.py:1509` already normalize). Add a narrowly scoped alias reader in `promote_run` that recognizes the historical backslash form, requires an unambiguous binding, still compares the recorded hash against the bytes, and refuses when both forms exist with different hashes; `verify_run_bundle` (BSM:277-297) and `usable_artifact` (EP:363-367) resolve a backslash `relative_path` through the same normalizer, because `PurePosixPath("final\DKEntries.csv")` is one component on Linux. Never rewrite old manifests (`_assert_mutable` BSM:68-70 refuses a promoted run) and never use `--force-unbound` as migration; keep R228's absent-key refusal and the mismatch refusal.
 - **Acceptance.** The four tests above pass on the Windows venv and on Linux; `test_core.RunProvenanceTests` gains the canonical posix key and the conflicting-alias refusal (+2 core); the promotion coverage is parameterized over forward- and backslash historical keys so Linux CI exercises the Windows record shape. The 1310_4g run re-promotes with its existing label and matching sha; an absent hash and changed bytes still refuse. `GOLD` unmoved; `LINT`, `GATE`.
 ### R473. Two record defects found live on 1400_4g: a re-promotion takes its label from the wrong manifest row, and a second record on a run overwrites the first (P1, S) | new 2026-09-30, from the 1400_4g BUILD session | Roadmap: Session 142
+
+> **Rider 2026-10-02 (Session 144, Phase 3, the board rebuild).** part (b), a second record on a run overwrites the first, is the same mechanism R430 files (`record_name` keys `<tag>_<run_id>.json`, `_write` overwrites a differing record, `promote_run` reaches the same name through `deliver`); (b) is MERGED INTO R430 and this entry keeps (a) only (the re-promotion label from the wrong manifest row). Roadmap: Session 142 holds (a), ordered after Session 128 because both edit `promote_run` and `delivery_record`.
 
 - **What.** (a) `tools/promote_run.py:96-98` keeps the LAST manifest row whose `run_id` matches, and `:233-235` then keeps a `review_grade*` prior over a `workflow_valid` run. On 1400_4g the PHI-hedge variant 7fdaa380 was recorded `review_grade_uncertified` under run 0efaf97e, and re-promoting 0efaf97e (sha 52d158c3, certified) inherited the variant's label; the session restored it by hand (b1429b5). The same row supplies date, tag, contest type, lineage, tier and strategy state (`:220-248`, `:319-321`), and `prior_delivery_record` (`:102-115`) takes controls and market from the latest record for the run. Reproduced offline. (b) `delivery_record.record_name` (:105-132) keys a record `<tag>_<run_id>.json` whenever a run is present, and `_write` (:399-411) overwrites on any different text: the variant's record replaced the certified parent's at cca02f1 and the restore replaced the variant's in turn, so no tracked record of 7fdaa380 exists at HEAD.
 - **Corrected by the premise check.** (a) Reading only `runs/<id>/manifest.json` would upgrade a downgrade-accepted swap to `certified` (the run manifest never carries `review_grade_downgrade_accepted`, and R388(e) keeps `:233-235` for that reason), so the fix selects the run's own row by run AND sha. (b) The `refinement` flag never reaches the mirror (`_mirror_to_delivery_record`, `UM`:286-321), and any second record with the same run and different bytes overwrites, refinement or not: R430's mechanism, seen a second time.
@@ -5253,6 +5546,8 @@ supervisor takes this class; noted on its entry via this number.
 ### R444. CLOSED 2026-09-26 -- SHIPPED as roadmap Session 113 (b), entry in CHANGELOG.md
 
 ### R430. A hand repair has no recording door, and the obvious call overwrites the parent's committed record (P1, S) | new 2026-09-25, from BUILD fragment `2026-09-23_BUILD_repair-record-overwrites-parent.md` (1905_10g) | Roadmap: Session 128
+
+> **Rider 2026-10-02 (Session 144, Phase 3, the board rebuild).** premise re-verified at HEAD e4588bc: `tools/repair_entry.py` has no recording door (zero `record_delivery`/`upload_manifest`/`delivery_record` hits; it writes only the file, :722); `record_name` keys `<tag>_<run_id>.json` (:126-127) and `_write` (:408-410) overwrites any record whose text differs; `promote_run` reaches the same name via `deliver(` (:309); `repair_of` has zero hits in code (the 1905_10g record carries it by hand). R473(b), a second record on a run overwrites the first (1400_4g, a second sighting), is merged here. Figure: three hand-recorded repairs on 09-22/09-23; the 1905_10g parent record was overwritten (the file survived). Exception band; S, or XS-S once the refusal half lands.
 
 - **What.** `tools/repair_entry.py --mode repair --out outputs/<date>/...` writes a file under `outputs/` that `preflight_upload.py` then HARD-FAILS: "no manifest record ... this file was not produced by a recorded delivery path". The repair tool records nothing, and the repair clause (R272) requires the preflight to exit 0. The session recorded it by hand through `upload_manifest.record_delivery` with the parent's `run_id`; `record_name` keys the tracked JSON on `<tag>_<run_id>`, so the call OVERWROTE the committed parent record (`1905_10g_20260923T221618Z_4a9aebc0.json`). Caught in `git diff`, restored from HEAD, and the repair re-recorded run-less as `1905_10g_norun_a403548e4860.json`.
 - **Reproduced by the 2026-09-25 code review (delivery area; `review_delivery/repro_record_overwrite.py`).** `delivery_record._write` (`:399-411`) is idempotent only on identical text and otherwise `target.write_text`s unconditionally; after a hand record with the parent's `run_id` the directory holds one file, sha `407bb3290959`, `cert=review_grade`, and the parent's content survives nowhere on disk. `tools/repair_entry.py:684` calls `write_entries` and never `record_delivery`. `tools/promote_run.py:314, 322` records under the re-promoted run's own id and lands on the same filename, so a re-promotion overwrites the original delivery's record too (same bytes normally; the original `delivered_file`, status and notes are what is lost).
@@ -5327,6 +5622,8 @@ of `--max-attempts`, or resuming with them spent, writes a stop record.
 The refusal was `mlb_engine/intake/paste_odds.py`'s, and the pool's `excluded_postponed` comes from a feed this tool never read. `--feed` (the pool's classifier) and `--exclude-game` exempt a salary game that is not being played; each is named under `excluded_postponed` with its signal, a priced row for it is dropped, DK's `Postponed` literal is named where it was silent, and a name matching no game or an unreadable feed warns and exempts nothing. Gate `PASS  v2.26.0  42 modules  2480 tests  5 skipped` (the five absent-file skips).
 
 ### R398. F4 grades hitters against the opener, not the declared bulk arm (P2, S) | new 2026-09-22, from `docs/backlog_inbox/2026-09-22_BUILD_f4-grades-against-opener-not-bulk-arm.md` | Roadmap: Session 32
+
+> **Rider 2026-10-02 (Session 144, Phase 3, the board rebuild).** premise re-verified at HEAD e4588bc, PARTLY: `extract_opposing_probables` (`live_data_adapters.py:1587`) is untouched since 2026-08-05; R470 writes the declared arm's own row and R471 adds the PO evidence check, and neither touches `opposing_probables`, so F4 never grades against the bulk arm on any path. 'Grades against the opener' holds on the feed path only: on a DK-only slate `DK_STARTING_PROBABLE_TOKENS={SP,P}` (:568) leaves a PO side with NO probable, so its opponents get a neutral F4. Band 1 (1840_5g DET mean F4 0.911 -> 1.059, primary stacks 0 -> 1, not re-run); S.
 
 - **What.** On 1840_5g, WSH ran Cornelio (PO) then Kent (PLR). `--declare-pitcher` made Kent rosterable, but `extract_opposing_probables` (`live_data_adapters.py:1423`) read the feed's probable, so DET hitters were graded against Cornelio (.296) instead of Kent (.351). Measured on the same inputs: DET mean F4 0.911 → 1.059, primary stacks 0 → 1.
 - **Fix.** When a side is PO and a declared bulk arm exists, grade against the bulk arm or a PA-weighted blend, and name the substitution in `pool_report`.
@@ -5934,6 +6231,8 @@ should say which of the other two it makes cheaper.
 
 ### R276. Ben's standing data-driven QA step, built as three `qa_portfolio` panels and a `--compare` flag rather than a prose checklist (P1, S-M; report-only, changes no delivered byte) | new 2026-08-30, merged from BUILD fragment `2026-08-30_BUILD_standing-data-driven-qa.md`; **Ben's dated instruction, 2026-08-30**
 
+> **Rider 2026-10-02 (Session 144, Phase 3, the board rebuild).** two QA asks folded here. (i) From `ledger/inbox/2026-09-30_DEV_miner-truth-remine-needs.md` (b): `qa_portfolio.py` quotes ledger 3.17/3.18 ownership and winner-captain medians as prose constants (:639-641, :968-970); they move once re-derived on `rostered_by_norm`, so read them from a ledger block or label them as of a date. (ii) From the branch fragment `2026-09-15_BUILD_shape-bands-inert-on-mixed-entered-set` (c): `qa_portfolio.py` has no stack-shape axis; put the delivered shape distribution beside the bucket's measured five-stack field share and top-cohort share (R37(2)'s bands). Both XS-S, band 3.
+
 **Rider 2026-09-15 (DEV, from the mine and the 2026-09-12 QA fragment; roadmap CC-12).** Four report-only panels the archive now justifies, beside the three already filed: (i) **chalk anchor** -- per entry, the within-pool percentile of its highest-owned player against the field's distribution (top 1% sits at 0.518, Ben's deliveries at 0.366); (ii) **own-stack-vs-rostered-SP share** -- the share of delivered entries rostering a hitter against an own SP, which makes any relaxation of `--max-opposing-hitters-per-sp` visible (first-place +14.1 pp [+4.2, +26.4] for NOT doing it; the 09-12 run listed "zero opposing hitters across all 21" as a thing to act on, and the archive says leave it); (iii) **team footprint over all roles** (R343's report half if it has not landed); (iv) **Showdown split and captain quartile** (5-1 / 4-2 / 3-3 shares against the field's 38/38/23; captain-ownership quartile per entry). Plus the emit-schema readability fix on `ownership_pred_<tag>.json` that R344's first agentic run needed (`Name: None` at the top level, predictions nested under `features`), since if the prior file is hard to read under a clock, `qa_portfolio.py` is the only thing that can read it and nothing else can check its work.
 
 **The instruction, and its second half is the load-bearing one.** Ben, after the
@@ -6301,6 +6600,8 @@ session's own R348) and `solver_probe --date 2026-09-08` FITS at 32s against a
 
 ### R300. The two tests that would have caught the two worst recent classes, and the string pins standing in for behaviour on money-adjacent claims (P1, S) | new 2026-09-02, from the greenfield tenth edition (GF10-X1, X2, X3, X5); VERIFIED-read
 
+> **Rider 2026-10-02 (Session 144, Phase 3, the board rebuild).** four test-hygiene items of the R155 class, re-found by the 2026-10-02 sweep and unfiled until now: GF7-X6 / GF10-X5, live reference reads at `tests/test_core.py:12560` (the live `dk_contest_paid_places.json`) and `:19908` (an `.env`-gated skip that never runs in a clone); the R155 CLOSED stub's own remainder (two `test_core` tests skip on the unstaged 2026-08-16 salary file); ed6 F-X12 (`VendoredPylibsTests` asserts on the LAST `subprocess.run` call and holds by fixture accident) and F-X13 (the vendored-or-guarded AST walker is loose three ways). All (d)-class; XS-S each.
+
 > **Rider 2026-10-02 (Session 144).** The independent review's §1 triage placed three Windows-only test failures here (MinerMoneyHonesty's `data/deliveries` substring, ReplaySlate's float demonstration, ClassicBaselineFirst's staged feed). They are filed as R478(b) (Session 146), beside the ten host fixtures of the same class, so that one chunk turns the Windows gate green; nothing is added to this entry.
 
 **2026-09-02 rider (DEV, shipping R292): (b) SHIPPED.** Two tests in a new `PreflightWallClockTests` build a fixture whose game time is `datetime.now() ± 1h` AT TEST TIME and run the real clock path with no `--as-of` at all, asserting exit 0 and exit 2; a second raw runner (`_run_preflight_argv`) exists because the pinning `run_preflight` helper can never be a caller of that branch. With (a) already shipped under R291, this entry now covers **(c) and (d) only**.
@@ -6636,7 +6937,9 @@ together.
   it. R126's game-split histogram is the check that it happened; R140's
   per-family profiles sharpen the target where they exist.
 - **Rides:** any session already touching SKILL.md — R131(c)(d) is the named
-  carrier. Never instead of a tier item. Genuine-miss install path still has no headroom check or reclaim (P2, M) | new 2026-08-01, (a) shipped 2026-08-04 — see CHANGELOG for the four incidents and full detail
+  carrier. Never instead of a tier item.
+
+### R42(b). Genuine-miss install path still has no headroom check or reclaim (P2, M) | new 2026-08-01, (a) shipped 2026-08-04 — see CHANGELOG for the four incidents and full detail
 
 **Note 2026-08-16 (DEV), the working remedy, from BUILD's 2026-08-14 fragment (merged late; this board had recorded it as merged on 08-14 and it was not):** a live Cowork build hit `[Errno 28] No space left on device` installing scipy and the fix is now known and cheap, which changes this item from "design a headroom check" to "write down what already works." The root filesystem is a DIFFERENT DEVICE from the one that filled, and it has room: `pip install --target /tmp/pylibs` with `TMPDIR=/var/tmp`, then `export PYTHONPATH=/tmp/pylibs`, took 19 seconds and carried across every later bash call in the session. Two things this adds to the entry as filed. The Errno 28 text names `/sessions/<session>/.local`, a directory holding 288K, so the message points at the wrong place and a session reading it hunts for space in a directory that is not the problem — the shortfall this entry asks to be "named" has to name the DEVICE, not the path pip mentions. And `env_probe.py`'s ask sharpens: not just "check headroom" but "pick a writable device that has room and print the exact `PYTHONPATH` export," because printing a runnable line is the difference between a diagnosis and a fix. The SKILL.md half is a copy-paste fallback block next to the preflight. This does not by itself pull the item out of Tier 6 — the bar there is a named measurement — but it does mean the M sizing is now wrong: the remedy above is S and most of it is documentation.
 
@@ -6778,6 +7081,8 @@ ever reads a portfolio control, `test_it_touches_no_portfolio_control` fails in
 the same run, so the clause cannot quietly outlive the property it rests on.
 
 ### R76. Doc-truth batch: the strategy authority and the pinned references have drifted from the shipped tree (P2, S) | audit 2026-08-04, verified in tree
+
+> **Rider 2026-10-02 (Session 144, Phase 3, the board rebuild).** the 2026-10-02 sweep's doc-truth list, seven sentences asserting work that already landed or a fact the premise checks corrected: `MLB_Classic.md:91` (F-4 'until then a build is deadline-aware only with --deliver-by'; Session 15 landed 2026-09-28), `:244` (the 1840_3g seeded ninth was picked by the PLATOON REFERENCE, not by APPG; see R482), `:264` (bank size 'UNMEASURED'; R374 measured it 2026-09-21); `skills/generate-lineups/SKILL.md:351` (`read_it` 'Mixed until R388 splits it'; Session 05 landed 2026-09-23); `docs/production_runbook.md:7-10` (two R338 defects, both fixed in R338's second commit); `docs/hosts.md:45` (the odds-key remedy; the key path is deprecated by R402); `skills/generate-lineups/references/adversarial_qa_brief.md:55` (credits the emit-schema fix to R276, whose body never mentions it). `CLAUDE.md:39`'s 'autobuild pre-R386' sentence retires with R481, not here.
 
 - **ed6 rider (2026-08-22, re-verified at ec832cf), and a re-price:** (c) is
   the one instance in this batch that causes a wrong ACTION, not a wrong
@@ -7510,6 +7815,95 @@ for a Classic slate whose bank does not fit the device VM, with the
 
 ## Workstream 7 — Archival and ledger tooling
 
+### R485. The nine curated satellite archetype rows and the four cautions for writing them, Ben's 2026-08-09 decision, carried verbatim from the retained inbox fragment (ARCHIVE; P2, XS data) | new 2026-10-02 (Session 144): the fragment `docs/backlog_inbox/2026-08-09_DEV_ben-decision-curated-satellite-archetypes.md` was the SOLE CARRIER of the table and was consumed by the board rebuild, so its text moves here unchanged | Roadmap: Session 88
+
+- **What.** ARCHIVE writes the nine ledger-3.14 satellite families into `data/reference/dk_contest_archetypes.csv` with observed `ticket_count`, following the four cautions below; the row set then grades per family. The fragment text follows verbatim.
+
+> **Fragment text (moved here 2026-10-02; the RETAINED banner is historical).**
+
+> > **RETAINED — DO NOT DELETE ON AN INBOX SWEEP.** This fragment is not
+> > unconsumed; it is KEPT by design, and has been through three inbox passes
+> > (2026-08-16, 2026-08-27, 2026-08-29). `docs/backlog.md` names it as the SOLE
+> > CARRIER of the nine-family table below and of the four cautions in "Four
+> > things to get right on the way in," which exist nowhere else in the project.
+> > The inbox contract says the owning role merges and deletes consumed
+> > fragments; this one is exempt until ARCHIVE writes the rows into
+> > `data/reference/dk_contest_archetypes.csv` (Tier 4, R1c-tail) and the
+> > cautions land with them. Referenced from `docs/backlog.md` at R1c-tail,
+> > R10's step 1, R40, and R196(a).
+>
+> # Ben's dated decision, 2026-08-09: add the nine ledger-3.14 satellite families to the curated archetypes table
+>
+> **For ARCHIVE to execute.** Filed by DEV because the decision came in a DEV
+> session; `data/reference/dk_contest_archetypes.csv` is ARCHIVE's write surface,
+> not DEV's, so nothing here has been written.
+>
+> ## The decision
+>
+> Ben has decided, on 2026-08-09, that the nine recurring satellite/qualifier
+> families in ledger section 3.14 go into the curated archetypes table with the
+> `ticket_count` values actually observed in the entry-history export.
+>
+> This is the input R1(c) has been waiting on and the one ARCHIVE deliberately
+> declined to write on 2026-07-29. That refusal was correct at the time and the
+> reasoning still holds: a curated `ticket_count` reaches `resolve_contest_shape`
+> immediately, where 1 routes to `wta_ticket_satellite` and anything else takes
+> the ticket-line blend, which reranks lineups on contests entered that night.
+> That makes it a strategy change rather than an archival write, and it needed
+> Ben's dated decision. It now has one.
+>
+> ## The table, from ledger 3.14
+>
+> For a satellite, the observed `Places_Paid` IS the ticket count awarded.
+>
+> | target family (name substring) | sport | entries | fees | observed ticket_count | median field |
+> |---|---|---|---|---|---|
+> | `Pocket Cup` MEGA Qualifier | MLB | 2,915 | $29.15 | 1 (2,475), 5 (200), 10 (240) | 237 |
+> | `Knuckleball` (Midseason Best Ball $5) | MLB | 207 | $36.45 | 1 | 23 |
+> | `FBWC` Qualifier | MLB | 193 | $19.30 | 1 | 111 |
+> | `Best Ball $25 Millionaire` | MLB / GOLF | 380 / 115 | $65.45 / $31.50 | 1 (both), 5 (1 GOLF) | 149 / 118 |
+> | `Relay Throw` | MLB | 215 | $30.20 | 1 | 166 |
+> | `Fantasy Football Millionaire` | MLB | 87 | $15.60 | 1 (60), 2 (19), 5 (8) | 59 |
+> | `Golf Millionaire` | GOLF / MLB | 167 / 168 | $45.50 / $51.90 | 1, 4 (1 GOLF) | 118 |
+> | `Sand Trap` (PGA $25) | GOLF | 86 | $16.70 | 1 | 118 |
+> | `FGWC` Qualifier | GOLF | 8 | $3.00 | 1 | 63 |
+>
+> ## Four things to get right on the way in
+>
+> 1. **Three families are not single-valued and must not be written as if they
+>    were.** `Pocket Cup` has been observed at 1, 5 and 10; `Fantasy Football
+>    Millionaire` at 1, 2 and 5; `Best Ball $25 Millionaire` and `Golf
+>    Millionaire` each carry a second value on one GOLF entry. A single curated
+>    `ticket_count` for those families asserts something the history contradicts
+>    on hundreds of entries. Whatever encoding is chosen, the multi-valued case
+>    should resolve to the modal value with the variance recorded, or stay
+>    UNRESOLVED and let the contest page settle it — not silently pick one.
+> 2. **The `SUPERSat` correction from 3.14 applies to the matching.** A
+>    `satellite` substring filter misses `SUPERSat` and undercounts the block by
+>    17 entries. Patterns written from this table inherit that gap unless the
+>    matcher is checked against it.
+> 3. **Check the competing-pattern behaviour before adding nine patterns at
+>    once.** `posture_by_contest` already records `matched_pattern` and
+>    `competing_patterns`, so a new pattern that shadows an existing one is
+>    observable; it is much cheaper to see that on the bench than at T-10.
+> 4. **Two GOLF-only families are in the table** (`Sand Trap`, `FGWC`). They are
+>    fine to curate as observed history, but they are not this engine's domain and
+>    should not be quoted in an MLB decision.
+>
+> ## Why this matters now, and what it unblocks
+>
+> R40 (one-seat satellite profile routing) is currently undecidable partly because
+> `paid_places` is null for both of the rank-1 satellite contests it traced — in
+> the mined records and in `contest_library` alike. This write is what gives that
+> routing key real values. R40's own routing decision stays Ben's and stays
+> separate; do not treat this fragment as authorising it.
+>
+> ## Labels
+>
+> Observed history from a completed export. The `ticket_count` values are observed
+> `Places_Paid`, not inferred. Nothing here is a win rate, a cash rate, an ROI
+> figure, or a probability claim, and nothing auto-applies.
+
 ### R225. CLOSED 2026-09-30 -- SHIPPED (roadmap Session 42), entry migrated to CHANGELOG.md
 
 One identity function, `field_miner.lineup_identity_groups` (Showdown: captain plus person set; Classic: `players_norm`), counts duplication at all three miner sites (`mine_contest` strict, `summarize_own_entries` and `update_registry` non-strict); the referee site landed in R444 and keeps its own implementation of the same key. An archived Showdown file with no `captain_norm` (91 of 249) falls back to the person set and says so (`duplication_basis`, `dup_person_set_contests`); 83 pre-R338 stored `duplication` blocks stay captain-blind until ARCHIVE re-mines them (fragment `2026-09-30_DEV_miner-truth-remine-needs`). Corrections to the filed text: the no-re-mine claim holds for 158 of 249 Showdown JSONs only; `summarize_own_entries` read 50 copies where the captain-aware answer is 2 (mined_194237511). R10's Showdown cells are unblocked on captain-aware counts. Gate: PASS  v2.26.0  45 modules  3069 tests  5 skipped (full line in CHANGELOG.md, 2026-09-30)
@@ -7626,6 +8020,8 @@ item's effective priority without changing its label.
 - **Rider added 2026-08-23, from ARCHIVE fragment `2026-08-22_ARCHIVE_extract-zips-never-moves-r44-evidence.md`.** The missing call is now named rather than inferred: `grep -n "processed_zips\|shutil.move\|os.replace\|rename" tools/extract_inbox_zips.py` returns NOTHING. The tool extracts and returns; it has never relocated a zip. `data/standings/processed_zips/` holds 127 files and every one was moved there **by hand**, which means the hand-move IS this item's mechanism — the loop is not "the mine forgets the zip", it is "nothing in the tooling has ever moved one." The 08-22 pass added 60 more hand-moves, the 128th through 187th in the archive's history. Two constraints on the fix, both already recorded elsewhere: on this mount `rm` is refused and `mv` works (R109), so the fix must MOVE to `processed_zips/` and can never delete; and the cheap independent second guard is to skip a zip whose contest id already has a `data/archive/*/mined_<id>.json`, which is the same exclusion `awaiting_standings.py` already computes.
 
 ### R196, remainder. The archetype table cannot express "single entry, broad curve": the Solo Shot row is WRITTEN and posture inference still needs a hand override (P2, XS-S) | **RETITLED 2026-08-30** when the row half closed after six sightings; the rows exist, the tax does not go away, and this entry's own Fix line was wrong. Original title: "`dk_contest_archetypes.csv` has no Solo Shot row" | new 2026-08-23, merged from THREE BUILD fragments (`2026-08-19_BUILD_solo-shot-archetype.md`, `..._-recurred.md`, `2026-08-22_BUILD_solo-shot-archetype-3rd-occurrence.md`); THREE occurrences in four days. **FOURTH occurrence 2026-08-27, from `2026-08-25_BUILD_posture-vocab-and-solo-shot.md` §2:** "MLB $100 Solo Shot (Turbo)" matched no row and name-inferred to `large_gpp` — wrong for a single-entry contest — until `--postures <id>=single_entry` was passed by hand; and a FIFTH sighting the same week, "MLB Showdown $1K Solo Shot" absent on 1905_1g_sd (the R238 fragment). The family recurs on both formats; the Tier 4 decision this waits on is unchanged.
+
+> **Rider 2026-10-02 (Session 144, Phase 3, the board rebuild).** premise re-verified at HEAD e4588bc, PARTLY: the precedence is as stated (`execution_pipeline.py:1448`, `se_gpp` OR `max_entries == 1`, is checked before `:1454` `broad_micro_gpp`); 'nothing reads `payout_shape_default`' is STALE (R446 reads it); 'routes to WTA construction' is unscoped (the mode follows the build's dominant shape, `:7111`, and flips on 1 of 12 Classic Solo Shot deliveries; on Showdown the posture is a label only, `build_slate.py:5698`); '[20 Entry Max]' is 1 of 18 titles. The XS edit is a CHOICE, which is D-12: moved above `:1448` the family gives `large_gpp`; exempted from `:1448` it gives `small_gpp`, the posture the hand overrides have been passing. The archive (n=11, 5-2-1 +2.0) files Solo Shot with the WTA family by its winners; the lineup effect is unmeasured (one rebuild moved the apex 796.47 -> 796.56 at 13 candidates). The `Triple Up [Top 9 Win $3]` archetype row (`ledger/inbox/2026-09-30_DEV_showdown-triple-up-archetype-row.md`) rides here. Roadmap: Session 148 (the routing chunk), Needs D-12.
 
 - **Rider 2026-09-29 (Session 123).** DK titles the Solo Shot family `[20 Entry Max]` (20 archived contests, `MLB $1.5K Solo Shot [20 Entry Max]`) while the `Solo Shot` row carries `inferred_max_entries` 1. R446 parses the title cap and, by design, fills only a blank, so `infer_contest_archetype` still returns max 1 (and `title_max_entries` 20, `max_entries_source: "archetype"`); posture is `single_entry` either way (`normalize_posture` checks `se_gpp` before any cap). What is undecided and is Ben's: which of the two facts `ContestCard.max_entries` should carry for that family, since overriding moves it from 1 to 20 on 20 real contests.
 
