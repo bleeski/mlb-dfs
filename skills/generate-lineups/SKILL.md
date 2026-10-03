@@ -1495,6 +1495,14 @@ when that covers every side; the result names both (`lock_source`,
 `confirmation_source`). A slate DK has only partly posted confirms nobody, and
 the tool says which side. `--dead-from-feed` reads the same DK orders.
 
+**`repair_entry.py` records its own delivery (R430).** An `--out` (or the default
+`<entries>_repaired.csv`) under `outputs/<date>/` goes through `upload_manifest.deliver`: a
+run-less row with `repair_of` (the parent's sha256 and run), review-grade, superseding the
+parent's live row, so the preflight no longer hard-fails it. Exit 5 means written but NOT
+recorded (the file keeps its `DO_NOT_UPLOAD_` name; the error names it). Never record a repair
+by hand under the parent's `run_id`: `record_delivery` now refuses a second record for a run
+with other bytes, because the record is keyed by the run.
+
 **Which tool owns the entry: `late_swap.py` while it is mostly OPEN,
 `tools/repair_entry.py` once it is mostly LOCKED, and the boundary is
 `open <= pinned`.** The repair tool prints that boundary in its own refusal

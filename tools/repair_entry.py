@@ -70,10 +70,27 @@ Usage:
         [--as-of 2026-08-29T19:40:00Z] \\
         [--mode auto|repair|defer] [--out <path>] [--json]
 
+R430: A REPAIR IS A DELIVERY, SO IT IS RECORDED. An `--out` (or the default
+`<entries>_repaired.csv`) under `outputs/<date>/` goes through
+`upload_manifest.deliver`, the one front door: the file is written at a
+`DO_NOT_UPLOAD_` name, a RUN-LESS manifest row naming the parent
+(`repair_of`: the parent's sha256 and run) is written, and only then is it
+promoted. Before R430 the tool wrote the file and recorded nothing, the
+preflight hard-failed it ("no manifest record"), and the session that needed
+exit 0 under the lock clock recorded it by hand with the PARENT's `run_id`,
+which overwrote the parent's committed delivery record. The row inherits the
+parent's contest, slate tag, lineage and projection tier and supersedes the
+parent's live row in that lineage, because the repair IS the file Ben uploads
+(R272). A parent with no manifest row still gets a record, with a warning:
+a hand repair of an unrecorded file needs a door too. An `--out` outside
+`outputs/` is an ad hoc file and records nothing, as before.
+
 Exit codes: 0 a repair was found for every dead slot (or there was nothing to
 repair); 2 at least one dead slot has NO legal replacement; 3 IO/parse error;
-4 clean and nothing written because --dry-run. A refusal outranks the dry-run
-code -- 4 never means "there was a problem but I did not write."
+4 clean and nothing written because --dry-run; 5 the repair was written but
+could not be RECORDED, so the file keeps its `DO_NOT_UPLOAD_` name and nothing
+was promoted to `--out` (the error names both paths). A refusal outranks the
+dry-run code -- 4 never means "there was a problem but I did not write."
 """
 from __future__ import annotations
 
@@ -101,9 +118,9 @@ if str(REPO_ROOT) not in sys.path:
 # wrong; `preflight_upload` owns the DK file geometry and the slot-eligibility
 # rule, and `verify_export` owns the lock derivation.
 from preflight_upload import (  # noqa: E402
-    CLASSIC_SLOTS, SALARY_CAP, EntryRow, Report, load_entries, load_salary,
-    parse_as_of, person_key, resolve_locked_teams, slot_admits, _digits,
-    _int_or_none, _norm_name,
+    CLASSIC_SLOTS, SALARY_CAP, EntryRow, Report, is_delivered_file, load_entries,
+    load_salary, parse_as_of, person_key, resolve_locked_teams, slot_admits,
+    _digits, _int_or_none, _norm_name,
 )
 
 PITCHER_SLOTS = {"P", "SP", "RP"}
@@ -518,6 +535,85 @@ def write_entries(path: Path, header: Sequence[str], entries: Sequence[EntryRow]
             writer.writerow(row)
 
 
+def record_repair(out_path: Path, parent_path: Path, salary_path: Path,
+                  header: Sequence[str], entries: Sequence[EntryRow],
+                  trailing: Sequence[Sequence[str]],
+                  result: Mapping[str, Any]) -> Dict[str, Any]:
+    """R430. Write the repair through `upload_manifest.deliver` and record it as a
+    run-less delivery whose `repair_of` names the parent's bytes and run.
+
+    The parent is found by the sha256 of ``parent_path`` in ``outputs/<date>/``'s
+    manifest, the same bytes-first resolution late swap uses
+    (`recorded_delivery_row`). The row inherits the parent's contest, slate tag,
+    lineage, tier and strategy state, so it supersedes the parent's live row in
+    that lineage. Two calls are the session's and are recorded here, not asked
+    about: an unrecorded parent still gets a record (with `run_id` None, and a
+    warning), and a parent whose own row is already superseded still gets the
+    repair recorded (with a warning that it supersedes whatever is live now).
+
+    Returns ``{"recorded", "path", "error", "warnings", "repair_of"}``; never
+    raises. ``path`` is where the file actually is: ``out_path`` once promoted,
+    the `DO_NOT_UPLOAD_` provisional when the record failed.
+    """
+    from mlb_engine.entries import upload_manifest as um
+    out: Dict[str, Any] = {"recorded": False, "path": str(out_path), "error": "",
+                           "warnings": [], "repair_of": None}
+    try:
+        date = out_path.parent.name
+        parent_sha = um.sha256_file(parent_path)
+        parent = um.recorded_delivery_row(date, parent_sha)
+        meta: Dict[str, Any]
+        if parent is None:
+            from mlb_engine.pipeline.execution_pipeline import _slate_tag
+            out["warnings"].append(
+                f"the parent {parent_path.name} (sha256 {parent_sha[:12]}) has no "
+                f"manifest row in outputs/{date}/: recording this repair with "
+                f"repair_of naming the parent's bytes and no run. Nothing "
+                f"supersedes the parent.")
+            meta = {"contest_type": "classic", "slate_tag": _slate_tag(salary_path),
+                    "contest_ids": sorted({e.contest_id for e in entries if e.contest_id}),
+                    "contest_names": sorted({e.contest_name for e in entries
+                                             if e.contest_name}),
+                    "projection_tier": "unknown", "strategy_state": None,
+                    "lineage": ""}
+            repair_of = {"run_id": None, "sha256": parent_sha}
+        else:
+            if parent.get("status") == "superseded":
+                out["warnings"].append(
+                    f"the parent's row is already superseded "
+                    f"({parent.get('superseded_by')}): recording this repair "
+                    f"supersedes whatever is live for the slate now.")
+            meta = {"contest_type": parent.get("contest_type") or "classic",
+                    "slate_tag": parent.get("slate_tag") or "",
+                    "contest_ids": parent.get("contest_ids") or [],
+                    "contest_names": parent.get("contest_names") or [],
+                    "projection_tier": parent.get("projection_tier") or "unknown",
+                    "strategy_state": parent.get("strategy_state"),
+                    "lineage": um.row_lineage(parent)}
+            repair_of = {"run_id": parent.get("run_id"), "sha256": parent_sha}
+        out["repair_of"] = repair_of
+        changes = "; ".join(
+            f"entry {r['entry_id']} {r['slot']}: {r['out_name']} -> {r['in_name']}"
+            for r in result.get("repairs") or [])
+        delivery = um.deliver(
+            date=date, dest=out_path, salary_csv=salary_path,
+            write=lambda provisional: write_entries(
+                Path(provisional), list(header), list(entries), list(trailing)),
+            run_id=None, status="candidate", certification="review_grade",
+            entries=len(entries), repair_of=repair_of,
+            notes=(f"R272 repair of {parent_sha[:12]} (run "
+                   f"{repair_of['run_id'] or 'none recorded'}): "
+                   f"{changes or 'no slot changed'}, via tools/repair_entry.py. "
+                   f"Review-grade, not certified."),
+            **meta)
+        out["recorded"] = bool(delivery.get("recorded"))
+        out["path"] = delivery.get("path") or out["path"]
+        out["error"] = delivery.get("error") or ""
+    except Exception as exc:  # noqa: BLE001 - the caller reports it; the lock clock is running
+        out["error"] = f"{type(exc).__name__}: {exc}"
+    return out
+
+
 def _load_json(path: Optional[Path]) -> Optional[Dict[str, Any]]:
     if path is None:
         return None
@@ -716,8 +812,27 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     out_path = args.out or args.entries.with_name(
         args.entries.stem + "_repaired.csv")
+    recorded_error = ""
     if args.dry_run:
         result["written"] = None
+    elif is_delivered_file(out_path) and out_path.parent.name[:2] == "20":
+        # R430. A file under outputs/<date>/ is a delivery and is recorded; a
+        # file elsewhere is ad hoc and, as before, is not.
+        recording = record_repair(out_path, args.entries, args.salary, header,
+                                  entries, trailing, result)
+        result["written"] = recording["path"]
+        result["recorded"] = {k: recording[k] for k in
+                              ("recorded", "repair_of", "warnings", "error")}
+        for warning in recording["warnings"]:
+            print(f"repair_entry: WARN {warning}", file=sys.stderr)
+        if not recording["recorded"]:
+            recorded_error = recording["error"] or "no reason was reported"
+            # On stderr whatever the output mode: a --json caller reads the
+            # exit code (5) and the payload, and still needs the reason.
+            print(f"repair_entry: REPAIRED BUT NOT RECORDED: {recorded_error}. The "
+                  f"file is at {result['written']}; it was NOT promoted to "
+                  f"{out_path.name} and no manifest row names it, so the preflight "
+                  f"will refuse it until it is recorded.", file=sys.stderr)
     else:
         write_entries(out_path, header, entries, trailing)
         result["written"] = str(out_path)
@@ -741,8 +856,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                   f"({d['open_slots']} open / {d['pinned_slots']} pinned)")
         print(f"lock: {result['lock_note']} [{result['lock_source']}]")
         print(f"confirmation: {result['confirmation_source']}")
-        if result["written"]:
+        if result["written"] and not recorded_error:
             print(f"wrote {result['written']}")
+            if isinstance(result.get("recorded"), Mapping):
+                held = (result["recorded"]["repair_of"] or {}).get("sha256", "")
+                print(f"recorded: run-less delivery, repair_of {held[:12]}")
             print("REVIEW-GRADE, not certified. Run the preflight before upload:")
             print(f"  python tools/preflight_upload.py --entries {result['written']} "
                   f"--salary {args.salary}")
@@ -754,6 +872,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     # in a new tool. 4 means clean-and-unwritten, never merely unwritten.
     if result["refusals"]:
         return 2
+    if recorded_error:
+        return 5
     return 4 if args.dry_run else 0
 
 

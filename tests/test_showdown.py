@@ -207,6 +207,82 @@ class ShowdownExportTests(unittest.TestCase):
             # and nothing was left at the delivered name
             self.assertFalse(out.exists())
 
+    # R451. The staging name `promote=False` hands back was `DO_NOT_UPLOAD_<target.name>`:
+    # one name per target, so two same-tag builds shared it.
+    _TEMPLATE = "\n".join([
+        "Entry ID,Contest Name,Contest ID,Entry Fee,CPT,UTIL,UTIL,UTIL,UTIL,UTIL,,Instructions",
+        "111,Test SD,900,$1,,,,,,,,1. blank reservation"]) + "\n"
+
+    def test_two_stagings_for_one_target_never_share_a_name(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tpl = Path(tmp) / "template.csv"
+            tpl.write_text(self._TEMPLATE, encoding="utf-8")
+            target = Path(tmp) / "DKEntries_showdown_1830_1g_sd.csv"
+            ids = {"A": ["7", "8", "9", "10", "11", "12"],
+                   "B": ["12", "11", "10", "9", "8", "7"]}
+            staged = {}
+            for key, roster in ids.items():
+                res = sd.write_showdown_entries(
+                    tpl, target, [{"entry_id": "111", "roster_ids": roster}], promote=False)
+                self.assertTrue(res["passed"], res["errors"])
+                self.assertFalse(res["promoted"])
+                staged[key] = Path(res["candidate_path"])
+            self.assertNotEqual(staged["A"], staged["B"])
+            for key, path in staged.items():
+                self.assertTrue(path.name.startswith("DO_NOT_UPLOAD_DKEntries_showdown_1830_1g_sd."))
+                self.assertEqual(path.suffix, ".csv")
+                reparsed = {r["entry_id"]: r for r in sd.read_showdown_reserved_rows(path)["reserved"]}
+                self.assertEqual(reparsed["111"]["cells"], ids[key],
+                                 "the second write landed on the first's bytes")
+            self.assertFalse(target.exists(), "promote=False must never touch the delivered name")
+
+    def test_promote_still_lands_on_the_target_and_leaves_no_staging_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tpl = Path(tmp) / "template.csv"
+            tpl.write_text(self._TEMPLATE, encoding="utf-8")
+            target = Path(tmp) / "candidate.csv"
+            res = sd.write_showdown_entries(
+                tpl, target, [{"entry_id": "111", "roster_ids": list("123456")}])
+            self.assertTrue(res["passed"], res["errors"])
+            self.assertEqual(res["candidate_path"], str(target))
+            self.assertTrue(target.is_file())
+            self.assertEqual(sorted(p.name for p in Path(tmp).glob("DO_NOT_UPLOAD_*")), [])
+
+    def test_a_staged_file_that_fails_its_readback_is_removed(self):
+        # The unique name would otherwise leave one orphan per failed attempt.
+        with tempfile.TemporaryDirectory() as tmp:
+            tpl = Path(tmp) / "template.csv"
+            tpl.write_text(self._TEMPLATE, encoding="utf-8")
+            target = Path(tmp) / "candidate.csv"
+            with unittest.mock.patch.object(
+                    sd, "read_showdown_reserved_rows",
+                    side_effect=[sd.read_showdown_reserved_rows(tpl), ValueError("torn write")]):
+                res = sd.write_showdown_entries(
+                    tpl, target, [{"entry_id": "111", "roster_ids": list("123456")}],
+                    promote=False)
+            self.assertFalse(res["passed"])
+            self.assertIn("did not read back", " ".join(res["errors"]))
+            self.assertEqual(sorted(p.name for p in Path(tmp).glob("DO_NOT_UPLOAD_*")), [])
+            self.assertFalse(target.exists())
+
+    def test_a_staged_file_whose_rows_do_not_match_the_assignment_is_removed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tpl = Path(tmp) / "template.csv"
+            tpl.write_text(self._TEMPLATE, encoding="utf-8")
+            target = Path(tmp) / "candidate.csv"
+            real = sd.read_showdown_reserved_rows(tpl)
+            torn = {"reserved": [{"entry_id": "111", "cells": list("999999"),
+                                  "is_blank": False, "is_complete": True}]}
+            with unittest.mock.patch.object(
+                    sd, "read_showdown_reserved_rows", side_effect=[real, torn]):
+                res = sd.write_showdown_entries(
+                    tpl, target, [{"entry_id": "111", "roster_ids": list("123456")}],
+                    promote=False)
+            self.assertFalse(res["passed"])
+            self.assertIn("does not match", " ".join(res["errors"]))
+            self.assertIsNone(res["candidate_path"])
+            self.assertEqual(sorted(p.name for p in Path(tmp).glob("DO_NOT_UPLOAD_*")), [])
+
     def test_single_team_pool_is_refused_at_the_melt(self):
         """F6(a): the both-teams check used to read its teams out of the pool."""
         import csv as _csv

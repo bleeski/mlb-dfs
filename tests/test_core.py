@@ -36521,9 +36521,13 @@ class ReviewGradeExportTests(unittest.TestCase):
     def test_the_manifest_refuses_an_uncertified_row_over_a_passing_one(self):
         _salary, certified = self._build()
         date = Path(certified["delivered_path"]).parent.name
+        # R451: a row needs bytes to hash, so the fixture writes the file; the
+        # path used to be a missing one, which recorded `sha256: None`.
+        unwritten = self.root / "x.csv"
+        write_entries(unwritten)
         with self.assertRaisesRegex(ValueError, "stays the delivery"):
             self.um.record_delivery(
-                date=date, delivered_file=self.root / "x.csv", contest_type="classic",
+                date=date, delivered_file=unwritten, contest_type="classic",
                 slate_tag="1905_2g", certification="review_grade_uncertified")
         # A late swap refines the file Ben entered, which may be an UNCERTIFIED
         # one a later certified build superseded: its row records, and is live.

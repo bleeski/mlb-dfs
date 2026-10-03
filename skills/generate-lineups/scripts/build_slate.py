@@ -6301,7 +6301,7 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
     # name write_showdown_entries already uses, and the name is promoted only once
     # a row names it. Everything downstream reads `delivered`, never `dest`.
     from mlb_engine.entries.upload_manifest import (
-        record_delivery, stage_salary_for_delivery, unrecorded_name,
+        record_delivery, stage_salary_for_delivery,
     )
     write_report = sd.write_showdown_entries(str(entries), str(dest), assignments,
                                              promote=False)
@@ -6313,7 +6313,9 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         showdown_refusal_carries_baseline(payload, "the Showdown build's export failed")
         print(json.dumps(payload, indent=1))
         return 3, {}
-    provisional = unrecorded_name(dest)
+    # R451. The staging path the writer MINTED (unique per write), never
+    # `unrecorded_name(dest)`, which names a file the writer no longer makes.
+    provisional = Path(write_report["candidate_path"])
     delivered = provisional
     manifest_error = ""
     try:
