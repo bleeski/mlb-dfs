@@ -1,0 +1,164 @@
+{
+ "code": {
+  "contest_allocator": "v1.12",
+  "execution_pipeline": "v1.17",
+  "git_dirty": true,
+  "git_sha": "879a07450b4391a6d83d153768d89aed8660d7df"
+ },
+ "controls": {
+  "max_cpt_exposure_pct": 0.25,
+  "max_cpt_per_contest": 2,
+  "max_player_exposure_pct": 0.5,
+  "max_shared_players": 4
+ },
+ "date": "2026-10-03",
+ "egress": "egress: statsapi 200, odds 401, savant 200, mlb-lineups 200, fangraphs 200 (curl), open-meteo 200",
+ "egress_source": "session_start 2026-10-03T21:32:46+00:00",
+ "entries": [
+  {
+   "contest_id": "196293782",
+   "contest_name": "MLB Showdown $400 Quarter Jukebox [Just $0.25!] (NYY @ TB)",
+   "entry_fee": 0.25,
+   "entry_id": "5280163615",
+   "filled": true,
+   "roster_ids": [
+    "44364088",
+    "44364003",
+    "44364007",
+    "44364008",
+    "44364014",
+    "44364015"
+   ]
+  },
+  {
+   "contest_id": "196293782",
+   "contest_name": "MLB Showdown $400 Quarter Jukebox [Just $0.25!] (NYY @ TB)",
+   "entry_fee": 0.25,
+   "entry_id": "5280163627",
+   "filled": true,
+   "roster_ids": [
+    "44364089",
+    "44363999",
+    "44364005",
+    "44364008",
+    "44364015",
+    "44364022"
+   ]
+  },
+  {
+   "contest_id": "196294345",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (NYY @ TB)",
+   "entry_fee": 0.1,
+   "entry_id": "5280167978",
+   "filled": true,
+   "roster_ids": [
+    "44364086",
+    "44364003",
+    "44364005",
+    "44364008",
+    "44364015",
+    "44364027"
+   ]
+  },
+  {
+   "contest_id": "196294345",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (NYY @ TB)",
+   "entry_fee": 0.1,
+   "entry_id": "5280167996",
+   "filled": true,
+   "roster_ids": [
+    "44364087",
+    "44363998",
+    "44364001",
+    "44364018",
+    "44364022",
+    "44364027"
+   ]
+  },
+  {
+   "contest_id": "196294350",
+   "contest_name": "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (NYY @ TB)",
+   "entry_fee": 1.0,
+   "entry_id": "5280163909",
+   "filled": true,
+   "roster_ids": [
+    "44364091",
+    "44363998",
+    "44364000",
+    "44364007",
+    "44364018",
+    "44364027"
+   ]
+  },
+  {
+   "contest_id": "196338564",
+   "contest_name": "MLB Showdown $100 Solo Shot (NYY @ TB)",
+   "entry_fee": 1.0,
+   "entry_id": "5280163883",
+   "filled": true,
+   "roster_ids": [
+    "44364093",
+    "44363999",
+    "44364001",
+    "44364002",
+    "44364018",
+    "44364022"
+   ]
+  }
+ ],
+ "entries_binding": {
+  "source": "outputs/2026-10-03/DO_NOT_UPLOAD_DKEntries_showdown_1830_1g_sd.csv",
+  "source_sha256": "cf21bca39e76bfe29208887e02bda00087d868a27fe0a6cd9587bef0ba18f9ec",
+  "status": "bound"
+ },
+ "host": {
+  "call_budget_s": 630.0,
+  "declared_ceiling_s": 900.0,
+  "host": "claude_code"
+ },
+ "kind": "delivery",
+ "labels": "deterministic review proxies and labeled priors only; never ROI, win rate, cash rate, or probability",
+ "manifest_row": {
+  "certification": "review_grade",
+  "contest_ids": [
+   "196293782",
+   "196294345",
+   "196294350",
+   "196338564"
+  ],
+  "contest_names": [
+   "MLB Showdown $100 Dime Time [Just $0.10!] (NYY @ TB)",
+   "MLB Showdown $100 Solo Shot (NYY @ TB)",
+   "MLB Showdown $400 Quarter Jukebox [Just $0.25!] (NYY @ TB)",
+   "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (NYY @ TB)"
+  ],
+  "contest_type": "showdown",
+  "delivered_file": "outputs/2026-10-03/DKEntries_showdown_1830_1g_sd.csv",
+  "entries": 6,
+  "notes": "Showdown ships review-grade; it does not pass the three certification gates. See CLAUDE.md.",
+  "projection_tier": "unknown",
+  "recorded_utc": "2026-10-03T21:38:37.599023+00:00",
+  "run_id": null,
+  "sha256": "cf21bca39e76bfe29208887e02bda00087d868a27fe0a6cd9587bef0ba18f9ec",
+  "slate_tag": "1830_1g_sd",
+  "status": "candidate",
+  "strategy_state": {
+   "counts": {},
+   "state": "unknown"
+  }
+ },
+ "recorded_utc": "2026-10-03T21:38:37.600502+00:00",
+ "relaxations": {
+  "both_relaxed": 0,
+  "captain_cap_relaxed": 0,
+  "captain_contest_cap_relaxed": 0,
+  "captain_lock_relaxed": 0,
+  "contest_cap_relaxed": 0,
+  "cpt_cap_relaxed": 0,
+  "min_per_team_relaxed": 0,
+  "overlap_relaxed": 0,
+  "player_relaxed": 0
+ },
+ "run": {},
+ "schema_version": 1
+}
