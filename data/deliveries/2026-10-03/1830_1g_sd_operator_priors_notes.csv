@@ -1,0 +1,21 @@
+Player_ID,Name,Team,Order,engine_Base,Base,why
+44364001,Ben Rice,NYY,1.0,9.722,9.722,engine prior x handedness-fix 1.0 x PA-risk 1.0
+44364005,Cody Bellinger,NYY,2.0,8.43,8.43,engine prior x handedness-fix 1.0 x PA-risk 1.0
+44364002,Luis Garcia Jr.,NYY,3.0,8.148,8.474,engine prior x handedness-fix 1.04 x PA-risk 1.0
+44364014,Spencer Jones,NYY,4.0,6.784,6.784,engine prior x handedness-fix 1.0 x PA-risk 1.0
+44364022,George Lombard Jr.,NYY,5.0,5.605,5.493,engine prior x handedness-fix 1.0 x PA-risk 0.98
+44364004,Jazz Chisholm Jr.,NYY,6.0,7.782,7.626,engine prior x handedness-fix 1.0 x PA-risk 0.98
+44364010,Trent Grisham,NYY,7.0,6.75,6.345,engine prior x handedness-fix 1.0 x PA-risk 0.94
+44364027,Austin Wells,NYY,8.0,4.563,4.289,engine prior x handedness-fix 1.0 x PA-risk 0.94
+44364028,Ryan McMahon,NYY,9.0,4.257,4.001,engine prior x handedness-fix 1.0 x PA-risk 0.94
+44363999,Gerrit Cole,NYY,,18.2,16.5,"SP: postseason hook; DK-scoring components, see notes"
+44364003,Yandy Diaz,TB,1.0,9.058,8.515,engine prior x handedness-fix 0.94 x PA-risk 1.0
+44364008,Jonathan Aranda,TB,2.0,8.464,8.464,engine prior x handedness-fix 1.0 x PA-risk 1.0
+44364000,Junior Caminero,TB,3.0,9.171,9.171,engine prior x handedness-fix 1.0 x PA-risk 1.0
+44364007,Liam Hicks,TB,4.0,8.201,8.201,engine prior x handedness-fix 1.0 x PA-risk 1.0
+44364015,Chandler Simpson,TB,5.0,7.248,7.103,engine prior x handedness-fix 1.0 x PA-risk 0.98
+44364009,Victor Mesa Jr.,TB,6.0,7.381,7.233,engine prior x handedness-fix 1.0 x PA-risk 0.98
+44364013,Jonny DeLuca,TB,7.0,6.056,5.813,engine prior x handedness-fix 1.0 x PA-risk 0.96
+44364018,Richie Palacios,TB,8.0,5.997,5.758,engine prior x handedness-fix 1.0 x PA-risk 0.96
+44364019,Taylor Walls,TB,9.0,5.391,5.175,engine prior x handedness-fix 1.0 x PA-risk 0.96
+44363998,Drew Rasmussen,TB,,20.0,19.8,"SP: postseason hook; DK-scoring components, see notes"
