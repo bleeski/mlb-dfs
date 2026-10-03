@@ -271,7 +271,9 @@ no byproducts (R28):
   front door. Fix with `python tools/env_probe.py --install`, never hand-pip.
 - **`past_slate_locks_passed`** — this slate's first lock is in the past, so no
   lineup built from it can be entered. Replays and evals pass
-  `--past-slate-replay`; a live build never needs it.
+  `--past-slate-replay`; a live build never needs it. A replay is a verification
+  run and never a delivery (R283): its export stays in `runs/`, Showdown's file stays
+  at a `DO_NOT_UPLOAD_..._replay` name, and nothing is mirrored, recorded or staged.
 - **`missing_inputs`** — the salary or entries path does not exist.
 - **`cli_value_invalid`** — a flag VALUE this build cannot use: an unknown
   posture or gate name, a `--declare-pitcher` with no id, a Classic

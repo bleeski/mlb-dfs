@@ -39264,6 +39264,178 @@ def _load_build_slate_module(name="_bs_thin_bank"):
     return module
 
 
+class ReplayDeliveryTests(unittest.TestCase):
+    """R283, roadmap Session 128 (a): a `--past-slate-replay` build is never recorded
+    and never promoted.
+
+    The 2026-08-16 guard appended `_replay` to the STAGED filenames and nothing
+    else, so the delivered mirror and the manifest were reachable from a replay:
+    on 2026-09-01 a replay of the played 1920_1g_sd Showdown slate overwrote
+    `outputs/2026-08-30/DKEntries_showdown_1920_1g_sd.csv` and superseded its
+    manifest row. Reproduced at 4821d93 through the real `main()` for both
+    contest types (the premise check's `repro.py`); the Showdown leg is in
+    `test_showdown.ReplayDeliveryTests`.
+
+    This is the Classic leg. A delivered file is PLANTED where the engine's own
+    mirror would write it (`DKEntries_<tag>.csv`) and a replay with perturbed
+    controls, so its bytes differ, is run through the real `main()`; the plant,
+    the manifest and the tracked records must be exactly as they were, and the
+    run itself must still have happened (its immutable `runs/` export exists).
+    """
+
+    _DATE = "2026-06-03"
+    _SALARY = REPO / "data" / "archive" / "2026-06-03" / "DKSalaries_2026-06-03.csv"
+    _ENTRIES = REPO / "data" / "archive" / "2026-06-03" / "DKEntries_2026-06-03.csv"
+
+    @classmethod
+    def setUpClass(cls):
+        cls._tmp = tempfile.TemporaryDirectory()
+        cls.base = Path(cls._tmp.name)
+        cls.reference = cls.base / "reference"
+        shutil.copytree(REPO / "data" / "reference", cls.reference)
+        # Writable copies: the tracked archive fixtures are READ-ONLY on some hosts.
+        cls.salary = cls.base / "DKSalaries.csv"
+        cls.entries = cls.base / "DKEntries.csv"
+        shutil.copyfile(cls._SALARY, cls.salary)
+        shutil.copyfile(cls._ENTRIES, cls.entries)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._tmp.cleanup()
+
+    @staticmethod
+    def _snapshot(root, date):
+        """Every byte a replay must leave alone: the delivered CSVs, the manifest
+        text, and the tracked delivery records."""
+        out = root / "outputs" / date
+        csvs = {p.name: p.read_bytes() for p in sorted(out.glob("*.csv"))} if out.exists() else {}
+        manifest = out / "upload_manifest.json"
+        records = root / "data" / "deliveries"
+        return {
+            "csv": csvs,
+            "manifest": manifest.read_text(encoding="utf-8") if manifest.exists() else None,
+            "records": {str(p.relative_to(records)): p.read_bytes()
+                        for p in sorted(records.rglob("*.json"))} if records.exists() else {},
+        }
+
+    def _plant(self, root):
+        """The played slate's delivery, recorded through the one front door under
+        the name Classic's mirror gives it."""
+        from mlb_engine.entries import upload_manifest as um
+        tag = epi._slate_tag(self.salary)
+        dest = root / "outputs" / self._DATE / f"DKEntries_{tag}.csv"
+        with unittest.mock.patch.object(um, "REPO_ROOT", root):
+            out = um.deliver(
+                date=self._DATE, dest=dest,
+                write=lambda p: Path(p).write_bytes(b"the delivered file Ben holds\n"),
+                contest_type="classic", slate_tag=tag, contest_ids=["1"], entries=1,
+                run_id="20260603T000000Z_planted", status="candidate",
+                certification="certified")
+        self.assertTrue(out["recorded"], out["error"])
+        return dest
+
+    def _replay(self, root, controls):
+        from mlb_engine.entries import upload_manifest as um
+        mod = ClassicBaselineFirstTests._module()
+        argv = ["build_slate.py", "--salary", str(self.salary), "--entries", str(self.entries),
+                "--date", self._DATE, "--past-slate-replay", "--ignore-pool-blockers",
+                "--assume-gates", "lineup_gate_passed", "--no-rotowire",
+                "--max-seconds", "300", "--reference-dir", str(self.reference),
+                "--controls-override", json.dumps(controls)]
+        for pid in ClassicBaselineFirstTests._DECLARED:
+            argv += ["--declare-pitcher", pid]
+
+        def no_feed(*_a, **_k):
+            raise OSError("no egress in a test")
+
+        env = {k: v for k, v in os.environ.items() if k != "THE_ODDS_API_KEY"}
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.ExitStack() as stack:
+            stack.enter_context(unittest.mock.patch.dict(os.environ, env, clear=True))
+            for target, name, value in ((mod, "REPO", root), (um, "REPO_ROOT", root),
+                                        (mod, "fetch_lineups", no_feed), (sys, "argv", argv)):
+                stack.enter_context(unittest.mock.patch.object(target, name, value))
+            stack.enter_context(contextlib.redirect_stdout(out))
+            stack.enter_context(contextlib.redirect_stderr(err))
+            code = mod._main_recording_refusals()
+        return code, out.getvalue(), err.getvalue()
+
+    def test_a_classic_replay_with_other_bytes_leaves_the_delivery_and_the_manifest_alone(self):
+        root = self.base / "classic"
+        root.mkdir()
+        planted = self._plant(root)
+        planted_bytes = planted.read_bytes()
+        before = self._snapshot(root, self._DATE)
+        # Caps opened as the existing Classic harness opens them, and one moved
+        # so the replay's bytes cannot equal anything already delivered.
+        controls = dict(ClassicBaselineFirstTests._OPEN, max_shared_players=7)
+        code, out, err = self._replay(root, controls)
+        self.assertEqual(code, 0, err[-1200:])
+        finals = sorted((root / "runs").glob("*/final/DKEntries.csv"))
+        self.assertTrue(finals, "the replay did not build: no immutable export under runs/")
+        replay_sha = hashlib.sha256(finals[-1].read_bytes()).hexdigest()
+        self.assertNotEqual(replay_sha, hashlib.sha256(planted_bytes).hexdigest(),
+                            "the replay's bytes must differ from the plant or the test is vacuous")
+        after = self._snapshot(root, self._DATE)
+        self.assertEqual(planted.read_bytes(), planted_bytes, "the delivered file was overwritten")
+        self.assertEqual(sorted(after["csv"]), sorted(before["csv"]),
+                         "a replay wrote a delivery file under outputs/")
+        self.assertEqual(after["csv"], before["csv"])
+        self.assertEqual(after["manifest"], before["manifest"],
+                         "a replay recorded or superseded a manifest row")
+        self.assertEqual(after["records"], before["records"],
+                         "a replay wrote a tracked delivery record")
+        # The presented file is the immutable run export, and it says it is a replay.
+        file_lines = [ln for ln in err.splitlines() if ln.startswith("FILE  ")]
+        self.assertTrue(file_lines, err[-800:])
+        for line in file_lines:
+            self.assertIn("REPLAY", line)
+            self.assertNotIn("outputs", line.split("sha256=")[0])
+        brief = json.loads(out[out.rfind("\n{") + 1:] if "\n{" in out else out[out.find("{"):])
+        self.assertEqual(Path(brief["delivered_path"]), finals[-1])
+        self.assertTrue(brief.get("replay"))
+
+    def test_the_two_mirrors_do_nothing_for_a_replay_result_and_say_so(self):
+        """`mirror_to_outputs` and `mirror_review_grade` are the only writers of a
+        Classic delivery; a replay result gets neither, under a key of its own
+        (`mirror_skipped` would read as a later failure, exit 7)."""
+        root = self.base / "mirrors"
+        root.mkdir()
+        run_export = root / "runs" / "r1" / "final" / "DKEntries.csv"
+        run_export.parent.mkdir(parents=True)
+        shutil.copyfile(self.entries, run_export)
+        from mlb_engine.entries import upload_manifest as um
+        with unittest.mock.patch.object(um, "REPO_ROOT", root):
+            certified = {"passed": True, "output_path": str(run_export), "run_id": "r1",
+                         "replay": True}
+            self.assertIsNone(epi.mirror_to_outputs(certified, self.salary))
+            self.assertTrue(certified["replay_not_mirrored"]["why"])
+            self.assertNotIn("mirror_skipped", certified)
+            self.assertNotIn("manifest_recorded", certified)
+            refused = {"passed": False, "run_id": "r1", "replay": True,
+                       "review_grade_export": {"path": str(run_export),
+                                               "failing_gates": ["portfolio_caps_passed"]}}
+            self.assertIsNone(epi.mirror_review_grade(refused, self.salary))
+            self.assertTrue(refused["review_grade_export"]["not_mirrored"]["why"])
+            self.assertNotIn("manifest_recorded", refused["review_grade_export"])
+        self.assertFalse((root / "outputs").exists(), "a mirror wrote under outputs/")
+
+    def test_a_result_without_the_replay_flag_still_mirrors(self):
+        """The negative control: the same certified result with no flag delivers."""
+        root = self.base / "mirrors_live"
+        root.mkdir()
+        run_export = root / "runs" / "r2" / "final" / "DKEntries.csv"
+        run_export.parent.mkdir(parents=True)
+        shutil.copyfile(self.entries, run_export)
+        from mlb_engine.entries import upload_manifest as um
+        with unittest.mock.patch.object(um, "REPO_ROOT", root):
+            certified = {"passed": True, "output_path": str(run_export), "run_id": "r2",
+                         "certification_label": "certified"}
+            delivered = epi.mirror_to_outputs(certified, self.salary)
+        self.assertTrue(delivered and Path(delivered).is_file(), delivered)
+        self.assertNotIn("replay_not_mirrored", certified)
+
+
 class ThinBankRecoveryTests(unittest.TestCase):
     """R390. A thin sliced bank that covers every reserved row produces a file
     inside the deadline instead of exit 10, and exit 10 stays the answer while a

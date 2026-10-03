@@ -10,6 +10,7 @@ from __future__ import annotations
 import ast
 import collections
 import contextlib
+import shutil
 import csv
 import hashlib
 import importlib.util
@@ -7020,6 +7021,113 @@ class _ShowdownExitDoorHarness:
         root = self.base / name
         root.mkdir()
         return root
+
+
+class ShowdownReplayDeliveryTests(_ShowdownExitDoorHarness, unittest.TestCase):
+    """R283, roadmap Session 128 (a), the Showdown leg (the Classic leg is
+    `test_core.ReplayDeliveryTests`). A `--past-slate-replay` build is never
+    recorded and never promoted.
+
+    Showdown is the half that lost a file: it is review-grade and promotes no run,
+    so no CSV exists under `runs/` behind the delivered mirror, and on 2026-09-01
+    a replay of the played 1920_1g_sd slate overwrote
+    `outputs/2026-08-30/DKEntries_showdown_1920_1g_sd.csv` and superseded its
+    manifest row. Reproduced at 4821d93 through the real `main()` (the premise
+    check's `repro.py`): leg A is the played slate's delivery through
+    `run_showdown`, leg B a replay with perturbed controls, so its bytes differ
+    and the test is not vacuous.
+    """
+
+    def _replay(self, root, extra=()):
+        from mlb_engine.entries import upload_manifest as um
+        mod = self._module()
+        sal, ent = root / "replay_DKSalaries.csv", root / "replay_DKEntries.csv"
+        shutil.copyfile(SAL, sal)
+        shutil.copyfile(ENT, ent)
+        argv = ["build_slate.py", "--salary", str(sal), "--entries", str(ent),
+                "--date", self._DATE, "--past-slate-replay", *extra]
+
+        def no_feed(*_a, **_k):
+            raise OSError("no egress in a test")
+
+        env = {k: v for k, v in os.environ.items() if k != "THE_ODDS_API_KEY"}
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.ExitStack() as stack:
+            stack.enter_context(unittest.mock.patch.dict(os.environ, env, clear=True))
+            for target, name, value in (
+                    (mod, "REPO", root), (um, "REPO_ROOT", root),
+                    (mod, "fetch_lineups", no_feed),
+                    (mod, "showdown_moneyline", lambda *_a, **_k: ({}, {}, {})),
+                    (sys, "argv", argv)):
+                stack.enter_context(unittest.mock.patch.object(target, name, value))
+            stack.enter_context(contextlib.redirect_stdout(out))
+            stack.enter_context(contextlib.redirect_stderr(err))
+            code = mod._main_recording_refusals()
+        return code, out.getvalue(), err.getvalue()
+
+    @staticmethod
+    def _snapshot(root, date):
+        out = Path(root) / "outputs" / date
+        manifest = out / "upload_manifest.json"
+        records = Path(root) / "data" / "deliveries"
+        return {
+            "csv": {p.name: p.read_bytes() for p in sorted(out.glob("*.csv"))},
+            "manifest": manifest.read_text(encoding="utf-8") if manifest.exists() else None,
+            "records": {str(p.relative_to(records)): p.read_bytes()
+                        for p in sorted(records.rglob("*.json"))} if records.exists() else {},
+        }
+
+    def test_a_showdown_replay_with_other_bytes_leaves_the_delivery_and_the_manifest_alone(self):
+        root = self._root()
+        played = self._build(root)
+        self.assertEqual(played.code, 0, played.err[-2000:])
+        delivered = [p for p in (root / "outputs" / self._DATE).glob("DKEntries_showdown*.csv")
+                     if "BASELINE" not in p.name]
+        self.assertEqual(len(delivered), 1, delivered)
+        before = self._snapshot(root, self._DATE)
+        code, out, err = self._replay(
+            root, ["--controls-override", json.dumps({"max_player_exposure_pct": 0.4})])
+        self.assertEqual(code, 0, err[-2000:])
+        after = self._snapshot(root, self._DATE)
+        # Everything the played slate left is exactly as it was.
+        for name, data in before["csv"].items():
+            self.assertEqual(after["csv"].get(name), data, f"{name} was overwritten")
+        self.assertEqual(after["manifest"], before["manifest"],
+                         "a replay recorded or superseded a manifest row")
+        self.assertEqual(after["records"], before["records"],
+                         "a replay wrote a tracked delivery record")
+        # What the replay DID leave carries both marks of a file nobody uploads.
+        new = sorted(set(after["csv"]) - set(before["csv"]))
+        self.assertTrue(new, "the replay left no file at all")
+        for name in new:
+            self.assertTrue(name.startswith("DO_NOT_UPLOAD_"), name)
+            self.assertIn("replay", name)
+        replay_shas = {hashlib.sha256(after["csv"][n]).hexdigest() for n in new}
+        played_sha = hashlib.sha256(before["csv"][delivered[0].name]).hexdigest()
+        self.assertNotIn(played_sha, replay_shas,
+                         "the replay's bytes equal the played file's: the test is vacuous")
+        # It says so where Ben reads it, and exits clean (not the manifest-error 7).
+        lines = self._file_lines(err)
+        self.assertTrue(lines, err[-800:])
+        for line in lines:
+            self.assertIn("REPLAY", line)
+        brief = json.loads(out[out.rfind("\n{") + 1:] if "\n{" in out else out[out.find("{"):])
+        self.assertTrue(brief.get("replay"))
+        self.assertIsNone(brief.get("manifest_recorded") or None)
+
+    def test_a_showdown_replay_into_an_empty_root_records_nothing_at_all(self):
+        """No played slate to protect: a replay still never writes a manifest, a
+        record or a delivered name."""
+        root = self._root()
+        code, _out, err = self._replay(root)
+        self.assertEqual(code, 0, err[-2000:])
+        out = root / "outputs" / self._DATE
+        self.assertFalse((out / "upload_manifest.json").exists())
+        self.assertFalse((root / "data" / "deliveries").exists()
+                         and list((root / "data" / "deliveries").rglob("*.json")))
+        names = sorted(p.name for p in out.glob("*.csv"))
+        self.assertTrue(names)
+        self.assertTrue(all(n.startswith("DO_NOT_UPLOAD_") and "replay" in n for n in names), names)
 
 
 class ShowdownBaselineFirstTests(_ShowdownExitDoorHarness, unittest.TestCase):

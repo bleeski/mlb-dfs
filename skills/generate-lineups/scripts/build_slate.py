@@ -587,6 +587,27 @@ _LAST_USABLE: dict = {}
 #: Classic brief and payload after the call carries it. Cleared per call.
 _BASELINE: dict = {}
 
+#: R283, roadmap Session 128 (a). True for the whole call when `--past-slate-replay`
+#: was passed: a replay VERIFIES a build and is never a delivery, so nothing it
+#: writes may land on a delivered name, in the manifest, in `data/deliveries/`, or
+#: as a staged salary. Set by `main()` beside the suffix guard (the only place the
+#: flag is read), NOT derived from `args.past_slate_replay` inside `run_classic`:
+#: the existing Classic harnesses call `run_classic` directly with that arg True
+#: for the probe limits and still expect their mirror. Read by `run_classic`,
+#: `publish_baseline`, `run_showdown`, `publish_showdown_baseline` and
+#: `_present_file`. Reset per call.
+_REPLAY_BARRED: bool = False
+
+REPLAY_NOTE = ("a past-slate replay is a verification run, never a delivery (R283): "
+               "nothing was mirrored to outputs/, recorded in the manifest, or "
+               "staged, and the file named here must not be uploaded")
+
+
+def replay_brief() -> dict | None:
+    """The brief key that says this call was a replay, or None."""
+    return {"barred_delivery": True, "note": REPLAY_NOTE} if _REPLAY_BARRED else None
+
+
 #: R393(b). Exit 7 means "delivered a prior valid artifact after a later
 #: failure": the file passed its essential checks, then something after it
 #: failed (a crashed promotion, a raising brief, a failed mirror or manifest
@@ -646,9 +667,13 @@ def later_failures(result: Mapping[str, Any]) -> list:
 
 def _present_file(record: Mapping[str, Any]) -> None:
     cov = record.get("coverage") or {}
+    # R283. A replay's file is labelled with what the engine says it is, and then
+    # with what it is for: a label such as `upload_ready` beside a replay path
+    # would read as a file to enter.
+    replay = "  REPLAY (verification only, never uploaded)" if _REPLAY_BARRED else ""
     print(f"FILE  {record.get('path')}  sha256={record.get('sha256')}  "
           f"label={record.get('label')}  "
-          f"coverage={cov.get('filled')}/{cov.get('reserved')}", file=sys.stderr)
+          f"coverage={cov.get('filled')}/{cov.get('reserved')}{replay}", file=sys.stderr)
 
 
 def present_review_grade(export: Mapping[str, Any], salary_csv) -> dict:
@@ -824,6 +849,7 @@ def publish_baseline(args, salary: Path, entries: Path, pool: Mapping[str, Any],
         out = run_baseline(
             runs_root=str(REPO / "runs"), salary_csv=salary, entries_csv=entries,
             pool=pool, requested_n=n_entries, deadline=deadline,
+            replay=_REPLAY_BARRED,
             attempt_controls=attempt_controls, never_relax=never_relax,
             contest_postures=parse_postures_arg(getattr(args, "postures", None)) or None,
             assume_gates=parse_assume_gates_arg(getattr(args, "assume_gates", None)),
@@ -4529,6 +4555,7 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
                 runs_root=str(REPO / "runs"),
                 salary_csv=str(salary), entries_csv=str(entries),
                 approve=True, requested_n=n_entries,
+                replay=_REPLAY_BARRED,
                 candidates_override=candidates,
                 # Same enrichment inputs the probe frame used. run_slate
                 # reassembles the frame internally, so passing anything less
@@ -5006,6 +5033,8 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         "manifest_recorded": result.get("manifest_recorded"),
         "mirror_error": result.get("mirror_error"),
         "delivered_sha256_error": result.get("delivered_sha256_error"),
+        # R283. None unless this was a `--past-slate-replay`, so absence is visible.
+        "replay": replay_brief(),
         # R393(b). On every delivered Classic brief, [] and None when nothing
         # applies, so absence is visible (R237). A non-empty list is exit 7.
         "later_failures": later_failures(result),
@@ -6289,7 +6318,10 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
 
     out_dir = REPO / "outputs" / args.date
     out_dir.mkdir(parents=True, exist_ok=True)
-    dest = out_dir / f"DKEntries_showdown{slate_tag_suffix(salary)}.csv"
+    # R283. A replay's file carries its own name, so the write below can never
+    # target the played slate's delivered name, and it is never recorded.
+    dest = out_dir / (f"DKEntries_showdown{slate_tag_suffix(salary)}"
+                      f"{'_replay' if _REPLAY_BARRED else ''}.csv")
     assignments = [
         {"entry_id": row["entry_id"], "roster_ids": list(lineup["roster_ids"])}
         for row, lineup in zip(rows, bank)
@@ -6318,48 +6350,55 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
     provisional = Path(write_report["candidate_path"])
     delivered = provisional
     manifest_error = ""
-    try:
-        record_delivery(
-            date=args.date, delivered_file=dest, hash_source=provisional,
-            contest_type="showdown",
-            slate_tag=slate_tag_suffix(salary).lstrip("_"),
-            contest_ids=sorted({r["contest_id"] for r in rows}),
-            contest_names=sorted({r.get("contest_name", "") for r in rows}),
-            # R34: was status="delivered", which is not in STATUS_VALUES and so
-            # read as current everywhere that only filters out 'superseded'.
-            # 'candidate' is the honest status for a review-grade Showdown file:
-            # it has not been through the three certification gates, so it is a
-            # candidate and preflight must not promote it past that.
-            # R457: counted off `provisional`'s own bytes (the file this row's
-            # `hash_source` also names), not off `assignments` -- the rows this
-            # build FILLED -- because a template carrying a complete row leaves
-            # the written file holding filled plus complete.
-            entries=_showdown_entries_in(provisional), run_id=None,
-            status="candidate",
-            certification="review_grade",
-            notes="Showdown ships review-grade; it does not pass the three "
-                  "certification gates. See CLAUDE.md.",
-            # R377. The four controls as solved (after any deadline opening),
-            # and the solver's relaxation counters. No strategy_state is passed
-            # on this path, so without these the record carried neither.
-            controls={"max_shared_players": share_cap,
-                      "max_cpt_exposure_pct": cpt_cap,
-                      "max_player_exposure_pct": player_cap_pct,
-                      "max_cpt_per_contest": cpt_per_contest},
-            relaxations=showdown_relaxation_counts(
-                solve_diag, cpt_diagnostics, ladder_meta),
-        )
-        # R96(4): a Showdown slate with no staged salary can only ever be mined
-        # standings_only, which is how the 2026-08-06 SD contests were lost.
-        stage_salary_for_delivery(args.date, str(salary),
-                                  slate_tag_suffix(salary).lstrip("_"))
-        os.replace(provisional, dest)
-        delivered = dest
-    except Exception as exc:  # noqa: BLE001 - bookkeeping never fails a build
-        manifest_error = str(exc)
-        print(f"upload manifest not recorded: {exc}; the file was NOT promoted "
-              f"and is at {provisional.name}, which names itself rather than "
-              f"waiting for preflight to hard-fail it", file=sys.stderr)
+    if _REPLAY_BARRED:
+        # R283. The file stays at its staging name, which names itself: there
+        # is no row for it, no staged salary, and no promotion. Exit 0, not the
+        # manifest-error path below, because nothing failed.
+        print(f"REPLAY: {provisional.name} is a verification file, not a delivery: "
+              f"no manifest row, no staged salary, never promoted", file=sys.stderr)
+    else:
+        try:
+            record_delivery(
+                date=args.date, delivered_file=dest, hash_source=provisional,
+                contest_type="showdown",
+                slate_tag=slate_tag_suffix(salary).lstrip("_"),
+                contest_ids=sorted({r["contest_id"] for r in rows}),
+                contest_names=sorted({r.get("contest_name", "") for r in rows}),
+                # R34: was status="delivered", which is not in STATUS_VALUES and so
+                # read as current everywhere that only filters out 'superseded'.
+                # 'candidate' is the honest status for a review-grade Showdown file:
+                # it has not been through the three certification gates, so it is a
+                # candidate and preflight must not promote it past that.
+                # R457: counted off `provisional`'s own bytes (the file this row's
+                # `hash_source` also names), not off `assignments` -- the rows this
+                # build FILLED -- because a template carrying a complete row leaves
+                # the written file holding filled plus complete.
+                entries=_showdown_entries_in(provisional), run_id=None,
+                status="candidate",
+                certification="review_grade",
+                notes="Showdown ships review-grade; it does not pass the three "
+                      "certification gates. See CLAUDE.md.",
+                # R377. The four controls as solved (after any deadline opening),
+                # and the solver's relaxation counters. No strategy_state is passed
+                # on this path, so without these the record carried neither.
+                controls={"max_shared_players": share_cap,
+                          "max_cpt_exposure_pct": cpt_cap,
+                          "max_player_exposure_pct": player_cap_pct,
+                          "max_cpt_per_contest": cpt_per_contest},
+                relaxations=showdown_relaxation_counts(
+                    solve_diag, cpt_diagnostics, ladder_meta),
+            )
+            # R96(4): a Showdown slate with no staged salary can only ever be mined
+            # standings_only, which is how the 2026-08-06 SD contests were lost.
+            stage_salary_for_delivery(args.date, str(salary),
+                                      slate_tag_suffix(salary).lstrip("_"))
+            os.replace(provisional, dest)
+            delivered = dest
+        except Exception as exc:  # noqa: BLE001 - bookkeeping never fails a build
+            manifest_error = str(exc)
+            print(f"upload manifest not recorded: {exc}; the file was NOT promoted "
+                  f"and is at {provisional.name}, which names itself rather than "
+                  f"waiting for preflight to hard-fail it", file=sys.stderr)
     template = sd.verify_template_preserved(str(entries), str(delivered))
     # R393(b). Presented once every lineup passed the solve's own checks and
     # the template survived, before any narrative. Showdown is review-grade
@@ -6632,8 +6671,10 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         "delivered_sha256": manifest_sha256(delivered),
         # R96(2). A brief that cited `dest` while the bytes sat under
         # DO_NOT_UPLOAD_ would send the operator to a file that does not exist.
-        "manifest_recorded": not manifest_error,
+        "manifest_recorded": None if _REPLAY_BARRED else not manifest_error,
         "manifest_error": manifest_error,
+        # R283. None unless this was a `--past-slate-replay`, so absence is visible.
+        "replay": replay_brief(),
         # R393(b), the same two keys the Classic brief carries.
         "later_failures": showdown_later_failures,
         "last_usable_artifact": (dict(_LAST_USABLE) if showdown_essential
@@ -7320,47 +7361,58 @@ def publish_showdown_baseline(args, salary: Path, entries: Path, frame,
             return _done()
         data = staged.read_bytes()
         sha = hashlib.sha256(data).hexdigest()
-        dest = out_dir / f"DKEntries_showdown{suffix}_BASELINE_{sha[:12]}.csv"
+        dest = out_dir / (f"DKEntries_showdown{suffix}{'_replay' if _REPLAY_BARRED else ''}"
+                          f"_BASELINE_{sha[:12]}.csv")
         provisional = unrecorded_name(dest)
         os.replace(staged, provisional)
         delivered = provisional
-        try:
-            record_delivery(
-                date=args.date, delivered_file=dest, hash_source=provisional,
-                contest_type="showdown", slate_tag=tag,
-                contest_ids=sorted({r["contest_id"] for r in rows}),
-                contest_names=sorted({r.get("contest_name", "") for r in rows}),
-                # R457: counted off `provisional`'s own bytes, not off
-                # `assignments` -- the rows this build FILLED -- because a
-                # template carrying a complete row leaves the written file
-                # holding filled plus complete.
-                entries=_showdown_entries_in(provisional), run_id=None,
-                status="candidate",
-                certification="review_grade",
-                notes=(f"Showdown baseline (R389(c)): a points-max bank at the "
-                       f"build's controls, published before {before}. "
-                       f"Showdown ships review-grade; see CLAUDE.md."),
-                controls=controls, relaxations=block["relaxations"],
-                lineage=BASELINE_LINEAGE)
-            block["manifest_recorded"] = True
-        except Exception as exc:  # noqa: BLE001 - bookkeeping never costs the file
-            block["manifest_recorded"] = False
-            block["later_failures"] = [{"stage": "manifest",
-                                        "error": f"{type(exc).__name__}: {exc}"}]
-            print(f"BASELINE manifest not recorded ({exc}); the file keeps its "
-                  f"DO_NOT_UPLOAD_ name, the only copy", file=sys.stderr)
-        block["promoted"] = False
-        if block["manifest_recorded"]:
+        if _REPLAY_BARRED:
+            # R283. Never recorded, staged or promoted: the file stays at its
+            # DO_NOT_UPLOAD_ name, which says so. `manifest_recorded` is None
+            # (not attempted), not False, which would read as a failure.
+            block["manifest_recorded"] = None
+            block["promoted"] = False
+            block["replay"] = True
+            print(f"BASELINE (replay): {provisional.name} is a verification file, not "
+                  f"a delivery: no manifest row, never promoted", file=sys.stderr)
+        else:
             try:
-                stage_salary_for_delivery(args.date, str(salary), tag)
-                os.replace(provisional, dest)
-                delivered = dest
-                block["promoted"] = True
-            except Exception as exc:  # noqa: BLE001 - the row exists; name the step
-                block.setdefault("later_failures", []).append(
-                    {"stage": "promote", "error": f"{type(exc).__name__}: {exc}"})
-                print(f"BASELINE recorded but not promoted ({exc}); the file keeps "
-                      f"its DO_NOT_UPLOAD_ name, the only copy", file=sys.stderr)
+                record_delivery(
+                    date=args.date, delivered_file=dest, hash_source=provisional,
+                    contest_type="showdown", slate_tag=tag,
+                    contest_ids=sorted({r["contest_id"] for r in rows}),
+                    contest_names=sorted({r.get("contest_name", "") for r in rows}),
+                    # R457: counted off `provisional`'s own bytes, not off
+                    # `assignments` -- the rows this build FILLED -- because a
+                    # template carrying a complete row leaves the written file
+                    # holding filled plus complete.
+                    entries=_showdown_entries_in(provisional), run_id=None,
+                    status="candidate",
+                    certification="review_grade",
+                    notes=(f"Showdown baseline (R389(c)): a points-max bank at the "
+                           f"build's controls, published before {before}. "
+                           f"Showdown ships review-grade; see CLAUDE.md."),
+                    controls=controls, relaxations=block["relaxations"],
+                    lineage=BASELINE_LINEAGE)
+                block["manifest_recorded"] = True
+            except Exception as exc:  # noqa: BLE001 - bookkeeping never costs the file
+                block["manifest_recorded"] = False
+                block["later_failures"] = [{"stage": "manifest",
+                                            "error": f"{type(exc).__name__}: {exc}"}]
+                print(f"BASELINE manifest not recorded ({exc}); the file keeps its "
+                      f"DO_NOT_UPLOAD_ name, the only copy", file=sys.stderr)
+            block["promoted"] = False
+            if block["manifest_recorded"]:
+                try:
+                    stage_salary_for_delivery(args.date, str(salary), tag)
+                    os.replace(provisional, dest)
+                    delivered = dest
+                    block["promoted"] = True
+                except Exception as exc:  # noqa: BLE001 - the row exists; name the step
+                    block.setdefault("later_failures", []).append(
+                        {"stage": "promote", "error": f"{type(exc).__name__}: {exc}"})
+                    print(f"BASELINE recorded but not promoted ({exc}); the file keeps "
+                          f"its DO_NOT_UPLOAD_ name, the only copy", file=sys.stderr)
         coverage = _coverage(delivered)
         block.update({
             "status": "delivered", "date": args.date, "path": str(delivered),
@@ -8842,9 +8894,21 @@ def main() -> int:
     # export a human had already been handed. The run/ copy survives, but the
     # path every brief, manifest and handoff cites does not, and the same
     # filename-keyed clobber has cost this project a delivery once before from a
-    # parallel session. A replay now carries its own name and can never land on
-    # the delivery path.
-    if getattr(args, "past_slate_replay", False):
+    # parallel session.
+    #
+    # R283, 2026-10-03. The 08-16 guard renamed the STAGED inputs only (this
+    # suffix) and the sentence it left here, "a replay can never land on the
+    # delivery path", was false for both contest types: Classic's mirror and
+    # Showdown's `dest` never read it. On 2026-09-01 a replay of the played
+    # 1920_1g_sd slate overwrote its delivered Showdown file (on Showdown, with
+    # no run behind it, the only copy of the bytes) and superseded its manifest
+    # row. The rule is now that a replay is never RECORDED and never PROMOTED:
+    # `_REPLAY_BARRED` reaches `run_slate(replay=...)`, which mirrors nothing,
+    # and Showdown's two writers, which leave their file at a DO_NOT_UPLOAD_
+    # name.
+    global _REPLAY_BARRED
+    _REPLAY_BARRED = bool(getattr(args, "past_slate_replay", False))
+    if _REPLAY_BARRED:
         suffix += "_replay"
     # The contest-type suffix separates Classic from Showdown but not one Classic
     # draftgroup from another on the same date. Compare game sets and move the
