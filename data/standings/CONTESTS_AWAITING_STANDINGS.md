@@ -1,4 +1,4 @@
-# Contests awaiting standings — regenerated 2026-09-15
+# Contests awaiting standings — regenerated 2026-10-02
 
 Scan: every 9-digit Contest ID on a filled entry row in `outputs/*/DKEntries*.csv`,
 minus the archived set (`data/archive/*/mined_*.json`), what's already sitting in
@@ -16,7 +16,7 @@ Contests whose slate date is today or later are held back, because DK serves an
 empty export until a contest settles. They are listed under "not yet settled"
 below rather than omitted.
 
-## Status as of 2026-09-15: 333 contests open across 19 slate dates
+## Status as of 2026-10-02: 342 contests open across 21 slate dates
 
 Prioritize oldest first. The 2026-07-25 ledger note found DK's export ages out
 some days after a contest settles, so the oldest rows below are the ones closest
@@ -412,7 +412,22 @@ to going empty; the newest date has the most runway left.
 - [MLB $600 Solo Shot](https://www.draftkings.com/contest/exportfullstandingscsv/195663416) — `195663416`
 - [MLB $150 Quarter Jukebox [Just $0.25!]](https://www.draftkings.com/contest/exportfullstandingscsv/195663995) — `195663995`
 
-## Unrecorded deliveries — 59 files with no manifest row
+**2026-09-15** (5 contests):
+
+- [MLB Satellite to 9-29 $20 Postseason Opener (Turbo)](https://www.draftkings.com/contest/exportfullstandingscsv/195667598) — `195667598`
+- [MLB $2.5K Solo Shot (Turbo)](https://www.draftkings.com/contest/exportfullstandingscsv/195668414) — `195668414`
+- [MLB $625 Quarter Jukebox [Just $0.25!] (Turbo)](https://www.draftkings.com/contest/exportfullstandingscsv/195668415) — `195668415`
+- [MLB $400 Solo Shot (Turbo)](https://www.draftkings.com/contest/exportfullstandingscsv/195700604) — `195700604`
+- [MLB $30 Quarter Jukebox [Just $0.25!] (Turbo)](https://www.draftkings.com/contest/exportfullstandingscsv/195703759) — `195703759`
+
+**2026-09-16** (4 contests):
+
+- [MLB Satellite to 9-29 $20 Postseason Opener (Early)](https://www.draftkings.com/contest/exportfullstandingscsv/195708384) — `195708384`
+- [MLB $500 Daily Dollar [Single Entry] (Early)](https://www.draftkings.com/contest/exportfullstandingscsv/195709704) — `195709704`
+- [MLB Satellite to $20 NFL Fantasy Football Millionaire (Early)](https://www.draftkings.com/contest/exportfullstandingscsv/195717703) — `195717703`
+- [MLB $100 Quarter Jukebox [Just $0.25!]  (Early)](https://www.draftkings.com/contest/exportfullstandingscsv/195720365) — `195720365`
+
+## Unrecorded deliveries — 209 files with no manifest row
 
 These `DKEntries*.csv` files sit in `outputs/<date>/` and no row in that
 date's `upload_manifest.json` names them (R96). Each one is outside
@@ -429,88 +444,260 @@ one is already saying what it is. Neither is a date with no
 and that is history rather than a defect.
 
 - **2026-06-03**
-  - `outputs/2026-06-03/DKEntries.csv`
+  - `outputs\2026-06-03\DKEntries.csv`
 - **2026-06-11**
-  - `outputs/2026-06-11/DKEntries.csv`
+  - `outputs\2026-06-11\DKEntries.csv`
 - **2026-07-18**
-  - `outputs/2026-07-18/DKEntries_showdown.csv`
+  - `outputs\2026-07-18\DKEntries_showdown.csv`
+- **2026-07-25**
+  - `outputs\2026-07-25\DKEntries_1605_4g.csv`
+  - `outputs\2026-07-25\DKEntries_1805_10g.csv`
+  - `outputs\2026-07-25\DKEntries_showdown_1310_1g.csv`
+  - `outputs\2026-07-25\DKEntries_showdown_1610_1g.csv`
+  - `outputs\2026-07-25\DKEntries_showdown_1915_1g.csv`
+- **2026-07-27**
+  - `outputs\2026-07-27\DKEntries_2138_3g.csv`
+  - `outputs\2026-07-27\DKEntries_showdown_2145_1g_sd.csv`
+- **2026-07-28**
+  - `outputs\2026-07-28\DKEntries_1840_5g.csv`
+  - `outputs\2026-07-28\DKEntries_1910_9g.csv`
+  - `outputs\2026-07-28\DKEntries_2138_5g.csv`
+  - `outputs\2026-07-28\DKEntries_showdown_2210_1g_sd.csv`
 - **2026-07-29**
-  - `outputs/2026-07-29/DKEntries_lateswap_1910_8g_3fea5430.csv`
-  - `outputs/2026-07-29/DKEntries_lateswap_1910_8g_ef47dca6.csv`
-  - `outputs/2026-07-29/DKEntries_patch_locked_revert.csv`
+  - `outputs\2026-07-29\DKEntries_1210_5g.csv`
+  - `outputs\2026-07-29\DKEntries_1910_8g.csv`
+  - `outputs\2026-07-29\DKEntries_2138_3g.csv`
+  - `outputs\2026-07-29\DKEntries_lateswap_1910_8g_1b728c8a.csv`
+  - `outputs\2026-07-29\DKEntries_lateswap_1910_8g_21b90b19.csv`
+  - `outputs\2026-07-29\DKEntries_lateswap_1910_8g_265b4148.csv`
+  - `outputs\2026-07-29\DKEntries_lateswap_1910_8g_2699bcf8.csv`
+  - `outputs\2026-07-29\DKEntries_lateswap_1910_8g_2c766d90.csv`
+  - `outputs\2026-07-29\DKEntries_lateswap_1910_8g_3d7fe9a9.csv`
+  - `outputs\2026-07-29\DKEntries_lateswap_1910_8g_3fea5430.csv`
+  - `outputs\2026-07-29\DKEntries_lateswap_1910_8g_58981b9b.csv`
+  - `outputs\2026-07-29\DKEntries_lateswap_1910_8g_80d6b36b.csv`
+  - `outputs\2026-07-29\DKEntries_lateswap_1910_8g_8a0c69e5.csv`
+  - `outputs\2026-07-29\DKEntries_lateswap_1910_8g_9b825d7a.csv`
+  - `outputs\2026-07-29\DKEntries_lateswap_1910_8g_a05cf440.csv`
+  - `outputs\2026-07-29\DKEntries_lateswap_1910_8g_a902842b.csv`
+  - `outputs\2026-07-29\DKEntries_lateswap_1910_8g_c2af245b.csv`
+  - `outputs\2026-07-29\DKEntries_lateswap_1910_8g_c781aab7.csv`
+  - `outputs\2026-07-29\DKEntries_lateswap_1910_8g_c9aa1b26.csv`
+  - `outputs\2026-07-29\DKEntries_lateswap_1910_8g_ce72e2a3.csv`
+  - `outputs\2026-07-29\DKEntries_lateswap_1910_8g_d91e25b3.csv`
+  - `outputs\2026-07-29\DKEntries_lateswap_1910_8g_da358312.csv`
+  - `outputs\2026-07-29\DKEntries_lateswap_1910_8g_ddb595aa.csv`
+  - `outputs\2026-07-29\DKEntries_lateswap_1910_8g_e78a43d2.csv`
+  - `outputs\2026-07-29\DKEntries_lateswap_1910_8g_ef47dca6.csv`
+  - `outputs\2026-07-29\DKEntries_lateswap_1910_8g_ef763833.csv`
+  - `outputs\2026-07-29\DKEntries_lateswap_1910_8g_f368ccec.csv`
+  - `outputs\2026-07-29\DKEntries_lateswap_1910_8g_fcb3460a.csv`
+  - `outputs\2026-07-29\DKEntries_lateswap_1910_8g_fe965ca9.csv`
+  - `outputs\2026-07-29\DKEntries_patch_locked_revert.csv`
+  - `outputs\2026-07-29\DKEntries_showdown_1310_1g_sd.csv`
+  - `outputs\2026-07-29\DKEntries_showdown_1840_1g_sd.csv`
+  - `outputs\2026-07-29\DKEntries_showdown_1945_1g_sd.csv`
+  - `outputs\2026-07-29\DKEntries_showdown_2210_1g_sd.csv`
 - **2026-07-30**
-  - `outputs/2026-07-30/DKEntries_apex_relay.csv`
+  - `outputs\2026-07-30\DKEntries_1210_4g.csv`
+  - `outputs\2026-07-30\DKEntries_1210_4g_run226d98ea.csv`
+  - `outputs\2026-07-30\DKEntries_1910_6g.csv`
+  - `outputs\2026-07-30\DKEntries_2140_3g.csv`
+  - `outputs\2026-07-30\DKEntries_apex_relay.csv`
+  - `outputs\2026-07-30\DKEntries_showdown_1210_1g_sd.csv`
+  - `outputs\2026-07-30\DKEntries_showdown_1415_1g_sd.csv`
+  - `outputs\2026-07-30\DKEntries_showdown_2210_1g_sd.csv`
+- **2026-08-01**
+  - `outputs\2026-08-01\DKEntries_1507_4g.csv`
+  - `outputs\2026-08-01\DKEntries_1905_10g.csv`
+  - `outputs\2026-08-01\DKEntries_2010_2g.csv`
+  - `outputs\2026-08-01\DKEntries_showdown_1507_1g_sd.csv`
+- **2026-08-03**
+  - `outputs\2026-08-03\DKEntries_1905_7g.csv`
+  - `outputs\2026-08-03\DKEntries_lateswap_1905_7g_e33f3e55.csv`
 - **2026-08-05**
-  - `outputs/2026-08-05/DKEntries_showdown_1905_1g_sd.csv`
+  - `outputs\2026-08-05\DKEntries_1905_7g.csv`
+  - `outputs\2026-08-05\DKEntries_showdown_1905_1g_sd.csv`
 - **2026-08-06**
-  - `outputs/2026-08-06/DKEntries_1910_4g.csv`
-  - `outputs/2026-08-06/DKEntries_showdown_2140_1g_sd_cptcap6.csv`
+  - `outputs\2026-08-06\DKEntries_1235_5g.csv`
+  - `outputs\2026-08-06\DKEntries_1910_4g.csv`
+  - `outputs\2026-08-06\DKEntries_showdown_2140_1g_sd.csv`
+  - `outputs\2026-08-06\DKEntries_showdown_2140_1g_sd_cptcap6.csv`
+- **2026-08-08**
+  - `outputs\2026-08-08\DKEntries_1505_3g.csv`
+  - `outputs\2026-08-08\DKEntries_1910_9g.csv`
+  - `outputs\2026-08-08\DKEntries_showdown_1910_1g_sd.csv`
 - **2026-08-09**
-  - `outputs/2026-08-09/DKEntries_1410_5g.csv`
+  - `outputs\2026-08-09\DKEntries_1410_5g.csv`
+  - `outputs\2026-08-09\DKEntries_1605_3g.csv`
+  - `outputs\2026-08-09\DKEntries_showdown_2020_1g_sd.csv`
+- **2026-08-10**
+  - `outputs\2026-08-10\DKEntries_2138_6g.csv`
+- **2026-08-11**
+  - `outputs\2026-08-11\DKEntries_1840_3g.csv`
+  - `outputs\2026-08-11\DKEntries_1905_12g.csv`
+  - `outputs\2026-08-11\DKEntries_showdown_1905_1g_sd.csv`
 - **2026-08-12**
-  - `outputs/2026-08-12/DKEntries_1840_3g.csv`
-  - `outputs/2026-08-12/DKEntries_1840_3g_v2.csv`
-  - `outputs/2026-08-12/DKEntries_2210_2g_distinct28.csv`
-  - `outputs/2026-08-12/DKEntries_2210_2g_run1b5d3a4a.csv`
-  - `outputs/2026-08-12/DKEntries_KCLAD_SD_template.csv`
-  - `outputs/2026-08-12/DKEntries_showdown_2210_1g_sd_FINAL.csv`
-  - `outputs/2026-08-12/DKEntries_showdown_2210_1g_sd_apex.csv`
-  - `outputs/2026-08-12/DKEntries_showdown_2210_1g_sd_evensplit.csv`
+  - `outputs\2026-08-12\DKEntries_1840_3g.csv`
+  - `outputs\2026-08-12\DKEntries_1840_3g_v2.csv`
+  - `outputs\2026-08-12\DKEntries_2210_2g.csv`
+  - `outputs\2026-08-12\DKEntries_2210_2g_distinct28.csv`
+  - `outputs\2026-08-12\DKEntries_2210_2g_run1b5d3a4a.csv`
+  - `outputs\2026-08-12\DKEntries_KCLAD_SD_template.csv`
+  - `outputs\2026-08-12\DKEntries_showdown_1610_1g_sd.csv`
+  - `outputs\2026-08-12\DKEntries_showdown_2210_1g_sd.csv`
+  - `outputs\2026-08-12\DKEntries_showdown_2210_1g_sd_apex.csv`
+  - `outputs\2026-08-12\DKEntries_showdown_2210_1g_sd_evensplit.csv`
+  - `outputs\2026-08-12\DKEntries_showdown_2210_1g_sd_FINAL.csv`
 - **2026-08-13**
-  - `outputs/2026-08-13/DKEntries_1507_3g_5of6_backup.csv`
-  - `outputs/2026-08-13/DKEntries_SEA-NYY_showdown_19_REVIEW.csv`
-  - `outputs/2026-08-13/DKEntries_SEA-NYY_showdown_19_REVIEW_v2.csv`
+  - `outputs\2026-08-13\DKEntries_1310_6g.csv`
+  - `outputs\2026-08-13\DKEntries_1507_3g.csv`
+  - `outputs\2026-08-13\DKEntries_1507_3g_5of6_backup.csv`
+  - `outputs\2026-08-13\DKEntries_2207_2g.csv`
+  - `outputs\2026-08-13\DKEntries_SEA-NYY_showdown_19_REVIEW.csv`
+  - `outputs\2026-08-13\DKEntries_SEA-NYY_showdown_19_REVIEW_v2.csv`
 - **2026-08-14**
-  - `outputs/2026-08-14/DKEntries_1810_3g_UNCERTIFIED_20260814T220447Z.csv`
-  - `outputs/2026-08-14/DKEntries_1910_10g_F4dead_92830903.csv`
-  - `outputs/2026-08-14/DKEntries_1910_10g_F4live_20260814T230115Z_e32dc32e.csv`
-  - `outputs/2026-08-14/DKEntries_showdown_1915_1g_sd_FINAL_v3.csv`
+  - `outputs\2026-08-14\DKEntries_1810_3g_UNCERTIFIED_20260814T220447Z.csv`
+  - `outputs\2026-08-14\DKEntries_1910_10g.csv`
+  - `outputs\2026-08-14\DKEntries_1910_10g_F4dead_92830903.csv`
+  - `outputs\2026-08-14\DKEntries_1910_10g_F4live_20260814T230115Z_e32dc32e.csv`
+  - `outputs\2026-08-14\DKEntries_2138_4g.csv`
+  - `outputs\2026-08-14\DKEntries_2210_2g.csv`
+  - `outputs\2026-08-14\DKEntries_lateswap_1810_3g_d5024fb1.csv`
+  - `outputs\2026-08-14\DKEntries_showdown_1915_1g_sd.csv`
+  - `outputs\2026-08-14\DKEntries_showdown_1915_1g_sd_FINAL_v3.csv`
+  - `outputs\2026-08-14\DKEntries_showdown_2210_1g_sd.csv`
+- **2026-08-15**
+  - `outputs\2026-08-15\DKEntries_2138_2g.csv`
+  - `outputs\2026-08-15\DKEntries_showdown_2140_1g_sd.csv`
+- **2026-08-16**
+  - `outputs\2026-08-16\DKEntries_1335_8g.csv`
+- **2026-08-17**
+  - `outputs\2026-08-17\DKEntries_1905_7g.csv`
 - **2026-08-18**
-  - `outputs/2026-08-18/DKEntries_1835_6g.csv`
-  - `outputs/2026-08-18/DKEntries_1910_9g.csv`
-  - `outputs/2026-08-18/DKEntries_showdown_2040_1g_sd.csv`
+  - `outputs\2026-08-18\DKEntries_1835_6g.csv`
+  - `outputs\2026-08-18\DKEntries_1910_9g.csv`
+  - `outputs\2026-08-18\DKEntries_2005_4g.csv`
+  - `outputs\2026-08-18\DKEntries_showdown_2040_1g_sd.csv`
 - **2026-08-19**
-  - `outputs/2026-08-19/DKEntries_1835_9g_ec326f50.csv`
-  - `outputs/2026-08-19/DKEntries_1835_9g_f64a2b1e.csv`
+  - `outputs\2026-08-19\DKEntries_1235_4g.csv`
+  - `outputs\2026-08-19\DKEntries_1235_4g_49f8ec18.csv`
+  - `outputs\2026-08-19\DKEntries_1835_9g.csv`
+  - `outputs\2026-08-19\DKEntries_1835_9g_ec326f50.csv`
+  - `outputs\2026-08-19\DKEntries_1835_9g_f64a2b1e.csv`
+  - `outputs\2026-08-19\DKEntries_2005_3g.csv`
+  - `outputs\2026-08-19\DKEntries_lateswap_1235_4g_2f55220a.csv`
+  - `outputs\2026-08-19\DKEntries_lateswap_1835_9g_eee73e52.csv`
+  - `outputs\2026-08-19\DKEntries_showdown_1610_1g_sd.csv`
+  - `outputs\2026-08-19\DKEntries_showdown_2040_1g_sd.csv`
+- **2026-08-20**
+  - `outputs\2026-08-20\DKEntries_1240_6g.csv`
+  - `outputs\2026-08-20\DKEntries_1835_3g.csv`
+  - `outputs\2026-08-20\DKEntries_2005_2g.csv`
+  - `outputs\2026-08-20\DKEntries_showdown_1835_1g_sd.csv`
+  - `outputs\2026-08-20\DKEntries_showdown_2010_1g_sd.csv`
+- **2026-08-21**
+  - `outputs\2026-08-21\DKEntries_showdown_1610_1g_sd.csv`
+- **2026-08-22**
+  - `outputs\2026-08-22\DKEntries_1335_3g.csv`
+  - `outputs\2026-08-22\DKEntries_showdown_1335_1g_sd.csv`
+  - `outputs\2026-08-22\DKEntries_showdown_1335_1g_sd_v2.csv`
+- **2026-08-23**
+  - `outputs\2026-08-23\DKEntries_1610_4g.csv`
+  - `outputs\2026-08-23\DKEntries_showdown_1910_1g_sd.csv`
+- **2026-08-24**
+  - `outputs\2026-08-24\DKEntries_1940_7g.csv`
+  - `outputs\2026-08-24\DKEntries_showdown_1940_1g_sd.csv`
+- **2026-08-25**
+  - `outputs\2026-08-25\DKEntries_1840_3g.csv`
+  - `outputs\2026-08-25\DKEntries_2138_6g.csv`
+  - `outputs\2026-08-25\DKEntries_showdown_2145_1g_sd.csv`
 - **2026-08-26**
-  - `outputs/2026-08-26/DKEntries_showdown_1905_1g_sd_dimeopt.csv`
-  - `outputs/2026-08-26/DKEntries_showdown_1905_1g_sd_v3dime.csv`
+  - `outputs\2026-08-26\DKEntries_1840_2g.csv`
+  - `outputs\2026-08-26\DKEntries_1905_7g.csv`
+  - `outputs\2026-08-26\DKEntries_showdown_1905_1g_sd.csv`
+  - `outputs\2026-08-26\DKEntries_showdown_1905_1g_sd_dimeopt.csv`
+  - `outputs\2026-08-26\DKEntries_showdown_1905_1g_sd_v3dime.csv`
+- **2026-08-27**
+  - `outputs\2026-08-27\DKEntries_1905_5g.csv`
+  - `outputs\2026-08-27\DKEntries_showdown_1905_1g_sd.csv`
+  - `outputs\2026-08-27\DKEntries_showdown_2145_1g_sd.csv`
+- **2026-08-28**
+  - `outputs\2026-08-28\DKEntries_2138_3g.csv`
+  - `outputs\2026-08-28\DKEntries_showdown_2215_1g_sd.csv`
 - **2026-08-29**
-  - `outputs/2026-08-29/DKEntries_1305_12g_feltnerfix.csv`
-  - `outputs/2026-08-29/DKEntries_1305_12g_v1.csv`
-  - `outputs/2026-08-29/DKEntries_1305_12g_v3final.csv`
-  - `outputs/2026-08-29/DKEntries_1305_12g_v4final.csv`
+  - `outputs\2026-08-29\DKEntries_1305_12g_ef6e904b.csv`
+  - `outputs\2026-08-29\DKEntries_1305_12g_feltnerfix.csv`
+  - `outputs\2026-08-29\DKEntries_1305_12g_v1.csv`
+  - `outputs\2026-08-29\DKEntries_1305_12g_v3final.csv`
+  - `outputs\2026-08-29\DKEntries_1305_12g_v4final.csv`
+  - `outputs\2026-08-29\DKEntries_lateswap_1305_12g_ef6e904b.csv`
+- **2026-08-30**
+  - `outputs\2026-08-30\DKEntries_1605_2g.csv`
+  - `outputs\2026-08-30\DKEntries_showdown_1920_1g_sd.csv`
 - **2026-09-01**
-  - `outputs/2026-09-01/DKEntries_lateswap_2040.csv`
-  - `outputs/2026-09-01/DKEntries_open2005_handbuilt.csv`
-  - `outputs/2026-09-01/DKEntries_showdown_1940_1g_sd_v1_appg.csv`
-  - `outputs/2026-09-01/DKEntries_showdown_1940_1g_sd_v2_platoon.csv`
+  - `outputs\2026-09-01\DKEntries_1840_6g.csv`
+  - `outputs\2026-09-01\DKEntries_1940_9g.csv`
+  - `outputs\2026-09-01\DKEntries_lateswap_2040.csv`
+  - `outputs\2026-09-01\DKEntries_open2005_handbuilt.csv`
+  - `outputs\2026-09-01\DKEntries_showdown_1940_1g_sd.csv`
+  - `outputs\2026-09-01\DKEntries_showdown_1940_1g_sd_v1_appg.csv`
+  - `outputs\2026-09-01\DKEntries_showdown_1940_1g_sd_v2_platoon.csv`
+  - `outputs\2026-09-01\DKEntries_showdown_2210_1g_sd.csv`
 - **2026-09-02**
-  - `outputs/2026-09-02/DKEntries_1940_6g_fixed.csv`
-  - `outputs/2026-09-02/DKEntries_1940_6g_repaired.csv`
+  - `outputs\2026-09-02\DKEntries_1840_3g.csv`
+  - `outputs\2026-09-02\DKEntries_1940_6g.csv`
+  - `outputs\2026-09-02\DKEntries_1940_6g_fixed.csv`
+  - `outputs\2026-09-02\DKEntries_1940_6g_repaired.csv`
+  - `outputs\2026-09-02\DKEntries_2138_2g.csv`
+  - `outputs\2026-09-02\DKEntries_showdown_2210_1g_sd.csv`
 - **2026-09-03**
-  - `outputs/2026-09-03/DKEntries_2140_2g_KEEP_635cc0b5.csv`
-  - `outputs/2026-09-03/DKEntries_2140_2g_noodds_backup.csv`
-  - `outputs/2026-09-03/DKEntries_showdown_2210_1g_sd_noodds_backup.csv`
-  - `outputs/2026-09-03/DKEntries_showdown_2210_1g_sd_sleeve.csv`
+  - `outputs\2026-09-03\DKEntries_1235_3g.csv`
+  - `outputs\2026-09-03\DKEntries_1915_6g.csv`
+  - `outputs\2026-09-03\DKEntries_2140_2g.csv`
+  - `outputs\2026-09-03\DKEntries_2140_2g_KEEP_635cc0b5.csv`
+  - `outputs\2026-09-03\DKEntries_2140_2g_noodds_backup.csv`
+  - `outputs\2026-09-03\DKEntries_showdown_1235_1g_sd.csv`
+  - `outputs\2026-09-03\DKEntries_showdown_1915_1g_sd.csv`
+  - `outputs\2026-09-03\DKEntries_showdown_2005_1g_sd.csv`
+  - `outputs\2026-09-03\DKEntries_showdown_2210_1g_sd.csv`
+  - `outputs\2026-09-03\DKEntries_showdown_2210_1g_sd_noodds_backup.csv`
+  - `outputs\2026-09-03\DKEntries_showdown_2210_1g_sd_sleeve.csv`
 - **2026-09-04**
-  - `outputs/2026-09-04/DKEntries_2210_2g_UPLOAD.csv`
+  - `outputs\2026-09-04\DKEntries_1810_3g.csv`
+  - `outputs\2026-09-04\DKEntries_2140_3g.csv`
+  - `outputs\2026-09-04\DKEntries_2210_2g.csv`
+  - `outputs\2026-09-04\DKEntries_2210_2g_UPLOAD.csv`
+  - `outputs\2026-09-04\DKEntries_showdown_2210_1g_sd.csv`
 - **2026-09-05**
-  - `outputs/2026-09-05/DKEntries_2110_2g_base_e94b52.csv`
-  - `outputs/2026-09-05/DKEntries_showdown_2140_1g_sd_baseline_0d372b4c.csv`
+  - `outputs\2026-09-05\DKEntries_2110_2g.csv`
+  - `outputs\2026-09-05\DKEntries_2110_2g_base_e94b52.csv`
+  - `outputs\2026-09-05\DKEntries_showdown_2010_1g_sd.csv`
+  - `outputs\2026-09-05\DKEntries_showdown_2140_1g_sd.csv`
+  - `outputs\2026-09-05\DKEntries_showdown_2140_1g_sd_baseline_0d372b4c.csv`
+- **2026-09-06**
+  - `outputs\2026-09-06\DKEntries_showdown_2210_1g_sd.csv`
 - **2026-09-08**
-  - `outputs/2026-09-08/DKEntries_2140_5g_CERTIFIED_807776f4.csv`
-  - `outputs/2026-09-08/DKEntries_2140_5g_LEV95.csv`
+  - `outputs\2026-09-08\DKEntries_1835_5g.csv`
+  - `outputs\2026-09-08\DKEntries_2140_5g.csv`
+  - `outputs\2026-09-08\DKEntries_2140_5g_CERTIFIED_807776f4.csv`
+  - `outputs\2026-09-08\DKEntries_2140_5g_LEV95.csv`
+  - `outputs\2026-09-08\DKEntries_showdown_2210_1g_sd.csv`
 - **2026-09-09**
-  - `outputs/2026-09-09/DKEntries_1835_10g.csv`
+  - `outputs\2026-09-09\DKEntries_1505_4g.csv`
+  - `outputs\2026-09-09\DKEntries_1835_10g.csv`
 - **2026-09-10**
-  - `outputs/2026-09-10/DKEntries_1905_2g.csv`
-  - `outputs/2026-09-10/DKEntries_final_0910_3g_early.csv`
-  - `outputs/2026-09-10/DKEntries_upload_0910_3g_early.csv`
-  - `outputs/2026-09-10/DKEntries_upload_0910_3g_early_repair1.csv`
+  - `outputs\2026-09-10\DKEntries_1905_2g.csv`
+  - `outputs\2026-09-10\DKEntries_final_0910_3g_early.csv`
+  - `outputs\2026-09-10\DKEntries_showdown_1940_1g_sd.csv`
+  - `outputs\2026-09-10\DKEntries_upload_0910_3g_early.csv`
+  - `outputs\2026-09-10\DKEntries_upload_0910_3g_early_repair1.csv`
 - **2026-09-12**
-  - `outputs/2026-09-12/DKEntries_1310_9g_repair.csv`
-  - `outputs/2026-09-12/DKEntries_1910_5g.csv`
+  - `outputs\2026-09-12\DKEntries_1310_9g.csv`
+  - `outputs\2026-09-12\DKEntries_1310_9g_repair.csv`
+  - `outputs\2026-09-12\DKEntries_1910_5g.csv`
+- **2026-09-15**
+  - `outputs\2026-09-15\DKEntries_1840_5g.csv`
 
 ## Not on this list — do not pull
 

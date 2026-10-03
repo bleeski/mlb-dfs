@@ -1,0 +1,2250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Standings pulls needed — 2026-10-02</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #171a21; --border: #2a2e38;
+    --text: #e6e8ec; --muted: #8b93a3; --accent: #4f8cff;
+    --done-bg: #10241a; --done-text: #5fbd8a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 32px 16px 80px;
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  .wrap { max-width: 780px; margin: 0 auto; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 14px; line-height: 1.5; margin: 0 0 24px; }
+  .sub b { color: var(--text); }
+  .sub code { background: var(--panel); padding: 1px 5px; border-radius: 4px; }
+  .progress {
+    position: sticky; top: 0; z-index: 5;
+    background: var(--bg); padding: 8px 0 16px; font-size: 13px; color: var(--muted);
+  }
+  #progressBar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-top: 6px; }
+  #progressFill { height: 100%; width: 0%; background: var(--accent); transition: width .15s; }
+  section { margin-bottom: 28px; }
+  h2 {
+    font-size: 15px; border-bottom: 1px solid var(--border); padding-bottom: 6px;
+    margin: 0 0 10px; display: flex; align-items: baseline; gap: 8px;
+  }
+  h2 .count { color: var(--muted); font-weight: normal; font-size: 13px; }
+  ul.rows { list-style: none; margin: 0; padding: 0; }
+  li.row {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; padding: 9px 12px; margin-bottom: 6px;
+    font-size: 13.5px;
+  }
+  li.row.done { background: var(--done-bg); border-color: #1d3b2a; }
+  li.row.done .name { color: var(--done-text); text-decoration: line-through; }
+  .chk input { width: 16px; height: 16px; cursor: pointer; }
+  .name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .cid { color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; flex-shrink: 0; }
+  a.pull {
+    flex-shrink: 0; color: #fff; background: var(--accent); text-decoration: none;
+    font-size: 12.5px; padding: 6px 10px; border-radius: 6px; white-space: nowrap;
+  }
+  a.pull:hover { background: #3d78e6; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Standings pulls needed</h1>
+  <p class="sub">
+    <b>342 contests</b> across <b>21 slate dates</b>, generated 2026-10-02.
+    Click <b>Open export</b> while logged into DraftKings; it opens the download and checks the row
+    off for you. Confirm the download is non-zero bytes, then drop it in
+    <code>data/standings/inbox/</code>. Oldest date first — DK's export is known to age out after
+    a few days, so those are the most at risk.
+  </p>
+  <div class="progress">
+    <span id="progressLabel">0 / 342 pulled</span>
+    <div id="progressBar"><div id="progressFill"></div></div>
+  </div>
+
+    <section>
+      <h2>2026-08-14 <span class="count">(7 contests)</span></h2>
+      <ul class="rows">
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $10K mini-MAX [150 Entry Max] (Night)</span>
+        <span class="cid">193712013</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/193712013" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $1K Solo Shot (NYY @ TOR)</span>
+        <span class="cid">193712018</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/193712018" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $1K Solo Shot (Late Night)</span>
+        <span class="cid">193712021</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/193712021" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $2K Solo Shot (MIL @ LAD)</span>
+        <span class="cid">193712022</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/193712022" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $20K mini-MAX [150 Entry Max]</span>
+        <span class="cid">193712023</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/193712023" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $1K Daily Dollar [Single Entry]</span>
+        <span class="cid">193712048</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/193712048" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $200 Solo Shot (Turbo)</span>
+        <span class="cid">193773322</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/193773322" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      </ul>
+    </section>
+    <section>
+      <h2>2026-08-15 <span class="count">(3 contests)</span></h2>
+      <ul class="rows">
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $2.5K Solo Shot (Night)</span>
+        <span class="cid">193775579</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/193775579" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $1.25K Solo Shot (TEX @ ATH)</span>
+        <span class="cid">193775591</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/193775591" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $500 Solo Shot (Night)</span>
+        <span class="cid">193850995</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/193850995" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      </ul>
+    </section>
+    <section>
+      <h2>2026-08-16 <span class="count">(1 contest)</span></h2>
+      <ul class="rows">
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $1.5K Solo Shot [20 Entry Max]</span>
+        <span class="cid">193882283</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/193882283" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      </ul>
+    </section>
+    <section>
+      <h2>2026-08-17 <span class="count">(2 contests)</span></h2>
+      <ul class="rows">
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $20K mini-MAX [150 Entry Max]</span>
+        <span class="cid">193891713</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/193891713" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $1.5K Solo Shot [20 Entry Max]</span>
+        <span class="cid">193957104</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/193957104" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      </ul>
+    </section>
+    <section>
+      <h2>2026-08-28 <span class="count">(14 contests)</span></h2>
+      <ul class="rows">
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB 40x Micro Booster [Top 5 Win $10] (Night)</span>
+        <span class="cid">194551595</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194551595" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $100 Dime Time [Just $0.10!] (Night)</span>
+        <span class="cid">194551604</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194551604" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB SUPERSatellite to NFL 9-13 $5 Fantasy Football Millionaire [2x] (Night)</span>
+        <span class="cid">194551651</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194551651" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB SUPERSatellite to NFL 9-13 $5 Fantasy Football Millionaire [2x] (Night)</span>
+        <span class="cid">194551652</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194551652" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $100 Dime Time [Just $0.10!] (ARI @ SF)</span>
+        <span class="cid">194551981</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194551981" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (ARI @ SF)</span>
+        <span class="cid">194551987</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194551987" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (ARI @ SF)</span>
+        <span class="cid">194551988</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194551988" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (ARI @ SF)</span>
+        <span class="cid">194551991</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194551991" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (ARI @ SF)</span>
+        <span class="cid">194551995</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194551995" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $6K mini-MAX [150 Entry Max] (Night)</span>
+        <span class="cid">194553020</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194553020" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $1K Solo Shot (Night)</span>
+        <span class="cid">194553021</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194553021" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $625 Quarter Jukebox [Just $0.25!] (Night)</span>
+        <span class="cid">194553022</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194553022" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $2K Solo Shot (ARI @ SF)</span>
+        <span class="cid">194553033</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194553033" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $250 Quarter Jukebox [Just $0.25!]  (ARI @ SF)</span>
+        <span class="cid">194553034</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194553034" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      </ul>
+    </section>
+    <section>
+      <h2>2026-08-29 <span class="count">(12 contests)</span></h2>
+      <ul class="rows">
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB 40x Micro Booster [Top 10 Win $10]</span>
+        <span class="cid">194616638</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194616638" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $100 Dime Time [Just $0.10!]</span>
+        <span class="cid">194616685</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194616685" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $300 Dime Time [Just $0.10!]</span>
+        <span class="cid">194616686</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194616686" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to $15 Relay Throw</span>
+        <span class="cid">194616709</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194616709" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to $2 MLB Pocket Cup MEGA Qualifier</span>
+        <span class="cid">194616718</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194616718" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to $2 MLB Pocket Cup MEGA Qualifier</span>
+        <span class="cid">194616719</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194616719" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB SUPERSatellite to NFL 9-13 $5 Fantasy Football Millionaire [2x]</span>
+        <span class="cid">194616783</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194616783" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB SUPERSatellite to NFL 9-13 $5 Fantasy Football Millionaire [5x]</span>
+        <span class="cid">194616796</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194616796" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to NFL 9-9 $20 Wednesday Kickoff Millionaire</span>
+        <span class="cid">194616829</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194616829" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $5K Solo Shot [$1K to 1st]</span>
+        <span class="cid">194618889</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194618889" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $10K mini-MAX [150 Entry Max]</span>
+        <span class="cid">194618890</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194618890" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $1.25K Quarter Jukebox [Just $0.25!]</span>
+        <span class="cid">194618891</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194618891" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      </ul>
+    </section>
+    <section>
+      <h2>2026-08-30 <span class="count">(14 contests)</span></h2>
+      <ul class="rows">
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB 40x Micro Booster [Top 5 Win $10] (Afternoon)</span>
+        <span class="cid">194681833</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194681833" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB SUPERSatellite to NFL 9-13 $5 Fantasy Football Millionaire [2x] (Afternoon)</span>
+        <span class="cid">194681892</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194681892" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown 40x Micro Booster [Top 5 Win $10] (CIN @ CHC)</span>
+        <span class="cid">194681930</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194681930" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown SUPERSatellite to NFL 9-13 $5 Fantasy Football Millionaire [2x] (CIN @ CHC)</span>
+        <span class="cid">194681989</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194681989" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $7.5K mini-MAX [150 Entry Max] (Afternoon)</span>
+        <span class="cid">194686506</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194686506" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $1.25K Solo Shot (Afternoon)</span>
+        <span class="cid">194686507</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194686507" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $300 Daily Dollar [Single Entry] (Afternoon)</span>
+        <span class="cid">194686512</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194686512" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $12K mini-MAX [150 Entry Max] (CIN @ CHC)</span>
+        <span class="cid">194686525</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194686525" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $1K Solo Shot (CIN @ CHC)</span>
+        <span class="cid">194686526</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194686526" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $750 Quarter Jukebox [Just $0.25!] (CIN @ CHC)</span>
+        <span class="cid">194686527</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194686527" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $250 Daily Dollar [Single Entry] (CIN @ CHC)</span>
+        <span class="cid">194686531</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194686531" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $20 Quarter Jukebox [Just $0.25!] (Afternoon)</span>
+        <span class="cid">194746677</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194746677" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $150 Solo Shot (CIN @ CHC)</span>
+        <span class="cid">194753786</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194753786" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $200 Quarter Jukebox [Just $0.25!] (CIN @ CHC)</span>
+        <span class="cid">194754812</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194754812" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      </ul>
+    </section>
+    <section>
+      <h2>2026-09-01 <span class="count">(40 contests)</span></h2>
+      <ul class="rows">
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB SUPERSatellite to NFL 9-13 $5 Fantasy Football Millionaire [2x]</span>
+        <span class="cid">194809944</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194809944" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to NHL 9-29 $15 Opening Night Puck Drop</span>
+        <span class="cid">194810001</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194810001" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to NHL 9-29 $15 Opening Night Puck Drop</span>
+        <span class="cid">194810003</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194810003" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to NFL 9-9 $20 Wednesday Kickoff Millionaire</span>
+        <span class="cid">194810013</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194810013" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to NFL 9-9 $20 Wednesday Kickoff Millionaire</span>
+        <span class="cid">194810014</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194810014" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to 9-29 $20 Postseason Opener</span>
+        <span class="cid">194810047</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194810047" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to 9-29 $20 Postseason Opener</span>
+        <span class="cid">194810048</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194810048" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Turbo)</span>
+        <span class="cid">194810630</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194810630" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to 9-29 $20 Postseason Opener (Turbo)</span>
+        <span class="cid">194810634</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194810634" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (MIL @ CHC)</span>
+        <span class="cid">194810654</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194810654" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (MIL @ CHC)</span>
+        <span class="cid">194810655</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194810655" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (MIL @ CHC)</span>
+        <span class="cid">194810656</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194810656" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (MIL @ CHC)</span>
+        <span class="cid">194810657</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194810657" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to 9-29 $20 Postseason Opener (MIL @ CHC)</span>
+        <span class="cid">194810661</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194810661" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (STL @ LAD)</span>
+        <span class="cid">194810709</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194810709" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (STL @ LAD)</span>
+        <span class="cid">194810711</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194810711" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (STL @ LAD)</span>
+        <span class="cid">194810723</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194810723" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to 9-29 $20 Postseason Opener (STL @ LAD)</span>
+        <span class="cid">194810727</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194810727" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to 9-29 $20 Postseason Opener (STL @ LAD)</span>
+        <span class="cid">194810728</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194810728" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $2K Quarter Jukebox [Just $0.25!]</span>
+        <span class="cid">194811977</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194811977" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $1K Strike Three [5 Entry Max]</span>
+        <span class="cid">194811983</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194811983" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $100 Quarter Jukebox [Just $0.25!]  (MIL @ CHC)</span>
+        <span class="cid">194861309</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194861309" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $50 Quarter Jukebox [Just $0.25!] (Turbo)</span>
+        <span class="cid">194861676</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194861676" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $100 Dime Time [Just $0.10!] (Turbo)</span>
+        <span class="cid">194862447</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194862447" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $300 Solo Shot (MIL @ CHC)</span>
+        <span class="cid">194864911</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194864911" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $300 Solo Shot (Turbo)</span>
+        <span class="cid">194865741</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194865741" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $300 Dime Time [Just $0.10!]</span>
+        <span class="cid">194865910</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194865910" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB 40x Micro Booster [Top 5 Win $10]</span>
+        <span class="cid">194866025</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194866025" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $2K Solo Shot</span>
+        <span class="cid">194867879</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194867879" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $100 Dime Time [Just $0.10!]</span>
+        <span class="cid">194868461</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194868461" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Turbo)</span>
+        <span class="cid">194870491</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194870491" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $300 Dime Time [Just $0.10!]</span>
+        <span class="cid">194870524</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194870524" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $250 Quarter Jukebox [Just $0.25!]</span>
+        <span class="cid">194870594</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194870594" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB SUPERSatellite to NFL 9-13 $5 Fantasy Football Millionaire [5x]</span>
+        <span class="cid">194870687</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194870687" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $100 Dime Time [Just $0.10!] (MIL @ CHC)</span>
+        <span class="cid">194870929</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194870929" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $200 Solo Shot (STL @ LAD)</span>
+        <span class="cid">194883869</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194883869" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (STL @ LAD)</span>
+        <span class="cid">194888740</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194888740" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (STL @ LAD)</span>
+        <span class="cid">194889142</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194889142" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $50 Quarter Jukebox [Just $0.25!] (STL @ LAD)</span>
+        <span class="cid">194890264</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194890264" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $75 Solo Shot (STL @ LAD)</span>
+        <span class="cid">194891685</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194891685" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      </ul>
+    </section>
+    <section>
+      <h2>2026-09-02 <span class="count">(28 contests)</span></h2>
+      <ul class="rows">
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $100 Dime Time [Just $0.10!]</span>
+        <span class="cid">194876282</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194876282" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $300 Dime Time [Just $0.10!]</span>
+        <span class="cid">194876284</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194876284" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to $15 Relay Throw</span>
+        <span class="cid">194876316</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194876316" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to NBA Best Ball $20 Shootaround</span>
+        <span class="cid">194876376</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194876376" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to NHL 9-29 $15 Opening Night Puck Drop</span>
+        <span class="cid">194876513</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194876513" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to 9-29 $20 Postseason Opener</span>
+        <span class="cid">194876571</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194876571" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to 9-29 $20 Postseason Opener (Turbo)</span>
+        <span class="cid">194877186</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194877186" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Night)</span>
+        <span class="cid">194877236</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194877236" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to 9-29 $20 Postseason Opener (Night)</span>
+        <span class="cid">194877240</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194877240" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $100 Dime Time [Just $0.10!] (STL @ LAD)</span>
+        <span class="cid">194877251</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194877251" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (STL @ LAD)</span>
+        <span class="cid">194877260</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194877260" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (STL @ LAD)</span>
+        <span class="cid">194877263</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194877263" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to 9-29 $20 Postseason Opener (STL @ LAD)</span>
+        <span class="cid">194877266</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194877266" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to 9-29 $20 Postseason Opener (STL @ LAD)</span>
+        <span class="cid">194877267</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194877267" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $750 Daily Dollar [Single Entry]</span>
+        <span class="cid">194878545</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194878545" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $300 Quarter Jukebox [Just $0.25!] (STL @ LAD)</span>
+        <span class="cid">194878593</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194878593" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $3K Solo Shot</span>
+        <span class="cid">194928885</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194928885" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $30 Quarter Jukebox [Just $0.25!] (Turbo)</span>
+        <span class="cid">194931508</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194931508" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $250 Solo Shot (Turbo)</span>
+        <span class="cid">194931553</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194931553" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $150 Quarter Jukebox [Just $0.25!]</span>
+        <span class="cid">194934295</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194934295" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Turbo)</span>
+        <span class="cid">194934587</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194934587" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $300 Dime Time [Just $0.10!]</span>
+        <span class="cid">194935516</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194935516" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $350 Solo Shot (STL @ LAD)</span>
+        <span class="cid">194940953</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194940953" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $100 Dime Time [Just $0.10!] (Night)</span>
+        <span class="cid">194941891</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194941891" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $30 Quarter Jukebox [Just $0.25!] (Night)</span>
+        <span class="cid">194942167</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194942167" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $50 Quarter Jukebox [Just $0.25!] (STL @ LAD)</span>
+        <span class="cid">194942848</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194942848" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Night)</span>
+        <span class="cid">194943244</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194943244" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $200 Solo Shot (Night)</span>
+        <span class="cid">194943531</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194943531" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      </ul>
+    </section>
+    <section>
+      <h2>2026-09-03 <span class="count">(56 contests)</span></h2>
+      <ul class="rows">
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB 40x Micro Booster [Top 5 Win $10] (Early)</span>
+        <span class="cid">194931944</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194931944" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB SUPERSatellite to NFL 9-13 $5 Fantasy Football Millionaire [2x] (Early)</span>
+        <span class="cid">194932001</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194932001" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB SUPERSatellite to NFL 9-13 $5 Fantasy Football Millionaire [2x] (Early)</span>
+        <span class="cid">194932002</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194932002" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to 9-29 $20 Postseason Opener (Early)</span>
+        <span class="cid">194932026</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194932026" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to 9-29 $20 Postseason Opener (Early)</span>
+        <span class="cid">194932027</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194932027" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to $15 Relay Throw</span>
+        <span class="cid">194932480</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194932480" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">FINAL STRETCH: MLB Satellite to NFL 9-9 $20 Wednesday Kickoff Millionaire</span>
+        <span class="cid">194932610</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194932610" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to 9-29 $20 Postseason Opener</span>
+        <span class="cid">194932651</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194932651" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $100 Dime Time [Just $0.10!] (SF @ PIT)</span>
+        <span class="cid">194932851</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194932851" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (SF @ PIT)</span>
+        <span class="cid">194932860</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194932860" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (SF @ PIT)</span>
+        <span class="cid">194932863</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194932863" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to 9-29 $20 Postseason Opener (SF @ PIT)</span>
+        <span class="cid">194932866</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194932866" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to 9-29 $20 Postseason Opener (SF @ PIT)</span>
+        <span class="cid">194932867</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194932867" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $100 Dime Time [Just $0.10!] (MIL @ CHC)</span>
+        <span class="cid">194932878</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194932878" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (MIL @ CHC)</span>
+        <span class="cid">194932887</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194932887" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (MIL @ CHC)</span>
+        <span class="cid">194932890</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194932890" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to 9-29 $20 Postseason Opener (MIL @ CHC)</span>
+        <span class="cid">194932893</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194932893" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to 9-29 $20 Postseason Opener (MIL @ CHC)</span>
+        <span class="cid">194932894</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194932894" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $100 Dime Time [Just $0.10!] (TB @ TEX)</span>
+        <span class="cid">194932905</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194932905" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (TB @ TEX)</span>
+        <span class="cid">194932914</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194932914" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (TB @ TEX)</span>
+        <span class="cid">194932917</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194932917" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to 9-29 $20 Postseason Opener (TB @ TEX)</span>
+        <span class="cid">194932920</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194932920" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to 9-29 $20 Postseason Opener (TB @ TEX)</span>
+        <span class="cid">194932921</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194932921" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Night)</span>
+        <span class="cid">194932956</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194932956" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to 9-29 $20 Postseason Opener (Night)</span>
+        <span class="cid">194932961</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194932961" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $100 Dime Time [Just $0.10!] (STL @ LAD)</span>
+        <span class="cid">194932972</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194932972" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (STL @ LAD)</span>
+        <span class="cid">194932981</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194932981" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (STL @ LAD)</span>
+        <span class="cid">194932984</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194932984" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to 9-29 $20 Postseason Opener (STL @ LAD)</span>
+        <span class="cid">194932987</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194932987" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to 9-29 $20 Postseason Opener (STL @ LAD)</span>
+        <span class="cid">194932988</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194932988" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $1K Quarter Jukebox [Just $0.25!]  (Early)</span>
+        <span class="cid">194946043</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194946043" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $1.25K Solo Shot (SF @ PIT)</span>
+        <span class="cid">194946059</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194946059" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $750 Solo Shot (TB @ TEX)</span>
+        <span class="cid">194946112</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194946112" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $125 Quarter Jukebox [Just $0.25!] (TB @ TEX)</span>
+        <span class="cid">194946113</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194946113" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $2K Solo Shot (STL @ LAD)</span>
+        <span class="cid">194946129</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194946129" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $300 Quarter Jukebox [Just $0.25!] (STL @ LAD)</span>
+        <span class="cid">194946130</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194946130" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $400 Solo Shot (Early)</span>
+        <span class="cid">194972967</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194972967" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Early)</span>
+        <span class="cid">194973224</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194973224" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $150 Quarter Jukebox [Just $0.25!] (Early)</span>
+        <span class="cid">194973842</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194973842" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $75 Solo Shot (SF @ PIT)</span>
+        <span class="cid">194974689</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194974689" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $50 Quarter Jukebox [Just $0.25!] (SF @ PIT)</span>
+        <span class="cid">194975744</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194975744" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $2.5K Solo Shot</span>
+        <span class="cid">194989770</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194989770" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $2.1K mini-MAX [150 Entry Max]</span>
+        <span class="cid">194992597</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194992597" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $30 Quarter Jukebox [Just $0.25!] (MIL @ CHC)</span>
+        <span class="cid">194994350</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194994350" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $150 Solo Shot (MIL @ CHC)</span>
+        <span class="cid">194995590</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194995590" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB SUPERSatellite to NFL 9-13 $5 Fantasy Football Millionaire [2x]</span>
+        <span class="cid">194996092</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194996092" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $100 Dime Time [Just $0.10!]</span>
+        <span class="cid">194996367</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194996367" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $125 Quarter Jukebox [Just $0.25!]</span>
+        <span class="cid">194997294</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194997294" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $100 Daily Dollar [Single Entry]</span>
+        <span class="cid">194998608</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194998608" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $50 Quarter Jukebox [Just $0.25!]</span>
+        <span class="cid">195002705</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195002705" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Night)</span>
+        <span class="cid">195006816</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195006816" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $100 Dime Time [Just $0.10!] (Night)</span>
+        <span class="cid">195007101</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195007101" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $75 Quarter Jukebox [Just $0.25!] (Night)</span>
+        <span class="cid">195008385</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195008385" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $20 Quarter Jukebox [Just $0.25!] (STL @ LAD)</span>
+        <span class="cid">195009322</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195009322" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $200 Solo Shot (Night)</span>
+        <span class="cid">195009401</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195009401" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $200 Solo Shot (STL @ LAD)</span>
+        <span class="cid">195010361</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195010361" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      </ul>
+    </section>
+    <section>
+      <h2>2026-09-04 <span class="count">(28 contests)</span></h2>
+      <ul class="rows">
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $100 Dime Time [Just $0.10!] (Night)</span>
+        <span class="cid">194991039</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194991039" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $100 Dime Time [Just $0.10!] (Night)</span>
+        <span class="cid">194991040</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194991040" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Night)</span>
+        <span class="cid">194991076</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194991076" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Night)</span>
+        <span class="cid">194991077</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194991077" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Night)</span>
+        <span class="cid">194991078</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194991078" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Night)</span>
+        <span class="cid">194991079</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194991079" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Night)</span>
+        <span class="cid">194991080</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194991080" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to 9-29 $20 Postseason Opener (Night)</span>
+        <span class="cid">194991110</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194991110" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $100 Dime Time [Just $0.10!] (Turbo)</span>
+        <span class="cid">194991318</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194991318" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $100 Dime Time [Just $0.10!] (Late Night)</span>
+        <span class="cid">194991402</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194991402" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to 9-29 $20 Postseason Opener (Late Night)</span>
+        <span class="cid">194991418</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194991418" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $100 Dime Time [Just $0.10!] (WSH @ LAD)</span>
+        <span class="cid">194991430</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194991430" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (WSH @ LAD)</span>
+        <span class="cid">194991439</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194991439" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (WSH @ LAD)</span>
+        <span class="cid">194991440</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194991440" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (WSH @ LAD)</span>
+        <span class="cid">194991442</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194991442" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to 9-29 $20 Postseason Opener (WSH @ LAD)</span>
+        <span class="cid">194991446</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194991446" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $2K Solo Shot (Turbo)</span>
+        <span class="cid">194992502</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194992502" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $400 Quarter Jukebox [Just $0.25!] (Turbo)</span>
+        <span class="cid">194992503</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194992503" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $6K mini-MAX [150 Entry Max] (Night)</span>
+        <span class="cid">194992570</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194992570" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $1K Solo Shot (Night)</span>
+        <span class="cid">194992571</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194992571" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $500 Quarter Jukebox [Just $0.25!] (Night)</span>
+        <span class="cid">194992572</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194992572" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $1K Solo Shot (Late Night)</span>
+        <span class="cid">194992583</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194992583" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $200 Quarter Jukebox [Just $0.25!] (Late Night)</span>
+        <span class="cid">194992584</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194992584" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $2K Solo Shot (WSH @ LAD)</span>
+        <span class="cid">194992590</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194992590" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $250 Quarter Jukebox [Just $0.25!]  (WSH @ LAD)</span>
+        <span class="cid">194992591</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/194992591" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $50 Quarter Jukebox [Just $0.25!] (Turbo)</span>
+        <span class="cid">195058194</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195058194" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $30 Quarter Jukebox [Just $0.25!] (WSH @ LAD)</span>
+        <span class="cid">195074039</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195074039" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $75 Quarter Jukebox [Just $0.25!] (Night)</span>
+        <span class="cid">195074997</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195074997" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      </ul>
+    </section>
+    <section>
+      <h2>2026-09-05 <span class="count">(15 contests)</span></h2>
+      <ul class="rows">
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $100 Dime Time [Just $0.10!] (STL @ COL)</span>
+        <span class="cid">195059984</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195059984" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (STL @ COL)</span>
+        <span class="cid">195059996</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195059996" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to 9-29 $20 Postseason Opener (STL @ COL)</span>
+        <span class="cid">195059999</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195059999" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Night)</span>
+        <span class="cid">195060024</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195060024" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to 9-29 $20 Postseason Opener (Night)</span>
+        <span class="cid">195060028</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195060028" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $100 Dime Time [Just $0.10!] (ATH @ SEA)</span>
+        <span class="cid">195060040</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195060040" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (ATH @ SEA)</span>
+        <span class="cid">195060049</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195060049" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (ATH @ SEA)</span>
+        <span class="cid">195060052</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195060052" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to 9-29 $20 Postseason Opener (ATH @ SEA)</span>
+        <span class="cid">195060055</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195060055" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $500 Solo Shot (STL @ COL)</span>
+        <span class="cid">195062364</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195062364" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $150 Quarter Jukebox [Just $0.25!] (STL @ COL)</span>
+        <span class="cid">195062365</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195062365" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $500 Quarter Jukebox [Just $0.25!] (Night)</span>
+        <span class="cid">195062373</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195062373" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $1.25K Solo Shot (ATH @ SEA)</span>
+        <span class="cid">195062382</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195062382" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $250 Quarter Jukebox [Just $0.25!]  (ATH @ SEA)</span>
+        <span class="cid">195062383</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195062383" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $500 Solo Shot (Night)</span>
+        <span class="cid">195141369</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195141369" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      </ul>
+    </section>
+    <section>
+      <h2>2026-09-06 <span class="count">(9 contests)</span></h2>
+      <ul class="rows">
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown 40x Micro Booster [Top 5 Win $10] (WSH @ LAD)</span>
+        <span class="cid">195108587</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195108587" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $100 Dime Time [Just $0.10!] (WSH @ LAD)</span>
+        <span class="cid">195108595</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195108595" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $100 Dime Time [Just $0.10!] (WSH @ LAD)</span>
+        <span class="cid">195108596</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195108596" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown SUPERSatellite to NFL 9-13 $5 Fantasy Football Millionaire [2x] (WSH @ LAD)</span>
+        <span class="cid">195108644</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195108644" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to 9-29 $20 Postseason Opener (WSH @ LAD)</span>
+        <span class="cid">195108665</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195108665" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $7.5K mini-MAX [150 Entry Max] (WSH @ LAD)</span>
+        <span class="cid">195122309</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195122309" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $1K Solo Shot (WSH @ LAD)</span>
+        <span class="cid">195122310</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195122310" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $750 Quarter Jukebox [Just $0.25!] (WSH @ LAD)</span>
+        <span class="cid">195122311</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195122311" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $250 Daily Dollar [Single Entry] (WSH @ LAD)</span>
+        <span class="cid">195122315</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195122315" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      </ul>
+    </section>
+    <section>
+      <h2>2026-09-08 <span class="count">(22 contests)</span></h2>
+      <ul class="rows">
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB 40x Micro Booster [Top 5 Win $10] (Night)</span>
+        <span class="cid">195251466</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195251466" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $100 Dime Time [Just $0.10!] (Night)</span>
+        <span class="cid">195251474</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195251474" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $100 Dime Time [Just $0.10!] (Night)</span>
+        <span class="cid">195251475</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195251475" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB SUPERSatellite to NFL 9-13 $5 Fantasy Football Millionaire [2x] (Night)</span>
+        <span class="cid">195251523</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195251523" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB SUPERSatellite to NFL 9-13 $5 Fantasy Football Millionaire [2x] (Night)</span>
+        <span class="cid">195251524</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195251524" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to 9-29 $20 Postseason Opener (Night)</span>
+        <span class="cid">195251545</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195251545" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to 9-29 $20 Postseason Opener (Turbo)</span>
+        <span class="cid">195251800</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195251800" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $100 Dime Time [Just $0.10!] (CIN @ LAD)</span>
+        <span class="cid">195251840</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195251840" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (CIN @ LAD)</span>
+        <span class="cid">195251849</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195251849" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (CIN @ LAD)</span>
+        <span class="cid">195251852</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195251852" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">FINAL STRETCH: MLB Showdown Satellite to NFL 9-9 $20 Wednesday Kickoff Millionaire (CIN @ LAD)</span>
+        <span class="cid">195251853</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195251853" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to 9-29 $20 Postseason Opener (CIN @ LAD)</span>
+        <span class="cid">195251855</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195251855" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $7.5K mini-MAX [150 Entry Max] (Night)</span>
+        <span class="cid">195265343</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195265343" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $2K Solo Shot (Night)</span>
+        <span class="cid">195265344</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195265344" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $625 Quarter Jukebox [Just $0.25!] (Night)</span>
+        <span class="cid">195265345</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195265345" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $2K Solo Shot (CIN @ LAD)</span>
+        <span class="cid">195265357</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195265357" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $300 Quarter Jukebox [Just $0.25!] (CIN @ LAD)</span>
+        <span class="cid">195265358</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195265358" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $300 Solo Shot (Turbo)</span>
+        <span class="cid">195374568</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195374568" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $50 Quarter Jukebox [Just $0.25!] (Turbo)</span>
+        <span class="cid">195375512</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195375512" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $100 Dime Time [Just $0.10!] (Turbo)</span>
+        <span class="cid">195378395</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195378395" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Turbo)</span>
+        <span class="cid">195380049</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195380049" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Turbo)</span>
+        <span class="cid">195381884</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195381884" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      </ul>
+    </section>
+    <section>
+      <h2>2026-09-09 <span class="count">(14 contests)</span></h2>
+      <ul class="rows">
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB SUPERSatellite to NFL 9-13 $5 Fantasy Football Millionaire [2x]</span>
+        <span class="cid">195370015</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195370015" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to 9-29 $20 Postseason Opener</span>
+        <span class="cid">195370022</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195370022" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB 40x Micro Booster [Top 5 Win $10] (Early)</span>
+        <span class="cid">195370063</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195370063" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB SUPERSatellite to NFL 9-13 $5 Fantasy Football Millionaire [2x] (Early)</span>
+        <span class="cid">195370109</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195370109" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB SUPERSatellite to NFL 9-13 $5 Fantasy Football Millionaire [2x] (Early)</span>
+        <span class="cid">195370110</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195370110" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to 9-29 $20 Postseason Opener (Early)</span>
+        <span class="cid">195370117</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195370117" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $1K Quarter Jukebox [Just $0.25!]  (Early)</span>
+        <span class="cid">195371535</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195371535" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $1K Daily Dollar [Single Entry]</span>
+        <span class="cid">195371560</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195371560" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $30 Quarter Jukebox [Just $0.25!] (Early)</span>
+        <span class="cid">195463772</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195463772" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $100 Solo Shot (Early)</span>
+        <span class="cid">195464644</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195464644" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $100 Dime Time [Just $0.10!]</span>
+        <span class="cid">195467032</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195467032" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $100 Dime Time [Just $0.10!]</span>
+        <span class="cid">195470620</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195470620" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $125 Quarter Jukebox [Just $0.25!]</span>
+        <span class="cid">195478656</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195478656" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $30 Daily Dollar [Single Entry]</span>
+        <span class="cid">195487533</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195487533" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      </ul>
+    </section>
+    <section>
+      <h2>2026-09-10 <span class="count">(22 contests)</span></h2>
+      <ul class="rows">
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB SUPERSatellite to NFL 9-13 $5 Fantasy Football Millionaire [2x]</span>
+        <span class="cid">195473857</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195473857" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB SUPERSatellite to NFL 9-13 $5 Fantasy Football Millionaire [2x]</span>
+        <span class="cid">195473858</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195473858" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Night)</span>
+        <span class="cid">195474231</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195474231" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to 9-29 $20 Postseason Opener (Night)</span>
+        <span class="cid">195474233</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195474233" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $100 Dime Time [Just $0.10!] (PIT @ CWS)</span>
+        <span class="cid">195474245</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195474245" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (PIT @ CWS)</span>
+        <span class="cid">195474252</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195474252" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (PIT @ CWS)</span>
+        <span class="cid">195474253</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195474253" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (PIT @ CWS)</span>
+        <span class="cid">195474254</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195474254" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to NFL 9-13 $5 Fantasy Football Millionaire (PIT @ CWS)</span>
+        <span class="cid">195474255</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195474255" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown Satellite to 9-29 $20 Postseason Opener (PIT @ CWS)</span>
+        <span class="cid">195474256</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195474256" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $10K mini-MAX [150 Entry Max]</span>
+        <span class="cid">195475481</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195475481" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $1.5K Solo Shot</span>
+        <span class="cid">195475482</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195475482" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $4K mini-MAX [150 Entry Max]</span>
+        <span class="cid">195475483</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195475483" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $750 Quarter Jukebox [Just $0.25!]</span>
+        <span class="cid">195475484</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195475484" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $500 Daily Dollar [Single Entry]</span>
+        <span class="cid">195475488</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195475488" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $4.5K mini-MAX [$1K to 1st 150 Entry Max] (Night)</span>
+        <span class="cid">195475521</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195475521" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $1K Solo Shot (PIT @ CWS)</span>
+        <span class="cid">195475535</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195475535" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Showdown $300 Quarter Jukebox [Just $0.25!] (PIT @ CWS)</span>
+        <span class="cid">195475537</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195475537" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Night)</span>
+        <span class="cid">195510603</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195510603" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $100 Dime Time [Just $0.10!] (Night)</span>
+        <span class="cid">195512799</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195512799" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $125 Quarter Jukebox [Just $0.25!] (Night)</span>
+        <span class="cid">195513446</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195513446" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $300 Solo Shot (Night)</span>
+        <span class="cid">195513461</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195513461" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      </ul>
+    </section>
+    <section>
+      <h2>2026-09-11 <span class="count">(8 contests)</span></h2>
+      <ul class="rows">
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $100 Dime Time [Just $0.10!] (Turbo)</span>
+        <span class="cid">195514638</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195514638" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Turbo)</span>
+        <span class="cid">195514645</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195514645" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Turbo)</span>
+        <span class="cid">195514646</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195514646" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Turbo)</span>
+        <span class="cid">195514647</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195514647" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Turbo)</span>
+        <span class="cid">195514648</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195514648" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to 9-29 $20 Postseason Opener (Turbo)</span>
+        <span class="cid">195514650</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195514650" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $200 Solo Shot (Turbo)</span>
+        <span class="cid">195541480</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195541480" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $30 Quarter Jukebox [Just $0.25!] (Turbo)</span>
+        <span class="cid">195544584</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195544584" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      </ul>
+    </section>
+    <section>
+      <h2>2026-09-12 <span class="count">(25 contests)</span></h2>
+      <ul class="rows">
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB 40x Micro Booster [Top 10 Win $10]</span>
+        <span class="cid">195543163</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195543163" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $100 Dime Time [Just $0.10!]</span>
+        <span class="cid">195543208</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195543208" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $300 Dime Time [Just $0.10!]</span>
+        <span class="cid">195543209</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195543209" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to $15 Relay Throw</span>
+        <span class="cid">195543230</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195543230" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB SUPERSatellite to NFL 9-13 $5 Fantasy Football Millionaire [2x]</span>
+        <span class="cid">195543265</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195543265" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB SUPERSatellite to NFL 9-13 $5 Fantasy Football Millionaire [2x]</span>
+        <span class="cid">195543272</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195543272" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to 9-29 $20 Postseason Opener</span>
+        <span class="cid">195543329</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195543329" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to NBA 10-20 $20 Opening Tip Off</span>
+        <span class="cid">195543335</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195543335" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB 40x Micro Booster [Top 5 Win $10] (Night)</span>
+        <span class="cid">195543442</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195543442" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $100 Dime Time [Just $0.10!] (Night)</span>
+        <span class="cid">195543451</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195543451" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Night)</span>
+        <span class="cid">195543468</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195543468" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Night)</span>
+        <span class="cid">195543476</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195543476" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to NFL 9-13 $5 Fantasy Football Millionaire (Night)</span>
+        <span class="cid">195543478</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195543478" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB SUPERSatellite to NFL 9-13 $5 Fantasy Football Millionaire [2x] (Night)</span>
+        <span class="cid">195543488</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195543488" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB SUPERSatellite to NFL 9-13 $5 Fantasy Football Millionaire [2x] (Night)</span>
+        <span class="cid">195543489</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195543489" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to 9-29 $20 Postseason Opener (Night)</span>
+        <span class="cid">195543496</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195543496" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $10K mini-MAX [150 Entry Max]</span>
+        <span class="cid">195544664</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195544664" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $5K Solo Shot [$1K to 1st]</span>
+        <span class="cid">195544665</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195544665" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $10K mini-MAX [150 Entry Max]</span>
+        <span class="cid">195544666</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195544666" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $1K Quarter Jukebox [Just $0.25!]</span>
+        <span class="cid">195544667</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195544667" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $500 Daily Dollar [Single Entry]</span>
+        <span class="cid">195544677</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195544677" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $12K mini-MAX [150 Entry Max] (Night)</span>
+        <span class="cid">195544729</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195544729" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $2.5K Solo Shot (Night)</span>
+        <span class="cid">195544730</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195544730" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $1K Quarter Jukebox [Just $0.25!]  (Night)</span>
+        <span class="cid">195544731</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195544731" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $500 Daily Dollar [Single Entry] (Night)</span>
+        <span class="cid">195544738</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195544738" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      </ul>
+    </section>
+    <section>
+      <h2>2026-09-14 <span class="count">(13 contests)</span></h2>
+      <ul class="rows">
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB 40x Micro Booster [Top 10 Win $10]</span>
+        <span class="cid">195618246</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195618246" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $100 Dime Time [Just $0.10!]</span>
+        <span class="cid">195618285</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195618285" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $300 Dime Time [Just $0.10!]</span>
+        <span class="cid">195618286</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195618286" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to $121 Battery</span>
+        <span class="cid">195618299</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195618299" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to $15 Relay Throw</span>
+        <span class="cid">195618301</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195618301" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to 9-29 $20 Postseason Opener</span>
+        <span class="cid">195618317</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195618317" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to NBA 10-20 $20 Opening Tip Off</span>
+        <span class="cid">195618323</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195618323" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $10K mini-MAX [150 Entry Max]</span>
+        <span class="cid">195638103</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195638103" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $750 Daily Dollar [Single Entry]</span>
+        <span class="cid">195638114</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195638114" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to $20 NFL Fantasy Football Millionaire</span>
+        <span class="cid">195656131</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195656131" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to $20 NFL Fantasy Football Millionaire</span>
+        <span class="cid">195656135</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195656135" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $600 Solo Shot</span>
+        <span class="cid">195663416</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195663416" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $150 Quarter Jukebox [Just $0.25!]</span>
+        <span class="cid">195663995</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195663995" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      </ul>
+    </section>
+    <section>
+      <h2>2026-09-15 <span class="count">(5 contests)</span></h2>
+      <ul class="rows">
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to 9-29 $20 Postseason Opener (Turbo)</span>
+        <span class="cid">195667598</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195667598" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $2.5K Solo Shot (Turbo)</span>
+        <span class="cid">195668414</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195668414" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $625 Quarter Jukebox [Just $0.25!] (Turbo)</span>
+        <span class="cid">195668415</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195668415" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $400 Solo Shot (Turbo)</span>
+        <span class="cid">195700604</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195700604" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $30 Quarter Jukebox [Just $0.25!] (Turbo)</span>
+        <span class="cid">195703759</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195703759" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      </ul>
+    </section>
+    <section>
+      <h2>2026-09-16 <span class="count">(4 contests)</span></h2>
+      <ul class="rows">
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to 9-29 $20 Postseason Opener (Early)</span>
+        <span class="cid">195708384</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195708384" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $500 Daily Dollar [Single Entry] (Early)</span>
+        <span class="cid">195709704</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195709704" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB Satellite to $20 NFL Fantasy Football Millionaire (Early)</span>
+        <span class="cid">195717703</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195717703" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      <li class="row">
+        <label class="chk"><input type="checkbox"></label>
+        <span class="name">MLB $100 Quarter Jukebox [Just $0.25!]  (Early)</span>
+        <span class="cid">195720365</span>
+        <a class="pull" href="https://www.draftkings.com/contest/exportfullstandingscsv/195720365" target="_blank" rel="noopener">Open export ↗</a>
+      </li>
+      </ul>
+    </section>
+
+</div>
+<script>
+  const total = 342;
+  function updateProgress() {
+    const done = document.querySelectorAll('li.row.done').length;
+    document.getElementById('progressLabel').textContent = done + ' / ' + total + ' pulled';
+    document.getElementById('progressFill').style.width = (total ? (done / total * 100) : 0) + '%';
+  }
+  document.querySelectorAll('li.row').forEach(row => {
+    const cb = row.querySelector('input[type=checkbox]');
+    const link = row.querySelector('a.pull');
+    function setDone(v) {
+      cb.checked = v;
+      row.classList.toggle('done', v);
+      updateProgress();
+    }
+    cb.addEventListener('change', () => setDone(cb.checked));
+    // Clicking the export link opens the download AND checks the box off --
+    // one click per contest instead of two.
+    link.addEventListener('click', () => setDone(true));
+  });
+</script>
+</body>
+</html>
