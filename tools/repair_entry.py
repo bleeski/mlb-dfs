@@ -97,6 +97,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -551,16 +552,33 @@ def record_repair(out_path: Path, parent_path: Path, salary_path: Path,
     warning), and a parent whose own row is already superseded still gets the
     repair recorded (with a warning that it supersedes whatever is live now).
 
-    Returns ``{"recorded", "path", "error", "warnings", "repair_of"}``; never
-    raises. ``path`` is where the file actually is: ``out_path`` once promoted,
-    the `DO_NOT_UPLOAD_` provisional when the record failed.
+    Returns ``{"recorded", "path", "error", "warnings", "repair_of", "noop"}``;
+    never raises. ``path`` is where the file actually is: ``out_path`` once
+    promoted, the `DO_NOT_UPLOAD_` provisional when the record failed. ``noop`` is
+    True when the repair's bytes EQUAL the parent's (nothing was replaced): nothing
+    is recorded and nothing is written here, because the same bytes recorded twice
+    are one delivery, so the record would have merged into the PARENT's row,
+    pointed it at the copy, and relabelled a certified parent review-grade. The
+    parent's row already describes those bytes (the preflight matches by bytes);
+    the caller writes the copy ad hoc, as before R430.
     """
+    import tempfile
     from mlb_engine.entries import upload_manifest as um
     out: Dict[str, Any] = {"recorded": False, "path": str(out_path), "error": "",
-                           "warnings": [], "repair_of": None}
+                           "warnings": [], "repair_of": None, "noop": False}
     try:
         date = out_path.parent.name
         parent_sha = um.sha256_file(parent_path)
+        with tempfile.TemporaryDirectory() as scratch:
+            probe = Path(scratch) / out_path.name
+            write_entries(probe, list(header), list(entries), list(trailing))
+            if um.sha256_file(probe) == parent_sha:
+                out["noop"] = True
+                out["warnings"].append(
+                    f"no slot was repaired: the output is byte-identical to the parent "
+                    f"{parent_path.name} (sha256 {parent_sha[:12]}), whose manifest row "
+                    f"already describes these bytes, so nothing was recorded")
+                return out
         parent = um.recorded_delivery_row(date, parent_sha)
         meta: Dict[str, Any]
         if parent is None:
@@ -815,17 +833,21 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     recorded_error = ""
     if args.dry_run:
         result["written"] = None
-    elif is_delivered_file(out_path) and out_path.parent.name[:2] == "20":
+    elif is_delivered_file(out_path) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", out_path.parent.name):
         # R430. A file under outputs/<date>/ is a delivery and is recorded; a
         # file elsewhere is ad hoc and, as before, is not.
         recording = record_repair(out_path, args.entries, args.salary, header,
                                   entries, trailing, result)
-        result["written"] = recording["path"]
+        if recording["noop"]:
+            write_entries(out_path, header, entries, trailing)
+            result["written"] = str(out_path)
+        else:
+            result["written"] = recording["path"]
         result["recorded"] = {k: recording[k] for k in
-                              ("recorded", "repair_of", "warnings", "error")}
+                              ("recorded", "repair_of", "warnings", "error", "noop")}
         for warning in recording["warnings"]:
             print(f"repair_entry: WARN {warning}", file=sys.stderr)
-        if not recording["recorded"]:
+        if not recording["recorded"] and not recording["noop"]:
             recorded_error = recording["error"] or "no reason was reported"
             # On stderr whatever the output mode: a --json caller reads the
             # exit code (5) and the payload, and still needs the reason.
@@ -836,6 +858,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     else:
         write_entries(out_path, header, entries, trailing)
         result["written"] = str(out_path)
+        if is_delivered_file(out_path):
+            # R430. Under outputs/ but not in outputs/<date>/: the manifest is
+            # per date, so there is no row to write, and the preflight will
+            # hard-fail the file for want of one. Say so now, not at T-5.
+            print(f"repair_entry: WARN {out_path} is under outputs/ but not in "
+                  f"outputs/<date>/, so it was written and NOT recorded; the "
+                  f"preflight will refuse it until it is. Use --out "
+                  f"outputs/<date>/<name>.csv.", file=sys.stderr)
 
     if args.json:
         print(json.dumps(result, indent=2, sort_keys=True))

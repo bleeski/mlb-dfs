@@ -4322,6 +4322,42 @@ class RepairRecordTests(unittest.TestCase):
         self.assertIn("supersedes whatever is live", err)
         self.assertTrue(result["recorded"]["recorded"])
 
+    def test_a_repair_that_changes_nothing_does_not_rewrite_the_parents_row(self):
+        """A repair run that found nothing to replace writes the parent's own bytes.
+        Recording that as a delivery would merge into the parent's row (the same
+        bytes recorded twice are one delivery) and point it at the copy."""
+        parent = self._record_parent()
+        rows_before = json.dumps(self._rows(), sort_keys=True)
+        copy = self.outputs / "DKEntries_1605_2g_repair1.csv"
+        # Zac Gallen is in the salary file and in no entry: nothing is dead.
+        import contextlib
+        import io
+        out, err = io.StringIO(), io.StringIO()
+        argv = ["--entries", str(parent), "--salary", str(self.fx.salary_path),
+                "--feed", str(self.fx.feed_path), "--as-of", self.AS_OF,
+                "--dead", "Zac Gallen", "--mode", "repair", "--out", str(copy), "--json"]
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = self.re.main(argv)
+        result = json.loads(out.getvalue())
+        self.assertEqual(code, 0, result)
+        self.assertEqual(result["repairs"], [])
+        self.assertTrue(copy.is_file(), "the file is still written, as before")
+        self.assertEqual(copy.read_bytes(), parent.read_bytes())
+        self.assertEqual(json.dumps(self._rows(), sort_keys=True), rows_before,
+                         "a no-op repair rewrote the parent's manifest row")
+        self.assertTrue(result["recorded"]["noop"])
+        self.assertIn("byte-identical", err.getvalue())
+
+    def test_an_out_under_outputs_but_not_in_a_dated_folder_says_it_is_unrecorded(self):
+        parent = self._record_parent()
+        stray = self.root / "outputs" / "DKEntries_stray_repair.csv"
+        code, result, err = self._repair(parent, stray)
+        self.assertEqual(code, 0, result)
+        self.assertTrue(stray.is_file())
+        self.assertEqual(len(self._rows()), 1, "a file outside outputs/<date>/ was recorded")
+        self.assertIn("NOT recorded", err)
+        self.assertIn("outputs/<date>/", err)
+
     def test_an_out_outside_outputs_is_ad_hoc_and_records_nothing(self):
         parent = self._record_parent()
         adhoc = self.fx.dir / "adhoc_repaired.csv"
