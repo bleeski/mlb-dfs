@@ -828,7 +828,8 @@ def publish_baseline(args, salary: Path, entries: Path, pool: Mapping[str, Any],
             contest_postures=parse_postures_arg(getattr(args, "postures", None)) or None,
             assume_gates=parse_assume_gates_arg(getattr(args, "assume_gates", None)),
             max_opposing_hitters_per_sp=getattr(args, "max_opposing_hitters_per_sp", None))
-        block.update({k: out[k] for k in ("core", "window", "controls") if k in out})
+        block.update({k: out[k] for k in ("core", "window", "controls", "projection")
+                      if k in out})
         if out.get("status") == "short":
             core = out.get("core") or {}
             block["status"] = "short"
@@ -3400,6 +3401,12 @@ def summarize_enrichment(reference_status: dict, enrichment: dict,
         "signal_applied_by_side": signal_by_side,
         "neutral_default": neutral_default,
         "projection_mode": projection_mode,
+        # R476 / R299(f). The rows kept at an emergency Base 0.0 because their
+        # APPG was negative or blank, with the original values. The filed name
+        # was `projection.negative_appg_clipped`; no brief had a `projection`
+        # block, so it lands here, beside `value_guard`. None on a prebuilt
+        # (projections_override) frame, which assembles nothing.
+        "projection": enrichment.get("projection"),
         # R119(a), ed4 adoption, recording only. Floor is a UNIFORM 0.58 of
         # Base_Projection (projection_builder.py, no per-row path), so ranking
         # by Floor is always identical to ranking by Base_Projection; Ceiling is

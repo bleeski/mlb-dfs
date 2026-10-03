@@ -5845,6 +5845,10 @@ def _assemble_projection_frame(
     # Parallel to ``assembled``: True where Base was derived from
     # AvgPointsPerGame, False where the caller supplied Base explicitly.
     base_sources: list[bool] = []
+    # R476 / R299(f). The two ways a row's APPG cannot be a Base, reported in
+    # ``enrichment["projection"]`` and the brief once the loop has run.
+    negative_appg_clipped: list[Dict[str, Any]] = []
+    blank_appg_defaulted: list[str] = []
     for raw in rows:
         r = dict(raw)
         pid = str(r.get("Player_ID") or r.get("player_id") or "").strip()
@@ -5892,9 +5896,42 @@ def _assemble_projection_frame(
         if _is_blank(base):
             base = None
         base_from_appg = False
-        if base is None and not _is_blank(r.get("AvgPointsPerGame")):
+        appg_blank = _is_blank(r.get("AvgPointsPerGame"))
+        if base is None and not appg_blank:
             base = r["AvgPointsPerGame"]
             base_from_appg = True
+            # R476. A FINITE negative season APPG (DK ships them: 25 of 998 rows
+            # on 2026-06-28, 8 of them SP) is not a usable Base, and
+            # `validate_projection_factors` rightly refuses a negative one, so
+            # one such arm lost the baseline for EVERY reserved row. It enters
+            # at 0.0, the declared non-negative emergency prior, tagged and
+            # counted below. The arm is never dropped (legal pool), the
+            # validator stays strict, and this branch is only the APPG-derived
+            # Base: an operator-supplied negative Base never reaches it and
+            # still refuses. Nonfinite is NOT clipped: `max(0.0, -inf)` would
+            # swallow a bad cell, so -inf and +inf fall through to the
+            # validator as before. The raw value stays in the frame's own
+            # AvgPointsPerGame column, which is what `apply_xwoba_correction`
+            # re-derives Base from (and clips at 0) on the Savant path.
+            _appg = float(base)
+            if math.isfinite(_appg) and _appg < 0.0:
+                negative_appg_clipped.append({"id": pid, "appg": _appg})
+                notes = (notes + f"; appg_negative_clipped: {_appg:g}->0.00").lstrip("; ")
+                base = 0.0
+        elif base is None and "AvgPointsPerGame" in r:
+            # R299(f). A blank APPG cell (`_pool_row` carries None for a blank or
+            # unparseable DK cell; a projections CSV read by pandas carries
+            # NaN), no operator Base: the row enters at Base 0.0, tagged and
+            # counted, instead of one cell aborting the build. Not derived from
+            # APPG, so it is not an xwOBA-correction candidate (False below;
+            # the NaN raw would exclude it anyway). A row with no
+            # AvgPointsPerGame KEY and no Base says nothing at all about the
+            # player: that is a caller's malformed row and still raises (R57,
+            # test_row_with_neither_base_nor_appg_still_raises). The pool's own
+            # warning counts these rows at the front door.
+            base = 0.0
+            blank_appg_defaulted.append(pid)
+            notes = (notes + "; appg_blank: Base 0.00 (no AvgPointsPerGame, no Base)").lstrip("; ")
         if base is None:
             raise ValueError(f"row for Player_ID {pid} missing Base/AvgPointsPerGame")
         base_sources.append(base_from_appg)
@@ -5912,7 +5949,11 @@ def _assemble_projection_frame(
             "Batting_Order": bo_val,
             "Stack_Group": r.get("Stack_Group") or sp.team,
             "Ownership_Tier": r.get("Ownership_Tier") or "Mid",
-            "AvgPointsPerGame": r.get("AvgPointsPerGame"),
+            # R476. A blank cell is stored as None, never as "" or "  ":
+            # `apply_xwoba_correction` reads this column with
+            # `pd.to_numeric(..., errors="raise")`, and until R299(f) a blank
+            # APPG raised above before it could reach there.
+            "AvgPointsPerGame": None if appg_blank else r.get("AvgPointsPerGame"),
             "Notes": notes,
             # R291, 2026-09-02. The operator exclusion, CARRIED into the frame
             # the optimizer actually solves. R289 made `_pool_row` read the
@@ -5941,6 +5982,47 @@ def _assemble_projection_frame(
             **({"Workload_Factor": float(r["Workload_Factor"])}
                if not _is_blank(r.get("Workload_Factor")) else {}),
         })
+
+    # --- R476 / R299(f): the rows whose APPG was not a usable Base -----------
+    # Reported with its own key beside `value_guard`, like it an internal prior
+    # and not enrichment (so it stays out of `manifest_projection_tier`'s key
+    # list). The baseline is the safety net every build publishes first; this
+    # says which rows it stands on at Base 0.0 and why. Notes carry the same
+    # fact per row.
+    _clipped_by_id = {rec["id"]: rec["appg"] for rec in negative_appg_clipped}
+    _clipped_ids = sorted(_clipped_by_id)
+    _blank_ids = sorted(blank_appg_defaulted)
+    enrichment["projection"] = {
+        "negative_appg_clipped": {
+            "n": len(negative_appg_clipped), "ids": _clipped_ids,
+            "original": {pid: _clipped_by_id[pid] for pid in _clipped_ids},
+            "note": "A finite negative AvgPointsPerGame is not a usable Base. The row "
+                    "stays in the pool at Base 0.0, the declared non-negative "
+                    "emergency prior; the validator still refuses a negative or "
+                    "nonfinite Base an operator supplies.",
+        },
+        "blank_appg_defaulted": {
+            "n": len(blank_appg_defaulted), "ids": _blank_ids,
+            "note": "A row with a blank AvgPointsPerGame cell and no operator Base "
+                    "stays in the pool at Base 0.0, the same emergency prior.",
+        },
+    }
+
+    def _named_ids(ids: Sequence[str], suffix=lambda pid: "") -> str:
+        shown = ", ".join(f"{players[p].name} [{p}]{suffix(p)}" for p in ids[:8])
+        return shown + ("" if len(ids) <= 8 else f", +{len(ids) - 8} more")
+
+    if _clipped_ids:
+        enrichment["warnings"].append(
+            f"{len(negative_appg_clipped)} row(s) carried a negative AvgPointsPerGame; "
+            f"each is kept in the pool at Base 0.0, the declared non-negative emergency "
+            f"prior ({_named_ids(_clipped_ids, lambda p: f' APPG {_clipped_by_id[p]:g}')}). "
+            "See enrichment['projection'].")
+    if _blank_ids:
+        enrichment["warnings"].append(
+            f"{len(blank_appg_defaulted)} row(s) carried no AvgPointsPerGame and no Base; "
+            f"each is kept in the pool at Base 0.0, the same emergency prior "
+            f"({_named_ids(_blank_ids)}). See enrichment['projection'].")
 
     frame = pd.DataFrame(assembled)
 
@@ -7520,6 +7602,11 @@ def run_baseline(
                    "left_at_call_s": round(left, 1),
                    "window_s": round(window_end - started, 1),
                    "core_s": round(clock() - started, 2)},
+        # R476. The rows this baseline's own frame holds at an emergency Base
+        # (a negative or blank APPG), from the assembly the core solved on. It
+        # rides to the baseline block and the bound baseline brief; without it
+        # the record would be dropped here with `_enrichment`.
+        "projection": (_enrichment or {}).get("projection"),
     }
     if core.status != "covered" or core.stop_reason == "nothing_to_fill":
         out["status"] = "short"
