@@ -2623,9 +2623,14 @@ def build_slate_pool(
         )
     missing_appg = [r["Player_ID"] for r in rows if r.get("AvgPointsPerGame") in (None, "")]
     if missing_appg:
+        # R299(f). Until Session 145 this said those rows "will fail assembly",
+        # and one blank cell did abort the build. They now assemble at Base 0.0
+        # (a tagged emergency prior, counted in `enrichment["projection"]`), so
+        # a row with a real Base to give still wants one supplied.
         warnings.append(
-            f"{len(missing_appg)} kept rows missing AvgPointsPerGame; supply Base "
-            f"before run_slate or those rows will fail assembly"
+            f"{len(missing_appg)} kept rows missing AvgPointsPerGame; Base 0.0 "
+            f"unless Base is supplied before run_slate (each is tagged appg_blank "
+            f"and counted in enrichment['projection'])"
         )
 
     clock = slate_clock(

@@ -4845,6 +4845,36 @@ class BuildSlatePoolTests(unittest.TestCase):
                   if r["Team"] == "T4" and "Ace" not in r["Name"]]
             self.assertTrue(all("Hitter" in r["Name"] for r in t4))  # APPG picks lineup bats over bench
 
+    def test_a_blank_appg_row_enters_at_base_zero_and_the_warning_says_so(self):
+        # R299(f). The pool warned that a kept row with no AvgPointsPerGame
+        # "will fail assembly", and it did: one blank cell aborted the build.
+        # The row now assembles at Base 0.0, tagged, and the warning says so.
+        with tempfile.TemporaryDirectory() as tmp:
+            salary = Path(tmp) / "salary.csv"
+            pool_salary_csv(salary)
+            with salary.open(newline="") as handle:
+                table = list(csv.reader(handle))
+            for row in table[1:]:
+                if row[2] == "T1 Hitter3":
+                    row[7] = ""                      # AvgPointsPerGame
+            with salary.open("w", newline="") as handle:
+                csv.writer(handle).writerows(table)
+            pool = lda.build_slate_pool(salary, pool_lineups_feed(),
+                                        platoon_json=pool_platoon_json())
+            warned = [w for w in pool["pool_report"]["warnings"]
+                      if "kept rows missing AvgPointsPerGame" in w]
+            self.assertEqual(len(warned), 1)
+            self.assertTrue(warned[0].startswith("1 kept rows missing AvgPointsPerGame"))
+            self.assertIn("Base 0.0", warned[0])
+            self.assertNotIn("fail assembly", warned[0])
+            frame, enrichment = epi._assemble_projection_frame(
+                str(salary), pool["projection_rows"], "emergency_proxy", None, None, None)
+            self.assertEqual(len(frame), len(pool["projection_rows"]))
+            row = frame[frame["Name"] == "T1 Hitter3"].iloc[0]
+            self.assertEqual(float(row["Base"]), 0.0)
+            self.assertIn("appg_blank", row["Notes"])
+            self.assertEqual(enrichment["projection"]["blank_appg_defaulted"]["n"], 1)
+
     def test_pool_missing_probable_is_blocker(self):
         with tempfile.TemporaryDirectory() as tmp:
             pool = self._pool(tmp, feed=pool_lineups_feed(drop_t4_probable=True))
@@ -37493,6 +37523,112 @@ class BaselineCoreTests(unittest.TestCase):
         # it would differ here.
         self.assertNotEqual(self._sha(helper), self._sha(self.frame8))
 
+    # --- R476 / R299(f): the baseline survives a negative or blank APPG ------ #
+    #
+    # Reproduced at a47c219 on the tracked 2026-06-28 salary file: one eligible
+    # arm with a negative season AvgPointsPerGame (Bieber, -1.15) made
+    # `unenriched_frame` raise `Base contains negative values`, so the baseline
+    # that every build publishes first was `status: error` for every reserved row;
+    # one BLANK APPG raised `missing Base/AvgPointsPerGame` the same way.
+
+    _SALARY_0628 = REPO / "data" / "archive" / "2026-06-28" / "DKSalaries_2026-06-28.csv"
+    _BIEBER, _BROWN = "43433715", "43433708"     # TOR SP at -1.15; HOU SP at 20.62
+
+    def _frame_0628(self, rows, **savant):
+        """The assembled frame and its enrichment record for ``rows`` on the
+        2026-06-28 pool: unenriched by default, with the vendored Savant
+        expected-stats CSVs when ``savant=True``."""
+        if not savant:
+            return self.bl.unenriched_frame(self._SALARY_0628, rows)
+        ref = REPO / "data" / "reference"
+        return epi._assemble_projection_frame(
+            str(self._SALARY_0628), rows, "emergency_proxy",
+            str(ref / "expected_stats_batting.csv"),
+            str(ref / "expected_stats_pitching.csv"), None)
+
+    def test_a_negative_appg_row_is_retained_at_zero_with_the_tag(self):
+        for label, appg, savant in (
+                ("unenriched", -1.15, {}),
+                ("with the Savant CSVs", -1.15, {"savant": True}),
+                ("a CSV-read string", "-1.15", {})):
+            with self.subTest(path=label):
+                rows = [{"Player_ID": self._BIEBER, "AvgPointsPerGame": appg},
+                        {"Player_ID": self._BROWN, "AvgPointsPerGame": 20.62}]
+                frame, enrichment = self._frame_0628(rows, **savant)
+                by_id = {r["Player_ID"]: r for r in frame.to_dict("records")}
+                # Never dropped: the arm stays in the legal pool.
+                self.assertEqual(sorted(by_id), sorted([self._BIEBER, self._BROWN]))
+                self.assertEqual(by_id[self._BIEBER]["Base"], 0.0)
+                self.assertEqual(by_id[self._BIEBER]["Base_Projection"], 0.0)
+                self.assertIn("appg_negative_clipped: -1.15->0.00",
+                              by_id[self._BIEBER]["Notes"])
+                # The raw value stays in its own column (the Savant path
+                # re-derives Base from it and clips at 0 itself), and the
+                # untouched row carries no tag.
+                self.assertEqual(float(by_id[self._BIEBER]["AvgPointsPerGame"]), -1.15)
+                self.assertNotIn("appg_", by_id[self._BROWN]["Notes"])
+                if savant:
+                    self.assertTrue(enrichment["xwoba"]["applied"])
+                clipped = enrichment["projection"]["negative_appg_clipped"]
+                self.assertEqual((clipped["n"], clipped["ids"], clipped["original"]),
+                                 (1, [self._BIEBER], {self._BIEBER: -1.15}))
+                self.assertEqual(enrichment["projection"]["blank_appg_defaulted"]["n"], 0)
+                self.assertEqual(
+                    len([w for w in enrichment["warnings"]
+                         if "1 row(s) carried a negative AvgPointsPerGame" in w]), 1)
+
+    def test_an_explicit_negative_base_and_a_nonfinite_appg_still_refuse(self):
+        # The validator stays strict: only a FINITE negative APPG is the
+        # declared emergency prior. An operator's own Base is their word, and
+        # `max(0.0, -inf)` would have turned a nonfinite cell into a quiet 0.0.
+        for label, row in (
+                ("Base -1.0", {"Base": -1.0}),
+                ("Base -1.0 beside a positive APPG", {"Base": -1.0, "AvgPointsPerGame": 5.0}),
+                ("Base -inf", {"Base": float("-inf")}),
+                ("APPG -inf", {"AvgPointsPerGame": float("-inf")}),
+                ("APPG +inf", {"AvgPointsPerGame": float("inf")})):
+            with self.subTest(case=label):
+                with self.assertRaisesRegex(ValueError, "projection factors invalid"):
+                    self._frame_0628([dict(row, Player_ID=self._BIEBER)])
+        # An operator Base beside a negative APPG wins, and nothing is clipped.
+        frame, enrichment = self._frame_0628(
+            [{"Player_ID": self._BIEBER, "Base": 3.0, "AvgPointsPerGame": -1.15}])
+        self.assertEqual(frame["Base"].tolist(), [3.0])
+        self.assertNotIn("appg_", frame["Notes"].iloc[0])
+        self.assertEqual(enrichment["projection"]["negative_appg_clipped"]["n"], 0)
+
+    def test_a_blank_appg_row_is_retained_at_zero_with_the_tag(self):
+        # R299(f). `_pool_row` carries the key with None when DK's cell is blank
+        # or unparseable; a projections CSV read by pandas carries NaN.
+        for label, blank in (("None", None), ("empty", ""), ("whitespace", "  "),
+                             ("NaN", float("nan"))):
+            for path, savant in (("unenriched", {}), ("Savant", {"savant": True})):
+                with self.subTest(appg=label, path=path):
+                    rows = [{"Player_ID": self._BIEBER, "AvgPointsPerGame": blank},
+                            {"Player_ID": self._BROWN, "AvgPointsPerGame": 20.62}]
+                    frame, enrichment = self._frame_0628(rows, **savant)
+                    by_id = {r["Player_ID"]: r for r in frame.to_dict("records")}
+                    self.assertEqual(sorted(by_id), sorted([self._BIEBER, self._BROWN]))
+                    self.assertEqual(by_id[self._BIEBER]["Base"], 0.0)
+                    self.assertIn("appg_blank", by_id[self._BIEBER]["Notes"])
+                    self.assertNotIn("appg_", by_id[self._BROWN]["Notes"])
+                    blanked = enrichment["projection"]["blank_appg_defaulted"]
+                    self.assertEqual((blanked["n"], blanked["ids"]), (1, [self._BIEBER]))
+                    self.assertEqual(enrichment["projection"]["negative_appg_clipped"]["n"], 0)
+                    self.assertTrue([w for w in enrichment["warnings"]
+                                     if "carried no AvgPointsPerGame" in w])
+        # An operator's Base beside a blank APPG is the documented remedy and
+        # is neither tagged nor counted.
+        frame, enrichment = self._frame_0628(
+            [{"Player_ID": self._BIEBER, "Base": 12.0, "AvgPointsPerGame": None}])
+        self.assertEqual(frame["Base"].tolist(), [12.0])
+        self.assertEqual(enrichment["projection"]["blank_appg_defaulted"]["n"], 0)
+        # A row with no AvgPointsPerGame KEY and no Base says nothing at all
+        # about the player, which is a caller's malformed row and not DK's blank
+        # cell: it still raises (R57's contract, test_row_with_neither_base_nor_appg_still_raises).
+        with self.assertRaisesRegex(ValueError, "missing Base/AvgPointsPerGame"):
+            self._frame_0628([{"Player_ID": self._BIEBER}])
+
     def _run_classic(self, *, fail_enriched):
         import importlib.util
         spec = importlib.util.spec_from_file_location(
@@ -38234,18 +38370,22 @@ class ClassicBaselineFirstTests(unittest.TestCase):
 
     @classmethod
     def _build_in(cls, root, *, patches=(), fake_enhanced=None, via_exit_door=True,
-                  **arg_overrides):
+                  slate=None, **arg_overrides):
         """One build in ``root``. Returns a dict: code, brief, err, out, mod,
         calls (every run_slate kwargs), root. ``fake_enhanced`` is a list of
         results the ENHANCED run_slate calls return in turn; the baseline's
-        call always runs for real."""
+        call always runs for real. ``slate`` is None for the vendored
+        2026-06-03 slate every other test drives, or ``(date, salary_csv,
+        entries_csv)`` for another one (R476's 2026-06-28)."""
         import shutil
         from mlb_engine.entries import upload_manifest as um
         root = Path(root)
+        date, salary_csv, entries_csv = slate or ("2026-06-03", cls._SALARY, cls._ENTRIES)
         (root / "slate").mkdir(parents=True, exist_ok=True)
-        shutil.copy(cls._SALARY, root / "slate" / "DKSalaries.csv")
+        shutil.copy(salary_csv, root / "slate" / "DKSalaries.csv")
         mod = cls._module()
         mod.REPO = root
+        arg_overrides.setdefault("date", date)
         args = cls._args(**arg_overrides)
         calls: list = []
         stash: dict = {}
@@ -38260,7 +38400,7 @@ class ClassicBaselineFirstTests(unittest.TestCase):
 
         def main():
             code, brief = mod.run_classic(
-                args, root / "slate", cls._SALARY, cls._ENTRIES, {"games": []},
+                args, root / "slate", salary_csv, entries_csv, {"games": []},
                 _build_deadline(float(args.max_seconds)))
             stash["brief"] = brief
             return code
@@ -38273,7 +38413,7 @@ class ClassicBaselineFirstTests(unittest.TestCase):
             stack.enter_context(unittest.mock.patch.object(epi, "run_slate", spy_run_slate))
             stack.enter_context(unittest.mock.patch.object(mod, "main", main))
             stack.enter_context(unittest.mock.patch.object(
-                sys, "argv", ["build_slate.py", "--date", "2026-06-03"]))
+                sys, "argv", ["build_slate.py", "--date", date]))
             for target, name, value in patches:
                 stack.enter_context(unittest.mock.patch.object(
                     mod if target == "mod" else target, name, value))
@@ -38302,13 +38442,13 @@ class ClassicBaselineFirstTests(unittest.TestCase):
     def _file_lines(err):
         return [line for line in err.splitlines() if line.startswith("FILE  ")]
 
-    def _preflight(self, path, *extra):
+    def _preflight(self, path, *extra, salary=None, as_of=None):
         from tools import preflight_upload
         out = io.StringIO()
         with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
             code = preflight_upload.main([
-                "--entries", str(path), "--salary", str(self._SALARY),
-                "--json", "--as-of", self._AS_OF, *extra])
+                "--entries", str(path), "--salary", str(salary or self._SALARY),
+                "--json", "--as-of", as_of or self._AS_OF, *extra])
         return code, json.loads(out.getvalue())
 
     @staticmethod
@@ -38430,6 +38570,86 @@ class ClassicBaselineFirstTests(unittest.TestCase):
         for entry in parse_dk_entry_rows(str(path)):
             by_contest[entry.contest_id].append(entry.lineup_signature)
         self.assertEqual(sum(len(v) for v in by_contest.values()), 18)
+        for cid, sigs in by_contest.items():
+            self.assertEqual(len(sigs), len(set(sigs)), f"a lineup twice in {cid}")
+
+    # -- R476: the baseline on a pool that carries a negative-APPG arm -------- #
+
+    # The tracked 2026-06-28 salary file: 998 rows, 11 games, 8 SP rows at a
+    # negative season AvgPointsPerGame (the premise check's list). Declared here
+    # beside eight positive arms, so the pool holds every one of them.
+    _SALARY_0628 = REPO / "data" / "archive" / "2026-06-28" / "DKSalaries_2026-06-28.csv"
+    _ENTRIES_0628 = REPO / "data" / "archive" / "2026-06-28" / "DKEntries_2026-06-28.csv"
+    _POSITIVE_0628 = ["43434243", "43434244", "43433708", "43434247",
+                      "43433709", "43434249", "43434250", "43433710"]
+    _NEGATIVE_0628 = {"43433715": -1.15, "43434336": -4.55, "43434353": -17.3,
+                      "43434399": -1.62, "43434434": -3.8, "43434442": -3.8,
+                      "43434445": -2.38, "43434457": -1.9}
+
+    @classmethod
+    def _blanked_entries_0628(cls):
+        """The tracked entries file with every roster cell cleared: the archive
+        holds the lineups Ben entered, and a filled row is complete and
+        immutable to the baseline, which reserves only blank ones (38 rows)."""
+        path = cls.base / "DKEntries_2026-06-28_blank.csv"
+        if not path.exists():
+            with cls._ENTRIES_0628.open(encoding="utf-8-sig", newline="") as fh:
+                rows = list(csv.reader(fh))
+            for row in rows[1:]:
+                if row and row[0]:
+                    row[4:14] = [""] * 10
+            with path.open("w", encoding="utf-8", newline="") as fh:
+                csv.writer(fh).writerows(rows)
+        return path
+
+    def test_a_negative_appg_arm_does_not_cost_the_2026_06_28_baseline(self):
+        """R476. At a47c219 this build's baseline was `status: error` (`Base
+        contains negative values`) and nothing was published before research.
+        Now the eight negative arms stay in the pool at Base 0.0, the baseline
+        covers all 38 reserved rows, the record names them, and an injected
+        enhancement refusal still names the baseline as the current file."""
+        entries = self._blanked_entries_0628()
+        build = self._build_in(
+            Path(tempfile.mkdtemp(dir=self.base)),
+            slate=("2026-06-28", self._SALARY_0628, entries),
+            declare_pitcher=self._POSITIVE_0628 + sorted(self._NEGATIVE_0628),
+            fake_enhanced=[self._REFUSAL])
+        self.assertEqual(build["code"], 3, build["err"][-800:])
+        payload = build["brief"]
+        block = payload["baseline"]
+        self.assertEqual(block["status"], "delivered", block)
+        self.assertEqual(block["coverage"], {"reserved": 38, "filled": 38})
+        self.assertTrue(block["current"])
+        # The count and the original values, on the brief's baseline block
+        # and on the baseline's own bound brief file.
+        clipped = block["projection"]["negative_appg_clipped"]
+        self.assertEqual(clipped["n"], 8)
+        self.assertEqual(clipped["ids"], sorted(self._NEGATIVE_0628))
+        self.assertEqual(clipped["original"], self._NEGATIVE_0628)
+        path = Path(block["path"])
+        bound = json.loads(sorted(path.parent.glob("build_brief_*_BASELINE_*.json"))[-1]
+                           .read_text(encoding="utf-8"))
+        self.assertEqual(bound["baseline"]["projection"]["negative_appg_clipped"]["n"], 8)
+        # The refusal names it: the last usable artifact is the baseline's bytes.
+        sha = hashlib.sha256(path.read_bytes()).hexdigest()
+        self.assertEqual(block["sha256"], sha)
+        records = [json.loads(p.read_text()) for p in
+                   sorted((build["root"] / "data" / "deliveries").rglob("*.json"))]
+        refusal = [r for r in records if r.get("kind") == "refusal"][-1]
+        self.assertEqual(refusal["refusal"]["last_usable_artifact"]["sha256"], sha)
+        # Both referees pass on the exact bytes, with a distinct lineup per
+        # contest (F-3), at the time the review replayed it.
+        verdict = build["mod"].verify_classic(self._SALARY_0628, path)
+        self.assertTrue(verdict["passed"], verdict["failures"])
+        from mlb_engine.entries import upload_manifest as um
+        with unittest.mock.patch.object(um, "REPO_ROOT", build["root"]):
+            code, report = self._preflight(path, salary=self._SALARY_0628,
+                                           as_of="2026-06-28T17:00:00Z")
+        self.assertEqual((code, report["verdict"]), (0, "review_ready"), report["failures"])
+        by_contest = defaultdict(list)
+        for entry in parse_dk_entry_rows(str(path)):
+            by_contest[entry.contest_id].append(entry.lineup_signature)
+        self.assertEqual(sum(len(v) for v in by_contest.values()), 38)
         for cid, sigs in by_contest.items():
             self.assertEqual(len(sigs), len(set(sigs)), f"a lineup twice in {cid}")
 
