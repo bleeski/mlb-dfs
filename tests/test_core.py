@@ -38357,6 +38357,348 @@ print(json.dumps(out, sort_keys=True))
         self.assertEqual(r.as_dict()["construction_label"], r.construction_label)
 
 
+class CompleteRowInitialBuildTests(unittest.TestCase):
+    """R448, roadmap Session 124: an initial build around rows that are already complete.
+
+    A re-downloaded DKEntries template that carries a lineup Ben already entered
+    refused EVERY write on an initial build: `run_slate` made each row a
+    requirement, the allocator gave the complete row a lineup, and the writer
+    refused it (`already complete and immutable`) with no review-grade file. The
+    complete row is FIXED instead: left in the file untouched, counted through
+    `fixed_portfolio_exposure` (R61), and its lineup held out of its contest for
+    F-3; the requirements cover the blank and partial rows only.
+
+    Driven on the vendored 2026-06-03 template (18 reserved rows, three contests)
+    through `run_slate` directly, the candidates the baseline core builds,
+    caps opened and the gates the fixture cannot evidence assumed, so a failure
+    here is the item's and not a cap's. Every write lands in a temp root. A
+    template with a complete row is the vendored one with row 5157463016 filled
+    from the certified build, which is the Verification's shape.
+    """
+
+    _SALARY = REPO / "data" / "archive" / "2026-06-03" / "DKSalaries_2026-06-03.csv"
+    _ENTRIES = REPO / "data" / "archive" / "2026-06-03" / "DKEntries_2026-06-03.csv"
+    _OPEN = {"max_player_exposure_pct": 1.0, "max_pitcher_exposure_pct": 1.0,
+             "max_primary_stack_exposure_pct": 1.0, "max_team_exposure_pct": 1.0,
+             "max_consensus_cluster_share_pct": 1.0, "max_sp_pair_repetition": 999,
+             "max_shared_players": 9}
+    _UNEVIDENCED = ["odds_gate_passed", "weather_gate_passed",
+                    "pitcher_audit_gate_passed", "lineup_gate_passed"]
+    HELD_ID, HELD_CONTEST = "5157463016", "191020573"
+    PARTIAL_ID = "5157463351"  # a blank row in the held row's contest
+
+    @classmethod
+    def setUpClass(cls):
+        import shutil
+        from mlb_engine.intake.slate_intake_manager import parse_dk_salary_csv
+        from mlb_engine.pipeline import baseline as bl
+        cls._tmp = tempfile.TemporaryDirectory()
+        cls.base = Path(cls._tmp.name)
+        cls.salary = cls.base / "DKSalaries.csv"
+        # `copyfile`, not `copy`: the tracked archive fixtures are read-only on
+        # this host and `copy` carries the bit (CLAUDE.local.md).
+        shutil.copyfile(cls._SALARY, cls.salary)
+        cls.blank = cls.base / "DKEntries_blank.csv"
+        shutil.copyfile(cls._ENTRIES, cls.blank)
+        cls.frame = pd.DataFrame([{
+            "Player_ID": sp.player_id, "Name": sp.name, "Team": sp.team,
+            "Opponent": sp.opponent, "Position": sp.raw["Roster Position"],
+            "Salary": sp.salary, "Game_ID": sp.game_id,
+            "Floor": 12.0 if "P" in sp.positions else 5.0,
+            "Ceiling": 25.0 if "P" in sp.positions else 12.0,
+            "Excluded": False, "Locked": False,
+        } for sp in parse_dk_salary_csv(str(cls.salary))])
+        core = bl.build_baseline(cls.salary, cls.frame,
+                                 requirements=bl.requirements_from_entries(cls.blank),
+                                 budget_s=120)
+        assert core.status == "covered", core.summary()
+        cls.core = core
+        cls.cands = core.allocator_candidates(cls.frame, 18)
+        # The held row is filled from the certified build: the lineup an ordinary
+        # build seats in that row of the blank template (ordered slots P P C 1B
+        # 2B 3B SS OF OF OF). A lineup the allocator ranks into that contest, so
+        # a naive filter that tells it nothing about the held row seats it again.
+        from mlb_engine.entries import upload_manifest as um
+        original, um.REPO_ROOT = um.REPO_ROOT, cls.base
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                certified = run_slate(
+                    runs_root=cls.base / "runs_certified", salary_csv=cls.salary,
+                    entries_csv=cls.blank, projections_override=cls.frame,
+                    candidates_override=list(cls.cands),
+                    portfolio_controls_override=dict(cls._OPEN), approve=True,
+                    assume_gates=cls._UNEVIDENCED, requested_n=18)
+        finally:
+            um.REPO_ROOT = original
+        assert certified["passed"], certified.get("errors")
+        from mlb_engine.entries.dk_entries_manager import parse_dk_entry_rows
+        cls.held_roster = list({r.entry_id: r for r in parse_dk_entry_rows(
+            str(certified["output_path"]))}[cls.HELD_ID].roster_cells)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._tmp.cleanup()
+
+    def setUp(self):
+        from mlb_engine.entries import upload_manifest as um
+        self.um = um
+        self.root = Path(tempfile.mkdtemp(dir=self.base))
+        self._original_root = um.REPO_ROOT
+        um.REPO_ROOT = self.root
+        self.addCleanup(self._restore)
+
+    def _restore(self):
+        self.um.REPO_ROOT = self._original_root
+
+    # -- fixtures --------------------------------------------------------- #
+
+    def _template(self, name, filled=None, partial=None):
+        """The vendored blank template with ``filled`` ``{entry_id: roster}``
+        complete and ``partial`` ``{entry_id: roster[:5]}`` half-entered."""
+        with self.blank.open(newline="", encoding="utf-8-sig") as handle:
+            rows = list(csv.reader(handle))
+        for row in rows:
+            if row and row[0] in (filled or {}):
+                row[4:14] = list(filled[row[0]])
+            elif row and row[0] in (partial or {}):
+                row[4:9] = list(partial[row[0]][:5])
+        path = self.root / name
+        with path.open("w", newline="", encoding="utf-8") as handle:
+            csv.writer(handle).writerows(rows)
+        return path
+
+    def _one_complete(self, name="DKEntries_one_complete.csv", partial=False):
+        return self._template(
+            name, filled={self.HELD_ID: self.held_roster},
+            partial=({self.PARTIAL_ID: list(self.core.candidates[1].roster)}
+                     if partial else None))
+
+    def _run(self, entries, *, approve=True, candidates=None, tag="r"):
+        with contextlib.redirect_stdout(io.StringIO()):
+            return run_slate(
+                runs_root=self.root / f"runs_{tag}", salary_csv=self.salary,
+                entries_csv=entries, projections_override=self.frame,
+                candidates_override=list(candidates if candidates is not None
+                                         else self.cands),
+                portfolio_controls_override=dict(self._OPEN), approve=approve,
+                assume_gates=self._UNEVIDENCED, requested_n=18)
+
+    @staticmethod
+    def _rows(path):
+        from mlb_engine.entries.dk_entries_manager import parse_dk_entry_rows
+        return {r.entry_id: r for r in parse_dk_entry_rows(str(path))}
+
+    # -- the item --------------------------------------------------------- #
+
+    def test_one_complete_row_is_built_around_and_left_untouched(self):
+        """The Verification's shape: 17 rows delivered around the held one, its
+        bytes unchanged, and its lineup not seated again in its contest (F-3)."""
+        entries = self._one_complete()
+        result = self._run(entries)
+        self.assertTrue(result["passed"], result.get("errors"))
+        self.assertTrue(result["workflow_valid"])
+        built = self._rows(result["output_path"])
+        held_in = self._rows(entries)[self.HELD_ID]
+        self.assertEqual(len(built), 18)
+        self.assertTrue(all(r.is_complete for r in built.values()),
+                        "17 built rows and the held one: every reserved row full")
+        self.assertEqual(built[self.HELD_ID].roster_cells, held_in.roster_cells,
+                         "the held row is the same ordered lineup, slot for slot")
+        same_contest = [r for r in built.values()
+                        if r.contest_id == self.HELD_CONTEST and r.entry_id != self.HELD_ID]
+        self.assertTrue(same_contest)
+        self.assertNotIn(held_in.lineup_signature,
+                         {r.lineup_signature for r in same_contest},
+                         "F-3: the held lineup is not seated twice in its contest")
+
+    def test_the_held_row_is_counted_by_the_allocator_at_the_files_denominator(self):
+        """R61's two denominators on an initial build: the solve is handed 17 rows
+        and the validator grades 18, so the allocator is told about the held one."""
+        result = self._run(self._one_complete())
+        self.assertTrue(result["passed"], result.get("errors"))
+        report = self._allocation(result).get("fixed_exposure_report") or {}
+        self.assertEqual(report.get("untouchable_row_count"), 1, report)
+        self.assertEqual(report.get("solve_entry_count"), 17, report)
+        self.assertEqual(report.get("entry_denominator"), 18, report)
+
+    def _allocation(self, result):
+        diag = json.loads((Path(result["run_dir"]) / "final" / "diagnostics.json")
+                          .read_text(encoding="utf-8"))
+        return diag.get("allocation") or {}
+
+    def test_without_the_fixed_row_seam_the_held_lineup_is_seated_twice(self):
+        """The negative control for the naive fix (requirements over the blank
+        rows, nothing told to the allocator): a blank row in the held row's
+        contest takes the held lineup, and the export validator refuses the file
+        for it. The seam, not the filter, is what keeps F-3."""
+        with unittest.mock.patch.object(epi, "fixed_portfolio_exposure",
+                                        lambda *a, **k: None):
+            result = self._run(self._one_complete(), tag="naive")
+        self.assertFalse(result["passed"], "the held lineup was seated twice")
+        self.assertTrue(any("duplicate roster" in str(e) for e in result["errors"]),
+                        result["errors"])
+
+    def test_a_blank_template_builds_exactly_as_before(self):
+        """No complete row: no fixed-exposure report and no extra read, so the
+        blank path is untouched (GOLD is the pin; this is the direct one)."""
+        result = self._run(self.blank, tag="blank")
+        self.assertTrue(result["passed"], result.get("errors"))
+        self.assertNotIn("fixed_exposure_report", self._allocation(result))
+        built = self._rows(result["output_path"])
+        self.assertEqual(len(built), 18)
+        self.assertTrue(all(r.is_complete for r in built.values()))
+
+    def test_a_partial_row_beside_a_held_row_is_still_refilled(self):
+        """Only COMPLETE rows are fixed. A half-entered row is refilled by the
+        build as it always was."""
+        entries = self._one_complete(partial=True)
+        before = self._rows(entries)
+        self.assertFalse(before[self.PARTIAL_ID].is_complete)
+        self.assertFalse(before[self.PARTIAL_ID].is_blank)
+        result = self._run(entries, tag="partial")
+        self.assertTrue(result["passed"], result.get("errors"))
+        built = self._rows(result["output_path"])
+        self.assertTrue(built[self.PARTIAL_ID].is_complete)
+        self.assertEqual(built[self.HELD_ID].roster_cells,
+                         before[self.HELD_ID].roster_cells)
+
+    def test_a_template_with_every_row_complete_is_refused_by_name(self):
+        """Nothing is left to fill, so there is nothing to build: refused up
+        front with the reason, never at the writer as `already complete and
+        immutable`. A refinement of a delivered file is a late swap."""
+        filled = {}
+        per_contest = {}
+        for row in self._rows(self.blank).values():
+            slot = per_contest.setdefault(row.contest_id, 0)
+            filled[row.entry_id] = list(self.core.candidates[slot].roster)
+            per_contest[row.contest_id] = slot + 1
+        entries = self._template("DKEntries_all_complete.csv", filled=filled)
+        self.assertTrue(all(r.is_complete for r in self._rows(entries).values()))
+        result = self._run(entries, tag="all")
+        self.assertFalse(result["passed"])
+        text = " ".join(str(e) for e in result["errors"])
+        self.assertIn("every reserved row is already complete", text)
+        self.assertIn("18 of 18", text)
+        self.assertNotIn("already complete and immutable", text)
+        self.assertIsNone(result.get("output_path"))
+
+    def test_the_review_leg_names_the_rows_it_holds(self):
+        """`approve=False` is the read the operator takes before approving; it
+        says which complete rows the build will leave alone."""
+        result = self._run(self._one_complete(), approve=False, tag="review")
+        self.assertEqual(result["status"], "plan_pending_approval", result.get("errors"))
+        self.assertEqual(result["held_complete_entry_ids"], [self.HELD_ID])
+
+    def test_an_empty_template_is_not_reported_as_complete(self):
+        """No reserved rows at all is a different failure from every row being
+        full: it still fails the entry-grid gate, and says nothing about rows
+        being complete."""
+        with self.blank.open(newline="", encoding="utf-8-sig") as handle:
+            header = next(csv.reader(handle))
+        empty = self.root / "DKEntries_empty.csv"
+        with empty.open("w", newline="", encoding="utf-8") as handle:
+            csv.writer(handle).writerow(header)
+        result = self._run(empty, tag="empty")
+        self.assertFalse(result["passed"])
+        text = " ".join(str(e) for e in result["errors"])
+        self.assertIn("entry_grid_gate_passed", text)
+        self.assertNotIn("already complete", text)
+
+    def test_the_fixed_exposure_read_happens_only_when_a_row_is_held(self):
+        """A blank template computes nothing extra (the R28 precedent: the build
+        stays byte-identical by construction); a held row costs one read."""
+        real = epi.fixed_portfolio_exposure
+        calls: list = []
+
+        def spy(*args, **kwargs):
+            calls.append(args)
+            return real(*args, **kwargs)
+        with unittest.mock.patch.object(epi, "fixed_portfolio_exposure", spy):
+            self._run(self.blank, tag="spy_blank")
+            self.assertEqual(calls, [], "a blank template reads no fixed rows")
+            self._run(self._one_complete(), tag="spy_held")
+        self.assertEqual(len(calls), 1)
+
+    def test_a_contest_whose_rows_are_all_complete_is_held_whole(self):
+        """Every row of one contest already holds a lineup and the others are
+        blank: the contest has no requirement left but keeps its posture, its
+        place in the manifest and its F-3 signatures, and the build fills the
+        rest around it."""
+        rows = self._rows(self.blank)
+        small = [r.entry_id for r in rows.values() if r.contest_id == "191047506"]
+        self.assertEqual(len(small), 4)
+        filled = {eid: list(self.core.candidates[i].roster)
+                  for i, eid in enumerate(small)}
+        entries = self._template("DKEntries_whole_contest.csv", filled=filled)
+        result = self._run(entries, tag="whole")
+        self.assertTrue(result["passed"], result.get("errors"))
+        built = self._rows(result["output_path"])
+        held_in = self._rows(entries)
+        self.assertEqual(len(built), 18)
+        for eid in small:
+            self.assertEqual(built[eid].roster_cells, held_in[eid].roster_cells)
+        self.assertEqual(sorted(result["held_complete_entry_ids"]), sorted(small))
+
+    # -- the baseline reads the same rows ---------------------------------- #
+
+    def test_the_baseline_requirements_fill_blank_and_partial_rows_and_hold_complete_ones(self):
+        from mlb_engine.pipeline import baseline as bl
+        entries = self._one_complete(partial=True)
+        reqs = {r.contest_id: r for r in bl.initial_build_requirements(entries)}
+        held = reqs[self.HELD_CONTEST]
+        self.assertNotIn(self.HELD_ID, held.fillable_entry_ids)
+        self.assertIn(self.PARTIAL_ID, held.fillable_entry_ids,
+                      "`run_slate` refills a partial row, so the baseline covers it")
+        self.assertEqual(len(held.held_signatures), 1)
+        self.assertEqual(held.partial_entry_ids, ())
+        self.assertEqual(sum(len(r.fillable_entry_ids) for r in reqs.values()), 17)
+
+    def test_the_baseline_on_a_one_complete_template_publishes_every_row(self):
+        """The R389(b) door on a re-downloaded template: the core seeds F-3 from
+        the held lineup, and the file its candidates export through `run_slate`
+        covers all 18 rows with the held one untouched."""
+        from mlb_engine.intake.live_data_adapters import build_slate_pool
+        pool = build_slate_pool(str(self.salary), {"games": []},
+                                declared_pitchers={p: "declared_probable_sp" for p in
+                                                   ClassicBaselineFirstTests._DECLARED},
+                                stale_platoon_policy="warn")
+        # The held lineup has to be legal under THIS pool (declared pitchers
+        # only; a held row the validator judges illegal blocks, which is this
+        # item's stated limit), so it is the baseline's own seat in the held row
+        # on the blank template, filled in the way the other tests fill theirs.
+        with contextlib.redirect_stdout(io.StringIO()):
+            first = epi.run_baseline(
+                runs_root=str(self.root / "runs_baseline_blank"), salary_csv=self.salary,
+                entries_csv=self.blank, pool=pool, requested_n=18,
+                deadline=time.monotonic() + 120.0)
+        self.assertTrue(first["result"]["passed"], first["result"].get("errors"))
+        seats = self._rows(first["result"]["output_path"])
+        # One complete row and one half-entered row in the same contest: the
+        # baseline fills the half-entered one because `run_slate` does.
+        entries = self._template(
+            "DKEntries_baseline_one_complete.csv",
+            filled={self.HELD_ID: list(seats[self.HELD_ID].roster_cells)},
+            partial={self.PARTIAL_ID: list(seats[self.PARTIAL_ID].roster_cells)})
+        with contextlib.redirect_stdout(io.StringIO()):
+            out = epi.run_baseline(
+                runs_root=str(self.root / "runs_baseline"), salary_csv=self.salary,
+                entries_csv=entries, pool=pool, requested_n=18,
+                deadline=time.monotonic() + 120.0)
+        self.assertEqual(out["status"], "allocated", out.get("core"))
+        contest = out["core"]["by_contest"][0]
+        self.assertEqual((contest["fillable"], contest["held"], contest["partial"]),
+                         (6, 1, 0), "5 blank + 1 half-entered row to fill, 1 held")
+        result = out["result"]
+        self.assertTrue(result["passed"], result.get("errors"))
+        built = self._rows(result["output_path"])
+        self.assertEqual(len(built), 18)
+        held_in = self._rows(entries)[self.HELD_ID]
+        self.assertEqual(built[self.HELD_ID].roster_cells, held_in.roster_cells)
+        others = {r.lineup_signature for r in built.values()
+                  if r.contest_id == self.HELD_CONTEST and r.entry_id != self.HELD_ID}
+        self.assertNotIn(held_in.lineup_signature, others)
+
+
 class ClassicBaselineFirstTests(unittest.TestCase):
     """R389(b), roadmap Session 11: baseline-first Classic.
 
@@ -38877,7 +39219,7 @@ class ClassicBaselineFirstTests(unittest.TestCase):
         from mlb_engine.pipeline import baseline as bl
         build = self._build_in(
             Path(tempfile.mkdtemp(dir=self.base)), via_exit_door=False,
-            patches=[(bl, "every_row_requirements",
+            patches=[(bl, "initial_build_requirements",
                       self._crash("a caller error inside the core")),
                      ("mod", "resolve_reference_data", self._crash("stop at research"))])
         block = self._continues(build)
@@ -39181,15 +39523,20 @@ class ClassicBaselineFirstTests(unittest.TestCase):
         self.assertFalse(export["manifest_recorded"])
         self.assertIn("R389(b)", export["not_mirrored"]["why"])
 
-    def test_a_filled_entries_file_is_rebuilt_whole_as_run_slate_does(self):
-        """A re-downloaded DKEntries file with every row filled: `run_slate`
-        refills every row, so the baseline covers every row too, never
-        `nothing_to_fill`."""
+    def test_a_filled_entries_file_has_nothing_to_fill_and_is_never_overwritten(self):
+        """A re-downloaded DKEntries file with every row filled. R389(b) first
+        wrote this as "`run_slate` refills every row, so the baseline covers
+        every row too", and `run_slate` never could: a complete row is an
+        entered lineup, and `preserve_completed` refuses to overwrite it (R448
+        found the belief false; the old test faked `run_slate`, so it never saw
+        the refusal). Every row is held now, so the baseline reads nothing to
+        fill and makes no `run_slate` call, never rebuilding the file whole."""
         from mlb_engine.pipeline import baseline as bl
         from mlb_engine.intake.live_data_adapters import build_slate_pool
         filled = Path(self._full()["brief"]["baseline"]["path"])
-        reqs = bl.every_row_requirements(filled)
-        self.assertEqual(sum(len(v) for v in reqs.values()), 18)
+        reqs = bl.initial_build_requirements(filled)
+        self.assertEqual(sum(len(r.fillable_entry_ids) for r in reqs), 0)
+        self.assertEqual(sum(len(r.held_signatures) for r in reqs), 18)
         pool = build_slate_pool(str(self._SALARY), {"games": []},
                                 declared_pitchers={p: "declared_probable_sp"
                                                    for p in self._DECLARED},
@@ -39201,9 +39548,58 @@ class ClassicBaselineFirstTests(unittest.TestCase):
                 runs_root=str(self.base / "unused"), salary_csv=self._SALARY,
                 entries_csv=filled, pool=pool, requested_n=18,
                 deadline=time.monotonic() + 120.0)
-        self.assertEqual(out["status"], "allocated", out["core"])
-        self.assertEqual(out["core"]["required"], 7)
-        self.assertEqual(len(seen), 1)
+        self.assertEqual(out["status"], "short", out["core"])
+        self.assertEqual(out["core"]["stop_reason"], "nothing_to_fill")
+        self.assertEqual(seen, [], "no export is attempted over entered lineups")
+
+    def _door_template(self, name, keep):
+        """The baseline's filled file with every reserved row blanked except
+        ``keep`` (None keeps them all): a re-downloaded template carrying the
+        lineups Ben entered."""
+        filled = Path(self._full()["brief"]["baseline"]["path"])
+        with filled.open(newline="", encoding="utf-8-sig") as handle:
+            rows = list(csv.reader(handle))
+        out = [r[:4] + [""] * 10 + r[14:]
+               if r and r[0].isdigit() and keep is not None and r[0] not in keep
+               else r for r in rows]
+        path = self.base / name
+        with path.open("w", newline="", encoding="utf-8") as handle:
+            csv.writer(handle).writerows(out)
+        return path
+
+    def test_a_template_with_one_complete_row_delivers_through_the_real_door(self):
+        """R448 end to end through `run_classic`: the baseline publishes all 18
+        rows around the held one and the enhanced solve certifies, where both
+        used to refuse at `already complete and immutable` with no file."""
+        from mlb_engine.entries.dk_entries_manager import parse_dk_entry_rows
+        entries = self._door_template("door_one_complete.csv", {"5157463016"})
+        build = self._build_in(Path(tempfile.mkdtemp(dir=self.base)),
+                               slate=("2026-06-03", self._SALARY, entries),
+                               controls_override=dict(self._OPEN))
+        self.assertEqual(build["code"], 0, build["brief"])
+        self.assertEqual(build["brief"]["status"], "certified")
+        block = build["brief"]["baseline"]
+        self.assertEqual(block["status"], "delivered")
+        held = {r.entry_id: r for r in parse_dk_entry_rows(str(entries))}["5157463016"]
+        built = {r.entry_id: r for r in parse_dk_entry_rows(block["path"])}
+        self.assertEqual(len(built), 18)
+        self.assertTrue(all(r.is_complete for r in built.values()))
+        self.assertEqual(built["5157463016"].roster_cells, held.roster_cells)
+
+    def test_a_template_with_every_row_complete_is_refused_by_name_at_the_real_door(self):
+        """Nothing is left to fill: the baseline says so and writes no file, and
+        the enhanced build refuses with the reason, not a writer error."""
+        entries = self._door_template("door_all_complete.csv", None)
+        build = self._build_in(Path(tempfile.mkdtemp(dir=self.base)),
+                               slate=("2026-06-03", self._SALARY, entries),
+                               controls_override=dict(self._OPEN))
+        self.assertEqual(build["code"], 3)
+        block = build["brief"]["baseline"]
+        self.assertEqual(block["status"], "short")
+        self.assertEqual(block["core"]["stop_reason"], "nothing_to_fill")
+        text = " ".join(str(e) for e in build["brief"]["errors"])
+        self.assertIn("every reserved row is already complete (18 of 18)", text)
+        self.assertNotIn("already complete and immutable", text)
 
     def test_an_earlier_live_certified_row_is_named_over_this_baseline(self):
         """A rebuild whose enhanced solve refuses: this run's baseline is its

@@ -185,7 +185,7 @@ from mlb_engine.contest_shapes import (
 from mlb_engine.entries.dk_entries_manager import (
     classify_export_failures,
     derive_essential_validity, derive_workflow_certification, entry_coverage,
-    fixed_portfolio_exposure,
+    fixed_portfolio_exposure, parse_dk_entry_rows,
     reconcile_entries_against_assignments,
     validate_dk_entries_file, validate_template_preservation,
     validate_upload_ready_gates, write_candidate_from_template,
@@ -696,17 +696,29 @@ def execute_portfolio(
         # the rows it cannot touch already hold so both ends resolve the same caps
         # against the same denominator.
         #
-        # Late swap only, deliberately. On an initial build from a reserved template
-        # the authorized set and the complete-row set are the same set, so there is
-        # nothing to offset and passing None keeps the build byte-identical (the R28
-        # precedent). `preserve_completed=True` below means an initial build CAN in
-        # principle carry completed rows outside the requirements; that case is
-        # filed as R61-tail rather than changed silently here.
+        # An initial build from a BLANK template has nothing to offset (the
+        # authorized set and the complete-row set are both empty), and passing
+        # None keeps it byte-identical (the R28 precedent).
+        #
+        # R448 (the R61-tail case). An initial build from a template that already
+        # holds COMPLETE rows (a re-downloaded DKEntries file carrying a lineup the
+        # operator entered) fixes them: `run_slate` leaves them out of the
+        # requirements, the writer leaves them in the file untouched, and the same
+        # offset goes to the allocator so it resolves the caps over the file's
+        # denominator and holds each lineup out of its contest (F-3). Without it a
+        # blank row in the held row's contest takes the held lineup and the export
+        # validator refuses the file. Only when such a row exists: a blank template
+        # computes nothing here.
+        solved_entry_ids = [str(req["entry_id"]) for req in entry_requirements]
+        solved_set = set(solved_entry_ids)
+        held_outside_solve = mode != "late_swap" and any(
+            row.is_complete and str(row.entry_id) not in solved_set
+            for row in parse_dk_entry_rows(str(entries_csv)))
         fixed_exposure = None
-        if mode == "late_swap":
+        if mode == "late_swap" or held_outside_solve:
             fixed_exposure = fixed_portfolio_exposure(
                 entries_csv,
-                [str(req["entry_id"]) for req in entry_requirements],
+                solved_entry_ids,
                 salary_csv_path=salary_csv,
                 # R343 + R61. The offset has to be counted at the SAME threshold the
                 # cap is enforced at, or the untouched rows are subtracted from a
@@ -6734,7 +6746,12 @@ def run_slate(
     never_relax = _dg.resolve_never_relax(never_relax_controls)
 
     entry_rows = parse_dk_entry_rows(str(entries_csv))
+    # R448. `reserved` stays every row: postures, the manifest's contest ids and
+    # the preflight's contest comparison all read the whole file. What the build
+    # FILLS is the blank and the partial rows; a complete row is a lineup already
+    # entered, left in the file untouched and counted as fixed (execute_portfolio).
     reserved = [r for r in entry_rows]
+    held_complete_entry_ids = [str(r.entry_id) for r in reserved if r.is_complete]
     posture_by_contest = _resolve_contest_postures(reserved, contest_postures, archetypes_path)
     contest_identity_blockers = unresolved_contest_blockers(posture_by_contest)
 
@@ -6796,7 +6813,7 @@ def run_slate(
             # posture and shape (the WTA tilt keys on `wta_satellite`).
             "posture": posture_by_contest.get(str(r.contest_id), {}).get("posture"),
         }
-        for r in reserved
+        for r in reserved if not r.is_complete
     ]
 
     checkpoint = build_checkpoint_plan(
@@ -7040,6 +7057,8 @@ def run_slate(
         "projection_schema": schema,
         "optimizer_preflight": preflight,
         "entry_requirements": entry_requirements,
+        # R448. The complete rows this build leaves in the file as they are.
+        "held_complete_entry_ids": held_complete_entry_ids,
         "posture_by_contest": posture_by_contest,
         "merged_controls": controls_for_report(controls),
         # R333 / R343. The washout-axis controls, on every Classic build
@@ -7094,6 +7113,20 @@ def run_slate(
     if not schema.get("passed"):
         return {"passed": False, "status": "blocked", "approved": bool(approve),
                 "errors": [f"projection schema failed: {schema}"], **base_payload}
+
+    # R448. Nothing blank or partial is left: every reserved row already holds a
+    # lineup, and an entered lineup is never overwritten (`preserve_completed`).
+    # Said here, in both modes and before any bank, rather than as the writer's
+    # `already complete and immutable` after the whole solve. A refinement of a
+    # delivered file is a late swap.
+    if reserved and not entry_requirements:
+        return {"passed": False, "status": "blocked", "approved": bool(approve),
+                "errors": [
+                    f"every reserved row is already complete "
+                    f"({len(held_complete_entry_ids)} of {len(reserved)}); there is "
+                    f"nothing to build, and an entered lineup is never overwritten. "
+                    f"A refinement of a delivered file is a late swap "
+                    f"(tools/late_swap.py)"], **base_payload}
 
     # Wrong-contest identity is a HARD gate: it is decidable from disk in under a
     # second, it changes the objective the whole portfolio is built to, and it is
@@ -7492,6 +7525,8 @@ def run_slate(
             "overridden_gates": overridden_gates,
             "gates_assumption_refused": gates_assumption_refused,
             "contest_identity_blockers": contest_identity_blockers,
+            # R448. The complete rows left in the file as they were.
+            "held_complete_entry_ids": held_complete_entry_ids,
             "strategy_defaults_are_priors": True,
             "light_satellite": bool(light_satellite),
         })
@@ -7568,8 +7603,10 @@ def run_baseline(
 
     Called by `run_classic` after the pool-blocker refusals and before any
     research. The frame is `baseline.unenriched_frame` on the pool's
-    projection rows and platoon order; the core covers EVERY reserved row
-    (`every_row_requirements`, because `run_slate` refills every row) within
+    projection rows and platoon order; the core covers every row the build
+    FILLS, the blank and the partial ones, and holds each complete row's
+    lineup out of its contest (`initial_build_requirements`, R448: `run_slate`
+    leaves a complete row in the file untouched and never refills it) within
     `BASELINE_WINDOW_SHARE` of the time left before ``deadline`` (a
     ``time.monotonic()`` end); the build's anti-correlation allowance reaches
     every solve. A short core returns without a `run_slate` call.
@@ -7602,7 +7639,7 @@ def run_baseline(
         salary_csv, kwargs.get("projection_rows"),
         projected_order_by_player_id=kwargs.get("platoon_order_by_player_id"))
     core = bl.build_baseline(
-        salary_csv, frame, requirements=bl.every_row_requirements(entries_csv),
+        salary_csv, frame, requirements=bl.initial_build_requirements(entries_csv),
         deadline=window_end,
         max_opposing_hitters_per_sp=max_opposing_hitters_per_sp, clock=clock)
     out: Dict[str, Any] = {
