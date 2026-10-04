@@ -1,0 +1,149 @@
+{
+ "code": {
+  "contest_allocator": "v1.12",
+  "execution_pipeline": "v1.17",
+  "git_dirty": true,
+  "git_sha": "aabab2c5b5f83bc1a859c0982520a4bda2b03986"
+ },
+ "controls": {
+  "max_cpt_exposure_pct": 0.25,
+  "max_cpt_per_contest": 2,
+  "max_player_exposure_pct": 0.5,
+  "max_shared_players": 4
+ },
+ "date": "2026-10-04",
+ "egress": "egress: statsapi 200, odds 401, savant 200, mlb-lineups 200, fangraphs 200 (curl), open-meteo timeout",
+ "egress_source": "session_start 2026-10-04T23:23:13+00:00",
+ "entries": [
+  {
+   "contest_id": "196328870",
+   "contest_name": "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (ATL @ LAD)",
+   "entry_fee": 1.0,
+   "entry_id": "5283416944",
+   "filled": true,
+   "roster_ids": [
+    "44382376",
+    "44382226",
+    "44382231",
+    "44382233",
+    "44382234",
+    "44382236"
+   ]
+  },
+  {
+   "contest_id": "196329524",
+   "contest_name": "MLB Showdown $4.5K mini-MAX [$1K to 1st 150 Entry Max] (ATL @ LAD)",
+   "entry_fee": 1.0,
+   "entry_id": "5283421412",
+   "filled": true,
+   "roster_ids": [
+    "44382365",
+    "44382230",
+    "44382231",
+    "44382232",
+    "44382235",
+    "44382319"
+   ]
+  },
+  {
+   "contest_id": "196329525",
+   "contest_name": "MLB Showdown $500 Solo Shot (ATL @ LAD)",
+   "entry_fee": 1.0,
+   "entry_id": "5283421368",
+   "filled": true,
+   "roster_ids": [
+    "44382325",
+    "44382223",
+    "44382229",
+    "44382233",
+    "44382236",
+    "44382239"
+   ]
+  },
+  {
+   "contest_id": "196329526",
+   "contest_name": "MLB Showdown $500 Quarter Jukebox [Just $0.25!] (ATL @ LAD)",
+   "entry_fee": 0.25,
+   "entry_id": "5283415911",
+   "filled": true,
+   "roster_ids": [
+    "44382333",
+    "44382224",
+    "44382227",
+    "44382229",
+    "44382239",
+    "44382277"
+   ]
+  },
+  {
+   "contest_id": "196329526",
+   "contest_name": "MLB Showdown $500 Quarter Jukebox [Just $0.25!] (ATL @ LAD)",
+   "entry_fee": 0.25,
+   "entry_id": "5283416121",
+   "filled": true,
+   "roster_ids": [
+    "44382322",
+    "44382227",
+    "44382232",
+    "44382245",
+    "44382266",
+    "44382319"
+   ]
+  }
+ ],
+ "entries_binding": {
+  "source": "outputs/2026-10-04/DO_NOT_UPLOAD_DKEntries_showdown_2000_1g_sd.8a1c8715af26.csv",
+  "source_sha256": "f06924a86bcd08c3ec379290bc7aac34a03982a3dd6571fafbd7705f1e2ded59",
+  "status": "bound"
+ },
+ "host": {
+  "call_budget_s": 630.0,
+  "declared_ceiling_s": 900.0,
+  "host": "claude_code"
+ },
+ "kind": "delivery",
+ "labels": "deterministic review proxies and labeled priors only; never ROI, win rate, cash rate, or probability",
+ "manifest_row": {
+  "certification": "review_grade",
+  "contest_ids": [
+   "196328870",
+   "196329524",
+   "196329525",
+   "196329526"
+  ],
+  "contest_names": [
+   "MLB Showdown $4.5K mini-MAX [$1K to 1st 150 Entry Max] (ATL @ LAD)",
+   "MLB Showdown $500 Quarter Jukebox [Just $0.25!] (ATL @ LAD)",
+   "MLB Showdown $500 Solo Shot (ATL @ LAD)",
+   "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (ATL @ LAD)"
+  ],
+  "contest_type": "showdown",
+  "delivered_file": "outputs/2026-10-04/DKEntries_showdown_2000_1g_sd.csv",
+  "entries": 5,
+  "notes": "Showdown ships review-grade; it does not pass the three certification gates. See CLAUDE.md.",
+  "projection_tier": "unknown",
+  "recorded_utc": "2026-10-04T23:30:26.271120+00:00",
+  "run_id": null,
+  "sha256": "f06924a86bcd08c3ec379290bc7aac34a03982a3dd6571fafbd7705f1e2ded59",
+  "slate_tag": "2000_1g_sd",
+  "status": "candidate",
+  "strategy_state": {
+   "counts": {},
+   "state": "unknown"
+  }
+ },
+ "recorded_utc": "2026-10-04T23:30:26.273414+00:00",
+ "relaxations": {
+  "both_relaxed": 0,
+  "captain_cap_relaxed": 0,
+  "captain_contest_cap_relaxed": 0,
+  "captain_lock_relaxed": 0,
+  "contest_cap_relaxed": 0,
+  "cpt_cap_relaxed": 0,
+  "min_per_team_relaxed": 0,
+  "overlap_relaxed": 0,
+  "player_relaxed": 0
+ },
+ "run": {},
+ "schema_version": 1
+}
