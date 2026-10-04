@@ -4,7 +4,7 @@ Classic first; Showdown's differences are the last section.
 
 **What lands.** `run_classic` publishes a baseline before it reads reference data, odds, weather or venues.
 - **Where it sits.** Directly after the pool-blocker refusals and the `--leverage` check, so every earlier refusal still refuses first and exit 4 still means "before any solve".
-- **The frame.** The core (`mlb_engine/pipeline/baseline.py`) builds entry-mapped lineups on the unenriched frame and covers every reserved row. The build's `--max-opposing-hitters-per-sp` reaches every solve.
+- **The frame.** The core (`mlb_engine/pipeline/baseline.py`) builds entry-mapped lineups on the unenriched frame and covers every row the build fills, the blank and the half-entered ones; a complete row (a lineup already entered) is left in the file untouched and its lineup is held out of its contest (R448). The build's `--max-opposing-hitters-per-sp` reaches every solve.
 - **Allocation.** `run_slate` allocates and exports them, with every portfolio cap opened to the deadline rung's value. A `--never-relax` control stays held, and F-3 (no lineup twice in one contest) always holds.
 - **The file.** `outputs/<date>/DKEntries_<tag>_BASELINE_<run_id>.csv`, labelled `review_grade_baseline`. It is never certified and never upload-ready: odds and weather are assumed by construction, and every cap was opened before any refusal. Preflight says `review_ready`, exit 0, and gives that reason. Upload stays Ben's call.
 

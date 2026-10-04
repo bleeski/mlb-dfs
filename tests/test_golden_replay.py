@@ -23,7 +23,10 @@ run_slate inputs. A 2026-06-28 file Ben found next turned out to be a
 record of already-submitted lineups, not a blank reserved-entries
 template, so run_initial_build correctly refused every entry as
 "already complete and immutable" -- the right guardrail, wrong file
-type, and not fixable by filtering the player pool. 2026-06-03 is
+type, and not fixable by filtering the player pool. (R448, 2026-10-04: a
+template with SOME blank rows now builds around its complete ones; a file
+with every row complete is still refused, by name and before any build.)
+2026-06-03 is
 anchored instead: Ben supplied DKSalaries.csv, a genuinely BLANK
 DKEntries.csv (18 reserved entries across 3 real contests, every roster
 cell empty), and contest-standings-191020573.csv. Files copied to

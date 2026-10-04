@@ -199,6 +199,29 @@ def requirements_from_entries(entries_csv) -> Tuple[ContestRequirement, ...]:
     named and never filled: pinning its slots is late swap's job. A file whose
     rows are not Classic's ten slots (a Showdown file) is a caller error.
     """
+    return _read_requirements(entries_csv, fill_partial=False)
+
+
+def initial_build_requirements(entries_csv) -> Tuple[ContestRequirement, ...]:
+    """R448. The rows an INITIAL build fills, per contest, off the DKEntries
+    file, in the shape ``build_baseline(requirements=)`` takes.
+
+    What ``run_slate`` does with a template: every blank row and every partial
+    row is refilled, and every complete row is left in the file as the operator
+    entered it. So blank and partial rows are fillable, and each complete row's
+    lineup is HELD in its contest (F-3), as ``requirements_from_entries`` holds
+    it. The one difference from that reader is the partial row, which this build
+    fills because ``run_slate`` does; reading it as "named, never filled" would
+    leave the baseline short of the rows ``run_slate`` expects covered.
+
+    A file with nothing blank or partial reads as nothing to fill, and the core
+    says ``nothing_to_fill``: an entered lineup is never overwritten. A file
+    whose rows are not Classic's ten slots is a caller error, as there.
+    """
+    return _read_requirements(entries_csv, fill_partial=True)
+
+
+def _read_requirements(entries_csv, *, fill_partial: bool) -> Tuple[ContestRequirement, ...]:
     by_contest: Dict[str, Dict[str, list]] = {}
     for row in parse_dk_entry_rows(str(entries_csv)):
         if len(row.roster_cells) != ROSTER_SIZE:
@@ -211,33 +234,14 @@ def requirements_from_entries(entries_csv) -> Tuple[ContestRequirement, ...]:
             slot["fillable"].append(str(row.entry_id))
         elif row.is_complete:
             slot["held"].append(row.lineup_signature)
+        elif fill_partial:
+            slot["fillable"].append(str(row.entry_id))
         else:
             slot["partial"].append(str(row.entry_id))
     return _normalize_requirements([
         ContestRequirement(cid, tuple(v["fillable"]), tuple(v["held"]),
                            tuple(v["partial"]))
         for cid, v in by_contest.items()])
-
-
-def every_row_requirements(entries_csv) -> Dict[str, Tuple[str, ...]]:
-    """R389(b). ``{contest_id: (entry_id, ...)}`` with EVERY reserved row
-    fillable, the shape ``build_baseline(requirements=)`` takes.
-
-    `run_slate` refills every reserved row on an initial build, complete and
-    partial ones included, so a baseline that held complete rows or skipped
-    partial ones (``requirements_from_entries``, the core's own reading) would
-    come up short or read ``nothing_to_fill`` on a re-downloaded DKEntries
-    file that `run_slate` rebuilds whole. A file whose rows are not Classic's
-    ten slots is a caller error, as there.
-    """
-    by_contest: Dict[str, list] = {}
-    for row in parse_dk_entry_rows(str(entries_csv)):
-        if len(row.roster_cells) != ROSTER_SIZE:
-            raise ValueError(
-                f"{entries_csv}: Entry ID {row.entry_id} has {len(row.roster_cells)} "
-                f"roster slots, not Classic's {ROSTER_SIZE}")
-        by_contest.setdefault(str(row.contest_id), []).append(str(row.entry_id))
-    return {cid: tuple(ids) for cid, ids in by_contest.items()}
 
 
 def _ids(values, what: str) -> Tuple[str, ...]:
