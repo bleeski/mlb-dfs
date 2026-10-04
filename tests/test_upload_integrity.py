@@ -4912,17 +4912,24 @@ class RePromoteRunTests(unittest.TestCase):
     def _rows(self):
         return self.um.read_manifest(self.date).get("deliveries", [])
 
-    def _seed_row(self, run_id, name, status="upload_ready", sha=None):
+    def _seed_row(self, run_id, name, status="upload_ready", sha=None,
+                  certification="certified", slate_tag="2138_2g", **extra):
         path = self.outputs / name
+        run_export = self.root / "runs" / run_id / "final" / "DKEntries.csv"
         if not path.exists():
-            path.write_text("seeded\n", encoding="utf-8")
+            # R473. A row seeded for a run delivers that run's own bytes unless
+            # the test names others: a row whose sha256 is not the bytes it
+            # describes is what R451 and R387 made impossible, and a
+            # re-promotion now reads a run's row by run AND sha256.
+            path.write_bytes(run_export.read_bytes()
+                             if sha is None and run_export.is_file() else b"seeded\n")
         rows = self._rows()
         rows.append({"delivered_file": self.um.repo_relative(path),
                      "sha256": sha or self.um.sha256_file(path),
-                     "contest_type": "classic", "slate_tag": "2138_2g",
+                     "contest_type": "classic", "slate_tag": slate_tag,
                      "contest_ids": ["193774256"], "entries": 2,
                      "run_id": run_id, "status": status,
-                     "certification": "certified"})
+                     "certification": certification, **extra})
         self.um._write(self.um.manifest_path(self.date),
                        {"version": "1.1", "date": self.date, "deliveries": rows})
 
@@ -5067,6 +5074,276 @@ class RePromoteRunTests(unittest.TestCase):
             "handing back 0 from the dry run while the promotion returns 4 is the "
             "same misreport one command earlier")
         self.assertEqual(len(self._rows()), before)
+
+    # ---- R473(a): a run's row is the row that records ITS bytes -----------
+    #
+    # 1400_4g, 2026-09-29: a PHI-hedge variant (7fdaa380) was recorded under run
+    # 0efaf97e (sha 52d158c3, certified) as `review_grade_uncertified`, and
+    # re-promoting the run took its label, tier and strategy state from the
+    # variant's row because `find_prior_row` kept the LAST row whose run id
+    # matched. These build the shape by hand with forward-slash artifact keys, so
+    # they run on every host (R477's backslash key is a `run_slate`-built run's).
+
+    def _own_row(self, run_id, name="DKEntries_2138_2g.csv", **extra):
+        """The run's own delivery: the run's bytes (the `_seed_row` default),
+        superseded because a variant was delivered after it."""
+        extra.setdefault("projection_tier", "enriched")
+        extra.setdefault("strategy_state", {"state": "clean", "counts": {}})
+        self._seed_row(run_id, name, status="superseded", **extra)
+
+    def _variant_row(self, run_id, name="DKEntries_2138_2g_variant.csv", **extra):
+        """A hand-recorded variant under the run's id: other bytes, review-grade,
+        its own tier and strategy state."""
+        path = self.outputs / name
+        path.write_text("variant bytes\n", encoding="utf-8")
+        extra.setdefault("projection_tier", "proxy")
+        extra.setdefault("strategy_state",
+                         {"state": "relaxed", "counts": {"player_cap": 2}})
+        self._seed_row(run_id, name, certification="review_grade_uncertified",
+                       sha=self.um.sha256_file(path), **extra)
+        return self.um.sha256_file(path)
+
+    def _say(self, *argv):
+        """``(exit code, stdout)`` of a promotion."""
+        import contextlib
+        import io
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = self._promote(*argv)
+        return code, out.getvalue()
+
+    def _plan(self, *argv):
+        code, text = self._say(*argv, "--dry-run", "--json")
+        self.assertEqual(code, 0, text)
+        return json.loads(text[text.index("{"):text.rindex("}") + 1])
+
+    def test_a_later_variant_row_on_the_same_run_lends_nothing_to_the_re_promotion(self):
+        run_id = "20260815T213800Z_aaaaaaaa"
+        self._make_run(run_id)
+        self._own_row(run_id)
+        self._variant_row(run_id)
+        plan = self._plan("--run-id", run_id)
+        self.assertEqual(plan["certification"], "certified",
+                         "the variant's review_grade_uncertified is the label of the "
+                         "variant's bytes, not of the run's")
+        self.assertEqual(plan["prior_row_status"], "superseded",
+                         "the status reported is the run's own row's, not the variant's")
+        self.assertEqual(self._promote("--run-id", run_id), 0)
+        new = self._rows()[-1]
+        self.assertEqual(new["certification"], "certified")
+        self.assertEqual(new["projection_tier"], "enriched",
+                         "the tier is a fact about the delivery, read off the same row")
+        self.assertEqual(new["strategy_state"]["state"], "clean")
+
+    def test_the_lineage_rides_with_the_row_for_the_runs_bytes(self):
+        """The same row supplies the lineage (R389(b)): a baseline run's row says
+        `baseline`, and a later enhanced-lineage variant must not erase it."""
+        from mlb_engine.entries.upload_manifest import BASELINE_LABEL, BASELINE_LINEAGE
+        run_id = "20260815T213800Z_aaaaaaaa"
+        self._make_run(run_id)
+        self._own_row(run_id, certification=BASELINE_LABEL, lineage=BASELINE_LINEAGE)
+        self._variant_row(run_id)
+        self.assertEqual(self._promote("--run-id", run_id), 0)
+        new = self._rows()[-1]
+        self.assertEqual(new.get("lineage"), BASELINE_LINEAGE)
+        self.assertEqual(new["certification"], BASELINE_LABEL)
+
+    def test_the_newest_row_for_the_runs_bytes_wins_over_an_older_one(self):
+        """Re-promoting a superseded run appends a row with the SAME bytes, so
+        several rows can match run AND sha256; the newest is the live label."""
+        from mlb_engine.pipeline import deadline_governor as dg
+        run_id = "20260815T213800Z_aaaaaaaa"
+        self._make_run(run_id)
+        self._own_row(run_id, name="DKEntries_2138_2g_first.csv")
+        self._own_row(run_id, name="DKEntries_2138_2g_second.csv",
+                      certification=dg.DEADLINE_LABEL)
+        self._variant_row(run_id)
+        self.assertEqual(self._plan("--run-id", run_id)["certification"],
+                         dg.DEADLINE_LABEL)
+
+    def test_a_run_whose_bytes_no_row_records_needs_the_slate_said_and_reads_its_own_label(self):
+        """No row records these bytes: nothing the manifest holds about the run
+        describes them, so the slate is said out loud (as for a run with no row)
+        and the label is the run's own. The refusal names the rows it did not
+        read, with the command that would go ahead."""
+        run_id = "20260815T213800Z_aaaaaaaa"
+        self._make_run(run_id)
+        variant_sha = self._variant_row(run_id)
+        code, text = self._say("--run-id", run_id)
+        self.assertEqual(code, 2, text)
+        self.assertIn("record other bytes", text)
+        self.assertIn(variant_sha[:12], text, "the unread row is named by its bytes")
+        self.assertIn("--date", text)
+        code, text = self._say("--run-id", run_id, "--date", self.date,
+                               "--tag", "2138_2g")
+        self.assertEqual(code, 0, text)
+        self.assertIn("none of them lends", text,
+                      "a promotion that ignored a row says so rather than silently")
+        new = self._rows()[-1]
+        self.assertEqual(new["certification"], "certified")
+        self.assertEqual(new["projection_tier"], "unknown")
+        self.assertEqual(new["strategy_state"]["state"], "unknown")
+        self.assertFalse(new.get("lineage"))
+
+    def test_a_downgrade_accepted_swap_is_still_not_upgraded_to_certified(self):
+        """The negative control for reading the run manifest alone. A swap run
+        passes its gates (`workflow_valid`), its run manifest never carries
+        `review_grade_downgrade_accepted`, and the only place that label lives is
+        the swap's own row (R388(e)). The fix selects that row by run AND sha256;
+        a fix that read only runs/<id>/manifest.json would say `certified`."""
+        label = "review_grade_downgrade_accepted"
+        source = (REPO / "tools" / "late_swap.py").read_text(encoding="utf-8")
+        self.assertIn(f'DOWNGRADE_LABEL = "{label}"', source)
+        run_id = "20260815T213800Z_cccccccc"
+        run_dir = self._make_run(run_id)
+        manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+        self.assertTrue(manifest["certification"]["workflow_valid"])
+        self.assertNotIn(label, json.dumps(manifest),
+                         "the run manifest cannot say it, which is the point")
+        self._seed_row(run_id, "DKEntries_lateswap_2138_2g_cccccccc.csv",
+                       status="superseded", certification=label,
+                       projection_tier="proxy")
+        self.assertEqual(self._plan("--run-id", run_id)["certification"], label)
+        self.assertEqual(self._promote("--run-id", run_id), 0)
+        self.assertEqual(self._rows()[-1]["certification"], label)
+
+    def test_find_prior_row_needs_the_bytes_and_returns_the_newest_match(self):
+        import promote_run
+        run_id = "20260815T213800Z_aaaaaaaa"
+        run_dir = self._make_run(run_id)
+        own_sha = self.um.sha256_file(run_dir / "final" / "DKEntries.csv")
+        self._own_row(run_id)
+        variant_sha = self._variant_row(run_id)
+        outputs = self.root / "outputs"
+        date, row = promote_run.find_prior_row(run_id, outputs, own_sha)
+        self.assertEqual((date, row["sha256"]), (self.date, own_sha))
+        date, row = promote_run.find_prior_row(run_id, outputs, variant_sha.upper())
+        self.assertEqual(row["sha256"], variant_sha,
+                         "a sha256 compares as the same hex however it is cased")
+        self.assertEqual(promote_run.find_prior_row(run_id, outputs, "ab" * 32),
+                         (None, None))
+        self.assertEqual(promote_run.find_prior_row(run_id, outputs, ""),
+                         (None, None), "no bytes asked about, no row: never by run alone")
+
+    def test_prior_delivery_record_takes_the_record_for_the_runs_bytes(self):
+        """The controls and the market a re-promotion carries are the build's, and
+        the tracked record for the run's bytes is where they live. Two records
+        under one run id (the other under another slate tag, which R430's refusal
+        allows) must not trade controls."""
+        import promote_run
+        from mlb_engine.entries import delivery_record as dr
+        run_id = "20260815T213800Z_aaaaaaaa"
+        run_dir = self._make_run(run_id)
+        own_sha = self.um.sha256_file(run_dir / "final" / "DKEntries.csv")
+        for tag, sha, controls in (("2138_2g", own_sha, {"max_player_exposure_pct": 0.33}),
+                                   ("2138_2g_alt", "ee" * 32, {"max_player_exposure_pct": 0.9})):
+            dr.write_delivery_record(
+                date=self.date, run_id=run_id, controls=controls,
+                manifest_row={"run_id": run_id, "sha256": sha, "slate_tag": tag,
+                              "contest_type": "classic",
+                              "delivered_file": f"outputs/{self.date}/x_{tag}.csv"})
+        got = promote_run.prior_delivery_record(run_id, self.date, own_sha)
+        self.assertEqual(got["controls"], {"max_player_exposure_pct": 0.33},
+                         "the later record is the other bytes' and is not the run's")
+        self.assertIsNone(promote_run.prior_delivery_record(run_id, self.date, "ab" * 32))
+        self.assertIsNone(promote_run.prior_delivery_record(run_id, self.date, ""),
+                          "no bytes asked about, no record: never by run alone")
+
+    def test_a_re_promotion_carries_the_controls_of_the_record_for_its_bytes(self):
+        """The helper above, through the real promotion: `run()` hands the run's
+        own sha256 to `prior_delivery_record`, so the record a re-promotion
+        rewrites keeps the controls the build solved under and not a variant's."""
+        from mlb_engine.entries import delivery_record as dr
+        run_id = "20260815T213800Z_aaaaaaaa"
+        run_dir = self._make_run(run_id)
+        own_sha = self.um.sha256_file(run_dir / "final" / "DKEntries.csv")
+        self._own_row(run_id)
+        for tag, sha, controls in (("2138_2g", own_sha, {"max_player_exposure_pct": 0.33}),
+                                   ("2138_2g_alt", "ee" * 32, {"max_player_exposure_pct": 0.9})):
+            dr.write_delivery_record(
+                date=self.date, run_id=run_id, controls=controls,
+                manifest_row={"run_id": run_id, "sha256": sha, "slate_tag": tag,
+                              "contest_type": "classic",
+                              "delivered_file": f"outputs/{self.date}/x_{tag}.csv"})
+        self.assertEqual(self._promote("--run-id", run_id), 0)
+        mine = [r for r in dr.read_records(date=self.date)
+                if r.get("kind") == "delivery"
+                and r["manifest_row"].get("re_promoted_from") == run_id]
+        self.assertEqual(len(mine), 1, "the re-promotion's own record")
+        self.assertEqual(mine[0]["controls"], {"max_player_exposure_pct": 0.33})
+
+
+class RunBytesIdentityTests(unittest.TestCase):
+    """R473. A delivery is identified by its run AND its bytes.
+
+    ``delivery_record.names_run_bytes`` is the one predicate behind
+    `promote_run.find_prior_row`, `promote_run.prior_delivery_record` and
+    `late_swap.parent_delivery_label`; the tests pin it where it lives, so a
+    reader that stops using it fails here and in its own suite.
+    """
+
+    RUN, SHA = "20260815T213800Z_aaaaaaaa", "ab" * 32
+
+    def test_the_run_and_the_bytes_both_have_to_match(self):
+        from mlb_engine.entries.delivery_record import names_run_bytes
+        row = {"run_id": self.RUN, "sha256": self.SHA}
+        self.assertTrue(names_run_bytes(row, self.RUN, self.SHA))
+        self.assertFalse(names_run_bytes(row, self.RUN, "cd" * 32),
+                         "the run's id with other bytes is a variant, not the run")
+        self.assertFalse(names_run_bytes(row, "20260815T000000Z_bbbbbbbb", self.SHA),
+                         "the same bytes under another run is another run's delivery")
+
+    def test_a_sha256_compares_as_hex_however_it_is_cased_or_padded(self):
+        from mlb_engine.entries.delivery_record import names_run_bytes
+        row = {"run_id": self.RUN, "sha256": f" {self.SHA.upper()} "}
+        self.assertTrue(names_run_bytes(row, self.RUN, self.SHA))
+        self.assertTrue(names_run_bytes({"run_id": self.RUN, "sha256": self.SHA},
+                                        self.RUN, self.SHA.upper()))
+
+    def test_missing_evidence_is_never_a_match(self):
+        """A row that records no bytes cannot vouch for any, and a caller with no
+        bytes to ask about gets no row: the R228 shape, absence read as a pass."""
+        from mlb_engine.entries.delivery_record import names_run_bytes
+        for row in ({"run_id": self.RUN}, {"run_id": self.RUN, "sha256": None},
+                    {"run_id": self.RUN, "sha256": ""}, {"sha256": self.SHA},
+                    None, "a string", []):
+            self.assertFalse(names_run_bytes(row, self.RUN, self.SHA), row)
+        row = {"run_id": self.RUN, "sha256": self.SHA}
+        self.assertFalse(names_run_bytes(row, self.RUN, ""))
+        self.assertFalse(names_run_bytes(row, self.RUN, None))
+        self.assertFalse(names_run_bytes(row, "", self.SHA))
+        self.assertFalse(names_run_bytes(row, None, self.SHA))
+
+    def test_the_record_reader_returns_only_the_records_for_the_bytes(self):
+        from mlb_engine.entries import delivery_record as dr
+        from mlb_engine.entries import upload_manifest as um
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            original, um.REPO_ROOT = um.REPO_ROOT, root
+            try:
+                for tag, sha in (("t", self.SHA), ("t_alt", "cd" * 32)):
+                    dr.write_delivery_record(
+                        date="2026-08-15", run_id=self.RUN, root=root,
+                        manifest_row={"run_id": self.RUN, "sha256": sha,
+                                      "slate_tag": tag, "contest_type": "classic",
+                                      "delivered_file": f"outputs/2026-08-15/{tag}.csv"})
+                folder = dr.deliveries_dir(root) / "2026-08-15"
+                (folder / "t_other_kind.json").write_text(json.dumps(
+                    {"kind": "run", "manifest_row": {"run_id": self.RUN,
+                                                     "sha256": self.SHA}}),
+                    encoding="utf-8")
+                got = dr.records_for_run_bytes("2026-08-15", self.RUN, self.SHA, root=root)
+                self.assertEqual([r["manifest_row"]["slate_tag"] for r in got], ["t"],
+                                 "only the delivery record whose bytes these are")
+                self.assertEqual(dr.records_for_run_bytes(
+                    "2026-08-15", self.RUN, "", root=root), [])
+                self.assertEqual(dr.records_for_run_bytes(
+                    "2026-08-15", "", self.SHA, root=root), [])
+                self.assertEqual(dr.records_for_run_bytes(
+                    "2026-08-14", self.RUN, self.SHA, root=root), [],
+                    "a record is read on its own date")
+            finally:
+                um.REPO_ROOT = original
 
 
 class ManifestRecordMatchingTests(unittest.TestCase):

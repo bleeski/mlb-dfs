@@ -155,6 +155,40 @@ def recorded_sha_for_run(date: str, slate_tag: str, run_id: Optional[str],
     return sha.strip().lower() or None
 
 
+def names_run_bytes(row: Any, run_id: Optional[str], sha256: Optional[str]) -> bool:
+    """R473. True when this manifest row, or a record's ``manifest_row``, is the
+    delivery of THESE bytes under THIS run: the run id AND the sha256 both match.
+
+    A run id alone does not identify a delivery. `record_name` keys a run's record
+    on `<tag>_<run_id>.json`, and a hand-recorded variant (1400_4g: 7fdaa380 under
+    run 0efaf97e) or a row under another slate tag shares the run id with the
+    run's own row while describing other bytes. The label, lineage, tier, strategy
+    state and controls on that row belong to those bytes. A row that carries no
+    sha256 cannot vouch for any bytes and does not match; neither does a call that
+    has no sha256 to ask about.
+    """
+    if not isinstance(row, Mapping) or not run_id or not sha256:
+        return False
+    held = str(row.get("sha256") or "").strip().lower()
+    return bool(held) and held == str(sha256).strip().lower() \
+        and str(row.get("run_id") or "") == str(run_id)
+
+
+def records_for_run_bytes(date: str, run_id: Optional[str], sha256: Optional[str],
+                          root: Optional[Path] = None) -> list:
+    """R473. The tracked delivery records for this run's bytes on this date, in
+    `read_records` order (sorted by path), or [].
+
+    The reader `promote_run.prior_delivery_record` and `late_swap.
+    parent_delivery_label` share, so neither picks a run's record by `run_id`
+    alone. Matching is `names_run_bytes` on the record's `manifest_row`."""
+    if not run_id or not sha256:
+        return []
+    return [rec for rec in read_records(root=root, date=date)
+            if rec.get("kind") == "delivery"
+            and names_run_bytes(rec.get("manifest_row"), run_id, sha256)]
+
+
 def code_identity() -> Dict[str, Any]:
     """What this build was built BY, which no live run record carries.
 
