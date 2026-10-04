@@ -21691,6 +21691,680 @@ class OwnershipPriorShadowLoopTests(unittest.TestCase):
                          f"the R107(a) shape exactly")
 
 
+class OwnershipSavedGradeTests(unittest.TestCase):
+    """R342(b1). The grade reads the SAVED pre-lock prediction, scores the zero tail,
+    spreads its flat baseline over the rows it scores, and reads the odds state off the
+    saved file. Every fixture is a temp skeleton (R155): nothing here reads Ben's disk,
+    and the "saved" file is a real emit written where BUILD would have written it.
+    """
+
+    DATE = "2026-08-16"
+    CID = "111111111"
+    GREEK = ["Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Golf", "Hotel", "India"]
+    BENCH = ["Zulu", "Yankee"]
+    NAMES = {"111111111": "MLB $5 Double Up"}
+
+    @staticmethod
+    def _tool():
+        from tools import ownership_grade_archive
+        return ownership_grade_archive
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.root = Path(self._tmp.name)
+
+    # -- fixtures -------------------------------------------------------------
+
+    def _salary(self, date=None, bump=None, path=None):
+        """Two teams: nine bats with a posted order and a probable arm each, plus two
+        bench bats and a non-probable arm per team that the file prices and nobody
+        rosters (the zero tail). 13 rows a team, 26 in all."""
+        date = date or self.DATE
+        path = path or self.root / "data" / "slates" / date / "DKSalaries.csv"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        header = ["Position", "Name + ID", "Name", "ID", "Roster Position", "Salary",
+                  "Game Info", "TeamAbbrev", "AvgPointsPerGame", "Status", "Starting"]
+        info = f"NYY@BOS {date[5:7]}/{date[8:10]}/{date[:4]} 07:05PM ET"
+        rows, pid = [], 7000
+        for team in ("Nyy", "Bos"):
+            for slot, greek in enumerate(self.GREEK, start=1):
+                name = f"{greek} {team}"
+                salary = 3000 + 100 * slot + (bump or 0) * (name == "Alpha Nyy")
+                rows.append(["OF", f"{name} ({pid})", name, str(pid), "OF", str(salary), info,
+                             team.upper(), "8.5", "", str(slot)])
+                pid += 1
+            for greek in self.BENCH:
+                name = f"{greek} {team}"
+                rows.append(["OF", f"{name} ({pid})", name, str(pid), "OF", "2500", info,
+                             team.upper(), "2.0", "", ""])
+                pid += 1
+            for arm, salary, starting in ((f"Ace {team}", 9000, "SP"), (f"Rookie {team}", 4000, "")):
+                rows.append(["SP", f"{arm} ({pid})", arm, str(pid), "P", str(salary), info,
+                             team.upper(), "10.0", "", starting])
+                pid += 1
+        with open(path, "w", encoding="utf-8", newline="") as fh:
+            writer = csv.writer(fh)
+            writer.writerow(header)
+            writer.writerows(rows)
+        return path
+
+    def _save(self, salary, name="ownership_pred_a.json", generated="2026-08-16T20:00:00Z",
+              odds_applied=None, date=None):
+        """A real emit, written to outputs/<date>/ the way BUILD writes it."""
+        from tools.ownership_pred import build_prediction
+        pred = build_prediction(salary, archetypes=["cash", "wta_satellite"],
+                                slate_tag="a", slate_date=date or self.DATE)
+        pred["generated_utc"] = generated
+        if odds_applied is not None:
+            pred["inputs"]["implied_totals"]["applied"] = odds_applied
+        out = self.root / "outputs" / (date or self.DATE) / name
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps(pred), encoding="utf-8")
+        return out
+
+    def _lineup(self, hitters, arms=("Ace Nyy", "Ace Bos")):
+        slots = ["C", "1B", "2B", "3B", "SS", "OF", "OF", "OF"]
+        return (f"P {arms[0]} P {arms[1]} "
+                + " ".join(f"{s} {h}" for s, h in zip(slots, hitters)))
+
+    def _standings(self, date=None, cid=None, entries=None):
+        date, cid = date or self.DATE, cid or self.CID
+        nyy = [f"{g} Nyy" for g in self.GREEK]
+        bos = [f"{g} Bos" for g in self.GREEK]
+        if entries is None:
+            entries = [self._lineup(nyy[:8]), self._lineup(nyy[:8]),
+                       self._lineup(nyy[1:8] + bos[:1]),
+                       self._lineup(bos[:8], ("Ace Bos", "Ace Nyy"))]
+        path = self.root / "data" / "archive" / date / f"contest-standings-{cid}.csv"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        header = ["Rank", "EntryId", "EntryName", "TimeRemaining", "Points", "Lineup",
+                  "", "Player", "Roster Position", "%Drafted", "FPTS"]
+        with open(path, "w", encoding="utf-8-sig", newline="") as fh:
+            writer = csv.writer(fh)
+            writer.writerow(header)
+            for i, cell in enumerate(entries, start=1):
+                writer.writerow([str(i), str(9000 + i), f"user{i} (1/1)", "0",
+                                 str(100 - i), cell, "", "", "", "", ""])
+        return path
+
+    def _record(self, date=None, cid=None, size=500, ctype="classic"):
+        return {"contest_id": cid or self.CID, "contest_type": ctype,
+                "slate_date": date or self.DATE,
+                "blob": {"own_results": {"field_size": size}}}
+
+    def _grade(self, record=None, names=None, **kwargs):
+        tool = self._tool()
+        index = tool.load_saved_predictions(self.root)
+        return tool.grade_saved_one(record or self._record(),
+                                    self.NAMES if names is None else names, index,
+                                    root=self.root, **kwargs)
+
+    def _graded_fixture(self):
+        self._save(self._salary())
+        self._standings()
+        return self._grade()
+
+    # -- the saved file is the thing graded -----------------------------------
+
+    def test_the_saved_file_is_read_named_and_never_rebuilt(self):
+        """Today's code is not what BUILD saved before lock. Make `build_prediction`
+        raise: a path that rebuilds the prediction cannot reach a grade."""
+        from tools import ownership_pred as packaged
+        self._tool()  # puts tools/ on sys.path, where the grade tool imports ownership_pred from
+        import ownership_pred as toplevel
+        saved = self._save(self._salary())
+        self._standings()
+        real = (packaged.build_prediction, toplevel.build_prediction)
+
+        def refuse_rebuild(*args, **kwargs):
+            raise AssertionError("the saved grade must not rebuild the prediction")
+
+        packaged.build_prediction = toplevel.build_prediction = refuse_rebuild
+        try:
+            graded = self._grade()
+        finally:
+            packaged.build_prediction, toplevel.build_prediction = real
+        self.assertEqual("GRADED", graded["status"], graded.get("refused"))
+        block = graded["saved"]
+        self.assertEqual(f"outputs/{self.DATE}/ownership_pred_a.json", block["source"])
+        self.assertEqual(hashlib.sha256(saved.read_bytes()).hexdigest(), block["file_sha256"])
+        self.assertTrue(block["prelock"])
+        self.assertTrue(block["salary_sha256_match"])
+        self.assertEqual("v0.1-prior", block["prior_version"])
+
+    def test_the_grade_scores_exactly_what_the_file_said(self):
+        """The graded number is the file's own map, not one recomputed from the salary
+        file: edit one saved share and the graded error moves with it."""
+        saved = self._save(self._salary())
+        self._standings()
+        before = self._grade()["whole_file"]["saved"]["mae"]
+        pred = json.loads(saved.read_text(encoding="utf-8"))
+        own = pred["archetypes"]["cash"]["own_pct_by_player_id"]
+        victim = next(str(p["Player_ID"]) for p in pred["players"] if p["Name"] == "Zulu Nyy")
+        own[victim] = round(own[victim] + 40.0, 2)  # a bench bat nobody rostered
+        saved.write_text(json.dumps(pred), encoding="utf-8")
+        after = self._grade()["whole_file"]["saved"]["mae"]
+        self.assertAlmostEqual(before + 40.0 / 26, after, places=2)
+
+    # -- the zero tail and the same-universe baseline -------------------------
+
+    def test_the_zero_tail_is_in_the_error_term(self):
+        graded = self._graded_fixture()
+        whole = graded["whole_file"]
+        self.assertEqual(26, whole["rows"], "every salary-file row, bench included")
+        pred = json.loads((self.root / "outputs" / self.DATE / "ownership_pred_a.json")
+                          .read_text(encoding="utf-8"))
+        own = pred["archetypes"]["cash"]["own_pct_by_player_id"]
+        by_name = {p["Name"]: str(p["Player_ID"]) for p in pred["players"]}
+        # The shares, counted by hand from the four lineups the fixture wrote.
+        nyy = [f"{g} Nyy" for g in self.GREEK]
+        bos = [f"{g} Bos" for g in self.GREEK]
+        count = {name: 0 for name in by_name}
+        for roster in ([*nyy[:8], "Ace Nyy", "Ace Bos"], [*nyy[:8], "Ace Nyy", "Ace Bos"],
+                       [*nyy[1:8], bos[0], "Ace Nyy", "Ace Bos"],
+                       [*bos[:8], "Ace Bos", "Ace Nyy"]):
+            for name in roster:
+                count[name] += 1
+        expected = sum(abs(own[by_name[n]] - 100.0 * c / 4) for n, c in count.items()) / len(count)
+        self.assertAlmostEqual(expected, whole["saved"]["mae"], places=3)
+        self.assertEqual(4, sum(1 for n, c in count.items()
+                                if c == 0 and n.split()[0] in self.BENCH))
+        self.assertLess(whole["saved"]["rostered_players"], whole["rows"])
+        self.assertGreater(whole["saved"]["zero_actual_pred_mass"], 0.0)
+
+    def test_rostered_is_membership_not_a_rounded_share(self):
+        """`rostered_by_player_norm` rounds to 2dp: a player on 1 of 40,000 lineups reads
+        0.00 there. The saved grade counts the same lineups and keeps the precision."""
+        from mlb_engine.field.field_miner import rostered_by_player_norm
+        tool = self._tool()
+        entries = [{"lineup_complete": True, "players_norm": ("star", "bat")}
+                   for _ in range(39_999)]
+        entries.append({"lineup_complete": True, "players_norm": ("star", "rare")})
+        entries.append({"lineup_complete": False, "players_norm": ("ghost",)})
+        exact, n = tool.rostered_shares_exact(entries)
+        rounded, n_rounded = rostered_by_player_norm(entries)
+        self.assertEqual(n_rounded, n)
+        self.assertEqual(0.0, rounded["rare"], "the 2dp definition loses the share")
+        self.assertAlmostEqual(100.0 / 40_000, exact["rare"], places=9)
+        self.assertNotIn("ghost", exact)
+        for name, value in rounded.items():
+            self.assertEqual(value, round(exact[name], 2), name)
+        rows = tool.saved_pool_rows(
+            {"archetypes": {"cash": {"own_pct_by_player_id": {"1": 5.0, "2": 5.0}}},
+             "players": [{"Player_ID": "1", "Name": "Rare", "pool": "hitter",
+                          "features": {"batting_order": 3}},
+                         {"Player_ID": "2", "Name": "Nobody", "pool": "hitter",
+                          "features": {"batting_order": None}}]},
+            "cash", {"rare": 100.0 / 40_000})
+        self.assertEqual([True, False], [r["rostered"] for r in rows])
+        self.assertEqual([True, False], [r["role_known"] for r in rows])
+
+    def test_the_flat_baseline_is_scored_on_the_same_rows(self):
+        tool = self._tool()
+        whole = self._graded_fixture()["whole_file"]
+        self.assertEqual(whole["saved"]["n"], whole["flat_budget"]["n"])
+        rows = [{"pool": "hitter"}] * 24 + [{"pool": "pitcher"}] * 4
+        flat = tool.flat_budget_values(rows)
+        self.assertAlmostEqual(800.0, sum(flat[:24]), places=6)
+        self.assertAlmostEqual(200.0, sum(flat[24:]), places=6)
+        self.assertEqual(200.0 / 4, flat[-1], "per pitcher: the budget over every pitcher row")
+        # A flat baseline ranks nothing: no top-10 score and no rank correlation, never a
+        # row-order artifact.
+        self.assertIsNone(whole["flat_budget"]["top10_recall"])
+        self.assertIsNone(whole["flat_budget"]["spearman"])
+        self.assertIsNotNone(whole["saved"]["top10_recall"])
+
+    # -- odds and provenance --------------------------------------------------
+
+    def test_the_odds_state_is_read_off_the_saved_file(self):
+        salary = self._salary()
+        self._save(salary, odds_applied=False)
+        self._standings()
+        inert = self._grade()["saved"]["inputs"]
+        self.assertIn("implied_totals", inert["inert"])
+        self.assertNotIn("implied_totals", inert["applied"])
+        self._save(salary, odds_applied=True)
+        applied = self._grade()["saved"]["inputs"]
+        self.assertIn("implied_totals", applied["applied"])
+        self.assertNotIn("implied_totals", applied["inert"])
+
+    def test_a_file_saved_after_the_first_game_is_refused_by_name(self):
+        self._save(self._salary(), generated="2026-08-16T23:30:00Z")
+        self._standings()
+        graded = self._grade()
+        self.assertEqual("SAVED_AFTER_LOCK", graded["status"])
+        self.assertIn(f"outputs/{self.DATE}/ownership_pred_a.json", graded["refused"])
+        self.assertFalse(graded["saved"]["prelock"])
+        self.assertNotIn("whole_file", graded)
+
+    def test_a_saved_file_for_a_different_salary_snapshot_matches_nothing(self):
+        self._save(self._salary())
+        self._salary(bump=300)  # the contest's salary file moved after the file was saved
+        self._standings()
+        graded = self._grade()
+        self.assertEqual("NO_MATCHING_SAVED_PREDICTION", graded["status"])
+        self.assertIn("differs in Player_ID, salary or team",
+                      graded["saved_candidates"][0]["identity_problem"])
+
+    def test_a_date_with_no_saved_file_is_named_and_not_rebuilt(self):
+        self._salary()
+        self._standings()
+        graded = self._grade()
+        self.assertEqual("NO_MATCHING_SAVED_PREDICTION", graded["status"])
+        self.assertEqual([], graded["saved_candidates"])
+
+    def test_a_date_with_no_saved_file_is_named_before_any_standings_parse(self):
+        graded = self._grade()  # no standings, no salary file, no saved file on disk
+        self.assertEqual("NO_MATCHING_SAVED_PREDICTION", graded["status"])
+        self.assertIn(f"no saved prediction is dated {self.DATE}", graded["refused"])
+
+    def test_selection_prefers_prelock_then_the_same_salary_sha_then_the_latest(self):
+        tool = self._tool()
+        salary = self._salary()
+        identity = tool.salary_identity(str(salary))
+        base = json.loads(self._save(salary).read_text(encoding="utf-8"))
+
+        def cand(source, generated, sha):
+            c = json.loads(json.dumps(base))
+            c.update({"_source": source, "_file_sha256": source, "generated_utc": generated})
+            c["salary_file"]["sha256"] = sha
+            return c
+
+        names = ["ace nyy", "alpha nyy"]
+        good = identity["sha256"]
+        late_wrong_sha = cand("late_wrong_sha", "2026-08-16T22:00:00Z", "0" * 64)
+        early_right_sha = cand("early_right_sha", "2026-08-16T12:00:00Z", good)
+        post_lock = cand("post_lock", "2026-08-16T23:50:00Z", good)
+        chosen, considered = tool.match_saved_prediction(
+            names, identity, [late_wrong_sha, early_right_sha, post_lock])
+        self.assertEqual("early_right_sha", chosen["_source"], "the sha match beats a later file")
+        self.assertEqual({"early_right_sha"},
+                         {c["source"] for c in considered if c.get("chosen")})
+        self.assertEqual(3, len(considered))
+        later_right = cand("later_right_sha", "2026-08-16T18:00:00Z", good)
+        chosen, _ = tool.match_saved_prediction(names, identity, [early_right_sha, later_right])
+        self.assertEqual("later_right_sha", chosen["_source"], "then the latest")
+        chosen, _ = tool.match_saved_prediction(names, identity, [post_lock, late_wrong_sha])
+        self.assertEqual("late_wrong_sha", chosen["_source"],
+                         "a file saved before lock beats a post-lock one with the right sha")
+
+    def test_a_salary_file_only_a_run_folder_holds_is_found_by_the_recorded_sha(self):
+        """data/slates/<date>/DKSalaries.csv is overwritten by the next draft group and
+        run folders carry YYYYMMDD: the bytes the saved file recorded are found by sha."""
+        own_bytes = self._salary().read_bytes()
+        self._save(self.root / "data" / "slates" / self.DATE / "DKSalaries.csv")
+        run_copy = self.root / "runs" / "20260816T200000Z_ab12cd34" / "inputs" / "DKSalaries.csv"
+        run_copy.parent.mkdir(parents=True)
+        run_copy.write_bytes(own_bytes)
+        elsewhere = self.root / "data" / "slates" / self.DATE / "DKSalaries.csv"
+        elsewhere.write_text(
+            "Position,Name + ID,Name,ID,Roster Position,Salary,Game Info,TeamAbbrev,"
+            "AvgPointsPerGame,Status,Starting\n"
+            "OF,Other One (1),Other One,1,OF,3000,CLE@DET 08/16/2026 01:10PM ET,CLE,5.0,,\n",
+            encoding="utf-8")
+        self._standings()
+        graded = self._grade()
+        self.assertEqual("GRADED", graded["status"], graded.get("refused"))
+        self.assertTrue(graded["saved"]["salary_sha256_match"])
+        tool = self._tool()
+        found = tool.recorded_salary_files(
+            self.root, tool.load_saved_predictions(self.root)[self.DATE])
+        self.assertEqual([str(run_copy)], found)
+
+    def test_an_operator_archetype_map_replaces_the_resolver_and_is_named(self):
+        tool = self._tool()
+        self._save(self._salary())
+        self._standings()
+        self.assertEqual("NO_CONTEST_NAME", self._grade(names={})["status"])
+        mapped = self._grade(names={}, archetype_map={self.CID: "wta_satellite"})
+        self.assertEqual("GRADED", mapped["status"], mapped.get("refused"))
+        self.assertEqual(("wta_satellite", "MAPPED"),
+                         (mapped["archetype"], mapped["archetype_exactness"]))
+        resolved = self._grade()
+        self.assertEqual("cash", resolved["archetype"])
+        self.assertNotEqual(resolved["whole_file"]["saved"]["mae"],
+                            mapped["whole_file"]["saved"]["mae"],
+                            "the map picks the archetype's own saved block")
+        path = self.root / "map.csv"
+        path.write_text(f"cid,archetype\n{self.CID},mme\n", encoding="utf-8")
+        self.assertEqual({self.CID: "mme"}, tool.load_archetype_map(str(path)))
+        path.write_text(f"cid,archetype\n{self.CID},not_an_archetype\n", encoding="utf-8")
+        with self.assertRaises(ValueError):
+            tool.load_archetype_map(str(path))
+
+    def test_a_showdown_contest_is_not_graded_here(self):
+        self.assertEqual("NOT_CLASSIC", self._grade(record=self._record(ctype="showdown"))["status"])
+
+    def test_a_saved_file_missing_a_rostered_player_is_refused_not_scored_short(self):
+        saved = self._save(self._salary())
+        self._standings()
+        pred = json.loads(saved.read_text(encoding="utf-8"))
+        own = pred["archetypes"]["cash"]["own_pct_by_player_id"]
+        alpha = next(str(p["Player_ID"]) for p in pred["players"] if p["Name"] == "Alpha Nyy")
+        del own[alpha]
+        saved.write_text(json.dumps(pred), encoding="utf-8")
+        graded = self._grade()
+        self.assertEqual("ACTUAL_MASS_NOT_COMPLETE", graded["status"])
+
+    def test_two_saved_players_with_one_normalized_name_are_refused(self):
+        saved = self._save(self._salary())
+        self._standings()
+        pred = json.loads(saved.read_text(encoding="utf-8"))
+        twin = dict(next(p for p in pred["players"] if p["Name"] == "Zulu Nyy"))
+        twin["Player_ID"] = "99999"
+        pred["players"].append(twin)
+        for block in pred["archetypes"].values():
+            block["own_pct_by_player_id"]["99999"] = 0.5
+        saved.write_text(json.dumps(pred), encoding="utf-8")
+        self.assertEqual("PREDICTED_NAME_AMBIGUITY", self._grade()["status"])
+
+    def test_saved_files_are_indexed_by_their_own_slate_date_and_schema(self):
+        tool = self._tool()
+        saved = self._save(self._salary())
+        pred = json.loads(saved.read_text(encoding="utf-8"))
+        pred["slate_date"] = "2026-08-17"
+        saved.write_text(json.dumps(pred), encoding="utf-8")
+        stranger = self.root / "outputs" / self.DATE / "ownership_pred_other_schema.json"
+        stranger.write_text(json.dumps({"schema": "something/v9", "slate_date": self.DATE}),
+                            encoding="utf-8")
+        index = tool.load_saved_predictions(self.root)
+        self.assertEqual(["2026-08-17"], sorted(index), "the file's slate_date, not its folder")
+        self.assertEqual(f"outputs/{self.DATE}/ownership_pred_a.json",
+                         index["2026-08-17"][0]["_source"])
+
+    def test_the_metric_arithmetic(self):
+        """Hand-computed: the calibration gap weights each prediction bin by its share of
+        the rows, which is NOT the MAE; the zero tail is counted in both."""
+        tool = self._tool()
+        rows = [{"pool": "hitter", "actual": a, "rostered": a > 0, "role_known": True}
+                for a in (3.0, 1.0, 17.0, 15.0, 0.0)]
+        values = [2.0, 4.0, 15.0, 25.0, 1.5]
+        got = tool.pool_metrics(rows, values)
+        self.assertAlmostEqual((1 + 3 + 2 + 10 + 1.5) / 5, got["mae"], places=4)
+        self.assertAlmostEqual((1 + 3 + 2 + 10) / 4, got["rostered_mae"], places=4)
+        # bins: [1,5) holds 2.0 and 4.0 and 1.5 (mean pred 2.5 vs mean actual 1.3333),
+        # [10,20) holds 15 vs 17, [20,100) holds 25 vs 15.
+        expected = (3 / 5) * abs(2.5 - 4.0 / 3) + (1 / 5) * 2.0 + (1 / 5) * 10.0
+        self.assertAlmostEqual(expected, got["calibration_gap"], places=3)
+        self.assertNotAlmostEqual(got["mae"], got["calibration_gap"], places=2)
+        self.assertAlmostEqual(1.5, got["zero_actual_pred_mass"], places=4)
+        self.assertEqual(5, got["n"])
+        self.assertIsNone(got["top10_recall"], "fewer than ten rows scores no top-10")
+        twelve = [{"pool": "hitter", "actual": float(12 - i), "rostered": True, "role_known": True}
+                  for i in range(12)]
+        swapped = [float(12 - i) for i in range(12)]
+        swapped[9], swapped[10] = swapped[10], swapped[9]  # the 10th and 11th trade places
+        self.assertEqual(0.9, tool.pool_metrics(twelve, swapped)["top10_recall"])
+        self.assertEqual(1.0, tool.pool_metrics(twelve, [float(12 - i) for i in range(12)])["top10_recall"])
+        tied = [5.0] * 8 + [4.0, 4.0, 4.0, 4.0]
+        self.assertTrue(tool.pool_metrics(twelve, tied)["top10_tie_at_cutoff"])
+        self.assertEqual(1.0, tool.pool_metrics(twelve, tied)["top10_recall"],
+                         "a tie at the cutoff is broken by row order, so the first two 4.0s make it")
+
+    # -- the two universes ----------------------------------------------------
+
+    def test_the_pool_proxy_is_scored_after_the_real_rescale(self):
+        """The comparator is the saved prior as R342(a) hands it to the solver, through the
+        production function and not a copy of it."""
+        from mlb_engine.field.ownership_prior import (
+            PROJECTED_OWNERSHIP_COLUMN, renormalize_ownership_to_frame,
+        )
+        tool = self._tool()
+        pool = self._graded_fixture()["pool_proxy"]
+        self.assertEqual(18 + 2, pool["rows"], "bats with a slot and arms with a probable flag")
+        self.assertEqual(pool["saved"]["n"], pool["saved_rescaled"]["n"])
+        rescaled = pool["saved_rescaled"]["by_pool"]
+        self.assertAlmostEqual(800.0, rescaled["hitter"]["pred_sum"], delta=1.0)
+        self.assertAlmostEqual(200.0, rescaled["pitcher"]["pred_sum"], delta=1.0)
+        self.assertLess(pool["saved"]["by_pool"]["hitter"]["pred_sum"], 800.0,
+                        "the raw file spends part of its budget on rows the pool lacks")
+        self.assertTrue(pool["saved_rescaled"]["budget"]["on_budget"])
+        self.assertFalse(pool["saved"]["budget"]["on_budget"])
+        rows = ([{"pool": "hitter", "predicted": v} for v in (5.0, 3.0, 2.0)]
+                + [{"pool": "pitcher", "predicted": v} for v in (6.0, 2.0)])
+        frame = pd.DataFrame({"Position": ["OF"] * 3 + ["P"] * 2,
+                              PROJECTED_OWNERSHIP_COLUMN: [r["predicted"] for r in rows]})
+        expected, _ = renormalize_ownership_to_frame(frame)
+        self.assertEqual(list(expected[PROJECTED_OWNERSHIP_COLUMN]),
+                         tool.rescaled_to_pool_values(rows))
+
+    def test_the_challenger_transform_keeps_budgets_caps_and_discounts_unknown_roles(self):
+        tool = self._tool()
+        rows = ([{"pool": "hitter", "predicted": 40.0 - i, "role_known": True} for i in range(30)]
+                + [{"pool": "hitter", "predicted": 30.0, "role_known": False} for _ in range(30)]
+                + [{"pool": "pitcher", "predicted": 30.0 - i, "role_known": i < 6}
+                   for i in range(12)])
+        out = tool.challenger_values(rows, 1.5, 0.05)
+        self.assertAlmostEqual(800.0, sum(out[:60]), delta=1.0)
+        self.assertAlmostEqual(200.0, sum(out[60:]), delta=1.0)
+        self.assertLessEqual(max(out), 100.0)
+        # Row 10 and row 30 carry the same saved share (30.0); only the role differs.
+        self.assertEqual(rows[10]["predicted"], rows[30]["predicted"])
+        self.assertAlmostEqual(0.05, out[30] / out[10], delta=0.01,
+                               msg="an unknown-role bat takes the factor and nothing else")
+        identity = tool.challenger_values(rows, 1.0, 1.0)
+        for a, b in zip(identity, tool.rescaled_to_pool_values(rows)):
+            self.assertAlmostEqual(a, b, delta=0.02)
+        heavy = [{"pool": "pitcher", "predicted": 90.0 if i == 0 else 1.0, "role_known": True}
+                 for i in range(4)]
+        self.assertLessEqual(max(tool.challenger_values(heavy, 3.0, 1.0)), 100.0)
+
+    # -- the grade across dates -----------------------------------------------
+
+    def _five_dates(self):
+        results = []
+        for i, day in enumerate(("2026-08-14", "2026-08-15", "2026-08-16", "2026-08-17",
+                                 "2026-08-18")):
+            self._save(self._salary(date=day), date=day, generated=f"{day}T20:00:00Z")
+            nyy = [f"{g} Nyy" for g in self.GREEK]
+            rotate = nyy[i:] + nyy[:i]
+            cid = f"1{i}1111111"
+            self._standings(date=day, cid=cid, entries=[
+                self._lineup(rotate[:8]), self._lineup(rotate[:8]), self._lineup(rotate[1:9])])
+            results.append(self._grade(record=self._record(date=day, cid=cid),
+                                       names={cid: "MLB $5 Double Up"}))
+        return results
+
+    def test_the_summary_splits_dates_60_40_and_names_every_gate_metric(self):
+        tool = self._tool()
+        results = self._five_dates()
+        self.assertEqual(["GRADED"] * 5, [r["status"] for r in results])
+        summary = tool.summarize_saved(results)
+        self.assertEqual(["2026-08-14", "2026-08-15", "2026-08-16"], summary["train_dates"])
+        self.assertEqual(["2026-08-17", "2026-08-18"], summary["holdout_dates"])
+        challenger = summary["challenger"]
+        cell = "%g|%g" % (challenger["selected_cell"]["exponent"],
+                          challenger["selected_cell"]["unknown_role_factor"])
+        self.assertIn(cell, results[0]["whole_file"]["challenger_grid"])
+        self.assertEqual(20, len(results[0]["whole_file"]["challenger_grid"]))
+        for universe, comparator in (("whole_file", "saved"), ("pool_proxy", "saved_rescaled")):
+            gate = challenger["gate"][universe]
+            self.assertEqual(comparator, gate["comparator"])
+            self.assertEqual({"mae", "rostered_mae", "calibration_gap", "top10_recall",
+                              "legal_budgets"}, set(gate["metrics"]))
+            self.assertEqual(2, gate["contests"])
+        held = {r["slate_date"]: r for r in results[3:]}
+        for day, delta in challenger["date_deltas_mae"].items():
+            row = held[day]["whole_file"]
+            self.assertAlmostEqual(row["challenger_grid"][cell]["mae"] - row["saved"]["mae"],
+                                   delta, places=9, msg="a plain mean over the date's contests")
+
+    def test_the_gate_is_the_challenger_against_the_right_comparator_on_every_metric(self):
+        tool = self._tool()
+        results = self._five_dates()
+        summary = tool.summarize_saved(results)
+        held = [r for r in results if r["slate_date"] in summary["holdout_dates"]]
+        cell = "%g|%g" % (summary["challenger"]["selected_cell"]["exponent"],
+                          summary["challenger"]["selected_cell"]["unknown_role_factor"])
+        for universe, comparator in (("whole_file", "saved"), ("pool_proxy", "saved_rescaled")):
+            gate = summary["challenger"]["gate"][universe]
+            for metric in ("mae", "rostered_mae", "calibration_gap", "top10_recall"):
+                base = tool._equal_date_mean(
+                    held, tool._variant_getter(universe, comparator, metric))
+                chal = tool._equal_date_mean(
+                    held, tool._variant_getter(universe, "challenger", metric, cell))
+                self.assertAlmostEqual(base, gate["metrics"][metric]["comparator"], places=9)
+                self.assertAlmostEqual(chal, gate["metrics"][metric]["challenger"], places=9)
+                self.assertEqual(chal > base if metric == "top10_recall" else chal < base,
+                                 gate["metrics"][metric]["beats"], (universe, metric))
+            self.assertEqual(all(v["beats"] for v in gate["metrics"].values()),
+                             gate["challenger_beats_on_every_metric"])
+
+    @staticmethod
+    def _fake(date, slate, saved_mae, chal_mae, on_budget=True, tie=False,
+              archetype="cash", band="f_0001_0100", pool=None):
+        """A per-contest result with only the numbers the summary reads. ``tie`` makes the
+        exponent-1 cell exactly as good as the exponent-1.5 one; ``pool`` is the
+        (rescaled comparator MAE, challenger MAE) of the pool proxy, absent when None."""
+        def node(mae):
+            return {"mae": mae, "rostered_mae": mae, "calibration_gap": mae, "top10_recall": 0.1,
+                    "spearman": 0.5, "zero_actual_pred_mass": 1.0, "unknown_role_pred_mass": 1.0,
+                    "unknown_role_actual_mass": 1.0,
+                    "budget": {"within_bounds": True, "on_budget": on_budget}}
+        grid = {f"{e:g}|{f:g}": node(9.0)
+                for e in (0.75, 1.0, 1.5, 2.0, 3.0) for f in (0.05, 0.10, 0.25, 1.00)}
+        grid["1.5|0.05"] = node(chal_mae)
+        if tie:
+            grid["1|0.05"] = node(chal_mae)
+        universe = {"saved": node(saved_mae), "flat_budget": node(20.0),
+                    "challenger_grid": grid}
+        pool_universe = None
+        if pool is not None:
+            pool_grid = {cell: node(9.0) for cell in grid}
+            pool_grid["1.5|0.05"] = node(pool[1])
+            pool_universe = {"saved": node(30.0), "saved_rescaled": node(pool[0]),
+                             "flat_budget": node(20.0), "challenger_grid": pool_grid}
+        return {"status": "GRADED", "slate_date": date, "saved": {"source": slate},
+                "archetype": archetype, "field_band": band,
+                "whole_file": universe, "pool_proxy": pool_universe}
+
+    def test_the_summary_arithmetic_on_hand_built_results(self):
+        """Selection on the train dates, equal-date weighting for the gate, a plain mean
+        over a date's contests for the per-date delta, and the legal-budget gate."""
+        tool = self._tool()
+        results = [self._fake(d, f"s{d}", 10.0, 2.0) for d in
+                   ("2026-08-14", "2026-08-15", "2026-08-16")]
+        results += [self._fake("2026-08-17", "A", 10.0, 4.0), self._fake("2026-08-17", "A", 10.0, 6.0),
+                    self._fake("2026-08-17", "B", 10.0, 2.0),
+                    self._fake("2026-08-18", "C", 10.0, 3.0)]
+        summary = tool.summarize_saved(results)
+        challenger = summary["challenger"]
+        self.assertEqual({"exponent": 1.5, "unknown_role_factor": 0.05},
+                         challenger["selected_cell"])
+        self.assertAlmostEqual(2.0, challenger["train_mae"])
+        # 08-17: A's two contests average 5.0 and B's is 2.0, so the slate-weighted mean is
+        # 3.5 and the per-contest mean is 4.0. The gate weights slates; the delta does not.
+        self.assertAlmostEqual(-6.0, challenger["date_deltas_mae"]["2026-08-17"])
+        self.assertAlmostEqual(-7.0, challenger["date_deltas_mae"]["2026-08-18"])
+        mae = challenger["gate"]["whole_file"]["metrics"]["mae"]
+        self.assertAlmostEqual(10.0, mae["comparator"])
+        self.assertAlmostEqual((3.5 + 3.0) / 2, mae["challenger"])
+        self.assertTrue(mae["beats"])
+        self.assertTrue(challenger["gate"]["whole_file"]["challenger_beats_on_every_metric"]
+                        is False, "top-10 recall is level, so not better on every metric")
+        # A challenger that leaves the budget fails the legal-budgets metric on its own.
+        results[3] = self._fake("2026-08-17", "A", 10.0, 4.0, on_budget=False)
+        gate = tool.summarize_saved(results)["challenger"]["gate"]["whole_file"]["metrics"]
+        self.assertFalse(gate["legal_budgets"]["beats"])
+
+    def test_a_tie_between_cells_takes_the_first_in_grid_order(self):
+        """The research's idxmin takes the first minimal cell in grid order (exponent, then
+        factor, ascending). A string sort would put "1.5|0.05" ahead of "1|0.05"."""
+        tool = self._tool()
+        results = [self._fake(d, f"s{d}", 10.0, 2.0, tie=True) for d in
+                   ("2026-08-14", "2026-08-15", "2026-08-16", "2026-08-17", "2026-08-18")]
+        selected = tool.summarize_saved(results)["challenger"]["selected_cell"]
+        self.assertEqual({"exponent": 1.0, "unknown_role_factor": 0.05}, selected)
+
+    def test_the_held_out_comparison_is_conditioned_on_archetype_and_band(self):
+        tool = self._tool()
+        results = [self._fake(d, f"s{d}", 10.0, 2.0) for d in
+                   ("2026-08-14", "2026-08-15", "2026-08-16")]
+        results += [
+            self._fake("2026-08-17", "A", 10.0, 4.0),                       # cash, small: -6
+            self._fake("2026-08-17", "A", 10.0, 12.0),                      # cash, small: +2
+            self._fake("2026-08-17", "A", 10.0, 3.0, archetype="mme", band="f_2001_plus",
+                       pool=(8.0, 9.0)),                                    # mme, large: -7; pool +1
+            self._fake("2026-08-18", "B", 10.0, 6.0, archetype="mme", band="f_2001_plus",
+                       pool=(8.0, 7.0)),                                    # mme, large: -4; pool -1
+            self._fake("2026-08-18", "B", 10.0, 10.0)]                      # cash, small: 0, a tie
+        bands = tool.summarize_saved(results)["challenger"]["by_archetype_band"]
+        by = {(b["archetype"], b["field_band"]): b for b in bands}
+        self.assertEqual({("cash", "f_0001_0100"), ("mme", "f_2001_plus")}, set(by))
+        cash = by[("cash", "f_0001_0100")]
+        self.assertEqual(3, cash["contests"])
+        self.assertAlmostEqual(0.0, cash["whole_file_median_delta_mae"])
+        self.assertEqual(1, cash["whole_file_challenger_closer"], "a tie is not closer")
+        self.assertEqual(0, cash["pool_proxy_contests"])
+        mme = by[("mme", "f_2001_plus")]
+        self.assertAlmostEqual(-5.5, mme["whole_file_median_delta_mae"])
+        self.assertEqual(2, mme["whole_file_challenger_closer"])
+        self.assertEqual(2, mme["pool_proxy_contests"])
+        self.assertAlmostEqual(0.0, mme["pool_proxy_median_delta_mae"])
+        self.assertEqual(1, mme["pool_proxy_challenger_closer"])
+
+    def test_an_unverifiable_prelock_time_is_its_own_refusal_not_after_lock(self):
+        saved = self._save(self._salary())
+        self._standings()
+        pred = json.loads(saved.read_text(encoding="utf-8"))
+        for broken in ("garbage", ""):
+            pred["generated_utc"] = broken
+            saved.write_text(json.dumps(pred), encoding="utf-8")
+            graded = self._grade()
+            self.assertEqual("PRELOCK_UNVERIFIABLE", graded["status"], broken)
+            self.assertIn("cannot be checked", graded["refused"])
+
+    def test_one_malformed_contest_is_a_returned_error_not_an_exception(self):
+        tool = self._tool()
+        self._save(self._salary())
+        self._standings()
+        with unittest.mock.patch.object(tool, "salary_identity", side_effect=OSError("boom")):
+            graded = self._grade()
+        self.assertEqual("GRADE_ERROR", graded["status"])
+        self.assertEqual("OSError: boom", graded["refused"])
+        self.assertEqual(self.CID, graded["contest_id"])
+
+    def test_the_saved_mode_refuses_the_chunk_merge_flag(self):
+        tool = self._tool()
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err), self.assertRaises(SystemExit) as caught:
+            tool.main(["--saved", "--fragments-from", "x*.json"])
+        self.assertEqual(2, caught.exception.code)
+        self.assertIn("--saved", err.getvalue())
+
+    def test_the_report_labels_itself_and_states_both_universes(self):
+        tool = self._tool()
+        results = self._five_dates()
+        summary = tool.summarize_saved(results)
+        summary["archetype_source"] = "a test map"
+        text = tool.saved_report(results, summary, "2026-10-04")
+        for needle in ("never calls `build_prediction`", "whole_file", "pool_proxy",
+                       "NOT the build's pool", "Reproduction of the 2026-09-14",
+                       "Per contest (never pooled)", "medians of per-contest statistics",
+                       "Nothing here is a win rate", "Archetype source.** a test map",
+                       "Held-out, conditioned on archetype and field band",
+                       "| cash | f_0101_0500 | 2 |"):
+            self.assertIn(needle, text)
+
+    def test_the_cli_runs_the_saved_grade_on_a_skeleton_root(self):
+        tool = self._tool()
+        self._save(self._salary())
+        self._standings()
+        (self.root / "data" / "archive" / self.DATE / f"mined_{self.CID}.json").write_text(
+            json.dumps({"contest_id": self.CID, "contest_type": "classic",
+                        "slate_date": self.DATE, "own_results": {"field_size": 500}}),
+            encoding="utf-8")
+        (self.root / "outputs" / self.DATE / "DKEntries_x.csv").write_text(
+            "Entry ID,Contest Name,Contest ID\n1,MLB $5 Double Up,111111111\n", encoding="utf-8")
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = tool.main(["--saved", "--root", str(self.root), "--date", "2026-10-04"])
+        self.assertEqual(0, code)
+        self.assertIn("1 Classic contest(s)", out.getvalue())
+        self.assertIn(f"outputs/{self.DATE}/ownership_pred_a.json", out.getvalue())
+
+
 class NamedProbableWithNoF4InputTests(unittest.TestCase):
     """R117(b): a probable that arrives NAMED but cannot feed F4 is one warning.
 
