@@ -1,0 +1,144 @@
+{
+ "code": {
+  "contest_allocator": "v1.12",
+  "execution_pipeline": "v1.17",
+  "git_dirty": false,
+  "git_sha": "aabab2c5b5f83bc1a859c0982520a4bda2b03986"
+ },
+ "controls": {
+  "max_cpt_exposure_pct": 0.25,
+  "max_player_exposure_pct": 0.5,
+  "max_shared_players": 4
+ },
+ "date": "2026-10-04",
+ "egress": "egress: statsapi 200, odds 401, savant 200, mlb-lineups 200, fangraphs 200 (curl), open-meteo timeout",
+ "egress_source": "session_start 2026-10-04T23:23:13+00:00",
+ "entries": [
+  {
+   "contest_id": "196328870",
+   "contest_name": "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (ATL @ LAD)",
+   "entry_fee": 1.0,
+   "entry_id": "5283416944",
+   "filled": true,
+   "roster_ids": [
+    "44382365",
+    "44382234",
+    "44382236",
+    "44382239",
+    "44382277",
+    "44382319"
+   ]
+  },
+  {
+   "contest_id": "196329524",
+   "contest_name": "MLB Showdown $4.5K mini-MAX [$1K to 1st 150 Entry Max] (ATL @ LAD)",
+   "entry_fee": 1.0,
+   "entry_id": "5283421412",
+   "filled": true,
+   "roster_ids": [
+    "44382376",
+    "44382226",
+    "44382236",
+    "44382245",
+    "44382266",
+    "44382319"
+   ]
+  },
+  {
+   "contest_id": "196329525",
+   "contest_name": "MLB Showdown $500 Solo Shot (ATL @ LAD)",
+   "entry_fee": 1.0,
+   "entry_id": "5283421368",
+   "filled": true,
+   "roster_ids": [
+    "44382325",
+    "44382224",
+    "44382229",
+    "44382231",
+    "44382232",
+    "44382234"
+   ]
+  },
+  {
+   "contest_id": "196329526",
+   "contest_name": "MLB Showdown $500 Quarter Jukebox [Just $0.25!] (ATL @ LAD)",
+   "entry_fee": 0.25,
+   "entry_id": "5283415911",
+   "filled": true,
+   "roster_ids": [
+    "44382323",
+    "44382223",
+    "44382230",
+    "44382231",
+    "44382232",
+    "44382239"
+   ]
+  },
+  {
+   "contest_id": "196329526",
+   "contest_name": "MLB Showdown $500 Quarter Jukebox [Just $0.25!] (ATL @ LAD)",
+   "entry_fee": 0.25,
+   "entry_id": "5283416121",
+   "filled": true,
+   "roster_ids": [
+    "44382328",
+    "44382223",
+    "44382225",
+    "44382230",
+    "44382233",
+    "44382237"
+   ]
+  }
+ ],
+ "entries_binding": {
+  "source": "outputs/2026-10-04/DO_NOT_UPLOAD_DKEntries_showdown_2000_1g_sd_BASELINE_4fedebd1e426.csv",
+  "source_sha256": "4fedebd1e42620f987123b24de57d2c8a5ed5d32d49beb5649551caac00832d9",
+  "status": "bound"
+ },
+ "host": {
+  "call_budget_s": 630.0,
+  "declared_ceiling_s": 900.0,
+  "host": "claude_code"
+ },
+ "kind": "delivery",
+ "labels": "deterministic review proxies and labeled priors only; never ROI, win rate, cash rate, or probability",
+ "manifest_row": {
+  "certification": "review_grade",
+  "contest_ids": [
+   "196328870",
+   "196329524",
+   "196329525",
+   "196329526"
+  ],
+  "contest_names": [
+   "MLB Showdown $4.5K mini-MAX [$1K to 1st 150 Entry Max] (ATL @ LAD)",
+   "MLB Showdown $500 Quarter Jukebox [Just $0.25!] (ATL @ LAD)",
+   "MLB Showdown $500 Solo Shot (ATL @ LAD)",
+   "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (ATL @ LAD)"
+  ],
+  "contest_type": "showdown",
+  "delivered_file": "outputs/2026-10-04/DKEntries_showdown_2000_1g_sd_BASELINE_4fedebd1e426.csv",
+  "entries": 5,
+  "lineage": "baseline",
+  "notes": "Showdown baseline (R389(c)): a points-max bank at the build's controls, published before the thesis ladder. Showdown ships review-grade; see CLAUDE.md.",
+  "projection_tier": "unknown",
+  "recorded_utc": "2026-10-04T23:27:47.325152+00:00",
+  "run_id": null,
+  "sha256": "4fedebd1e42620f987123b24de57d2c8a5ed5d32d49beb5649551caac00832d9",
+  "slate_tag": "2000_1g_sd",
+  "status": "candidate",
+  "strategy_state": {
+   "counts": {},
+   "state": "unknown"
+  }
+ },
+ "recorded_utc": "2026-10-04T23:27:47.328305+00:00",
+ "relaxations": {
+  "both_relaxed_slots": 0,
+  "overlap_relaxed_slots": 0,
+  "player_relaxed_slots": 0,
+  "relaxed_slots": 0
+ },
+ "run": {},
+ "schema_version": 1
+}
