@@ -3949,6 +3949,12 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
               f"{_own_report['players_scored'] + _own_report['players_unscored']} "
               f"pool players carry a predicted share, from "
               f"{leverage_brief['source']}", file=sys.stderr)
+        # R342(a). The engine's own pre and post budget, copied and never
+        # recomputed here: the prior spends 1000 points over the whole salary
+        # file, so the cap reads the share of it that sat on the pool, rescaled.
+        _renorm = _own_report.get("renormalization") or {}
+        leverage_brief["renormalization"] = _renorm
+        print(leverage_renormalization_note(_renorm), file=sys.stderr)
 
     t0 = time.monotonic()
     from mlb_engine.optimize.optimizer_v3 import (
@@ -5299,6 +5305,30 @@ def showdown_handedness(args, slate_dir: Path, df) -> tuple[dict, dict, dict]:
     # than to infer from `teams_with_hand: 1`.
     note["teams_without_hand"] = sorted(t for t in teams if t not in hand)
     return bat_side, facing, note
+
+
+def leverage_renormalization_note(renorm: dict) -> str:
+    """The one stderr line for R342(a)'s pre and post budget, from the ENGINE's
+    own block (`apply_leverage_ownership`'s `renormalization`), never recomputed
+    here. A function rather than an inline `print` so a test can execute it: the
+    sliced door's copy of the block into the brief is the surface an operator
+    reads, and an untested line there is R242's shape."""
+    if not (renorm or {}).get("applied"):
+        return (f"leverage: map NOT rescaled to the pool "
+                f"({(renorm or {}).get('reason')}); the cap reads the raw prior")
+
+    def _n(value, spec=".0f"):
+        # A diagnostic line must never kill a build at T-10: a missing figure
+        # prints as '?', it does not raise inside the f-string.
+        return format(value, spec) if isinstance(value, (int, float)) else "?"
+    scale = {g: ((renorm.get(g) or {}).get("scale")
+                 if (renorm.get(g) or {}).get("scale") is not None else "unchanged")
+             for g in ("hitters", "pitchers")}
+    return (f"leverage: {_n(renorm.get('frame_pre'))} of {_n(renorm.get('map_total'))} "
+            f"map points sat on the pool ({renorm.get('off_pool_pct')}% off-pool); "
+            f"rescaled to {_n(renorm.get('frame_post'))} (hitters x{scale['hitters']}, "
+            f"pitchers x{scale['pitchers']}), so a max_cumulative_ownership_pct "
+            f"cap binds at its face value")
 
 
 def resolve_leverage(args, salary: Path, slate_tag: str) -> tuple[dict, dict]:

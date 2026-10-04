@@ -574,6 +574,15 @@ Five things to know before you use it:
   `Projected_Ownership_Pct` over each delivered lineup before choosing a cap,
   and if the cap sits above that maximum say so in the handoff rather than
   reporting a leverage build.
+- **Since R342(a) the cap binds at its FACE value, and every reading above was measured on the raw
+  map.** The prior spends 1000 points over the whole salary file and the engine's frame is the pool,
+  so the map is now rescaled to the pool (hitters to 800, pitchers to 200) before the solver reads
+  it; the brief's `leverage.renormalization` records the points that sat on the pool and the rescale
+  (1840_5g: 477 of 1000, 52.2% off-pool; caps of 80, 100 and 120 were slack before and bind after).
+  So a cap of 90 is tighter than the readings above say, the low-owned threshold and the candidate
+  scoring's field-pressure term moved with it (same column, same direction), and those magnitudes are
+  stale: re-measure. `qa_portfolio` still reads the raw file, so its "+X pp" is on the whole-file
+  scale and is not the cap's number.
 - **`min_low_owned_hitters` has a hard infeasibility edge**, at 6 on that same
   pool. If the build refuses, lower the floor before you touch the cap; they are
   independently settable for exactly this reason.

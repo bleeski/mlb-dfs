@@ -26379,7 +26379,14 @@ class LeveragePassthroughTests(unittest.TestCase):
                     "source": "pred.json"})
         self.assertTrue(report["applied"])
         self.assertEqual(report["source"], "pred.json")
-        self.assertEqual([4.25] * len(ids),
+        # R342(a). The map no longer lands raw: a flat 4.25 over every row is
+        # now the pool's own budget, 800 over the bats and 200 over the arms
+        # (the rewrite is deliberate; the question this test asks is still "does
+        # the branch EXECUTE", and a disabled branch writes no column at all).
+        is_p = [str(p) == "P" for p in frame["Position"]]
+        n_pit = sum(is_p)
+        expected = [200.0 / n_pit if p else 800.0 / (len(ids) - n_pit) for p in is_p]
+        self.assertEqual(expected,
                          [float(v) for v in out["Projected_Ownership_Pct"]])
 
     def test_run_slate_takes_leverage_and_attaches_before_anything_reads_it(self):
@@ -26530,6 +26537,376 @@ class LeveragePassthroughTests(unittest.TestCase):
         refusal = src.index("leverage_not_supported_on_showdown")
         staging = src.index('suffix = "_showdown" if contest == "showdown" else ""')
         self.assertLess(refusal, staging)
+
+
+class LeverageRenormalizationTests(unittest.TestCase):
+    """R342(a). The emitted ownership prior is a 1000-point budget (800 hitters,
+    200 pitchers) spread over EVERY salary-file row, and `build_slate_pool` hands
+    the engine a frame of only the players who can take the field. The map used
+    to pass through raw, so the cumulative cap summed a prior whose mass mostly
+    sat on players the solver can never roster. On 1840_5g (2026-09-15) the 98
+    pool rows held 477.2 of the 1000 points (52.2% off the pool), the
+    unconstrained lineup summed 48.6 on the raw map and 129.6 on the pool's own
+    budget, and caps of 80 / 100 / 120 were completely slack on the raw one.
+
+    `apply_leverage_ownership` now rescales the map to the frame's rows, hitters
+    to 800 and pitchers to 200, and records the pre and post budget. These tests
+    compute the face-value scale from the MAP they build, by plain arithmetic,
+    and never from the frame: after the fix the frame holds the rescaled values,
+    so reading it back would grade the function against itself.
+
+    Every number is a labeled prior and a deterministic review proxy.
+    """
+
+    N_HIT, N_PIT = 64, 8      # `LeverageControlsTests._pool()`: 4 teams x (16 bats + 2 arms)
+
+    @staticmethod
+    def _frame(excluded_hitter_pos=None):
+        """The leverage fixture with its ownership column dropped, as the engine's
+        own frame arrives. One chalky bat per position carries Ceiling 16, the
+        low-owned one 10, so the unconstrained ceiling lineup is the chalk lineup.
+        ``excluded_hitter_pos`` flags the first chalky bat at that position as an
+        operator exclusion (a row that stays in the frame)."""
+        df = LeveragePassthroughTests._pool().drop(columns=["Projected_Ownership_Pct"])
+        if excluded_hitter_pos is not None:
+            hit = df[(df["Position"] == excluded_hitter_pos) & (df["Ceiling"] == 16.0)]
+            df.loc[hit.index[0], "Excluded"] = "TRUE"
+        return df
+
+    @classmethod
+    def _map(cls, frame, hitter_pool_mass=400.0, pitcher_pool_mass=40.0):
+        """The emitted prior as the file carries it: the whole budget, split
+        between the frame's rows and phantom ids the frame does not hold (the
+        bench, the non-starting arms). Chalky bats weigh 5x a low bat and the
+        chalky arm 4x a low one, so the prior has an ordering to preserve."""
+        is_p = frame["Position"].astype(str) == "P"
+        own = {}
+        hit_w = {str(p): (5.0 if c >= 16.0 else 1.0)
+                 for p, c in zip(frame.loc[~is_p, "Player_ID"], frame.loc[~is_p, "Ceiling"])}
+        pit_w = {str(p): (4.0 if c >= 24.0 else 1.0)
+                 for p, c in zip(frame.loc[is_p, "Player_ID"], frame.loc[is_p, "Ceiling"])}
+        for w, mass in ((hit_w, hitter_pool_mass), (pit_w, pitcher_pool_mass)):
+            unit = mass / sum(w.values())
+            own.update({pid: round(weight * unit, 4) for pid, weight in w.items()})
+        own.update({f"90{i:05d}": round((800.0 - hitter_pool_mass) / cls.N_HIT, 4)
+                    for i in range(cls.N_HIT)})
+        own.update({f"91{i:05d}": round((200.0 - pitcher_pool_mass) / cls.N_PIT, 4)
+                    for i in range(cls.N_PIT)})
+        return own
+
+    @staticmethod
+    def _face_scale(frame, own):
+        """{player_id: face-value share}: the map rescaled to the frame's rows by
+        plain arithmetic (hitters x 800/pool mass, pitchers x 200/pool mass),
+        independent of the function under test. Valid while no player reaches
+        the 100 bound, which these fixtures keep well clear of."""
+        is_p = frame["Position"].astype(str) == "P"
+        out = {}
+        for mask, budget in ((~is_p, 800.0), (is_p, 200.0)):
+            ids = [str(p) for p in frame.loc[mask, "Player_ID"]]
+            factor = budget / sum(own[i] for i in ids)
+            out.update({i: own[i] * factor for i in ids})
+        return out
+
+    @staticmethod
+    def _sum(lineup, scale):
+        return sum(scale[str(p)] for p in lineup["Player_ID"])
+
+    @staticmethod
+    def _lev(own, **kw):
+        return {"own_pct_by_player_id": own, "source": "pred.json", **kw}
+
+    # -- the negative control ------------------------------------------------ #
+
+    def test_a_cap_binds_at_face_value_only_on_the_renormalized_map(self):
+        """The sharpest test in the item. A cap that the unconstrained lineup
+        passes on the raw map but fails at face value is slack on the raw attach
+        (today's behaviour, reproduced here through the function the engine
+        used to call alone) and binds once the map is rescaled to the pool."""
+        from mlb_engine.field.ownership_prior import attach_predicted_ownership
+        from mlb_engine.pipeline.execution_pipeline import apply_leverage_ownership
+        frame = self._frame()
+        own = self._map(frame)
+        raw_scale = {pid: float(v) for pid, v in own.items()}
+        face = self._face_scale(frame, own)
+
+        raw_frame, _ = attach_predicted_ownership(frame, own, overwrite=True)
+        free, _ = opt.build_single_lineup(raw_frame, target="ceiling")
+        s_raw, s_face = self._sum(free, raw_scale), self._sum(free, face)
+        self.assertGreater(s_face, 1.5 * s_raw,
+                           "fixture precondition: the pool's budget is a multiple of its raw mass")
+        cap = round((s_raw + s_face) / 2.0, 2)       # slack raw, violated at face value
+
+        buggy, _ = opt.build_single_lineup(
+            raw_frame, target="ceiling", max_cumulative_ownership_pct=cap)
+        self.assertAlmostEqual(float(buggy["Ceiling"].sum()), float(free["Ceiling"].sum()), places=6,
+                               msg="the cap on the raw map cost nothing: it was slack")
+        self.assertGreater(self._sum(buggy, face), cap,
+                           "and that lineup breaks the same cap at face value")
+
+        fixed_frame, _ = apply_leverage_ownership(frame, self._lev(own))
+        fixed, _ = opt.build_single_lineup(
+            fixed_frame, target="ceiling", max_cumulative_ownership_pct=cap)
+        self.assertIsNotNone(fixed, "the cap is feasible on the pool's own scale")
+        self.assertLessEqual(self._sum(fixed, face), cap + 0.1,
+                             "renormalized, the cap holds at face value")
+        self.assertLess(float(fixed["Ceiling"].sum()), float(free["Ceiling"].sum()),
+                        "and it actually bound: the lineup gave up ceiling to meet it")
+
+    # -- what renormalize means --------------------------------------------- #
+
+    def test_the_pools_hitters_reach_800_and_pitchers_200_and_the_ordering_survives(self):
+        from mlb_engine.pipeline.execution_pipeline import apply_leverage_ownership
+        frame = self._frame()
+        own = self._map(frame)
+        out, _ = apply_leverage_ownership(frame, self._lev(own))
+        is_p = out["Position"].astype(str) == "P"
+        vals = out["Projected_Ownership_Pct"].astype(float)
+        self.assertAlmostEqual(vals[~is_p].sum(), 800.0, delta=0.5)
+        self.assertAlmostEqual(vals[is_p].sum(), 200.0, delta=0.5)
+        self.assertLessEqual(vals.max(), 100.0)
+        self.assertGreaterEqual(vals.min(), 0.0)
+        ceil = out["Ceiling"].astype(float)
+        chalk_bat = vals[(~is_p) & (ceil == 16.0)].iloc[0]
+        low_bat = vals[(~is_p) & (ceil == 10.0)].iloc[0]
+        self.assertAlmostEqual(chalk_bat / low_bat, 5.0, delta=0.05,
+                               msg="a proportional rescale keeps the prior's ratios")
+        chalk_arm = vals[is_p & (ceil == 24.0)].iloc[0]
+        low_arm = vals[is_p & (ceil == 17.0)].iloc[0]
+        self.assertGreater(chalk_arm, low_arm)
+
+    def test_the_input_frame_and_the_emitted_map_are_not_mutated(self):
+        from mlb_engine.pipeline.execution_pipeline import apply_leverage_ownership
+        frame = self._frame()
+        own = self._map(frame)
+        before_map, before_cols = dict(own), list(frame.columns)
+        apply_leverage_ownership(frame, self._lev(own))
+        self.assertEqual(own, before_map)
+        self.assertEqual(list(frame.columns), before_cols)
+
+    def test_an_operator_exclusion_stays_in_the_basis(self):
+        """An Excluded row stays in the frame (the solver drops it later, EP
+        after the attach) and the field's ownership of that player does not
+        vanish because the operator will not roster him, so he keeps a share and
+        the budget is spent over every frame row. A mutant that left the excluded
+        rows out of the denominator spends 800 over fewer rows and the all-rows
+        sum overshoots."""
+        from mlb_engine.pipeline.execution_pipeline import apply_leverage_ownership
+        frame = self._frame(excluded_hitter_pos="C")
+        self.assertEqual(int((frame["Excluded"] == "TRUE").sum()), 1)
+        out, _ = apply_leverage_ownership(frame, self._lev(self._map(frame)))
+        is_p = out["Position"].astype(str) == "P"
+        self.assertAlmostEqual(out.loc[~is_p, "Projected_Ownership_Pct"].sum(), 800.0, delta=0.5)
+        flagged = out.loc[out["Excluded"] == "TRUE", "Projected_Ownership_Pct"]
+        self.assertTrue(flagged.notna().all() and float(flagged.iloc[0]) > 0.0)
+
+    # -- the brief ---------------------------------------------------------- #
+
+    def test_the_report_records_the_pre_and_post_budget(self):
+        from mlb_engine.pipeline.execution_pipeline import apply_leverage_ownership
+        frame = self._frame()
+        out, report = apply_leverage_ownership(frame, self._lev(self._map(frame)))
+        self.assertTrue(report["applied"])
+        self.assertEqual(report["source"], "pred.json")
+        block = report["renormalization"]
+        self.assertTrue(block["applied"])
+        self.assertAlmostEqual(block["map_total"], 1000.0, delta=0.5)
+        self.assertAlmostEqual(block["frame_pre"], 440.0, delta=0.5)
+        self.assertAlmostEqual(block["frame_post"], 1000.0, delta=1.0)
+        self.assertAlmostEqual(block["off_pool_pct"], 56.0, delta=0.1)
+        for name, budget, pre in (("hitters", 800.0, 400.0), ("pitchers", 200.0, 40.0)):
+            g = block[name]
+            self.assertEqual(g["budget"], budget)
+            self.assertAlmostEqual(g["pre"], pre, delta=0.5)
+            self.assertAlmostEqual(g["post"], budget, delta=0.5)
+            self.assertAlmostEqual(g["scale"], budget / pre, delta=0.01)
+        self.assertEqual((block["hitters"]["rows"], block["pitchers"]["rows"]),
+                         (self.N_HIT, self.N_PIT))
+        self.assertIn("uncalibrated", block["label"].lower(),
+                      "labeled a prior, the way every sibling block is")
+
+    def test_the_operator_surface_prints_and_copies_the_engines_block(self):
+        """The sliced door's copy of the block into the brief is what the
+        operator reads, and an inline `print` is not executable by a test (R242's
+        shape, which R246 met the same way). The line is a function; the copy is
+        position-checked, because position is a property of the layout."""
+        from mlb_engine.pipeline.execution_pipeline import apply_leverage_ownership
+        mod = LeveragePassthroughTests._build_slate()
+        frame = self._frame()
+        _out, report = apply_leverage_ownership(frame, self._lev(self._map(frame)))
+        line = mod.leverage_renormalization_note(report["renormalization"])
+        for piece in ("440 of 1000 map points sat on the pool", "56.0% off-pool",
+                      "rescaled to 1000", "hitters x2.0", "pitchers x5.0",
+                      "binds at its face value"):
+            self.assertIn(piece, line)
+        self.assertIn("NOT rescaled", mod.leverage_renormalization_note(
+            {"applied": False, "reason": "no_group_could_be_rescaled"}))
+        self.assertIn("NOT rescaled", mod.leverage_renormalization_note({}))
+        self.assertIn("? of ?", mod.leverage_renormalization_note({"applied": True}),
+                      "a block missing its figures prints '?', it never raises at build time")
+        src = (REPO / "skills" / "generate-lineups" / "scripts"
+               / "build_slate.py").read_text(encoding="utf-8")
+        apply_at = src.index("apply_leverage_ownership(projections, leverage)")
+        copy_at = src.index('leverage_brief["renormalization"] = _renorm')
+        self.assertLess(apply_at, copy_at)
+        self.assertIn('_own_report.get("renormalization")', src,
+                      "the brief carries the ENGINE's block, never a second computation")
+
+    # -- a build with no map is the build it always was ---------------------- #
+
+    def test_no_leverage_map_returns_the_same_frame_and_the_old_report(self):
+        from mlb_engine.pipeline.execution_pipeline import apply_leverage_ownership
+        frame = self._frame()
+        for lev in (None, {}, {"max_cumulative_ownership_pct": 90},
+                    {"own_pct_by_player_id": {}, "source": "x"}):
+            out, report = apply_leverage_ownership(frame, lev)
+            self.assertIs(out, frame, f"{lev!r} must hand the frame back untouched")
+            self.assertEqual(report, {"applied": False, "reason": "no leverage supplied"})
+            self.assertNotIn("Projected_Ownership_Pct", out.columns)
+
+    # -- the edges ----------------------------------------------------------- #
+
+    def test_unmapped_rows_stay_unscored_and_the_rest_still_reach_the_budget(self):
+        from mlb_engine.pipeline.execution_pipeline import apply_leverage_ownership
+        frame = self._frame()
+        own = self._map(frame)
+        drop = [str(p) for p in frame.loc[frame["Position"] != "P", "Player_ID"]][:5]
+        for pid in drop:
+            del own[pid]
+        out, report = apply_leverage_ownership(frame, self._lev(own))
+        self.assertEqual(report["players_unscored"], 5)
+        self.assertEqual(sorted(report["unscored_player_ids"]), sorted(drop))
+        ids = out["Player_ID"].astype(str)
+        self.assertTrue(out.loc[ids.isin(drop), "Projected_Ownership_Pct"].isna().all(),
+                        "an unmapped player is never written a number the file did not predict")
+        is_p = out["Position"].astype(str) == "P"
+        covered = 800.0 * (self.N_HIT - 5) / self.N_HIT      # 59 of 64 bats: the covered share
+        self.assertAlmostEqual(
+            out.loc[(~is_p) & (~ids.isin(drop)), "Projected_Ownership_Pct"].sum(), covered, delta=0.5)
+        hitters = report["renormalization"]["hitters"]
+        self.assertEqual((hitters["scored"], hitters["rows"]), (self.N_HIT - 5, self.N_HIT))
+        self.assertAlmostEqual(hitters["target"], covered, delta=0.01)
+
+    def test_a_group_with_no_mass_is_left_raw_with_a_reason(self):
+        from mlb_engine.pipeline.execution_pipeline import apply_leverage_ownership
+        frame = self._frame()
+        own = self._map(frame)
+        is_p = frame["Position"].astype(str) == "P"
+        for pid in frame.loc[is_p, "Player_ID"]:
+            own[str(pid)] = 0.0
+        out, report = apply_leverage_ownership(frame, self._lev(own))
+        p_vals = out.loc[out["Position"].astype(str) == "P", "Projected_Ownership_Pct"]
+        self.assertTrue((p_vals == 0.0).all(), "no mass to scale: nothing is invented")
+        self.assertEqual(report["renormalization"]["pitchers"]["reason"], "zero_mass")
+        h_vals = out.loc[out["Position"].astype(str) != "P", "Projected_Ownership_Pct"]
+        self.assertAlmostEqual(h_vals.sum(), 800.0, delta=0.5)
+
+    def test_a_map_for_another_slate_scores_nobody_and_rescales_nothing(self):
+        from mlb_engine.pipeline.execution_pipeline import apply_leverage_ownership
+        frame = self._frame()
+        out, report = apply_leverage_ownership(
+            frame, self._lev({f"77{i:05d}": 5.0 for i in range(40)}))
+        self.assertEqual(report["players_scored"], 0)
+        self.assertEqual(report["players_unscored"], len(frame))
+        self.assertTrue(out["Projected_Ownership_Pct"].isna().all())
+        block = report["renormalization"]
+        self.assertFalse(block["applied"])
+        self.assertEqual(block["hitters"]["reason"], "no_scored_rows")
+        self.assertEqual(block["pitchers"]["reason"], "no_scored_rows")
+
+    def test_a_map_that_matches_three_bats_does_not_hand_them_the_budget(self):
+        """Three of 64 bats matched (a stale file, a wrong `--ownership-pred`):
+        scaled to the full 800 each would sit at the 100 bound, so the cap would
+        sum garbage. Scaled to the covered share, 3/64 of 800, they sit at the
+        pool's average share."""
+        from mlb_engine.pipeline.execution_pipeline import apply_leverage_ownership
+        frame = self._frame()
+        hit_ids = [str(p) for p in frame.loc[frame["Position"] != "P", "Player_ID"]][:3]
+        out, report = apply_leverage_ownership(frame, self._lev({p: 2.0 for p in hit_ids}))
+        vals = out.loc[out["Player_ID"].astype(str).isin(hit_ids), "Projected_Ownership_Pct"]
+        self.assertTrue(((vals > 0.0) & (vals < 20.0)).all(), list(vals))
+        self.assertAlmostEqual(float(vals.sum()), 800.0 * 3 / self.N_HIT, delta=0.1)
+        self.assertEqual(report["renormalization"]["hitters"]["capped_players"], 0)
+
+    def test_a_map_already_on_the_pools_budget_is_unchanged(self):
+        """Idempotent: the sliced door and `run_slate` each apply this to their
+        own frame from the SAME raw map, and a map already at face value must
+        come back as it went in (to the 2dp the prior emits)."""
+        from mlb_engine.pipeline.execution_pipeline import apply_leverage_ownership
+        frame = self._frame()
+        once, _ = apply_leverage_ownership(frame, self._lev(self._map(frame)))
+        on_budget = {str(p): float(v) for p, v in
+                     zip(once["Player_ID"], once["Projected_Ownership_Pct"])}
+        twice, report = apply_leverage_ownership(frame, self._lev(on_budget))
+        self.assertLessEqual(
+            float((twice["Projected_Ownership_Pct"] - once["Projected_Ownership_Pct"]).abs().max()),
+            0.011)
+        self.assertAlmostEqual(report["renormalization"]["hitters"]["scale"], 1.0, delta=0.01)
+
+    def test_the_rescale_never_pushes_a_share_past_100(self):
+        """A pool too thin to carry its budget (three bats) cannot show 800%:
+        the prior's own water-fill spends what the pool can bear, each share at
+        most 100, and says so rather than describing an impossible 267%."""
+        from mlb_engine.pipeline.execution_pipeline import apply_leverage_ownership
+        frame = self._frame().iloc[:3].copy()
+        frame["Position"] = ["C", "1B", "2B"]
+        out, report = apply_leverage_ownership(
+            frame, self._lev({str(p): 4.0 for p in frame["Player_ID"]}))
+        self.assertTrue((out["Projected_Ownership_Pct"] <= 100.0).all())
+        self.assertLessEqual(float(out["Projected_Ownership_Pct"].sum()), 300.0 + 0.5)
+        self.assertEqual(report["renormalization"]["hitters"]["capped_players"], 3)
+
+    # -- through the real run_slate ----------------------------------------- #
+
+    def test_the_cap_holds_at_face_value_in_the_delivered_file_through_run_slate(self):
+        """Not the function: `run_slate` end to end on the two-team fixture, the
+        auto bank solving under the cap. AAA bats are the chalk (raw 30, the
+        pool's two thirds of 320 raw points), CCC the low-owned (raw 10), the
+        phantom bench carries the other 480 of the hitter budget; the pool's
+        rescale is x2.5 on bats and the two arms hit the 100 bound. A cap of 600
+        is slack on every raw lineup (at most 270) and binds at face value
+        (400 + 50 per AAA bat), so a delivered lineup with five AAA bats fails
+        the test, and without the rescale the chalk lineups ship."""
+        import csv as _csv
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            salary = root / "salary.csv"; ids = write_salary(salary)
+            entries = root / "DKEntries.csv"; write_entries(entries)
+            proj = projection_frame(ids)
+            proj["Ceiling"] = [14.0 if t == "AAA" and p != "P" else c
+                               for t, p, c in zip(proj["Team"], proj["Position"], proj["Ceiling"])]
+            own = {}
+            for pid, team, pos in zip(proj["Player_ID"], proj["Team"], proj["Position"]):
+                own[str(pid)] = (20.0 if team == "AAA" else 10.0) if pos == "P" else (
+                    30.0 if team == "AAA" else 10.0)
+            own.update({f"90{i:05d}": 10.0 for i in range(48)})        # 480 bench points
+            own.update({f"91{i:05d}": 17.0 for i in range(10)})        # 170 arm points
+            self.assertAlmostEqual(sum(own.values()), 1000.0, delta=0.01)
+            face = {}
+            for pid, team, pos in zip(proj["Player_ID"], proj["Team"], proj["Position"]):
+                face[str(pid)] = 100.0 if pos == "P" else (75.0 if team == "AAA" else 25.0)
+            cap = 600.0
+            out = run_slate(
+                runs_root=root / "runs", salary_csv=salary, entries_csv=entries,
+                projections_override=proj,
+                portfolio_controls_override=RunSlateFrontDoorTests.LOOSE,
+                assume_gates=RunSlateFrontDoorTests.UNEVIDENCED, approve=True,
+                bank_time_budget_s=15.0, solver_time_limit_s=10.0,
+                leverage={"own_pct_by_player_id": own, "source": "pred.json",
+                          "max_cumulative_ownership_pct": cap})
+            self.assertTrue(out["passed"], out.get("errors"))
+            block = out["leverage"]["renormalization"]
+            self.assertTrue(block["applied"])
+            self.assertAlmostEqual(block["map_total"], 1000.0, delta=0.5)
+            self.assertAlmostEqual(block["frame_pre"], 350.0, delta=0.5)
+            self.assertAlmostEqual(block["frame_post"], 1000.0, delta=1.0)
+            self.assertEqual(out["leverage"]["constraints"]["max_cumulative_ownership_pct"], cap)
+            with Path(out["output_path"]).open(encoding="utf-8", newline="") as fh:
+                rows = list(_csv.reader(fh))[1:]
+            self.assertEqual(len(rows), 2)
+            for row in rows:
+                total = sum(face[p] for p in row[4:14])
+                self.assertLessEqual(total, cap + 0.5, f"a delivered lineup sums {total} at face value")
 
 
 class LostWindowFlagValueTests(unittest.TestCase):
