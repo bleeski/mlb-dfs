@@ -1017,6 +1017,135 @@ def attach_predicted_ownership(
     return frame, report
 
 
+RENORMALIZATION_BASIS = (
+    "frame rows carrying a map value, hitters rescaled to the prior's 800 and "
+    "pitchers to its 200 budget (a group the map covers only in part, to its "
+    "covered share of that budget); Excluded rows stay in the basis; unscored "
+    "rows are left as they were")
+RENORMALIZATION_LABEL = (
+    "UNCALIBRATED, UNGRADED PRIOR rescaled to the rows the engine can roster. "
+    "The ORDERING and the ratios among those rows are the emitted file's; the "
+    "level is the prior's own 800/200 budget spent over the pool instead of the "
+    "whole salary file. A deterministic review proxy and a predicted share, "
+    "never a measured one, and never an ROI, win-rate, cash-rate or probability "
+    "claim.")
+
+
+def renormalize_ownership_to_frame(
+    projections_df: Any,
+    map_total: Optional[float] = None,
+    column: str = PROJECTED_OWNERSHIP_COLUMN,
+) -> Tuple[Any, Dict[str, Any]]:
+    """Rescale the attached ownership column to the rows the solver can draw from.
+
+    R342(a). The emitted prior spends its 1000-point budget (800 hitters, 200
+    pitchers) over EVERY row of the salary file, and ``build_slate_pool`` hands
+    the engine a frame of only the players who can take the field. Attached raw,
+    the cumulative cap (``optimizer_v3``'s ``max_cumulative_ownership_pct``)
+    summed a prior whose mass mostly sat on players no lineup can hold: on
+    1840_5g (2026-09-15) the 98 pool rows carried 477.2 of the 1000 points, so
+    every number the cap, the low-owned floor and the candidate scoring read was
+    about half of what the same prior calls that player's share of the pool.
+
+    What it does. Over the frame's rows that carry a value, hitters and pitchers
+    separately (the prior's own split, ``_is_pitcher`` over the position
+    tokens), the values are rescaled proportionally to 800 and 200 through the
+    prior's own water-fill, ``_bounded_marginals``. Proportional, so the file's
+    ordering and ratios survive untouched; the water-fill, so no share leaves
+    [0, 100] and a pool too thin to carry its budget (three bats) spends what it
+    can bear instead of describing an impossible 267%. A map already on the
+    pool's budget comes back unchanged to the 2dp the prior emits, which is what
+    lets the sliced door and ``run_slate`` each apply this to their own frame
+    from the same raw map.
+
+    A group the map covers only in part is rescaled to its COVERED share of the
+    budget (budget x scored rows / group rows), so the unscored rows are assumed
+    average rather than empty. Complete coverage, which an emit from the same
+    salary file gives, is the full 800 / 200; a map for the wrong slate (three
+    of ninety bats matched) gets 3/90 of it instead of handing those three bats
+    100% each.
+
+    What it leaves alone. Rows with no value stay NaN (``_ownership_pct_for_row``
+    falls back to the tier default for them, as before). A group with no scored
+    row, or no mass to scale, is left as it was and the block says why. Excluded
+    rows stay in the basis: an operator exclusion is the operator's lineup
+    choice, not a fact about the field, and the solver drops the row later.
+
+    Returns ``(frame_copy, block)``; ``block`` is the pre and post budget the
+    brief records. ``map_total`` is the sum of the whole emitted map, which only
+    the caller has, and gives the share of the budget that sat off the pool.
+
+    **Still an UNCALIBRATED, UNGRADED PRIOR.** This repairs the BUDGET, not the
+    ordering: where the file spread the pitcher budget near-flat over every arm
+    in the salary file (29.9 of the 200 points on the 8 pool arms on 1840_5g),
+    rescaling to 200 amplifies whatever flatness the file carried. Fixing the
+    ordering is R342(b).
+    """
+    frame = projections_df.copy()
+    block: Dict[str, Any] = {
+        "applied": False, "reason": None, "basis": RENORMALIZATION_BASIS,
+        "column": column, "map_total": None, "frame_pre": 0.0, "frame_post": 0.0,
+        "off_pool_pct": None, "hitters": {}, "pitchers": {},
+        "label": RENORMALIZATION_LABEL,
+    }
+    if map_total is not None:
+        block["map_total"] = round(float(map_total), 2)
+    if column not in getattr(frame, "columns", []) or not len(getattr(frame, "index", [])):
+        block["reason"] = "no_ownership_column_or_empty_frame"
+        return frame, block
+
+    positions = list(frame["Position"]) if "Position" in frame.columns else [""] * len(frame.index)
+    raw: List[float] = []
+    for value in frame[column]:
+        try:
+            raw.append(float(value))
+        except (TypeError, ValueError):
+            raw.append(float("nan"))
+    is_pitcher = [
+        _is_pitcher([t for t in str(pos or "").replace("/", ",").split(",") if t.strip()])
+        for pos in positions]
+
+    rescaled = list(raw)
+    for name, budget in (("hitters", HITTER_BUDGET_PCT), ("pitchers", PITCHER_BUDGET_PCT)):
+        want_pitcher = name == "pitchers"
+        in_group = [i for i, p in enumerate(is_pitcher) if p == want_pitcher]
+        scored = [i for i in in_group if math.isfinite(raw[i])]
+        pre = sum(raw[i] for i in scored)
+        target = budget * len(scored) / len(in_group) if in_group else budget
+        group: Dict[str, Any] = {
+            "budget": budget, "target": round(target, 2), "rows": len(in_group),
+            "scored": len(scored), "pre": round(pre, 2), "post": round(pre, 2),
+            "scale": None, "capped_players": 0, "reason": None,
+        }
+        if not scored:
+            group["reason"] = "no_scored_rows"
+        elif pre <= 0.0:
+            group["reason"] = "zero_mass"
+        else:
+            out = _bounded_marginals({str(i): raw[i] for i in scored}, target)
+            for i in scored:
+                rescaled[i] = out[str(i)]
+            post = sum(out.values())
+            group.update({
+                "post": round(post, 2), "scale": round(post / pre, 4),
+                "capped_players": sum(1 for v in out.values() if v >= 100.0),
+            })
+            block["applied"] = True
+        block[name] = group
+        block["frame_pre"] += pre
+        block["frame_post"] += group["post"]
+    block["frame_pre"] = round(block["frame_pre"], 2)
+    block["frame_post"] = round(block["frame_post"], 2)
+    if block["map_total"]:
+        block["off_pool_pct"] = round(
+            100.0 * (block["map_total"] - block["frame_pre"]) / block["map_total"], 1)
+    if not block["applied"]:
+        block["reason"] = "no_group_could_be_rescaled"
+        return frame, block
+    frame[column] = rescaled
+    return frame, block
+
+
 def attach_projected_ownership(
     projections_df: Any,
     contest_shape: object = None,

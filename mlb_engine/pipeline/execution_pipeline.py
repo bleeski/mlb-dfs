@@ -6571,11 +6571,23 @@ def apply_leverage_ownership(projections, leverage):
     """
     if not (leverage or {}).get("own_pct_by_player_id"):
         return projections, {"applied": False, "reason": "no leverage supplied"}
-    from mlb_engine.field.ownership_prior import attach_predicted_ownership
-    return attach_predicted_ownership(
+    from mlb_engine.field.ownership_prior import (
+        attach_predicted_ownership, renormalize_ownership_to_frame)
+    frame, report = attach_predicted_ownership(
         projections, leverage["own_pct_by_player_id"],
         source=(leverage or {}).get("source"), overwrite=True,
     )
+    if report.get("applied"):
+        # R342(a). The emitted prior spends its 1000-point budget over every
+        # salary-file row and this frame holds only the pool, so the cap, the
+        # low-owned floor and the candidate scoring all read about half of the
+        # prior's own share of the pool (52.2% of the budget sat off the pool on
+        # 1840_5g). Rescaled HERE, after the sha-named attach and before anything
+        # reads the column, so both call sites (`run_slate` and the sliced door)
+        # take the same fix; the block is the brief's pre and post budget.
+        frame, report["renormalization"] = renormalize_ownership_to_frame(
+            frame, map_total=sum(float(v) for v in leverage["own_pct_by_player_id"].values()))
+    return frame, report
 
 
 def run_slate(
