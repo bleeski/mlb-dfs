@@ -37079,11 +37079,81 @@ class LateSwapReviewParentTests(unittest.TestCase):
         um.record_delivery(date="2026-07-25", delivered_file=delivered, contest_type="classic",
                            slate_tag="t", run_id="RUN_X", certification=ls.DOWNGRADE_LABEL)
         (builds.root / "outputs" / "2026-07-25" / "upload_manifest.json").unlink()
+        # R473. The record is read by the parent's BYTES (a run id alone is not a
+        # delivery), so the parent's export hash is the delivered file's own.
         parent = {"manifest": {"run_id": "RUN_X", "certification": {
             "workflow_valid": True, "selection_certified": True, "allocation_certified": True}},
-            "run_dir": str(builds.root / "missing"), "parent_export_sha256": "0" * 64}
+            "run_dir": str(builds.root / "missing"),
+            "parent_export_sha256": um.sha256_file(delivered)}
         label, source, _gates = ls.parent_delivery_label(parent, "2026-07-25")
         self.assertEqual((label, source), (ls.DOWNGRADE_LABEL, "delivery_record"))
+
+    # -- R473(b): the tracked record is read by the parent's bytes --------- #
+
+    def _two_records_under_one_run(self, own_label, variant_label=None,
+                                   variant_gates=("portfolio_caps_passed",)):
+        """The parent's own record and a variant's, under ONE run id and two
+        slate tags (R430 refuses a second record only under the same tag; 1400_4g
+        recorded one by hand). The outputs/ manifest is removed so the tracked
+        records are the only evidence. Returns ``(ls, parent, own_sha)``."""
+        from mlb_engine.entries import upload_manifest as um
+        builds = ReviewGradeExportTests("test_a_certified_build_is_unchanged_and_records_its_controls")
+        builds.setUp()
+        self.addCleanup(builds._restore)
+        ls = SwapControlsInheritanceTests._late_swap()
+        folder = builds.root / "outputs" / "2026-07-25"
+        folder.mkdir(parents=True)
+        own, variant = folder / "DKEntries_own.csv", folder / "DKEntries_variant.csv"
+        write_entries(own)
+        write_entries(variant, [None] * 3, contest_ids=["900"] * 3)
+        self.assertNotEqual(um.sha256_file(own), um.sha256_file(variant))
+        um.record_delivery(date="2026-07-25", delivered_file=own, contest_type="classic",
+                           slate_tag="t", run_id="RUN_X", certification=own_label)
+        if variant_label:
+            um.record_delivery(date="2026-07-25", delivered_file=variant,
+                               contest_type="classic", slate_tag="t_alt",
+                               run_id="RUN_X", certification=variant_label,
+                               failing_gates=list(variant_gates))
+        (folder / "upload_manifest.json").unlink()
+        parent = {"manifest": {"run_id": "RUN_X", "certification": {
+            "workflow_valid": True, "selection_certified": True, "allocation_certified": True}},
+            "run_dir": str(builds.root / "missing"),
+            "parent_export_sha256": um.sha256_file(own)}
+        return ls, parent, um.sha256_file(own)
+
+    def test_a_record_of_other_bytes_under_the_parents_run_lends_it_no_label(self):
+        """Reproduced at c2979af: the parent's own record said `certified` and a
+        variant recorded under the same run id (another slate tag) said
+        `review_grade_uncertified` with a failing gate; the loop matched the run
+        id alone, collected both, and UNCERTIFIED wins, so a clean swap off
+        certified bytes was labelled `review_grade_uncertified`."""
+        ls, parent, _sha = self._two_records_under_one_run(
+            "certified", "review_grade_uncertified")
+        label, source, gates = ls.parent_delivery_label(parent, "2026-07-25")
+        self.assertEqual((label, source, gates), ("certified", "delivery_record", []))
+        self.assertEqual(ls.swap_certification({"workflow_valid": True}, [], label),
+                         "certified")
+
+    def test_the_record_for_the_parents_own_bytes_still_labels_it_beside_a_variants(self):
+        """The control arm: a record that DOES describe the parent's bytes is
+        still found, and a variant's stronger-looking label does not outrank it."""
+        ls, parent, _sha = self._two_records_under_one_run(
+            "review_grade_downgrade_accepted", "review_grade_uncertified")
+        label, source, gates = ls.parent_delivery_label(parent, "2026-07-25")
+        self.assertEqual((label, source), ("review_grade_downgrade_accepted",
+                                           "delivery_record"))
+        self.assertEqual(gates, [], "the variant's failing gates are not the parent's")
+
+    def test_a_parent_with_no_export_hash_keeps_the_by_run_read(self):
+        """What is NOT changed, stated: with no export hash there are no bytes to
+        match, so the record is still read by run id. That can only over-label (a
+        review-grade record is kept), never upgrade; dropping it would."""
+        ls, parent, _sha = self._two_records_under_one_run(
+            "review_grade_downgrade_accepted")
+        parent["parent_export_sha256"] = ""
+        label, source, _gates = ls.parent_delivery_label(parent, "2026-07-25")
+        self.assertEqual((label, source), ("review_grade_downgrade_accepted",
+                                           "delivery_record"))
 
     # -- R452: a mismatch never inherits the latest promotion's label ------ #
 

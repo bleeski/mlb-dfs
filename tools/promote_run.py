@@ -45,7 +45,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
@@ -70,21 +70,15 @@ def _refuse(message: str) -> int:
     return 2
 
 
-def find_prior_row(run_id: str, outputs_root: Path) -> Tuple[Optional[str], Optional[Dict[str, Any]]]:
-    """The most recent upload-manifest row naming this run, and its slate date.
-
-    The row is where ``date``, ``contest_type`` and ``slate_tag`` come from, and
-    both filings of R129 have one: the variant that got superseded inside a
-    session was delivered first, and the earlier certified run being restored was
-    delivered when it was built. A run with no row is a run that was never
-    delivered, and then the operator has to say which slate it belongs to, because
-    guessing the slate identity is how a file lands under another draftgroup.
-    """
+def run_rows(run_id: str, outputs_root: Path) -> List[Tuple[str, Dict[str, Any]]]:
+    """Every upload-manifest row naming this run, oldest first, each with its
+    slate date. A row names the run; whether it describes THESE bytes is
+    `find_prior_row`'s question (R473)."""
     from mlb_engine.entries.upload_manifest import read_manifest
 
-    best: Tuple[Optional[str], Optional[Dict[str, Any]]] = (None, None)
+    rows: List[Tuple[str, Dict[str, Any]]] = []
     if not outputs_root.is_dir():
-        return best
+        return rows
     for date_dir in sorted(outputs_root.iterdir()):
         if not date_dir.is_dir():
             continue
@@ -95,20 +89,69 @@ def find_prior_row(run_id: str, outputs_root: Path) -> Tuple[Optional[str], Opti
             continue
         for row in manifest.get("deliveries", []):
             if str(row.get("run_id") or "") == run_id:
-                best = (date_dir.name, row)
+                rows.append((date_dir.name, row))
+    return rows
+
+
+def pick_prior_row(rows: Sequence[Tuple[str, Dict[str, Any]]], run_id: str,
+                   sha256: str) -> Tuple[Optional[str], Optional[Dict[str, Any]]]:
+    """The newest of ``rows`` that is the delivery of ``sha256`` under this run,
+    and its slate date; ``(None, None)`` when no row records the bytes.
+
+    The row is where ``date``, ``contest_type`` and ``slate_tag`` come from, and
+    both filings of R129 have one: the variant that got superseded inside a
+    session was delivered first, and the earlier certified run being restored was
+    delivered when it was built. A run with no row is a run that was never
+    delivered, and then the operator has to say which slate it belongs to, because
+    guessing the slate identity is how a file lands under another draftgroup.
+
+    R473. The row must carry the run's BYTES as well as its id. A run id alone
+    picked the LAST row naming the run, and on 1400_4g that was a hand-recorded
+    variant (7fdaa380, `review_grade_uncertified`) under the certified run
+    0efaf97e, so the re-promotion took the variant's label, lineage, tier and
+    strategy state. Rows that name the run but record other bytes are not read
+    for any of those, and not for the slate either: a row that describes other
+    bytes may sit under another slate tag, and `run()` says out loud which rows
+    it left unread. Several rows can match (re-promoting a superseded run appends
+    one with the same bytes); the newest is the live label.
+    """
+    from mlb_engine.entries.delivery_record import names_run_bytes
+
+    best: Tuple[Optional[str], Optional[Dict[str, Any]]] = (None, None)
+    for date, row in rows:
+        if names_run_bytes(row, run_id, sha256):
+            best = (date, row)
     return best
 
 
-def prior_delivery_record(run_id: str, date: str) -> Optional[Dict[str, Any]]:
-    """The latest delivery record for this run on this date, or None (R377)."""
-    from mlb_engine.entries.delivery_record import read_records
+def _describe_rows(rows: Sequence[Tuple[str, Dict[str, Any]]]) -> str:
+    """One clause per row, enough to find it: slate date, tag, bytes, label."""
+    return "; ".join(
+        f"{d} {r.get('slate_tag') or '-'} sha256 "
+        f"{str(r.get('sha256') or '')[:12] or 'none'} "
+        f"{r.get('certification') or 'no label'}" for d, r in rows)
+
+
+def find_prior_row(run_id: str, outputs_root: Path,
+                   sha256: str) -> Tuple[Optional[str], Optional[Dict[str, Any]]]:
+    """The newest upload-manifest row that is the delivery of ``sha256`` under
+    this run, and its slate date: `run_rows` then `pick_prior_row`, whose
+    docstring says why the bytes are part of the key (R473). `run()` calls the
+    two directly because it also needs the rows that name the run and record
+    other bytes."""
+    return pick_prior_row(run_rows(run_id, outputs_root), run_id, sha256)
+
+
+def prior_delivery_record(run_id: str, date: str,
+                          sha256: str) -> Optional[Dict[str, Any]]:
+    """The latest delivery record for this run's bytes on this date, or None
+    (R377). R473: matched on run AND sha256, because a run id keys one record per
+    slate tag and a variant under another tag shares it while carrying other
+    controls and another market."""
+    from mlb_engine.entries.delivery_record import records_for_run_bytes
 
     best: Optional[Dict[str, Any]] = None
-    for record in read_records(date=date):
-        if record.get("kind") != "delivery":
-            continue
-        if str((record.get("manifest_row") or {}).get("run_id") or "") != run_id:
-            continue
+    for record in records_for_run_bytes(date, run_id, sha256):
         if best is None or str(record.get("recorded_utc") or "") > str(
                 best.get("recorded_utc") or ""):
             best = record
@@ -165,6 +208,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def run(args: argparse.Namespace) -> int:
     from mlb_engine.entries import upload_manifest as um
+    from mlb_engine.entries.delivery_record import names_run_bytes
     from mlb_engine.entries.upload_manifest import (
         CorruptManifestError, deliver, repo_relative, sha256_file)
 
@@ -217,12 +261,31 @@ def run(args: argparse.Namespace) -> int:
             f"or acknowledge with --force-unbound, which promotes, records the "
             f"unverified bind on the row, and exits 4 rather than 0")
 
-    prior_date, prior_row = find_prior_row(run_id, outputs_root)
+    # R473. The row is the one that records THESE bytes under this run, never the
+    # last row naming the run: a variant recorded under the run's id describes
+    # other bytes, and its label, lineage, tier and strategy state are theirs.
+    # Every read of `prior_row` below moves with this choice; nothing reads a row
+    # that names the run and records other bytes.
+    named = run_rows(run_id, outputs_root)
+    prior_date, prior_row = pick_prior_row(named, run_id, actual_sha)
+    unread = [(d, r) for d, r in named if not names_run_bytes(r, run_id, actual_sha)]
     date = str(args.date or prior_date or "").strip()
     if not date:
+        if unread:
+            return _refuse(
+                f"no manifest row records these bytes (sha256 {actual_sha[:12]}) "
+                f"under run {run_id}; {len(unread)} row(s) name the run but record "
+                f"other bytes ({_describe_rows(unread)}). A row that describes other "
+                f"bytes is not read for the slate, the label, the lineage or the "
+                f"tier. Pass --date <slate date> --tag <slate tag> to say which slate "
+                f"these entries belong to")
         return _refuse(f"no manifest row names run {run_id} and no --date was given; "
                        f"pass --date <slate date> --tag <slate tag> to say which slate "
                        f"these entries belong to")
+    if unread:
+        print(f"WARN  {len(unread)} manifest row(s) name run {run_id} but record "
+              f"other bytes ({_describe_rows(unread)}); none of them lends its "
+              f"label, lineage, tier or strategy state to this promotion")
     tag = args.tag if args.tag is not None else str((prior_row or {}).get("slate_tag") or "")
     contest_type = str((prior_row or {}).get("contest_type") or "classic")
     # R388(e), R377. A re-promotion restores bytes an earlier delivery already
@@ -245,7 +308,7 @@ def run(args: argparse.Namespace) -> int:
         certification = meta_label
     lineage = str((prior_row or {}).get("lineage")
                   or run_meta.get("delivery_lineage") or "")
-    prior_record = prior_delivery_record(run_id, date) or {}
+    prior_record = prior_delivery_record(run_id, date, actual_sha) or {}
 
     facts = entries_facts(source)
     out_dir = outputs_root / date

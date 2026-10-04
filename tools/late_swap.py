@@ -448,7 +448,9 @@ def parent_delivery_label(parent: dict, date: str) -> tuple:
     manifest cannot hide it: the run manifest's `certification_label` (a
     governed build, R388(e)), then its `review_grade_export` (R388(d)), then
     the ``outputs/<date>/`` row for these bytes, then the tracked delivery
-    record for the run (where a downgrade-accepted swap's label lives).
+    record for the run's bytes (where a downgrade-accepted swap's label lives;
+    R473: matched on the run AND its export's sha256, so a record of other
+    bytes under the same run id lends no label).
     UNCERTIFIED named by any source wins, because a governed build that still
     failed its gates records the deadline label in its metadata too; then any
     other review-grade label; a run none of them names is labelled by its own
@@ -494,14 +496,27 @@ def parent_delivery_label(parent: dict, date: str) -> tuple:
         gates = gates or list(row.get("failing_gates") or [])
     if not mismatched:
         try:
-            from mlb_engine.entries.delivery_record import read_records
-            for rec in read_records(date=date):
+            from mlb_engine.entries.delivery_record import (
+                read_records, records_for_run_bytes)
+            if label_sha:
+                # R473. The record for the parent's BYTES, not any record under
+                # its run id: a variant recorded under the same run (another
+                # slate tag, or after the parent's record was lost) carries a
+                # label that belongs to the variant, and UNCERTIFIED wins below.
+                held = records_for_run_bytes(date, run_id, label_sha)
+            else:
+                # No export hash to key on (a run manifest that records none):
+                # the by-run read, the one case that cannot tell the bytes
+                # apart. It can only over-label, never upgrade.
+                held = [rec for rec in read_records(date=date)
+                        if rec.get("kind") == "delivery" and run_id and (
+                            rec.get("run_id") or (rec.get("manifest_row") or {})
+                            .get("run_id")) == run_id]
+            for rec in held:
                 row_of = rec.get("manifest_row") or {}
-                if rec.get("kind") == "delivery" and run_id and (
-                        rec.get("run_id") or row_of.get("run_id")) == run_id:
-                    if row_of.get("certification"):
-                        found.append((str(row_of["certification"]), "delivery_record"))
-                    gates = gates or list(row_of.get("failing_gates") or [])
+                if row_of.get("certification"):
+                    found.append((str(row_of["certification"]), "delivery_record"))
+                gates = gates or list(row_of.get("failing_gates") or [])
         except Exception:  # noqa: BLE001
             pass
     for label, source in found:
