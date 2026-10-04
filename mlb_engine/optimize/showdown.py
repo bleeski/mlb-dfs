@@ -22,6 +22,7 @@ import math
 import os
 import re
 import time as _time
+import uuid
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence
 
@@ -1814,8 +1815,17 @@ def write_showdown_entries(template_path: str | Path, candidate_path: str | Path
     # place. The old path opened the delivered name with "w" and never re-read
     # it, so an interrupted write left a truncated file sitting at the canonical
     # upload path with no indication anything had gone wrong.
+    #
+    # R451. The staging name is UNIQUE per write (`DO_NOT_UPLOAD_<stem>.<uuid>
+    # <suffix>`), not `DO_NOT_UPLOAD_<target.name>`: two same-tag builds shared
+    # that one name, so the second write landed on the first's bytes between
+    # its read-back and its promotion. A caller that keeps the file (`promote=
+    # False`) reads `candidate_path`; none may re-derive the name. A staged file
+    # that fails its own read-back is removed, because it is an invalid file and
+    # a unique name would otherwise leave one orphan per failed attempt.
     target.parent.mkdir(parents=True, exist_ok=True)
-    staging = target.with_name(f"DO_NOT_UPLOAD_{target.name}")
+    staging = target.with_name(
+        f"DO_NOT_UPLOAD_{target.stem}.{uuid.uuid4().hex[:12]}{target.suffix}")
     with staging.open("w", newline="", encoding="utf-8") as fh:
         csv.writer(fh).writerows(rows)
     try:
@@ -1835,9 +1845,11 @@ def write_showdown_entries(template_path: str | Path, candidate_path: str | Path
                     f"{log['entry_id']}: the written row does not match the "
                     f"assignment it was built from")
         if readback:
+            staging.unlink(missing_ok=True)
             return {"passed": False, "errors": readback, "candidate_path": None,
                     "assignment_log": logs}
     except (OSError, ValueError) as exc:
+        staging.unlink(missing_ok=True)
         return {"passed": False,
                 "errors": [f"written file did not read back as a valid "
                            f"{contract.name} export: {exc}"],

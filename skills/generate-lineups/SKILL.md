@@ -271,7 +271,9 @@ no byproducts (R28):
   front door. Fix with `python tools/env_probe.py --install`, never hand-pip.
 - **`past_slate_locks_passed`** — this slate's first lock is in the past, so no
   lineup built from it can be entered. Replays and evals pass
-  `--past-slate-replay`; a live build never needs it.
+  `--past-slate-replay`; a live build never needs it. A replay is a verification
+  run and never a delivery (R283): its export stays in `runs/`, Showdown's file stays
+  at a `DO_NOT_UPLOAD_..._replay` name, and nothing is mirrored, recorded or staged.
 - **`missing_inputs`** — the salary or entries path does not exist.
 - **`cli_value_invalid`** — a flag VALUE this build cannot use: an unknown
   posture or gate name, a `--declare-pitcher` with no id, a Classic
@@ -1494,6 +1496,14 @@ there is one) and, with no `--feed`, confirmation from DK's `Starting` column
 when that covers every side; the result names both (`lock_source`,
 `confirmation_source`). A slate DK has only partly posted confirms nobody, and
 the tool says which side. `--dead-from-feed` reads the same DK orders.
+
+**`repair_entry.py` records its own delivery (R430).** An `--out` (or the default
+`<entries>_repaired.csv`) under `outputs/<date>/` goes through `upload_manifest.deliver`: a
+run-less row with `repair_of` (the parent's sha256 and run), review-grade, superseding the
+parent's live row, so the preflight no longer hard-fails it. Exit 5 means written but NOT
+recorded (the file keeps its `DO_NOT_UPLOAD_` name; the error names it). Never record a repair
+by hand under the parent's `run_id`: `record_delivery` now refuses a second record for a run
+with other bytes, because the record is keyed by the run.
 
 **Which tool owns the entry: `late_swap.py` while it is mostly OPEN,
 `tools/repair_entry.py` once it is mostly LOCKED, and the boundary is

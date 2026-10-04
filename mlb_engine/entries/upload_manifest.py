@@ -92,6 +92,30 @@ def unrecorded_name(dest: str | Path) -> Path:
     return dest.with_name(f"{UNRECORDED_PREFIX}{dest.name}")
 
 
+def unique_unrecorded_name(dest: str | Path) -> Path:
+    """R451. The provisional path ONE delivery writes to: `unrecorded_name`'s
+    prefix with a per-delivery token, `DO_NOT_UPLOAD_<stem>.<token><suffix>`.
+
+    `unrecorded_name` is deterministic on purpose (it is the self-labelling
+    prefix rule `is_unrecorded_name` reads) and is what two deliveries to the
+    same `dest` shared: the second write landed on the first's bytes between its
+    existence check and its hash, so a manifest row, a brief sha and a preflight
+    `upload_ready` verdict could all name run A while `outputs/` held B's
+    portfolio. The token is minted ONCE by the caller that owns the delivery and
+    carried as that delivery's path (``deliver``'s ``out["path"]`` and
+    ``hash_source``); nothing may recompute it. No sweep removes the provisional
+    a failed delivery leaves, by R96(2)'s design (it is then the only copy), so a
+    failure costs one named orphan where the shared name used to heal itself.
+    """
+    dest = Path(dest)
+    name = dest.name
+    if name.startswith(UNRECORDED_PREFIX):
+        name = name[len(UNRECORDED_PREFIX):]
+    base = Path(name)
+    return dest.with_name(
+        f"{UNRECORDED_PREFIX}{base.stem}.{uuid.uuid4().hex[:12]}{base.suffix}")
+
+
 def is_unrecorded_name(path: str | Path) -> bool:
     """True for a file that is labelling itself as having no manifest row."""
     return Path(path).name.startswith(UNRECORDED_PREFIX)
@@ -347,6 +371,7 @@ def record_delivery(
     refinement: bool = False,
     lineage: str = "",
     market: Optional[Mapping[str, Any]] = None,
+    repair_of: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Append one delivery record and supersede any prior record for the same slate.
 
@@ -374,6 +399,16 @@ def record_delivery(
     recorded fact, not a waiver: the row is an ordinary appended delivery and it
     supersedes the current one the same way any other delivery does.
 
+    R430. ``repair_of`` is ``{"run_id": <parent's run or None>, "sha256": <the
+    parent file's bytes>}`` on a hand repair (`tools/repair_entry.py`), recorded
+    like ``re_promoted_from``: a fact on the row, never a waiver. Nothing reads it
+    yet; it is what the archive's grading key needs to tie a repaired file back
+    to the build it repaired. A repair records RUN-LESS (``run_id=None``), and a
+    record whose ``run_id`` already has a tracked delivery record holding other
+    bytes is REFUSED here, before any row is written: the record is keyed
+    ``<tag>_<run_id>.json``, so it would replace the earlier run's record
+    (1905_10g, 1400_4g). The remedy the error names is to record run-less.
+
     R36 F6m. A manifest that exists and cannot be parsed is QUARANTINED before
     this function writes, and the fresh manifest says where the old bytes went.
     Raises ``CorruptManifestError`` when the quarantine fails, which the delivery
@@ -382,6 +417,18 @@ def record_delivery(
     """
     path = Path(delivered_file)
     source = Path(hash_source) if hash_source is not None else path
+    if not source.is_file():
+        # R451. A row is the claim that THESE bytes were delivered, and its
+        # sha256 is what preflight, `verify_manifest` and the brief check them
+        # against. With no file to hash it recorded `sha256: None`, which
+        # superseded the live row, passed `verify_manifest` as `unverifiable`
+        # and pointed preflight at a re-promotion whose bytes were not the ones
+        # on disk. Nothing in production recorded one on purpose: every caller
+        # passes a provisional it has just written and read back.
+        raise ValueError(
+            f"cannot record a delivery whose bytes cannot be read: {source} is "
+            f"not a file (delivered_file={path}); a row with no sha256 names "
+            f"bytes nothing can verify (R451)")
     manifest = read_manifest(date)
     corrupt = manifest.pop("corrupt", None)
     if corrupt:
@@ -397,7 +444,7 @@ def record_delivery(
         }
     record = {
         "delivered_file": repo_relative(path),
-        "sha256": sha256_file(source) if source.exists() else None,
+        "sha256": sha256_file(source),
         "contest_type": str(contest_type).lower(),
         "slate_tag": str(slate_tag or ""),
         "contest_ids": sorted({str(c) for c in (contest_ids or [])}),
@@ -422,6 +469,26 @@ def record_delivery(
     }
     if re_promoted_from:
         record["re_promoted_from"] = str(re_promoted_from)
+    if repair_of:
+        record["repair_of"] = {"run_id": repair_of.get("run_id"),
+                               "sha256": str(repair_of.get("sha256") or "")}
+    if run_id:
+        # R430 / R473(b). Compared on the delivered sha256, never on record
+        # text: `recorded_utc` makes every second write differ, and the same
+        # bytes recorded again (a re-promotion, a label change, preflight's
+        # candidate -> upload_ready) must still rewrite its one record.
+        from mlb_engine.entries.delivery_record import recorded_sha_for_run
+        held = recorded_sha_for_run(date, record["slate_tag"], run_id)
+        if held and held != record["sha256"]:
+            raise ValueError(
+                f"refusing to record run_id {run_id!r} for slate "
+                f"{record['slate_tag']!r}: its tracked delivery record already "
+                f"holds bytes {held[:12]} and this delivery's are "
+                f"{record['sha256'][:12]}. A run's record is keyed by the run, so "
+                f"a second one would replace the first. A file that is not that "
+                f"run's own export (a hand repair, a variant) records RUN-LESS "
+                f"(run_id=None); tools/repair_entry.py --out does it for a repair "
+                f"(R430)")
     if failing_gates:
         # R388(d). The gates an UNCERTIFIED file failed, so preflight's note
         # and the delivery record can name them.
@@ -556,7 +623,7 @@ def deliver(*, date: str, dest: str | Path, write, salary_csv: Optional[str | Pa
     in a brief. Never raises.
     """
     dest = Path(dest)
-    provisional = unrecorded_name(dest)
+    provisional = unique_unrecorded_name(dest)
     out: Dict[str, Any] = {"path": str(provisional), "recorded": False,
                            "record": None, "staged_salary": None, "error": ""}
     try:

@@ -132,6 +132,29 @@ def record_name(slate_tag: str, run_id: Optional[str],
     return f"{norun}_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.json"
 
 
+def recorded_sha_for_run(date: str, slate_tag: str, run_id: Optional[str],
+                         root: Optional[Path] = None) -> Optional[str]:
+    """R430. The delivered sha256 the tracked record already holds under this
+    run's name, or None: no run id, no record, an unreadable one, or one whose
+    row carries no sha256 (nothing to compare against is not a conflict).
+
+    `record_name` keys a run's record on `<tag>_<run_id>.json` alone, so a second
+    record for the run lands on the first's file and `_write` replaces it when
+    the text differs. This is the read `record_delivery` makes BEFORE it writes
+    its manifest row, because `write_delivery_record` never raises: a refusal
+    from inside the writer would drop only the record and leave the row.
+    """
+    if not run_id:
+        return None
+    path = deliveries_dir(root) / str(date) / record_name(slate_tag, run_id)
+    try:
+        held = json.loads(path.read_text(encoding="utf-8"))
+        sha = str(((held or {}).get("manifest_row") or {}).get("sha256") or "")
+    except (OSError, ValueError, AttributeError):
+        return None
+    return sha.strip().lower() or None
+
+
 def code_identity() -> Dict[str, Any]:
     """What this build was built BY, which no live run record carries.
 
@@ -286,8 +309,9 @@ def bound_entries(source: Path, expected_sha256: Optional[str]) -> tuple:
     actual = sha256_file(source)
     binding["source_sha256"] = actual
     if not expected:
-        # Nothing to bind against: the row itself carries no hash, which
-        # `record_delivery` writes only when the source was already missing.
+        # Nothing to bind against: the row itself carries no hash. Only a row
+        # written before R451 can: `record_delivery` now raises on a source it
+        # cannot read, where it used to write `sha256: None`.
         binding["status"] = "unverified_no_row_sha256"
         return entry_rows(source), binding
     if actual != expected:

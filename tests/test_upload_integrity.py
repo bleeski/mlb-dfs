@@ -13,11 +13,13 @@ blocker (F3a), the preflight tool's hard checks (G1), and the upload manifest
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import unittest
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -3749,7 +3751,10 @@ class R96UnrecordedDeliveryTests(unittest.TestCase):
         self.assertIn("MANIFEST NOT RECORDED", out["error"])
         self.assertFalse(dest.exists(),
                          "an unrecorded delivery must never wear the upload name")
-        self.assertTrue(self.um.unrecorded_name(dest).is_file())
+        # R451: the provisional is minted per delivery, so the file is where
+        # `deliver` says it is, not at a name this test can re-derive.
+        self.assertTrue(Path(out["path"]).is_file())
+        self.assertTrue(self.um.is_unrecorded_name(out["path"]))
         self.assertEqual(self._rows(), [])
 
     def test_the_row_names_the_upload_path_and_hashes_the_provisional_bytes(self):
@@ -3859,6 +3864,536 @@ class R96UnrecordedDeliveryTests(unittest.TestCase):
     def test_p6_a_rename_of_an_unrecorded_file_moves_nothing(self):
         self.assertFalse(self.um.rename_recorded_delivery(
             self.date, self.outputs / "a.csv", self.outputs / "b.csv"))
+
+
+class ProvisionalNameTests(unittest.TestCase):
+    """R451, roadmap Session 128(c). `deliver` wrote every same-dest delivery to ONE
+    fixed provisional name, `DO_NOT_UPLOAD_<dest.name>`, so two same-date same-tag
+    deliveries interleaved left `outputs/` holding B's portfolio under a manifest
+    row, a brief sha and a preflight `upload_ready` verdict that all said run A
+    (ordering 1), or recorded `sha256: None` and pointed preflight at a
+    re-promotion whose bytes were not the file on disk (ordering 2).
+
+    Reproduced at 4821d93 through the real `deliver` with two threads and Events
+    (the premise check's `repro.py`); both orderings fail on that tree. The
+    payloads are plain bytes: the manifest hashes them and never parses them.
+    """
+
+    A, B = b"payload-A,1\n", b"payload-B,2\n"
+
+    def setUp(self):
+        from mlb_engine.entries import upload_manifest as um
+        self.um = um
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self._original_root = um.REPO_ROOT
+        um.REPO_ROOT = self.root
+        self.date = "2026-07-25"
+        self.dest = self.root / "outputs" / self.date / "DKEntries_1905_2g.csv"
+        self.addCleanup(self._restore)
+
+    def _restore(self):
+        self.um.REPO_ROOT = self._original_root
+        self.tmp.cleanup()
+
+    def _rows(self):
+        return self.um.read_manifest(self.date).get("deliveries", [])
+
+    def _deliver(self, write, run_id, **extra):
+        kwargs = dict(contest_type="classic", slate_tag="1905_2g", contest_ids=["5"],
+                      entries=1, status="candidate", certification="certified")
+        kwargs.update(extra)
+        return self.um.deliver(date=self.date, dest=self.dest, write=write,
+                               run_id=run_id, **kwargs)
+
+    @staticmethod
+    def _sha(data):
+        return hashlib.sha256(data).hexdigest()
+
+    def test_each_delivery_gets_its_own_provisional_name(self):
+        seen = []
+
+        def write(p):
+            seen.append(Path(p))
+            Path(p).write_bytes(self.A)
+
+        first = self._deliver(write, "run_A")
+        second = self._deliver(write, "run_B")
+        self.assertNotEqual(seen[0], seen[1], "two deliveries shared one provisional name")
+        for path in seen:
+            self.assertTrue(self.um.is_unrecorded_name(path), path)
+            self.assertEqual(path.suffix, ".csv")
+            self.assertTrue(path.name.startswith("DO_NOT_UPLOAD_DKEntries_1905_2g."), path)
+            self.assertNotEqual(path, self.um.unrecorded_name(self.dest))
+        # `deliver` reports where the file ended up: the upload name, once promoted.
+        self.assertEqual((first["path"], second["path"]), (str(self.dest), str(self.dest)))
+        # The deterministic helper is still the prefix rule other code reads.
+        self.assertEqual(self.um.unrecorded_name(self.dest).name,
+                         "DO_NOT_UPLOAD_DKEntries_1905_2g.csv")
+        again = self.um.unique_unrecorded_name(self.um.unrecorded_name(self.dest))
+        self.assertEqual(again.name.split(".")[0], "DO_NOT_UPLOAD_DKEntries_1905_2g",
+                         "an already-prefixed name gains no second prefix")
+
+    def test_ordering_one_each_delivery_keeps_its_own_bytes_and_row(self):
+        """A writes, B writes, A checks/records/promotes, B checks. On the shared
+        name B wrote over A's bytes and A recorded sha(B) under run A."""
+        a_written, b_written, a_done = (threading.Event() for _ in range(3))
+        outs = {}
+
+        def write_a(p):
+            Path(p).write_bytes(self.A)
+            a_written.set()
+            self.assertTrue(b_written.wait(30))
+
+        def write_b(p):
+            self.assertTrue(a_written.wait(30))
+            Path(p).write_bytes(self.B)
+            b_written.set()
+            self.assertTrue(a_done.wait(30))
+
+        worker = threading.Thread(target=lambda: outs.__setitem__(
+            "B", self._deliver(write_b, "run_B")))
+        worker.start()
+        outs["A"] = self._deliver(write_a, "run_A")
+        a_done.set()
+        worker.join(30)
+        for key in "AB":
+            self.assertTrue(outs[key]["recorded"], (key, outs[key]["error"]))
+            self.assertEqual(outs[key]["error"], "")
+        rows = {r["run_id"]: r for r in self._rows()}
+        self.assertEqual(rows["run_A"]["sha256"], self._sha(self.A))
+        self.assertEqual(rows["run_B"]["sha256"], self._sha(self.B))
+        # B promoted last, so B's bytes are the delivery and A's row is retired.
+        self.assertEqual(self.dest.read_bytes(), self.B)
+        self.assertEqual(rows["run_A"]["status"], "superseded")
+        self.assertNotEqual(rows["run_B"]["status"], "superseded")
+        self.assertTrue(self.um.verify_manifest(self.date)["passed"])
+
+    def test_ordering_two_never_records_a_missing_hash(self):
+        """B writes, A writes, A checks, B checks/records/promotes, A records. On
+        the shared name A's row carried `sha256: None` and superseded B's."""
+        b_written, a_written, b_done = (threading.Event() for _ in range(3))
+        outs = {}
+        real = self.um.record_delivery
+
+        def write_b(p):
+            Path(p).write_bytes(self.B)
+            b_written.set()
+            self.assertTrue(a_written.wait(30))
+
+        def write_a(p):
+            self.assertTrue(b_written.wait(30))
+            Path(p).write_bytes(self.A)
+            a_written.set()
+
+        def gated(**kw):
+            if kw.get("run_id") == "run_A":
+                self.assertTrue(b_done.wait(30))
+            return real(**kw)
+
+        def run_b():
+            outs["B"] = self._deliver(write_b, "run_B")
+            b_done.set()
+
+        self.um.record_delivery = gated
+        self.addCleanup(setattr, self.um, "record_delivery", real)
+        worker = threading.Thread(target=run_b)
+        worker.start()
+        outs["A"] = self._deliver(write_a, "run_A")
+        worker.join(30)
+        for key in "AB":
+            self.assertTrue(outs[key]["recorded"], (key, outs[key]["error"]))
+            self.assertEqual(outs[key]["error"], "")
+        rows = self._rows()
+        self.assertEqual({r["run_id"]: r["sha256"] for r in rows},
+                         {"run_A": self._sha(self.A), "run_B": self._sha(self.B)})
+        self.assertEqual(self.dest.read_bytes(), self.A)
+        live = [r for r in rows if r["status"] != "superseded"]
+        self.assertEqual([(r["run_id"], r["sha256"]) for r in live],
+                         [("run_A", self._sha(self.A))])
+        check = self.um.verify_manifest(self.date)
+        self.assertTrue(check["passed"], check)
+        self.assertFalse(check.get("unverifiable"), check)
+
+    def test_a_missing_hash_source_raises_instead_of_recording_none(self):
+        for label, kwargs in (
+                ("a missing provisional", {"hash_source": self.dest.with_name("gone.csv")}),
+                ("no hash_source and no file at the delivered name", {})):
+            with self.subTest(case=label):
+                with self.assertRaisesRegex(
+                        ValueError, "cannot record a delivery whose bytes cannot be read"):
+                    self.um.record_delivery(
+                        date=self.date, delivered_file=self.dest, contest_type="classic",
+                        slate_tag="1905_2g", **kwargs)
+                self.assertEqual(self._rows(), [], "a refused record wrote a row")
+        # And through `deliver`, a writer that produced nothing is reported, no
+        # row is written, and nothing wears the upload name.
+        out = self._deliver(lambda p: None, "run_A")
+        self.assertFalse(out["recorded"])
+        self.assertIn("nothing was delivered", out["error"])
+        self.assertEqual(self._rows(), [])
+        self.assertFalse(self.dest.exists())
+
+    def test_a_failed_delivery_leaves_one_named_orphan_each(self):
+        """The cost the unique name carries, stated and pinned: no sweep removes a
+        failed delivery's provisional (R96(2): it is then the only copy)."""
+        paths = []
+        for run in ("run_A", "run_B"):
+            out = self._deliver(lambda p: Path(p).write_bytes(self.A), run,
+                                status="not-a-real-status")
+            self.assertFalse(out["recorded"])
+            paths.append(Path(out["path"]))
+        self.assertNotEqual(paths[0], paths[1])
+        self.assertTrue(all(p.is_file() and self.um.is_unrecorded_name(p) for p in paths))
+        self.assertFalse(self.dest.exists())
+
+
+class RecordIntegrityTests(unittest.TestCase):
+    """R430 / R473(b), roadmap Session 128(b), the refusal half. A delivery record is
+    keyed `<tag>_<run_id>.json`, so a second record for a run replaced the first
+    (the 1905_10g parent record, the 1400_4g records). The manifest ROW survived
+    and the record did not, and the archive's grading key is the record.
+
+    The refusal compares the delivered sha256, never the record text: the text
+    carries `recorded_utc`, so it differs on every write, and the same bytes
+    recorded again (a re-promotion, a label change) must still rewrite their one
+    record. The negative control below is the test a text-keyed refusal fails.
+    """
+
+    A, B = b"payload-A,1\n", b"payload-B,2\n"
+    DATE, TAG, RUN = "2026-09-23", "1905_10g", "20260923T221618Z_4a9aebc0"
+
+    def setUp(self):
+        from mlb_engine.entries import upload_manifest as um
+        self.um = um
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self._original_root = um.REPO_ROOT
+        um.REPO_ROOT = self.root
+        self.outputs = self.root / "outputs" / self.DATE
+        self.addCleanup(self._restore)
+
+    def _restore(self):
+        self.um.REPO_ROOT = self._original_root
+        self.tmp.cleanup()
+
+    def _deliver(self, name, data, run_id, **extra):
+        kwargs = dict(contest_type="classic", slate_tag=self.TAG, contest_ids=["5"],
+                      entries=1, status="candidate", certification="certified")
+        kwargs.update(extra)
+        return self.um.deliver(
+            date=self.DATE, dest=self.outputs / name,
+            write=lambda p: Path(p).write_bytes(data), run_id=run_id, **kwargs)
+
+    def _records(self):
+        return sorted((self.root / "data" / "deliveries" / self.DATE).glob("*.json"))
+
+    def _rows(self):
+        return self.um.read_manifest(self.DATE).get("deliveries", [])
+
+    def test_a_second_record_for_a_run_with_other_bytes_is_refused_before_any_write(self):
+        first = self._deliver("DKEntries_1905_10g.csv", self.A, self.RUN)
+        self.assertTrue(first["recorded"], first["error"])
+        record_path = self.root / "data" / "deliveries" / self.DATE / f"{self.TAG}_{self.RUN}.json"
+        before = record_path.read_text(encoding="utf-8")
+        rows_before = json.dumps(self._rows(), sort_keys=True)
+        # The 1905_10g call: a hand repair recorded under the PARENT's run_id.
+        second = self._deliver("DKEntries_1905_10g_repair1.csv", self.B, self.RUN,
+                               certification="review_grade")
+        self.assertFalse(second["recorded"])
+        self.assertIn("refusing to record run_id", second["error"])
+        self.assertIn("RUN-LESS", second["error"], "the error must name the remedy")
+        self.assertEqual(record_path.read_text(encoding="utf-8"), before,
+                         "the parent's record was overwritten")
+        self.assertEqual(json.dumps(self._rows(), sort_keys=True), rows_before,
+                         "a refused delivery wrote a manifest row")
+        self.assertFalse((self.outputs / "DKEntries_1905_10g_repair1.csv").exists(),
+                         "a refused delivery was promoted to the upload name")
+        self.assertTrue(Path(second["path"]).is_file(), "the bytes must survive under the DO_NOT_UPLOAD_ name")
+        self.assertEqual(len(self._records()), 1)
+
+    def test_the_same_bytes_recorded_again_still_rewrites_the_one_record(self):
+        """The negative control: same run, same sha256, different record text."""
+        self.assertTrue(self._deliver("DKEntries_1905_10g.csv", self.A, self.RUN)["recorded"])
+        record_path = self.root / "data" / "deliveries" / self.DATE / f"{self.TAG}_{self.RUN}.json"
+        before = record_path.read_text(encoding="utf-8")
+        again = self._deliver("DKEntries_1905_10g.csv", self.A, self.RUN,
+                              notes="re-promoted: a label change on the same bytes")
+        self.assertTrue(again["recorded"], again["error"])
+        after = record_path.read_text(encoding="utf-8")
+        self.assertNotEqual(after, before, "the record must be REWRITTEN for the same bytes")
+        self.assertIn("a label change on the same bytes", after)
+        self.assertEqual(len(self._records()), 1)
+        self.assertEqual(len(self._rows()), 1)
+
+    def test_a_run_less_record_for_other_bytes_is_unaffected(self):
+        self.assertTrue(self._deliver("DKEntries_1905_10g.csv", self.A, self.RUN)["recorded"])
+        parent = self.root / "data" / "deliveries" / self.DATE / f"{self.TAG}_{self.RUN}.json"
+        before = parent.read_text(encoding="utf-8")
+        repair = self._deliver("DKEntries_1905_10g_repair1.csv", self.B, None,
+                               certification="review_grade",
+                               repair_of={"run_id": self.RUN,
+                                          "sha256": hashlib.sha256(self.A).hexdigest()})
+        self.assertTrue(repair["recorded"], repair["error"])
+        self.assertEqual(parent.read_text(encoding="utf-8"), before)
+        names = [p.name for p in self._records()]
+        self.assertEqual(len(names), 2, names)
+        self.assertTrue(any(n.startswith(f"{self.TAG}_norun_") for n in names), names)
+        row = [r for r in self._rows() if r["delivered_file"].endswith("repair1.csv")][0]
+        self.assertEqual(row["repair_of"], {"run_id": self.RUN,
+                                            "sha256": hashlib.sha256(self.A).hexdigest()})
+        self.assertIsNone(row["run_id"])
+
+    def test_an_old_record_with_no_sha_is_not_a_conflict(self):
+        """Nothing to compare against must not block a run's first honest record."""
+        record_dir = self.root / "data" / "deliveries" / self.DATE
+        record_dir.mkdir(parents=True)
+        (record_dir / f"{self.TAG}_{self.RUN}.json").write_text(
+            json.dumps({"manifest_row": {"sha256": None}}), encoding="utf-8")
+        out = self._deliver("DKEntries_1905_10g.csv", self.A, self.RUN)
+        self.assertTrue(out["recorded"], out["error"])
+        (record_dir / f"{self.TAG}_{self.RUN}.json").write_text("{not json", encoding="utf-8")
+        again = self._deliver("DKEntries_1905_10g.csv", self.A, self.RUN)
+        self.assertTrue(again["recorded"], again["error"])
+
+
+class RepairRecordTests(unittest.TestCase):
+    """R430, roadmap Session 128(b), the recording half. `repair_entry.py --out`
+    wrote a file under `outputs/` and recorded nothing, so `preflight_upload.py`
+    hard-failed it ("no manifest record") while CLAUDE.md's repair clause needs it
+    to exit 0 under the lock clock; the session recorded it by hand under the
+    parent's `run_id` and overwrote the parent's record (1905_10g, 2026-09-23).
+
+    Reproduced at 4821d93 through the real tool and the real preflight in a temp
+    root (the premise check's `repro.py`). The fixture is `SingleSlotRepairTests`'s
+    (a COL starter scratched, one legal replacement), reached by composition so
+    its tests do not run twice.
+    """
+
+    DATE = "2026-08-29"
+    PARENT_RUN = "20260829T170000Z_aaaa1111"
+    AS_OF = "2026-08-29T23:40:00Z"
+
+    def setUp(self):
+        import preflight_upload
+        import repair_entry
+        from mlb_engine.entries import upload_manifest as um
+        self.re, self.pf, self.um = repair_entry, preflight_upload, um
+        self.fx = SingleSlotRepairTests()
+        self.fx.setUp()
+        self.addCleanup(self.fx.tearDown)
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self._saved = (um.REPO_ROOT, preflight_upload.REPO_ROOT)
+        um.REPO_ROOT = self.root
+        preflight_upload.REPO_ROOT = self.root
+        self.addCleanup(self._restore)
+        self.outputs = self.root / "outputs" / self.DATE
+        self.outputs.mkdir(parents=True)
+
+    def _restore(self):
+        self.um.REPO_ROOT, self.pf.REPO_ROOT = self._saved
+        self.tmp.cleanup()
+
+    def _record_parent(self, run_id=PARENT_RUN):
+        parent = self.outputs / "DKEntries_1605_2g.csv"
+        out = self.um.deliver(
+            date=self.DATE, dest=parent,
+            write=lambda p: shutil.copyfile(self.fx.entries_path, p),
+            contest_type="classic", slate_tag="1605_2g", contest_ids=["1111"],
+            contest_names=["Test GPP"], entries=1, run_id=run_id, status="candidate",
+            certification="certified", projection_tier="enriched",
+            strategy_state={"state": "clean", "counts": {}})
+        self.assertTrue(out["recorded"], out["error"])
+        return parent
+
+    def _repair(self, parent, out_path, *extra):
+        import contextlib
+        import io
+        argv = ["--entries", str(parent), "--salary", str(self.fx.salary_path),
+                "--feed", str(self.fx.feed_path), "--as-of", self.AS_OF,
+                "--dead", "Ryan Feltner", "--mode", "repair", "--out", str(out_path),
+                "--json", *extra]
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = self.re.main(argv)
+        return code, json.loads(out.getvalue()), err.getvalue()
+
+    def _rows(self):
+        return self.um.read_manifest(self.DATE).get("deliveries", [])
+
+    def test_a_repair_under_outputs_is_recorded_run_less_and_names_its_parent(self):
+        parent = self._record_parent()
+        parent_sha = self.um.sha256_file(parent)
+        parent_record = (self.root / "data" / "deliveries" / self.DATE
+                         / f"1605_2g_{self.PARENT_RUN}.json")
+        parent_before = parent_record.read_text(encoding="utf-8")
+        repaired = self.outputs / "DKEntries_1605_2g_repair1.csv"
+        code, result, _err = self._repair(parent, repaired)
+        self.assertEqual(code, 0, result)
+        self.assertTrue(repaired.is_file())
+        self.assertEqual(sorted(p.name for p in self.outputs.glob("DO_NOT_UPLOAD_*")), [])
+        self.assertTrue(result["recorded"]["recorded"], result["recorded"])
+        rows = {r["delivered_file"].rsplit("\\", 1)[-1].rsplit("/", 1)[-1]: r
+                for r in self._rows()}
+        mine, theirs = rows["DKEntries_1605_2g_repair1.csv"], rows["DKEntries_1605_2g.csv"]
+        self.assertIsNone(mine["run_id"])
+        self.assertEqual(mine["repair_of"], {"run_id": self.PARENT_RUN, "sha256": parent_sha})
+        self.assertEqual((mine["status"], mine["certification"]), ("candidate", "review_grade"))
+        self.assertEqual((mine["slate_tag"], mine["contest_ids"], mine["projection_tier"]),
+                         ("1605_2g", ["1111"], "enriched"))
+        self.assertIn("Ryan Feltner -> Zac Gallen", mine["notes"])
+        self.assertEqual(mine["sha256"], self.um.sha256_file(repaired))
+        # The repair IS the file Ben uploads: it supersedes the parent's live row.
+        self.assertEqual(theirs["status"], "superseded")
+        self.assertTrue(theirs["superseded_by"].endswith("DKEntries_1605_2g_repair1.csv"))
+        # The parent's tracked record is untouched; the repair has its own.
+        self.assertEqual(parent_record.read_text(encoding="utf-8"), parent_before)
+        own = sorted((self.root / "data" / "deliveries" / self.DATE).glob("1605_2g_norun_*.json"))
+        self.assertEqual(len(own), 1, [p.name for p in own])
+        held = json.loads(own[0].read_text(encoding="utf-8"))
+        self.assertEqual(held["manifest_row"]["repair_of"]["sha256"], parent_sha)
+
+    def test_the_preflight_no_longer_fails_the_repair_for_want_of_a_record(self):
+        parent = self._record_parent()
+        repaired = self.outputs / "DKEntries_1605_2g_repair1.csv"
+        self.assertEqual(self._repair(parent, repaired)[0], 0)
+        import contextlib
+        import io
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(io.StringIO()):
+            self.pf.main(["--entries", str(repaired), "--salary", str(self.fx.salary_path),
+                          "--json", "--as-of", self.AS_OF])
+        failures = json.loads(buf.getvalue()).get("failures") or []
+        self.assertEqual([f for f in failures if "no manifest record" in f], [], failures)
+
+    def test_a_parent_with_no_row_still_gets_a_record_and_a_warning(self):
+        parent = self.outputs / "DKEntries_unrecorded_parent.csv"
+        shutil.copyfile(self.fx.entries_path, parent)
+        repaired = self.outputs / "DKEntries_1605_2g_repair1.csv"
+        code, result, err = self._repair(parent, repaired)
+        self.assertEqual(code, 0, result)
+        self.assertIn("has no manifest row", err)
+        rows = self._rows()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["repair_of"],
+                         {"run_id": None, "sha256": self.um.sha256_file(parent)})
+        self.assertEqual((rows[0]["slate_tag"], rows[0]["contest_ids"], rows[0]["contest_type"]),
+                         ("1605_2g", ["1111"], "classic"))
+        self.assertIsNone(rows[0]["run_id"])
+
+    def test_the_repair_inherits_the_parents_lineage_and_leaves_the_other_lineage_live(self):
+        baseline = self.outputs / "DKEntries_1605_2g_BASELINE_x.csv"
+        out = self.um.deliver(
+            date=self.DATE, dest=baseline,
+            write=lambda p: shutil.copyfile(self.fx.entries_path, p),
+            contest_type="classic", slate_tag="1605_2g", contest_ids=["1111"], entries=1,
+            run_id="20260829T160000Z_bbbb2222", status="candidate",
+            certification="review_grade_baseline", lineage="baseline")
+        self.assertTrue(out["recorded"], out["error"])
+        enhanced = self.outputs / "DKEntries_1605_2g.csv"
+        out = self.um.deliver(
+            date=self.DATE, dest=enhanced, write=lambda p: Path(p).write_bytes(b"enhanced\n"),
+            contest_type="classic", slate_tag="1605_2g", contest_ids=["1111"], entries=1,
+            run_id=self.PARENT_RUN, status="candidate", certification="certified")
+        self.assertTrue(out["recorded"], out["error"])
+        repaired = self.outputs / "DKEntries_1605_2g_BASELINE_x_repair1.csv"
+        code, result, _err = self._repair(baseline, repaired)
+        self.assertEqual(code, 0, result)
+        by_file = {Path(r["delivered_file"]).name: r for r in self._rows()}
+        self.assertEqual(by_file[repaired.name].get("lineage"), "baseline")
+        self.assertEqual(by_file[baseline.name]["status"], "superseded")
+        self.assertNotEqual(by_file[enhanced.name]["status"], "superseded",
+                            "repairing the baseline retired the enhanced file's row")
+        self.assertEqual(by_file[repaired.name]["repair_of"]["run_id"], "20260829T160000Z_bbbb2222")
+
+    def test_a_superseded_parent_is_repaired_with_a_warning(self):
+        parent = self._record_parent()
+        newer = self.outputs / "DKEntries_1605_2g_newer.csv"
+        out = self.um.deliver(
+            date=self.DATE, dest=newer, write=lambda p: Path(p).write_bytes(b"newer\n"),
+            contest_type="classic", slate_tag="1605_2g", contest_ids=["1111"], entries=1,
+            run_id="20260829T180000Z_cccc3333", status="candidate", certification="certified")
+        self.assertTrue(out["recorded"], out["error"])
+        repaired = self.outputs / "DKEntries_1605_2g_repair1.csv"
+        code, result, err = self._repair(parent, repaired)
+        self.assertEqual(code, 0, result)
+        self.assertIn("already superseded", err)
+        self.assertIn("supersedes whatever is live", err)
+        self.assertTrue(result["recorded"]["recorded"])
+
+    def test_a_repair_that_changes_nothing_does_not_rewrite_the_parents_row(self):
+        """A repair run that found nothing to replace writes the parent's own bytes.
+        Recording that as a delivery would merge into the parent's row (the same
+        bytes recorded twice are one delivery) and point it at the copy."""
+        parent = self._record_parent()
+        rows_before = json.dumps(self._rows(), sort_keys=True)
+        copy = self.outputs / "DKEntries_1605_2g_repair1.csv"
+        # Zac Gallen is in the salary file and in no entry: nothing is dead.
+        import contextlib
+        import io
+        out, err = io.StringIO(), io.StringIO()
+        argv = ["--entries", str(parent), "--salary", str(self.fx.salary_path),
+                "--feed", str(self.fx.feed_path), "--as-of", self.AS_OF,
+                "--dead", "Zac Gallen", "--mode", "repair", "--out", str(copy), "--json"]
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = self.re.main(argv)
+        result = json.loads(out.getvalue())
+        self.assertEqual(code, 0, result)
+        self.assertEqual(result["repairs"], [])
+        self.assertTrue(copy.is_file(), "the file is still written, as before")
+        self.assertEqual(copy.read_bytes(), parent.read_bytes())
+        self.assertEqual(json.dumps(self._rows(), sort_keys=True), rows_before,
+                         "a no-op repair rewrote the parent's manifest row")
+        self.assertTrue(result["recorded"]["noop"])
+        self.assertIn("byte-identical", err.getvalue())
+
+    def test_an_out_under_outputs_but_not_in_a_dated_folder_says_it_is_unrecorded(self):
+        parent = self._record_parent()
+        stray = self.root / "outputs" / "DKEntries_stray_repair.csv"
+        code, result, err = self._repair(parent, stray)
+        self.assertEqual(code, 0, result)
+        self.assertTrue(stray.is_file())
+        self.assertEqual(len(self._rows()), 1, "a file outside outputs/<date>/ was recorded")
+        self.assertIn("NOT recorded", err)
+        self.assertIn("outputs/<date>/", err)
+
+    def test_an_out_outside_outputs_is_ad_hoc_and_records_nothing(self):
+        parent = self._record_parent()
+        adhoc = self.fx.dir / "adhoc_repaired.csv"
+        code, result, _err = self._repair(parent, adhoc)
+        self.assertEqual(code, 0, result)
+        self.assertTrue(adhoc.is_file())
+        self.assertNotIn("recorded", result)
+        self.assertEqual(len(self._rows()), 1, "an ad hoc file gained a manifest row")
+
+    def test_a_dry_run_records_nothing(self):
+        parent = self._record_parent()
+        repaired = self.outputs / "DKEntries_1605_2g_repair1.csv"
+        code, result, _err = self._repair(parent, repaired, "--dry-run")
+        self.assertEqual(code, 4)
+        self.assertFalse(repaired.exists())
+        self.assertEqual(len(self._rows()), 1)
+
+    def test_a_repair_that_cannot_be_recorded_exits_5_and_keeps_its_self_labelling_name(self):
+        parent = self._record_parent()
+        repaired = self.outputs / "DKEntries_1605_2g_repair1.csv"
+
+        def refuse(**_kw):
+            raise ValueError("the manifest is full")
+
+        real = self.um.record_delivery
+        self.um.record_delivery = refuse
+        self.addCleanup(setattr, self.um, "record_delivery", real)
+        code, result, err = self._repair(parent, repaired)
+        self.assertEqual(code, 5, result)
+        self.assertFalse(repaired.exists(), "an unrecorded repair wore the upload name")
+        orphans = list(self.outputs.glob("DO_NOT_UPLOAD_DKEntries_1605_2g_repair1.*.csv"))
+        self.assertEqual(len(orphans), 1, orphans)
+        self.assertEqual(result["written"], str(orphans[0]))
+        self.assertIn("REPAIRED BUT NOT RECORDED", err)
+        self.assertIn("the manifest is full", err)
+        self.assertEqual(len(self._rows()), 1)
 
 
 class R96PerCallerTests(unittest.TestCase):
@@ -4257,7 +4792,10 @@ class CorruptManifestIsItsOwnStateTests(unittest.TestCase):
         self.assertFalse(out["recorded"])
         self.assertIn("MANIFEST NOT RECORDED", out["error"])
         self.assertFalse(dest.exists(), "an unrecorded file never wears the upload name")
-        self.assertTrue(self.um.unrecorded_name(dest).is_file())
+        # R451: the provisional is minted per delivery, so the file is where
+        # `deliver` says it is, not at a name this test can re-derive.
+        self.assertTrue(Path(out["path"]).is_file())
+        self.assertTrue(self.um.is_unrecorded_name(out["path"]))
 
     def test_verify_manifest_fails_on_a_corrupt_manifest(self):
         self._corrupt()

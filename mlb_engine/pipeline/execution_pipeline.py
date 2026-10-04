@@ -6651,6 +6651,12 @@ def run_slate(
     # manifest lineage, so the enhanced delivery never supersedes it. None is
     # every existing caller's build exactly.
     delivery_lineage: Optional[str] = None,
+    # R283. A past-slate replay VERIFIES a build; it is never a delivery. The
+    # export stays in `runs/<run_id>/final/` (immutable) and nothing is mirrored
+    # to `outputs/`, recorded in the manifest, written to `data/deliveries/`, or
+    # staged. `build_slate.py`'s `main()` sets it from `--past-slate-replay`;
+    # every other caller keeps False, which is every existing caller's build.
+    replay: bool = False,
 ) -> Dict[str, Any]:
     """Single front door: raw slate inputs -> certified DKEntries file plus diagnostics.
 
@@ -7499,6 +7505,8 @@ def run_slate(
     # pick the baseline's name and manifest lineage.
     if delivery_lineage:
         result["delivery_lineage"] = str(delivery_lineage)
+    if replay:
+        result["replay"] = True
     # R393(b). When the report fields failed, the manifest row the mirror would
     # record reads a result missing its label and its contests, so nothing is
     # published from it: build_slate presents the immutable runs/ export.
@@ -7553,6 +7561,7 @@ def run_baseline(
     assume_gates: Sequence[str] = (),
     max_opposing_hitters_per_sp: Optional[int] = None,
     clock: Any = time.monotonic,
+    replay: bool = False,
 ) -> Dict[str, Any]:
     """R389(b), roadmap Session 11. The baseline's engine half: the core's
     entry-mapped candidates, allocated and exported through `run_slate`.
@@ -7644,7 +7653,7 @@ def run_baseline(
         portfolio_controls_override=controls or None,
         certification_label=BASELINE_LABEL, delivery_lineage=BASELINE_LINEAGE,
         never_relax_controls=sorted(held), control_moves=moves,
-        assume_gates=assumed, contest_postures=contest_postures,
+        assume_gates=assumed, contest_postures=contest_postures, replay=replay,
         source_metadata={"pool_report": pool.get("pool_report")},
         metadata={"bank_diagnostics": {
             "source": "baseline_core",
@@ -7663,6 +7672,16 @@ def run_baseline(
     return out
 
 
+#: R283. Why a replay result is mirrored nowhere. A replay of a played slate
+#: used to write the live delivered name (`DKEntries_<tag>.csv`, and on Showdown
+#: the only copy of the file) and supersede its manifest row, because the 08-16
+#: guard renamed only the STAGED inputs.
+REPLAY_NOT_MIRRORED_WHY = (
+    "a past-slate replay is a verification run, not a delivery (R283): its export "
+    "stays in runs/<run_id>/final/, and no mirror, manifest row, delivery record "
+    "or staged salary is written for it")
+
+
 def mirror_to_outputs(result: Mapping[str, Any], salary_csv: Any) -> Optional[str]:
     """Copy a promoted export to outputs/<date>/ and return the path.
 
@@ -7673,6 +7692,13 @@ def mirror_to_outputs(result: Mapping[str, Any], salary_csv: Any) -> Optional[st
     """
     output_path = result.get("output_path")
     if not output_path or not result.get("passed"):
+        return None
+    if result.get("replay"):
+        # R283. Under a key of its own: `mirror_skipped` would read as a LATER
+        # FAILURE (build_slate turns it into exit 7), and a replay that did
+        # exactly what it should is not one.
+        if isinstance(result, dict):
+            result["replay_not_mirrored"] = {"why": REPLAY_NOT_MIRRORED_WHY}
         return None
     try:
         from mlb_engine.intake.slate_intake_manager import (
@@ -7815,6 +7841,11 @@ def mirror_review_grade(result: MutableMapping[str, Any], salary_csv: Any) -> Op
     """
     export = result.get("review_grade_export")
     if not isinstance(export, dict) or result.get("passed"):
+        return None
+    if result.get("replay"):
+        # R283. No `manifest_recorded` key: absent reads as "nothing was
+        # attempted", and False would read as a manifest failure.
+        export["not_mirrored"] = {"why": REPLAY_NOT_MIRRORED_WHY}
         return None
     if result.get("delivery_lineage"):
         # R389(b). A baseline ships only when every gate passed; an S/P-only
