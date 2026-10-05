@@ -30,6 +30,18 @@ It reports two universes side by side, the whole salary file and a pool proxy sc
 after R342(a)'s own rescale, and replays the pre-registered challenger on held-out
 dates. The inputs are gitignored: it runs where BUILD saved them (benbook).
 
+THE RECORDED POOL (R342(c)). The proxy is not the build's pool: the saved file has a
+row for every salary player and cannot say which the build kept. Since R342(c) a
+Classic brief carries `pool.members` (the pool's Player_IDs, each row's carried role
+source, the whole excluded list, the salary sha256), and `--saved` reads it when a brief
+joins the saved prediction: (slate date, slate tag), the key `find_prior_file` hands a
+build its prediction by, read in reverse, falling back to the salary sha256 when the tag
+finds nothing. Two shas are reported as confirmation and never gate the join. A contest
+with a record adds a third universe, `pool_recorded`, scored exactly as `pool_proxy`
+is; `pool_basis` says per contest which pool was used and why; several DISTINCT records
+for one join are named and the contest grades on the proxy. A contest without a record
+grades as before. Only briefs written after R342(c) carry one: it grades future slates.
+
 TRUTHFUL LABELS. Every number this emits is an observed count from an archived
 DK standings export, or a deterministic statistic over one. A Spearman here is
 a rank correlation between two measured shares. Nothing is a win rate, a cash
@@ -554,6 +566,13 @@ BUDGET_TOLERANCE_PER_ROW = 0.005
 
 SAVED_METRICS = ("mae", "rostered_mae", "calibration_gap", "top10_recall")
 
+# R342(c). The role sources a brief's `pool.members` records that count as a KNOWN
+# role when a recorded row feeds the challenger's unknown-role factor: a posted
+# lineup, and an arm the build kept as a probable or declared starter. A projected
+# slot and `unknown` are not known (an unknown role is UNCERTAIN, never equally
+# eligible). A labeled convention, not a measurement.
+RECORDED_ROLE_KNOWN = frozenset({"confirmed_lineup", "probable_sp", "declared_pitcher"})
+
 
 def load_saved_predictions(root: Path = REPO_ROOT) -> Dict[str, List[Dict[str, Any]]]:
     """{slate_date: [saved prediction, ...]} from `outputs/*/ownership_pred_*.json`.
@@ -738,6 +757,140 @@ def saved_pool_rows(prediction: Mapping[str, Any], archetype: str,
                      "actual": float(shares.get(norm, 0.0)),
                      "rostered": norm in shares, "role_known": bool(role_known)})
     return rows
+
+
+def recorded_pool_briefs(root: Path, slate_date: str,
+                         cache: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """The briefs in ``outputs/<slate_date>/`` that record a pool (R342(c)), in sorted file order.
+
+    ``{"files": n, "records": [{"name", "tag", "run_id", "leverage_sha256", "members"}]}``.
+    A brief written before R342(c), or one whose record failed (`recorded: false`), is
+    counted in ``files`` and is not a record. Sorted file order is determinism, never
+    selection: nothing is chosen by position here.
+    """
+    key = f"recorded_pool_briefs:{slate_date}"
+    if cache is not None and key in cache:
+        return cache[key]
+    found: Dict[str, Any] = {"files": 0, "records": []}
+    for path in sorted(Path(root).glob(f"outputs/{slate_date}/build_brief*.json")):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8-sig"))
+        except (OSError, ValueError):
+            continue
+        if not isinstance(data, dict):
+            continue
+        found["files"] += 1
+        block = data.get("pool")
+        members = block.get("members") if isinstance(block, dict) else None
+        if (not isinstance(members, dict) or members.get("recorded") is not True
+                or not isinstance(members.get("player_ids"), list)
+                or not isinstance(members.get("role_source"), dict)
+                or str(data.get("date") or "") != str(slate_date)):
+            continue
+        found["records"].append({
+            "name": path.name,
+            "tag": str((data.get("slate") or {}).get("tag") or "").strip(),
+            "run_id": data.get("run_id"),
+            "leverage_sha256": str((data.get("leverage") or {}).get("sha256") or ""),
+            "members": members})
+    if cache is not None:
+        cache[key] = found
+    return found
+
+
+def _proxy_basis(reason: Optional[str] = None) -> Dict[str, Any]:
+    """The basis of a contest that grades on the proxy: nothing joined, or nothing usable."""
+    return {"used": "proxy", "reason": reason, "joined_by": None, "brief": None, "briefs": [],
+            "run_id": None, "salary_sha_match": None, "prediction_sha_confirmed": None}
+
+
+def recorded_pool_for(chosen: Mapping[str, Any], slate_date: str, root: Path,
+                      cache: Optional[Dict[str, Any]] = None
+                      ) -> Tuple[Optional[Mapping[str, Any]], Dict[str, Any]]:
+    """(the recorded pool or None, the basis that says which pool a contest used and why).
+
+    The join (R342(c)) is the saved prediction's (slate date, slate tag), the key
+    `qa_portfolio.find_prior_file` hands a build its prediction by, read in reverse; when
+    the tag finds nothing (a hand-named or untagged emit) it falls back to the salary
+    file's sha256, byte-exact. Two confirmation flags are reported and NEVER gate it:
+    ``salary_sha_match`` (BUILD often emits from an earlier download than it builds on,
+    so the sha alone would refuse valid pools) and ``prediction_sha_confirmed`` (a
+    leverage build records the prediction file's own sha256). Byte-identical records
+    (`build_brief.json` and its tagged copy) are ONE match; several DISTINCT records for
+    one join are named and the contest grades on the proxy (`retro.resolve_brief`'s rule:
+    nothing is picked by name or order).
+    """
+    tag = str(chosen.get("slate_tag") or "").strip()
+    sha = str((chosen.get("salary_file") or {}).get("sha256") or "")
+    found = recorded_pool_briefs(root, slate_date, cache)
+    basis = _proxy_basis()
+    records = found["records"]
+    if not records:
+        basis["reason"] = (f"no brief in outputs/{slate_date}/ records a pool "
+                           f"({found['files']} brief file(s) read; a brief written before "
+                           "R342(c) records none)")
+        return None, basis
+    joined_by = "slate_tag"
+    matched = [r for r in records if tag and r["tag"] == tag]
+    if not matched:
+        joined_by = "salary_sha256"
+        matched = [r for r in records if sha and r["members"].get("salary_sha256") == sha]
+    if not matched:
+        basis["reason"] = (f"{len(records)} brief(s) in outputs/{slate_date}/ record a pool and "
+                           f"none carries slate tag {tag!r} or this salary file's sha256")
+        return None, basis
+    names = [r["name"] for r in matched]
+
+    def identity(rec: Mapping[str, Any]) -> str:
+        m = rec["members"]
+        return json.dumps({"ids": m["player_ids"], "role_source": m["role_source"],
+                           "excluded": m.get("excluded_player_ids") or []}, sort_keys=True)
+
+    basis.update(joined_by=joined_by, briefs=names)
+    distinct = {identity(r) for r in matched}
+    if len(distinct) > 1:
+        basis["reason"] = (f"AMBIGUOUS: {len(distinct)} different recorded pools join by "
+                           f"{joined_by} ({', '.join(names)}); none is picked, the proxy is used")
+        return None, basis
+    members = matched[0]["members"]
+    leverage_shas = {r["leverage_sha256"] for r in matched if r["leverage_sha256"]}
+    prediction_sha = str(chosen.get("_file_sha256") or "")
+    basis.update(
+        brief=names[0], run_id=matched[0]["run_id"],
+        salary_sha_match=(members.get("salary_sha256") == sha
+                          if sha and members.get("salary_sha256") else None),
+        prediction_sha_confirmed=((prediction_sha in leverage_shas)
+                                  if leverage_shas and prediction_sha else None))
+    return members, basis
+
+
+def recorded_pool_rows(rows: Sequence[Mapping[str, Any]], members: Mapping[str, Any]
+                       ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    """(the saved rows whose Player_ID the build's pool held, the accounting).
+
+    ``role_known`` comes from the RECORDED source (`RECORDED_ROLE_KNOWN`), not from the
+    saved file's emit-time features. Operator-excluded rows stay in: R342(a) rescaled over
+    them and the solver read that basis, so subtracting them would grade a different
+    number; the count is reported instead. A recorded id the saved file lacks is counted.
+    """
+    source = {str(k): str(v) for k, v in (members.get("role_source") or {}).items()}
+    kept: List[Dict[str, Any]] = []
+    for row in rows:
+        src = source.get(row["pid"])
+        if src is None:
+            continue
+        kept.append({**row, "role_known": src in RECORDED_ROLE_KNOWN, "role_source": src})
+    in_saved = {row["pid"] for row in rows}
+    kept_ids = {row["pid"] for row in kept}
+    counts: Dict[str, int] = {}
+    for row in kept:
+        counts[row["role_source"]] = counts.get(row["role_source"], 0) + 1
+    return kept, {
+        "recorded_ids": len(source),
+        "recorded_ids_in_saved_file": len(kept),
+        "recorded_ids_not_in_saved_file": len([p for p in source if p not in in_saved]),
+        "excluded_in_pool": len({str(p) for p in members.get("excluded_player_ids") or []} & kept_ids),
+        "role_source_counts": dict(sorted(counts.items()))}
 
 
 def _top_ids(values: Sequence[float], k: int = 10) -> List[int]:
@@ -1087,6 +1240,26 @@ def _grade_saved_one(record: Mapping[str, Any], names: Mapping[str, str],
     out["pool_proxy"] = _universe_grades(pool, rescale=True) if pool else None
     out["pool_proxy_off_pool_actual"] = round(
         sum(r["actual"] for r in rows if not r["role_known"]), 3)
+    # R342(c). THE pool, when a brief recorded it. The proxy above is still emitted and
+    # never relabeled; `pool_basis` says which pool this contest's pool-aware grade is.
+    try:
+        members, basis = recorded_pool_for(chosen, record["slate_date"], root, cache)
+        if members is not None:
+            recorded_rows, account = recorded_pool_rows(rows, members)
+            if recorded_rows:
+                basis.update(account, used="recorded")
+                out["pool_recorded"] = _universe_grades(recorded_rows, rescale=True)
+                held = {r["pid"] for r in recorded_rows}
+                out["pool_recorded_off_pool_actual"] = round(
+                    sum(r["actual"] for r in rows if r["pid"] not in held), 3)
+            else:
+                basis["reason"] = "the recorded pool matches no row of the saved file"
+    except Exception as exc:  # noqa: BLE001 -- a malformed brief must not cost the contest its proxy grade
+        out.pop("pool_recorded", None)
+        out.pop("pool_recorded_off_pool_actual", None)
+        basis = _proxy_basis(f"the recorded pool could not be read or scored: "
+                             f"{type(exc).__name__}: {exc}")
+    out["pool_basis"] = basis
     return out
 
 
@@ -1173,6 +1346,9 @@ def summarize_saved(results: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
     summary: Dict[str, Any] = {
         "contests": len(graded), "slates": len({r["saved"]["source"] for r in graded}),
         "dates": len(dates), "train_dates": train, "holdout_dates": holdout}
+    # R342(c). Which pool each contest's pool-aware grade used; the two are never merged.
+    n_recorded = sum(1 for r in graded if (r.get("pool_basis") or {}).get("used") == "recorded")
+    summary["pool_basis"] = {"recorded": n_recorded, "proxy": len(graded) - n_recorded}
     summary["saved_prior_whole_file"] = {
         key: _equal_date_mean(graded, _variant_getter("whole_file", "saved", key))
         for key in ("mae", "rostered_mae", "spearman", "top10_recall",
@@ -1195,7 +1371,10 @@ def summarize_saved(results: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
         return summary
     held = [r for r in graded if r["slate_date"] in holdout]
     gate: Dict[str, Any] = {}
-    for universe, comparator in (("whole_file", "saved"), ("pool_proxy", "saved_rescaled")):
+    universes = [("whole_file", "saved"), ("pool_proxy", "saved_rescaled")]
+    if any(r.get("pool_recorded") for r in held):      # R342(c): only where a pool was recorded
+        universes.append(("pool_recorded", "saved_rescaled"))
+    for universe, comparator in universes:
         rows = [r for r in held if r.get(universe)]
         table = {}
         for metric in SAVED_METRICS:
@@ -1222,7 +1401,7 @@ def summarize_saved(results: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
             universe: {key: _equal_date_mean(
                 [r for r in held if r.get(universe)], _variant_getter(universe, "flat_budget", key))
                 for key in ("mae", "rostered_mae", "calibration_gap")}
-            for universe in ("whole_file", "pool_proxy")},
+            for universe, _comparator in universes},
         "date_deltas_mae": {
             d: _delta(_plain_mean([r for r in held if r["slate_date"] == d],
                                   _variant_getter("whole_file", "challenger", "mae", best)),
@@ -1241,6 +1420,7 @@ def saved_report(results: Sequence[Mapping[str, Any]], summary: Mapping[str, Any
     def f(value: Any, places: int = 3) -> str:
         return "n/a" if value is None else f"{value:.{places}f}"
 
+    pb = summary.get("pool_basis") or {}
     lines = [
         f"# Ownership prior graded on its SAVED pre-lock files | {len(graded)} Classic contest(s)",
         "",
@@ -1263,6 +1443,13 @@ def saved_report(results: Sequence[Mapping[str, Any]], summary: Mapping[str, Any
         "recorded pre-lock role (a batting-order slot or a probable flag), scored after R342(a)'s "
         "own rescale to 800/200, which is what the solver reads. The proxy is NOT the build's pool: a "
         "TBD side's platoon-projected nine and a declared pitcher are not recorded in the saved file.",
+        "",
+        f"**Pool basis (R342(c)).** {pb.get('recorded', 0)} of {len(graded)} contest(s) were scored on "
+        "the build's RECORDED pool (a brief's `pool.members`, joined by slate date and tag) and "
+        f"{pb.get('proxy', 0)} on the proxy. `pool_recorded` is scored exactly as `pool_proxy` is, over "
+        "the saved rows whose Player_ID the build's pool held (an operator-excluded row stays in, as in "
+        "R342(a)'s basis). Recorded and proxy contests are reported separately and never averaged "
+        "together. Only briefs written after R342(c) record a pool.",
         "",
     ]
     sp = summary.get("saved_prior_whole_file") or {}
@@ -1295,7 +1482,7 @@ def saved_report(results: Sequence[Mapping[str, Any]], summary: Mapping[str, Any
             f"unknown-role factor {cell['unknown_role_factor']:g} (train MAE {f(ch['train_mae'], 3)}).",
             "",
         ]
-        for universe in ("whole_file", "pool_proxy"):
+        for universe in ch["gate"]:       # whole_file, pool_proxy, and pool_recorded where one exists
             g = ch["gate"][universe]
             lines += [
                 f"### `{universe}` (comparator: `{g['comparator']}`, {g['contests']} held-out contests)",
@@ -1336,15 +1523,33 @@ def saved_report(results: Sequence[Mapping[str, Any]], summary: Mapping[str, Any
             ""]
     lines += ["## Per contest (never pooled)", "",
               "| contest | date | archetype | field | band | saved file | pre-lock | sha match | tilts inert "
-              "| MAE | rostered MAE | rho |",
-              "|---|---|---|---|---|---|---|---|---|---|---|---|"]
+              "| MAE | rostered MAE | rho | pool basis |",
+              "|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for r in sorted(graded, key=lambda x: (x["slate_date"], x["contest_id"])):
         s, w = r["saved"], r["whole_file"]["saved"]
+        basis = r.get("pool_basis") or {}
+        used = (f"recorded ({basis.get('joined_by')})" if basis.get("used") == "recorded"
+                else "proxy")
         lines.append(
             f"| `{r['contest_id']}` | {r['slate_date']} | {r['archetype']} | {r['field_size']} "
             f"| {r['field_band']} | `{s['source']}` | {s['prelock']} | {s['salary_sha256_match']} "
             f"| {', '.join(s['inputs']['inert']) or 'none'} | {f(w['mae'], 2)} "
-            f"| {f(w['rostered_mae'], 2)} | {f(w['spearman'])} |")
+            f"| {f(w['rostered_mae'], 2)} | {f(w['spearman'])} | {used} |")
+    recorded = [r for r in graded if (r.get("pool_basis") or {}).get("used") == "recorded"]
+    if recorded:
+        lines += ["", "## Contests scored on a RECORDED pool (never averaged with the proxy ones)", "",
+                  "| contest | joined by | brief | pool rows | recorded ids not in the saved file "
+                  "| excluded in the pool | salary sha match | prediction sha confirmed "
+                  "| recorded-pool MAE (rescaled) | proxy MAE (rescaled) |",
+                  "|---|---|---|---|---|---|---|---|---|---|"]
+        for r in sorted(recorded, key=lambda x: (x["slate_date"], x["contest_id"])):
+            b = r["pool_basis"]
+            lines.append(
+                f"| `{r['contest_id']}` | {b['joined_by']} | `{b['brief']}` "
+                f"| {b['recorded_ids_in_saved_file']} | {b['recorded_ids_not_in_saved_file']} "
+                f"| {b['excluded_in_pool']} | {b['salary_sha_match']} | {b['prediction_sha_confirmed']} "
+                f"| {f(((r.get('pool_recorded') or {}).get('saved_rescaled') or {}).get('mae'))} "
+                f"| {f(((r.get('pool_proxy') or {}).get('saved_rescaled') or {}).get('mae'))} |")
     lines += ["", "## By archetype and field band (medians of per-contest statistics)", ""]
     groups: Dict[Tuple[str, str], List[Mapping[str, Any]]] = {}
     for r in graded:

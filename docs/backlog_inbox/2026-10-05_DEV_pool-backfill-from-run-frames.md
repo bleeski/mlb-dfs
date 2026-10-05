@@ -1,0 +1,9 @@
+# A pool-aware ownership grade can run on PAST slates now: the pool survives in `runs/<run_id>/final/projections.csv`
+
+Filed 2026-10-05 by DEV (Session 43, R342(c)), from the `dfs-premise` run's measurement. XS-S; not built (the task said no backfill). Ben's to schedule.
+
+**The finding.** R342(c) records the build's pool in the brief, so it only grades slates built after it lands, and the archive stops at 2026-08-27 with an empty standings inbox. But `execute_portfolio` already writes the pool's Player_IDs for every run: `runs/<run_id>/final/projections.csv` (`execution_pipeline.py:690-692`) is the frame after the leverage attach, with no reassignment between `:6813` and `:7416`. On benbook the premise run matched saved predictions to run folders by the salary file's sha256 (the index `ownership_grade_archive.recorded_salary_files` already builds): 28 saved predictions are dated inside the archive window and 17 of them have at least one run frame built from the same salary bytes, all of the Classic ones; the 11 without are `_sd` Showdown files, which `--saved` refuses.
+
+**Why it matters.** (b2)'s gate (a pool-aware grade over held-out DATES) waits on ARCHIVE pulling standings for slates built after R342(c) landed. The archive already holds standings for 41 dates through 2026-08-27, so a reader that builds a `pool.members`-shaped record from a run frame would let `--saved` grade past slates through the same `pool_recorded` path, and could shorten the road to (b2) by weeks.
+
+**Caveats, so the reader is built honestly.** Up to 18 runs share one salary sha, so choosing the run needs the delivered one (a brief's `run_id`, `tools/retro.resolve_brief`); the frame carries a role signal for hitters only (the Notes tags `confirmed_order` and `platoon_order`, and `Batting_Order`), nothing for pitchers, so pitchers would read `unknown`; operator-excluded rows are in the frame. Run only on benbook (the runs and the salary files are gitignored).

@@ -4781,6 +4781,233 @@ class R291ExcludedColumnReachesTheOptimizerTests(unittest.TestCase):
             self.assertFalse(zero["column_present"])
 
 
+class PoolMembersRecordTests(unittest.TestCase):
+    """R342(c). The brief's `pool.members`: which rows the build's POOL held and what
+    intake carried about each one.
+
+    The saved pre-lock ownership file has a row for every salary player and cannot say
+    which of them the build kept, so `ownership_grade_archive --saved` scored a proxy
+    pool. The register put the record in the `leverage` block; that block exists only on
+    a `--leverage` build (2 of 192 briefs on disk), so the record rides the `pool` block,
+    which is on every Classic brief. Every test here builds a real pool with
+    `build_slate_pool` and reads the production function, and the end-to-end half drives
+    `run_classic` with only `run_slate` faked.
+    """
+
+    @staticmethod
+    def _module():
+        import importlib.util
+        path = (REPO / "skills" / "generate-lineups" / "scripts" / "build_slate.py")
+        spec = importlib.util.spec_from_file_location("build_slate_pool_members_under_test", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.tmp = Path(self._tmp.name)
+        self.mod = self._module()
+        self.salary = self.tmp / "salary.csv"
+        pool_salary_csv(self.salary)
+
+    def _pool(self, *, platoon="default", feed=None, **kwargs):
+        if platoon == "default":
+            platoon = pool_platoon_json()
+        return lda.build_slate_pool(
+            self.salary, feed if feed is not None else pool_lineups_feed(),
+            platoon_json=platoon, **kwargs)
+
+    def _id_of(self, name):
+        with open(self.salary, newline="") as fh:
+            return {r["Name"]: r["ID"] for r in csv.DictReader(fh)}[name]
+
+    # -- membership ---------------------------------------------------------- #
+
+    def test_every_pool_row_is_listed_sorted_with_one_source_each(self):
+        import copy
+        pool = copy.deepcopy(self._pool())
+        # Reversed on purpose: the fixture's rows are already in id order, so a record
+        # that forgot to sort would pass on the natural order.
+        pool["projection_rows"] = list(reversed(pool["projection_rows"]))
+        rec = self.mod.pool_members_record(pool, self.salary)
+        self.assertTrue(rec["recorded"])
+        row_ids = [str(r["Player_ID"]) for r in pool["projection_rows"]]
+        self.assertEqual(40, len(row_ids))
+        self.assertEqual(sorted(row_ids), rec["player_ids"])
+        self.assertEqual(40, rec["n_players"])
+        self.assertEqual(rec["player_ids"], list(rec["role_source"]),
+                         "role_source is in sorted id order, every id once")
+        self.assertEqual(40, sum(rec["role_source_counts"].values()))
+        self.assertEqual(sorted(rec["role_source_counts"]), list(rec["role_source_counts"]))
+
+    def test_each_source_is_the_carried_fact(self):
+        import copy
+        pool = self._pool()
+        rec = self.mod.pool_members_record(pool, self.salary)
+        by_team = {}
+        for row in pool["projection_rows"]:
+            by_team.setdefault(row["Team"], {})[str(row["Player_ID"])] = row
+        src = rec["role_source"]
+        for team in ("T1", "T2", "T3"):
+            hitters = [p for p, r in by_team[team].items() if "P" not in r["Position"].split("/")]
+            self.assertEqual({"confirmed_lineup"}, {src[p] for p in hitters}, team)
+            self.assertEqual(9, len(hitters))
+        t4_hitters = [p for p, r in by_team["T4"].items() if r["Position"] != "P"]
+        self.assertEqual({"platoon_projected"}, {src[p] for p in t4_hitters})
+        for team in ("T1", "T2", "T3", "T4"):
+            arms = [p for p, r in by_team[team].items() if r["Position"] == "P"]
+            self.assertEqual(["probable_sp"], [src[p] for p in arms])
+        self.assertEqual({"confirmed_lineup": 27, "platoon_projected": 9, "probable_sp": 4},
+                         rec["role_source_counts"])
+        # Precedence 1: a row that holds BOTH facts is confirmed (a posted lineup
+        # outranks a projected slot, R143 / R32).
+        both = copy.deepcopy(pool)
+        confirmed_id = both["run_slate_kwargs"]["confirmed_hitter_ids"][0]
+        both["run_slate_kwargs"]["platoon_order_by_player_id"] = {confirmed_id: 1}
+        self.assertEqual("confirmed_lineup", self.mod.pool_members_record(both)["role_source"][confirmed_id])
+        # Precedence 2: an arm the operator declared is declared, probable or not
+        # (LDA:2518 overwrites :2502 the same way).
+        ace, pen = self._id_of("T1 Ace"), self._id_of("T2 Pen1")
+        declared = self._pool(declared_pitchers={ace: "declared_probable_sp",
+                                                 pen: "viable_bulk_or_alt_sp"})
+        drec = self.mod.pool_members_record(declared, self.salary)
+        self.assertEqual("declared_pitcher", drec["role_source"][ace])
+        self.assertEqual("declared_pitcher", drec["role_source"][pen])
+        self.assertEqual({"confirmed_lineup": 27, "declared_pitcher": 2,
+                          "platoon_projected": 9, "probable_sp": 3}, drec["role_source_counts"])
+
+    def test_a_row_intake_carried_no_fact_for_is_unknown_never_a_guess(self):
+        # No platoon reference: T4's TBD side falls to the top nine by APPG, which is a
+        # real fill that intake carries no per-player fact for.
+        pool = self._pool(platoon=None)
+        self.assertEqual("fallback_top9_appg", pool["pool_report"]["teams"]["T4"]["status"])
+        rec = self.mod.pool_members_record(pool, self.salary)
+        t4 = [str(r["Player_ID"]) for r in pool["projection_rows"]
+              if r["Team"] == "T4" and r["Position"] != "P"]
+        self.assertEqual(9, len(t4))
+        self.assertEqual({"unknown"}, {rec["role_source"][p] for p in t4})
+        self.assertEqual({"confirmed_lineup": 27, "probable_sp": 4, "unknown": 9},
+                         rec["role_source_counts"])
+        # A caller that handed intake's rows and nothing else: every row, arms
+        # included, is unknown. Position, APPG and salary never stand in for a fact.
+        bare = {"projection_rows": pool["projection_rows"]}
+        brec = self.mod.pool_members_record(bare)
+        self.assertEqual({"unknown": 40}, brec["role_source_counts"])
+
+    def test_the_excluded_list_is_whole_not_capped_at_fifty(self):
+        rows = [{"Player_ID": str(30000 + i), "Excluded": i < 60, "Position": "OF", "Team": "T1"}
+                for i in range(70)]
+        rec = self.mod.pool_members_record({"projection_rows": rows})
+        self.assertEqual([str(30000 + i) for i in range(60)], rec["excluded_player_ids"])
+        # And on a real restricted pool the record names the same ids the report counts.
+        salary = self.tmp / "excl.csv"
+        R289SalaryExcludedColumnTests._salary_with_excluded(salary)
+        pool = lda.build_slate_pool(salary, pool_lineups_feed(), platoon_json=pool_platoon_json())
+        banned = sorted(str(r["Player_ID"]) for r in pool["projection_rows"] if r["Excluded"])
+        rec = self.mod.pool_members_record(pool, salary)
+        self.assertEqual(banned, rec["excluded_player_ids"])
+        self.assertEqual(pool["pool_report"]["excluded_column"]["applied"], len(banned))
+        self.assertEqual(40, rec["n_players"], "operator-excluded rows stay in the basis")
+
+    def test_team_status_is_the_pool_reports_verbatim(self):
+        pool = self._pool()
+        rec = self.mod.pool_members_record(pool, self.salary)
+        expected = {t: v["status"] for t, v in pool["pool_report"]["teams"].items()}
+        self.assertEqual(expected, rec["team_status"])
+        self.assertEqual({"confirmed", "platoon"}, set(rec["team_status"].values()))
+
+    # -- the record is a copy -------------------------------------------------- #
+
+    def test_the_record_is_a_read_only_copy_and_the_old_block_is_unchanged(self):
+        """The negative control for "the record is not an input". The pool is
+        deep-copied before and compared after, and the seven keys the block carried
+        before R342(c) are rebuilt by hand from the same report and must be equal."""
+        import copy
+        pool = self._pool()
+        before = json.dumps(copy.deepcopy(pool), sort_keys=True, default=str)
+        report = pool["pool_report"]
+        block = self.mod.pool_brief_block(report, pool, self.salary)
+        self.assertEqual(before, json.dumps(pool, sort_keys=True, default=str),
+                         "building the record changed the pool")
+        old = {"teams": len(report.get("teams") or {}),
+               "platoon_source": pool.get("platoon_source"),
+               "warnings": report.get("warnings") or [],
+               "blockers": report.get("blockers") or [],
+               "opposing_probables_incomplete": report.get("opposing_probables_incomplete") or {},
+               "dk_batting_order": report.get("dk_batting_order"),
+               "excluded_column": report.get("excluded_column") or {}}
+        self.assertEqual(old, {k: v for k, v in block.items() if k != "members"})
+        self.assertEqual({"members"}, set(block) - set(old))
+        json.dumps(block)      # a brief is JSON: the record must serialise as it stands
+
+    def test_a_malformed_pool_still_gives_a_block_with_a_named_failure(self):
+        """The brief writer must not lose a build to its record
+        (test_showdown still calls `pool_brief_block({}, {})`)."""
+        block = self.mod.pool_brief_block({}, {})
+        self.assertFalse(block["members"]["recorded"])
+        self.assertIn("projection_rows", block["members"]["reason"])
+        bad = self.mod.pool_members_record({"projection_rows": [{"Name": "no id"}]})
+        self.assertFalse(bad["recorded"])
+        self.assertIn("KeyError", bad["reason"])
+
+    def test_the_salary_sha_is_the_bytes_of_the_file_and_null_when_unreadable(self):
+        pool = self._pool()
+        rec = self.mod.pool_members_record(pool, self.salary)
+        self.assertEqual(hashlib.sha256(self.salary.read_bytes()).hexdigest(),
+                         rec["salary_sha256"])
+        self.assertIsNone(self.mod.pool_members_record(pool, self.tmp / "gone.csv")["salary_sha256"])
+        self.assertIsNone(self.mod.pool_members_record(pool)["salary_sha256"])
+
+    def test_the_leverage_off_payload_is_byte_unchanged(self):
+        """The task's named control: with no leverage the engine's report is still
+        exactly the off payload (and solver keys alone attach nothing). The record
+        lives in the brief's pool block now, so this module is untouched."""
+        frame = pd.DataFrame({"Player_ID": ["1"], "Position": ["OF"]})
+        _, off = epi.apply_leverage_ownership(frame, None)
+        self.assertEqual({"applied": False, "reason": "no leverage supplied"}, off)
+        _, keys_only = epi.apply_leverage_ownership(frame, {"max_cumulative_ownership_pct": 90})
+        self.assertEqual({"applied": False, "reason": "no leverage supplied"}, keys_only)
+
+    # -- the brief, through run_classic ---------------------------------------- #
+
+    def _brief(self, **overrides):
+        wiring = DeadlineGovernorWiringTests(
+            "test_the_anti_correlation_flag_reaches_the_controls_the_validator_grades")
+        wiring.setUp()
+        self.addCleanup(wiring.doCleanups)
+        good = {"passed": True, "run_id": "r1", "workflow_valid": True,
+                "selection_certified": True, "allocation_certified": True,
+                "delivered_path": str(wiring._delivered_csv())}
+        code, brief, _calls, err = wiring._run(30, refusal=good, args_overrides=overrides or None)
+        self.assertEqual(0, code, err[-600:])
+        return brief, wiring
+
+    def test_the_brief_carries_the_record_through_run_classic_on_both_bank_strategies(self):
+        """The executed control for "the frame the solver read": the ids in the
+        record equal the ids `run_slate` was HANDED, on the direct bank and on the
+        sliced one (R415: naming a cap selects it), with `--leverage` off. One
+        brief dict feeds both strategies, which is why one record serves both."""
+        for overrides, strategy in (({}, "direct"), ({"bank_max_candidates": 12}, "sliced_bank")):
+            with self.subTest(strategy=strategy):
+                brief, wiring = self._brief(**overrides)
+                self.assertEqual(strategy, brief["solve"]["strategy"])
+                members = brief["pool"]["members"]
+                handed = sorted(str(r["Player_ID"])
+                                for r in wiring.solve_kwargs[0]["projection_rows"])
+                self.assertTrue(members["recorded"])
+                self.assertEqual(handed, members["player_ids"])
+                self.assertEqual(60, members["n_players"])
+                self.assertEqual({"confirmed_lineup": 54, "probable_sp": 6},
+                                 members["role_source_counts"])
+                self.assertEqual(
+                    hashlib.sha256(wiring._SALARY.read_bytes()).hexdigest(),
+                    members["salary_sha256"])
+                self.assertEqual({"applied": False, "reason": "no --leverage supplied"},
+                                 brief["leverage"],
+                                 "the record is there with leverage off")
+
+
 class BuildSlatePoolTests(unittest.TestCase):
     def _pool(self, tmp: str, feed=None, platoon="default", postponed_teams=(), **kwargs):
         salary = Path(tmp) / "salary.csv"
@@ -22363,6 +22590,347 @@ class OwnershipSavedGradeTests(unittest.TestCase):
         self.assertEqual(0, code)
         self.assertIn("1 Classic contest(s)", out.getvalue())
         self.assertIn(f"outputs/{self.DATE}/ownership_pred_a.json", out.getvalue())
+
+
+class OwnershipRecordedPoolGradeTests(unittest.TestCase):
+    """R342(c). `--saved` scores THE pool when a brief recorded it, and says which pool it used.
+
+    The saved-grade fixtures are `OwnershipSavedGradeTests`'s own, borrowed (not copied), and
+    the pool record is the production `pool_members_record` run on a real `build_slate_pool`,
+    written into `outputs/<date>/` the way BUILD writes a brief, then edited by hand where a
+    test needs a pool that differs from the proxy. Every fixture is a temp skeleton (R155).
+    """
+
+    DATE = OwnershipSavedGradeTests.DATE
+    CID = OwnershipSavedGradeTests.CID
+    GREEK = OwnershipSavedGradeTests.GREEK
+    BENCH = OwnershipSavedGradeTests.BENCH
+    NAMES = OwnershipSavedGradeTests.NAMES
+    _tool = staticmethod(OwnershipSavedGradeTests._tool)
+    setUp = OwnershipSavedGradeTests.setUp
+    _salary = OwnershipSavedGradeTests._salary
+    _save = OwnershipSavedGradeTests._save
+    _lineup = OwnershipSavedGradeTests._lineup
+    _standings = OwnershipSavedGradeTests._standings
+    _record = OwnershipSavedGradeTests._record
+    _grade = OwnershipSavedGradeTests._grade
+
+    # -- fixtures -------------------------------------------------------------
+
+    @staticmethod
+    def _bs():
+        import importlib.util
+        path = REPO / "skills" / "generate-lineups" / "scripts" / "build_slate.py"
+        spec = importlib.util.spec_from_file_location("build_slate_recorded_pool_grade", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def _members(self, salary):
+        """The production record, from a real pool build on the fixture's salary file."""
+        pool = lda.build_slate_pool(str(salary), {"games": []})
+        return self._bs().pool_members_record(pool, salary)
+
+    @staticmethod
+    def _ids(salary):
+        with open(salary, newline="", encoding="utf-8") as fh:
+            return {r["Name"]: r["ID"] for r in csv.DictReader(fh)}
+
+    @staticmethod
+    def _with_sources(members, changes):
+        """``members`` with {player id: source, or None to drop} applied; ids, order and
+        counts are kept consistent, as the writer keeps them."""
+        import copy
+        out = copy.deepcopy(members)
+        source = dict(out["role_source"])
+        for pid, value in changes.items():
+            if value is None:
+                source.pop(pid, None)
+            else:
+                source[pid] = value
+        counts: dict = {}
+        for value in source.values():
+            counts[value] = counts.get(value, 0) + 1
+        out.update(player_ids=sorted(source), n_players=len(source),
+                   role_source={p: source[p] for p in sorted(source)},
+                   role_source_counts=dict(sorted(counts.items())))
+        return out
+
+    def _brief(self, members, *, name="build_brief.json", tag="a", date=None,
+               run_id="20260816T200000Z_r1", leverage_sha=None, pool_block=True,
+               payload_date=None):
+        date = date or self.DATE
+        payload = {"date": payload_date or date, "slate": {"tag": tag}, "run_id": run_id}
+        if pool_block:
+            payload["pool"] = {"members": members}
+        if leverage_sha is not None:
+            payload["leverage"] = {"applied": True, "sha256": leverage_sha}
+        path = self.root / "outputs" / date / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload), encoding="utf-8")
+        return path
+
+    def _differing_pool(self, salary):
+        """A recorded pool that is NOT the proxy's: Alpha Nyy dropped, a bench bat on a
+        projected slot, an arm the proxy never flags declared, a bench bat of unknown source."""
+        ids = self._ids(salary)
+        return self._with_sources(self._members(salary), {
+            ids["Alpha Nyy"]: None, ids["Zulu Nyy"]: "platoon_projected",
+            ids["Rookie Nyy"]: "declared_pitcher", ids["Yankee Bos"]: "unknown"})
+
+    # -- the join and the basis -------------------------------------------------
+
+    def test_a_recorded_pool_is_the_pool_scored_and_the_output_says_so(self):
+        salary = self._salary()
+        self._save(salary)
+        self._standings()
+        without = self._grade()
+        self.assertEqual("proxy", without["pool_basis"]["used"])
+        self.assertNotIn("pool_recorded", without)
+        self._brief(self._differing_pool(salary), run_id="20260816T200000Z_abc")
+        out = self._grade()
+        basis = out["pool_basis"]
+        self.assertEqual("recorded", basis["used"])
+        self.assertEqual("slate_tag", basis["joined_by"])
+        self.assertEqual("build_brief.json", basis["brief"])
+        self.assertEqual("20260816T200000Z_abc", basis["run_id"])
+        self.assertEqual(22, out["pool_recorded"]["rows"], "the recorded pool, not the proxy's 20")
+        self.assertEqual(20, out["pool_proxy"]["rows"], "the proxy is still emitted, unrelabeled")
+        self.assertEqual({"confirmed_lineup": 17, "declared_pitcher": 1, "platoon_projected": 1,
+                          "probable_sp": 2, "unknown": 1}, basis["role_source_counts"])
+        self.assertEqual((22, 0, 0), (basis["recorded_ids_in_saved_file"],
+                                      basis["recorded_ids_not_in_saved_file"],
+                                      basis["excluded_in_pool"]))
+        self.assertTrue(out["pool_recorded"]["saved_rescaled"]["budget"]["on_budget"])
+        # The negative control: recording a pool changes no figure the proxy and the
+        # whole file already carried.
+        self.assertEqual(without["pool_proxy"], out["pool_proxy"])
+        self.assertEqual(without["whole_file"], out["whole_file"])
+
+    def test_no_brief_grades_on_the_proxy_and_says_why(self):
+        self._save(self._salary())
+        self._standings()
+        out = self._grade()
+        self.assertEqual("GRADED", out["status"])
+        self.assertEqual("proxy", out["pool_basis"]["used"])
+        self.assertIn(f"no brief in outputs/{self.DATE}/ records a pool", out["pool_basis"]["reason"])
+        self.assertIn("0 brief file(s) read", out["pool_basis"]["reason"])
+        self.assertEqual(20, out["pool_proxy"]["rows"])
+
+    def test_a_brief_without_a_pool_record_is_named_and_the_proxy_used(self):
+        salary = self._salary()
+        self._save(salary)
+        self._standings()
+        self._brief(None, pool_block=False)                       # a brief written before R342(c)
+        failed = self._members(salary)
+        failed["recorded"] = False                                # a record that says it failed,
+        self._brief(failed, name="build_brief_a.json")            # whatever else it carries
+        out = self._grade()
+        self.assertEqual("proxy", out["pool_basis"]["used"])
+        self.assertIn("2 brief file(s) read", out["pool_basis"]["reason"])
+        self.assertIn("records a pool", out["pool_basis"]["reason"])
+        self.assertNotIn("pool_recorded", out)
+
+    def test_a_brief_for_another_slate_tag_or_date_is_not_joined(self):
+        salary = self._salary()
+        self._save(salary)
+        self._standings()
+        members = self._members(salary)
+        members["salary_sha256"] = "0" * 64        # and no sha fallback either
+        self._brief(members, tag="zzz")
+        self._brief(members, tag="a", date="2026-08-17")             # another date's folder
+        self._brief(members, tag="a", name="build_brief_copied.json",
+                    payload_date="2026-08-17")                       # another slate's brief, copied in
+        out = self._grade()
+        self.assertEqual("proxy", out["pool_basis"]["used"])
+        self.assertIn("none carries slate tag 'a'", out["pool_basis"]["reason"])
+        self.assertIn("1 brief(s)", out["pool_basis"]["reason"], "only the zzz brief is a record here")
+        self.assertNotIn("pool_recorded", out)
+
+    def test_a_malformed_brief_never_costs_the_contest_its_proxy_grade(self):
+        """`grade_saved_one` turns an exception into GRADE_ERROR for the WHOLE contest, so a
+        brief that joins and then cannot be scored must degrade to the proxy by name, not
+        take (b1)'s grade down with it."""
+        salary = self._salary()
+        self._save(salary)
+        self._standings()
+        members = self._members(salary)
+        members["excluded_player_ids"] = 5                        # a record that joins and cannot be scored
+        self._brief(members)
+        out = self._grade()
+        self.assertEqual("GRADED", out["status"], out.get("refused"))
+        self.assertEqual("proxy", out["pool_basis"]["used"])
+        self.assertIn("could not be read or scored", out["pool_basis"]["reason"])
+        self.assertNotIn("pool_recorded", out)
+        self.assertEqual(20, out["pool_proxy"]["rows"])
+
+    def test_the_tag_wins_and_the_sha_is_only_a_fallback(self):
+        salary = self._salary()
+        self._save(salary)
+        self._standings()
+        members = self._members(salary)
+        ids = self._ids(salary)
+        by_tag = self._with_sources(members, {ids["Alpha Nyy"]: None})
+        by_tag["salary_sha256"] = "e" * 64                             # the tag's brief: another download
+        self._brief(by_tag, name="build_brief.json", tag="a", run_id="by_tag")
+        self._brief(members, name="build_brief_other.json", tag="other", run_id="by_sha")
+        basis = self._grade()["pool_basis"]
+        self.assertEqual("recorded", basis["used"], basis["reason"])
+        self.assertEqual(("slate_tag", "by_tag"), (basis["joined_by"], basis["run_id"]))
+        self.assertEqual(19, basis["recorded_ids_in_saved_file"])
+
+    def test_an_untagged_prediction_joins_by_the_salary_sha_and_says_so(self):
+        salary = self._salary()
+        self._save(salary)
+        self._standings()
+        self._brief(self._members(salary), tag="")      # the build's tag does not match, the bytes do
+        out = self._grade()
+        self.assertEqual("recorded", out["pool_basis"]["used"])
+        self.assertEqual("salary_sha256", out["pool_basis"]["joined_by"])
+        self.assertTrue(out["pool_basis"]["salary_sha_match"])
+
+    def test_byte_identical_records_are_one_match(self):
+        salary = self._salary()
+        self._save(salary)
+        self._standings()
+        members = self._members(salary)
+        self._brief(members, name="build_brief_a.json", run_id="r1")
+        self._brief(members, name="build_brief.json", run_id="r1")
+        out = self._grade()
+        self.assertEqual("recorded", out["pool_basis"]["used"])
+        self.assertEqual(["build_brief.json", "build_brief_a.json"], out["pool_basis"]["briefs"])
+        self.assertEqual("build_brief.json", out["pool_basis"]["brief"])
+
+    def test_two_distinct_records_are_named_never_picked(self):
+        salary = self._salary()
+        self._save(salary)
+        self._standings()
+        members = self._members(salary)
+        ids = self._ids(salary)
+        self._brief(members, name="build_brief.json")
+        self._brief(self._with_sources(members, {ids["Alpha Nyy"]: None}), name="build_brief_late.json")
+        out = self._grade()
+        self.assertEqual("proxy", out["pool_basis"]["used"])
+        self.assertTrue(out["pool_basis"]["reason"].startswith("AMBIGUOUS: 2 different recorded pools"))
+        self.assertIn("build_brief.json", out["pool_basis"]["reason"])
+        self.assertIn("build_brief_late.json", out["pool_basis"]["reason"])
+        self.assertNotIn("pool_recorded", out)
+
+    def test_a_recorded_id_the_saved_file_lacks_is_counted(self):
+        salary = self._salary()
+        self._save(salary)
+        self._standings()
+        members = self._with_sources(self._members(salary), {"99999999": "platoon_projected"})
+        self._brief(members)
+        basis = self._grade()["pool_basis"]
+        self.assertEqual("recorded", basis["used"])
+        self.assertEqual(21, basis["recorded_ids"])
+        self.assertEqual(20, basis["recorded_ids_in_saved_file"])
+        self.assertEqual(1, basis["recorded_ids_not_in_saved_file"])
+
+    def test_the_two_shas_are_confirmation_flags_and_never_a_gate(self):
+        salary = self._salary()
+        saved = self._save(salary)
+        self._standings()
+        members = self._members(salary)
+        members["salary_sha256"] = "f" * 64                       # a different download: still joins
+        file_sha = hashlib.sha256(saved.read_bytes()).hexdigest()
+        self._brief(members, leverage_sha=file_sha)
+        basis = self._grade()["pool_basis"]
+        self.assertEqual("recorded", basis["used"])
+        self.assertIs(False, basis["salary_sha_match"])
+        self.assertIs(True, basis["prediction_sha_confirmed"])
+        self._brief(members, leverage_sha="0" * 64)
+        basis = self._grade()["pool_basis"]
+        self.assertEqual("recorded", basis["used"], "a contradicting leverage sha does not refuse the pool")
+        self.assertIs(False, basis["prediction_sha_confirmed"])
+        self._brief(members)                                      # no leverage block at all
+        self.assertIsNone(self._grade()["pool_basis"]["prediction_sha_confirmed"])
+
+    # -- the rows ---------------------------------------------------------------
+
+    def test_role_known_follows_the_recorded_source_and_unknown_is_not_known(self):
+        tool = self._tool()
+        rows = [{"pid": str(i), "pool": "hitter", "predicted": 1.0, "actual": 0.0,
+                 "rostered": False, "role_known": True} for i in range(1, 8)]
+        sources = {"1": "confirmed_lineup", "2": "probable_sp", "3": "declared_pitcher",
+                   "4": "platoon_projected", "5": "unknown", "6": "confirmed_lineup"}
+        kept, account = tool.recorded_pool_rows(rows, {"role_source": sources,
+                                                       "excluded_player_ids": ["2"]})
+        self.assertEqual(["1", "2", "3", "4", "5", "6"], [r["pid"] for r in kept],
+                         "a saved row the record does not name is not in the pool")
+        self.assertEqual([True, True, True, False, False, True], [r["role_known"] for r in kept])
+        self.assertEqual("platoon_projected", kept[3]["role_source"])
+        self.assertEqual(1, account["excluded_in_pool"])
+        self.assertEqual(6, account["recorded_ids_in_saved_file"])
+
+    def test_excluded_rows_stay_in_and_are_counted(self):
+        salary = self._salary()
+        self._save(salary)
+        self._standings()
+        ids = self._ids(salary)
+        members = self._members(salary)
+        members["excluded_player_ids"] = sorted([ids["Bravo Nyy"], ids["Charlie Nyy"]])
+        self._brief(members)
+        out = self._grade()
+        self.assertEqual(20, out["pool_recorded"]["rows"], "R342(a)'s basis keeps an excluded row in")
+        self.assertEqual(2, out["pool_basis"]["excluded_in_pool"])
+
+    # -- the summary and the report -------------------------------------------
+
+    def _dates(self, recorded=()):
+        results = []
+        for i, day in enumerate(("2026-08-14", "2026-08-15", "2026-08-16", "2026-08-17",
+                                 "2026-08-18")):
+            salary = self._salary(date=day)
+            self._save(salary, date=day, generated=f"{day}T20:00:00Z")
+            stale = self.root / "outputs" / day / "build_brief.json"     # a scenario's own leftover
+            if day not in recorded and stale.exists():
+                stale.unlink()
+            if day in recorded:
+                self._brief(self._members(salary), date=day)
+            nyy = [f"{g} Nyy" for g in self.GREEK]
+            rotate = nyy[i:] + nyy[:i]
+            cid = f"1{i}1111111"
+            self._standings(date=day, cid=cid, entries=[
+                self._lineup(rotate[:8]), self._lineup(rotate[:8]), self._lineup(rotate[1:9])])
+            results.append(self._grade(record=self._record(date=day, cid=cid),
+                                       names={cid: "MLB $5 Double Up"}))
+        return results
+
+    def test_the_report_states_the_basis_per_contest_and_never_averages_the_two(self):
+        tool = self._tool()
+        results = self._dates(recorded=("2026-08-14", "2026-08-17"))
+        summary = tool.summarize_saved(results)
+        self.assertEqual({"recorded": 2, "proxy": 3}, summary["pool_basis"])
+        gate = summary["challenger"]["gate"]
+        self.assertEqual(["whole_file", "pool_proxy", "pool_recorded"], list(gate))
+        self.assertEqual(2, gate["pool_proxy"]["contests"], "the proxy is every held-out contest")
+        self.assertEqual(1, gate["pool_recorded"]["contests"],
+                         "the recorded gate is the recorded held-out contests only")
+        summary["archetype_source"] = "a test map"
+        text = tool.saved_report(results, summary, "2026-10-05")
+        for needle in ("**Pool basis (R342(c)).** 2 of 5 contest(s)", "recorded (slate_tag)",
+                       "| proxy |", "## Contests scored on a RECORDED pool",
+                       "### `pool_recorded` (comparator: `saved_rescaled`, 1 held-out contests)",
+                       "never averaged", "NOT the build's pool"):
+            self.assertIn(needle, text)
+        # Recorded only on a TRAIN date: there is no held-out recorded contest, so no gate block.
+        train_only = tool.summarize_saved(self._dates(recorded=("2026-08-14",)))
+        self.assertEqual({"recorded": 1, "proxy": 4}, train_only["pool_basis"])
+        self.assertEqual(["whole_file", "pool_proxy"], list(train_only["challenger"]["gate"]))
+
+    def test_without_any_record_the_report_is_the_b1_report_plus_the_basis_line(self):
+        tool = self._tool()
+        results = self._dates()
+        summary = tool.summarize_saved(results)
+        self.assertEqual({"recorded": 0, "proxy": 5}, summary["pool_basis"])
+        self.assertEqual(["whole_file", "pool_proxy"], list(summary["challenger"]["gate"]))
+        summary["archetype_source"] = "a test map"
+        text = tool.saved_report(results, summary, "2026-10-05")
+        self.assertIn("**Pool basis (R342(c)).** 0 of 5 contest(s)", text)
+        self.assertNotIn("## Contests scored on a RECORDED pool", text)
+        self.assertNotIn("pool_recorded", text.replace("`pool_recorded` is scored exactly as", ""))
 
 
 class NamedProbableWithNoF4InputTests(unittest.TestCase):
