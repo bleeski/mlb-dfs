@@ -1008,7 +1008,8 @@ def run_post_swap_preflight(entries: Path, parent, salary: Path, sha: str,
 
 def deliver_swap(args, result: dict, out: Path, salary: Path, swap_parent,
                  contest_shapes: dict, after_rosters: dict, downgraded: list,
-                 controls: dict, feed_path=None, declared_pitchers=None) -> int:
+                 controls: dict, feed_path=None, declared_pitchers=None,
+                 exempted=None) -> int:
     """Everything after a passing joint solve: present, promote, record, ship.
 
     R414. Split out of `main()` so a test can drive every later-failure
@@ -1127,7 +1128,11 @@ def deliver_swap(args, result: dict, out: Path, salary: Path, swap_parent,
         # swap relaxes on its own authority: a downgrade taken anyway.
         controls=controls_for_report(
             {k: v for k, v in controls.items() if k != "time_limit"}),
-        relaxations={"downgrades_accepted": len(downgraded)},
+        # R472. A downgrade the standings exempted is not one the operator
+        # accepted: counted on its own key, the file still review-grade.
+        relaxations=({"downgrades_accepted": len(downgraded)} if not exempted else
+                     {"downgrades_accepted": len(downgraded) - len(exempted),
+                      "downgrades_exempted_by_standings": len(exempted)}),
         # R388(d). A swap refines the file Ben entered, so an UNCERTIFIED
         # refinement records even over a later passing build's row.
         refinement=True,
@@ -1253,6 +1258,23 @@ def main() -> int:
                     help="write the file even when a swapped entry scores below the "
                          "lineup it replaced under its own contest shape. Recorded "
                          "on stderr; there is no silent path.")
+    ap.add_argument("--standings", action="append", default=None, metavar="CSV_OR_ZIP",
+                    help="R472. A DK standings export (.csv or .zip) for a contest in "
+                         "this file, by explicit path (repeat for several contests). "
+                         "Read-only; the swap prints each authorized entry's verdict "
+                         "(live_for_target / cash_viable / out / unknown, review "
+                         "proxies) and exempts a live_for_target entry in a gpp or "
+                         "wta contest from the downgrade REFUSAL, provided the chosen "
+                         "lineup still reaches the target; the file still ships "
+                         "review-grade. Nothing else is exempted (not the consensus-"
+                         "pair guard), and an unusable file means no exemption. The "
+                         "live export format is unverified; see tools/standings_read.py.")
+    ap.add_argument("--paid-places", dest="paid_places", default=None,
+                    help="with --standings: the contest page's paid places, N or "
+                         "<contest_id>=N,...; without it the cash line is unknown")
+    ap.add_argument("--target-rank", dest="target_rank", type=int, default=None,
+                    help="with --standings: the rank whose points define 'live for "
+                         "the target' (default 1)")
     ap.add_argument("--allow-parent-mismatch", action="store_true",
                     help="proceed when --parent-entries matches no run's export "
                          "(R268(b): the parent is found by the file's bytes, so "
@@ -1340,6 +1362,31 @@ def main() -> int:
               f"else. Nothing was read and no swap was attempted.",
               file=sys.stderr)
         return 4
+    # R472. What the operator typed is checked here, before anything is read, by the
+    # file's own rule for a named input; whether a file that exists is USABLE is
+    # decided later and only ever degrades to today's refusal.
+    standings_target_rank = 1
+    if args.standings or args.paid_places is not None or args.target_rank is not None:
+        if not args.standings:
+            print("--paid-places and --target-rank apply only with --standings. "
+                  "Nothing was read and no swap was attempted.", file=sys.stderr)
+            return 4
+        for standings_path in args.standings:
+            if not Path(standings_path).is_file():
+                print(f"missing input: --standings {standings_path} is not a file. "
+                      f"Nothing was read and no swap was attempted.", file=sys.stderr)
+                return 4
+        _sr = _standings_module()
+        try:
+            _sr.check_paid_places_scope(_sr.parse_paid_places(args.paid_places),
+                                        len(args.standings))
+            if args.target_rank is not None:
+                if args.target_rank < 1:
+                    raise _sr.StandingsFormatError("--target-rank must be a positive integer")
+                standings_target_rank = args.target_rank
+        except _sr.StandingsFormatError as exc:
+            print(f"{exc}. Nothing was read and no swap was attempted.", file=sys.stderr)
+            return 4
 
     slate = REPO / "data" / "slates" / args.date
     # R29(4): the salary path was hardcoded to the shared, date-keyed staged
@@ -1727,6 +1774,12 @@ def main() -> int:
           f"re-certifies the whole portfolio, so this stage runs over every "
           f"entry, not only the authorized ones)")
 
+    # R472. The standings, read before the solve so the operator sees each entry's
+    # verdict even when the swap later refuses; None means no entry can be exempt.
+    standings_report = (_read_standings_for_swap(
+        args, requirements, parent_rosters, status, now, salary, swap_parent,
+        projections, standings_target_rank) if args.standings else None)
+
     result = run_late_swap(
         runs_root=str(REPO / "runs"),
         current_entries_csv=args.parent_entries,
@@ -1754,7 +1807,9 @@ def main() -> int:
         # what this one carried: a swap writes no brief.
         metadata={"declared_pitchers": dict(declared_pitchers),
                   "declared_pitcher_workload": dict(declared_workload),
-                  "declared_pitcher_evidence": dict(declared_evidence)},
+                  "declared_pitcher_evidence": dict(declared_evidence),
+                  **({"standings": standings_report["metadata_for_run"]}
+                     if standings_report is not None else {})},
         # R29(2): the downgrade check below can still refuse this file, and a
         # refused run must not leave the latest-run pointer naming it. Promotion
         # happens after the mirror, at the bottom of this function.
@@ -1809,10 +1864,35 @@ def main() -> int:
               f"({delta:+.2f})")
         if delta < 0:
             downgraded.append(f"{entry_id} [{shape}] {delta:+.2f}")
-    if downgraded and not args.accept_downgrade:
+    # R472. With --standings (and without --accept-downgrade, which subsumes it) a
+    # live_for_target entry whose chosen lineup still reaches the target is exempt
+    # from the REFUSAL below. It stays in `downgraded`: the file still ships
+    # review-grade (R386), and it is reported as exempted, never as "accepted".
+    exempted: list[str] = []
+    exempt_detail: dict = {}
+    refusable = downgraded
+    if standings_report is not None and downgraded and not args.accept_downgrade:
+        _sr = _standings_module()
+        try:
+            refusable, exempted, exempt_detail = _sr.partition_downgrades(
+                downgraded, standings_report,
+                {e: _sr.objective_class(s) for e, s in shape_by_entry.items()}, after_rosters)
+        except Exception as exc:  # noqa: BLE001 - an optional loosening never withholds the file
+            refusable, exempted, exempt_detail = downgraded, [], {}
+            print(f"STANDINGS NOT USED at the refusal: {type(exc).__name__}: {exc}; no "
+                  f"entry is exempt and the refusal is exactly what it is without "
+                  f"--standings", file=sys.stderr)
+        for line in exempted:
+            held = exempt_detail[line.split(" ", 1)[0]]
+            print(f"downgrade exempted by standings (live_for_target, the chosen "
+                  f"lineup still reaches the target; review proxy): {line}; points "
+                  f"{held['points']:.2f}, reach {held['reach']:.2f}, chosen reach "
+                  f"{held['chosen_reach']:.2f}, target {held['target_points']:.2f}",
+                  file=sys.stderr)
+    if refusable and not args.accept_downgrade:
         print("late swap refused: these entries score below the lineups they "
               "replaced:", file=sys.stderr)
-        for line in downgraded:
+        for line in refusable:
             print(f"  {line}", file=sys.stderr)
         print(f"the run record is at {result.get('run_dir')}; nothing was "
               f"mirrored to outputs/ and the latest-run pointer still names the "
@@ -1832,8 +1912,9 @@ def main() -> int:
         {str(r.entry_id): str(r.contest_id) for r in reserved_rows}, downgraded)
     if guard is not None:
         return guard
-    if downgraded:
-        print("downgrade accepted by --accept-downgrade: " + "; ".join(downgraded),
+    accepted = [line for line in downgraded if line not in exempted]
+    if accepted:
+        print("downgrade accepted by --accept-downgrade: " + "; ".join(accepted),
               file=sys.stderr)
 
     # R21: the fixed DKEntries_lateswap.csv silently overwrote the previous
@@ -1848,7 +1929,68 @@ def main() -> int:
     return deliver_swap(args, result, out, salary, swap_parent, contest_shapes,
                         after_rosters, downgraded, controls,
                         feed_path=(feed_path if dk_feed is None else None),
-                        declared_pitchers=declared_pitchers)
+                        declared_pitchers=declared_pitchers,
+                        exempted=exempted or None)
+
+
+def _standings_module():
+    """`tools/standings_read.py`, loaded only when ``--standings`` is given (the one
+    path that reads it), the way `retro` and `preflight_upload` are."""
+    tools_dir = str(Path(__file__).resolve().parent)
+    if tools_dir not in sys.path:
+        sys.path.insert(0, tools_dir)
+    import standings_read  # noqa: PLC0415
+    return standings_read
+
+
+def _read_standings_for_swap(args, requirements: list, parent_rosters: dict, status: dict,
+                             now, salary: Path, swap_parent, projections, target_rank: int):
+    """R472. The standings report for this swap's authorized entries, printed, or None.
+
+    None means NO entry is exempt and the swap runs exactly as it would without
+    ``--standings``: the flag can only loosen a refusal, so a file that cannot be used
+    (an unrecognised TimeRemaining, wrong header, Showdown, two files for one contest,
+    no contest id it can determine) is named and degrades, and never withholds the file
+    (delivery first). A file that reads but holds none of the authorized entries (the
+    wrong contest's export) does NOT return None: every entry then reports `unknown`
+    with the reason, and none is exempt. What the operator typed wrong was already
+    refused at exit 4. The seats are the parent file's own rows, so the roster being
+    refined is the one the standings' Lineup must match.
+    """
+    sr = _standings_module()
+    try:
+        from mlb_engine.intake.slate_intake_manager import parse_dk_salary_csv  # noqa: PLC0415
+        slate = sr.Slate({p.player_id: p for p in parse_dk_salary_csv(str(salary))},
+                         status["status_by_player_id"], now)
+        seats = []
+        for requirement in requirements:
+            entry_id = str(requirement["entry_id"])
+            roster = list(parent_rosters.get(entry_id) or [])
+            seats.append({
+                "entry_id": entry_id, "contest_id": str(requirement.get("contest_id") or ""),
+                "roster_ids": roster if len(roster) == len(sr.SLOT_TYPES) else None,
+                "problem": "the roster in the parent file is not ten players"})
+        parent_frame = None
+        if swap_parent is not None and swap_parent["current_matches_parent_export"]:
+            run_dir = Path(swap_parent["run_dir"])
+            try:
+                parent_frame = sr.frame_for_run(run_dir.parent, run_dir.name)
+            except sr.FrameUnavailable as exc:
+                print(f"standings: parent frame unavailable ({exc}); the in-hand swap "
+                      f"frame is the only ceiling source")
+        report = sr.swap_context(
+            standings_paths=args.standings, paid_places=args.paid_places,
+            target_rank=target_rank, seats=seats, slate=slate, parent_frame=parent_frame,
+            swap_frame=sr.frame_from_dataframe(projections), root=REPO)
+        report["metadata_for_run"] = sr.metadata_for_run(report)
+    except Exception as exc:  # noqa: BLE001 - an optional loosening never blocks the file
+        print(f"STANDINGS NOT USED: {type(exc).__name__}: {exc}; no entry is exempt and "
+              f"the downgrade refusal is exactly what it is without --standings",
+              file=sys.stderr)
+        return None
+    for line in sr.render(report):
+        print(line)
+    return report
 
 
 def _argv_date(argv) -> str:

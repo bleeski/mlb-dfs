@@ -4636,8 +4636,11 @@ class DeliveryRecordBytesTests(unittest.TestCase):
                  ("controls={\"max_shared_players\": share_cap",
                   "relaxations=showdown_relaxation_counts(")),
                 ("tools/late_swap.py", "record = record_delivery(",
+                 # R472: the dict is now split when the standings exempted an entry, so
+                 # the pin names the two keys and the unchanged no-standings shape.
                  ("controls=controls_for_report(",
-                  "relaxations={\"downgrades_accepted\": len(downgraded)}")),
+                  "relaxations=({\"downgrades_accepted\": len(downgraded)} if not exempted else",
+                  "\"downgrades_exempted_by_standings\": len(exempted)")),
                 ("mlb_engine/pipeline/execution_pipeline.py", "    return deliver(\n",
                  ("controls=result.get(\"merged_controls\")",
                   "strategy_state=manifest_strategy_state(result)")),
