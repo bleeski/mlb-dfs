@@ -3163,7 +3163,97 @@ def load_savant_table(path):
         return None
 
 
-def pool_brief_block(report: dict, pool: dict) -> dict:
+POOL_MEMBERS_BASIS = (
+    "every row of the intake pool: the rows run_slate and the sliced bank assemble "
+    "their frames from and R342(a) rescales over (operator-excluded rows included)")
+POOL_MEMBERS_LABEL = (
+    "a COPY of the pool's membership and what intake carried about each row, taken "
+    "after the solve from the pool object; a labeled record, never an input to a "
+    "solve, a cap or a gate. role_source is a carried fact or 'unknown', never a "
+    "guess: confirmed_lineup = in confirmed_hitter_ids; platoon_projected = not "
+    "confirmed and holding a slot in platoon_order_by_player_id; declared_pitcher = "
+    "an arm the operator declared (it outranks a probable); probable_sp = in "
+    "pitcher_roles and not declared (a DK or feed probable); unknown = none of "
+    "those (APPG-fallback hitters and posted-partial seeds without a platoon slot "
+    "land here, which intake does not tell apart per player; team_status says how "
+    "each side was filled)")
+
+
+def pool_members_record(pool: dict, salary_path=None) -> dict:
+    """R342(c). Which rows the build's POOL held, and what intake carried about each.
+
+    The saved pre-lock ownership file has a row for every salary player but cannot
+    say which of them the build kept, so `tools/ownership_grade_archive.py --saved`
+    graded a PROXY pool (the rows that had a recorded pre-lock role). This is the
+    record that lets it score THE pool. It rides the brief's ``pool`` block, which
+    is on every Classic brief, and not the ``leverage`` block the register named:
+    that block is present only on a ``--leverage`` build (2 of 192 briefs on the
+    2026-10-05 disk carry it) while `--saved` grades every saved prediction.
+
+    A read-only view of the intake pool, taken at brief time (after the solve), so
+    it cannot change the frame the solver read or a byte of the delivered file. It
+    reads only facts intake already returned (`confirmed_hitter_ids`,
+    `platoon_order_by_player_id`, `pitcher_roles` and the pool report's
+    `declared_arm_workload` and `teams`); intake is not asked for anything new, so
+    a row it carried no fact for is ``unknown``. ``player_ids`` and ``role_source``
+    are in sorted order (`mlb_engine.determinism.stable_union`), and
+    ``excluded_player_ids`` is the whole list (the report's own stops at 50).
+
+    Never raises: the brief writer must not lose a build to a malformed pool, so a
+    failure comes back as ``{"recorded": False, "reason": ...}``.
+    """
+    try:
+        from mlb_engine.determinism import stable_union
+        rows = (pool or {}).get("projection_rows")
+        if not isinstance(rows, (list, tuple)) or not rows:
+            return {"recorded": False, "reason": "the pool carries no projection_rows"}
+        kwargs = pool.get("run_slate_kwargs") or {}
+        report = pool.get("pool_report") or {}
+        confirmed = set(stable_union(kwargs.get("confirmed_hitter_ids")))
+        platoon = set(stable_union(list(kwargs.get("platoon_order_by_player_id") or {})))
+        roles = set(stable_union(list(kwargs.get("pitcher_roles") or {})))
+        declared = set(stable_union(
+            [a.get("player_id") for a in (report.get("declared_arm_workload") or [])]))
+        source: dict = {}
+        for row in rows:
+            pid = str(row["Player_ID"])
+            if pid in declared:
+                source[pid] = "declared_pitcher"
+            elif pid in roles:
+                source[pid] = "probable_sp"
+            elif pid in confirmed:
+                source[pid] = "confirmed_lineup"
+            elif pid in platoon:
+                source[pid] = "platoon_projected"
+            else:
+                source[pid] = "unknown"
+        ids = stable_union(list(source))
+        counts: dict = {}
+        for value in source.values():
+            counts[value] = counts.get(value, 0) + 1
+        try:
+            salary_sha = manifest_sha256(salary_path)
+        except OSError:
+            salary_sha = None
+        return {
+            "recorded": True,
+            "basis": POOL_MEMBERS_BASIS,
+            "n_players": len(ids),
+            "salary_sha256": salary_sha,
+            "player_ids": ids,
+            "role_source": {pid: source[pid] for pid in ids},
+            "role_source_counts": dict(sorted(counts.items())),
+            "excluded_player_ids": stable_union(
+                [r["Player_ID"] for r in rows if r.get("Excluded")]),
+            "team_status": {str(team): (rec or {}).get("status")
+                            for team, rec in sorted((report.get("teams") or {}).items())},
+            "label": POOL_MEMBERS_LABEL,
+        }
+    except Exception as exc:                            # noqa: BLE001
+        return {"recorded": False, "reason": f"{type(exc).__name__}: {exc}"}
+
+
+def pool_brief_block(report: dict, pool: dict, salary_path=None) -> dict:
     """The brief's ``pool`` block, from the engine's own pool_report.
 
     R190. This block carried four keys -- teams, platoon_source, warnings,
@@ -3197,6 +3287,12 @@ def pool_brief_block(report: dict, pool: dict) -> dict:
     into `SalaryPlayer.raw` (the R289 fixture reads 20 rows True through the
     front door), and nothing in this script rewrites the salary CSV (no
     `to_csv`, no `DictWriter`). This block was the whole of it.
+
+    R342(c). Fourth instance, and the fact was the pool itself: the brief said
+    how many teams were kept and not which players, so a grade of the ownership
+    prior could only guess the pool. ``members`` is the membership and what
+    intake carried about each row (`pool_members_record`); ``salary_path`` is the
+    file this build read, hashed into it.
     """
     return {
         "teams": len(report.get("teams") or {}),
@@ -3207,6 +3303,7 @@ def pool_brief_block(report: dict, pool: dict) -> dict:
             report.get("opposing_probables_incomplete") or {}),
         "dk_batting_order": report.get("dk_batting_order"),
         "excluded_column": report.get("excluded_column") or {},
+        "members": pool_members_record(pool, salary_path),
     }
 
 
@@ -5109,7 +5206,7 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
             "minutes_to_deadline": clock.get("minutes_to_deadline"),
             "salary_cross_check": (clock.get("salary_cross_check") or {}).get("agrees"),
         },
-        "pool": pool_brief_block(report, pool),
+        "pool": pool_brief_block(report, pool, salary),
         "exposure": exposure,
         "verification": checks,
         "controls_override_applied": args.controls_override,
