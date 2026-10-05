@@ -34,6 +34,34 @@ The swap also refuses at exit 3 when it would remove a contest's last lineup on 
 consensus SP pair its parent recorded (R469, `references/chalk_core_seat.md`);
 `--accept-downgrade` takes it and the file ships review-grade.
 
+### `--standings` (R472): the standings at the decision
+
+`--standings <contest-standings-<id>.csv|.zip>` (repeat for several contests;
+`--paid-places N` for one file or `<contest_id>=N,...`; `--target-rank k`, default 1)
+reads a DK standings export Ben downloaded, by explicit path, read-only, and prints
+per contest the points at #1, #10 and #100, the cash line, the %Drafted of started
+players, and each leader's open-pitcher inference, then per authorized entry a
+verdict: `live_for_target` (current points plus the projected Ceiling of every
+unstarted slot reaches the target rank's points), `cash_viable`, `out`, or `unknown`
+with the reason. Review proxies, never a prediction: Ceiling is a model prior from the
+parent run's `final/projections.csv`, and the live export's TimeRemaining and
+hidden-slot format are UNVERIFIED (0 of 516,804 archived rows are nonzero), so
+TimeRemaining is printed raw and feeds nothing. Rule: never lower a `cash_viable`
+entry's projection for leverage.
+
+What it changes: an entry that is `live_for_target` while still BEHIND the target, in
+a `gpp` or `wta` contest, whose CHOSEN lineup still reaches the target, is exempt from
+the downgrade refusal above (and nothing else: not the consensus-pair guard, not any
+V check, which all run before it). The file still ships review-grade
+(`review_grade_downgrade_accepted`); it is reported as `exempted by standings`, never
+as accepted by the flag, and the record counts it as
+`relaxations.downgrades_exempted_by_standings`. `--accept-downgrade` subsumes it. An
+absent `--standings` path or a typo'd flag is exit 4; a file that exists but cannot be
+used prints `STANDINGS NOT USED: <reason>` and the refusal is exactly what it is
+without the flag. `--dry-run` checks the `--standings` flags but returns before the
+verdicts are read; read them without a swap with `python tools/standings_read.py
+--help` (the standalone reader).
+
 ## The command
 
 ```bash
@@ -160,7 +188,8 @@ contract Session 08 gave `build_slate.py`. Codes:
   say which check failed. It is not upload-ready. Repair the failure
   (`tools/repair_entry.py` for a dead or locked player) and run the preflight
   again; nothing is withdrawn, and nothing was uploaded.
-- **3** — refused: a downgrade without `--accept-downgrade`, or a promotion
+- **3** — refused: a downgrade without `--accept-downgrade` (and not exempted by
+  `--standings`, R472), or a promotion
   another session's race beat (the file sits at its `DO_NOT_UPLOAD_` name,
   withdrawn, not delivered).
 - **7** — delivered a prior valid artifact after a LATER failure: a raising
@@ -184,7 +213,7 @@ The swap runs `preflight_upload.py` on the file it just wrote, in process, with
 read), and prints `referee: preflight_upload exit 0 ... verdict <verdict>` before
 it prints the upload line. Only `verdict upload_ready` means upload-ready;
 preflight also exits 0 for `review_ready`, which is what a downgrade taken with
-`--accept-downgrade` or a review-grade parent produces, and the line says so. Exit 5 is the swap saying it has no such verdict. Also
+`--accept-downgrade` (or exempted by `--standings`) or a review-grade parent produces, and the line says so. Exit 5 is the swap saying it has no such verdict. Also
 run `verify_export.py` below, because CLAUDE.md's two-referee clause is about two
 tools. Verify before handing it over. `preflight_upload.py` auto-resolves `--parent`
 from the manifest's supersession chain when it is omitted (R450), the same

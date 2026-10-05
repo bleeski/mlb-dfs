@@ -43976,3 +43976,1041 @@ class DeclaredPitcherEvidenceTests(unittest.TestCase):
         got, where = ls._parent_declaration_record(Path("."), "2026-07-10", parent)
         self.assertEqual(got["declared_pitcher_evidence"], {"111": "a"})
         self.assertIn("swap1", where)
+
+class StandingsReadTests(unittest.TestCase):
+    """R472 (roadmap Session 141). `tools/standings_read.py` reads a live DK
+    standings export for the late-swap decision.
+
+    SYNTHETIC FIXTURES, stated here because it is the load-bearing caveat: 0 of
+    the 516,804 archived standings rows carry a nonzero TimeRemaining, so the
+    LIVE format (its unit, how a hidden or open slot appears in a Lineup cell) has
+    never been seen. Every export below is written by this class in the archived
+    column layout; it checks the tool's arithmetic and its refusals, never that
+    DraftKings' live file looks like this.
+
+    The slate is the four-team pool fixture: T1@T2 started (23:05Z) and T3@T4 not
+    (01:05Z next day), the clock at 23:30Z, so T1/T2 players are locked and T3/T4
+    players are open. Ceilings: pitchers 20.0, hitters 10.0 unless a test says.
+    """
+
+    DATE = "2026-07-10"
+    AS_OF = datetime(2026, 7, 10, 23, 30, tzinfo=timezone.utc)
+    HEADER = ["Rank", "EntryId", "EntryName", "TimeRemaining", "Points", "Lineup", "",
+              "Player", "Roster Position", "%Drafted", "FPTS"]
+    LABEL_FRAGMENT = "Never a win rate, cash rate, ROI, edge or probability"
+
+    LOCKED_ALL = ["T1 Ace", "T2 Ace", "T1 Hitter1", "T1 Hitter2", "T1 Hitter3",
+                  "T1 Hitter4", "T1 Hitter5", "T2 Hitter6", "T2 Hitter7", "T2 Hitter8"]
+    # P1 locked (T1), P2 open (T3 Ace), C..SS locked (T1), the three OF open (T3).
+    OPEN4 = ["T1 Ace", "T3 Ace", "T1 Hitter1", "T1 Hitter2", "T1 Hitter3",
+             "T1 Hitter4", "T1 Hitter5", "T3 Hitter6", "T3 Hitter7", "T3 Hitter8"]
+
+    @staticmethod
+    def _tool():
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "standings_read_r472", REPO / "tools" / "standings_read.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.sr = self._tool()
+        self.salary, self.ids = self._salary_file()
+        self.slate = self._slate(self.salary)
+
+    # -- fixtures ------------------------------------------------------------ #
+
+    def _salary_file(self, salary_by_name=None, rename=None, name="DKSalaries.csv"):
+        path = self.root / name
+        pool_salary_csv(path)
+        with path.open(newline="", encoding="utf-8") as fh:
+            rows = list(csv.reader(fh))
+        for row in rows[1:]:
+            if row[8] in ("T3", "T4"):
+                row[6] = row[6].replace("07:05PM", "09:05PM")
+            if rename and row[2] in rename:
+                row[1] = row[1].replace(row[2], rename[row[2]])
+                row[2] = rename[row[2]]
+            if salary_by_name and row[2] in salary_by_name:
+                row[5] = str(salary_by_name[row[2]])
+        with path.open("w", newline="", encoding="utf-8") as fh:
+            csv.writer(fh).writerows(rows)
+        return path, {row[2]: row[3] for row in rows[1:]}
+
+    def _slate(self, salary, as_of=None):
+        feed = pool_lineups_feed(t4_confirmed=True)
+        feed["games"][1]["game_date_utc"] = "2026-07-11T01:05:00Z"
+        status = build_status_map_from_lineups_feed(feed, str(salary))
+        players = {p.player_id: p for p in parse_dk_salary_csv(str(salary))}
+        return self.sr.Slate(players, status["status_by_player_id"], as_of or self.AS_OF)
+
+    def _frame_csv(self, ceilings=None, drop=(), name="projections.csv"):
+        path = self.root / name
+        ceilings = dict(ceilings or {})
+        with path.open("w", newline="", encoding="utf-8") as fh:
+            writer = csv.writer(fh)
+            writer.writerow(["Player_ID", "Name", "Salary", "Floor", "Ceiling"])
+            for player_name, pid in sorted(self.ids.items(), key=lambda kv: int(kv[1])):
+                if player_name in drop:
+                    continue
+                default = 20.0 if "Ace" in player_name or "Pen" in player_name else 10.0
+                writer.writerow([pid, player_name, 3500, 1.0, ceilings.get(player_name, default)])
+        return path
+
+    def _cell(self, names):
+        slots = list(self.sr.SLOT_TYPES)
+        return " ".join(f"{slot} {n}" for slot, n in zip(slots, names))
+
+    def _write_standings(self, rows, name="contest-standings-900.csv", players=()):
+        """rows: (rank, entry_id, time_remaining, points, names_or_cell)."""
+        path = self.root / name
+        body = []
+        for i in range(max(len(rows), len(players))):
+            left = ["", "", "", "", "", ""]
+            if i < len(rows):
+                rank, eid, tr, pts, lineup = rows[i]
+                cell = lineup if isinstance(lineup, str) else self._cell(lineup)
+                left = [str(rank), str(eid), f"user{eid}", str(tr), str(pts), cell]
+            right = ["", "", "", ""]
+            if i < len(players):
+                pname, pos, pct, fpts = players[i]
+                right = [pname, pos, pct, str(fpts)]
+            body.append(left + [""] + right)
+        with path.open("w", newline="", encoding="utf-8-sig") as fh:
+            writer = csv.writer(fh)
+            writer.writerow(self.HEADER)
+            writer.writerows(body)
+        return path
+
+    def _field(self, extra=(), tr="0"):
+        rows = [(1, "9001", tr, 100.0, self.LOCKED_ALL), (2, "9002", tr, 95.0, self.LOCKED_ALL),
+                (3, "9003", tr, 85.0, self.LOCKED_ALL), (4, "9004", tr, 80.0, self.LOCKED_ALL),
+                (5, "7001", tr, 70.0, self.OPEN4), (6, "7002", tr, 40.0, self.OPEN4),
+                (7, "7003", tr, 10.0, self.OPEN4)]
+        return rows + list(extra)
+
+    def _seat(self, entry_id, names, contest_id="900"):
+        return {"entry_id": entry_id, "contest_id": contest_id,
+                "roster_ids": [self.ids[n] for n in names], "problem": ""}
+
+    def _seats(self):
+        return [self._seat("7001", self.OPEN4), self._seat("7002", self.OPEN4),
+                self._seat("7003", self.OPEN4)]
+
+    def _report(self, rows=None, seats=None, paid=4, k=1, ceilings=None, drop=(),
+                slate=None, leaders=10, players=()):
+        path = self._write_standings(rows if rows is not None else self._field(),
+                                     players=players)
+        standing = self.sr.read_standings(path)
+        frame = self.sr.load_frame(self._frame_csv(ceilings, drop))
+        return self.sr.build_report(
+            standings={"900": standing}, seats=seats if seats is not None else self._seats(),
+            slate=slate or self.slate, ceilings=self.sr.Ceilings([("parent", frame)]),
+            target_rank=k, paid_places=({"900": paid} if paid else {}),
+            leaders_n=leaders, root=self.root)
+
+    # -- reading: csv and zip, the by-name refusals ---------------------------- #
+
+    def test_a_csv_and_a_zip_read_identically_and_the_zip_is_never_extracted(self):
+        import zipfile
+        csv_path = self._write_standings(self._field())
+        zip_path = self.root / "contest-standings-900.zip"
+        with zipfile.ZipFile(zip_path, "w") as zf:
+            zf.write(csv_path, "contest-standings-900.csv")
+        before = sorted(p.name for p in self.root.iterdir())
+        a, b = self.sr.read_standings(csv_path), self.sr.read_standings(zip_path)
+        self.assertEqual(sorted(p.name for p in self.root.iterdir()), before,
+                         "reading a zip must not extract anything beside it")
+        self.assertEqual(a["contest_id"], "900")
+        self.assertEqual(b["contest_id"], "900")
+        self.assertEqual(a["entries"], b["entries"])
+        self.assertEqual(a["player_table"], b["player_table"])
+        self.assertEqual(len(a["entries"]), 7)
+        # Negative controls, each refused by name.
+        two = self.root / "two.zip"
+        with zipfile.ZipFile(two, "w") as zf:
+            zf.write(csv_path, "contest-standings-900.csv")
+            zf.write(csv_path, "contest-standings-901.csv")
+        none = self.root / "none.zip"
+        with zipfile.ZipFile(none, "w") as zf:
+            zf.writestr("readme.txt", "x")
+        junk = self.root / "contest-standings-902.zip"
+        junk.write_bytes(b"not a zip")
+        txt = self.root / "contest-standings-903.txt"
+        txt.write_text("x", encoding="utf-8")
+        for path, needle in ((two, "2 CSV member"), (none, "0 CSV member"),
+                             (junk, "not a readable zip"), (txt, "a .csv or a .zip")):
+            with self.assertRaises(self.sr.StandingsFormatError, msg=path.name) as ctx:
+                self.sr.read_standings(path)
+            self.assertIn(needle, str(ctx.exception))
+        with self.assertRaises(FileNotFoundError):
+            self.sr.read_standings(self.root)  # a directory is not a path the tool takes
+
+    def test_time_remaining_blank_zero_and_plain_numbers_pass_other_shapes_are_refused_by_name(self):
+        for cell in ("", "0", "300", "12.5"):
+            path = self._write_standings(self._field(tr=cell), name=f"contest-standings-9{len(cell)}1.csv")
+            got = self.sr.read_standings(path)
+            self.assertEqual({e["time_remaining"] for e in got["entries"]}, {cell})
+        for bad in ("1:30", "45 min", "-", "1,200", "N/A"):
+            path = self._write_standings(self._field(tr=bad), name="contest-standings-955.csv")
+            with self.assertRaises(self.sr.StandingsFormatError, msg=bad) as ctx:
+                self.sr.read_standings(path)
+            text = str(ctx.exception)
+            self.assertIn(repr(bad), text, "the offending cell is named")
+            self.assertIn("unverified", text)
+            self.assertIn("will not guess", text)
+
+    def test_a_showdown_export_is_refused_by_name_and_a_classic_one_is_not(self):
+        showdown = self._write_standings(
+            [(1, "1", "0", 90.0, "CPT T1 Ace UTIL T1 Hitter1 UTIL T1 Hitter2 UTIL T1 Hitter3 "
+                                 "UTIL T1 Hitter4 UTIL T1 Hitter5")], name="contest-standings-956.csv")
+        with self.assertRaises(self.sr.StandingsFormatError) as ctx:
+            self.sr.read_standings(showdown)
+        self.assertIn("showdown", str(ctx.exception))
+        self.assertIn("Classic only", str(ctx.exception))
+        self.assertEqual(self.sr.read_standings(self._write_standings(self._field()))["contest_type"],
+                         "classic")
+
+    PARSE_191020573_SHA = "9ebe2ba118a9338cdf5ba6b50a5950f0ef6c729dd1b9275d0ad719e89c7eb2b8"
+    MINE_191020573_SHA = "783114881e31d5f1ebdb029d581a3f5c8fcb63d1a76ac3966b9ed9333d0b0356"
+    VENDORED = REPO / "data" / "archive" / "2026-06-03" / "contest-standings-191020573.csv"
+
+    @unittest.skipUnless(VENDORED.exists(), f"the vendored fixture {VENDORED} is absent")
+    def test_parse_standings_export_default_output_is_byte_identical_on_real_bytes(self):
+        """The two digests were computed at HEAD 6859442, BEFORE the keyword existed
+        (`tools/_scratch_r472/pin_hash.py`), on the vendored 2026-06-03 export read in
+        place. The returned dict embeds the file path, which differs per checkout, so
+        the parse digest excludes that one key; `mine_contest` embeds none."""
+        from mlb_engine.field import field_miner as fm
+
+        def digest(obj):
+            def default(o):
+                if isinstance(o, (set, frozenset)):
+                    return sorted(o)
+                if isinstance(o, tuple):
+                    return list(o)
+                return repr(o)
+            return hashlib.sha256(json.dumps(obj, sort_keys=True, default=default)
+                                  .encode("utf-8")).hexdigest()
+
+        parsed = fm.parse_standings_export(str(self.VENDORED))
+        self.assertNotIn("time_remaining", parsed["entries"][0])
+        self.assertEqual(digest({k: v for k, v in parsed.items() if k != "path"}),
+                         self.PARSE_191020573_SHA)
+        mined = fm.mine_contest(fm.parse_standings_export(str(self.VENDORED)), None,
+                                contest_id="191020573")
+        self.assertEqual(digest(mined), self.MINE_191020573_SHA)
+
+    def test_with_time_remaining_adds_exactly_one_key_and_nothing_else_moves(self):
+        from mlb_engine.field import field_miner as fm
+        path = self._write_standings(self._field(tr="300"))
+        plain = fm.parse_standings_export(str(path))
+        rich = fm.parse_standings_export(str(path), with_time_remaining=True)
+        self.assertEqual(plain["player_table"], rich["player_table"])
+        for a, b in zip(plain["entries"], rich["entries"]):
+            self.assertNotIn("time_remaining", a)
+            self.assertEqual(b.pop("time_remaining"), "300")
+            self.assertEqual(a, b, "every other key is equal")
+
+    # -- the verdicts ---------------------------------------------------------- #
+
+    def test_verdicts_on_a_synthetic_live_export(self):
+        report = self._report()
+        v = report["verdicts"]
+        self.assertEqual(report["contests"]["900"]["target"]["T"], 100.0)
+        self.assertEqual(report["contests"]["900"]["cash"]["line"], 80.0)
+        live, cash, out = v["7001"], v["7002"], v["7003"]
+        self.assertEqual(live["verdict"], "live_for_target", live)
+        self.assertEqual(cash["verdict"], "cash_viable", cash)
+        self.assertEqual(out["verdict"], "out", out)
+        self.assertEqual(live["open_slots"], ["P", "OF", "OF", "OF"])
+        self.assertAlmostEqual(live["remaining_ceiling"], 50.0)
+        self.assertAlmostEqual(live["reach"], 120.0)
+        self.assertAlmostEqual(cash["reach"], 90.0)
+        self.assertAlmostEqual(out["reach"], 60.0)
+        self.assertEqual((live["rank"], live["time_remaining"]), ("5", "0"))
+        # The negative control the exemption rests on: neither is live.
+        self.assertNotEqual(cash["verdict"], "live_for_target")
+        self.assertNotEqual(out["verdict"], "live_for_target")
+
+    def test_an_input_that_is_missing_ambiguous_or_mismatched_is_unknown_with_its_reason(self):
+        cases = []
+        # absent from the file
+        cases.append(("is not in", self._seats() + [self._seat("7999", self.OPEN4)], None, ()))
+        # appears twice
+        cases.append(("appears 2 times", self._seats(), self._field(extra=[(8, "7001", "0", 5.0, self.OPEN4)]), ()))
+        # the standings Lineup differs from the roster being refined
+        wrong = [self._seat("7001", self.LOCKED_ALL)] + self._seats()[1:]
+        cases.append(("differs from the roster", wrong, None, ()))
+        # an open-slot player with no frame row
+        cases.append(("no usable Ceiling", self._seats(), None, ("T3 Hitter7",)))
+        # a partial Lineup cell for our own entry
+        partial = self._field()
+        partial[4] = (5, "7001", "0", 70.0, self._cell(self.OPEN4[:9]))
+        cases.append(("partial", self._seats(), partial, ()))
+        for needle, seats, rows, drop in cases:
+            report = self._report(rows=rows, seats=seats, drop=drop)
+            hit = [r for v in report["verdicts"].values() if v["verdict"] == "unknown"
+                   for r in v["reasons"] if needle in r]
+            self.assertTrue(hit, (needle, {k: (v["verdict"], v["reasons"]) for k, v in report["verdicts"].items()}))
+        # NaN and negative ceilings are not a number to add.
+        for bad in (float("nan"), -3.0):
+            report = self._report(ceilings={"T3 Hitter7": bad})
+            self.assertEqual(report["verdicts"]["7001"]["verdict"], "unknown", bad)
+            self.assertIn("no usable Ceiling", " ".join(report["verdicts"]["7001"]["reasons"]))
+        # A contest with no standings file at all.
+        report = self._report(seats=self._seats() + [self._seat("8001", self.OPEN4, "901")])
+        self.assertEqual(report["verdicts"]["8001"]["verdict"], "unknown")
+        self.assertIn("no standings file", report["verdicts"]["8001"]["reasons"][0])
+
+    def test_the_cash_line_comes_from_paid_places_else_the_reference_files_else_unknown(self):
+        # --paid-places, bare and keyed
+        for given in ({"900": 4}, {"*": 4}):
+            places, source = self.sr.resolve_paid_places("900", given, self.root)
+            self.assertEqual((places, source), (4, "--paid-places"))
+        self.assertEqual(self.sr.parse_paid_places("900=4,901=9"), {"900": 4, "901": 9})
+        self.assertEqual(self.sr.parse_paid_places("2200"), {"*": 2200})
+        for bad in ("0", "abc", "900=x", "-3"):
+            with self.assertRaises(self.sr.StandingsFormatError, msg=bad):
+                self.sr.parse_paid_places(bad)
+        # no paid places and no reference: the cash verdict is unknown, never a guess
+        report = self._report(paid=None)
+        self.assertIsNone(report["contests"]["900"]["cash"]["line"])
+        self.assertEqual(report["verdicts"]["7001"]["verdict"], "live_for_target",
+                         "live needs no cash line")
+        for eid in ("7002", "7003"):
+            self.assertEqual(report["verdicts"][eid]["verdict"], "unknown", eid)
+            self.assertIn("cash line unknown", report["verdicts"][eid]["reasons"][0])
+        # the reference fallback (a temp root; both files post-slate history), labeled by source
+        ref = self.root / "data" / "reference"
+        ref.mkdir(parents=True)
+        (ref / "dk_contest_money_2026-09-15.json").write_text(
+            json.dumps({"contests": {"900": {"paid_places": 4}}}), encoding="utf-8")
+        places, source = self.sr.resolve_paid_places("900", {}, self.root)
+        self.assertEqual(places, 4)
+        self.assertIn("dk_contest_money_2026-09-15.json", source)
+        report = self._report(paid=None)
+        self.assertEqual(report["contests"]["900"]["cash"]["line"], 80.0)
+        self.assertEqual(report["verdicts"]["7002"]["verdict"], "cash_viable")
+        # the contest library's name-keyed paid_places is never read
+        lib = ref / "contest_library.json"
+        lib.write_text(json.dumps({"contests": {"MLB Test GPP": {"paid_places": 1}}}), encoding="utf-8")
+        self.assertEqual(self.sr.resolve_paid_places("901", {}, self.root)[0], None)
+        # paid places above the field: named, the line stays unknown
+        report = self._report(paid=50)
+        cash = report["contests"]["900"]["cash"]
+        self.assertIsNone(cash["line"])
+        self.assertIn("above the 7 scored row(s)", cash["source"])
+
+    def test_the_target_rank_is_the_kth_highest_points_ties_kept(self):
+        rows = [(1, "1", "0", 90.0, self.LOCKED_ALL), (2, "2", "0", 90.0, self.LOCKED_ALL),
+                (3, "3", "0", 80.0, self.LOCKED_ALL)]
+        path = self._write_standings(rows, name="contest-standings-957.csv")
+        entries = self.sr.read_standings(path)["entries"]
+        self.assertEqual([self.sr.points_at_rank(entries, k) for k in (1, 2, 3, 4)],
+                         [90.0, 90.0, 80.0, None])
+        # k above the field: the verdict is unknown with the reason, never a default
+        report = self._report(k=50)
+        self.assertEqual(report["verdicts"]["7001"]["verdict"], "unknown")
+        self.assertIn("fewer than target rank 50", " ".join(report["verdicts"]["7001"]["reasons"]))
+        # the target moves the verdict: reach 90 misses ranks 1-2 (100, 95) and meets rank 3 (85)
+        self.assertEqual(self._report(k=2)["verdicts"]["7002"]["verdict"], "cash_viable")
+        self.assertEqual(self._report(k=3)["verdicts"]["7002"]["verdict"], "live_for_target")
+
+    def test_open_slots_follow_the_lock_clock_and_an_absent_player_counts_locked_and_named(self):
+        # Before the T1@T2 lock every slot is open: reach = points + 10 slots' ceilings.
+        early = self._slate(self.salary, as_of=datetime(2026, 7, 10, 22, 0, tzinfo=timezone.utc))
+        report = self._report(slate=early)
+        self.assertEqual(report["verdicts"]["7001"]["open_slots"],
+                         ["P", "P", "C", "1B", "2B", "3B", "SS", "OF", "OF", "OF"])
+        self.assertAlmostEqual(report["verdicts"]["7001"]["remaining_ceiling"], 120.0,
+                               msg="two pitchers at 20 and eight hitters at 10")
+        # After the T3@T4 lock nothing is open.
+        late = self._slate(self.salary, as_of=datetime(2026, 7, 11, 2, 0, tzinfo=timezone.utc))
+        v = self._report(slate=late)["verdicts"]["7001"]
+        self.assertEqual((v["open_slots"], v["remaining_ceiling"]), ([], 0.0))
+        self.assertEqual(v["verdict"], "out", "70.0 + 0 misses the 80.0 cash line")
+        # A player the status map does not hold is locked by absence and named.
+        pid = self.ids["T3 Hitter7"]
+        status = dict(self.slate.status)
+        del status[pid]
+        absent = self.sr.Slate({p: r for p, r in self.slate.players.items()}, status, self.AS_OF)
+        v = self._report(slate=absent)["verdicts"]["7001"]
+        self.assertEqual(v["locked_by_absence"], [pid])
+        self.assertAlmostEqual(v["remaining_ceiling"], 40.0, msg="the absent player adds nothing")
+
+    def test_time_remaining_is_display_only_and_changes_no_verdict(self):
+        zero = self._report(rows=self._field(tr="0"))["verdicts"]
+        live = self._report(rows=self._field(tr="300"))["verdicts"]
+        blank = self._report(rows=self._field(tr=""))["verdicts"]
+        for eid in ("7001", "7002", "7003"):
+            self.assertEqual((zero[eid]["verdict"], zero[eid]["reach"]),
+                             (live[eid]["verdict"], live[eid]["reach"]))
+            self.assertEqual((zero[eid]["verdict"], zero[eid]["reach"]),
+                             (blank[eid]["verdict"], blank[eid]["reach"]))
+        self.assertEqual(live["7001"]["time_remaining"], "300", "printed raw")
+        self.assertIn("time_remaining '300'", "\n".join(self.sr.render(
+            self._report(rows=self._field(tr="300")))))
+
+    def test_the_frame_is_one_hop_and_names_the_run_and_its_mode(self):
+        runs = self.root / "runs"
+        for run_id, mode, ceiling in (("BUILD1", "initial_build", 11.0), ("SWAP1", "late_swap", 6.0)):
+            run = runs / run_id
+            (run / "final").mkdir(parents=True)
+            (run / "manifest.json").write_text(json.dumps({"mode": mode, "run_id": run_id}), encoding="utf-8")
+            frame = self._frame_csv({"T3 Hitter6": ceiling})
+            (run / "final" / "projections.csv").write_bytes(Path(frame).read_bytes())
+        frame, info = self.sr.frame_for_run(runs, "BUILD1")
+        self.assertEqual((info["run_id"], info["mode"], info["note"]), ("BUILD1", "initial_build", ""))
+        self.assertEqual(frame[self.ids["T3 Hitter6"]], 11.0)
+        frame, info = self.sr.frame_for_run(runs, "SWAP1")
+        self.assertEqual(info["mode"], "late_swap")
+        self.assertIn("unenriched swap frame", info["note"])
+        with self.assertRaises(self.sr.FrameUnavailable) as ctx:
+            self.sr.frame_for_run(runs, "NOPE")
+        self.assertIn("runs/ is gitignored", str(ctx.exception))
+        # A newcomer the parent never carried takes the in-hand frame, and is counted.
+        parent = {p: c for p, c in self.sr.load_frame(self._frame_csv()).items()
+                  if p != self.ids["T3 Hitter8"]}
+        # The swap frame also disagrees about a player the parent HAS (T3 Ace: 99.0 vs 20.0):
+        # the parent's value wins, so reading the swap frame first is visible.
+        swap = {self.ids["T3 Hitter8"]: 7.0, self.ids["T3 Ace"]: 99.0}
+        ceilings = self.sr.Ceilings([("parent", parent), ("swap_frame", swap)])
+        got = self.sr.reach_for_roster([self.ids[n] for n in self.OPEN4], 70.0, self.slate, ceilings)
+        self.assertEqual(got["ceiling_source"], {"parent": 3, "swap_frame": 1})
+        self.assertAlmostEqual(got["remaining_ceiling"], 20.0 + 10.0 + 10.0 + 7.0)
+
+    # -- leaders: the hidden-pitcher inference --------------------------------- #
+
+    def _leader_slate(self):
+        """T1 hitters H1-H5 at $5000 and T2 H6-H8 at $3000: with T1 Ace ($9200) a nine-man
+        lineup costs $43,200, so $6,800 is left, which buys a $4,500 reliever, not an ace."""
+        sal = {f"T1 Hitter{i}": 5000 for i in range(1, 6)}
+        sal.update({f"T2 Hitter{i}": 3000 for i in (6, 7, 8)})
+        path, ids = self._salary_file(salary_by_name=sal, name="DKSalaries_leaders.csv")
+        return path, ids, self._slate(path)
+
+    def _hidden_cell(self, ids):
+        names = ["T1 Ace", "T1 Hitter1", "T1 Hitter2", "T1 Hitter3", "T1 Hitter4",
+                 "T1 Hitter5", "T2 Hitter6", "T2 Hitter7", "T2 Hitter8"]
+        slots = ["P", "C", "1B", "2B", "3B", "SS", "OF", "OF", "OF"]
+        return " ".join(f"{s} {n}" for s, n in zip(slots, names))
+
+    def test_a_hidden_pitcher_slot_infers_the_max_salary_arm_the_cap_allows(self):
+        path, ids, slate = self._leader_slate()
+        self.ids = ids
+        ceilings = {"T3 Pen1": 12.0, "T4 Pen2": 31.0, "T4 Pen3": 31.0, "T1 Pen1": 99.0,
+                    "T4 Ace": 50.0}
+        rows = [(1, "9001", "0", 100.0, self._hidden_cell(ids))] + self._field()[1:]
+        report = self._report(rows=rows, slate=slate, ceilings=ceilings)
+        leader = report["contests"]["900"]["leaders"][0]
+        self.assertEqual(leader["status"], "inferred", leader)
+        self.assertAlmostEqual(leader["cap_left"], 6800.0)
+        # The ace ($9,200) does not fit; the arm is a $4,500 reliever; started T1 Pen1 (ceiling
+        # 99) is excluded; the tie between T4 Pen2 and T4 Pen3 (both 31.0) goes to the lower id.
+        self.assertEqual(leader["arm"]["name"], "T4 Pen2")
+        self.assertEqual((leader["arm"]["salary"], leader["arm"]["ceiling"]), (4500.0, 31.0))
+        target = report["contests"]["900"]["target"]
+        self.assertAlmostEqual(target["T"], 100.0 + 31.0, msg="T rises by exactly the arm's Ceiling")
+        # An entry live against p_k (reach 120 >= 100) is not live against T (131).
+        self.assertEqual(report["verdicts"]["7001"]["verdict"], "cash_viable")
+        # The inference only RAISES T: with the leader fully started T stays at his points.
+        self.assertEqual(self._report()["contests"]["900"]["target"]["T"], 100.0)
+
+    def test_a_named_open_pitcher_is_reported_and_the_other_open_shapes_are_not_inferred(self):
+        named = ["T1 Ace", "T3 Ace", "T1 Hitter1", "T1 Hitter2", "T1 Hitter3", "T1 Hitter4",
+                 "T1 Hitter5", "T2 Hitter6", "T2 Hitter7", "T2 Hitter8"]
+        rows = [(1, "9001", "0", 100.0, named)] + self._field()[1:]
+        leader = self._report(rows=rows)["contests"]["900"]["leaders"][0]
+        self.assertEqual((leader["status"], leader["arm"]["name"]), ("named", "T3 Ace"))
+        self.assertAlmostEqual(self._report(rows=rows)["contests"]["900"]["target"]["T"], 120.0)
+        # two open slots (a pitcher and an outfielder): not inferred, T stays at his points
+        two = ["T1 Ace", "T3 Ace", "T1 Hitter1", "T1 Hitter2", "T1 Hitter3", "T1 Hitter4",
+               "T1 Hitter5", "T3 Hitter6", "T2 Hitter7", "T2 Hitter8"]
+        report = self._report(rows=[(1, "9001", "0", 100.0, two)] + self._field()[1:])
+        leader = report["contests"]["900"]["leaders"][0]
+        self.assertEqual(leader["status"], "not_inferred")
+        self.assertIn("only a lone open pitcher is inferred", leader["reason"])
+        self.assertEqual(report["contests"]["900"]["target"]["T"], 100.0)
+        # a lone open HITTER is not inferred either
+        hitter = ["T1 Ace", "T2 Ace", "T1 Hitter1", "T1 Hitter2", "T1 Hitter3", "T1 Hitter4",
+                  "T1 Hitter5", "T2 Hitter6", "T2 Hitter7", "T3 Hitter8"]
+        leader = self._report(rows=[(1, "9001", "0", 100.0, hitter)] + self._field()[1:]
+                              )["contests"]["900"]["leaders"][0]
+        self.assertEqual(leader["status"], "not_inferred")
+        self.assertIn("['OF']", leader["reason"])
+
+    def test_a_leader_whose_name_is_ambiguous_or_unknown_is_skipped_and_named(self):
+        path, ids = self._salary_file(rename={"T3 Bench1": "T2 Hitter6"}, name="DKSalaries_dup.csv")
+        slate = self._slate(path)
+        leader = self._report(slate=slate)["contests"]["900"]["leaders"][0]
+        self.assertEqual(leader["status"], "not_inferred")
+        self.assertIn("is ambiguous in the salary file", leader["reason"])
+        ghost = ["T1 Ace", "T2 Ace", "T1 Hitter1", "T1 Hitter2", "T1 Hitter3", "T1 Hitter4",
+                 "T1 Hitter5", "T2 Hitter6", "T2 Hitter7", "Nobody Atall"]
+        leader = self._report(rows=[(1, "9001", "0", 100.0, ghost)] + self._field()[1:]
+                              )["contests"]["900"]["leaders"][0]
+        self.assertIn("is not in the salary file", leader["reason"])
+
+    def test_percent_drafted_lists_only_players_whose_games_have_started(self):
+        players = [("T1 Hitter1", "C", "55.00%", 3.0), ("T3 Hitter6", "OF", "70.00%", 0.0),
+                   ("T2 Ace", "P", "40.50%", 12.0), ("Nobody Atall", "OF", "9.00%", 0.0)]
+        report = self._report(players=players)
+        drafted = report["contests"]["900"]["started_drafted"]
+        self.assertEqual([(p["name"], p["pct_drafted"]) for p in drafted["players"]],
+                         [("T1 Hitter1", 55.0), ("T2 Ace", 40.5)],
+                         "T3 Hitter6 (70%) has not started and is left out")
+        self.assertEqual(drafted["unmatched_names"], 1)
+
+    # -- the standalone door --------------------------------------------------- #
+
+    def _deliveries(self, *records):
+        folder = self.root / "data" / "deliveries" / self.DATE
+        folder.mkdir(parents=True, exist_ok=True)
+        for index, (status, run_id, entry_ids) in enumerate(records):
+            record = {"kind": "delivery",
+                      "manifest_row": {"status": status, "run_id": run_id, "contest_ids": ["900"]},
+                      "entries": [{"entry_id": e, "contest_id": "900"} for e in entry_ids]}
+            (folder / f"rec_{index}.json").write_text(json.dumps(record), encoding="utf-8")
+
+    def _run_cli(self, *extra):
+        feed = pool_lineups_feed(t4_confirmed=True)
+        feed["games"][1]["game_date_utc"] = "2026-07-11T01:05:00Z"
+        feed_path = self.root / "feed.json"
+        feed_path.write_text(json.dumps(feed), encoding="utf-8")
+        standings = self._write_standings(self._field(), players=[("T1 Hitter1", "C", "55.00%", 3.0)])
+        argv = ["--date", self.DATE, "--standings", str(standings), "--salary", str(self.salary),
+                "--lineups", str(feed_path), "--as-of", "2026-07-10T23:30:00Z",
+                "--paid-places", "4", "--root", str(self.root), *extra]
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = self.sr.main(argv)
+        return code, out.getvalue(), err.getvalue()
+
+    def _tree(self):
+        return {str(p.relative_to(self.root)): hashlib.sha256(p.read_bytes()).hexdigest()
+                for p in sorted(self.root.rglob("*")) if p.is_file()}
+
+    def test_the_standalone_door_takes_ids_from_the_records_and_a_run_id_only_when_unique(self):
+        from mlb_engine.field import field_miner as fm
+        # 1400_4g's shape: several non-superseded records over the same entries, two run ids.
+        self._deliveries(("candidate", "RUN_A", ["7001", "7002", "7003"]),
+                         ("upload_ready", "RUN_B", ["7001", "7002", "7003"]),
+                         ("superseded", "RUN_OLD", ["7001", "9999"]))
+        self.assertEqual(fm.harvest_own_entry_ids(self.DATE, "900", root=self.root),
+                         ["7001", "7002", "7003"], "the harvester unions the live records")
+        self.assertEqual(self.sr.delivery_run_ids(self.root, self.DATE, "900"), ["RUN_A", "RUN_B"],
+                         "the same filter: a superseded record's run id is not a candidate")
+        for run_id in ("RUN_A", "RUN_B"):
+            run = self.root / "runs" / run_id / "final"
+            run.mkdir(parents=True, exist_ok=True)
+            (run / "projections.csv").write_bytes(self._frame_csv().read_bytes())
+        code, out, err = self._run_cli()
+        self.assertEqual(code, 0, err)
+        self.assertIn("2 run ids (RUN_A, RUN_B)", out, "named, never the first one")
+        self.assertIn("pass --run-id or --projections", out)
+        self.assertEqual(out.count("-> live_for_target"), 0)
+        self.assertIn("7001 [900] unknown", out)
+        # --run-id names the frame and the verdicts return.
+        code, out, err = self._run_cli("--run-id", "RUN_B")
+        self.assertEqual(code, 0, err)
+        self.assertRegex(out, r"7001 \[900\] rank 5 points 70\.00 .* -> live_for_target")
+        self.assertRegex(out, r"7002 \[900\] .* -> cash_viable")
+        self.assertRegex(out, r"7003 \[900\] .* -> out")
+        # Dropping the second live record leaves ONE run id, which is then used unasked.
+        (self.root / "data" / "deliveries" / self.DATE / "rec_1.json").unlink()
+        self.assertEqual(self.sr.delivery_run_ids(self.root, self.DATE, "900"), ["RUN_A"])
+        code, out, err = self._run_cli()
+        self.assertRegex(out, r"7001 \[900\] .* -> live_for_target")
+
+    def test_the_tool_writes_nothing_and_opens_no_socket(self):
+        import socket
+        self._deliveries(("upload_ready", "RUN_A", ["7001", "7002", "7003"]))
+        run = self.root / "runs" / "RUN_A" / "final"
+        run.mkdir(parents=True)
+        (run / "projections.csv").write_bytes(self._frame_csv().read_bytes())
+        self._write_standings(self._field(), players=[("T1 Hitter1", "C", "55.00%", 3.0)])
+        before = self._tree()
+        with unittest.mock.patch.object(socket.socket, "connect",
+                                        side_effect=AssertionError("the tool must never fetch")):
+            code, out, err = self._run_cli()
+        self.assertEqual(code, 0, err)
+        # `_run_cli` itself writes the feed; everything else must be byte-identical.
+        after = self._tree()
+        after.pop("feed.json", None)
+        before.pop("feed.json", None)
+        self.assertEqual(after, before, "read-only: no file added, changed, moved or deleted")
+
+    def test_the_cli_prints_the_label_and_the_rule_and_none_of_the_forbidden_words_elsewhere(self):
+        self._deliveries(("upload_ready", "RUN_A", ["7001", "7002", "7003"]))
+        run = self.root / "runs" / "RUN_A" / "final"
+        run.mkdir(parents=True)
+        (run / "projections.csv").write_bytes(self._frame_csv().read_bytes())
+        code, out, err = self._run_cli()
+        self.assertEqual(code, 0, err)
+        self.assertIn(self.LABEL_FRAGMENT, out)
+        self.assertIn("never lower a cash_viable entry's projection for leverage", out)
+        self.assertIn("UNVERIFIED", out)
+        self.assertIn("time_remaining '0'", out, "TimeRemaining is printed raw")
+        forbidden = re.compile(r"\b(roi|win rate|cash rate|edge|probab\w*|profitab\w*)\b", re.I)
+        for line in out.splitlines():
+            if line.startswith("standings read (R472) --"):
+                continue  # the label sentence, which names them to disclaim them
+            self.assertIsNone(forbidden.search(line), line)
+
+    def test_without_a_frame_the_report_still_prints_and_every_verdict_is_unknown(self):
+        self._deliveries(("upload_ready", None, ["7001", "7002", "7003"]))   # a hand-built delivery
+        code, out, err = self._run_cli()
+        self.assertEqual(code, 0, err)
+        self.assertIn("UNAVAILABLE", out)
+        self.assertIn("contest 900", out)
+        self.assertIn("#1 100.00", out)
+        self.assertIn("cash line: 80.00 = rank 4", out)
+        self.assertIn("leader #1 entry 9001", out)
+        self.assertEqual(sum(1 for ln in out.splitlines() if " unknown: " in ln), 3)
+        # --projections names the frame and the verdicts come back.
+        code, out, err = self._run_cli("--projections", str(self._frame_csv()))
+        self.assertEqual(code, 0, err)
+        self.assertRegex(out, r"7001 \[900\] .* -> live_for_target")
+        # refusals by name for what the operator typed
+        for extra, needle in ((["--target-rank", "0"], "--target-rank"),
+                              (["--paid-places", "abc"], "--paid-places")):
+            code, out, err = self._run_cli(*extra)
+            self.assertEqual(code, 4, extra)
+            self.assertIn(needle, err)
+
+    def test_partition_downgrades_is_pure_and_unknown_is_never_exempt(self):
+        report = self._report()
+        lines = ["7001 [large_field_gpp] -5.00", "7002 [large_field_gpp] -5.00",
+                 "7003 [large_field_gpp] -5.00"]
+        classes = {"7001": "gpp", "7002": "gpp", "7003": "gpp"}
+        chosen = {e: [self.ids[n] for n in self.OPEN4] for e in ("7001", "7002", "7003")}
+        refusable, exempt, detail = self.sr.partition_downgrades(lines, report, classes, chosen)
+        self.assertEqual(exempt, [lines[0]])
+        self.assertEqual(refusable, lines[1:])
+        self.assertEqual(sorted(refusable + exempt), sorted(lines), "a partition of the input")
+        self.assertEqual(set(detail), {"7001"})
+        self.assertEqual(detail["7001"]["verdict"], "live_for_target")
+        # Fail closed: no verdicts, a line whose first token is no entry id, a cash class,
+        # a chosen roster that is not ten players, a chosen lineup that no longer reaches T.
+        empty = dict(report, verdicts={})
+        self.assertEqual(self.sr.partition_downgrades(lines, empty, classes, chosen)[0], lines)
+        self.assertEqual(self.sr.partition_downgrades(["junk -5.00"], report, classes, chosen)[0],
+                         ["junk -5.00"])
+        self.assertEqual(self.sr.partition_downgrades(lines[:1], report, {"7001": "cash"}, chosen)[0],
+                         lines[:1])
+        self.assertEqual(self.sr.partition_downgrades(lines[:1], report, {"7001": "ticket_line"}, chosen)[0],
+                         lines[:1])
+        self.assertEqual(self.sr.partition_downgrades(lines[:1], report, classes,
+                                                      {"7001": chosen["7001"][:9]})[0], lines[:1])
+        # the incumbent keeps its ceilings (live); the CHOSEN lineup is the one on weak ones:
+        other = [self.ids[n] for n in ["T1 Ace", "T4 Ace", "T1 Hitter1", "T1 Hitter2", "T1 Hitter3",
+                                       "T1 Hitter4", "T1 Hitter5", "T4 Hitter6", "T4 Hitter7", "T4 Hitter8"]]
+        low = self._report(ceilings={"T4 Ace": 1.0, "T4 Hitter6": 1.0, "T4 Hitter7": 1.0, "T4 Hitter8": 1.0})
+        self.assertEqual(low["verdicts"]["7001"]["verdict"], "live_for_target")
+        self.assertEqual(self.sr.partition_downgrades(lines[:1], low, classes, {"7001": other})[0],
+                         lines[:1], "chosen reach 70 + 1 + 3 < T 100: not exempt")
+        # The entry must be live on its OWN incumbent standing: a merely cash_viable entry
+        # (reach 90 < T 100) stays refusable even when the swap's chosen lineup WOULD reach T.
+        better = self._report(ceilings={"T4 Ace": 30.0, "T4 Hitter6": 30.0,
+                                        "T4 Hitter7": 30.0, "T4 Hitter8": 30.0})
+        self.assertEqual(better["verdicts"]["7002"]["verdict"], "cash_viable")
+        chosen_reach = self.sr.reach_for_roster(other, 40.0, self.slate, better["ceilings"])["reach"]
+        self.assertGreaterEqual(chosen_reach, 100.0, "the chosen lineup reaches the target")
+        self.assertEqual(self.sr.partition_downgrades(lines[1:2], better, classes, {"7002": other})[0],
+                         lines[1:2], "but the incumbent was not live, so no exemption")
+
+    # -- fixes from the review of this change ---------------------------------- #
+
+    def test_a_bare_paid_places_applies_to_one_file_and_a_repeated_key_is_refused(self):
+        self.sr.check_paid_places_scope({"*": 4}, 1)
+        self.sr.check_paid_places_scope({"900": 4, "901": 9}, 2)
+        with self.assertRaises(self.sr.StandingsFormatError) as ctx:
+            self.sr.check_paid_places_scope({"*": 4}, 2)
+        self.assertIn("exactly one --standings file", str(ctx.exception))
+        for bad in ("900=4,900=9", "3,4"):
+            with self.assertRaises(self.sr.StandingsFormatError, msg=bad) as ctx:
+                self.sr.parse_paid_places(bad)
+            self.assertIn("twice", str(ctx.exception))
+        # the same refusal at the library door that late_swap uses
+        a = self._write_standings(self._field(), name="contest-standings-900.csv")
+        b = self._write_standings(self._field(), name="contest-standings-901.csv")
+        with self.assertRaises(self.sr.StandingsFormatError):
+            self.sr.swap_context(
+                standings_paths=[str(a), str(b)], paid_places="3", target_rank=1,
+                seats=self._seats(), slate=self.slate,
+                parent_frame=({}, {}), swap_frame={}, root=self.root)
+
+    def test_the_contest_id_skips_a_browser_duplicate_suffix_and_falls_back_to_entry_membership(self):
+        self.assertEqual(self.sr.infer_contest_id("contest-standings-195970831 (1).csv"), "195970831")
+        self.assertEqual(self.sr.infer_contest_id("contest-standings-195970831.zip"), "195970831")
+        self.assertEqual(self.sr.infer_contest_id("a (1).zip", "contest-standings-195970831.csv"),
+                         "195970831", "the zip member's name is consulted too")
+        self.assertEqual(self.sr.infer_contest_id("contest-standings-900.csv"), "900",
+                         "a short id still reads when no long run exists")
+        self.assertEqual(self.sr.infer_contest_id("standings.csv"), "")
+        # A short, ambiguous name ('... 900 (1)' reads as contest 1): the join is by EntryId.
+        path = self._write_standings(self._field(), name="contest-standings-900 (1).csv")
+        frame = self.sr.load_frame(self._frame_csv())
+        report = self.sr.swap_context(
+            standings_paths=[str(path)], paid_places="4", target_rank=1, seats=self._seats(),
+            slate=self.slate, parent_frame=(frame, {"run_id": "R", "mode": "initial_build"}),
+            swap_frame={}, root=self.root)
+        self.assertEqual(sorted(report["contests"]), ["900"])
+        self.assertEqual(report["verdicts"]["7001"]["verdict"], "live_for_target")
+        self.assertIn("entry membership", "\n".join(self.sr.render(report)))
+        self.assertIn("entry membership",
+                      self.sr.metadata_for_run(report)["files"]["900"]["contest_id_source"])
+        # no digits anywhere and none of our entries in the file: refused by name
+        none = self._write_standings([(1, "9001", "0", 100.0, self.LOCKED_ALL)], name="standings.csv")
+        with self.assertRaises(self.sr.StandingsFormatError) as ctx:
+            self.sr.swap_context(standings_paths=[str(none)], paid_places=None, target_rank=1,
+                                 seats=self._seats(), slate=self.slate,
+                                 parent_frame=(frame, {}), swap_frame={}, root=self.root)
+        self.assertIn("no contest id in the file name and no entry of ours", str(ctx.exception))
+
+    def test_an_entry_at_or_above_the_target_is_never_exempt(self):
+        # 7001 leads with only its second pitcher (T3 Ace, named) still open. T is its OWN
+        # points plus that arm's ceiling, so it reaches T; it is defending, not chasing.
+        lone_p = ["T1 Ace", "T3 Ace", "T1 Hitter1", "T1 Hitter2", "T1 Hitter3", "T1 Hitter4",
+                  "T1 Hitter5", "T2 Hitter6", "T2 Hitter7", "T2 Hitter8"]
+        rows = [(1, "7001", "0", 100.0, lone_p), (2, "9002", "0", 95.0, self.LOCKED_ALL)]
+        report = self._report(rows=rows, seats=[self._seat("7001", lone_p)], paid=2)
+        v = report["verdicts"]["7001"]
+        self.assertEqual(v["verdict"], "live_for_target")
+        self.assertTrue(v["at_or_above_target"])
+        self.assertIn("at or above the target: never exempt", "\n".join(self.sr.render(report)))
+        line = ["7001 [large_field_gpp] -5.00"]
+        chosen = {"7001": [self.ids[n] for n in lone_p]}
+        self.assertEqual(self.sr.partition_downgrades(line, report, {"7001": "gpp"}, chosen)[0], line)
+        # a plain leader (all locked) is the same: nothing to chase
+        report = self._report(rows=[(1, "7001", "0", 100.0, self.OPEN4)] + self._field()[1:4],
+                              seats=[self._seat("7001", self.OPEN4)])
+        self.assertTrue(report["verdicts"]["7001"]["at_or_above_target"])
+        self.assertEqual(self.sr.partition_downgrades(line, report, {"7001": "gpp"},
+                                                      {"7001": chosen["7001"]})[0], line)
+        # and the entry that IS chasing (behind the target) is not flagged
+        self.assertFalse(self._report()["verdicts"]["7001"]["at_or_above_target"])
+
+    def test_an_unreadable_frame_is_named_and_the_standalone_report_still_prints(self):
+        bad = self.root / "bad.csv"
+        bad.write_bytes(b"Player_ID,Ceiling\n1,\xff\xfe\x00bad\n")
+        with self.assertRaises(self.sr.FrameUnavailable) as ctx:
+            self.sr.load_frame(bad)
+        self.assertIn("cannot be read", str(ctx.exception))
+        nocols = self.root / "nocols.csv"
+        nocols.write_text("a,b\n1,2\n", encoding="utf-8")
+        with self.assertRaises(self.sr.FrameUnavailable):
+            self.sr.load_frame(nocols)
+        code, out, err = self._run_cli("--projections", str(bad))
+        self.assertEqual(code, 0, err)
+        self.assertIn("UNAVAILABLE", out)
+        self.assertIn("every verdict is unknown", out)
+
+    def test_the_standalone_door_says_when_no_record_names_an_entry_of_ours(self):
+        code, out, err = self._run_cli("--projections", str(self._frame_csv()))
+        self.assertEqual(code, 0, err)
+        self.assertIn("WARN no delivery record or outputs/ manifest on this host names an entry "
+                      "of ours in contest 900", out)
+        self.assertIn("not evidence that none was entered", out)
+
+
+class LateSwapStandingsGateTests(unittest.TestCase):
+    """R472 (roadmap Session 141). `late_swap.py --standings` exempts a
+    live_for_target entry from the F16 downgrade REFUSAL, and nothing else.
+
+    Driven through the real `late_swap.main()` over a real parent run and a real
+    `run_late_swap` (the R468 harness, composed rather than subclassed so its own
+    tests do not run twice). Two seams, both named: `_score_roster` is patched on the
+    loaded late_swap module so every changed entry scores 10.0 -> 5.0 (the
+    refusal's own comparison is covered by LateSwapIdentityTests; this class needs a
+    downgrade to exist, deterministically), and `standings_read.frame_for_run` is
+    patched so the parent frame's ceilings are exactly the ones a test states
+    (`frame_for_run` itself is covered by StandingsReadTests).
+
+    SYNTHETIC STANDINGS: the live export format is unverified, see StandingsReadTests.
+    Roles at the 23:30Z clock (T3/T4 open): 7001 live (reach 201 vs T 200), 7002
+    cash_viable (reach 150 vs the 150.0 cash line), 7003 out (reach 94). Ceilings are
+    10.0 for every player, so an entry's remaining ceiling is 10 x its open slots.
+    """
+
+    DATE = LateSwapDeclaredPitcherTests.DATE
+    CONTEST = "800"
+    LEADER_NAMES = StandingsReadTests.LOCKED_ALL
+    REFUSAL_HEAD = "late swap refused: these entries score below the lineups they replaced:"
+
+    def setUp(self):
+        self.h = LateSwapDeclaredPitcherTests("test_the_grammar_is_build_slates_own_parser")
+        self.h.setUp()
+        self.addCleanup(self.h.doCleanups)
+        self.ls = self.h.ls
+        self.sr = self.ls._standings_module()
+        with self.h.salary.open(newline="", encoding="utf-8") as fh:
+            rows = list(csv.reader(fh))[1:]
+        self.name_by_id = {row[3]: row[2] for row in rows}
+        self.pids = sorted(self.name_by_id)
+        self.parent = _entry_rosters(self.h.parent_file)
+        self.assertEqual(sorted(self.parent), ["7001", "7002", "7003"])
+
+        def forced(projections, roster_ids, shape):
+            ids = [str(p) for p in roster_ids]
+            return 10.0 if any(ids == [str(p) for p in r] for r in self.parent.values()) else 5.0
+
+        self.ls._score_roster = forced
+        self.ceilings = {pid: 10.0 for pid in self.pids}
+        patch = unittest.mock.patch.object(
+            self.sr, "frame_for_run",
+            side_effect=lambda root, run_id: (dict(self.ceilings), {
+                "run_id": run_id, "mode": "initial_build", "path": "synthetic", "note": ""}))
+        patch.start()
+        self.addCleanup(patch.stop)
+
+    # -- fixtures ------------------------------------------------------------ #
+
+    def _open_count(self, entry_id):
+        return sum(1 for pid in self.parent[entry_id] if self.name_by_id[pid][:2] in ("T3", "T4"))
+
+    def _cell(self, names):
+        return " ".join(f"{slot} {n}" for slot, n in zip(("P", "P", "C", "1B", "2B", "3B", "SS",
+                                                          "OF", "OF", "OF"), names))
+
+    def _entry_cell(self, entry_id):
+        return self._cell([self.name_by_id[pid] for pid in self.parent[entry_id]])
+
+    def _standings(self, points=None, tr="0", skip=(), twice=(), wrong=(), name=None):
+        """Leaders 200/150/100 plus our three entries. Defaults make 7001 live, 7002
+        cash_viable, 7003 out (see the class docstring)."""
+        if points is None:
+            points = {"7001": 201.0 - 10 * self._open_count("7001"),
+                      "7002": 150.0 - 10 * self._open_count("7002"),
+                      "7003": 94.0 - 10 * self._open_count("7003")}
+        rows = [("1", "9001", tr, 200.0, self._cell(self.LEADER_NAMES)),
+                ("2", "9002", tr, 150.0, self._cell(self.LEADER_NAMES)),
+                ("3", "9003", tr, 100.0, self._cell(self.LEADER_NAMES))]
+        for eid in ("7001", "7002", "7003"):
+            if eid in skip:
+                continue
+            cell = (self._cell(self.LEADER_NAMES) if eid in wrong else self._entry_cell(eid))
+            rows.append(("9", eid, tr, points[eid], cell))
+            if eid in twice:
+                rows.append(("10", eid, tr, points[eid], cell))
+        path = self.h.root / (name or f"contest-standings-{self.CONTEST}.csv")
+        with path.open("w", newline="", encoding="utf-8-sig") as fh:
+            writer = csv.writer(fh)
+            writer.writerow(StandingsReadTests.HEADER)
+            for rank, eid, trm, pts, cell in rows:
+                writer.writerow([rank, eid, f"user{eid}", trm, pts, cell, "", "", "", "", ""])
+        return path
+
+    def _run(self, *extra, brief=True):
+        if brief:
+            self.h._brief()
+        return self.h._run(*extra)
+
+    def _record(self):
+        records = sorted((self.h.root / "data" / "deliveries" / self.DATE).glob("*.json"))
+        self.assertEqual(len(records), 1, [p.name for p in records])
+        return json.loads(records[0].read_text(encoding="utf-8"))
+
+    # -- today's refusal, byte for byte ---------------------------------------- #
+
+    def test_without_standings_the_refusal_is_todays(self):
+        code, out, err = self._run()
+        self.assertEqual(code, 3, err[-800:])
+        self.assertIn(self.REFUSAL_HEAD, err)
+        for entry in ("7001", "7002", "7003"):
+            self.assertIn(f"  {entry} [large_field_gpp] -5.00", err)
+        self.assertIn("Re-run with --accept-downgrade to take it anyway", err)
+        self.assertNotIn("standings", (out + err).lower(), "no new line without the flag")
+        self.assertNotIn("exempted", err)
+
+    def test_accept_downgrade_without_standings_records_exactly_todays_relaxations(self):
+        code, out, err = self._run("--accept-downgrade")
+        self.assertEqual(code, 0, err[-800:])
+        self.assertIn("downgrade accepted by --accept-downgrade: ", err)
+        self.assertEqual(self._record()["relaxations"], {"downgrades_accepted": 3})
+        self.assertNotIn("standings", (out + err).lower())
+
+    # -- the exemption --------------------------------------------------------- #
+
+    def test_a_live_for_target_entry_is_exempt_labeled_review_grade_and_counted_apart(self):
+        path = self._standings()
+        code, out, err = self._run("--standings", str(path), "--paid-places", "3",
+                                   "--entry-ids", "7001")
+        self.assertEqual(code, 0, err[-1500:])
+        self.assertRegex(out, r"7001 \[800\] rank \d+ points \S+ .* -> live_for_target")
+        self.assertIn("downgrade exempted by standings (live_for_target", err)
+        self.assertIn("7001 [large_field_gpp] -5.00", err)
+        self.assertNotIn("accepted by --accept-downgrade", err,
+                         "an exempted entry is not reported as one the operator accepted")
+        record = self._record()
+        self.assertEqual(record["relaxations"], {"downgrades_accepted": 0,
+                                                 "downgrades_exempted_by_standings": 1})
+        self.assertEqual(record["manifest_row"]["certification"], "review_grade_downgrade_accepted",
+                         "the file IS review-grade (R386)")
+        manifests = [json.loads(p.read_text(encoding="utf-8"))
+                     for p in (self.h.root / "runs").glob("*/manifest.json")]
+        swap = [m for m in manifests if m.get("mode") == "late_swap"]
+        self.assertEqual(len(swap), 1)
+        meta = swap[0]["metadata"]["standings"]
+        self.assertEqual(meta["verdicts"]["7001"]["verdict"], "live_for_target")
+        self.assertEqual(meta["target_rank"], 1)
+        self.assertEqual(len(meta["files"]["800"]["sha256"]), 64)
+        self.assertIn("never a probability", meta["label"])
+
+    def test_with_accept_downgrade_the_flag_subsumes_the_standings(self):
+        path = self._standings()
+        code, out, err = self._run("--standings", str(path), "--paid-places", "3",
+                                   "--entry-ids", "7001", "--accept-downgrade")
+        self.assertEqual(code, 0, err[-1500:])
+        self.assertIn("downgrade accepted by --accept-downgrade: 7001", err)
+        self.assertNotIn("exempted by standings", err)
+        self.assertEqual(self._record()["relaxations"], {"downgrades_accepted": 1})
+        self.assertRegex(out, r"7001 \[800\] .* -> live_for_target", "the verdicts still print")
+
+    def test_a_cash_viable_entry_and_an_out_entry_are_not_exempt(self):
+        path = self._standings()
+        code, out, err = self._run("--standings", str(path), "--paid-places", "3")
+        self.assertEqual(code, 3, err[-1500:])
+        self.assertRegex(out, r"7002 \[800\] .* -> cash_viable")
+        self.assertRegex(out, r"7003 \[800\] .* -> out")
+        self.assertIn(self.REFUSAL_HEAD, err)
+        refusal = err[err.index(self.REFUSAL_HEAD):]
+        self.assertIn("  7002 [large_field_gpp] -5.00", refusal)
+        self.assertIn("  7003 [large_field_gpp] -5.00", refusal)
+        self.assertNotIn("  7001 [large_field_gpp]", refusal, "the live entry left the refusal")
+        self.assertIn("downgrade exempted by standings", err, "and is named as exempted")
+
+    def test_a_missing_duplicated_or_mismatched_standings_row_is_not_exempt(self):
+        path = self._standings(skip=("7001",), twice=("7002",), wrong=("7003",))
+        code, out, err = self._run("--standings", str(path), "--paid-places", "3")
+        self.assertEqual(code, 3, err[-1500:])
+        self.assertIn("7001 [800] unknown: entry 7001 is not in", out)
+        self.assertIn("7002 [800] unknown: entry 7002 appears 2 times", out)
+        self.assertIn("7003 [800] unknown: the standings Lineup differs from the roster", out)
+        refusal = err[err.index(self.REFUSAL_HEAD):]
+        for entry in ("7001", "7002", "7003"):
+            self.assertIn(f"  {entry} [large_field_gpp] -5.00", refusal)
+        self.assertNotIn("exempted by standings", err)
+
+    def test_an_unusable_standings_file_degrades_to_todays_refusal_and_never_blocks_the_file(self):
+        # What the operator typed wrong is refused at exit 4, before anything is read.
+        missing = self.h.root / "contest-standings-999.csv"
+        for extra, needle in ((["--standings", str(missing)], "is not a file"),
+                              (["--standings", str(self._standings()), "--paid-places", "abc"],
+                               "--paid-places"),
+                              (["--standings", str(self._standings()), "--target-rank", "0"],
+                               "--target-rank"),
+                              (["--paid-places", "3"], "apply only with --standings")):
+            code, out, err = self.h._run(*extra)
+            self.assertEqual(code, 4, (extra, err[-400:]))
+            self.assertIn(needle, err)
+        # A file that exists but cannot be used degrades.
+        bad = self._standings(tr="1:30", name="contest-standings-800.csv")
+        code, out, err = self._run("--standings", str(bad), "--paid-places", "3")
+        self.assertEqual(code, 3, err[-800:])
+        self.assertIn("STANDINGS NOT USED: StandingsFormatError", err)
+        self.assertIn("'1:30'", err)
+        self.assertIn(self.REFUSAL_HEAD, err, "exactly the refusal the swap makes without the flag")
+        self.assertNotIn("exempted by standings", err)
+
+    def test_a_bad_standings_file_does_not_stop_a_swap_the_operator_accepted(self):
+        bad = self._standings(tr="45 min")
+        code, out, err = self._run("--standings", str(bad), "--accept-downgrade")
+        self.assertEqual(code, 0, err[-800:])
+        self.assertIn("STANDINGS NOT USED", err)
+        self.assertEqual(self._record()["relaxations"], {"downgrades_accepted": 3})
+
+    def test_the_chosen_lineup_must_still_reach_the_target(self):
+        # Only 7001's own players keep a 10.0 ceiling; any newcomer the swap seats is 1.0.
+        self.ceilings = {pid: (10.0 if pid in self.parent["7001"] else 1.0) for pid in self.pids}
+        path = self._standings()
+        code, out, err = self._run("--standings", str(path), "--paid-places", "3",
+                                   "--entry-ids", "7001")
+        self.assertRegex(out, r"7001 \[800\] .* -> live_for_target", "live on the incumbent")
+        self.assertEqual(code, 3, err[-1500:])
+        self.assertIn("  7001 [large_field_gpp] -5.00", err[err.index(self.REFUSAL_HEAD):])
+        self.assertNotIn("exempted by standings", err)
+
+    def test_a_cash_class_contest_is_never_exempt(self):
+        path = self._standings()
+        code, out, err = self._run("--standings", str(path), "--paid-places", "3",
+                                   "--entry-ids", "7001", "--postures", "800=cash")
+        self.assertRegex(out, r"7001 \[800\] .* -> live_for_target",
+                         "the verdict is rank-based; the CLASS decides the exemption")
+        self.assertEqual(code, 3, err[-1500:])
+        self.assertIn("  7001 [cash] -5.00", err)
+        self.assertNotIn("exempted by standings", err)
+
+    def test_a_v_failure_is_never_exempt_because_the_refusal_is_never_reached(self):
+        path = self._standings()
+        code, out, err = self._run("--standings", str(path), "--paid-places", "3", brief=False)
+        self.assertEqual(code, 3)
+        self.assertIn("no compatible candidate", err, "the engine's own V refusal")
+        self.assertNotIn("exempted by standings", err)
+        self.assertNotIn(self.REFUSAL_HEAD, err, "the F16 block was never reached")
+
+    def test_the_consensus_pair_guard_is_untouched_by_an_exemption(self):
+        calls = []
+
+        def spy(args, pair, parent_rosters, after_rosters, contest_by_entry, downgraded):
+            calls.append((args.accept_downgrade, list(downgraded)))
+            return 3
+
+        self.ls.consensus_pair_guard = spy
+        path = self._standings()
+        code, out, err = self._run("--standings", str(path), "--paid-places", "3",
+                                   "--entry-ids", "7001")
+        self.assertEqual(code, 3, "the guard still refuses; standings exempt nothing else")
+        self.assertEqual(len(calls), 1)
+        self.assertFalse(calls[0][0], "--accept-downgrade was not given")
+        self.assertEqual(calls[0][1], ["7001 [large_field_gpp] -5.00"],
+                         "the exempted line reaches the guard's list unchanged")
+        self.assertIn("downgrade exempted by standings", err)
+
+    # -- fixes from the review of this change ---------------------------------- #
+
+    def test_a_zip_a_duplicate_suffix_a_keyed_paid_places_and_a_target_rank_through_main(self):
+        import zipfile
+        csv_path = self._standings(name="member.csv")
+        zip_path = self.h.root / "contest-standings-800 (1).zip"
+        with zipfile.ZipFile(zip_path, "w") as zf:
+            zf.write(csv_path, "contest-standings-800.csv")
+        code, out, err = self._run("--standings", str(zip_path), "--paid-places", "800=3",
+                                   "--target-rank", "2", "--entry-ids", "7001")
+        self.assertIn("target rank 2: 151.00 -> T 151.00 (entry 7001)", out,
+                      "rank 2 is our own entry (151.00 beats the leaders' 150.00), read through the zip")
+        self.assertIn("cash line: 150.00 = rank 3 (paid places from --paid-places)", out,
+                      "the keyed paid-places map")
+        self.assertIn("[contest id from entry membership", out,
+                      "'(1)' is not a contest id; the entries named the contest")
+        # 7001 IS the rank-2 row: it is defending that rank, not chasing it, so it is live
+        # against the target and still NOT exempt. At the default target (rank 1) it is.
+        self.assertRegex(out, r"7001 \[800\] .* -> live_for_target \(at or above the target")
+        self.assertEqual(code, 3, err[-1500:])
+        self.assertIn("  7001 [large_field_gpp] -5.00", err[err.index(self.REFUSAL_HEAD):])
+        self.assertNotIn("exempted by standings (", err)
+
+    def test_a_bare_paid_places_with_two_standings_files_is_refused_at_exit_4(self):
+        a, b = self._standings(name="contest-standings-800.csv"), self._standings(name="contest-standings-801.csv")
+        code, out, err = self.h._run("--standings", str(a), "--standings", str(b), "--paid-places", "3")
+        self.assertEqual(code, 4, err[-600:])
+        self.assertIn("exactly one --standings file", err)
+        self.assertIn("Nothing was read and no swap was attempted", err)
+
+    def test_an_exception_in_the_exemption_falls_back_to_todays_refusal(self):
+        def boom(*args, **kwargs):
+            raise RuntimeError("synthetic failure inside the exemption")
+
+        with unittest.mock.patch.object(self.sr, "partition_downgrades", side_effect=boom):
+            code, out, err = self._run("--standings", str(self._standings()), "--paid-places", "3",
+                                       "--entry-ids", "7001")
+        self.assertEqual(code, 3, err[-1500:])
+        self.assertIn("STANDINGS NOT USED at the refusal: RuntimeError", err)
+        self.assertIn(self.REFUSAL_HEAD, err, "exactly the refusal the swap makes without the flag")
+        self.assertIn("  7001 [large_field_gpp] -5.00", err[err.index(self.REFUSAL_HEAD):])
+        self.assertNotIn("exempted by standings (", err)

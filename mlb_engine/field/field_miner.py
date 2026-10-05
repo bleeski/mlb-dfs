@@ -260,8 +260,17 @@ def _parse_pct(cell: str) -> Optional[float]:
         return None
 
 
-def parse_standings_export(path: str) -> Dict[str, Any]:
-    """Read a DK contest-standings CSV into entry rows and the player table."""
+def parse_standings_export(path: str, *,
+                           with_time_remaining: bool = False) -> Dict[str, Any]:
+    """Read a DK contest-standings CSV into entry rows and the player table.
+
+    R472. ``with_time_remaining=True`` adds one key to each entry,
+    ``"time_remaining"``: the stripped raw ``TimeRemaining`` cell, never
+    interpreted here (its unit and live behavior are unverified: 0 of the
+    516,804 archived rows are nonzero). The default leaves every entry dict, and
+    so every archived output built from it, exactly as it was; only
+    ``tools/standings_read.py`` passes it.
+    """
     entries: List[Dict[str, Any]] = []
     players: List[Dict[str, Any]] = []
     with open(path, "r", encoding="utf-8-sig", newline="") as fh:
@@ -296,7 +305,7 @@ def parse_standings_export(path: str) -> Dict[str, Any]:
                 points = float(row[4]) if str(row[4]).strip() else None
             except ValueError:
                 points = None
-            entries.append({
+            entry = {
                 "rank": str(row[0]).strip(),
                 "entry_id": str(row[1]).strip(),
                 "entry_name": name_raw,
@@ -315,7 +324,10 @@ def parse_standings_export(path: str) -> Dict[str, Any]:
                 # standings CSVs directly to measure it at all. Captured here, at
                 # parse time, so a re-mine backfills the whole archive.
                 "captain_norm": _captain_norm(lineup),
-            })
+            }
+            if with_time_remaining:
+                entry["time_remaining"] = str(row[3]).strip()
+            entries.append(entry)
         # Right block: a player row has a non-empty Player cell.
         if len(row) > 10 and str(row[7]).strip():
             try:
