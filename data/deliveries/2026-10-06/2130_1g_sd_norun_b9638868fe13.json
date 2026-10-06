@@ -1,0 +1,538 @@
+{
+ "code": {
+  "contest_allocator": "v1.12",
+  "execution_pipeline": "v1.17",
+  "git_dirty": true,
+  "git_sha": "14aa670630363d547edb7f21671ccb58b4340bf0"
+ },
+ "controls": {
+  "max_cpt_exposure_pct": 0.25,
+  "max_cpt_per_contest": 2,
+  "max_player_exposure_pct": 0.5,
+  "max_shared_players": 4
+ },
+ "date": "2026-10-06",
+ "egress": "egress: statsapi 200, odds 401, savant 200, mlb-lineups 200, fangraphs 200 (curl), open-meteo 429",
+ "egress_source": "caller",
+ "entries": [
+  {
+   "contest_id": "196429127",
+   "contest_name": "MLB Showdown $10K mini-MAX [150 Entry Max] (MIL @ SD)",
+   "entry_fee": 1.0,
+   "entry_id": "5285628820",
+   "filled": true,
+   "roster_ids": [
+    "44400240",
+    "44400138",
+    "44400143",
+    "44400144",
+    "44400148",
+    "44400162"
+   ]
+  },
+  {
+   "contest_id": "196429128",
+   "contest_name": "MLB Showdown $1.5K Solo Shot (MIL @ SD)",
+   "entry_fee": 1.0,
+   "entry_id": "5285628838",
+   "filled": true,
+   "roster_ids": [
+    "44400227",
+    "44400139",
+    "44400146",
+    "44400149",
+    "44400162",
+    "44400164"
+   ]
+  },
+  {
+   "contest_id": "196429129",
+   "contest_name": "MLB Showdown $1.5K Quarter Jukebox [Just $0.25!] (MIL @ SD)",
+   "entry_fee": 0.25,
+   "entry_id": "5285623260",
+   "filled": true,
+   "roster_ids": [
+    "44400227",
+    "44400140",
+    "44400144",
+    "44400154",
+    "44400162",
+    "44400164"
+   ]
+  },
+  {
+   "contest_id": "196429129",
+   "contest_name": "MLB Showdown $1.5K Quarter Jukebox [Just $0.25!] (MIL @ SD)",
+   "entry_fee": 0.25,
+   "entry_id": "5285623271",
+   "filled": true,
+   "roster_ids": [
+    "44400231",
+    "44400140",
+    "44400144",
+    "44400146",
+    "44400154",
+    "44400164"
+   ]
+  },
+  {
+   "contest_id": "196429409",
+   "contest_name": "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (MIL @ SD)",
+   "entry_fee": 0.1,
+   "entry_id": "5285629221",
+   "filled": true,
+   "roster_ids": [
+    "44400229",
+    "44400143",
+    "44400144",
+    "44400148",
+    "44400150",
+    "44400164"
+   ]
+  },
+  {
+   "contest_id": "196429409",
+   "contest_name": "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (MIL @ SD)",
+   "entry_fee": 0.1,
+   "entry_id": "5285629251",
+   "filled": true,
+   "roster_ids": [
+    "44400227",
+    "44400140",
+    "44400143",
+    "44400151",
+    "44400162",
+    "44400164"
+   ]
+  },
+  {
+   "contest_id": "196429409",
+   "contest_name": "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (MIL @ SD)",
+   "entry_fee": 0.1,
+   "entry_id": "5285629252",
+   "filled": true,
+   "roster_ids": [
+    "44400227",
+    "44400140",
+    "44400144",
+    "44400155",
+    "44400160",
+    "44400162"
+   ]
+  },
+  {
+   "contest_id": "196429409",
+   "contest_name": "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (MIL @ SD)",
+   "entry_fee": 0.1,
+   "entry_id": "5285629253",
+   "filled": true,
+   "roster_ids": [
+    "44400228",
+    "44400141",
+    "44400142",
+    "44400146",
+    "44400162",
+    "44400164"
+   ]
+  },
+  {
+   "contest_id": "196429409",
+   "contest_name": "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (MIL @ SD)",
+   "entry_fee": 0.1,
+   "entry_id": "5285629254",
+   "filled": true,
+   "roster_ids": [
+    "44400231",
+    "44400141",
+    "44400145",
+    "44400146",
+    "44400150",
+    "44400164"
+   ]
+  },
+  {
+   "contest_id": "196429409",
+   "contest_name": "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (MIL @ SD)",
+   "entry_fee": 0.1,
+   "entry_id": "5285629255",
+   "filled": true,
+   "roster_ids": [
+    "44400231",
+    "44400139",
+    "44400141",
+    "44400145",
+    "44400160",
+    "44400164"
+   ]
+  },
+  {
+   "contest_id": "196429409",
+   "contest_name": "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (MIL @ SD)",
+   "entry_fee": 0.1,
+   "entry_id": "5285629256",
+   "filled": true,
+   "roster_ids": [
+    "44400228",
+    "44400138",
+    "44400146",
+    "44400148",
+    "44400160",
+    "44400164"
+   ]
+  },
+  {
+   "contest_id": "196463022",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (MIL @ SD)",
+   "entry_fee": 0.1,
+   "entry_id": "5285629188",
+   "filled": true,
+   "roster_ids": [
+    "44400242",
+    "44400138",
+    "44400143",
+    "44400144",
+    "44400151",
+    "44400154"
+   ]
+  },
+  {
+   "contest_id": "196463022",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (MIL @ SD)",
+   "entry_fee": 0.1,
+   "entry_id": "5285629286",
+   "filled": true,
+   "roster_ids": [
+    "44400233",
+    "44400140",
+    "44400143",
+    "44400148",
+    "44400153",
+    "44400162"
+   ]
+  },
+  {
+   "contest_id": "196463022",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (MIL @ SD)",
+   "entry_fee": 0.1,
+   "entry_id": "5285629287",
+   "filled": true,
+   "roster_ids": [
+    "44400229",
+    "44400138",
+    "44400148",
+    "44400149",
+    "44400154",
+    "44400164"
+   ]
+  },
+  {
+   "contest_id": "196463022",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (MIL @ SD)",
+   "entry_fee": 0.1,
+   "entry_id": "5285629288",
+   "filled": true,
+   "roster_ids": [
+    "44400229",
+    "44400138",
+    "44400148",
+    "44400149",
+    "44400160",
+    "44400162"
+   ]
+  },
+  {
+   "contest_id": "196463022",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (MIL @ SD)",
+   "entry_fee": 0.1,
+   "entry_id": "5285629289",
+   "filled": true,
+   "roster_ids": [
+    "44400233",
+    "44400138",
+    "44400143",
+    "44400148",
+    "44400154",
+    "44400164"
+   ]
+  },
+  {
+   "contest_id": "196463022",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (MIL @ SD)",
+   "entry_fee": 0.1,
+   "entry_id": "5285629290",
+   "filled": true,
+   "roster_ids": [
+    "44400232",
+    "44400140",
+    "44400144",
+    "44400149",
+    "44400151",
+    "44400162"
+   ]
+  },
+  {
+   "contest_id": "196463022",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (MIL @ SD)",
+   "entry_fee": 0.1,
+   "entry_id": "5285629291",
+   "filled": true,
+   "roster_ids": [
+    "44400237",
+    "44400140",
+    "44400144",
+    "44400149",
+    "44400150",
+    "44400151"
+   ]
+  },
+  {
+   "contest_id": "196463022",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (MIL @ SD)",
+   "entry_fee": 0.1,
+   "entry_id": "5285629292",
+   "filled": true,
+   "roster_ids": [
+    "44400238",
+    "44400140",
+    "44400143",
+    "44400144",
+    "44400153",
+    "44400154"
+   ]
+  },
+  {
+   "contest_id": "196463022",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (MIL @ SD)",
+   "entry_fee": 0.1,
+   "entry_id": "5285629293",
+   "filled": true,
+   "roster_ids": [
+    "44400232",
+    "44400138",
+    "44400144",
+    "44400146",
+    "44400160",
+    "44400162"
+   ]
+  },
+  {
+   "contest_id": "196463022",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (MIL @ SD)",
+   "entry_fee": 0.1,
+   "entry_id": "5285629294",
+   "filled": true,
+   "roster_ids": [
+    "44400231",
+    "44400141",
+    "44400145",
+    "44400146",
+    "44400154",
+    "44400160"
+   ]
+  },
+  {
+   "contest_id": "196463022",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (MIL @ SD)",
+   "entry_fee": 0.1,
+   "entry_id": "5285629295",
+   "filled": true,
+   "roster_ids": [
+    "44400230",
+    "44400142",
+    "44400145",
+    "44400146",
+    "44400153",
+    "44400162"
+   ]
+  },
+  {
+   "contest_id": "196463022",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (MIL @ SD)",
+   "entry_fee": 0.1,
+   "entry_id": "5285629296",
+   "filled": true,
+   "roster_ids": [
+    "44400228",
+    "44400142",
+    "44400145",
+    "44400146",
+    "44400154",
+    "44400164"
+   ]
+  },
+  {
+   "contest_id": "196463022",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (MIL @ SD)",
+   "entry_fee": 0.1,
+   "entry_id": "5285629297",
+   "filled": true,
+   "roster_ids": [
+    "44400228",
+    "44400141",
+    "44400142",
+    "44400150",
+    "44400154",
+    "44400164"
+   ]
+  },
+  {
+   "contest_id": "196463022",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (MIL @ SD)",
+   "entry_fee": 0.1,
+   "entry_id": "5285629298",
+   "filled": true,
+   "roster_ids": [
+    "44400235",
+    "44400141",
+    "44400142",
+    "44400147",
+    "44400150",
+    "44400160"
+   ]
+  },
+  {
+   "contest_id": "196463022",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (MIL @ SD)",
+   "entry_fee": 0.1,
+   "entry_id": "5285629299",
+   "filled": true,
+   "roster_ids": [
+    "44400234",
+    "44400142",
+    "44400146",
+    "44400147",
+    "44400150",
+    "44400153"
+   ]
+  },
+  {
+   "contest_id": "196463022",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (MIL @ SD)",
+   "entry_fee": 0.1,
+   "entry_id": "5285629300",
+   "filled": true,
+   "roster_ids": [
+    "44400231",
+    "44400139",
+    "44400146",
+    "44400148",
+    "44400150",
+    "44400164"
+   ]
+  },
+  {
+   "contest_id": "196463022",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (MIL @ SD)",
+   "entry_fee": 0.1,
+   "entry_id": "5285629301",
+   "filled": true,
+   "roster_ids": [
+    "44400235",
+    "44400139",
+    "44400142",
+    "44400145",
+    "44400153",
+    "44400160"
+   ]
+  },
+  {
+   "contest_id": "196463022",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (MIL @ SD)",
+   "entry_fee": 0.1,
+   "entry_id": "5285629302",
+   "filled": true,
+   "roster_ids": [
+    "44400227",
+    "44400142",
+    "44400146",
+    "44400154",
+    "44400155",
+    "44400162"
+   ]
+  },
+  {
+   "contest_id": "196463022",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (MIL @ SD)",
+   "entry_fee": 0.1,
+   "entry_id": "5285629303",
+   "filled": true,
+   "roster_ids": [
+    "44400230",
+    "44400140",
+    "44400142",
+    "44400144",
+    "44400162",
+    "44400164"
+   ]
+  },
+  {
+   "contest_id": "196463022",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (MIL @ SD)",
+   "entry_fee": 0.1,
+   "entry_id": "5285629304",
+   "filled": true,
+   "roster_ids": [
+    "44400243",
+    "44400139",
+    "44400142",
+    "44400146",
+    "44400149",
+    "44400150"
+   ]
+  }
+ ],
+ "entries_binding": {
+  "source": "outputs/2026-10-06/DKEntries_showdown_2130_1g_sd_REVIEW_GRADE_final.csv",
+  "source_sha256": "b9638868fe13872525353dc34c93cc6903e61f358fd8a932b304c3bb84529666",
+  "status": "bound"
+ },
+ "host": {
+  "call_budget_s": 630.0,
+  "declared_ceiling_s": 900.0,
+  "host": "claude_code"
+ },
+ "kind": "delivery",
+ "labels": "deterministic review proxies and labeled priors only; never ROI, win rate, cash rate, or probability",
+ "manifest_row": {
+  "certification": "review_grade",
+  "contest_ids": [
+   "196429127",
+   "196429128",
+   "196429129",
+   "196429409",
+   "196463022"
+  ],
+  "contest_names": [],
+  "contest_type": "showdown",
+  "delivered_file": "outputs/2026-10-06/DKEntries_showdown_2130_1g_sd_REVIEW_GRADE_final.csv",
+  "entries": 31,
+  "notes": "Operator assembly, review-grade, never certified. The 31 lineups are exactly the thesis-ladder rows of build 206ce1850e1bf409 (supplied postseason Base sha256 d651bccdbc948, odds BetMGM paste). One swap: Solo Shot 5285628838 takes the Pivetta-CPT both-starters lineup (proxy 51.4) from Dime Time 5285629304, which takes the Pratt-CPT bottom-order lineup; the ladder fills rows in file order, so the single-entry broad-payout contest had drawn a leverage template. Caps re-checked on the assembled set by preflight: per-contest CPT 0 over cap, overlap <= 4, player exposure <= 15 of 31.",
+  "projection_tier": "unknown",
+  "recorded_utc": "2026-10-06T23:43:34.334996+00:00",
+  "run_id": null,
+  "sha256": "b9638868fe13872525353dc34c93cc6903e61f358fd8a932b304c3bb84529666",
+  "slate_tag": "2130_1g_sd",
+  "status": "candidate",
+  "strategy_state": {
+   "counts": {},
+   "state": "unknown"
+  }
+ },
+ "recorded_utc": "2026-10-06T23:43:34.618303+00:00",
+ "relaxations": {
+  "both_relaxed_slots": 0,
+  "cap_reassignments_withdrawn": 0,
+  "captain_apportionment_shortfall": 0,
+  "captain_relaxed_slots": 0,
+  "clean": true,
+  "contest_cap_relaxed_slots": 0,
+  "cpt_cap_relaxed_slots": 0,
+  "min_per_team_relaxed_slots": 0,
+  "min_per_team_slots_carrying_floor": 8,
+  "overlap_relaxed_slots": 0,
+  "per_contest_cap_breaches": 0,
+  "player_relaxed_slots": 0
+ },
+ "run": {},
+ "schema_version": 1
+}
