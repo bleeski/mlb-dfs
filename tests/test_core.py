@@ -44428,7 +44428,10 @@ class LateSwapEnrichedFrameTests(unittest.TestCase):
         self.assertIn(f"ENRICHED by carry from run {root_id} (initial_build, 1 hop(s) from the parent",
                       line, "the root-most frame wins over the first swap's own")
         self.assertIn(f"origin {root_id}", line)
-        second = self._swap_runs(h.root)[-1]
+        # By identity, not by sort order: run ids are `<second>_<random suffix>`, so two
+        # swap runs minted in the same second sort by the random suffix and `[-1]` can
+        # be the FIRST swap (a CI flake: chain read [root] instead of [first, root]).
+        second = next(r for r in self._swap_runs(h.root) if r["run_id"] != first_run)
         chain = second["metadata"]["projection_carry"]["chain"]
         self.assertEqual([c["run_id"] for c in chain], [first_run, root_id])
         self.assertNotEqual(second["run_id"], first_run)

@@ -19,6 +19,22 @@ What changed in the engine, the tools and the contracts, when, and why.
 
 **Scope.** `CHANGELOG.md` and `docs/backlog_inbox/2026-10-06_DEV_late-swap-carries-no-sleeve-or-seat-stamps.md` (its candidate-item paragraph now states the decision). No code, no test, no pin moved. Gate: the PR's `gate` check.
 
+## 2026-10-06 — Test flake fixed: `LateSwapEnrichedFrameTests.test_S6` found its second swap run by sort order, and two runs minted in the same second sort by their random suffix (R428's test; no engine change)
+
+**Scope.** `tests/test_core.py` (one line in `test_S6_a_swap_of_a_swap_carries_the_root_builds_values`) and this file. No engine, tool, pin or count moved.
+
+**What was wrong.** After R434 merged, the CI `gate` went red about one run in four (PR #117's `pull_request` gate, PR #119's `push` gate) with `FAIL  test suite FAILED in tests.test_core` and no test named. Throwaway `diag/` branches that print the failing suite's stderr tail (the audit keeps it at `result["checks"]["tests"]["stderr_tail"]`) named it on the first failure: `test_S6_a_swap_of_a_swap_carries_the_root_builds_values` (run 37521433004), `AssertionError: Lists differ: ['...194930Z_6900e4d9'] != ['...194931Z_b356fc36', '...194930Z_6900e4d9']`. It is R428's test, not R434's, and it was already in the failing names of the starting-HEAD baseline worktree (the 'cleared' name in R434's verification). `_swap_runs` returns the `late_swap` manifests in `sorted()` glob order, run ids are `<UTC second>_<random 8 hex>` (`build_state_manager.create_run`), and the test takes `[-1]` as the second swap. When both swaps are minted in the same second, the random suffix decides the order, so `[-1]` can be the FIRST swap, whose chain is `[root]` and not `[first, root]`. The rate seen on CI was roughly one gate run in four; the mechanism needs both swaps minted in one second and the later suffix to sort lower, and how often the two swaps share a second on a runner was not measured.
+
+**Reproduction, before the fix.** `build_state_manager._utc_now` pinned to one second and `uuid.uuid4` stubbed to hand out descending suffixes (so the later run sorts first) fails the test with exactly the CI diff; the unforced class passed 29 of 29 on the Windows host, which is why no local gate ever saw it.
+
+**What shipped.** `second = next(r for r in self._swap_runs(h.root) if r["run_id"] != first_run)`: the second swap is the swap run that is not the first, by identity. With the same forced ordering the test passes, and the class passes unforced (29 of 29). `assertNotEqual(second["run_id"], first_run)` is now implied by the selection and is left as it was. No other test in the class takes two swaps (`_swap_runs(...)[-1]` elsewhere follows a single swap).
+
+**Declined or filed.** The audit's failure line still names suites, not tests; that is `docs/backlog_inbox/2026-10-06_DEV_gate-failure-line-names-suites-not-tests.md`, whose reading above (3 of 4 green on identical bytes) is now explained.
+
+**Mutation check.** The fix reverted (`[-1]`) under the forced ordering: red with the CI diff. Restored: green.
+
+**Verification.** `python -m unittest tests.test_core.LateSwapEnrichedFrameTests`: Ran 29 tests, OK; the forced-ordering run: Ran 1 test, OK. The PR's `gate` check is the merge authority.
+
 ## 2026-10-06 — R434: `--stack-sleeve`, a named secondary stack seated through the allocator's sleeve mask. One entry (or a named few) carries a team the operator names, at least `min` hitters of it under a different and strictly larger primary stack; every cap binds it jointly, F-3 holds, a seat the slate cannot carry is relaxed and counted (never a refusal), and the build records it on the brief and the delivery record (roadmap Session 117)
 
 **Scope.**
