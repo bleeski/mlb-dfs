@@ -1,0 +1,876 @@
+{
+ "code": {
+  "contest_allocator": "v1.12",
+  "execution_pipeline": "v1.17",
+  "git_dirty": true,
+  "git_sha": "6c18b905141158757c2ed833da0c12ad67d2d8b7"
+ },
+ "controls": {},
+ "date": "2026-10-06",
+ "egress": "egress: statsapi 200, odds 401, savant 200, mlb-lineups 200, fangraphs 200 (curl), open-meteo timeout",
+ "egress_source": "session_start 2026-10-06T21:10:25+00:00",
+ "entries": [
+  {
+   "contest_id": "196429090",
+   "contest_name": "MLB $1.5K Quarter Jukebox [Just $0.25!]",
+   "entry_fee": 0.25,
+   "entry_id": "5285482783",
+   "filled": true,
+   "roster_ids": [
+    "44393503",
+    "44393505",
+    "44393525",
+    "44393520",
+    "44393509",
+    "44393541",
+    "44393532",
+    "44393538",
+    "44393518",
+    "44393527"
+   ]
+  },
+  {
+   "contest_id": "196429090",
+   "contest_name": "MLB $1.5K Quarter Jukebox [Just $0.25!]",
+   "entry_fee": 0.25,
+   "entry_id": "5285482797",
+   "filled": true,
+   "roster_ids": [
+    "44393504",
+    "44393506",
+    "44393526",
+    "44393514",
+    "44393533",
+    "44393551",
+    "44393512",
+    "44393509",
+    "44393534",
+    "44393517"
+   ]
+  },
+  {
+   "contest_id": "196429098",
+   "contest_name": "MLB $1K Daily Dollar [Single Entry]",
+   "entry_fee": 1.0,
+   "entry_id": "5285483020",
+   "filled": true,
+   "roster_ids": [
+    "44393504",
+    "44393503",
+    "44393526",
+    "44393523",
+    "44393549",
+    "44393516",
+    "44393532",
+    "44393518",
+    "44393538",
+    "44393534"
+   ]
+  },
+  {
+   "contest_id": "196429268",
+   "contest_name": "MLB Satellite to $15 Relay Throw",
+   "entry_fee": 0.1,
+   "entry_id": "5285483051",
+   "filled": true,
+   "roster_ids": [
+    "44393506",
+    "44393503",
+    "44393525",
+    "44393523",
+    "44393513",
+    "44393535",
+    "44393539",
+    "44393527",
+    "44393511",
+    "44393518"
+   ]
+  },
+  {
+   "contest_id": "196429268",
+   "contest_name": "MLB Satellite to $15 Relay Throw",
+   "entry_fee": 0.1,
+   "entry_id": "5285483201",
+   "filled": true,
+   "roster_ids": [
+    "44393506",
+    "44393505",
+    "44393525",
+    "44393507",
+    "44393509",
+    "44393535",
+    "44393512",
+    "44393524",
+    "44393515",
+    "44393548"
+   ]
+  },
+  {
+   "contest_id": "196429268",
+   "contest_name": "MLB Satellite to $15 Relay Throw",
+   "entry_fee": 0.1,
+   "entry_id": "5285483202",
+   "filled": true,
+   "roster_ids": [
+    "44393503",
+    "44393505",
+    "44393525",
+    "44393523",
+    "44393509",
+    "44393535",
+    "44393532",
+    "44393518",
+    "44393527",
+    "44393544"
+   ]
+  },
+  {
+   "contest_id": "196429268",
+   "contest_name": "MLB Satellite to $15 Relay Throw",
+   "entry_fee": 0.1,
+   "entry_id": "5285483203",
+   "filled": true,
+   "roster_ids": [
+    "44393504",
+    "44393505",
+    "44393560",
+    "44393528",
+    "44393509",
+    "44393551",
+    "44393512",
+    "44393517",
+    "44393515",
+    "44393538"
+   ]
+  },
+  {
+   "contest_id": "196429268",
+   "contest_name": "MLB Satellite to $15 Relay Throw",
+   "entry_fee": 0.1,
+   "entry_id": "5285483204",
+   "filled": true,
+   "roster_ids": [
+    "44393503",
+    "44393505",
+    "44393521",
+    "44393528",
+    "44393509",
+    "44393535",
+    "44393532",
+    "44393515",
+    "44393544",
+    "44393527"
+   ]
+  },
+  {
+   "contest_id": "196429276",
+   "contest_name": "MLB Satellite to NBA 10-20 $20 Opening Tip Off",
+   "entry_fee": 0.1,
+   "entry_id": "5285483072",
+   "filled": true,
+   "roster_ids": [
+    "44393505",
+    "44393503",
+    "44393560",
+    "44393528",
+    "44393533",
+    "44393535",
+    "44393532",
+    "44393511",
+    "44393518",
+    "44393515"
+   ]
+  },
+  {
+   "contest_id": "196429276",
+   "contest_name": "MLB Satellite to NBA 10-20 $20 Opening Tip Off",
+   "entry_fee": 0.1,
+   "entry_id": "5285493614",
+   "filled": true,
+   "roster_ids": [
+    "44393503",
+    "44393505",
+    "44393525",
+    "44393523",
+    "44393509",
+    "44393535",
+    "44393532",
+    "44393518",
+    "44393527",
+    "44393544"
+   ]
+  },
+  {
+   "contest_id": "196429276",
+   "contest_name": "MLB Satellite to NBA 10-20 $20 Opening Tip Off",
+   "entry_fee": 0.1,
+   "entry_id": "5285493615",
+   "filled": true,
+   "roster_ids": [
+    "44393505",
+    "44393504",
+    "44393560",
+    "44393528",
+    "44393558",
+    "44393516",
+    "44393512",
+    "44393511",
+    "44393538",
+    "44393518"
+   ]
+  },
+  {
+   "contest_id": "196429276",
+   "contest_name": "MLB Satellite to NBA 10-20 $20 Opening Tip Off",
+   "entry_fee": 0.1,
+   "entry_id": "5285493616",
+   "filled": true,
+   "roster_ids": [
+    "44393504",
+    "44393505",
+    "44393560",
+    "44393528",
+    "44393509",
+    "44393551",
+    "44393512",
+    "44393517",
+    "44393515",
+    "44393538"
+   ]
+  },
+  {
+   "contest_id": "196429276",
+   "contest_name": "MLB Satellite to NBA 10-20 $20 Opening Tip Off",
+   "entry_fee": 0.1,
+   "entry_id": "5285493617",
+   "filled": true,
+   "roster_ids": [
+    "44393503",
+    "44393506",
+    "44393525",
+    "44393523",
+    "44393513",
+    "44393541",
+    "44393512",
+    "44393534",
+    "44393527",
+    "44393515"
+   ]
+  },
+  {
+   "contest_id": "196429276",
+   "contest_name": "MLB Satellite to NBA 10-20 $20 Opening Tip Off",
+   "entry_fee": 0.1,
+   "entry_id": "5285493618",
+   "filled": true,
+   "roster_ids": [
+    "44393504",
+    "44393506",
+    "44393526",
+    "44393520",
+    "44393513",
+    "44393541",
+    "44393532",
+    "44393507",
+    "44393524",
+    "44393522"
+   ]
+  },
+  {
+   "contest_id": "196429276",
+   "contest_name": "MLB Satellite to NBA 10-20 $20 Opening Tip Off",
+   "entry_fee": 0.1,
+   "entry_id": "5285493619",
+   "filled": true,
+   "roster_ids": [
+    "44393504",
+    "44393505",
+    "44393526",
+    "44393528",
+    "44393509",
+    "44393558",
+    "44393532",
+    "44393524",
+    "44393515",
+    "44393522"
+   ]
+  },
+  {
+   "contest_id": "196455477",
+   "contest_name": "MLB Satellite to $20 NFL Fantasy Football Millionaire",
+   "entry_fee": 0.1,
+   "entry_id": "5285483131",
+   "filled": true,
+   "roster_ids": [
+    "44393506",
+    "44393503",
+    "44393521",
+    "44393523",
+    "44393513",
+    "44393516",
+    "44393544",
+    "44393524",
+    "44393529",
+    "44393515"
+   ]
+  },
+  {
+   "contest_id": "196455477",
+   "contest_name": "MLB Satellite to $20 NFL Fantasy Football Millionaire",
+   "entry_fee": 0.1,
+   "entry_id": "5285493522",
+   "filled": true,
+   "roster_ids": [
+    "44393503",
+    "44393505",
+    "44393525",
+    "44393528",
+    "44393549",
+    "44393516",
+    "44393539",
+    "44393507",
+    "44393548",
+    "44393518"
+   ]
+  },
+  {
+   "contest_id": "196455477",
+   "contest_name": "MLB Satellite to $20 NFL Fantasy Football Millionaire",
+   "entry_fee": 0.1,
+   "entry_id": "5285493523",
+   "filled": true,
+   "roster_ids": [
+    "44393504",
+    "44393506",
+    "44393521",
+    "44393507",
+    "44393558",
+    "44393535",
+    "44393512",
+    "44393518",
+    "44393534",
+    "44393522"
+   ]
+  },
+  {
+   "contest_id": "196455477",
+   "contest_name": "MLB Satellite to $20 NFL Fantasy Football Millionaire",
+   "entry_fee": 0.1,
+   "entry_id": "5285493524",
+   "filled": true,
+   "roster_ids": [
+    "44393504",
+    "44393505",
+    "44393560",
+    "44393514",
+    "44393509",
+    "44393558",
+    "44393512",
+    "44393527",
+    "44393517",
+    "44393538"
+   ]
+  },
+  {
+   "contest_id": "196455477",
+   "contest_name": "MLB Satellite to $20 NFL Fantasy Football Millionaire",
+   "entry_fee": 0.1,
+   "entry_id": "5285493525",
+   "filled": true,
+   "roster_ids": [
+    "44393504",
+    "44393506",
+    "44393560",
+    "44393523",
+    "44393513",
+    "44393541",
+    "44393512",
+    "44393511",
+    "44393527",
+    "44393517"
+   ]
+  },
+  {
+   "contest_id": "196455477",
+   "contest_name": "MLB Satellite to $20 NFL Fantasy Football Millionaire",
+   "entry_fee": 0.1,
+   "entry_id": "5285493526",
+   "filled": true,
+   "roster_ids": [
+    "44393504",
+    "44393505",
+    "44393526",
+    "44393528",
+    "44393509",
+    "44393558",
+    "44393532",
+    "44393524",
+    "44393515",
+    "44393522"
+   ]
+  },
+  {
+   "contest_id": "196455477",
+   "contest_name": "MLB Satellite to $20 NFL Fantasy Football Millionaire",
+   "entry_fee": 0.1,
+   "entry_id": "5285493527",
+   "filled": true,
+   "roster_ids": [
+    "44393503",
+    "44393506",
+    "44393521",
+    "44393520",
+    "44393509",
+    "44393535",
+    "44393544",
+    "44393515",
+    "44393527",
+    "44393524"
+   ]
+  },
+  {
+   "contest_id": "196456672",
+   "contest_name": "MLB $300 Dime Time [Just $0.10!]",
+   "entry_fee": 0.1,
+   "entry_id": "5285493053",
+   "filled": true,
+   "roster_ids": [
+    "44393505",
+    "44393504",
+    "44393560",
+    "44393528",
+    "44393558",
+    "44393516",
+    "44393512",
+    "44393511",
+    "44393538",
+    "44393518"
+   ]
+  },
+  {
+   "contest_id": "196456672",
+   "contest_name": "MLB $300 Dime Time [Just $0.10!]",
+   "entry_fee": 0.1,
+   "entry_id": "5285493092",
+   "filled": true,
+   "roster_ids": [
+    "44393506",
+    "44393505",
+    "44393525",
+    "44393507",
+    "44393509",
+    "44393535",
+    "44393512",
+    "44393524",
+    "44393515",
+    "44393548"
+   ]
+  },
+  {
+   "contest_id": "196456672",
+   "contest_name": "MLB $300 Dime Time [Just $0.10!]",
+   "entry_fee": 0.1,
+   "entry_id": "5285493093",
+   "filled": true,
+   "roster_ids": [
+    "44393506",
+    "44393503",
+    "44393521",
+    "44393523",
+    "44393513",
+    "44393516",
+    "44393544",
+    "44393524",
+    "44393529",
+    "44393515"
+   ]
+  },
+  {
+   "contest_id": "196456672",
+   "contest_name": "MLB $300 Dime Time [Just $0.10!]",
+   "entry_fee": 0.1,
+   "entry_id": "5285493094",
+   "filled": true,
+   "roster_ids": [
+    "44393503",
+    "44393505",
+    "44393525",
+    "44393528",
+    "44393549",
+    "44393516",
+    "44393539",
+    "44393507",
+    "44393548",
+    "44393518"
+   ]
+  },
+  {
+   "contest_id": "196456672",
+   "contest_name": "MLB $300 Dime Time [Just $0.10!]",
+   "entry_fee": 0.1,
+   "entry_id": "5285493095",
+   "filled": true,
+   "roster_ids": [
+    "44393503",
+    "44393505",
+    "44393525",
+    "44393520",
+    "44393509",
+    "44393541",
+    "44393532",
+    "44393538",
+    "44393518",
+    "44393527"
+   ]
+  },
+  {
+   "contest_id": "196456672",
+   "contest_name": "MLB $300 Dime Time [Just $0.10!]",
+   "entry_fee": 0.1,
+   "entry_id": "5285493096",
+   "filled": true,
+   "roster_ids": [
+    "44393506",
+    "44393504",
+    "44393525",
+    "44393523",
+    "44393513",
+    "44393551",
+    "44393512",
+    "44393534",
+    "44393509",
+    "44393529"
+   ]
+  },
+  {
+   "contest_id": "196456672",
+   "contest_name": "MLB $300 Dime Time [Just $0.10!]",
+   "entry_fee": 0.1,
+   "entry_id": "5285493097",
+   "filled": true,
+   "roster_ids": [
+    "44393505",
+    "44393503",
+    "44393560",
+    "44393528",
+    "44393533",
+    "44393535",
+    "44393532",
+    "44393511",
+    "44393518",
+    "44393515"
+   ]
+  },
+  {
+   "contest_id": "196456672",
+   "contest_name": "MLB $300 Dime Time [Just $0.10!]",
+   "entry_fee": 0.1,
+   "entry_id": "5285493098",
+   "filled": true,
+   "roster_ids": [
+    "44393504",
+    "44393503",
+    "44393526",
+    "44393523",
+    "44393549",
+    "44393516",
+    "44393532",
+    "44393518",
+    "44393538",
+    "44393534"
+   ]
+  },
+  {
+   "contest_id": "196456672",
+   "contest_name": "MLB $300 Dime Time [Just $0.10!]",
+   "entry_fee": 0.1,
+   "entry_id": "5285493099",
+   "filled": true,
+   "roster_ids": [
+    "44393506",
+    "44393503",
+    "44393525",
+    "44393523",
+    "44393513",
+    "44393535",
+    "44393539",
+    "44393527",
+    "44393511",
+    "44393518"
+   ]
+  },
+  {
+   "contest_id": "196456672",
+   "contest_name": "MLB $300 Dime Time [Just $0.10!]",
+   "entry_fee": 0.1,
+   "entry_id": "5285493100",
+   "filled": true,
+   "roster_ids": [
+    "44393504",
+    "44393506",
+    "44393521",
+    "44393507",
+    "44393558",
+    "44393535",
+    "44393512",
+    "44393518",
+    "44393534",
+    "44393522"
+   ]
+  },
+  {
+   "contest_id": "196456672",
+   "contest_name": "MLB $300 Dime Time [Just $0.10!]",
+   "entry_fee": 0.1,
+   "entry_id": "5285493101",
+   "filled": true,
+   "roster_ids": [
+    "44393505",
+    "44393504",
+    "44393526",
+    "44393528",
+    "44393513",
+    "44393535",
+    "44393532",
+    "44393522",
+    "44393538",
+    "44393509"
+   ]
+  },
+  {
+   "contest_id": "196456672",
+   "contest_name": "MLB $300 Dime Time [Just $0.10!]",
+   "entry_fee": 0.1,
+   "entry_id": "5285493102",
+   "filled": true,
+   "roster_ids": [
+    "44393504",
+    "44393505",
+    "44393560",
+    "44393514",
+    "44393509",
+    "44393558",
+    "44393512",
+    "44393527",
+    "44393517",
+    "44393538"
+   ]
+  },
+  {
+   "contest_id": "196456672",
+   "contest_name": "MLB $300 Dime Time [Just $0.10!]",
+   "entry_fee": 0.1,
+   "entry_id": "5285493103",
+   "filled": true,
+   "roster_ids": [
+    "44393503",
+    "44393506",
+    "44393525",
+    "44393523",
+    "44393513",
+    "44393541",
+    "44393512",
+    "44393534",
+    "44393527",
+    "44393515"
+   ]
+  },
+  {
+   "contest_id": "196456672",
+   "contest_name": "MLB $300 Dime Time [Just $0.10!]",
+   "entry_fee": 0.1,
+   "entry_id": "5285493104",
+   "filled": true,
+   "roster_ids": [
+    "44393504",
+    "44393506",
+    "44393526",
+    "44393514",
+    "44393533",
+    "44393551",
+    "44393512",
+    "44393509",
+    "44393534",
+    "44393517"
+   ]
+  },
+  {
+   "contest_id": "196456672",
+   "contest_name": "MLB $300 Dime Time [Just $0.10!]",
+   "entry_fee": 0.1,
+   "entry_id": "5285493105",
+   "filled": true,
+   "roster_ids": [
+    "44393504",
+    "44393506",
+    "44393560",
+    "44393523",
+    "44393513",
+    "44393541",
+    "44393512",
+    "44393511",
+    "44393527",
+    "44393517"
+   ]
+  },
+  {
+   "contest_id": "196456672",
+   "contest_name": "MLB $300 Dime Time [Just $0.10!]",
+   "entry_fee": 0.1,
+   "entry_id": "5285493106",
+   "filled": true,
+   "roster_ids": [
+    "44393503",
+    "44393505",
+    "44393521",
+    "44393528",
+    "44393509",
+    "44393535",
+    "44393532",
+    "44393515",
+    "44393544",
+    "44393527"
+   ]
+  },
+  {
+   "contest_id": "196456672",
+   "contest_name": "MLB $300 Dime Time [Just $0.10!]",
+   "entry_fee": 0.1,
+   "entry_id": "5285493107",
+   "filled": true,
+   "roster_ids": [
+    "44393504",
+    "44393506",
+    "44393526",
+    "44393520",
+    "44393513",
+    "44393541",
+    "44393532",
+    "44393507",
+    "44393524",
+    "44393522"
+   ]
+  },
+  {
+   "contest_id": "196456672",
+   "contest_name": "MLB $300 Dime Time [Just $0.10!]",
+   "entry_fee": 0.1,
+   "entry_id": "5285493108",
+   "filled": true,
+   "roster_ids": [
+    "44393503",
+    "44393506",
+    "44393521",
+    "44393520",
+    "44393509",
+    "44393535",
+    "44393544",
+    "44393515",
+    "44393527",
+    "44393524"
+   ]
+  },
+  {
+   "contest_id": "196456672",
+   "contest_name": "MLB $300 Dime Time [Just $0.10!]",
+   "entry_fee": 0.1,
+   "entry_id": "5285493109",
+   "filled": true,
+   "roster_ids": [
+    "44393504",
+    "44393506",
+    "44393521",
+    "44393507",
+    "44393513",
+    "44393541",
+    "44393532",
+    "44393550",
+    "44393515",
+    "44393524"
+   ]
+  },
+  {
+   "contest_id": "196456672",
+   "contest_name": "MLB $300 Dime Time [Just $0.10!]",
+   "entry_fee": 0.1,
+   "entry_id": "5285493110",
+   "filled": true,
+   "roster_ids": [
+    "44393506",
+    "44393503",
+    "44393525",
+    "44393520",
+    "44393509",
+    "44393558",
+    "44393544",
+    "44393515",
+    "44393534",
+    "44393511"
+   ]
+  }
+ ],
+ "entries_binding": {
+  "source": "outputs/2026-10-06/DO_NOT_UPLOAD_DKEntries_1800_2g_REPAIRED_1712.b93e81db0061.csv",
+  "source_sha256": "40b97c3e11425b3387eb0b30af3888325c4409e0e7e45ef7b1f71ef2b39075ee",
+  "status": "bound"
+ },
+ "host": {
+  "call_budget_s": 630.0,
+  "declared_ceiling_s": 900.0,
+  "host": "claude_code"
+ },
+ "kind": "delivery",
+ "labels": "deterministic review proxies and labeled priors only; never ROI, win rate, cash rate, or probability",
+ "manifest_row": {
+  "certification": "review_grade",
+  "contest_ids": [
+   "196429090",
+   "196429098",
+   "196429268",
+   "196429276",
+   "196455477",
+   "196456672"
+  ],
+  "contest_names": [
+   "MLB $1.5K Quarter Jukebox [Just $0.25!]",
+   "MLB $1K Daily Dollar [Single Entry]",
+   "MLB $300 Dime Time [Just $0.10!]",
+   "MLB Satellite to $15 Relay Throw",
+   "MLB Satellite to $20 NFL Fantasy Football Millionaire",
+   "MLB Satellite to NBA 10-20 $20 Opening Tip Off"
+  ],
+  "contest_type": "classic",
+  "delivered_file": "outputs/2026-10-06/DKEntries_1800_2g_REPAIRED_1712.csv",
+  "entries": 42,
+  "notes": "R272 repair of e6914109eb81 (run 20261006T210104Z_ffd6f042): entry 5285483072 C: Luis Campusano -> Ethan Salas; entry 5285493097 C: Luis Campusano -> Ethan Salas, via tools/repair_entry.py. Review-grade, not certified.",
+  "projection_tier": "enriched",
+  "recorded_utc": "2026-10-06T21:12:20.064450+00:00",
+  "repair_of": {
+   "run_id": "20261006T210104Z_ffd6f042",
+   "sha256": "e6914109eb81d6bfbbff2192dc874dda5cf3b5f599e50f454a974ad54ff2a7ec"
+  },
+  "run_id": null,
+  "sha256": "40b97c3e11425b3387eb0b30af3888325c4409e0e7e45ef7b1f71ef2b39075ee",
+  "slate_tag": "1800_2g",
+  "status": "candidate",
+  "strategy_state": {
+   "bank_warnings": [],
+   "counts": {
+    "built": 69,
+    "candidate_reuse": 1,
+    "du_relaxation_high_water": 0,
+    "overlap_relaxed_lineups": 12,
+    "requested": 84
+   },
+   "evidence": "recorded",
+   "state": "relaxed",
+   "warnings": [
+    "overlap cap relaxed on 12 of 69 lineups"
+   ]
+  }
+ },
+ "recorded_utc": "2026-10-06T21:12:20.067319+00:00",
+ "relaxations": {},
+ "run": {},
+ "schema_version": 1
+}
