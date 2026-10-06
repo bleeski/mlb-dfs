@@ -2,6 +2,23 @@
 
 What changed in the engine, the tools and the contracts, when, and why.
 
+## 2026-10-06 — Decided, not yet built: a late swap holds an operator-named stack, and only that (the R434 follow-up; roadmap row filed at the next triage)
+
+**Decided.** Ben, 2026-10-06, delegating the call to the architect and lead dev ("I will take your recommendation"), on the question R434's fragment `2026-10-06_DEV_late-swap-carries-no-sleeve-or-seat-stamps.md` left open: should a late swap hold a strategy preference. **An operator-named stack is held; derived sleeves are not.** An R434 named stack is an explicit instruction, and R381's rule is that an instruction that did not arrive is loud; R428 now re-ranks a swap's open slots on the parent's enriched frame, which makes a swap more likely to pull the named team out. R406's weighted worlds and R422's tail seats are derived coverage rules over a labeled prior; a repair (R272) does not rebuild them, and the swap's bank has no sleeve jobs for them.
+
+**How it is built, when it is.**
+- The swap reads the parent's tracked delivery record: `extra.stack_sleeve.outcome.seated` is `{entry_id: team}` and `requested.min` is the minimum (`tools/late_swap.py` already reads the parent's record for its label, `parent_delivery_label`, by the parent's bytes, R473).
+- For an AUTHORIZED entry the parent seated, the swap entry requirement carries `stack_sleeve_team`/`stack_sleeve_min`, and the swap's bank gets the named-stack depth jobs (`build_sleeve_jobs`' `named_stack` branch, built for the swap's frame). Unauthorized entries and locked slots stay byte for byte as today.
+- A dead player on the entry is repaired as R272 says: the best legal replacement by the build's projection, a hitter of the named team preferred only when it costs nothing against the minimum-loss choice. The named team is never a reason to move a locked slot, add a pool restriction, refuse the swap or take longer than the swap's window.
+- When the team cannot be kept at `min`, the seat is relaxed and COUNTED in the swap's brief and printout (`stack.status`, a `fallbacks` row), exactly as R434 does at build time. F-3 never relaxes; this is S, never V; delivery first (R386).
+- **First step, report-only and nearly free:** the swap prints, for each authorized entry the parent seated, the named team's hitter count before and after, and says so when it falls below `min`. That alone ends the silent loss and can ship ahead of the hold.
+
+**Rank, when it is filed.** Band 1 (it protects a deliberate contrarian ticket seat), effort S to M, a late-swap row beside Session 115's. It is NOT inserted into the master table here: the rank line is numeric across 154 rows and a mid-queue insert renumbers about 140 of them, so the next DEV triage files the register entry and the row together under the next free R-number and places it. The fragment carries the full reading until then.
+
+**Not decided here.** Whether R406's weighted worlds or R422's tail seats should ever be held by a swap (the answer above is no, on the reading that they are derived); the no-ladder-rung asymmetry (`2026-10-06_DEV_sleeve-masks-have-no-ladder-rung-a-proven-infeasible-mask-refuses.md`) stays an open fragment.
+
+**Scope.** `CHANGELOG.md` and `docs/backlog_inbox/2026-10-06_DEV_late-swap-carries-no-sleeve-or-seat-stamps.md` (its candidate-item paragraph now states the decision). No code, no test, no pin moved. Gate: the PR's `gate` check.
+
 ## 2026-10-06 — Test flake fixed: `LateSwapEnrichedFrameTests.test_S6` found its second swap run by sort order, and two runs minted in the same second sort by their random suffix (R428's test; no engine change)
 
 **Scope.** `tests/test_core.py` (one line in `test_S6_a_swap_of_a_swap_carries_the_root_builds_values`) and this file. No engine, tool, pin or count moved.
