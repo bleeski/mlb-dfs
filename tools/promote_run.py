@@ -368,6 +368,7 @@ def run(args: argparse.Namespace) -> int:
     def _write(provisional: Path) -> None:
         provisional.write_bytes(source.read_bytes())
 
+    prior_extra = prior_record.get("extra") or {}
     try:
         result = deliver(
             date=date, dest=dest, write=_write,
@@ -388,7 +389,10 @@ def run(args: argparse.Namespace) -> int:
             relaxations=prior_record.get("relaxations") or None,
             # R422(a). The market the run was ranked by, or a re-promotion
             # rewrites the tracked record without it.
-            market=(prior_record.get("extra") or {}).get("market") or None,
+            market=prior_extra.get("market") or None,
+            # R434. The named stack's request and what seated, for the same reason.
+            **({"stack_sleeve": prior_extra["stack_sleeve"]}
+               if prior_extra.get("stack_sleeve") else {}),
             **({"lineage": lineage} if lineage else {}),
         )
     except CorruptManifestError as exc:

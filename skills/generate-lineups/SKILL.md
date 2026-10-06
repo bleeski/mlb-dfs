@@ -770,6 +770,7 @@ MILP and every cap still bind across the whole entered set.
   delivered apex and washout proxies) and the `sleeves:` stderr line.
   Constructions over labeled priors; a sleeve that does well in a replay is
   "supported in the shapes replayed", never a probability or an edge.
+- **A named secondary stack for one entry** (R434, `--stack-sleeve`): `references/stack_sleeve.md`.
 
 ### Caps that scale with input confidence (R407, Classic only)
 

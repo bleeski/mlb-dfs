@@ -4204,7 +4204,10 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
              "classic_tail_seats": (args.controls_override or {}).get(
                  "classic_tail_seats", True)},
             projections,
-            implied_total_by_team=(f1_report or {}).get("implied_total_by_team"))
+            implied_total_by_team=(f1_report or {}).get("implied_total_by_team"),
+            # R434. The operator's named stack, planned by the same helper
+            # run_slate stamps from, on the entry ids the tail did not take.
+            stack_sleeve=getattr(args, "_stack_sleeve", None))
         _bank_budget = (slice_budget * (1.0 - BANK_SLEEVE_BUDGET_SHARE)
                         if sleeve_request["active"] else slice_budget)
         _ordinary_budget = _bank_budget
@@ -4487,6 +4490,11 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
     # sliced door ranked its games above, from the same F1 report).
     if (f1_report or {}).get("implied_total_by_team"):
         slate_kwargs["sleeve_implied_total_by_team"] = dict(f1_report["implied_total_by_team"])
+    # R434. The operator's named secondary stack, validated and normalized in
+    # `validate_cli_values`. A kwarg of THIS build only: the R389(b) baseline's
+    # run_slate call is made elsewhere and never receives it.
+    if getattr(args, "_stack_sleeve", None):
+        slate_kwargs["stack_sleeve"] = dict(args._stack_sleeve)
 
     # The pool report is the evidence behind the lineup gate. Without it run_slate
     # can only say "some players carry a batting order", which is not the same
@@ -7794,8 +7802,12 @@ def format_sleeves_line(block: dict | None) -> str:
     fallbacks. Every sleeve is a deterministic construction over labeled priors."""
     block = dict(block or {})
     status = block.get("status")
+    stack_clause = format_stack_clause(block)
     if status != "applied":
-        return f"not applied ({status or 'no block'})"
+        # R434. A named stack the sleeves being off dropped, or a ladder step
+        # that left no sleeve bank behind, is still named on the line.
+        return (f"not applied ({status or 'no block'})"
+                + (f"; {stack_clause}" if stack_clause else ""))
     totals: dict = {}
     for per in (block.get("entries_by_sleeve") or {}).values():
         for sleeve, n in per.items():
@@ -7805,8 +7817,38 @@ def format_sleeves_line(block: dict | None) -> str:
     return (", ".join(f"{k} {v}" for k, v in totals.items() if v)
             + f"; environment games {games} (by {env.get('basis')}); "
             + f"{format_tail_clause(block)}; "
+            + (f"{stack_clause}; " if stack_clause else "")
             + f"{block.get('relaxations', 0)} entr(ies) fell back to projection "
             + "(constructions over labeled priors, not probabilities)")
+
+
+def format_stack_clause(block: dict | None) -> str:
+    """R434. The operator-named secondary stack: what was asked, what seated,
+    and what was relaxed, or why none was. Empty when no ``--stack-sleeve`` was
+    given, so the line is the line it was. The baseline carries no sleeve, and
+    a build that dropped the seat says so by name."""
+    block = dict(block or {})
+    plan = dict((block.get("request") or {}).get("stack") or {})
+    outcome = dict(block.get("stack") or {})
+    if not plan and not outcome:
+        return ""
+    team = plan.get("team") or ", ".join(sorted(set((outcome.get("requested") or {}).values())))
+    head = f"stack {team}>={plan.get('min')} secondary" if plan.get("min") else f"stack {team}"
+    if plan.get("dropped"):
+        return f"{head} none ({plan['dropped']})"
+    if outcome.get("status") == "relaxed_by_ladder":
+        return (f"{head} RELAXED by the ladder: the joint solve was proven "
+                f"infeasible with the seat, so {len(outcome.get('fell_back') or [])} "
+                f"entr(ies) seat as the weights say")
+    seated = dict(outcome.get("seated") or {})
+    wanted = plan.get("requested_entries")
+    bits = [f"{len(seated)} of {wanted} seated"]
+    if outcome.get("fell_back"):
+        bits.append(f"{len(outcome['fell_back'])} fell back to projection")
+    if plan.get("unplaced"):
+        bits.append(f"{plan['unplaced']} unplaced ({plan.get('unplaced_reason')})")
+    return (f"{head}: " + ", ".join(bits)
+            + " (an operator's strategy preference; the baseline carries none)")
 
 
 def format_tail_clause(block: dict | None) -> str:
@@ -8275,7 +8317,73 @@ _JSON_OBJECT_FLAGS = (("controls_override", "--controls-override"),
                       # R381. Same door, same reason: every reader of this flag
                       # subscripts it, so a `[1,2]` or a bare `4` would crash
                       # past every handler rather than refuse with a brief.
-                      ("captain_sleeve", "--captain-sleeve"))
+                      ("captain_sleeve", "--captain-sleeve"),
+                      # R434. Same door, same reason: the grammar subscripts it.
+                      ("stack_sleeve", "--stack-sleeve"))
+
+
+def stack_sleeve_refusal(args, spec) -> dict | None:
+    """R434. ``--stack-sleeve``'s refusals, all exit 4 before anything is staged.
+
+    The grammar is ``classic_sleeves.normalize_stack_sleeve``'s (one owner, the
+    engine door raises the same ``StackSleeveError``); the normalized spec is
+    stored on ``args._stack_sleeve`` for the sliced door and ``run_slate``. When
+    both files can be read it also checks what a typo would otherwise turn into
+    a silent no-op: the team has a hitter in the salary file, ``entries`` is not
+    more than the entries file has rows, ``contest_id`` is a contest in it, and
+    the slate is Classic. A well-formed seat the slate merely cannot seat (no
+    room, no lineup, a cap) is NOT refused here: it is relaxed and counted by
+    the engine. A file this parser cannot read is refused where it is read.
+    """
+    from mlb_engine.optimize.classic_sleeves import (
+        StackSleeveError, normalize_stack_sleeve)
+
+    def _refuse(error: str, **extra) -> dict:
+        return {
+            "status": "cli_value_invalid",
+            "date": getattr(args, "date", None),
+            "flag": "--stack-sleeve",
+            "error": error, **extra,
+            "note": ("checked in main() before staging, before the pool build "
+                     "and before the bank. Nothing was staged and no run "
+                     "directory was created."),
+        }
+
+    try:
+        normalized = normalize_stack_sleeve(spec)
+    except StackSleeveError as exc:
+        return _refuse(str(exc))
+    args._stack_sleeve = normalized
+    salary = getattr(args, "salary", None)
+    entries = getattr(args, "entries_csv", None)
+    if not (salary and entries and Path(salary).is_file() and Path(entries).is_file()):
+        return None  # `missing_inputs` refuses next
+    try:
+        if detect_contest_type(Path(salary), Path(entries)) != "classic":
+            return _refuse("--stack-sleeve is Classic only: Showdown ships "
+                           "review-grade and carries no sleeves")
+        from mlb_engine.entries.dk_entries_manager import parse_dk_entry_rows
+        from mlb_engine.intake.slate_intake_manager import parse_dk_salary_csv
+        hitter_teams = {str(p.team).strip().upper()
+                        for p in parse_dk_salary_csv(str(salary))
+                        if "P" not in set(p.positions)}
+        rows = parse_dk_entry_rows(str(entries))
+    except (OSError, ValueError, csv.Error):
+        return None
+    if hitter_teams and normalized["team"] not in hitter_teams:
+        return _refuse(
+            f"--stack-sleeve team {normalized['team']!r} has no hitter in the "
+            f"salary file; the teams there are {sorted(hitter_teams)}")
+    if normalized["entries"] > len(rows):
+        return _refuse(
+            f"--stack-sleeve asks for {normalized['entries']} entries and the "
+            f"entries file holds {len(rows)} row(s); no slate could seat that")
+    contest = normalized.get("contest_id")
+    if contest and contest not in {str(r.contest_id) for r in rows}:
+        return _refuse(
+            f"--stack-sleeve contest_id {contest!r} is not a contest in the "
+            f"entries file ({sorted({str(r.contest_id) for r in rows})})")
+    return None
 
 
 def validate_cli_values(args) -> dict | None:
@@ -8350,6 +8458,10 @@ def validate_cli_values(args) -> dict | None:
                      "never a correction of DK's tag. Nothing was staged and "
                      "no run directory was created."),
         }
+    # R434. The named secondary stack: the grammar, then what a typo would
+    # silently turn into a no-op.
+    if getattr(args, "stack_sleeve", None) is not None:
+        return stack_sleeve_refusal(args, args.stack_sleeve)
     return None
 
 
@@ -8552,6 +8664,23 @@ def main() -> int:
                          "ownership share, coldest first, from the prior "
                          "--captain-prior reads, and refuses when no prior "
                          "was read.")
+    ap.add_argument("--stack-sleeve", dest="stack_sleeve", type=json.loads,
+                    default=None,
+                    help="Classic only: JSON naming ONE team to carry as a "
+                         "SECONDARY stack in some entries, e.g. "
+                         "'{\"team\": \"MIA\", \"min\": 3, \"entries\": 1}' "
+                         "(role is always \"secondary\"; \"contest_id\" is "
+                         "optional). The seated entry carries at least `min` "
+                         "(2 or 3) of the team's hitters under a DIFFERENT, "
+                         "strictly larger primary stack, seated through the "
+                         "allocator's sleeve mask, so every portfolio cap binds "
+                         "it jointly and F-3 holds. An unmeetable seat is "
+                         "relaxed and counted, never a refusal; a malformed "
+                         "value, a team that is not on the slate or more "
+                         "entries than the file holds is exit 4 before "
+                         "staging. The R389(b) baseline carries none. An "
+                         "operator's strategy preference, never a prediction. "
+                         "See references/stack_sleeve.md.")
     ap.add_argument("--bundle",
                     help="slate_bundle.json from tools/fetch_slate_bundle.py. "
                          "Supplies the per-venue forecast for F5. Park factors "

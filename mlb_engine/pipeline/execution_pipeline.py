@@ -2650,6 +2650,7 @@ def resolve_sleeve_bank_request(
     projections: Any = None,
     *,
     implied_total_by_team: Optional[Mapping[str, float]] = None,
+    stack_sleeve: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
     """R406. What to ask the bank for so each sleeve can seat its entries.
 
@@ -2662,6 +2663,12 @@ def resolve_sleeve_bank_request(
 
     R422. The ``tail`` block is ``resolve_tail_seats`` over the same inputs,
     and its seats come off each contest before the weights apportion the rest.
+
+    R434. ``stack_sleeve`` is the operator's named secondary stack
+    (``--stack-sleeve``). The ``stack`` block is ``resolve_stack_seats`` over
+    the same inputs, planned on the entry ids the tail did not take, and its
+    seats come off each contest too. Both keys appear only when a spec was
+    given, so a request without one is the request it was.
     """
     from mlb_engine.optimize import classic_sleeves as cs
     enabled = (controls or {}).get("classic_sleeves", True) is not False
@@ -2676,9 +2683,13 @@ def resolve_sleeve_bank_request(
             req.get("posture"), req.get("contest_shape")))
     tail = resolve_tail_seats(entry_requirements, controls, projections,
                               implied_total_by_team=implied_total_by_team)
+    stack = resolve_stack_seats(entry_requirements, controls, stack_sleeve, projections,
+                                implied_total_by_team=implied_total_by_team,
+                                tail_plan=tail)
     expected = cs.expected_entries_by_sleeve(
         weights, counts,
-        {cid: len(teams) for cid, teams in (tail.get("seats_by_contest") or {}).items()})
+        {cid: len(teams) for cid, teams in (tail.get("seats_by_contest") or {}).items()},
+        {cid: len(eids) for cid, eids in ((stack or {}).get("seats_by_contest") or {}).items()})
     teams_by_game = _teams_by_game(projections)
     environment = cs.rank_environment_games(
         sorted(teams_by_game), implied_total_by_team=implied_total_by_team,
@@ -2693,6 +2704,18 @@ def resolve_sleeve_bank_request(
             "expected_entries": sleeves[cs.SLEEVE_TAIL]["expected_entries"],
             "min_candidates_per_team": 2,
             "teams": list(tail.get("placed_teams") or []),
+        }
+    if cs.SLEEVE_NAMED_STACK in sleeves and stack:
+        # R434. R406's margin of twice the seats, and never fewer lineups than
+        # primary teams that could carry the named stack: the job grid's first
+        # round gives each such team one, so the allocator's contest-fit
+        # scoring chooses among primaries rather than among a handful.
+        slate_teams = {str(t).strip().upper() for ts in teams_by_game.values() for t in ts}
+        seated = int(sleeves[cs.SLEEVE_NAMED_STACK]["expected_entries"])
+        sleeves[cs.SLEEVE_NAMED_STACK] = {
+            "expected_entries": seated,
+            "min_candidates": max(2 * seated, len(slate_teams - {stack["team"]})),
+            "team": stack["team"], "min": stack["min"],
         }
     dropped: Dict[str, str] = {}
     if not environment.get("games"):
@@ -2714,6 +2737,8 @@ def resolve_sleeve_bank_request(
         "dropped": dropped,
         "environment": environment,
         "tail": tail,
+        # R434. Only when a spec was given.
+        **({"stack": stack} if stack is not None else {}),
         "note": ("deterministic constructions over labeled priors; a sleeve that "
                  "does well in a replay is supported in the shapes replayed, never "
                  "a probability or an edge"),
@@ -2802,6 +2827,63 @@ def resolve_tail_seats(
     return cs.tail_seat_plan(entry_requirements or [], rank)
 
 
+#: R434. Said on the plan so the brief, the checkpoint and the delivery record
+#: each carry what the seat is and is not.
+STACK_SLEEVE_LABEL = (
+    "an operator's strategy preference (Ben, 2026-09-23, 'what if our priors "
+    "are wrong'), a construction rule seated through the allocator's mask; "
+    "never a prediction, an edge or a probability")
+STACK_SLEEVE_BASELINE_NOTE = (
+    "not carried: the R389(b) baseline solves on the core's unbanked "
+    "candidates with every sleeve off")
+
+
+def resolve_stack_seats(
+    entry_requirements: Sequence[Mapping[str, Any]],
+    controls: Optional[Mapping[str, Any]],
+    stack_sleeve: Optional[Mapping[str, Any]],
+    projections: Any = None,
+    *,
+    implied_total_by_team: Optional[Mapping[str, float]] = None,
+    tail_plan: Optional[Mapping[str, Any]] = None,
+) -> Optional[Dict[str, Any]]:
+    """R434. The operator-named secondary stack's seats, each pinned to its team.
+
+    ``None`` when no ``--stack-sleeve`` was given, so a build without one is
+    the build it was. Otherwise the one derivation for the bank's request and
+    for ``run_slate``'s stamp, as ``resolve_tail_seats`` is for the tail: it
+    computes the tail plan FIRST (or takes ``tail_plan``) and places the stack's
+    seats on the entry ids the tail did not take, so the bank is asked for
+    exactly the seats the mask will confine. A spec ``classic_sleeves: False``
+    (the T-15 rung and the R389(b) baseline's controls) or a team that is not
+    on the slate drops the plan BY NAME and stamps nothing: counted, never a
+    refusal. A malformed spec raises ``StackSleeveError`` (a ``ValueError``),
+    because that is a caller error with no slate to relax against.
+    """
+    from mlb_engine.optimize import classic_sleeves as cs
+    spec = cs.normalize_stack_sleeve(stack_sleeve)
+    if spec is None:
+        return None
+    ctl = controls or {}
+    reqs = list(entry_requirements or [])
+    tail = (tail_plan if tail_plan is not None else resolve_tail_seats(
+        reqs, ctl, projections, implied_total_by_team=implied_total_by_team))
+    plan = cs.stack_seat_plan(reqs, spec, taken=dict(tail.get("team_by_entry") or {}))
+    teams = {str(t).strip().upper() for ts in _teams_by_game(projections).values() for t in ts}
+    dropped = None
+    if ctl.get("classic_sleeves", True) is False:
+        dropped = "classic_sleeves is off"
+    elif teams and spec["team"] not in teams:
+        dropped = (f"team {spec['team']} has no hitter in this build's pool "
+                   f"({', '.join(sorted(teams))})")
+    if dropped:
+        plan = {**plan, "active": False, "seats": 0, "seats_by_contest": {},
+                "team_by_entry": {}, "unplaced": int(spec["entries"]),
+                "dropped": dropped}
+    return {**plan, "requested": dict(spec), "label": STACK_SLEEVE_LABEL,
+            "baseline": STACK_SLEEVE_BASELINE_NOTE}
+
+
 def build_sleeve_jobs(
     cache: Any,
     projections: Any,
@@ -2826,6 +2908,10 @@ def build_sleeve_jobs(
     * ``tail`` (R422): the projection frame, stack jobs only for the tail teams
       the bank holds fewer than two lineups primary-stacking -- depth, like
       environment, because the ordinary grid already stacks every team.
+    * ``named_stack`` (R434): the projection frame, every job carrying the
+      operator's named team at exactly ``min`` hitters under a different, larger
+      primary (``extend_bank(secondary_stack=)``); depth-only, built for the
+      shortfall the bank does not already hold.
 
     Each call stops at the sleeve's own candidate need; the budget is split
     evenly across the sleeves still to run. Search effort only.
@@ -2864,6 +2950,39 @@ def build_sleeve_jobs(
                               "built": rep.get("built_this_slice"),
                               "job_list_exhausted": rep.get("job_list_exhausted"),
                               "conditions_signature": rep.get("conditions_signature")}
+            continue
+        if sleeve == cs.SLEEVE_NAMED_STACK:
+            # R434. Depth, like the tail: count the distinct projection-world
+            # lineups that already carry the named team as a strictly smaller
+            # secondary stack (the bank's, and the direct door's in-memory
+            # ``prior_candidates``), and build only the shortfall. The ordinary
+            # grid builds primary jobs only, so a shortfall is the usual case.
+            spec = request["sleeves"][sleeve]
+            named, minimum = str(spec["team"]), int(spec["min"])
+            need = int(spec.get("min_candidates") or 0)
+            held = _secondary_stacked_on_team(cache, projections, named, minimum,
+                                              prior_candidates)
+            if held >= need:
+                report[sleeve] = {"attempted": False, "need": need, "already_held": held,
+                                  "team": named, "min": minimum,
+                                  "reason": "the bank already holds enough lineups "
+                                            "carrying the named team as a secondary "
+                                            "stack"}
+                continue
+            rep = extend_bank(cache, projections, secondary_stack=(named, minimum),
+                              max_candidates=len(cache) + (need - held),
+                              max_opposing_hitters_per_sp=max_opposing_hitters_per_sp,
+                              **common)
+            report[sleeve] = {"attempted": True, "need": need, "already_held": held,
+                              "team": named, "min": minimum,
+                              "built": rep.get("built_this_slice"),
+                              "jobs_attempted_this_slice": rep.get("attempted_this_slice"),
+                              "jobs_total": rep.get("jobs_total"),
+                              "job_list_exhausted": rep.get("job_list_exhausted"),
+                              "stop_reason": rep.get("stop_reason"),
+                              "elapsed_s": rep.get("elapsed_s"),
+                              "conditions_signature": rep.get("conditions_signature"),
+                              "secondary_stack": rep.get("secondary_stack")}
             continue
         need = int(request["sleeves"][sleeve]["min_candidates"])
         if sleeve == cs.SLEEVE_CHALK_FAILS:
@@ -3026,6 +3145,76 @@ def _primary_stacked_on_teams(cache: Any, projections: Any, teams: Sequence[str]
             seen.add(key)
             held[stack] += 1
     return held
+
+
+def _secondary_stacked_on_team(cache: Any, projections: Any, team: str, minimum: int,
+                               prior_candidates: Optional[Sequence[Mapping[str, Any]]] = None,
+                               ) -> int:
+    """R434. How many DISTINCT projection-world lineups carry ``team`` as a
+    SECONDARY stack: at least ``minimum`` of its hitters under a different
+    primary stack that is STRICTLY larger. The lineups the allocator's named-
+    stack mask can seat, counted cheaply for ``build_sleeve_jobs``' depth test.
+
+    The same predicate the mask applies (``contest_allocator``'s
+    ``_resolve_classic_sleeves``), read off the frame's team and position
+    columns: hitters are the roster's non-pitchers, the primary is
+    ``optimizer_v3.candidate_primary_stack`` (the function behind the
+    ``primary_stack`` the mask reads). A cached roster counts only when the
+    frame resolves all of it; a chalk-fails or salary-only lineup is another
+    world and never counts; a roster two buckets hold counts once.
+    ``prior_candidates`` are the door's in-memory candidates (the direct door's
+    bank is not in the throwaway cache), read off their own ``primary_stack``
+    and ``primary_stack_size``.
+    """
+    from mlb_engine.optimize import classic_sleeves as cs
+    from mlb_engine.optimize.optimizer_v3 import (
+        candidate_primary_stack, candidate_primary_stack_size)
+    team = str(team).strip().upper()
+    if projections is None or not hasattr(projections, "columns"):
+        return 0
+    by_id = projections.assign(Player_ID=projections["Player_ID"].astype(str)
+                               ).drop_duplicates("Player_ID").set_index("Player_ID",
+                                                                        drop=False)
+    team_of = {pid: str(t).strip().upper() for pid, t in zip(by_id.index, by_id["Team"])}
+    arm = {pid for pid, pos in zip(by_id.index, by_id["Position"]) if str(pos) == "P"}
+
+    def _named(roster: Sequence[str]) -> int:
+        return sum(1 for p in roster if p not in arm and team_of.get(p) == team)
+
+    held = 0
+    seen: set = set()
+    other_worlds = {cs.SLEEVE_SALARY_ONLY, cs.SLEEVE_CHALK_FAILS}
+    for c in prior_candidates or []:
+        roster = [str(p) for p in (c.get("roster_slot_ids") or c.get("player_ids") or [])]
+        key = tuple(sorted(roster))
+        if not roster or key in seen or cs.SLEEVE_PROJECTION not in cs.candidate_sleeves(c):
+            continue
+        stack = str(c.get("primary_stack") or "").strip().upper()
+        try:
+            size = int(c.get("primary_stack_size") or 0)
+        except (TypeError, ValueError):
+            size = 0
+        count = _named(roster)
+        if stack and stack != team and count >= minimum and size > count:
+            seen.add(key)
+            held += 1
+    for entry in cache.candidates:
+        if cs.SLEEVE_BY_JOB_CLASS.get(str(entry.get("job_class") or "")) in other_worlds:
+            continue
+        roster = [str(p) for p in (entry.get("roster") or [])]
+        key = tuple(sorted(roster))
+        if not roster or key in seen or any(p not in by_id.index for p in roster):
+            continue
+        count = _named(roster)
+        if count < minimum:
+            continue
+        lineup = by_id.loc[roster]
+        stack = str(candidate_primary_stack(lineup) or "").strip().upper()
+        if stack and stack != team and int(candidate_primary_stack_size(lineup)) > count:
+            seen.add(key)
+            held += 1
+    return held
+
 
 def sleeve_candidates(
     cache: Any,
@@ -5385,6 +5574,7 @@ def _plan_joint_allocation(
     contest_shapes: Optional[Sequence[str]] = None,
     solver_time_limit_s: Optional[float] = None,
     implied_total_by_team: Optional[Mapping[str, float]] = None,
+    stack_sleeve: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Solve the build's joint allocation at approve=False and report the verdict.
 
@@ -5522,7 +5712,9 @@ def _plan_joint_allocation(
                 # same request, a sibling cache for the salary-only frame.
                 _plan_sleeves = resolve_sleeve_bank_request(
                     entries, controls, bank_projections,
-                    implied_total_by_team=implied_total_by_team)
+                    implied_total_by_team=implied_total_by_team,
+                    # R434: the plan bank carries the named stack's jobs too.
+                    stack_sleeve=stack_sleeve)
                 _plan_salary_cache = None
                 if _plan_sleeves["active"] and report.get("job_list_exhausted"):
                     from mlb_engine.allocate.contest_allocator import (
@@ -6760,6 +6952,11 @@ def run_slate(
     input_confidence_facts: Optional[Mapping[str, Any]] = None,
     input_confidence_relax: Optional[str] = None,
     sleeve_implied_total_by_team: Optional[Mapping[str, float]] = None,
+    # R434. The operator's named secondary stack (`--stack-sleeve`), the grammar
+    # of `classic_sleeves.normalize_stack_sleeve`. A build-level argument, not a
+    # portfolio control: the R389(b) baseline passes none and its controls turn
+    # every sleeve off. None is every existing caller's build exactly.
+    stack_sleeve: Optional[Mapping[str, Any]] = None,
     # R388(e). The label the manifest records for this build's delivery, when
     # the CALLER knows something the gates cannot: build_slate's deadline
     # governor opened controls to get here, so the file is review-grade however
@@ -6874,6 +7071,11 @@ def run_slate(
         if certification_label != BASELINE_LABEL:
             raise ValueError(f"delivery_lineage='baseline' records {BASELINE_LABEL!r}, "
                              f"not {certification_label!r}")
+    # R434. Refused before any work too: a malformed named stack has no slate to
+    # relax against (`StackSleeveError` is a ValueError). The normalized spec is
+    # what every door and the stamp read.
+    from mlb_engine.optimize.classic_sleeves import normalize_stack_sleeve as _norm_stack  # noqa: PLC0415
+    stack_sleeve = _norm_stack(stack_sleeve)
     # R388(b). Refused before any work too: a misspelled never-relax holds
     # nothing and says nothing. The same resolver build_slate's flag uses, so
     # the two doors accept the same names; F-3 is in the set on every build.
@@ -7065,6 +7267,15 @@ def run_slate(
         entry_requirements, controls, projections,
         implied_total_by_team=sleeve_implied_total_by_team)
     stamp_tail_seats(entry_requirements, tail_seats)
+    # R434. The operator's named secondary stack, on the entry ids the tail did
+    # not take, stamped after the tail so the two seats share a portfolio and
+    # neither moves the other. The same helper and inputs the bank request used.
+    stack_seats = resolve_stack_seats(
+        entry_requirements, controls, stack_sleeve, projections,
+        implied_total_by_team=sleeve_implied_total_by_team, tail_plan=tail_seats)
+    if stack_seats is not None:
+        from mlb_engine.optimize.classic_sleeves import stamp_stack_seats
+        stamp_stack_seats(entry_requirements, stack_seats)
     market = slate_market_record(projections, sleeve_implied_total_by_team)
 
     # F15: the exclusion set now reaches the bank build, so the checkpoint says
@@ -7227,6 +7438,8 @@ def run_slate(
         # R422. The coverage rule's inputs, the seats it placed, and why none
         # were when none were.
         "classic_tail_seats": tail_seats,
+        # R434. Only when `--stack-sleeve` was given.
+        **({"stack_sleeve": stack_seats} if stack_seats is not None else {}),
         "feasibility": checkpoint["feasibility"],
         "exclusions": exclusion_block,
         "slate_clock": clock,
@@ -7319,6 +7532,8 @@ def run_slate(
             solver_time_limit_s=solver_time_limit_s,
             # R422: the plan bank's tail request, from the build's own totals.
             implied_total_by_team=sleeve_implied_total_by_team,
+            # R434: and the operator's named stack, the same spec the stamp used.
+            stack_sleeve=stack_sleeve,
         )
         checkpoint["joint_allocation"] = joint
         if joint.get("verdict") != "would_certify":
@@ -7446,7 +7661,8 @@ def run_slate(
         # against is derived from this door's own unconstrained candidates.
         sleeve_request = resolve_sleeve_bank_request(
             entry_requirements, controls, bank_projections,
-            implied_total_by_team=sleeve_implied_total_by_team)
+            implied_total_by_team=sleeve_implied_total_by_team,
+            stack_sleeve=stack_sleeve)
         sleeve_jobs: Dict[str, Any] = {"attempted": False,
                                        "reason": "sleeves not requested"}
         _sleeves_started = time.monotonic()
@@ -7635,6 +7851,9 @@ def run_slate(
             # is what the delivery record carries for the archive to grade.
             "classic_tail_seats": tail_seats,
             "market": market,
+            # R434. Only when `--stack-sleeve` was given; the delivery record
+            # reads it (and the allocator's `classic_sleeves.stack`) at the mirror.
+            **({"stack_sleeve": stack_seats} if stack_seats is not None else {}),
             "feasibility": checkpoint["feasibility"],
             "exclusions": exclusion_block,
             "slate_clock": clock,
@@ -8248,6 +8467,7 @@ def _deliver_mirror(slate_date: str, dest: Path, source: Path,
         from mlb_engine.entries.dk_entries_manager import parse_dk_entry_rows
         return len(parse_dk_entry_rows(path))
 
+    stack_record = stack_sleeve_delivery_record(result)
     return deliver(
         date=slate_date,
         dest=dest,
@@ -8274,7 +8494,25 @@ def _deliver_mirror(slate_date: str, dest: Path, source: Path,
         **({"lineage": lineage} if lineage else {}),
         # R422(a). The market the build ranked by, into the tracked record.
         market=result.get("market"),
+        # R434. The named stack's request and what seated, only when asked for,
+        # so every other row keeps exactly its old keys.
+        **({"stack_sleeve": stack_record} if stack_record else {}),
     )
+
+
+def stack_sleeve_delivery_record(result: Mapping[str, Any]) -> Optional[Dict[str, Any]]:
+    """R434. The tracked delivery record's ``extra.stack_sleeve``: the plan
+    ``run_slate`` placed (the request, ``team_by_entry``, ``unplaced``,
+    ``dropped``, the label) and the allocator's outcome (``seated`` as
+    ``{entry_id: team}``, ``fell_back``, ``status``), or ``None`` when no
+    ``--stack-sleeve`` was given. The entry ids are the point: a later swap
+    session needs which entry held the named team, not only which team."""
+    plan = result.get("stack_sleeve")
+    if not plan:
+        return None
+    outcome = (result.get("classic_sleeves") or {}).get("stack")
+    return {**dict(plan), "outcome": dict(outcome) if outcome else None}
+
 
 
 def _mirror_notes(result: Mapping[str, Any]) -> str:
