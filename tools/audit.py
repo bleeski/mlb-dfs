@@ -3557,7 +3557,8 @@ def terse_output(result: Dict[str, Any], root: Path) -> str:
     test_count = test_check.get("runtime_test_count", "?")
     modules = engine_module_count(root)
     if not result["passed"]:
-        return "FAIL  " + ";  ".join(result["errors"])
+        return ("FAIL  " + ";  ".join(result["errors"])
+                + " || DIAG stdout_tail: " + str(result.get("stdout_tail") or "").replace("\n", " | "))
     line = f"PASS  {result['project_version']}  {modules} modules  {test_count} tests"
     skipped = test_check.get("skipped_total", 0)
     if skipped:
