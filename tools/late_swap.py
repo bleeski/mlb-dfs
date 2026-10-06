@@ -45,10 +45,12 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import csv
 import datetime as dt
 import hashlib
 import io
 import json
+import math
 import os
 import sys
 import time
@@ -85,7 +87,12 @@ from mlb_engine.entries.upload_manifest import (  # noqa: E402
 from mlb_engine.swap.late_swap_manager import (  # noqa: E402
     ParentLineageError, resolve_parent_run,
 )
+from mlb_engine.pipeline.build_state_manager import (  # noqa: E402
+    read_run_manifest, sha256_file, verify_run_bundle,
+)
+from mlb_engine.projections.projection_builder import XISO_CEILING_NEUTRAL  # noqa: E402
 from mlb_engine.pipeline.execution_pipeline import (  # noqa: E402
+    NEUTRAL_TOLERANCE,
     _assemble_projection_frame, _merged_controls_for_build, _slate_feasibility,
     controls_for_report, derive_roster_id_maps,
     resolve_shape_bands, slate_game_count,
@@ -117,6 +124,10 @@ DOWNGRADE_LABEL = "review_grade_downgrade_accepted"
 # what it actually checks: the salary file parsed, the entry grid parsed, and the
 # parent's posted lineups were read. The rest are declared assumptions, and
 # ``assumed_gates`` in the artifact names them.
+# R428: the FRAME's factors are a different matter from these gates. The swap
+# carries what its parent run APPLIED to each player (`resolve_swap_carry`),
+# labelled, and still re-derives no weather, odds or pitcher audit; nothing below
+# is checked more because the frame carries more.
 WORKFLOW_GATES = {
     "projection_schema_gate_passed": True, "optimizer_gate_passed": True,
 }
@@ -324,6 +335,365 @@ def declared_pitcher_argv(declared) -> list[str]:
     for pid, role in sorted((declared or {}).items()):
         out += ["--declare-pitcher", f"{pid}={role}"]
     return out
+
+
+# --- R428. The swap's frame carries what its parent run APPLIED ------------------
+#
+# `late_swap` used to assemble `emergency_proxy` with no Savant, F1, F4, F5 or
+# FanGraphs input, so it ranked candidates and compared incumbent to chosen on
+# AvgPointsPerGame x batting order while the file it refines was built on the
+# whole stack. Neither the brief nor `runs/<id>/inputs/` records those inputs in a
+# form a swap can re-read (the brief keeps counts and file ages; the inputs folder
+# holds the salary and entries files), but the parent run's own
+# `final/projections.csv` is the frame its optimizer saw, hash-registered in its
+# bundle: Base after the xwOBA correction and the value guard, F1..F5, and the
+# Ceiling_Multiplier. So the swap carries those applied values per player,
+# refreshes only the batting orders (F2) from the new feed, and says so.
+#
+# Truthful labels: this is the parent's applied values, a deterministic review
+# proxy, not a re-derivation and not fresher than the parent. Missing or unusable
+# parent data makes a LABELLED unenriched swap; nothing here ever refuses one
+# (CLAUDE.md delivery first, R386).
+
+#: The factor columns a carry reads; F2 is deliberately absent (the pool's).
+CARRY_FACTOR_COLUMNS = ("F1", "F3", "F4", "F5")
+#: Real swap chains on the 2026-10-05 host ran 15 runs deep.
+CARRY_MAX_HOPS = 32
+CARRY_UNENRICHED_TAIL = (
+    "AvgPointsPerGame x batting order only, no odds, Savant, matchup or park "
+    "factors. Candidates are ranked, and the incumbent is compared with the "
+    "chosen lineup, on that model, not on an enriched build's.")
+
+
+def _carry_float(raw):
+    """A finite float, None for a blank cell, ValueError for anything else."""
+    text = str(raw if raw is not None else "").strip()
+    if not text:
+        return None
+    value = float(text)
+    if not math.isfinite(value):
+        raise ValueError(f"{text!r} is not finite")
+    return value
+
+
+def _read_carry_frame(path: Path) -> tuple[list, str]:
+    """``(rows, sha256)`` of ONE read of a frame, so the hash names the bytes used."""
+    data = Path(path).read_bytes()
+    reader = csv.DictReader(io.StringIO(data.decode("utf-8-sig"), newline=""))
+    if "Player_ID" not in (reader.fieldnames or []):
+        raise ValueError("no Player_ID column")
+    return [dict(row) for row in reader], hashlib.sha256(data).hexdigest()
+
+
+def _frame_measures_enriched(rows) -> bool:
+    """MEASURED off the rows, never assumed from a run's mode or a label: some
+    F1/F3/F4/F5 off 1.0, or a Ceiling_Multiplier off the uniform default."""
+    for row in rows:
+        for col in CARRY_FACTOR_COLUMNS:
+            try:
+                value = _carry_float(row.get(col))
+            except ValueError:
+                continue
+            if value is not None and abs(value - 1.0) > NEUTRAL_TOLERANCE:
+                return True
+        try:
+            mult = _carry_float(row.get("Ceiling_Multiplier"))
+        except ValueError:
+            mult = None
+        if mult is not None and abs(mult - float(XISO_CEILING_NEUTRAL)) > NEUTRAL_TOLERANCE:
+            return True
+    return False
+
+
+def _carry_records(rows) -> tuple[dict, list]:
+    """``({Player_ID: record}, rejected)``. A record holds the numeric columns the
+    row carries. A row with ANY unusable value, or a duplicated id, is rejected
+    whole and by id, so no neighbour pays for it. ``Base`` is left out of a record
+    whose parent row has a ``Workload_Factor`` below 1: that Base is already
+    scaled, and the swap's own APPG x workload prior stands for the arm."""
+    carried: dict = {}
+    rejected: list = []
+    seen: set = set()
+    for row in rows:
+        pid = str(row.get("Player_ID") or "").strip()
+        if not pid:
+            continue
+        if pid in seen:
+            carried.pop(pid, None)
+            if not any(r["id"] == pid for r in rejected):
+                rejected.append({"id": pid, "why": "duplicate Player_ID in the frame"})
+            continue
+        seen.add(pid)
+        record: dict = {}
+        try:
+            for col in ("Base", *CARRY_FACTOR_COLUMNS):
+                value = _carry_float(row.get(col))
+                if value is None:
+                    continue
+                if value < 0.0:
+                    raise ValueError(f"{col} is negative ({value})")
+                record[col] = value
+            mult = _carry_float(row.get("Ceiling_Multiplier"))
+            if mult is not None:
+                if mult <= 0.0:
+                    raise ValueError(f"Ceiling_Multiplier is not positive ({mult})")
+                record["Ceiling_Multiplier"] = mult
+            workload = _carry_float(row.get("Workload_Factor"))
+        except ValueError as exc:
+            rejected.append({"id": pid, "why": str(exc)})
+            continue
+        if workload is not None and workload < 1.0:
+            record.pop("Base", None)
+        if record:
+            carried[pid] = record
+    return carried, rejected
+
+
+def _salary_snapshot_signature(run_dir):
+    """``pool_signature`` of the salary file a run snapshotted, or None."""
+    snaps = sorted((Path(run_dir) / "inputs").glob("DKSalaries*.csv"))
+    if not snaps:
+        return None
+    try:
+        return pool_signature(snaps[0])
+    except (OSError, ValueError, csv.Error):
+        return None
+
+
+def resolve_swap_carry(runs_root, swap_parent, salary) -> tuple[dict, dict]:
+    """R428. ``(carried_by_player_id, info)``: the parent's applied values, or
+    ``({}, info)`` naming why nothing was carried. Never raises on data.
+
+    The source is the parent run's own ``final/projections.csv`` (bundle-verified
+    by `resolve_parent_run` for the direct parent), and it is used only when it
+    MEASURES enriched. A frame that does not (a swap run from before R428, a
+    baseline build, a ``--no-enrichment`` build) is passed over and the walk
+    follows the manifest ``parent_run_id`` chain, bounded and cycle-safe, and
+    takes the ROOT-MOST enriched frame that verifies, so a swap of a swap carries
+    the root build's values for every player the root carried (an intermediate
+    swap's frame holds them only for ITS pool). An ANCESTOR chosen as the source
+    is bundle-verified first, from the root end; a neutral one is read and passed
+    over, since nothing is taken from it.
+
+    Slate identity (deviation 5 of the R428 plan): a parent whose export is not
+    this file's bytes (``--allow-parent-mismatch`` resolves the LATEST promoted
+    run, possibly another slate's, and 30 of 97 swaps on the 2026-10-05 host
+    were that case) lends only when its salary snapshot's `pool_signature` equals
+    this swap's: the same player-ID universe is the same draftgroup, and a frame
+    is a model of the slate's players, not a statement about this file's
+    lineage. Every hop after the first is held to the same test, so a stale
+    ``parent_run_id`` cannot cross slates.
+    """
+    root = Path(runs_root)
+    info: dict = {"carried": False, "reason": None, "chain": [], "source": None,
+                  "rejected_rows": [], "rejected_rows_n": 0}
+
+    def _none(reason: str) -> tuple[dict, dict]:
+        info["reason"] = reason
+        return {}, info
+
+    if swap_parent is None:
+        return _none("no parent run resolved")
+    matched = bool(swap_parent.get("current_matches_parent_export"))
+    try:
+        want = pool_signature(salary)
+    except (OSError, ValueError, csv.Error) as exc:
+        return _none(f"this swap's salary file could not be read for the slate check ({exc})")
+    manifest = dict(swap_parent.get("manifest") or {})
+    run_dir = Path(swap_parent.get("run_dir") or root / str(manifest.get("run_id") or "_"))
+    seen: set = set()
+    candidates: list = []     # enriched frames in chain order: (hop, step, run_dir, manifest, rows, digest, sig)
+    for hop in range(CARRY_MAX_HOPS + 1):
+        run_id = str(manifest.get("run_id") or run_dir.name)
+        step: dict = {"run_id": run_id, "mode": str(manifest.get("mode") or "")}
+        info["chain"].append(step)
+        if run_id in seen:
+            step["verdict"] = "already examined (a cycle in parent_run_id)"
+            break
+        seen.add(run_id)
+        slate_sig = None
+        if hop or not matched:
+            slate_sig = _salary_snapshot_signature(run_dir)
+            if slate_sig is None:
+                step["verdict"] = "no salary snapshot to prove it is this slate"
+                break
+            if slate_sig != want:
+                step["verdict"] = (f"another slate (pool signature {slate_sig}, this "
+                                   f"swap's {want})")
+                break
+        rows = digest = None
+        try:
+            rows, digest = _read_carry_frame(run_dir / "final" / "projections.csv")
+        except (OSError, ValueError, csv.Error, UnicodeDecodeError) as exc:
+            step["verdict"] = f"frame unreadable ({exc})"
+        if rows is not None:
+            step["rows"] = len(rows)
+            step["enriched"] = _frame_measures_enriched(rows)
+            if step["enriched"]:
+                step["verdict"] = "enriched"
+                candidates.append((hop, step, run_dir, manifest, rows, digest, slate_sig))
+            else:
+                step["verdict"] = "frame carries no factor or multiplier off neutral"
+        parent_id = str(manifest.get("parent_run_id") or "").strip()
+        if not parent_id:
+            break
+        run_dir = root / parent_id
+        try:
+            manifest = dict(read_run_manifest(run_dir))
+        except Exception as exc:  # noqa: BLE001 - an absent ancestor ends the walk
+            info["chain"].append({"run_id": parent_id, "verdict":
+                                  f"ancestor manifest absent or unreadable ({type(exc).__name__})"})
+            break
+    # The ROOT-MOST usable frame wins: a swap's own frame holds the root's values only for
+    # the players ITS pool carried, and a later swap's pool is not the earlier one's (a side
+    # confirmed since is why there is a later swap), so stopping at the nearest enriched
+    # swap run would drop a player the root build still carries. Verification is lazy and
+    # starts at the root end; the direct parent (hop 0) was verified at resolution.
+    for hop, step, c_dir, c_manifest, rows, digest, slate_sig in reversed(candidates):
+        if hop:
+            try:
+                verification = verify_run_bundle(c_dir)
+            except Exception as exc:  # noqa: BLE001 - a bad ancestor is skipped
+                verification = {"passed": False, "errors": [str(exc)]}
+            if not verification.get("passed"):
+                step["verdict"] = ("failed bundle verification: "
+                                   + "; ".join(str(e) for e in
+                                               (verification.get("errors") or [])[:2]))
+                continue
+        carried, rejected = _carry_records(rows)
+        meta = ((c_manifest.get("metadata") or {}).get("projection_carry") or {})
+        # A swap run holds, at neutral, the players ITS parent never carried; those rows
+        # are placeholders, not values, so they are not lent and stay named as not carried.
+        inherited_neutral = {str(p) for p in (meta.get("not_carried_player_ids") or [])}
+        placeholders = sorted(inherited_neutral & set(carried))
+        for pid in placeholders:
+            carried.pop(pid)
+        if not carried:
+            step["verdict"] = "no usable row in the frame"
+            continue
+        for _hop, other, *_rest in candidates:
+            if other is not step and other["verdict"] == "enriched":
+                other["verdict"] = "enriched; the root-most usable frame was taken instead"
+        origin = str(((meta.get("source") or {}).get("origin_run_id")) or step["run_id"])
+        step["verdict"] = "used"
+        if placeholders:
+            step["placeholders_not_lent"] = len(placeholders)
+        info.update({
+            "carried": True, "reason": None,
+            "rejected_rows": rejected[:50], "rejected_rows_n": len(rejected),
+            "source": {
+                "run_id": step["run_id"], "mode": step["mode"], "origin_run_id": origin,
+                "hops": hop, "frame_path": f"{step['run_id']}/final/projections.csv",
+                "frame_sha256": digest,
+                "parent_export_sha256": swap_parent.get("parent_export_sha256"),
+                "parent_matches_file": matched,
+                "slate_pool_signature": slate_sig,
+            },
+        })
+        return carried, info
+    return _none("no run in the parent chain lends an enriched frame for this slate")
+
+
+def swap_projection_tier(report) -> str:
+    """R428. The delivery record's ``projection_tier`` for a swap: ``enriched``
+    only when a carry reached pool rows AND moved at least one cell off neutral
+    (a factor, a ceiling multiplier or a restated Base), else ``proxy``. Read off
+    the assembler's own count of the frame, never off the size of the map."""
+    if not report or not int(report.get("applied_count") or 0):
+        return "proxy"
+    moved = sum(int(v or 0) for v in (report.get("non_neutral") or {}).values())
+    return "enriched" if (moved or int(report.get("base_restated") or 0)) else "proxy"
+
+
+def _carry_chain_text(info) -> str:
+    steps = [f"{s.get('run_id')} ({s.get('verdict') or s.get('mode') or '?'})"
+             for s in (info.get("chain") or [])]
+    return ("Examined: " + "; ".join(steps) + ". ") if steps else ""
+
+
+def carry_label(info, report, projections=None) -> str:
+    """R428. The ONE line a swap prints about its frame. Only the assembler's
+    ``enrichment["carried"]`` block is read: the rest of its record describes the
+    frame BEFORE the carry (its neutral-default text says no FanGraphs file was
+    supplied) and would be false here."""
+    tier = swap_projection_tier(report)
+    if info.get("carried") and report and tier == "enriched":
+        src = info["source"]
+        side = report.get("by_side") or {}
+        hit, pit = side.get("hitters") or {}, side.get("pitchers") or {}
+        moved = report.get("non_neutral") or {}
+        total = int(hit.get("pool") or 0) + int(pit.get("pool") or 0)
+        lineage = ("" if src.get("parent_matches_file")
+                   else (f", the resolved parent is NOT this file's lineage; same slate by "
+                         f"pool signature {src.get('slate_pool_signature')}"))
+        missing = list(report.get("not_carried_player_ids") or [])
+        names = {}
+        if projections is not None:
+            names = dict(zip(projections["Player_ID"].astype(str), projections["Name"]))
+        shown = ", ".join(f"{names.get(p, '?')} [{p}]" for p in missing[:8])
+        absent = (f"Not carried, ranked neutral: {len(missing)} player(s): {shown}"
+                  + ("" if len(missing) <= 8 else f", +{len(missing) - 8} more") + ". "
+                  if missing else "Every pool player was carried. ")
+        return (
+            f"projection frame: ENRICHED by carry from run {src['run_id']} ({src['mode']}, "
+            f"{src['hops']} hop(s) from the parent, origin {src['origin_run_id']}{lineage}; "
+            f"frame sha256 {str(src['frame_sha256'])[:12]}): carried "
+            f"{report.get('applied_count')} of {total} pool players "
+            f"(hitters {hit.get('carried')}/{hit.get('pool')}, pitchers "
+            f"{pit.get('carried')}/{pit.get('pool')}); "
+            f"f1_games_priced={report.get('f1_games_priced')} (games with a non-neutral F1 "
+            f"row, measured off this frame; the build's own count is games with a usable "
+            f"total) f1_non_neutral={moved.get('f1')} f4_non_neutral={moved.get('f4')} "
+            f"f5_non_neutral={moved.get('f5')} "
+            f"ceiling_multiplier_differentiated={moved.get('ceiling_multiplier')}; "
+            f"Base restated for {report.get('base_restated')} player(s); batting orders and "
+            f"F2 from this feed. {absent}Deterministic review proxy of the parent's applied "
+            f"values, not a re-derivation.")
+    if info.get("carried") and report:
+        src = info["source"]
+        reason = (f"the carry from run {src['run_id']} reached "
+                  f"{report.get('applied_count')} pool player(s) and moved none off neutral")
+    else:
+        reason = info.get("reason") or "no carry"
+    head = "carry REJECTED" if info.get("rejected_by_assembler") else "UNENRICHED"
+    return (f"projection frame: {head} ({reason}): "
+            f"{CARRY_UNENRICHED_TAIL} {_carry_chain_text(info)}".rstrip())
+
+
+def carry_record(info, report, label) -> dict:
+    """R428. What the swap run's manifest ``metadata.projection_carry`` holds, so
+    the next swap, `standings_read` and a reviewer find what this one carried (a
+    swap writes no brief; R468's precedent)."""
+    counts = None
+    if report:
+        counts = {k: report.get(k) for k in (
+            "requested", "applied_count", "by_side", "base_restated", "non_neutral",
+            "f1_games_priced", "base_kept_workload_prior_ids")}
+    return {
+        "carried": bool(report) and int((report or {}).get("applied_count") or 0) > 0
+        and bool(info.get("carried")),
+        "tier": swap_projection_tier(report),
+        "reason": info.get("reason"),
+        "source": info.get("source"),
+        "chain": list(info.get("chain") or []),
+        "counts": counts,
+        "not_carried_player_ids": list((report or {}).get("not_carried_player_ids") or []),
+        "rejected_rows": list(info.get("rejected_rows") or []),
+        "rejected_rows_n": int(info.get("rejected_rows_n") or 0),
+        "label": label,
+    }
+
+
+def carry_notes_clause(record) -> str:
+    """R428. The clause a swap's delivery-record ``notes`` gains; empty for a
+    caller that passed no record, so every existing `deliver_swap` call is as it was."""
+    if not record:
+        return ""
+    if record.get("carried") and record.get("tier") == "enriched":
+        src = record.get("source") or {}
+        return (f"; frame carried from run {src.get('run_id')} "
+                f"(origin {src.get('origin_run_id')})")
+    return f"; frame unenriched ({record.get('reason') or 'the carry moved nothing off neutral'})"
 
 
 def consensus_pair_seats_lost(parent_rosters: dict, after_rosters: dict,
@@ -1009,7 +1379,7 @@ def run_post_swap_preflight(entries: Path, parent, salary: Path, sha: str,
 def deliver_swap(args, result: dict, out: Path, salary: Path, swap_parent,
                  contest_shapes: dict, after_rosters: dict, downgraded: list,
                  controls: dict, feed_path=None, declared_pitchers=None,
-                 exempted=None) -> int:
+                 exempted=None, projection_carry=None) -> int:
     """Everything after a passing joint solve: present, promote, record, ship.
 
     R414. Split out of `main()` so a test can drive every later-failure
@@ -1122,8 +1492,11 @@ def deliver_swap(args, result: dict, out: Path, salary: Path, swap_parent,
         certification=certification,
         # R388(d). An UNCERTIFIED parent's failing gates ride its refinement.
         failing_gates=(parent_gates if certification == UNCERTIFIED_LABEL else None),
-        projection_tier="proxy",  # the swap assembles emergency-proxy projections
-        notes=f"late swap; parent {args.parent_entries}",
+        # R428. "enriched" only when the frame's carry reached rows and moved a
+        # cell off neutral; "proxy" for every other swap, which is what this
+        # always said before a swap could carry (no record passed = no carry).
+        projection_tier=((projection_carry or {}).get("tier") or "proxy"),
+        notes=f"late swap; parent {args.parent_entries}" + carry_notes_clause(projection_carry),
         # R377. The controls the joint solve ran under, and the one thing a
         # swap relaxes on its own authority: a downgrade taken anyway.
         controls=controls_for_report(
@@ -1611,10 +1984,40 @@ def main() -> int:
     for blocker in pool["pool_report"].get("blockers") or []:
         print(f"BLOCKER: {blocker}", file=sys.stderr)
 
-    projections, _ = _assemble_projection_frame(
-        str(salary), kwargs["projection_rows"], "emergency_proxy", None, None, None,
-        projected_order_by_player_id=kwargs.get("platoon_order_by_player_id"),
-    )
+    # R428. The parent run's applied per-player values, carried; only the batting
+    # orders (F2) are the new feed's. Never a refusal: whatever cannot be carried
+    # is named, and the swap runs on today's frame (CLAUDE.md delivery first).
+    try:
+        carried_map, carry_info = resolve_swap_carry(REPO / "runs", swap_parent, salary)
+    except Exception as exc:  # noqa: BLE001 - a resolver bug must not cost the file
+        carried_map, carry_info = {}, {
+            "carried": False, "chain": [], "source": None, "rejected_rows": [],
+            "rejected_rows_n": 0,
+            "reason": f"the carry resolver failed ({type(exc).__name__}: {exc})"}
+    platoon_order = kwargs.get("platoon_order_by_player_id")
+    try:
+        projections, carry_enrichment = _assemble_projection_frame(
+            str(salary), kwargs["projection_rows"], "emergency_proxy", None, None, None,
+            projected_order_by_player_id=platoon_order,
+            carried_by_player_id=carried_map or None)
+    except ValueError as exc:
+        if not carried_map:
+            raise
+        # The engine's own validators refused a carried value (a multiplier that
+        # breaks Ceiling >= Floor, a non-finite cell). Degrade exactly as the
+        # build does (build_slate's ENRICHMENT FAILED path): the unenriched
+        # frame, and the reason impossible to miss.
+        print(f"ENRICHMENT CARRY FAILED, building unenriched: {exc}", file=sys.stderr)
+        carry_info = {**carry_info, "carried": False, "rejected_by_assembler": True,
+                      "reason": f"the engine refused a carried value: {exc}"}
+        carried_map = {}
+        projections, carry_enrichment = _assemble_projection_frame(
+            str(salary), kwargs["projection_rows"], "emergency_proxy", None, None, None,
+            projected_order_by_player_id=platoon_order)
+    carry_report = (carry_enrichment or {}).get("carried")
+    carry_label_text = carry_label(carry_info, carry_report, projections)
+    print(carry_label_text)
+    projection_carry = carry_record(carry_info, carry_report, carry_label_text)
 
     authorized = [e.strip() for e in args.entry_ids.split(",")] if args.entry_ids else None
     requirements = build_entry_requirements(
@@ -1808,6 +2211,9 @@ def main() -> int:
         metadata={"declared_pitchers": dict(declared_pitchers),
                   "declared_pitcher_workload": dict(declared_workload),
                   "declared_pitcher_evidence": dict(declared_evidence),
+                  # R428. What this swap's frame carried and from which run, so a
+                  # swap of this file, `standings_read` and a reviewer find it.
+                  "projection_carry": projection_carry,
                   **({"standings": standings_report["metadata_for_run"]}
                      if standings_report is not None else {})},
         # R29(2): the downgrade check below can still refuse this file, and a
@@ -1930,7 +2336,8 @@ def main() -> int:
                         after_rosters, downgraded, controls,
                         feed_path=(feed_path if dk_feed is None else None),
                         declared_pitchers=declared_pitchers,
-                        exempted=exempted or None)
+                        exempted=exempted or None,
+                        projection_carry=projection_carry)
 
 
 def _standings_module():

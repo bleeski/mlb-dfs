@@ -34,6 +34,40 @@ The swap also refuses at exit 3 when it would remove a contest's last lineup on 
 consensus SP pair its parent recorded (R469, `references/chalk_core_seat.md`);
 `--accept-downgrade` takes it and the file ships review-grade.
 
+### The swap's frame (R428): the parent's applied values, labelled
+
+A swap ranks candidates, and compares the incumbent with the chosen lineup (the
+downgrade refusal), on the projection frame it assembles. Since R428 that frame carries
+what the parent run APPLIED to each player, read from the parent run's own
+`final/projections.csv` (Base after the xwOBA correction and the value guard, F1, F3,
+F4, F5, the Ceiling_Multiplier), and only the batting orders (F2) are the new feed's.
+Neither the brief nor `runs/<id>/inputs/` records the odds packet, the Savant files or
+the F1/F4/F5 maps, so there is nothing to re-read; the swap carries values, not inputs,
+and says so on one line before the bank is built (also on `--dry-run`):
+
+- `projection frame: ENRICHED by carry from run <id> (...)`: the run, its hops from the
+  parent, the origin build, the frame's sha256, `carried N of M pool players`,
+  `f1_games_priced` (games with a non-neutral F1 row, measured off this frame; the build's
+  own count of that name is games with a usable total), `f1_non_neutral`,
+  `f4_non_neutral`, `f5_non_neutral`, `ceiling_multiplier_differentiated`, and the pool
+  players the parent never carried (they stay in the frame at neutral, named).
+- `projection frame: UNENRICHED (<reason>)`: no parent run, no run in the chain that
+  measures enriched, or another slate. The swap still runs, on AvgPointsPerGame x
+  batting order only, and the entry scores below are on that model. It is never a refusal.
+- `projection frame: carry REJECTED (...)`: the engine refused a carried value (a
+  multiplier that breaks Ceiling >= Floor); the swap builds unenriched, exit unchanged.
+
+A parent that is not this file's lineage (`--allow-parent-mismatch` resolves the latest
+promoted run) lends its frame only when its salary snapshot has this swap's player-ID
+pool (`pool_signature`); a swap of a swap walks the manifests' `parent_run_id` and takes
+the root-most run whose frame measures enriched and verifies (an intermediate swap's frame
+holds the root's values only for its own pool). The record is on the swap run's manifest
+(`metadata.projection_carry`) and the delivery record's `projection_tier` is `enriched`
+only when the carry moved a cell off neutral. A deterministic review proxy of the
+parent's values, not a re-derivation and not fresher than the parent. The entry scores
+now move with the parent's model: an incumbent seated for its market total or platoon
+edge is no longer "improved" into an APPG-max roster with the refusal silent.
+
 ### `--standings` (R472): the standings at the decision
 
 `--standings <contest-standings-<id>.csv|.zip>` (repeat for several contests;
