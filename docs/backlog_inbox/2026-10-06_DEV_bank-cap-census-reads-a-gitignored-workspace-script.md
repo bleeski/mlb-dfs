@@ -1,0 +1,9 @@
+# 2026-10-06 DEV (Session 117, R434): `BankCapPerBucketTests.test_every_cap_passing_caller_is_bucket_relative_or_named` is red on any checkout that has the gitignored `skills/generate-lineups-workspace/deepen_bank.py`
+
+**Observed.** On this host's main tree, at the starting HEAD 2563d9b and after R434, the census test scans `mlb_engine`, `tools` and `skills` with `rglob("*.py")` and skips only paths whose parts start with `_scratch`. `skills/generate-lineups-workspace/` is gitignored (`.gitignore:20`) but present on this machine, and `deepen_bank.py` calls `extend_bank` with a cap, so `found` holds `'skills/generate-lineups-workspace/deepen_bank.py': [('extend_bank', 'fresh_cache')]` that the expectation does not list. CI's clean checkout has no such file, so the test is green there. `R293BankOnEveryRungTests` already handles the same file, by design (R322: "Paths in the census above that git does not track, BY DESIGN"), by listing it and skipping the entry when git does not track it; this census was written without that rule.
+
+**Reproduced.** `python -m unittest tests.test_core.BankCapPerBucketTests` in the main tree: the diff, with `maxDiff = None`, is exactly the one `deepen_bank.py` entry (after R434's own sixth `extend_bank` caller is counted in `execution_pipeline.py`). In a `git worktree` under `tools/_scratch_*` the same test reads `{}` instead, because the `_scratch` filter excludes every path under the worktree; a failing-name baseline taken in such a worktree therefore lists this name for a different reason than the main tree does.
+
+**Candidate item.** Apply R322's rule here: skip a path git does not track (or list `deepen_bank.py` with its reason, as the R293 census does), so the test reads the same on every checkout. Effort XS; no engine surface.
+
+Nothing here is a lift, an edge, an ROI or a win rate.

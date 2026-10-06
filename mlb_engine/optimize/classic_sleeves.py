@@ -32,6 +32,16 @@ a membership through the allocator's mask, like environment, because the
 bank's job grid already stacks every team. Seats go only to top-heavy shapes
 with two or more entries, at most half of a contest. A coverage rule over a
 labeled prior; it says nothing about how often a tail wins.
+
+R434 (Ben, 2026-09-23 and 2026-09-24, on 1410_4g): a NAMED secondary stack.
+``--stack-sleeve '{"team": "MIA", "min": 3, "entries": 1}'`` pins ``entries``
+entries to a lineup carrying at least ``min`` hitters from the named team under
+a DIFFERENT, strictly larger primary stack. The operator names the team and the
+count; nothing here ranks a team or says how often such a stack wins. It is a
+strategy preference (Ben's "what if our priors are wrong"), seated through the
+same mask as the tail, so every cap binds the entry jointly and F-3 holds. The
+ordinary job grid builds only per-team PRIMARY jobs, so the bank gets its own
+job family for it (``build_sleeve_jobs``).
 """
 from __future__ import annotations
 
@@ -40,7 +50,7 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 from mlb_engine.contest_shapes import WTA_CONSTRUCTION_SHAPES, validate_shape
 
-VERSION = "1.1"
+VERSION = "1.2"
 
 SLEEVE_PROJECTION = "projection"
 SLEEVE_SALARY_ONLY = "salary_only"
@@ -74,12 +84,31 @@ SLEEVE_JOB_CLASS: Dict[str, str] = {
 #: apportion the rest of each contest.
 SLEEVE_TAIL = "tail"
 SLEEVE_JOB_CLASS[SLEEVE_TAIL] = "sleeve_tail"
-#: The order the bank builds sleeves in: the weighted four, then the tail.
-BANK_SLEEVES: Tuple[str, ...] = SLEEVES + (SLEEVE_TAIL,)
+#: R434. The operator-named secondary stack. Like the tail it is not in
+#: ``SLEEVES`` (its seats are named, not apportioned by weight), and its lineups
+#: are a projection-world solve under one extra constraint.
+SLEEVE_NAMED_STACK = "named_stack"
+SLEEVE_JOB_CLASS[SLEEVE_NAMED_STACK] = "sleeve_named_stack"
+#: The order the bank builds sleeves in: the weighted four, the tail, then the
+#: named stack.
+BANK_SLEEVES: Tuple[str, ...] = SLEEVES + (SLEEVE_TAIL, SLEEVE_NAMED_STACK)
 #: The entry-requirement key a tail seat's team is stamped under.
 TAIL_TEAM_KEY = "tail_team"
 #: The membership token a projection-world lineup stacking ``team`` carries.
 TAIL_TOKEN_PREFIX = "tail:"
+#: R434. The entry-requirement keys a named-stack seat's team and minimum are
+#: stamped under, and the membership token a qualifying lineup carries.
+STACK_TEAM_KEY = "stack_sleeve_team"
+STACK_MIN_KEY = "stack_sleeve_min"
+STACK_TOKEN_PREFIX = "stack:"
+#: The grammar of ``--stack-sleeve``. ``min`` is 2 or 3 and nothing else: a
+#: secondary is STRICTLY smaller than its primary, the primary is at most five,
+#: and a roster has eight hitter slots, so 4 would need 4 + 5 = 9 and 5 is the
+#: primary stack by definition. Only the secondary role exists here; a named
+#: PRIMARY is R422's seat.
+STACK_SPEC_KEYS = frozenset({"team", "min", "entries", "role", "contest_id"})
+STACK_MIN_ALLOWED = (2, 3)
+STACK_ROLE = "secondary"
 #: Top-heavy shapes, the only ones a tail seat goes to. Cash, satellites and
 #: single entry seat none, whatever N is.
 TAIL_SHAPES = frozenset({"large_field_gpp", "large_wta", "mme_gpp"})
@@ -168,6 +197,10 @@ def apportion_entries(
     R422. An entry stamped with a tail team (``TAIL_TEAM_KEY``, by
     ``tail_seat_plan``) seats ``tail:<team>`` and the weights apportion the
     rest of its contest.
+
+    R434. An entry stamped with a named stack team (``STACK_TEAM_KEY``, by
+    ``stack_seat_plan``) seats ``stack:<team>`` the same way. An entry carrying
+    both stamps is a tail seat: the plan never gives it both.
     """
     have = set(available) if available is not None else set(SLEEVES)
     have.add(SLEEVE_PROJECTION)
@@ -180,7 +213,10 @@ def apportion_entries(
     for cid in sorted(by_contest):
         every = sorted(by_contest[cid], key=lambda r: str(r.get("entry_id")))
         tail_reqs = [r for r in every if r.get(TAIL_TEAM_KEY)]
-        reqs = [r for r in every if not r.get(TAIL_TEAM_KEY)]
+        stack_reqs = [r for r in every
+                      if r.get(STACK_TEAM_KEY) and not r.get(TAIL_TEAM_KEY)]
+        reqs = [r for r in every
+                if not r.get(TAIL_TEAM_KEY) and not r.get(STACK_TEAM_KEY)]
         declared = dict(weights.get(cid) or {SLEEVE_PROJECTION: 1.0})
         if len(every) <= 1:
             declared, rule = {SLEEVE_PROJECTION: 1.0}, "single entry"
@@ -188,6 +224,8 @@ def apportion_entries(
             rule = "weights" if len(declared) > 1 else "projection only"
         for req in tail_reqs:
             sleeve_by_entry[str(req.get("entry_id"))] = tail_token(req[TAIL_TEAM_KEY])
+        for req in stack_reqs:
+            sleeve_by_entry[str(req.get("entry_id"))] = stack_token(req[STACK_TEAM_KEY])
         seats = largest_remainder(len(reqs), declared)
         for s in SLEEVES:
             if s != SLEEVE_PROJECTION and seats.get(s) and s not in have:
@@ -202,6 +240,8 @@ def apportion_entries(
             cursor += seats.get(s, 0)
         if tail_reqs:
             seats = {**seats, SLEEVE_TAIL: len(tail_reqs)}
+        if stack_reqs:
+            seats = {**seats, SLEEVE_NAMED_STACK: len(stack_reqs)}
         contests.append({"contest_id": cid, "entries": len(every), "weights": declared,
                          "entries_by_sleeve": seats, "rule": rule})
     return {"sleeve_by_entry": sleeve_by_entry, "contests": contests,
@@ -212,21 +252,28 @@ def expected_entries_by_sleeve(
     weights: Mapping[str, Mapping[str, float]],
     entries_by_contest: Mapping[str, int],
     tail_seats_by_contest: Optional[Mapping[str, int]] = None,
+    stack_seats_by_contest: Optional[Mapping[str, int]] = None,
 ) -> Dict[str, int]:
     """How many entries each sleeve will seat, before any fallback: what the
     bank has to be asked to supply. R422: a contest's tail seats come off its
     count before the weights apportion the rest, as ``apportion_entries``
-    does, and ``tail`` appears only when a seat was placed."""
+    does, and ``tail`` appears only when a seat was placed. R434: the named
+    stack's seats come off the same way and ``named_stack`` appears only when
+    one was placed."""
     tail = {str(k): int(v) for k, v in (tail_seats_by_contest or {}).items() if int(v) > 0}
+    stack = {str(k): int(v) for k, v in (stack_seats_by_contest or {}).items() if int(v) > 0}
     totals = {s: 0 for s in SLEEVES}
     for cid, n in sorted(entries_by_contest.items()):
         declared = dict(weights.get(str(cid)) or {SLEEVE_PROJECTION: 1.0})
         if int(n) <= 1:
             declared = {SLEEVE_PROJECTION: 1.0}
-        for s, seats in largest_remainder(int(n) - tail.get(str(cid), 0), declared).items():
+        pinned = tail.get(str(cid), 0) + stack.get(str(cid), 0)
+        for s, seats in largest_remainder(int(n) - pinned, declared).items():
             totals[s] += seats
     if tail:
         totals[SLEEVE_TAIL] = sum(tail.values())
+    if stack:
+        totals[SLEEVE_NAMED_STACK] = sum(stack.values())
     return totals
 
 
@@ -370,7 +417,7 @@ def tag_sleeves(candidates: Sequence[Mapping[str, Any]],
     for c in candidates:
         c = dict(c)
         built = SLEEVE_BY_JOB_CLASS.get(str(c.get("bank_job_class") or ""))
-        if built in (SLEEVE_ENVIRONMENT, SLEEVE_TAIL):
+        if built in (SLEEVE_ENVIRONMENT, SLEEVE_TAIL, SLEEVE_NAMED_STACK):
             built = SLEEVE_PROJECTION  # a projection-world solve, a narrower grid
         world = built or SLEEVE_PROJECTION
         if world != SLEEVE_PROJECTION:
@@ -412,8 +459,11 @@ def tail_token(team: str) -> str:
 
 
 def sleeve_family(sleeve: str) -> str:
-    """``tail:MIA`` -> ``tail``; every other sleeve is its own family."""
+    """``tail:MIA`` -> ``tail``, ``stack:MIA`` -> ``named_stack``; every other
+    sleeve is its own family."""
     text = str(sleeve or SLEEVE_PROJECTION)
+    if text.startswith(STACK_TOKEN_PREFIX):
+        return SLEEVE_NAMED_STACK
     return SLEEVE_TAIL if text.startswith(TAIL_TOKEN_PREFIX) else text
 
 
@@ -566,6 +616,184 @@ def stamp_tail_seats(entry_requirements: Sequence[Dict[str, Any]],
         team = team_by_entry.get(str(req.get("entry_id")))
         if team:
             req[TAIL_TEAM_KEY] = team
+            stamped += 1
+    return stamped
+
+
+# --------------------------------------------------------------------------- #
+# R434. The operator-named secondary stack.
+# --------------------------------------------------------------------------- #
+class StackSleeveError(ValueError):
+    """A ``--stack-sleeve`` value that is not the grammar, or that no slate
+    could ever seat. The message is the reason in words; ``build_slate`` prints
+    it and refuses with exit 4 before staging."""
+
+
+def stack_token(team: str) -> str:
+    """The membership a lineup carrying ``team`` as a secondary stack holds,
+    and the sleeve a stamped named-stack seat asks for."""
+    return f"{STACK_TOKEN_PREFIX}{str(team).strip().upper()}"
+
+
+def normalize_stack_sleeve(spec: Any) -> Optional[Dict[str, Any]]:
+    """The one grammar of ``--stack-sleeve``: a normalized dict, ``None`` for
+    ``None``, or ``StackSleeveError`` naming what is wrong.
+
+    ``{"team": "MIA", "min": 3, "entries": 1, "role": "secondary",
+    "contest_id": "195996455"}``. ``team`` is required; ``min`` is 2 or 3
+    (default 3); ``entries`` is a whole number of at least 1 (default 1);
+    ``role`` is ``"secondary"`` (default); ``contest_id`` is optional. An
+    unknown key is refused, because ``entires`` quietly falling back to one
+    seat is the failure a typo guard exists for. A bool or a float is not a
+    whole number. Nothing here looks at a slate: whether the team is on it, and
+    whether the entries file has room, is the caller's check (and an unmeetable
+    seat on a well-formed value is relaxed and counted, never refused).
+    """
+    if spec is None:
+        return None
+    if not isinstance(spec, Mapping):
+        raise StackSleeveError(
+            f"--stack-sleeve takes a JSON object; got {type(spec).__name__}")
+    unknown = sorted(str(k) for k in spec if str(k) not in STACK_SPEC_KEYS)
+    if unknown:
+        raise StackSleeveError(
+            f"--stack-sleeve has unknown key(s) {unknown}; the keys are "
+            f"{sorted(STACK_SPEC_KEYS)}")
+    team = spec.get("team")
+    if not isinstance(team, str) or not team.strip():
+        raise StackSleeveError(
+            "--stack-sleeve needs a \"team\": the DraftKings team code as it "
+            "appears in the salary file (for example \"MIA\")")
+
+    def _whole(key: str, default: int) -> int:
+        value = spec.get(key, default)
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise StackSleeveError(
+                f"--stack-sleeve {key!r} must be a whole number; got {value!r}")
+        return int(value)
+
+    role = spec.get("role", STACK_ROLE)
+    if role != STACK_ROLE:
+        hint = (" A named PRIMARY stack is not built here: R422's tail seat is "
+                "the engine's primary-role seat, and it is ranked by the "
+                "market, not named." if str(role).lower() == "primary" else "")
+        raise StackSleeveError(
+            f"--stack-sleeve 'role' must be \"{STACK_ROLE}\"; got {role!r}.{hint}")
+    minimum = _whole("min", 3)
+    if minimum not in STACK_MIN_ALLOWED:
+        raise StackSleeveError(
+            f"--stack-sleeve 'min' must be 2 or 3; got {minimum}. A secondary "
+            f"stack is STRICTLY smaller than its primary, the primary is at "
+            f"most 5 and a roster has 8 hitter slots, so 4 would need 4 + 5 = 9 "
+            f"hitters, 5 is the primary stack itself, and 1 is not a stack")
+    entries = _whole("entries", 1)
+    if entries < 1:
+        raise StackSleeveError(
+            f"--stack-sleeve 'entries' must be at least 1; got {entries}")
+    out: Dict[str, Any] = {"team": team.strip().upper(), "min": minimum,
+                           "entries": entries, "role": STACK_ROLE}
+    contest = spec.get("contest_id")
+    if contest is not None:
+        if (isinstance(contest, bool) or not isinstance(contest, (str, int))
+                or not str(contest).strip()):
+            raise StackSleeveError(
+                f"--stack-sleeve 'contest_id' must be a contest id (a string "
+                f"or a whole number); got {contest!r}")
+        out["contest_id"] = str(contest).strip()
+    return out
+
+
+def stack_seat_plan(
+    entry_requirements: Sequence[Mapping[str, Any]],
+    spec: Mapping[str, Any],
+    taken: Iterable[str] = (),
+) -> Dict[str, Any]:
+    """Place the named stack's seats and pin each to the spec's team.
+
+    ``spec`` is ``normalize_stack_sleeve``'s return. ``taken`` is the entry ids
+    the tail already holds (``tail_seat_plan``'s ``team_by_entry``): the plan
+    never takes one, so an operator-named seat and a derived seat share a
+    portfolio without either moving. With a ``contest_id`` the seats go there
+    (the operator's call, so the top-heavy-shape test does not apply); without
+    one they follow the tail's eligibility (a top-heavy shape, two or more
+    entries, not a cash or single-entry posture), largest contest first and then
+    by contest id. Inside a contest the seats are the LAST free entry ids, the
+    end R406 and R422 seat toward, and a contest takes as many as it has free
+    entries (no half rule: the operator named the count). A seat with no room is
+    counted in ``unplaced``, never silently dropped.
+    """
+    reqs = list(entry_requirements or [])
+    taken_ids = {str(x) for x in (taken or ())}
+    wanted = int(spec.get("entries") or 0)
+    plan: Dict[str, Any] = {
+        "active": False, "entries": len(reqs), "team": str(spec.get("team") or ""),
+        "min": int(spec.get("min") or 0), "role": STACK_ROLE,
+        "requested_entries": wanted, "contest_id": spec.get("contest_id"),
+        "seats": 0, "seats_by_contest": {}, "team_by_entry": {},
+        "unplaced": wanted, "dropped": None,
+        "note": ("an operator-named construction preference, not a prediction "
+                 "and never a probability; it says nothing about how often a "
+                 "named stack wins"),
+    }
+    by_contest: Dict[str, List[Mapping[str, Any]]] = {}
+    for req in reqs:
+        by_contest.setdefault(str(req.get("contest_id") or ""), []).append(req)
+    named = spec.get("contest_id")
+    if named:
+        order = [str(named)] if str(named) in by_contest else []
+    else:
+        eligible = [cid for cid, rows in by_contest.items() if len(rows) >= 2 and str(
+            rows[0].get("contest_shape") or "").strip().lower() in TAIL_SHAPES
+            and str(rows[0].get("posture") or "") not in SINGLE_ENTRY_POSTURES | CASH_POSTURES]
+        order = sorted(eligible, key=lambda cid: (-len(by_contest[cid]), cid))
+    left = wanted
+    for cid in order:
+        if left <= 0:
+            break
+        free = sorted(str(r.get("entry_id")) for r in by_contest[cid]
+                      if str(r.get("entry_id")) not in taken_ids)
+        take = free[len(free) - min(left, len(free)):] if free else []
+        if not take:
+            continue
+        for eid in take:
+            plan["team_by_entry"][eid] = plan["team"]
+        plan["seats_by_contest"][cid] = list(take)
+        left -= len(take)
+    plan["seats"] = wanted - left
+    plan["unplaced"] = left
+    plan["active"] = bool(plan["team_by_entry"])
+    if left:
+        if named and str(named) not in by_contest:
+            plan["unplaced_reason"] = (
+                f"contest {named} holds no entry this build fills")
+        elif named:
+            plan["unplaced_reason"] = (
+                f"contest {named} had {wanted - left} free entr"
+                f"{'y' if wanted - left == 1 else 'ies'} for {wanted} seat(s) "
+                f"(tail seats are never taken)")
+        else:
+            plan["unplaced_reason"] = (
+                "no top-heavy contest with two or more entries had a free "
+                "entry left (the tail's seats are never taken)")
+    return plan
+
+
+def stamp_stack_seats(entry_requirements: Sequence[Dict[str, Any]],
+                      plan: Optional[Mapping[str, Any]]) -> int:
+    """Write each named-stack seat's team and minimum onto its entry
+    requirement, in place, and return how many were stamped. A stale stamp from
+    an earlier call is cleared first, so the requirements always say what THIS
+    plan placed (``None`` clears every stamp)."""
+    team_by_entry = dict((plan or {}).get("team_by_entry") or {})
+    minimum = int((plan or {}).get("min") or 0)
+    stamped = 0
+    for req in entry_requirements:
+        req.pop(STACK_TEAM_KEY, None)
+        req.pop(STACK_MIN_KEY, None)
+        team = team_by_entry.get(str(req.get("entry_id")))
+        if team and minimum:
+            req[STACK_TEAM_KEY] = team
+            req[STACK_MIN_KEY] = minimum
             stamped += 1
     return stamped
 

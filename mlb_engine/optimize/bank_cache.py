@@ -660,6 +660,7 @@ def conditions_signature(
     *, target: str = "ceiling", leverage: Optional[Mapping[str, Any]] = None,
     max_selected_from: Optional[Tuple[Sequence[str], int]] = None,
     stack_teams: Optional[Sequence[str]] = None,
+    secondary_stack: Optional[Tuple[str, int]] = None,
 ) -> str:
     """A short digest of everything outside (pair, team, locks) that moves a solve.
 
@@ -706,6 +707,13 @@ def conditions_signature(
     if stack_teams is not None:
         digest.update(
             f"teams:{'|'.join(sorted(str(t) for t in stack_teams))}\n".encode())
+    # R434. A job grid whose lineups must carry a NAMED team as a secondary
+    # stack answers a different question and buckets apart. Without this term
+    # its job keys would equal the ordinary bucket's and every job would be
+    # skipped as already attempted. Appended only when set, for the rule above.
+    if secondary_stack is not None:
+        digest.update(
+            f"sec:{str(secondary_stack[0]).strip().upper()}:{int(secondary_stack[1])}\n".encode())
     digest.update(_projection_bytes(projections_df))
     return digest.hexdigest()[:16]
 
@@ -783,6 +791,7 @@ def extend_bank(
     job_class: Optional[str] = None,
     stack_teams: Optional[Sequence[str]] = None,
     other_held: Optional[Union[int, Mapping[str, int]]] = None,
+    secondary_stack: Optional[Tuple[str, int]] = None,
 ) -> Dict[str, Any]:
     """Generate candidates across (SP pair, stack team) until the budget runs out.
 
@@ -811,6 +820,18 @@ def extend_bank(
     R406. ``stack_teams`` restricts which teams the job grid STACKS (the
     environment sleeve's games), never who may be rostered: every player stays
     legal as a filler in every job, and the restriction is its own bucket.
+
+    R434. ``secondary_stack=(team, m)`` is the operator-named secondary stack:
+    every job stacks a primary team OTHER than ``team`` and carries exactly ``m``
+    of ``team``'s hitters (``build_single_lineup``'s ``bringback_constraint``,
+    ``max`` named explicitly because its default is 2), so ``team`` can never
+    tie or outsize the primary. The primary's floor is raised to ``m + 1`` as a
+    guard for a caller that lowered it; at the default 4 and ``m`` of 2 or 3 it
+    is already there, so the bucket is separated by its own signature term, not
+    by the stack bounds. A constraint on the LINEUP, never on the pool: every
+    player stays legal. A team with fewer than ``m`` legal hitters builds
+    nothing and the report says so. ``None`` (the default) is this function
+    before R434, byte for byte.
 
     Returns a report with what was built and whether the job list is exhausted, so
     the caller knows whether another slice is worth running. ``locked_slot_assignments``
@@ -855,6 +876,15 @@ def extend_bank(
         stack_min = stack_relaxed_to
         stack_max = max(stack_max, stack_min)
 
+    # R434. The primary must be strictly larger than the named secondary, so
+    # the floor is at least m + 1 BEFORE the signature is computed (a no-op at
+    # the production default of 4 for m of 2 or 3).
+    secondary: Optional[Tuple[str, int]] = None
+    if secondary_stack is not None:
+        secondary = (str(secondary_stack[0]).strip().upper(), int(secondary_stack[1]))
+        stack_min = max(stack_min, secondary[1] + 1)
+        stack_max = max(stack_max, stack_min)
+
     # Everything outside (pair, team, locks) that changes a solve's answer, fixed
     # now that the stack bounds are settled and used as part of every job key.
     # R101 splits it in two: the pool digest is the half that INVALIDATES, the
@@ -864,7 +894,7 @@ def extend_bank(
         projections_df, excl, stack_min, stack_max,
         max_opposing_hitters_per_sp=max_opposing_hitters_per_sp,
         target=target, leverage=leverage, max_selected_from=max_selected_from,
-        stack_teams=stack_teams)
+        stack_teams=stack_teams, secondary_stack=secondary)
     pool_digest = projection_digest(projections_df)
     # R453. What the caller holds in buckets other than this call's own.
     others: Optional[int] = None
@@ -909,6 +939,21 @@ def extend_bank(
     if stack_teams is not None:
         wanted_teams = {str(t) for t in stack_teams}
         teams = [t for t in teams if t in wanted_teams]
+    secondary_report: Optional[Dict[str, Any]] = None
+    if secondary is not None:
+        # R434. The primary is any team but the named one, and the named team
+        # needs m LEGAL hitters (after the Excluded column) or no job can be
+        # answered with a lineup: say so and build nothing, rather than pay a
+        # proven-infeasible solve per pair to find it out.
+        legal_named = int((hitters["Team"].astype(str).str.upper() == secondary[0]).sum())
+        teams = [t for t in teams if str(t).upper() != secondary[0]]
+        secondary_report = {"team": secondary[0], "min": secondary[1],
+                            "primary_min_size": int(stack_min),
+                            "legal_hitters_on_team": legal_named,
+                            "primary_teams": len(teams), "status": "jobs_enumerated"}
+        if legal_named < secondary[1]:
+            teams = []
+            secondary_report["status"] = "team_has_fewer_than_min_legal_hitters"
     all_pitchers = projections_df[projections_df["Position"] == "P"]
     excluded_arms_dropped = int(len(all_pitchers) - len(pitchers))
     all_hitters = projections_df[projections_df["Position"] != "P"]
@@ -1070,6 +1115,12 @@ def extend_bank(
                 max_opposing_hitters_per_sp=max_opposing_hitters_per_sp,
                 # R405(c). None on every ordinary slice.
                 max_selected_from=max_selected_from,
+                # R434. Present only for the named secondary stack, so every
+                # other slice's call is exactly the call it was.
+                **({"bringback_constraint": {"bringback_team": secondary[0],
+                                             "min": secondary[1],
+                                             "max": secondary[1]}}
+                   if secondary is not None else {}),
             )
             # R293. Recorded from the SOLVE, on the same "on every rung"
             # reasoning as the two lines above: this path was already wired, and
@@ -1219,6 +1270,8 @@ def extend_bank(
             else None),
         "job_class": job_class,
         "stack_teams": sorted(str(t) for t in stack_teams) if stack_teams is not None else None,
+        # R434. Only when a named secondary stack was asked for.
+        **({"secondary_stack": secondary_report} if secondary_report else {}),
         # R103. Named so a +0-candidate slice on a fully-pinned entry reads as
         # the pin it is, not as a dry pool: True means both P slots were
         # pinned to a same-game pair and the same-game filter was bypassed to

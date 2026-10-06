@@ -1696,6 +1696,8 @@ def _resolve_classic_sleeves(
     full_compatible: List[List[bool]],
     controls: Mapping[str, Any],
     rosters: Sequence[Tuple[str, ...]],
+    *,
+    stack_relaxed_steps: Optional[Sequence[Mapping[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """R406. Apportion entries to sleeves and confine each through the mask.
 
@@ -1719,6 +1721,20 @@ def _resolve_classic_sleeves(
     sleeve bank too; the rest of such a portfolio then seats ``projection``, as
     ``no_sleeve_bank`` would have, so a bank that never built the weighted
     sleeves is not counted as falling out of them.
+
+    R434. An entry stamped with a named stack (``classic_sleeves.STACK_TEAM_KEY``
+    and ``STACK_MIN_KEY``, by ``stack_seat_plan``) seats ``stack:<team>``: a
+    projection-world candidate carrying at least ``min`` of the team's HITTERS
+    (``controls["player_team_by_id"]``, the map R343's footprint reads) under a
+    primary stack that is a DIFFERENT team and STRICTLY larger. Strictly,
+    because both primary readers break a 3-3 split alphabetically, so a tie
+    would read as a secondary by accident; an unmeasured size (0) never
+    qualifies (R34's safe direction) and is counted. A missing team map seats
+    nothing, and the entries fall back counted: an unknown never invents an
+    exposure. ``stack_relaxed_steps`` is the allocator's ladder saying the joint
+    solve was proven infeasible with the seat active: the stamps are ignored,
+    the entries seat as the weights say, and the block records the step and
+    counts the entries as fallbacks, so the file ships and the loss is named.
     """
     from mlb_engine.optimize import classic_sleeves as cs
     if controls.get("classic_sleeves") is False:
@@ -1728,7 +1744,36 @@ def _resolve_classic_sleeves(
     tail_on = controls.get("classic_tail_seats") is not False
     tail_of = {str(e.get("entry_id") or ""): str(e[cs.TAIL_TEAM_KEY]).upper()
                for e in entries if tail_on and e.get(cs.TAIL_TEAM_KEY)}
-    if not sleeve_bank and not tail_of:
+    # R434. What the plan stamped, and what the ladder left in force.
+    stack_requested = {str(e.get("entry_id") or ""): str(e[cs.STACK_TEAM_KEY]).upper()
+                       for e in entries
+                       if e.get(cs.STACK_TEAM_KEY) and not e.get(cs.TAIL_TEAM_KEY)}
+    stack_relaxed = stack_relaxed_steps is not None and bool(stack_requested)
+    stack_of = {} if stack_relaxed else dict(stack_requested)
+    stack_min_by_team: Dict[str, int] = {}
+    for e in entries:
+        if str(e.get("entry_id") or "") in stack_of:
+            team = str(e[cs.STACK_TEAM_KEY]).upper()
+            stack_min_by_team[team] = max(stack_min_by_team.get(team, 0),
+                                          int(e.get(cs.STACK_MIN_KEY) or 0))
+    relaxed_row = None
+    if stack_relaxed:
+        relaxed_row = {
+            "sleeve": "stack:" + ",".join(sorted(set(stack_requested.values()))),
+            "entries": len(stack_requested), "entry_ids": sorted(stack_requested),
+            "reason": ("entry-level joint MILP proven infeasible with the named-stack "
+                       "seat active; the seat is a construction preference and never "
+                       "the file, so it was dropped and the entries seat as the "
+                       "weights say"),
+        }
+    if not sleeve_bank and not tail_of and not stack_of:
+        if relaxed_row:
+            return {"status": "no_sleeve_bank", "relaxations": relaxed_row["entries"],
+                    "fallbacks": [relaxed_row],
+                    "stack": {"status": "relaxed_by_ladder",
+                              "requested": dict(sorted(stack_requested.items())),
+                              "seated": {}, "fell_back": sorted(stack_requested),
+                              "relaxation_steps": list(stack_relaxed_steps or [])}}
         return {"status": "no_sleeve_bank", "relaxations": 0}
     tail_teams = set(tail_of.values())
     # A stack below the primary-stack floor is excluded after this mask, so it
@@ -1736,12 +1781,32 @@ def _resolve_classic_sleeves(
     # read as the floor's relaxation, not the tail's. An unmeasured size (0) is
     # left to the floor's own unmeasurable-bank rule.
     floor = int(controls.get("primary_stack_min_size") or 0)
+    # R434. The team map the named-stack membership counts hitters through, and
+    # how many lineups carried enough of the team but no measured primary size.
+    stack_team_of = {str(k): str(v).strip().upper()
+                     for k, v in (controls.get("player_team_by_id") or {}).items()}
+    stack_unmeasured = 0
     for k, c in enumerate(candidates):
         stack = _candidate_primary_stack(c)
         size = _candidate_primary_stack_size(c)
         if (stack in tail_teams and cs.SLEEVE_PROJECTION in cand_sleeves[k]
                 and not (floor and 0 < size < floor)):
             cand_sleeves[k].add(cs.tail_token(stack))
+        if stack_min_by_team and stack_team_of and cs.SLEEVE_PROJECTION in cand_sleeves[k]:
+            named_counts = Counter(stack_team_of.get(str(p))
+                                   for p in _candidate_hitter_ids(c))
+            for team, need in stack_min_by_team.items():
+                held = named_counts.get(team, 0)
+                if held < need or stack == team:
+                    continue
+                if size <= 0:
+                    stack_unmeasured += 1
+                    continue
+                # Strictly larger: a tie is labelled by alphabet, not by role.
+                # And the floor, as the tail's: a stack under it is excluded
+                # after this mask and would starve the seat at the floor.
+                if size > held and not (floor and 0 < size < floor):
+                    cand_sleeves[k].add(cs.stack_token(team))
     E, K = len(entries), len(candidates)
     weights: Dict[str, Dict[str, float]] = {}
     for entry in entries:
@@ -1750,11 +1815,21 @@ def _resolve_classic_sleeves(
             entry.get("posture"), entry.get("contest_shape"))
             if sleeve_bank else {cs.SLEEVE_PROJECTION: 1.0})
     available = sorted(set().union(*cand_sleeves))
+
+    def _seen_by_plan(e: Dict[str, Any]) -> Dict[str, Any]:
+        drop = set()
+        if not tail_on:
+            drop.add(cs.TAIL_TEAM_KEY)
+        if stack_relaxed:  # R434: the ladder dropped the named-stack seat
+            drop |= {cs.STACK_TEAM_KEY, cs.STACK_MIN_KEY}
+        return {k: v for k, v in e.items() if k not in drop} if drop else e
+
     plan = cs.apportion_entries(
-        [e if tail_on else {k: v for k, v in e.items() if k != cs.TAIL_TEAM_KEY}
-         for e in entries], weights, available=available)
+        [_seen_by_plan(e) for e in entries], weights, available=available)
     sleeve_of = dict(plan["sleeve_by_entry"])
     fallbacks = list(plan["fallbacks"])
+    if relaxed_row:
+        fallbacks.append(relaxed_row)
     ids = [str(e.get("entry_id") or "") for e in entries]
     # A (contest, sleeve) needs as many distinct compatible lineups as entries,
     # or the same-contest duplicate rule cannot seat it.
@@ -1790,7 +1865,8 @@ def _resolve_classic_sleeves(
     for e, entry in enumerate(entries):
         cid = str(entry.get("contest_id") or "")
         bucket = entries_by_sleeve.setdefault(
-            cid, {x: 0 for x in cs.SLEEVES + ((cs.SLEEVE_TAIL,) if tail_of else ())})
+            cid, {x: 0 for x in cs.SLEEVES + ((cs.SLEEVE_TAIL,) if tail_of else ())
+                  + ((cs.SLEEVE_NAMED_STACK,) if stack_of else ())})
         bucket[cs.sleeve_family(sleeve_of.get(ids[e], cs.SLEEVE_PROJECTION))] += 1
     out = {
         "status": "applied",
@@ -1816,6 +1892,34 @@ def _resolve_classic_sleeves(
             "seated": seated,
             "entries_by_team": dict(sorted(Counter(seated.values()).items())),
             "fell_back": sorted(set(tail_of) - set(seated)),
+        }
+    if stack_of:
+        # R434. What the plan asked for and what the mask seated, by entry id.
+        seated_stack = {eid: sleeve_of.get(eid, "")[len(cs.STACK_TOKEN_PREFIX):]
+                        for eid in sorted(stack_of)
+                        if cs.sleeve_family(sleeve_of.get(eid, "")) == cs.SLEEVE_NAMED_STACK
+                        and eid not in unmasked}
+        out["stack"] = {
+            "status": "applied",
+            "requested": dict(sorted(stack_of.items())),
+            "min_by_team": dict(sorted(stack_min_by_team.items())),
+            "seated": seated_stack,
+            "entries_by_team": dict(sorted(Counter(seated_stack.values()).items())),
+            "fell_back": sorted(set(stack_of) - set(seated_stack)),
+            "candidates_carrying_token": sum(
+                1 for members in cand_sleeves
+                if any(m.startswith(cs.STACK_TOKEN_PREFIX) for m in members)),
+            "team_map_wired": bool(stack_team_of),
+            "unmeasured_primary_size": stack_unmeasured,
+            "rule": ("at least `min` hitters of the named team under a different, "
+                     "strictly larger primary stack"),
+        }
+    elif stack_relaxed:
+        out["stack"] = {
+            "status": "relaxed_by_ladder",
+            "requested": dict(sorted(stack_requested.items())),
+            "seated": {}, "fell_back": sorted(stack_requested),
+            "relaxation_steps": list(stack_relaxed_steps or []),
         }
     return out
 
@@ -3778,8 +3882,13 @@ def select_and_assign_entries(
 
     # R406. The sleeves' mask, applied before the floor and the prefilter so
     # both see the compatible set each entry's world allows.
+    # R434. The ladder's verdict on the named-stack seat rides `_seat_state`
+    # (every re-entry already carries it) under its own keys.
     sleeve_report = _resolve_classic_sleeves(
-        candidates, entries, full_compatible, controls, all_rosters)
+        candidates, entries, full_compatible, controls, all_rosters,
+        stack_relaxed_steps=(
+            list((_seat_state or {}).get("stack_relaxation_steps") or [])
+            if (_seat_state or {}).get("stack_relaxed") else None))
 
     # R37 stage 1. The primary-stack floor is applied HERE: after entry
     # compatibility and the untouchable-row blocking, so the starvation check
@@ -4611,6 +4720,45 @@ def select_and_assign_entries(
                     _search_state=_search_state,
                 )
 
+        # R434. The operator's named-stack seat steps after the five-stack quota
+        # and before R469's pair seat: of every control that can move here it is
+        # the smallest loss, at most `entries` rows of ONE construction
+        # preference the operator named for this slate, no cap and no standing
+        # rule. One step, dropped, counted and named: a seat the joint solve
+        # cannot carry is never the file (R386). Only when the mask actually
+        # seated an entry (a seat that fell back constrains nothing, so dropping
+        # it cannot restore feasibility), and only once.
+        _stack_block = sleeve_report.get("stack") or {}
+        if (proven_infeasible and (not slate_blocked) and not _probe
+                and _stack_block.get("status") == "applied"
+                and _stack_block.get("seated")):
+            return select_and_assign_entries(
+                _all_candidates, entry_requirements, portfolio_controls,
+                bank_report=bank_report, fixed_exposure=fixed_exposure,
+                feasibility_inputs=feasibility_inputs,
+                feasibility_checks=feasibility_checks,
+                interaction_probe_budget_s=interaction_probe_budget_s,
+                interaction_probe_not_after=interaction_probe_not_after,
+                _floor_state=_floor_state,
+                _reuse_state=_reuse_state,
+                _quota_state=_quota_state,
+                _search_state=_search_state,
+                _seat_state={
+                    **(_seat_state or {}),
+                    "stack_relaxed": True,
+                    "stack_relaxation_steps": list(
+                        (_seat_state or {}).get("stack_relaxation_steps") or []) + [{
+                            "from": dict(sorted(_stack_block["seated"].items())),
+                            "to": None,
+                            "reason": ("entry-level joint MILP proven infeasible with "
+                                       "the named-stack seat active; the seat is one "
+                                       "of the controls whose interaction the solver "
+                                       "could not satisfy"),
+                            "trigger": "proven_infeasible_with_stack_sleeve",
+                        }],
+                },
+            )
+
         # R469. The seat steps after the five-stack quota and before the
         # primary-stack floor. The quota is the thinnest-evidenced lower bound
         # (one dated decision whose lift has moved three ways); the seat is one
@@ -4630,6 +4778,8 @@ def select_and_assign_entries(
                 _quota_state=_quota_state,
                 _search_state=_search_state,
                 _seat_state={
+                    # R434: spread, so a named-stack step already taken survives.
+                    **(_seat_state or {}),
                     "relaxed": True,
                     "relaxation_steps": list(seat_report.get("relaxation_steps") or []) + [{
                         "from": dict(sorted(seat_need.items())),
