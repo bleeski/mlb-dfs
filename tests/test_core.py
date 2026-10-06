@@ -42933,6 +42933,713 @@ def _entry_rosters(path) -> dict:
     return {row.entry_id: list(row.roster_cells) for row in parse_dk_entry_rows(path)}
 
 
+class LateSwapEnrichedFrameTests(unittest.TestCase):
+    """R428 (roadmap Session 115). A late swap ranks candidates, and compares the
+    incumbent with the chosen lineup, on the frame its PARENT RUN applied, not on
+    AvgPointsPerGame x batting order.
+
+    The parent brief records counts and file ages and `runs/<id>/inputs/` holds only
+    the salary and entries files, so the register's "reuse the parent's inputs" had
+    nothing to read. What a run does persist per player is its applied values, in
+    `final/projections.csv`: Base after the xwOBA correction and the value guard,
+    F1..F5 and the Ceiling_Multiplier. `late_swap.resolve_swap_carry` reads them,
+    `_assemble_projection_frame(carried_by_player_id=)` overlays them (after the
+    value guard, before the shared `build_projections`), and only the batting
+    orders (F2) are the new feed's.
+
+    Three layers, each driving the production function: the engine overlay (E*),
+    the resolver over hand-written `runs/` skeletons (R*), and the real
+    `late_swap.main()` over a real parent run and a real `run_late_swap` (S*, the
+    R468 harness composed, never subclassed, so its tests do not run twice). The
+    harness's own parent frame is NEUTRAL, so the swap-level parent is a SECOND
+    `run_initial_build` in the same temp `runs/` whose frame was assembled through
+    the real map path (F1/F4/F5) plus the new kwarg (Ceiling_Multiplier: a column
+    set after assembly never reaches Ceiling, and synthetic Savant CSVs would need
+    the DK-keyed name crosswalk to match the fixture's names).
+    """
+
+    DATE = LateSwapDeclaredPitcherTests.DATE
+
+    # -- engine fixtures ---------------------------------------------------------- #
+
+    def _eng(self, tmp):
+        salary = Path(tmp) / "salary.csv"
+        return salary, write_salary(salary)
+
+    @staticmethod
+    def _rows(overrides=None, extra=None):
+        overrides = overrides or {}
+        extra = extra or {}
+        out = []
+        for raw in salary_rows():
+            row = {"Player_ID": raw[3], "AvgPointsPerGame": overrides.get(raw[2], 10.0)}
+            row.update(extra.get(raw[2], {}))
+            out.append(row)
+        return out
+
+    @staticmethod
+    def _by_id(frame):
+        return {str(r["Player_ID"]): r for r in frame.to_dict("records")}
+
+    def _assemble(self, salary, rows, **kw):
+        return epi._assemble_projection_frame(
+            str(salary), rows, "emergency_proxy", None, None, None, **kw)
+
+    # -- E: the engine overlay ---------------------------------------------------- #
+
+    def test_E1_the_overlay_lands_and_f2_and_the_order_are_the_pools(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            salary, ids = self._eng(tmp)
+            rows = self._rows(extra={"AAA SS": {"Batting_Order": 3, "F2": 1.07}})
+            carried = {
+                ids["AAA SS"]: {"Base": 12.0, "F1": 1.10, "F3": 1.02, "F4": 0.95, "F5": 1.05,
+                                "Ceiling_Multiplier": 1.30,
+                                # never read: F2 and the order are the pool's
+                                "F2": 9.9, "Batting_Order": 9},
+                ids["Pitcher C"]: {"F1": 1.04, "Ceiling_Multiplier": 1.60},
+            }
+            frame, enrich = self._assemble(salary, rows, carried_by_player_id=carried)
+            by = self._by_id(frame)
+            ss = by[ids["AAA SS"]]
+            self.assertEqual((float(ss["Base"]), float(ss["F1"]), float(ss["F2"]), float(ss["F3"]),
+                              float(ss["F4"]), float(ss["F5"])),
+                             (12.0, 1.10, 1.07, 1.02, 0.95, 1.05))
+            self.assertEqual(int(ss["Batting_Order"]), 3)
+            bp = 12.0 * 1.10 * 1.07 * 1.02 * 0.95 * 1.05
+            self.assertAlmostEqual(float(ss["Base_Projection"]), bp, places=9)
+            self.assertAlmostEqual(float(ss["Ceiling"]), bp * 1.30, places=9)
+            self.assertAlmostEqual(float(ss["Floor"]), bp * 0.58, places=9)
+            self.assertIn("carried_from_parent", str(ss["Notes"]))
+            arm = by[ids["Pitcher C"]]
+            self.assertEqual((float(arm["Base"]), float(arm["F1"])), (10.0, 1.04))
+            self.assertAlmostEqual(float(arm["Ceiling"]) / float(arm["Base_Projection"]), 1.60, places=9)
+            other = by[ids["AAA C"]]
+            self.assertEqual((float(other["Base"]), float(other["F1"]), float(other["F4"])), (10.0, 1.0, 1.0))
+            self.assertAlmostEqual(float(other["Ceiling"]) / float(other["Base_Projection"]), 1.42, places=9)
+            self.assertNotIn("carried_from_parent", str(other["Notes"]))
+            block = enrich["carried"]
+            self.assertEqual((block["requested"], block["applied_count"]), (2, 2))
+            self.assertEqual(block["non_neutral"], {"f1": 2, "f3": 1, "f4": 1, "f5": 1,
+                                                    "ceiling_multiplier": 2})
+            self.assertEqual(block["base_restated"], 1)
+            self.assertEqual(block["f1_games_priced"], 2)
+            self.assertEqual(block["by_side"]["pitchers"], {"pool": 2, "carried": 1})
+            self.assertEqual(block["by_side"]["hitters"], {"pool": 16, "carried": 1})
+
+    def test_E1_without_the_kwarg_the_frame_and_the_record_are_byte_identical(self):
+        """Negative control: the default, None and {} are today's call exactly, and no
+        other caller's enrichment record gains a key."""
+        with tempfile.TemporaryDirectory() as tmp:
+            salary, ids = self._eng(tmp)
+            rows = self._rows(extra={"AAA SS": {"Batting_Order": 3, "F2": 1.07}})
+            base, base_enrich = self._assemble(salary, rows)
+            for kw in ({"carried_by_player_id": None}, {"carried_by_player_id": {}}):
+                again, enrich = self._assemble(salary, rows, **kw)
+                pd.testing.assert_frame_equal(base, again)
+                self.assertNotIn("carried", enrich)
+            self.assertNotIn("carried", base_enrich)
+            self.assertEqual(sorted(base_enrich), sorted(enrich))
+
+    def test_E2_the_value_guard_does_not_reclip_a_carried_base(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            salary, ids = self._eng(tmp)
+            rows = self._rows(overrides={"AAA SS": 30.0, "CCC SS": 30.0})
+            plain, _ = self._assemble(salary, rows)
+            cap = float(self._by_id(plain)[ids["CCC SS"]]["Base"])
+            self.assertLess(cap, 25.0, "the guard must clip a 30.0 APPG below the carried 25.0 "
+                                       "for this test to mean anything")
+            frame, _ = self._assemble(salary, rows,
+                                      carried_by_player_id={ids["AAA SS"]: {"Base": 25.0}})
+            by = self._by_id(frame)
+            self.assertEqual(float(by[ids["AAA SS"]]["Base"]), 25.0,
+                             "a Base the parent already capped is not capped again")
+            self.assertAlmostEqual(float(by[ids["CCC SS"]]["Base"]), cap, places=9,
+                                   msg="a row that was not carried is still capped")
+
+    def test_E3_a_workload_row_keeps_its_own_base_and_takes_the_factors(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            salary, ids = self._eng(tmp)
+            rows = self._rows(extra={"Pitcher C": {"Workload_Factor": 0.5}})
+            frame, enrich = self._assemble(
+                salary, rows, carried_by_player_id={
+                    ids["Pitcher C"]: {"Base": 20.0, "F1": 1.05},
+                    ids["AAA C"]: {"F4": 1.10}})
+            by = self._by_id(frame)
+            self.assertEqual(float(by[ids["Pitcher C"]]["Base"]), 5.0,
+                             "APPG 10 x the swap's own 0.5 prior, never the carried 20 scaled twice")
+            self.assertEqual(float(by[ids["Pitcher C"]]["F1"]), 1.05)
+            self.assertEqual(enrich["carried"]["base_kept_workload_prior_ids"], [ids["Pitcher C"]])
+            self.assertEqual(float(by[ids["AAA C"]]["Base"]), 10.0, "a record with no Base leaves Base")
+            self.assertEqual(float(by[ids["AAA C"]]["F4"]), 1.10)
+
+    def test_E4_the_pool_is_the_callers_never_trimmed_or_widened(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            salary, ids = self._eng(tmp)
+            rows = self._rows()
+            plain, _ = self._assemble(salary, rows)
+            frame, enrich = self._assemble(
+                salary, rows, carried_by_player_id={
+                    ids["AAA SS"]: {"F1": 1.1}, "99999": {"F1": 1.2}})
+            self.assertEqual(list(frame["Player_ID"]), list(plain["Player_ID"]))
+            block = enrich["carried"]
+            self.assertEqual((block["requested"], block["applied_count"]), (2, 1))
+            self.assertNotIn("99999", [str(p) for p in frame["Player_ID"]])
+            self.assertIn(ids["AAA C"], block["not_carried_player_ids"])
+            self.assertEqual(len(block["not_carried_player_ids"]), len(plain) - 1)
+            row = self._by_id(frame)[ids["AAA C"]]
+            self.assertEqual((float(row["F1"]), float(row["Base"])), (1.0, 10.0))
+
+    def test_E5_a_value_the_engine_refuses_raises_naming_the_player(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            salary, ids = self._eng(tmp)
+            rows = self._rows()
+            with self.assertRaisesRegex(ValueError, "Ceiling below Floor"):
+                self._assemble(salary, rows, carried_by_player_id={
+                    ids["AAA SS"]: {"Ceiling_Multiplier": 0.3}})
+            for bad in (float("nan"), float("inf"), -1.0, "abc"):
+                with self.assertRaisesRegex(ValueError, ids["AAA SS"]):
+                    self._assemble(salary, rows, carried_by_player_id={
+                        ids["AAA SS"]: {"F1": bad}})
+            # a record that is not a mapping is the same refusal, so `main()`'s fallback
+            # catches it (a TypeError would escape as a traceback)
+            for bad_record in (None, [1.1], "1.1"):
+                with self.assertRaisesRegex(ValueError, "not a mapping"):
+                    self._assemble(salary, rows, carried_by_player_id={ids["AAA SS"]: bad_record})
+
+    # -- R: the resolver over hand-written runs/ skeletons ------------------------ #
+
+    def _skeleton(self, root, run_id, *, mode="initial_build", parent=None, frame=None,
+                  salary_ids=None, metadata=None):
+        """One run directory with only what `resolve_swap_carry` reads."""
+        run = Path(root) / "runs" / run_id
+        (run / "final").mkdir(parents=True)
+        (run / "inputs").mkdir()
+        (run / "manifest.json").write_text(json.dumps({
+            "run_id": run_id, "mode": mode, "parent_run_id": parent,
+            "metadata": metadata or {}}), encoding="utf-8")
+        if frame is not None:
+            cols = sorted({c for row in frame for c in row})
+            with (run / "final" / "projections.csv").open("w", newline="", encoding="utf-8") as fh:
+                writer = csv.DictWriter(fh, fieldnames=cols)
+                writer.writeheader()
+                writer.writerows(frame)
+        ids = salary_ids if salary_ids is not None else ["1", "2", "3"]
+        with (run / "inputs" / "DKSalaries.csv").open("w", newline="", encoding="utf-8") as fh:
+            writer = csv.writer(fh)
+            writer.writerow(["Position", "Name", "ID"])
+            writer.writerows([["OF", f"p{i}", i] for i in ids])
+        return run
+
+    @staticmethod
+    def _neutral(ids=("1", "2", "3")):
+        return [{"Player_ID": i, "Base": "10.0", "F1": "1.0", "F3": "1.0", "F4": "1.0", "F5": "1.0"}
+                for i in ids]
+
+    @staticmethod
+    def _rich(ids=("1", "2", "3")):
+        return [{"Player_ID": i, "Base": "11.0", "F1": "1.08", "F3": "1.0", "F4": "0.97",
+                 "F5": "1.02", "Ceiling_Multiplier": "1.31"} for i in ids]
+
+    def _resolve(self, root, run_id, *, matched=True, salary_ids=None, verify=True):
+        ls = LateSwapDeclaredPitcherTests._tool()
+        sal = Path(root) / "swap_salary.csv"
+        with sal.open("w", newline="", encoding="utf-8") as fh:
+            writer = csv.writer(fh)
+            writer.writerow(["Position", "Name", "ID"])
+            writer.writerows([["OF", f"p{i}", i] for i in (salary_ids or ["1", "2", "3"])])
+        manifest = json.loads((Path(root) / "runs" / run_id / "manifest.json").read_text())
+        parent = {"run_dir": str(Path(root) / "runs" / run_id), "manifest": manifest,
+                  "current_matches_parent_export": matched, "parent_export_sha256": "abc"}
+
+        def stub(run_dir):
+            ok = verify(Path(run_dir).name) if callable(verify) else bool(verify)
+            return {"passed": ok, "errors": [] if ok else ["hash mismatch: final/projections.csv"]}
+
+        with unittest.mock.patch.object(ls, "verify_run_bundle", side_effect=stub):
+            return ls.resolve_swap_carry(Path(root) / "runs", parent, sal)
+
+    def test_R1_one_hop_carries_every_row_and_records_the_bytes_it_read(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run = self._skeleton(tmp, "B1", frame=self._rich())
+            carried, info = self._resolve(tmp, "B1")
+            self.assertEqual(sorted(carried), ["1", "2", "3"])
+            self.assertEqual(carried["1"], {"Base": 11.0, "F1": 1.08, "F3": 1.0, "F4": 0.97,
+                                            "F5": 1.02, "Ceiling_Multiplier": 1.31})
+            src = info["source"]
+            self.assertEqual((src["run_id"], src["hops"], src["origin_run_id"]), ("B1", 0, "B1"))
+            self.assertEqual(src["frame_sha256"],
+                             hashlib.sha256((run / "final" / "projections.csv").read_bytes()).hexdigest())
+            self.assertTrue(src["parent_matches_file"])
+
+    def test_R2_a_neutral_swap_intermediate_walks_to_the_root_build(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._skeleton(tmp, "ROOT", frame=self._rich())
+            self._skeleton(tmp, "SW1", mode="late_swap", parent="ROOT", frame=self._neutral())
+            self._skeleton(tmp, "SW2", mode="late_swap", parent="SW1", frame=self._neutral())
+            carried, info = self._resolve(tmp, "SW2")
+            self.assertEqual(info["source"]["run_id"], "ROOT")
+            self.assertEqual(info["source"]["hops"], 2)
+            self.assertEqual([s["run_id"] for s in info["chain"]], ["SW2", "SW1", "ROOT"])
+            self.assertEqual(info["chain"][0]["verdict"], "frame carries no factor or multiplier off neutral")
+            self.assertEqual(carried["2"]["F1"], 1.08)
+
+    def test_R2_an_enriched_swap_run_with_no_root_on_disk_is_used_and_names_its_origin(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._skeleton(tmp, "SW1", mode="late_swap", parent="ROOT", frame=self._rich(),
+                           metadata={"projection_carry": {"source": {"origin_run_id": "ROOT"}}})
+            carried, info = self._resolve(tmp, "SW1")
+            self.assertEqual((info["source"]["run_id"], info["source"]["hops"],
+                              info["source"]["origin_run_id"]), ("SW1", 0, "ROOT"))
+            self.assertIn("absent or unreadable", info["chain"][-1]["verdict"])
+
+    def test_R2_a_swap_run_does_not_lend_the_rows_it_never_carried(self):
+        """Player 3 sits in the swap run's frame at neutral because ITS parent never carried
+        him: that row is a placeholder, so he is not lent (and the label names him)."""
+        with tempfile.TemporaryDirectory() as tmp:
+            frame = self._rich(("1", "2")) + self._neutral(("3",))
+            self._skeleton(tmp, "SW1", mode="late_swap", parent="GONE", frame=frame,
+                           metadata={"projection_carry": {"not_carried_player_ids": ["3"],
+                                                          "source": {"origin_run_id": "ROOT"}}})
+            carried, info = self._resolve(tmp, "SW1")
+            self.assertEqual(sorted(carried), ["1", "2"])
+            self.assertEqual(info["chain"][0]["placeholders_not_lent"], 1)
+        with tempfile.TemporaryDirectory() as tmp:    # neg. control: no record, the row is lent
+            frame = self._rich(("1", "2")) + self._neutral(("3",))
+            self._skeleton(tmp, "SW1", mode="late_swap", parent="GONE", frame=frame)
+            self.assertEqual(sorted(self._resolve(tmp, "SW1")[0]), ["1", "2", "3"])
+
+    def test_R2_the_root_most_frame_wins_and_keeps_a_player_the_intermediate_lacks(self):
+        """A swap's own frame holds the root's values only for ITS pool's players, and a
+        later swap's pool is not the earlier one's (a side confirmed since is why there is
+        a later swap): stopping at the nearest enriched swap run would drop player 3."""
+        with tempfile.TemporaryDirectory() as tmp:
+            self._skeleton(tmp, "ROOT", frame=self._rich(("1", "2", "3")))
+            self._skeleton(tmp, "SW1", mode="late_swap", parent="ROOT", frame=self._rich(("1", "2")),
+                           metadata={"projection_carry": {"source": {"origin_run_id": "ROOT"}}})
+            carried, info = self._resolve(tmp, "SW1")
+            self.assertEqual(sorted(carried), ["1", "2", "3"])
+            self.assertEqual((info["source"]["run_id"], info["source"]["hops"]), ("ROOT", 1))
+            sw1 = next(s for s in info["chain"] if s["run_id"] == "SW1")
+            self.assertTrue(sw1["verdict"].startswith("enriched; the root-most usable frame"))
+
+    def test_R3_every_ancestor_neutral_is_unenriched_with_the_chain_named(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._skeleton(tmp, "ROOT", frame=self._neutral())
+            self._skeleton(tmp, "SW1", mode="late_swap", parent="ROOT", frame=self._neutral())
+            carried, info = self._resolve(tmp, "SW1")
+            self.assertEqual(carried, {})
+            self.assertFalse(info["carried"])
+            self.assertIn("no run in the parent chain", info["reason"])
+            self.assertEqual([s["run_id"] for s in info["chain"]], ["SW1", "ROOT"])
+
+    def test_R3_a_cycle_and_a_missing_ancestor_stop_the_walk_and_say_so(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._skeleton(tmp, "A", mode="late_swap", parent="B", frame=self._neutral())
+            self._skeleton(tmp, "B", mode="late_swap", parent="A", frame=self._neutral())
+            carried, info = self._resolve(tmp, "A")
+            self.assertEqual(carried, {})
+            self.assertEqual(info["chain"][-1]["verdict"], "already examined (a cycle in parent_run_id)")
+        with tempfile.TemporaryDirectory() as tmp:
+            self._skeleton(tmp, "C", mode="late_swap", parent="GONE", frame=self._neutral())
+            carried, info = self._resolve(tmp, "C")
+            self.assertEqual(carried, {})
+            self.assertIn("absent or unreadable", info["chain"][-1]["verdict"])
+
+    def test_R4_a_bad_row_is_rejected_by_id_and_its_neighbours_still_carry(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            frame = self._rich(("1", "2", "3", "4"))
+            frame[0]["F1"] = "nan"
+            frame[1]["Ceiling_Multiplier"] = "-1"
+            frame[2]["Base"] = "-5"
+            self._skeleton(tmp, "B1", frame=frame, salary_ids=["1", "2", "3", "4"])
+            carried, info = self._resolve(tmp, "B1", salary_ids=["1", "2", "3", "4"])
+            self.assertEqual(sorted(carried), ["4"])
+            self.assertEqual(sorted(r["id"] for r in info["rejected_rows"]), ["1", "2", "3"])
+            self.assertEqual(info["rejected_rows_n"], 3)
+
+    def test_R4_an_unreadable_frame_and_one_with_no_player_id_never_raise(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run = self._skeleton(tmp, "B1", frame=self._rich())
+            (run / "final" / "projections.csv").write_bytes(b"\xff\xfe\x00 not a csv")
+            carried, info = self._resolve(tmp, "B1")
+            self.assertEqual(carried, {})
+            self.assertIn("frame unreadable", info["chain"][0]["verdict"])
+        with tempfile.TemporaryDirectory() as tmp:
+            run = self._skeleton(tmp, "B1", frame=self._rich())
+            (run / "final" / "projections.csv").write_text("Base,F1\n11,1.1\n", encoding="utf-8")
+            carried, info = self._resolve(tmp, "B1")
+            self.assertEqual(carried, {})
+            self.assertIn("no Player_ID column", info["chain"][0]["verdict"])
+
+    def test_R5_a_parent_row_with_a_workload_prior_lends_its_factors_but_not_its_base(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            frame = self._rich()
+            frame[0]["Workload_Factor"] = "0.5"
+            self._skeleton(tmp, "B1", frame=frame)
+            carried, _ = self._resolve(tmp, "B1")
+            self.assertNotIn("Base", carried["1"])
+            self.assertEqual(carried["1"]["F1"], 1.08)
+            self.assertEqual(carried["2"]["Base"], 11.0)
+
+    def test_R6_an_ancestor_that_fails_bundle_verification_is_skipped_by_name(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._skeleton(tmp, "ROOT", frame=self._rich())
+            self._skeleton(tmp, "MID", mode="late_swap", parent="ROOT", frame=self._rich())
+            self._skeleton(tmp, "SW", mode="late_swap", parent="MID", frame=self._neutral())
+            carried, info = self._resolve(tmp, "SW", verify=lambda run: run != "ROOT")
+            self.assertEqual(info["source"]["run_id"], "MID", "ROOT's bytes were never trusted")
+            root = next(s for s in info["chain"] if s["run_id"] == "ROOT")
+            self.assertIn("failed bundle verification", root["verdict"])
+            # the direct parent was verified by resolve_parent_run, not again here
+            self.assertEqual(self._resolve(tmp, "ROOT", verify=lambda run: False)[1]["source"]["hops"], 0)
+
+    def test_R7_a_parent_that_is_not_this_files_lineage_lends_only_for_the_same_slate(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._skeleton(tmp, "B1", frame=self._rich())
+            same, info = self._resolve(tmp, "B1", matched=False)
+            self.assertEqual(sorted(same), ["1", "2", "3"])
+            self.assertFalse(info["source"]["parent_matches_file"])
+            self.assertEqual(len(info["source"]["slate_pool_signature"]), 10)
+            other, info = self._resolve(tmp, "B1", matched=False, salary_ids=["1", "2", "9"])
+            self.assertEqual(other, {})
+            self.assertIn("another slate", info["chain"][0]["verdict"])
+            # a matched parent needs no slate check on itself
+            self.assertEqual(sorted(self._resolve(tmp, "B1", matched=True,
+                                                  salary_ids=["1", "2", "9"])[0]), ["1", "2", "3"])
+
+    def test_R7_a_stale_parent_run_id_cannot_cross_slates(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._skeleton(tmp, "OTHER", frame=self._rich(), salary_ids=["7", "8", "9"])
+            self._skeleton(tmp, "SW", mode="late_swap", parent="OTHER", frame=self._neutral())
+            carried, info = self._resolve(tmp, "SW")
+            self.assertEqual(carried, {})
+            self.assertIn("another slate", info["chain"][-1]["verdict"])
+
+    def test_R8_no_parent_and_no_salary_snapshot_are_named_not_raised(self):
+        ls = LateSwapDeclaredPitcherTests._tool()
+        with tempfile.TemporaryDirectory() as tmp:
+            sal = Path(tmp) / "s.csv"
+            sal.write_text("Position,Name,ID\nOF,p1,1\n", encoding="utf-8")
+            carried, info = ls.resolve_swap_carry(Path(tmp) / "runs", None, sal)
+            self.assertEqual((carried, info["reason"]), ({}, "no parent run resolved"))
+            run = self._skeleton(tmp, "B1", frame=self._rich())
+            (run / "inputs" / "DKSalaries.csv").unlink()
+            carried, info = self._resolve(tmp, "B1", matched=False)
+            self.assertEqual(carried, {})
+            self.assertIn("no salary snapshot", info["chain"][0]["verdict"])
+
+    # -- S: the real late_swap.main() --------------------------------------------- #
+
+    @staticmethod
+    def _team(name):
+        return name.split(" ", 1)[0]
+
+    def _world(self, *, enriched=True, drop=()):
+        """The R468 harness plus, when ``enriched``, a SECOND parent build whose frame
+        carries odds/matchup/park values and Ceiling_Multipliers, promoted last, with
+        the declared-pitcher brief written for IT. ``drop`` names players the second
+        parent's frame never carried."""
+        h = LateSwapDeclaredPitcherTests("test_the_grammar_is_build_slates_own_parser")
+        h.setUp()
+        self.addCleanup(h.doCleanups)
+        with h.salary.open(newline="", encoding="utf-8") as fh:
+            sal_rows = list(csv.reader(fh))[1:]
+        id_by_name = {r[2]: r[3] for r in sal_rows}
+        name_by_id = {v: k for k, v in id_by_name.items()}
+        feed = json.loads((h.root / "data" / "slates" / h.DATE / "lineups_feed.json").read_text(
+            encoding="utf-8"))
+        pool = lda.build_slate_pool(str(h.salary), feed, declared_pitchers=h.declared)
+        pool_rows = [dict(r) for r in pool["run_slate_kwargs"]["projection_rows"]]
+        fx = {"h": h, "ids": id_by_name, "names": name_by_id, "pool_rows": pool_rows}
+        if not enriched:
+            return fx
+        orig = {str(r["Player_ID"]): dict(r) for r in pool_rows}
+        trap = next(pid for pid in sorted(orig)
+                    if orig[pid].get("Batting_Order") and "Hitter" in name_by_id[pid]
+                    and self._team(name_by_id[pid]) == "T3"
+                    and int(orig[pid]["Batting_Order"]) > 4)
+        fx["trap"], fx["trap_orig"] = trap, orig[trap]
+        parent_rows = []
+        for row in pool_rows:
+            row = dict(row)
+            if name_by_id[str(row["Player_ID"])] in drop:
+                continue
+            if str(row["Player_ID"]) == trap:
+                row["Batting_Order"], row["F2"] = 1, 1.10     # the parent's lineup led him off
+            parent_rows.append(row)
+        f1, f4, f5, cm = {}, {}, {}, {}
+        for name, pid in id_by_name.items():
+            team = self._team(name)
+            hitter = "Hitter" in name or "Bench" in name
+            if hitter:
+                f1[pid] = 1.08 if team in ("T1", "T2") else 0.95
+                f4[pid] = 0.98 if team in ("T1", "T2") else 1.03
+                if team in ("T3", "T4"):
+                    f5[pid] = 0.94
+                    cm[pid] = {"Ceiling_Multiplier": 1.30}
+            elif name.endswith("Ace"):
+                f1[pid] = {"T1": 1.04, "T3": 0.97}.get(team, 1.0)
+        parent_frame, _ = epi._assemble_projection_frame(
+            str(h.salary), parent_rows, "emergency_proxy", None, None, None,
+            f4_by_player_id=f4, f1_by_player_id=f1, f5_by_player_id=f5,
+            carried_by_player_id=cm)
+        ids = id_by_name
+        hit = lambda team, i: ids[f"{team} Hitter{i}"]
+        with_pen = [h.pen, ids["T3 Ace"], *(hit("T1", i) for i in (1, 2, 3, 4)),
+                    *(hit("T3", i) for i in (5, 6, 7, 8))]
+        second = [ids["T2 Ace"], ids["T4 Ace"], *(hit("T2", i) for i in (1, 2, 3)),
+                  *(hit("T4", i) for i in (4, 5, 6, 7, 8))]
+        third = [ids["T2 Ace"], ids["T3 Ace"], *(hit("T3", i) for i in (1, 2, 3, 4)),
+                 *(hit("T2", i) for i in (5, 6, 7, 8))]
+        gates = {g: True for g in (
+            "salary_gate_passed", "entry_grid_gate_passed", "lineup_gate_passed",
+            "pitcher_audit_gate_passed", "weather_gate_passed", "odds_gate_passed",
+            "projection_schema_gate_passed", "optimizer_gate_passed")}
+        parent = run_initial_build(
+            runs_root=h.root / "runs", salary_csv=h.salary,
+            entries_csv=h.root / "DKEntries_template.csv", projections=parent_frame,
+            candidates=[candidate("A", with_pen, 100, "T3"), candidate("B", second, 99, "T4"),
+                        candidate("C", third, 98, "T2")],
+            entry_requirements=[{"entry_id": str(7001 + i), "contest_id": "800",
+                                 "contest_name": "MLB Test GPP",
+                                 "contest_shape": "large_wta"} for i in range(3)],
+            workflow_gates=gates, portfolio_controls=pipeline_controls())
+        self.assertTrue(parent["passed"], parent.get("errors"))
+        h.parent, h.parent_file = parent, Path(parent["output_path"])
+        fx.update(parent=parent, parent_frame=parent_frame)
+        h._brief()
+        return fx
+
+    def _frame_of(self, root, run_id):
+        with (Path(root) / "runs" / run_id / "final" / "projections.csv").open(
+                encoding="utf-8-sig", newline="") as fh:
+            return {r["Player_ID"]: r for r in csv.DictReader(fh)}
+
+    def _swap_runs(self, root):
+        out = []
+        for path in sorted((Path(root) / "runs").glob("*/manifest.json")):
+            manifest = json.loads(path.read_text(encoding="utf-8"))
+            if manifest.get("mode") == "late_swap":
+                out.append(manifest)
+        return out
+
+    def _record(self, h):
+        records = sorted((h.root / "data" / "deliveries" / h.DATE).glob("*.json"))
+        self.assertEqual(len(records), 1, [p.name for p in records])
+        return json.loads(records[0].read_text(encoding="utf-8"))
+
+    def test_S1_an_enriched_parent_is_carried_and_the_label_prints_f1_games_priced(self):
+        fx = self._world()
+        h = fx["h"]
+        code, out, err = h._run()
+        self.assertEqual(code, 0, err[-1500:])
+        parent_id = fx["parent"]["run_id"]
+        line = next(l for l in out.splitlines() if l.startswith("projection frame:"))
+        self.assertIn(f"ENRICHED by carry from run {parent_id}", line)
+        self.assertIn("f1_games_priced=2 (games with a non-neutral F1 row", line)
+        self.assertIn("Every pool player was carried", line)
+        self.assertNotIn("uniform neutral", out + err, "the pre-carry neutral-default text is not echoed")
+        swap = self._swap_runs(h.root)
+        self.assertEqual(len(swap), 1)
+        swap_frame = self._frame_of(h.root, swap[0]["run_id"])
+        parent_frame = self._frame_of(h.root, parent_id)
+        carried_ids = [p for p in swap_frame if p in parent_frame]
+        self.assertGreater(len(carried_ids), 30)
+        for pid in carried_ids:
+            for col in ("Base", "F1", "F3", "F4", "F5", "Ceiling_Multiplier"):
+                a, b = swap_frame[pid].get(col), parent_frame[pid].get(col)
+                self.assertAlmostEqual(float(a), float(b), places=9, msg=f"{pid} {col}")
+        # F2 and the order are the FEED's: the parent led this hitter off.
+        trap = fx["trap"]
+        self.assertEqual(int(float(parent_frame[trap]["Batting_Order"])), 1)
+        self.assertEqual(int(float(swap_frame[trap]["Batting_Order"])),
+                         int(fx["trap_orig"]["Batting_Order"]))
+        from mlb_engine.projections.projection_builder import batting_order_factor
+        self.assertAlmostEqual(float(swap_frame[trap]["F2"]),
+                               batting_order_factor(int(fx["trap_orig"]["Batting_Order"])), places=9)
+        self.assertNotAlmostEqual(float(swap_frame[trap]["F2"]), 1.10, places=3)
+        meta = swap[0]["metadata"]["projection_carry"]
+        self.assertTrue(meta["carried"])
+        self.assertEqual(meta["tier"], "enriched")
+        self.assertEqual(meta["source"]["run_id"], parent_id)
+        self.assertEqual(meta["source"]["frame_sha256"], sha256_file(
+            h.root / "runs" / parent_id / "final" / "projections.csv"))
+        self.assertEqual(meta["counts"]["f1_games_priced"], 2)
+        record = self._record(h)
+        self.assertEqual(record["manifest_row"]["projection_tier"], "enriched")
+        self.assertIn(f"frame carried from run {parent_id}", json.dumps(record))
+
+    def test_S2_a_neutral_parent_is_labelled_unenriched_and_still_swaps(self):
+        """Negative control for S1: the R468 harness's own parent frame carries nothing."""
+        fx = self._world(enriched=False)
+        h = fx["h"]
+        h._brief()
+        code, out, err = h._run()
+        self.assertEqual(code, 0, err[-1500:])
+        line = next(l for l in out.splitlines() if l.startswith("projection frame:"))
+        self.assertIn("UNENRICHED (no run in the parent chain lends an enriched frame", line)
+        self.assertIn("AvgPointsPerGame x batting order only", line)
+        self.assertNotIn("f1_games_priced", line)
+        swap = self._swap_runs(h.root)
+        self.assertFalse(swap[0]["metadata"]["projection_carry"]["carried"])
+        self.assertEqual(swap[0]["metadata"]["projection_carry"]["tier"], "proxy")
+        self.assertEqual(self._record(h)["manifest_row"]["projection_tier"], "proxy")
+
+    def test_S3_a_mismatched_parent_lends_only_when_it_is_the_same_slate(self):
+        fx = self._world()
+        h = fx["h"]
+        # A hand-edited copy: one harmless cell (the Instructions column) differs, so
+        # its bytes match no run's export while every entry and roster is unchanged.
+        hand_edited = h.root / "DKEntries_hand_edited.csv"
+        with Path(h.parent_file).open(newline="", encoding="utf-8") as fh:
+            table = list(csv.reader(fh))
+        table[1][-1] = "hand edited"
+        with hand_edited.open("w", newline="", encoding="utf-8") as fh:
+            csv.writer(fh).writerows(table)
+        h.parent_file = hand_edited
+        pen = f"{h.pen}=viable_bulk_or_alt_sp"
+        # `--accept-downgrade`: with no parent controls to inherit, the re-derived
+        # controls pick a lineup that scores below the incumbent on the parent's own
+        # model (the F16 refusal reading the carried frame, R428's point). This test is
+        # about the frame and its label, not the refusal.
+        # S3b: same salary file, so the same pool signature: the frame is carried.
+        code, out, err = h._run("--allow-parent-mismatch", "--accept-downgrade",
+                                "--declare-pitcher", pen)
+        self.assertEqual(code, 0, err[-1500:])
+        line = next(l for l in out.splitlines() if l.startswith("projection frame:"))
+        self.assertIn("ENRICHED by carry", line)
+        self.assertIn("NOT this file's lineage; same slate by pool signature", line)
+        self.assertEqual(self._swap_runs(h.root)[-1]["metadata"]["projection_carry"]["tier"], "enriched")
+        # S3a: the swap's salary file has another player-ID universe: another slate.
+        other = h.root / "DKSalaries_other.csv"
+        lines = h.salary.read_text(encoding="utf-8").splitlines()
+        drop = f",{fx['ids']['T1 Bench4']},"
+        kept = [l for l in lines if drop not in l]
+        self.assertEqual(len(kept), len(lines) - 1)
+        other.write_text("\n".join(kept) + "\n", encoding="utf-8")
+        code, out, err = h._run("--allow-parent-mismatch", "--accept-downgrade",
+                                "--declare-pitcher", pen, "--salary", str(other))
+        line = next(l for l in out.splitlines() if l.startswith("projection frame:"))
+        self.assertIn("UNENRICHED", line)
+        self.assertIn("another slate", line)
+        self.assertEqual(self._swap_runs(h.root)[-1]["metadata"]["projection_carry"]["tier"], "proxy")
+
+    def test_S4_a_value_the_engine_refuses_builds_unenriched_and_never_refuses(self):
+        fx = self._world()
+        h = fx["h"]
+        ls = h.ls
+        bad = {pid: {"Ceiling_Multiplier": 0.3} for pid in fx["ids"].values()}
+        info = {"carried": True, "reason": None, "chain": [], "rejected_rows": [],
+                "rejected_rows_n": 0,
+                "source": {"run_id": "X", "mode": "initial_build", "origin_run_id": "X", "hops": 0,
+                           "frame_sha256": "0" * 64, "parent_matches_file": True,
+                           "slate_pool_signature": None}}
+        with unittest.mock.patch.object(ls, "resolve_swap_carry", return_value=(bad, info)):
+            code, out, err = h._run()
+        self.assertEqual(code, 0, err[-1500:])
+        self.assertIn("ENRICHMENT CARRY FAILED, building unenriched", err)
+        line = next(l for l in out.splitlines() if l.startswith("projection frame:"))
+        self.assertIn("carry REJECTED (the engine refused a carried value", line)
+        self.assertEqual(self._swap_runs(h.root)[-1]["metadata"]["projection_carry"]["tier"], "proxy")
+        self.assertEqual(self._record(h)["manifest_row"]["projection_tier"], "proxy")
+
+    def test_S5_the_legal_pool_is_not_trimmed_and_a_player_the_parent_never_carried_stays(self):
+        fx = self._world(drop=("T4 Hitter1",))
+        h = fx["h"]
+        never = fx["ids"]["T4 Hitter1"]
+        code, out, err = h._run()
+        self.assertEqual(code, 0, err[-1500:])
+        swap_frame = self._frame_of(h.root, self._swap_runs(h.root)[-1]["run_id"])
+        parent_frame = self._frame_of(h.root, fx["parent"]["run_id"])
+        self.assertNotIn(never, parent_frame)
+        pool_ids = {str(r["Player_ID"]) for r in fx["pool_rows"]}
+        self.assertEqual(set(swap_frame), pool_ids, "the swap's frame is exactly the swap's pool")
+        row = swap_frame[never]
+        self.assertEqual((float(row["F1"]), float(row["F4"]), float(row["F5"])), (1.0, 1.0, 1.0))
+        self.assertAlmostEqual(float(row["Ceiling_Multiplier"]), 1.42, places=9,
+                               msg="the uniform default, not another player's multiplier")
+        meta =self._swap_runs(h.root)[-1]["metadata"]["projection_carry"]
+        self.assertIn(never, meta["not_carried_player_ids"])
+        line = next(l for l in out.splitlines() if l.startswith("projection frame:"))
+        self.assertIn("T4 Hitter1 [", line)
+        self.assertIn("ranked neutral", line)
+
+    def test_S6_a_swap_of_a_swap_carries_the_root_builds_values(self):
+        fx = self._world()
+        h = fx["h"]
+        code, out, err = h._run()
+        self.assertEqual(code, 0, err[-1500:])
+        first = next((h.root / "outputs" / h.DATE).glob("DKEntries_*lateswap*.csv"))
+        first_run = self._swap_runs(h.root)[-1]["run_id"]
+        h.parent_file = first
+        code, out, err = h._run()
+        self.assertEqual(code, 0, err[-1500:])
+        line = next(l for l in out.splitlines() if l.startswith("projection frame:"))
+        root_id = fx["parent"]["run_id"]
+        self.assertIn(f"ENRICHED by carry from run {root_id} (initial_build, 1 hop(s) from the parent",
+                      line, "the root-most frame wins over the first swap's own")
+        self.assertIn(f"origin {root_id}", line)
+        second = self._swap_runs(h.root)[-1]
+        chain = second["metadata"]["projection_carry"]["chain"]
+        self.assertEqual([c["run_id"] for c in chain], [first_run, root_id])
+        self.assertNotEqual(second["run_id"], first_run)
+        self.assertEqual(second["metadata"]["projection_carry"]["source"]["origin_run_id"],
+                         fx["parent"]["run_id"])
+        root_frame = self._frame_of(h.root, fx["parent"]["run_id"])
+        second_frame = self._frame_of(h.root, second["run_id"])
+        for pid in (p for p in second_frame if p in root_frame):
+            for col in ("Base", "F1", "F4", "F5"):
+                self.assertAlmostEqual(float(second_frame[pid][col]), float(root_frame[pid][col]),
+                                       places=9, msg=f"{pid} {col}")
+
+    def test_S7_the_tier_is_truthful_both_ways(self):
+        ls = LateSwapDeclaredPitcherTests._tool()
+        self.assertEqual(ls.swap_projection_tier(None), "proxy")
+        self.assertEqual(ls.swap_projection_tier({"applied_count": 0, "non_neutral": {"f1": 3}}), "proxy")
+        self.assertEqual(ls.swap_projection_tier(
+            {"applied_count": 5, "non_neutral": {"f1": 0, "f4": 0}, "base_restated": 0}), "proxy")
+        self.assertEqual(ls.swap_projection_tier(
+            {"applied_count": 5, "non_neutral": {"f1": 0, "f4": 1}, "base_restated": 0}), "enriched")
+        self.assertEqual(ls.swap_projection_tier(
+            {"applied_count": 5, "non_neutral": {}, "base_restated": 2}), "enriched")
+        # end to end: a carry that reached rows and moved nothing reads proxy, and says so
+        fx = self._world(enriched=False)
+        h = fx["h"]
+        h._brief()
+        flat = {pid: {"F1": 1.0} for pid in fx["ids"].values()}
+        info = {"carried": True, "reason": None, "chain": [], "rejected_rows": [],
+                "rejected_rows_n": 0,
+                "source": {"run_id": "X", "mode": "initial_build", "origin_run_id": "X", "hops": 0,
+                           "frame_sha256": "0" * 64, "parent_matches_file": True,
+                           "slate_pool_signature": None}}
+        with unittest.mock.patch.object(h.ls, "resolve_swap_carry", return_value=(flat, info)):
+            code, out, err = h._run()
+        self.assertEqual(code, 0, err[-1500:])
+        line = next(l for l in out.splitlines() if l.startswith("projection frame:"))
+        self.assertIn("UNENRICHED (the carry from run X reached", line)
+        self.assertIn("moved none off neutral", line)
+        self.assertEqual(self._record(h)["manifest_row"]["projection_tier"], "proxy")
+
+    def test_S8_a_dry_run_prints_the_label_too(self):
+        fx = self._world()
+        h = fx["h"]
+        code, out, err = h._run("--dry-run")
+        self.assertEqual(code, 0, err[-1500:])
+        self.assertTrue(any(l.startswith("projection frame: ENRICHED") for l in out.splitlines()), out[-800:])
+
+    def test_S9_the_label_reads_only_the_carried_block(self):
+        ls = LateSwapDeclaredPitcherTests._tool()
+        info = {"carried": False, "reason": "no parent run resolved", "chain": [],
+                "source": None, "rejected_rows": [], "rejected_rows_n": 0}
+        text = ls.carry_label(info, None)
+        self.assertIn("UNENRICHED (no parent run resolved)", text)
+        self.assertNotIn("neutral", text.replace("off neutral", ""))
+        record = ls.carry_record(info, None, text)
+        self.assertEqual((record["carried"], record["tier"]), (False, "proxy"))
+        self.assertEqual(ls.carry_notes_clause(None), "")
+        self.assertIn("frame unenriched (no parent run resolved)", ls.carry_notes_clause(record))
+
+
 class ConsensusPairSeatTests(unittest.TestCase):
     """R469 (roadmap Session 138), Ben's rule of 2026-09-30: every Classic
     contest with two or more entries seats at least one lineup on the
@@ -44370,6 +45077,20 @@ class StandingsReadTests(unittest.TestCase):
         frame, info = self.sr.frame_for_run(runs, "SWAP1")
         self.assertEqual(info["mode"], "late_swap")
         self.assertIn("unenriched swap frame", info["note"])
+        # R428: a swap run that RECORDED a carry reads clean; one that recorded none
+        # (every swap run from before R428) or recorded that it carried nothing keeps
+        # the note, so an old swap frame is never mislabelled enriched.
+        for run_id, record in (("SWAP2", {"carried": True, "tier": "enriched"}),
+                               ("SWAP3", {"carried": False, "tier": "proxy"})):
+            run = runs / run_id
+            (run / "final").mkdir(parents=True)
+            (run / "manifest.json").write_text(json.dumps({
+                "mode": "late_swap", "run_id": run_id,
+                "metadata": {"projection_carry": record}}), encoding="utf-8")
+            (run / "final" / "projections.csv").write_bytes(
+                (runs / "SWAP1" / "final" / "projections.csv").read_bytes())
+        self.assertEqual(self.sr.frame_for_run(runs, "SWAP2")[1]["note"], "")
+        self.assertIn("unenriched swap frame", self.sr.frame_for_run(runs, "SWAP3")[1]["note"])
         with self.assertRaises(self.sr.FrameUnavailable) as ctx:
             self.sr.frame_for_run(runs, "NOPE")
         self.assertIn("runs/ is gitignored", str(ctx.exception))

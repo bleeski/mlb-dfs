@@ -5742,6 +5742,7 @@ def _assemble_projection_frame(
     f5_by_player_id: Optional[Mapping[str, float]] = None,
     apply_value_sanity_guard: bool = True,
     fangraphs_pitching_csv: Optional[str | Path] = None,
+    carried_by_player_id: Optional[Mapping[str, Mapping[str, float]]] = None,
 ) -> "tuple[pd.DataFrame, Dict[str, Any]]":
     """Join per-player projection rows to the authoritative salary file and build an
     optimizer-ready frame. Returns ``(projections, enrichment)``.
@@ -5791,6 +5792,26 @@ def _assemble_projection_frame(
     mirroring the xwOBA guard; omit the file to build with uniform pitcher
     ceilings on purpose. Deterministic labeled prior, never a probability
     claim.
+
+    ``carried_by_player_id`` (R428) is the late swap's hook: ``{Player_ID:
+    {Base, F1, F3, F4, F5, Ceiling_Multiplier}}``, ANY SUBSET per player, read
+    off the parent run's own ``final/projections.csv`` by ``late_swap``. It
+    carries what the parent's model APPLIED to a player (a swap writes no
+    enrichment inputs, and neither does a build), overlaid after the value
+    guard and before ``build_projections``, so Floor, Ceiling and
+    Base_Projection come from the one shared formula and the guard does not
+    re-clip a Base the parent already capped. F2 and Batting_Order are never
+    carried: they are the pool's, the one thing a lineup post moves. A row the
+    pool stamped a ``Workload_Factor`` below 1 keeps its own Base (the
+    workload multiply runs after this overlay and would scale a carried Base
+    twice) and still takes the carried factors. A pool player the map omits is
+    left exactly as assembled and named in ``enrichment["carried"]``; a map id
+    that is not in the pool adds no row, because the pool is the caller's. The
+    key is present ONLY when a non-empty map was supplied, so no other
+    caller's ``enrichment`` changes; the default None is byte-identical.
+    A non-finite or negative value raises ``ValueError`` naming the player and
+    column, which the caller turns into an unenriched, labelled frame.
+    Deterministic labeled prior, never a probability claim.
 
     Two records are assembled last, after every factor block has run (R127).
     ``enrichment["neutral_default"]`` NAMES the pool players whose factor took
@@ -6251,6 +6272,108 @@ def _assemble_projection_frame(
     else:
         enrichment["value_guard"] = {"applied": False,
                                      "note": "value-sanity guard opted out for this build"}
+
+    # --- R428: a late swap carries what its parent APPLIED ---------------------
+    # Placed AFTER the value guard on purpose: a carried Base already passed the
+    # parent's guard at the parent's pool, and re-running the cap here over this
+    # pool's APPG bases could clip it a second time. Placed BEFORE the
+    # neutral-default report and the per-side split, so `enrichment["by_side"]`
+    # measures the frame the solver will see, carried cells included (R127: the
+    # measurement is off the frame, never off the size of an input map). And
+    # BEFORE the workload multiply and `build_projections`, which is why a row
+    # with a workload prior keeps its own Base: the multiply below would scale a
+    # carried (already scaled) Base twice. F2 and Batting_Order are not carried.
+    if carried_by_player_id:
+        carried_map: Dict[str, Dict[str, Any]] = {}
+        for _k, _rec in carried_by_player_id.items():
+            if not isinstance(_rec, Mapping):
+                raise ValueError(
+                    f"carried record for Player_ID {_k} is not a mapping: {_rec!r}")
+            carried_map[str(_k)] = dict(_rec)
+
+        def _carried_value(pid: str, col: str, rec: Mapping[str, Any]) -> Optional[float]:
+            raw = rec.get(col)
+            if raw is None:
+                return None
+            try:
+                value = float(raw)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    f"carried {col} for Player_ID {pid} is not a number: {raw!r}") from exc
+            if not math.isfinite(value) or value < 0.0:
+                raise ValueError(
+                    f"carried {col} for Player_ID {pid} is {value!r}; a factor, a Base "
+                    "and a ceiling multiplier are finite and non-negative")
+            return value
+
+        _carry_wf = (pd.to_numeric(frame["Workload_Factor"], errors="coerce").fillna(1.0)
+                     if "Workload_Factor" in frame.columns else None)
+        if "Ceiling_Multiplier" not in frame.columns and any(
+                rec.get("Ceiling_Multiplier") is not None for rec in carried_map.values()):
+            frame["Ceiling_Multiplier"] = None
+        _carry_applied: list[str] = []
+        _carry_missing: list[str] = []
+        _carry_base_restated: list[str] = []
+        _carry_base_kept: list[str] = []
+        _carry_non_neutral = {"f1": 0, "f3": 0, "f4": 0, "f5": 0, "ceiling_multiplier": 0}
+        _carry_f1_games: set[str] = set()
+        for idx in frame.index:
+            pid = str(frame.at[idx, "Player_ID"])
+            rec = carried_map.get(pid)
+            if rec is None:
+                _carry_missing.append(pid)
+                continue
+            _carry_applied.append(pid)
+            for col in ("F1", "F3", "F4", "F5"):
+                value = _carried_value(pid, col, rec)
+                if value is None:
+                    continue
+                frame.at[idx, col] = value
+                if abs(value - 1.0) > NEUTRAL_TOLERANCE:
+                    _carry_non_neutral[col.lower()] += 1
+                    if col == "F1":
+                        _carry_f1_games.add(str(frame.at[idx, "Game_ID"]))
+            base_value = _carried_value(pid, "Base", rec)
+            if base_value is not None:
+                if _carry_wf is not None and float(_carry_wf.at[idx]) < 1.0:
+                    _carry_base_kept.append(pid)
+                else:
+                    if abs(base_value - float(frame.at[idx, "Base"])) > NEUTRAL_TOLERANCE:
+                        _carry_base_restated.append(pid)
+                    frame.at[idx, "Base"] = base_value
+            mult = _carried_value(pid, "Ceiling_Multiplier", rec)
+            if mult is not None:
+                frame.at[idx, "Ceiling_Multiplier"] = mult
+                if abs(mult - float(XISO_CEILING_NEUTRAL)) > NEUTRAL_TOLERANCE:
+                    _carry_non_neutral["ceiling_multiplier"] += 1
+            frame.at[idx, "Notes"] = (
+                str(frame.at[idx, "Notes"]) + "; carried_from_parent").lstrip("; ")
+        _carry_pitchers = _pitcher_mask(frame)
+        _carry_applied_set = set(_carry_applied)
+        _carry_in_pool = frame["Player_ID"].astype(str)
+        _carry_hit = _carry_in_pool.isin(_carry_applied_set)
+        enrichment["carried"] = {
+            "requested": len(carried_map),
+            "applied_count": len(_carry_applied),
+            "applied_player_ids": sorted(_carry_applied),
+            "not_carried_player_ids": sorted(_carry_missing),
+            "by_side": {
+                "hitters": {"pool": int((~_carry_pitchers).sum()),
+                            "carried": int((~_carry_pitchers & _carry_hit).sum())},
+                "pitchers": {"pool": int(_carry_pitchers.sum()),
+                             "carried": int((_carry_pitchers & _carry_hit).sum())},
+            },
+            "base_restated": len(_carry_base_restated),
+            "base_kept_workload_prior_ids": sorted(_carry_base_kept),
+            "non_neutral": dict(_carry_non_neutral),
+            "f1_games_priced": len(_carry_f1_games),
+            "note": "The parent run's APPLIED per-player values (Base, F1, F3, F4, F5, "
+                    "Ceiling_Multiplier) overlaid on this pool's frame; F2 and Batting_Order "
+                    "are this pool's. `f1_games_priced` here is games with at least one "
+                    "non-neutral F1 row, measured off this frame; the build's own count is "
+                    "games with a usable posted total. Deterministic prior, never a "
+                    "probability claim.",
+        }
 
     # --- Neutral-default report and the per-side signal split (R127) ---------
     # Assembled last, so it sees every factor block's outcome. Everything below

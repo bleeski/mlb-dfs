@@ -404,22 +404,28 @@ def frame_from_dataframe(frame) -> Dict[str, Optional[float]]:
 def frame_for_run(runs_root, run_id: str) -> Tuple[Dict[str, Optional[float]], Dict[str, str]]:
     """ONE hop: ``runs/<id>/final/projections.csv`` and the run's manifest ``mode``.
 
-    A run whose mode is ``late_swap`` wrote the swap's UNENRICHED frame (R428), so its
-    ceilings are APPG-derived; the info says so. Multi-hop to the root build is not
-    walked (Session 115 makes swap frames reuse the parent's enrichment)."""
+    A run whose mode is ``late_swap`` wrote the swap's own frame. Since R428 a swap
+    CARRIES its parent's applied values and records that on its manifest
+    (``metadata.projection_carry``); a swap run that carried reads clean, and one that
+    did not, or that predates R428 and has no record, is UNENRICHED, its ceilings
+    APPG-derived, and the info says so. The walk to the root build is the swap's own
+    (`late_swap.resolve_swap_carry`), so one hop here is enough."""
     run_dir = Path(runs_root) / str(run_id)
     path = run_dir / "final" / "projections.csv"
     if not path.is_file():
         raise FrameUnavailable(f"no {path} on this host (runs/ is gitignored: the frame "
                                f"exists only where the run was built)")
-    mode = ""
+    mode, carried = "", False
     try:
-        mode = str(json.loads((run_dir / "manifest.json").read_text(encoding="utf-8")).get("mode") or "")
+        manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+        mode = str(manifest.get("mode") or "")
+        carry = (manifest.get("metadata") or {}).get("projection_carry")
+        carried = isinstance(carry, dict) and bool(carry.get("carried"))
     except (OSError, ValueError):
         pass
     info = {"run_id": str(run_id), "mode": mode, "path": str(path),
             "note": ("unenriched swap frame: its ceilings are APPG-derived (R428)"
-                     if mode == "late_swap" else "")}
+                     if mode == "late_swap" and not carried else "")}
     return load_frame(path), info
 
 
