@@ -1,0 +1,162 @@
+{
+ "code": {
+  "contest_allocator": "v1.12",
+  "execution_pipeline": "v1.17",
+  "git_dirty": true,
+  "git_sha": "db90932698c8aa39e96aea4ee217812c6a607c5f"
+ },
+ "controls": {
+  "max_cpt_exposure_pct": 0.25,
+  "max_cpt_per_contest": 2,
+  "max_player_exposure_pct": 0.5,
+  "max_shared_players": 4
+ },
+ "date": "2026-10-06",
+ "egress": "egress: statsapi 200, odds 401, savant 200, mlb-lineups 200, fangraphs 200 (curl), open-meteo 200",
+ "egress_source": "session_start 2026-10-06T21:00:54+00:00",
+ "entries": [
+  {
+   "contest_id": "196455553",
+   "contest_name": "MLB Showdown $1 Triple Up [Top 9 Win $3] (LAD @ ATL)",
+   "entry_fee": 1.0,
+   "entry_id": "5285523936",
+   "filled": true,
+   "roster_ids": [
+    "44400043",
+    "44399949",
+    "44399955",
+    "44399956",
+    "44399959",
+    "44399974"
+   ]
+  },
+  {
+   "contest_id": "196455952",
+   "contest_name": "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (LAD @ ATL)",
+   "entry_fee": 1.0,
+   "entry_id": "5285523894",
+   "filled": true,
+   "roster_ids": [
+    "44400042",
+    "44399954",
+    "44399957",
+    "44399958",
+    "44399961",
+    "44399967"
+   ]
+  },
+  {
+   "contest_id": "196460143",
+   "contest_name": "MLB Showdown $30 Quarter Jukebox [Just $0.25!] (LAD @ ATL)",
+   "entry_fee": 0.25,
+   "entry_id": "5285523307",
+   "filled": true,
+   "roster_ids": [
+    "44400045",
+    "44399948",
+    "44399955",
+    "44399956",
+    "44399957",
+    "44399959"
+   ]
+  },
+  {
+   "contest_id": "196460143",
+   "contest_name": "MLB Showdown $30 Quarter Jukebox [Just $0.25!] (LAD @ ATL)",
+   "entry_fee": 0.25,
+   "entry_id": "5285523318",
+   "filled": true,
+   "roster_ids": [
+    "44400044",
+    "44399947",
+    "44399949",
+    "44399955",
+    "44399964",
+    "44399974"
+   ]
+  },
+  {
+   "contest_id": "196460143",
+   "contest_name": "MLB Showdown $30 Quarter Jukebox [Just $0.25!] (LAD @ ATL)",
+   "entry_fee": 0.25,
+   "entry_id": "5285523326",
+   "filled": true,
+   "roster_ids": [
+    "44400050",
+    "44399948",
+    "44399951",
+    "44399957",
+    "44399958",
+    "44399961"
+   ]
+  },
+  {
+   "contest_id": "196460143",
+   "contest_name": "MLB Showdown $30 Quarter Jukebox [Just $0.25!] (LAD @ ATL)",
+   "entry_fee": 0.25,
+   "entry_id": "5285523342",
+   "filled": true,
+   "roster_ids": [
+    "44400047",
+    "44399946",
+    "44399954",
+    "44399956",
+    "44399958",
+    "44399967"
+   ]
+  }
+ ],
+ "entries_binding": {
+  "source": "outputs/2026-10-06/DO_NOT_UPLOAD_DKEntries_showdown_1800_1g_sd.926daea5f52e.csv",
+  "source_sha256": "652119b6f8300cbe2e26840920ef4e92225614ad4c7ed3e3fbb7e41ded30d4da",
+  "status": "bound"
+ },
+ "host": {
+  "call_budget_s": 630.0,
+  "declared_ceiling_s": 900.0,
+  "host": "claude_code"
+ },
+ "kind": "delivery",
+ "labels": "deterministic review proxies and labeled priors only; never ROI, win rate, cash rate, or probability",
+ "manifest_row": {
+  "certification": "review_grade",
+  "contest_ids": [
+   "196455553",
+   "196455952",
+   "196460143"
+  ],
+  "contest_names": [
+   "MLB Showdown $1 Triple Up [Top 9 Win $3] (LAD @ ATL)",
+   "MLB Showdown $30 Quarter Jukebox [Just $0.25!] (LAD @ ATL)",
+   "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (LAD @ ATL)"
+  ],
+  "contest_type": "showdown",
+  "delivered_file": "outputs/2026-10-06/DKEntries_showdown_1800_1g_sd.csv",
+  "entries": 6,
+  "notes": "Showdown ships review-grade; it does not pass the three certification gates. See CLAUDE.md.",
+  "projection_tier": "unknown",
+  "recorded_utc": "2026-10-06T21:08:06.765723+00:00",
+  "run_id": null,
+  "sha256": "652119b6f8300cbe2e26840920ef4e92225614ad4c7ed3e3fbb7e41ded30d4da",
+  "slate_tag": "1800_1g_sd",
+  "status": "candidate",
+  "strategy_state": {
+   "counts": {},
+   "state": "unknown"
+  }
+ },
+ "recorded_utc": "2026-10-06T21:08:06.767889+00:00",
+ "relaxations": {
+  "both_relaxed": 0,
+  "captain_cap_relaxed": 0,
+  "captain_contest_cap_relaxed": 0,
+  "captain_lock_relaxed": 0,
+  "contest_cap_relaxed": 0,
+  "cpt_cap_relaxed": 0,
+  "min_per_team_relaxed": 0,
+  "overlap_relaxed": 0,
+  "player_relaxed": 0
+ },
+ "run": {},
+ "schema_version": 1
+}
