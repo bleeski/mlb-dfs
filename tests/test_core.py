@@ -24349,6 +24349,577 @@ class BankCapPerBucketTests(unittest.TestCase):
             self.assertEqual(cache.count_outside_buckets([]), 3)
 
 
+class ServedBucketFactsTests(unittest.TestCase):
+    """R465. A conditions signature is a hash, so a cache could count the
+    candidates a build was handed from questions it did not ask (R453) and could
+    not NAME them: the brief read `agrees_with_request: true` beside 32 lineups
+    built under k=2 for a k=0 request. The cache now keeps each bucket's FACTS
+    (`conditions_facts`, the signature's inputs from the one normalizer the
+    signature also reads) in a sibling key beside `conditions_index`, and the
+    brief names what a served bucket was built under and fires `disagreement`
+    when it differs from the build-level request (k, target, leverage).
+
+    The served set is unchanged: `as_candidates` still serves the union, on
+    purpose (the filter's hazards are in the CHANGELOG entry and its fragment).
+    """
+
+    # Frozen at ebf9333, BEFORE this change, on the three-game frame: the byte
+    # stream is a compatibility surface (every signature in a live cache file is a
+    # value of it), and the facts refactor must not move one.
+    FROZEN_SIGNATURES = {
+        "base": "4eeba7db5e5413be",
+        "default_call": "0b62061abb7c4d40",
+        "k2": "ff9291bada37a391",
+        "k0_explicit": "4eeba7db5e5413be",
+        "sel": "459a9819a9cc1ef3",
+        "teams": "c3558c2321fc29ca",
+        "teams_empty": "f85fb7ced294822f",
+        "sec": "bc63e71db1ad7377",
+        "lev_int": "807afb771e98ed72",
+        "lev_float": "868792e6d508f215",
+        "lev_three": "29b82fb87bdbf939",
+        "floor": "365662f2f1033a14",
+        "excl": "d1d7e298b97c18d2",
+    }
+
+    @staticmethod
+    def _frame():
+        return BankCapPerBucketTests._frame()
+
+    @staticmethod
+    def _bs():
+        return BankCapPerBucketTests._build_slate()
+
+    def _extend(self, cache, frame, k, cap, **kw):
+        return bank_cache.extend_bank(
+            cache, frame, time_budget_s=120, max_candidates=cap,
+            max_opposing_hitters_per_sp=k, **kw)
+
+    @staticmethod
+    def _report(rep, cache, requested_sigs, stack_min=4):
+        """The sliced door's bank report for a build that asked `requested_sigs`,
+        assembled the way `run_classic` does after its slices and sleeves."""
+        bs = BankCapPerBucketTests._build_slate()
+        rep = dict(rep)
+        rep["stack_min_requested"] = stack_min
+        merged = bs._merge_bank_slice_reports([rep])
+        merged["served_from_unrequested_buckets"] = cache.count_outside_buckets(requested_sigs)
+        merged["unrequested_buckets"] = cache.describe_outside_buckets(requested_sigs)
+        return merged
+
+    # ---- the facts are the signature's inputs ------------------------------
+
+    def test_the_signature_bytes_are_unchanged(self):
+        frame = self._frame()
+        sig = bank_cache.conditions_signature
+        got = {
+            "base": sig(frame, [], 4, 5),
+            "default_call": sig(frame),
+            "k2": sig(frame, [], 4, 5, max_opposing_hitters_per_sp=2),
+            "k0_explicit": sig(frame, [], 4, 5, max_opposing_hitters_per_sp=0),
+            "sel": sig(frame, [], 4, 5, max_selected_from=(["21001", "21002", "21003"], 2)),
+            "teams": sig(frame, [], 4, 5, stack_teams=["A0", "B1"]),
+            "teams_empty": sig(frame, [], 4, 5, stack_teams=[]),
+            "sec": sig(frame, [], 4, 5, secondary_stack=("A1", 3)),
+            "lev_int": sig(frame, [], 4, 5, leverage={"max_cumulative_ownership_pct": 90}),
+            "lev_float": sig(frame, [], 4, 5, leverage={"max_cumulative_ownership_pct": 90.0}),
+            "lev_three": sig(frame, [], 4, 5, leverage={"max_cumulative_ownership_pct": 95,
+                                                        "min_low_owned_hitters": 2,
+                                                        "low_owned_threshold_pct": 6.0}),
+            "floor": sig(frame, [], 4, 5, target="floor"),
+            "excl": sig(frame, ["21003", "21001"], 4, 5),
+        }
+        self.assertEqual(got, self.FROZEN_SIGNATURES)
+        # the two normalizer traps the property test below also hits by name
+        self.assertNotEqual(got["teams"], got["teams_empty"])
+        self.assertNotEqual(got["lev_int"], got["lev_float"],
+                            "json.dumps writes 90 and 90.0 differently")
+        self.assertEqual(sig(frame, None, 4, 5), sig(frame, [], 4, 5))
+
+    def _variations(self, frame):
+        pins = {slot: frame[frame.Position == pos].Player_ID.iloc[0]
+                for slot, pos in (("C", "C"), ("1B", "1B"), ("2B", "2B"),
+                                  ("3B", "3B"), ("SS", "SS"))}
+        return {
+            "base": {},
+            "k0_explicit": {"max_opposing_hitters_per_sp": 0},
+            "k1": {"max_opposing_hitters_per_sp": 1},
+            "k2": {"max_opposing_hitters_per_sp": 2},
+            "target_floor": {"target": "floor"},
+            "excludes": {"excludes": ["21003", "21001"]},
+            "excludes_empty": {"excludes": []},
+            "stack_4_4": {"stack_min": 4, "stack_max": 4},
+            "stack_3_5": {"stack_min": 3, "stack_max": 5},
+            "lev_cap_int": {"leverage": {"max_cumulative_ownership_pct": 150}},
+            "lev_cap_float": {"leverage": {"max_cumulative_ownership_pct": 150.0}},
+            "lev_floor": {"leverage": {"min_low_owned_hitters": 1,
+                                       "low_owned_threshold_pct": 6.0}},
+            "sel": {"max_selected_from": (["21001", "21002", "21003"], 2)},
+            "teams": {"stack_teams": ["A0", "B1"]},
+            "teams_empty": {"stack_teams": []},
+            "sec": {"secondary_stack": ("a1", 3), "job_class": "sleeve_named_stack"},
+            "pinned_hitters_relax_the_floor": {"locked_slot_assignments": pins},
+        }
+
+    def test_persisted_facts_rebuild_the_signature_for_every_input(self):
+        """The anti-drift property. For every input varied through a REAL
+        `extend_bank`, the facts that come back from a save and a reload give
+        the signature stored beside them. A normalizer that drifts from the
+        byte stream (a dropped term, `[]` read as None, a leverage 90 turned
+        into 90.0) fails here, because the reconstruction goes through
+        `signature_from_facts` and the stored signature came from the call."""
+        frame = self._frame()
+        seen = {}
+        for name, kwargs in self._variations(frame).items():
+            with self.subTest(variation=name), tempfile.TemporaryDirectory() as tmp:
+                path = Path(tmp) / "bank.json"
+                rep = bank_cache.extend_bank(
+                    bank_cache.BankCache(path), frame, time_budget_s=3.0, max_candidates=1,
+                    **kwargs)
+                sig = rep["conditions_signature"]
+                reloaded = bank_cache.BankCache(path)
+                facts = reloaded.conditions_facts.get(sig)
+                self.assertIsNotNone(facts, "the bucket the call wrote into has facts")
+                self.assertEqual(bank_cache.signature_from_facts(frame, facts), sig)
+                seen[name] = (sig, json.dumps(facts, sort_keys=True))
+        # negative control: facts differ exactly where the bytes do
+        by_sig = {}
+        for name, (sig, facts_json) in seen.items():
+            by_sig.setdefault(sig, set()).add(facts_json)
+        self.assertTrue(all(len(v) == 1 for v in by_sig.values()),
+                        "one signature, one set of facts")
+        self.assertEqual(len(by_sig), len({f for _s, f in seen.values()}),
+                         "distinct signatures have distinct facts")
+        for same in (("base", "excludes_empty", "k0_explicit"),):
+            self.assertEqual(len({seen[n][0] for n in same}), 1, same)
+        for different in (("teams", "teams_empty"), ("base", "teams_empty"),
+                          ("lev_cap_int", "lev_cap_float"),
+                          ("stack_4_4", "stack_3_5"), ("k1", "k2")):
+            self.assertEqual(len({seen[n][0] for n in different}), len(different), different)
+        # the relaxation is in the facts: five pinned hitter slots leave 3 free
+        facts = json.loads(seen["pinned_hitters_relax_the_floor"][1])
+        self.assertEqual(facts["stack_min"], 3)
+        # the named stack's team is upper-cased, as in the signature
+        self.assertEqual(json.loads(seen["sec"][1])["secondary_stack"],
+                         {"team": "A1", "min": 3})
+        # `job_class` is a per-candidate tag, not a bucket fact: two families can
+        # share one signature, so it is not persisted at all
+        self.assertNotIn("job_class", json.loads(seen["sec"][1]))
+
+    # ---- the cache file ----------------------------------------------------
+
+    def test_an_old_file_without_facts_loads_as_unknown_and_stays_unknown(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "bank.json"
+            roster = [str(i) for i in range(10)]
+            path.write_text(json.dumps({
+                "version": "v1.3",
+                "candidates": [{"roster": roster, "objective": 1.0, "job": "a+b|T||SIG_OLD"}],
+                "attempted": [], "retired_jobs": [],
+                "conditions_index": {"SIG_OLD": "POOL"}}), encoding="utf-8")
+            cache = bank_cache.BankCache(path)
+            self.assertEqual(cache.conditions_facts, {})
+            self.assertEqual(cache.describe_outside_buckets(set()), [
+                {"conditions_signature": "SIG_OLD", "candidates": 1, "built_under": None}])
+            cache.save()
+            again = bank_cache.BankCache(path)
+            self.assertEqual(again.conditions_facts, {}, "a save invents no facts")
+            self.assertEqual(again.conditions_index, {"SIG_OLD": "POOL"})
+            self.assertEqual(json.loads(path.read_text(encoding="utf-8"))["conditions_facts"], {})
+
+    def test_facts_survive_a_save_and_union_writers_and_a_re_request_fills_an_unknown(self):
+        facts_a = bank_cache.conditions_facts([], 4, 5, 2)
+        facts_b = bank_cache.conditions_facts([], 4, 5, 0, target="floor")
+        facts_c = bank_cache.conditions_facts(["9"], 3, 5, 1)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "bank.json"
+            a, b = bank_cache.BankCache(path), bank_cache.BankCache(path)
+            a.register_conditions("SIG_A", "POOL", facts_a)
+            b.register_conditions("SIG_B", "POOL", facts_b)
+            a.save()
+            b.save()
+            merged = bank_cache.BankCache(path)
+            self.assertEqual(merged.conditions_facts, {"SIG_A": facts_a, "SIG_B": facts_b})
+            # a signature an older file held WITHOUT facts is filled by the next
+            # request for the same question, and a facts-less re-registration
+            # leaves what is there alone
+            merged.register_conditions("SIG_C", "POOL")
+            self.assertNotIn("SIG_C", merged.conditions_facts)
+            merged.register_conditions("SIG_C", "POOL", facts_c)
+            merged.register_conditions("SIG_C", "POOL")
+            merged.save()
+            self.assertEqual(bank_cache.BankCache(path).conditions_facts["SIG_C"], facts_c)
+
+    def test_a_corrupt_file_resets_the_facts_with_the_index(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "bank.json"
+            path.write_text("{ not json", encoding="utf-8")
+            cache = bank_cache.BankCache(path)
+            self.assertTrue(cache.corrupt_on_load)
+            self.assertEqual((cache.conditions_index, cache.conditions_facts), ({}, {}))
+            # a hand edit that is not a mapping of mappings reads as no facts
+            path.write_text(json.dumps({"candidates": [], "conditions_facts": [1, 2]}),
+                            encoding="utf-8")
+            self.assertEqual(bank_cache.BankCache(path).conditions_facts, {})
+
+    def test_a_refused_other_held_registers_no_facts(self):
+        frame = self._frame()
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = bank_cache.BankCache(Path(tmp) / "bank.json")
+            with self.assertRaises(ValueError):
+                self._extend(cache, frame, 0, 10, other_held=-1)
+            self.assertEqual((cache.conditions_index, cache.conditions_facts), ({}, {}))
+
+    def test_two_families_that_share_a_signature_share_one_set_of_facts(self):
+        """R469's pinned-pair slice shares the ordinary bucket's signature (its pins
+        are in the job key's lock signature, not the conditions signature), so a
+        bucket-level `job_class` would flip with whichever call registered last.
+        It is a per-candidate tag and is not a persisted bucket fact."""
+        frame = self._frame()
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = bank_cache.BankCache(Path(tmp) / "bank.json")
+            first = self._extend(cache, frame, 0, 3, other_held=0)
+            second = self._extend(cache, frame, 0, 6, other_held=0,
+                                  job_class="consensus_pair")
+            self.assertEqual(first["conditions_signature"], second["conditions_signature"])
+            facts = cache.conditions_facts[first["conditions_signature"]]
+            self.assertNotIn("job_class", facts)
+            self.assertEqual(facts, bank_cache.conditions_facts([], 4, 5, 0))
+            self.assertEqual({e.get("job_class") for e in cache.candidates},
+                             {None, "consensus_pair"}, "the per-candidate tag is untouched")
+
+    def test_describe_outside_buckets_agrees_with_the_count(self):
+        facts = bank_cache.conditions_facts(["x", "y", "z"], 4, 5, 2)
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = bank_cache.BankCache(Path(tmp) / "bank.json")
+            roster = lambda n: [f"p{n}_{i}" for i in range(10)]  # noqa: E731
+            for n, sig in enumerate(["sigA", "sigA", "sigA", "sigB", "sigB", "sigC"]):
+                cache.add(roster(n), 1.0, job=f"a|b||{sig}")
+            cache.add(roster(9), 1.0)                        # keyless
+            cache.register_conditions("sigA", "POOL", facts)
+            for asked in (set(), {"sigA"}, {"sigA", "sigB"}, {"sigA", "sigB", "sigC"},
+                          {"sigA", "sigB", "sigC", ""}):
+                with self.subTest(asked=sorted(asked)):
+                    rows = cache.describe_outside_buckets(asked)
+                    self.assertEqual(sum(r["candidates"] for r in rows),
+                                     cache.count_outside_buckets(asked))
+            rows = cache.describe_outside_buckets(set())
+            self.assertEqual([(r["conditions_signature"], r["candidates"]) for r in rows],
+                             [("sigA", 3), ("sigB", 2), ("", 1), ("sigC", 1)],
+                             "largest first, then signature")
+            shown = rows[0]["built_under"]
+            self.assertEqual(shown["excludes_count"], 3)
+            self.assertNotIn("excludes", shown, "a late-swap bucket's id list stays in the file")
+            self.assertEqual(shown["max_opposing_hitters_per_sp"], 2)
+            self.assertIsNone(rows[2]["built_under"], "a keyless candidate is unknown")
+            self.assertEqual(facts["excludes"], ["x", "y", "z"],
+                             "the persisted facts keep the list the signature needs")
+
+    # ---- the brief ---------------------------------------------------------
+
+    def test_a_k0_build_handed_a_k2_bucket_names_k2_and_disagrees(self):
+        """The entry's own sequence. Before: `agrees_with_request: true`, a count
+        of 32 and nothing that names k=2. After: the 32 are named by what they
+        were built under, `disagreement` fires, and `agrees_with_request` keeps
+        its meaning (this build's own solves)."""
+        frame = self._frame()
+        bs = self._bs()
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "bank.json"
+            first = self._extend(bank_cache.BankCache(path), frame, 2, 32, other_held=0)
+            cache = bank_cache.BankCache(path)               # a later build reads the file
+            second = self._extend(cache, frame, 0, 30, other_held=0)
+            sig2, sig0 = first["conditions_signature"], second["conditions_signature"]
+            report = self._report(second, cache, {sig0})
+            self.assertEqual(report["served_from_unrequested_buckets"], 32)
+            block = bs.anti_correlation_brief_block(0, report, {}, request={"leverage": {}})
+            self.assertIs(block["agrees_with_request"], True)
+            named = block["unrequested_built_under"]
+            self.assertEqual(named["allowance_k"], {"2": 32})
+            self.assertEqual(named["buckets_total"], 1)
+            row = named["buckets"][0]
+            self.assertEqual((row["conditions_signature"], row["candidates"], row["differs_in"]),
+                             (sig2, 32, ["allowance_k"]))
+            self.assertEqual(row["built_under"]["max_opposing_hitters_per_sp"], 2)
+            self.assertIn("32 under k=2", block["disagreement"])
+            self.assertIn("NOT all built under the requested conditions", block["disagreement"])
+            self.assertIn("32 candidate(s)", block["unmeasured"], "the R453 words stand")
+            # the facts agree with a measurement that never reads them: the k=2
+            # bucket really holds hitters against a rostered SP, and no more
+            # than two; the requested k=0 bucket holds none
+            measured = [BankCapPerBucketTests._opposing(e["roster"], frame)
+                        for e in cache.candidates
+                        if bank_cache._key_conditions(e.get("job")) == sig2]
+            self.assertEqual(len(measured), 32)
+            self.assertTrue(0 < max(measured) <= 2)
+            requested = [BankCapPerBucketTests._opposing(e["roster"], frame)
+                         for e in cache.candidates
+                         if bank_cache._key_conditions(e.get("job")) == sig0]
+            self.assertEqual(set(requested), {0})
+            # NEGATIVE CONTROLS. A build that asked both questions was handed
+            # nothing it did not ask: no new keys, no disagreement.
+            both = self._report(second, cache, {sig0, sig2})
+            clean = bs.anti_correlation_brief_block(0, both, {}, request={"leverage": {}})
+            self.assertNotIn("unrequested_built_under", clean)
+            self.assertNotIn("disagreement", clean)
+            # a same-k unrequested bucket (another stack floor) is named and silent
+            third = self._extend(cache, frame, 0, 10, other_held=0, stack_min=3)
+            self.assertNotEqual(third["conditions_signature"], sig0)
+            quiet = bs.anti_correlation_brief_block(
+                0, self._report(second, cache, {sig0, sig2}), {}, request={"leverage": {}})
+            self.assertEqual([r["conditions_signature"] for r in
+                              quiet["unrequested_built_under"]["buckets"]],
+                             [third["conditions_signature"]])
+            self.assertNotIn("disagreement", quiet, "same k, target and leverage: named, silent")
+            only0 = bs.anti_correlation_brief_block(
+                0, self._report(second, cache, {sig0}), {}, request={"leverage": {}})
+            rows = {r["conditions_signature"]: r for r in
+                    only0["unrequested_built_under"]["buckets"]}
+            self.assertEqual(rows[third["conditions_signature"]]["differs_in"], [])
+            self.assertEqual(rows[third["conditions_signature"]]["built_under"]["stack_min"], 3)
+            # the k=2 request against the same cache is told about the k=0 bucket
+            reverse = bs.anti_correlation_brief_block(
+                2, self._report(first, cache, {sig2}, stack_min=4), {}, request={"leverage": {}})
+            self.assertEqual(reverse["unrequested_built_under"]["allowance_k"]["0"], 40,
+                             "the k=0 bucket (30) and the k=0 stack-floor-3 bucket (10)")
+            self.assertIn("under k=0", reverse["disagreement"])
+
+    def test_differs_in_names_target_and_leverage_but_not_stack_bounds(self):
+        frame = self._frame()
+        bs = self._bs()
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = bank_cache.BankCache(Path(tmp) / "bank.json")
+            asked = self._extend(cache, frame, 0, 4, other_held=0)
+            lev = self._extend(cache, frame, 0, 4, other_held=0,
+                               leverage={"max_cumulative_ownership_pct": 150})
+            floor = self._extend(cache, frame, 0, 4, other_held=0, target="floor")
+            bounds = self._extend(cache, frame, 0, 4, other_held=0, stack_min=3, stack_max=3)
+            sigs = {asked["conditions_signature"], lev["conditions_signature"],
+                    floor["conditions_signature"], bounds["conditions_signature"]}
+            self.assertEqual(len(sigs), 4)
+            report = self._report(asked, cache, {asked["conditions_signature"]})
+
+            def differs(request):
+                block = bs.anti_correlation_brief_block(0, report, {}, request=request)
+                return ({r["conditions_signature"]: r["differs_in"]
+                         for r in block["unrequested_built_under"]["buckets"]}, block)
+
+            # a resolve_leverage-shaped mapping also carries the prior itself and
+            # its source; only the three solver keys are compared
+            request = {"leverage": {"max_cumulative_ownership_pct": 95,
+                                    "own_pct_by_player_id": {"1": 5.0}, "source": "x.json"}}
+            got, block = differs(request)
+            self.assertEqual(got[lev["conditions_signature"]], ["leverage"])
+            self.assertEqual(got[floor["conditions_signature"]], ["target", "leverage"])
+            self.assertEqual(got[bounds["conditions_signature"]], ["leverage"],
+                             "the request carries a cap this bucket was not built under; "
+                             "its stack bounds are not what differs")
+            self.assertIn("target ceiling", block["disagreement"])
+            # the SAME three keys compare equal through the filter, whatever else
+            # the mapping carries (the comparison reads `_leverage_kwargs`)
+            same = {"leverage": {"max_cumulative_ownership_pct": 150,
+                                 "own_pct_by_player_id": {"1": 5.0}, "source": "x.json"}}
+            got, _ = differs(same)
+            self.assertEqual(got[lev["conditions_signature"]], [])
+            # no leverage requested: the cap-150 bucket differs, the stack-bounds
+            # bucket does not, and the target bucket differs on target alone
+            got, block = differs({"leverage": {}})
+            self.assertEqual(got[lev["conditions_signature"]], ["leverage"])
+            self.assertEqual(got[floor["conditions_signature"]], ["target"])
+            self.assertEqual(got[bounds["conditions_signature"]], [],
+                             "per-slice inputs (stack bounds) are named, never compared")
+            self.assertIn("disagreement", block)
+            # request=None (every caller before R465) compares k alone
+            got, block = differs(None)
+            self.assertTrue(all(v == [] for v in got.values()), got)
+            self.assertNotIn("disagreement", block)
+
+    def test_the_request_target_is_extend_banks_default(self):
+        """`run_classic` never passes a target to any slice or sleeve, so a
+        bucket's target is `extend_bank`'s default, and the brief's request
+        compares against the literal the block assumes."""
+        default = inspect.signature(bank_cache.extend_bank).parameters["target"].default
+        self.assertEqual(default, "ceiling")
+        src = (Path(__file__).resolve().parents[1] / "mlb_engine" / "pipeline"
+               / "execution_pipeline.py").read_text(encoding="utf-8")
+        calls = [n for n in ast.walk(ast.parse(src)) if isinstance(n, ast.Call)
+                 and getattr(n.func, "id", getattr(n.func, "attr", "")) == "extend_bank"]
+        self.assertTrue(calls)
+        self.assertFalse([c for c in calls if any(k.arg == "target" for k in c.keywords)],
+                         "a family builder that sets a target makes it a per-slice input")
+
+    def test_unknown_facts_are_named_unknown_and_never_fire_a_disagreement(self):
+        bs = self._bs()
+        report = {"anti_correlation": opt.anti_correlation_report([0], requested=0),
+                  "slices": [], "served_from_unrequested_buckets": 5,
+                  "unrequested_buckets": [{"conditions_signature": "OLD", "candidates": 5,
+                                           "built_under": None}]}
+        block = bs.anti_correlation_brief_block(0, report, {}, request={"leverage": {}})
+        self.assertEqual(block["unrequested_built_under"]["allowance_k"], {"unknown": 5})
+        self.assertIsNone(block["unrequested_built_under"]["buckets"][0]["differs_in"])
+        self.assertNotIn("disagreement", block)
+
+    def test_a_one_bucket_cache_gives_the_brief_it_gave_before(self):
+        """The negative control for every new key: the legacy report shapes give
+        the exact dicts `ebf9333` gave (captured before the change)."""
+        bs = self._bs()
+        acr = opt.anti_correlation_report
+        note = ("a CONVENTION about negative correlation, not a DK rule; `applied` is measured "
+                "from the bank's own solves (R293), never restated from the flag that requested it")
+        unit = "hitters facing ONE rostered SP; per-lineup worst case is twice this on Classic"
+        agree = {"agrees_with_request": True, "applied": 0, "applied_source": "sliced_bank",
+                 "engine_default": 0, "note": note, "observed": [0], "requested": 0,
+                 "served_from_unrequested_buckets": None, "solves_observed": 1, "unit": unit}
+        self.assertEqual(bs.anti_correlation_brief_block(
+            0, {"anti_correlation": acr([0], requested=0), "slices": []}, {}), agree)
+        self.assertEqual(bs.anti_correlation_brief_block(
+            0, {"anti_correlation": acr([0], requested=0), "slices": []}, {},
+            request={"leverage": {}}), agree)
+        for report in ({"served_from_unrequested_buckets": 0},
+                       {"served_from_unrequested_buckets": 0, "unrequested_buckets": []}):
+            self.assertEqual(bs.anti_correlation_brief_block(
+                0, {"anti_correlation": acr([0], requested=0), "slices": [], **report}, {},
+                request={"leverage": {}}),
+                dict(agree, served_from_unrequested_buckets=0))
+        counted = bs.anti_correlation_brief_block(
+            0, {"anti_correlation": acr([0], requested=0), "slices": [],
+                "served_from_unrequested_buckets": 32}, {})
+        self.assertEqual(counted, dict(
+            agree, served_from_unrequested_buckets=32,
+            unmeasured="32 candidate(s) in the served bank sit in conditions buckets this run "
+                       "did not solve for (an earlier run's, on the shared cache; a sleeve "
+                       "bucket the bank already covered is counted here too); `applied` and "
+                       "`agrees_with_request` describe this run's own solves and say nothing "
+                       "about them"))
+        self.assertEqual(bs.anti_correlation_brief_block(
+            3, {"anti_correlation": acr([0, 0], requested=3)}, None),
+            {"agrees_with_request": False, "applied": 0, "applied_source": "sliced_bank",
+             "disagreement": "the build requested k=3 and its bank's solves ran at [0]; the "
+                             "delivered candidates are NOT all built under the requested "
+                             "allowance",
+             "engine_default": 0, "note": note, "observed": [0], "requested": 3,
+             "served_from_unrequested_buckets": None, "solves_observed": 2, "unit": unit})
+
+    # ---- through the sliced door -------------------------------------------
+
+    def _wired(self):
+        """`run_classic` with a faked `run_slate` over the frozen 2026-07-29
+        fixture; `bank_max_candidates` selects the sliced door. Two builds in one
+        harness share one root, so they share one bank cache file."""
+        wiring = DeadlineGovernorWiringTests(
+            "test_the_anti_correlation_flag_reaches_the_controls_the_validator_grades")
+        wiring.setUp()
+        self.addCleanup(wiring.doCleanups)
+        good = {"passed": True, "run_id": "r1", "workflow_valid": True,
+                "selection_certified": True, "allocation_certified": True,
+                "delivered_path": str(wiring._delivered_csv())}
+        return wiring, good
+
+    def _sliced_brief(self, wiring, good, k):
+        code, brief, _calls, err = wiring._run(30, refusal=good, args_overrides={
+            "bank_max_candidates": 60, "max_opposing_hitters_per_sp": k})
+        self.assertEqual(0, code, err[-600:])
+        self.assertEqual("sliced_bank", brief["solve"]["strategy"])
+        return brief
+
+    def test_a_fresh_cache_sliced_build_serves_nothing_it_did_not_request(self):
+        """The requested-set completeness guard (R465 hazard i): every bucket a
+        build creates on a fresh cache, the ordinary slices and the cluster-
+        limited slice included, is in the set `run_classic` calls requested, so
+        a build is never told it was handed what it just built. A repeat of the
+        SAME question names nothing either."""
+        wiring, good = self._wired()
+        for label in ("fresh", "repeat"):
+            brief = self._sliced_brief(wiring, good, 2)
+            block = brief["anti_correlation"]
+            bank = brief["solve"]["bank"]
+            self.assertGreaterEqual(len(bank["slices"]), 3, "ordinary slices and the limited one ran")
+            self.assertEqual(block["served_from_unrequested_buckets"], 0, label)
+            self.assertNotIn("unrequested_built_under", block, label)
+            self.assertNotIn("unmeasured", block, label)
+            self.assertEqual(bank["unrequested_buckets"], [], label)
+
+    def test_a_second_sliced_build_at_another_k_names_the_first_builds_buckets(self):
+        wiring, good = self._wired()
+        first = self._sliced_brief(wiring, good, 2)
+        held = first["solve"]["bank"]["total_candidates"]
+        second = self._sliced_brief(wiring, good, 0)
+        block = second["anti_correlation"]
+        self.assertEqual(block["served_from_unrequested_buckets"], held)
+        named = block["unrequested_built_under"]
+        self.assertEqual(named["allowance_k"], {"2": held})
+        self.assertGreaterEqual(named["buckets_total"], 3,
+                                "the five-stack slice, the ordinary slice and the limited slice")
+        self.assertTrue(all(b["differs_in"] == ["allowance_k"] for b in named["buckets"]))
+        self.assertIn(f"{held} under k=2", block["disagreement"])
+        self.assertIs(block["agrees_with_request"], True, "this run's own solves ran at k=0")
+        self.assertEqual(block["observed"], [0])
+        # the cluster limit rides in the facts of the limited bucket
+        limited = [b for b in named["buckets"] if b["built_under"]["max_selected_from"]]
+        self.assertTrue(limited and limited[0]["built_under"]["max_selected_from"]["m"] >= 1)
+
+    def test_every_sleeve_family_reports_the_bucket_it_creates(self):
+        """What `run_classic` adds to `_requested_sigs` is each sleeve report's
+        `conditions_signature`. A family whose report omitted it would have its
+        lineups counted (and now named, and perhaps flagged) as unrequested on
+        the very build that made them. Every attempted family reports its own
+        bucket, and the buckets in the cache are exactly the ordinary one plus
+        the reported ones (the salary-only family lives in its own file)."""
+        from mlb_engine.optimize import classic_sleeves as cs
+        frame = diverse_projection_frame()
+        with tempfile.TemporaryDirectory() as tmp:
+            full = bank_cache.BankCache(Path(tmp) / "full.json")
+            bank_cache.extend_bank(full, frame, time_budget_s=60)
+            members = ca.consensus_cluster_members(full.as_candidates(None))["member_ids"]
+            thin = bank_cache.BankCache(Path(tmp) / "thin.json")
+            ordinary = bank_cache.extend_bank(thin, frame, time_budget_s=60, max_candidates=2)
+            request = {"active": True, "environment": {"teams": ["T3", "T4"]},
+                       "sleeves": {
+                           cs.SLEEVE_CHALK_FAILS: {"min_candidates": 3},
+                           cs.SLEEVE_ENVIRONMENT: {"min_candidates": 50},
+                           cs.SLEEVE_TAIL: {"expected_entries": 1, "min_candidates_per_team": 2,
+                                            "teams": ["T1"]},
+                           cs.SLEEVE_NAMED_STACK: {"team": "T3", "min": 2, "min_candidates": 3}}}
+            jobs = epi.build_sleeve_jobs(thin, frame, request, consensus_members=members,
+                                         time_budget_s=120)
+            attempted = {name: rep for name, rep in jobs["sleeves"].items() if rep.get("attempted")}
+            self.assertEqual(sorted(attempted), sorted([
+                cs.SLEEVE_CHALK_FAILS, cs.SLEEVE_ENVIRONMENT, cs.SLEEVE_TAIL,
+                cs.SLEEVE_NAMED_STACK]), jobs)
+            for name, rep in attempted.items():
+                self.assertTrue(rep.get("conditions_signature"), f"{name} reports no bucket")
+            reported = {rep["conditions_signature"] for rep in attempted.values()}
+            live = set(thin.live_buckets())
+            self.assertLessEqual(live - {ordinary["conditions_signature"]}, reported,
+                                 "a bucket in the cache that no family reported")
+            for name, rep in attempted.items():
+                if rep.get("built"):
+                    self.assertIn(rep["conditions_signature"], live, name)
+            # a family that found the bank already holding enough builds nothing
+            # and reports no bucket: its earlier bucket is the one a repeat build
+            # counts as unrequested (named, same question, silent)
+            again = epi.build_sleeve_jobs(thin, frame, request, consensus_members=members,
+                                          time_budget_s=120)
+            for rep in again["sleeves"].values():
+                if not rep.get("attempted"):
+                    self.assertNotIn("conditions_signature", rep)
+
+    def test_the_brief_lists_at_most_eight_buckets_and_counts_the_rest(self):
+        bs = self._bs()
+        rows = [{"conditions_signature": f"S{n:02d}", "candidates": n,
+                 "built_under": dict(bank_cache.conditions_facts([], 4, 5, 2), excludes_count=0)}
+                for n in range(12, 0, -1)]
+        block = bs.anti_correlation_brief_block(
+            0, {"anti_correlation": opt.anti_correlation_report([0], requested=0), "slices": [],
+                "served_from_unrequested_buckets": sum(r["candidates"] for r in rows),
+                "unrequested_buckets": rows}, {})
+        named = block["unrequested_built_under"]
+        self.assertEqual(len(named["buckets"]), 8)
+        self.assertEqual(named["buckets_total"], 12)
+        self.assertEqual(named["allowance_k"], {"2": 78}, "the tally covers every bucket")
+        self.assertEqual([b["candidates"] for b in named["buckets"]], [12, 11, 10, 9, 8, 7, 6, 5])
+
+
 class AutobuildBankCapTests(unittest.TestCase):
     """R415. autobuild raises a capped bank's cap on a refusal, as search effort.
 

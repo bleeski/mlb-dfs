@@ -3615,7 +3615,88 @@ def salary_cross_check_note(clock: dict) -> str | None:
     )
 
 
-def anti_correlation_brief_block(requested, bank_report, result) -> dict:
+#: R465. How many unrequested buckets the brief lists by name; the rest are
+#: counted in `buckets_total`.
+UNREQUESTED_BUCKETS_LISTED = 8
+
+
+def unrequested_built_under_block(buckets, effective_k, request=None) -> tuple:
+    """R465. ``(block, problems)`` for the unrequested buckets a sliced door serves.
+
+    ``buckets`` is ``BankCache.describe_outside_buckets``: each row says how many
+    candidates a bucket holds and what it was built under (``built_under``, or
+    None when the cache file predates the facts). A known bucket is compared with
+    the BUILD-LEVEL request: the allowance ``effective_k``, and, when ``request``
+    is given, ``target`` and the leverage keys. These are the inputs every slice
+    of one build shares (the sleeve, limited and pair builders forward the same
+    ``leverage`` and k and none passes a target), so a difference is a bucket
+    that answered another question. The per-slice inputs (stack bounds, cluster
+    limit, teams, named stack, excludes) are named, never compared: the build's
+    own requested buckets differ from one another in exactly those. An unknown
+    bucket is counted under ``unknown`` and never fires.
+    """
+    from mlb_engine.optimize.bank_cache import _leverage_kwargs  # lazy: no engine at load
+    asked = (_leverage_kwargs((request or {}).get("leverage"))
+             if request is not None else None)
+    asked_target = (request or {}).get("target", "ceiling") if request is not None else None
+    allowance: dict = {}
+    listed = []
+    by_what: dict = {}
+    for row in buckets or []:
+        facts = row.get("built_under")
+        n = int(row.get("candidates") or 0)
+        differs = None
+        if facts is None:
+            allowance["unknown"] = allowance.get("unknown", 0) + n
+        else:
+            k = facts.get("max_opposing_hitters_per_sp")
+            allowance[str(k)] = allowance.get(str(k), 0) + n
+            differs = []
+            if k != effective_k:
+                differs.append("allowance_k")
+                by_what.setdefault("allowance_k", {}).setdefault(f"k={k}", 0)
+                by_what["allowance_k"][f"k={k}"] += n
+            if request is not None:
+                if facts.get("target") != asked_target:
+                    differs.append("target")
+                    by_what.setdefault("target", {}).setdefault(
+                        f"target {facts.get('target')}", 0)
+                    by_what["target"][f"target {facts.get('target')}"] += n
+                if (facts.get("leverage") or {}) != asked:
+                    differs.append("leverage")
+                    label = f"leverage {json.dumps(facts.get('leverage') or {}, sort_keys=True)}"
+                    by_what.setdefault("leverage", {}).setdefault(label, 0)
+                    by_what["leverage"][label] += n
+        listed.append({"conditions_signature": row.get("conditions_signature"),
+                       "candidates": n, "built_under": facts, "differs_in": differs})
+    block = {
+        "allowance_k": dict(sorted(allowance.items())),
+        "buckets": listed[:UNREQUESTED_BUCKETS_LISTED],
+        "buckets_total": len(listed),
+        "note": "what each served bucket was built under, from the facts "
+                "`extend_bank` registered beside the cache's conditions index; "
+                "`unknown` is a bucket a file written before R465 holds, never a guess",
+    }
+    problems = []
+    if by_what:
+        parts = []
+        for what in ("allowance_k", "target", "leverage"):
+            if what in by_what:
+                parts.append(", ".join(f"{n} under {label}"
+                                       for label, n in sorted(by_what[what].items())))
+        wanted = [f"k={effective_k}"]
+        if request is not None:
+            wanted += [f"target {asked_target}", f"leverage {json.dumps(asked, sort_keys=True)}"]
+        problems.append(
+            f"the served bank holds candidates built under another question than this "
+            f"build requested ({' / '.join(wanted)}): {'; '.join(parts)}; they are NOT "
+            f"all built under the requested conditions and the allocator can seat them "
+            f"(see `unrequested_built_under`); `agrees_with_request` describes this "
+            f"run's own solves only")
+    return block, problems
+
+
+def anti_correlation_brief_block(requested, bank_report, result, request=None) -> dict:
     """The brief's `anti_correlation`, with `applied` READ OFF THE SOLVES.
 
     R293. This block used to write `applied` from `args.max_opposing_hitters_per_sp`
@@ -3638,6 +3719,11 @@ def anti_correlation_brief_block(requested, bank_report, result) -> dict:
     `applied` is also null when the observed values DISAGREE, with the values
     listed. That is the R293 condition itself, and a brief that averaged it or
     picked one would be the same lie in a new place.
+
+    R465. ``request`` is the build-level request beyond the allowance
+    (``{"target": ..., "leverage": <the --leverage mapping>}``); with it, the
+    served unrequested buckets are compared on target and leverage as well as k.
+    ``None`` (every caller before R465) compares k alone.
     """
     from mlb_engine.optimize.optimizer_v3 import ANTI_CORRELATION_DEFAULT_MAX
 
@@ -3713,6 +3799,19 @@ def anti_correlation_brief_block(requested, bank_report, result) -> dict:
                 f"so nothing was solved for them under that allowance; raise "
                 f"--bank-max-candidates (counted {[s.get('cap_counted') for s in starved]} "
                 f"against {[s.get('max_candidates') for s in starved]})")
+    # R465. The served buckets this build did not request, NAMED by what they
+    # were built under, and compared with the build-level request. Present only
+    # when the sliced door serves some AND the report carries the bucket list,
+    # so a one-bucket cache, the direct door and every legacy report shape give
+    # the block they always gave. `agrees_with_request` is untouched on purpose:
+    # it is a fact about this run's own solves.
+    served_buckets = ((bank_report or {}).get("unrequested_buckets")
+                      if source == "sliced_bank" else None)
+    if served_buckets:
+        named, named_problems = unrequested_built_under_block(
+            served_buckets, effective, request)
+        block["unrequested_built_under"] = named
+        problems.extend(named_problems)
     if problems:
         block["disagreement"] = "; ".join(problems)
     # R453. Stated beside the count rather than left for a reader to connect:
@@ -4355,6 +4454,10 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         if consensus_pair_jobs.get("conditions_signature"):  # R469
             _requested_sigs.add(consensus_pair_jobs["conditions_signature"])
         bank_report["served_from_unrequested_buckets"] = cache.count_outside_buckets(
+            _requested_sigs)
+        # R465. The same buckets, NAMED: what each was built under (the facts
+        # `extend_bank` registered), or None where the cache file predates them.
+        bank_report["unrequested_buckets"] = cache.describe_outside_buckets(
             _requested_sigs)
         # R453. The cap bounds this build's own buckets, so the union `as_candidates`
         # serves can pass the ceiling `_bank_cap` was clamped to when an earlier
@@ -5241,7 +5344,7 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         # not passed and `applied` is the engine default the build actually ran.
         "anti_correlation": anti_correlation_brief_block(
             getattr(args, "max_opposing_hitters_per_sp", None),
-            bank_report, result),
+            bank_report, result, request={"leverage": leverage}),
         "enrichment": enrichment_summary,
         # R407. The tier, the facts that set it, and each control's before and
         # after, as run_slate applied them.
