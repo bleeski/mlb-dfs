@@ -2,6 +2,45 @@
 
 What changed in the engine, the tools and the contracts, when, and why.
 
+## 2026-10-07 — R487: test flake fixed, `LateSwapEnrichedFrameTests.test_S3` read its second swap run by sort order (the S6 flake's twin; R428's test; no engine change)
+
+**Scope.**
+- `tests/test_core.py`: `test_S3_a_mismatched_parent_lends_only_when_it_is_the_same_slate` keeps S3b's swap run when only one exists, then selects S3a's by identity.
+- `CHANGELOG.md`: this entry, and the R486 entry's pointer to the open audit-side fragment.
+- No engine, tool, pin or count moved.
+
+**What was wrong.** PR #126's `pull_request` gate went red three times on identical bytes (jobs 112985237214, 113009846721, 113028165683) while its `push` gate passed, and R486's step named the test on its first red run: `FAIL: test_S3_a_mismatched_parent_lends_only_when_it_is_the_same_slate`, `tests/test_core.py:45456`, `AssertionError: 'enriched' != 'proxy'`; the step's own re-run (`tests.test_core` in 249.9s) failed the same way. The mechanism is the 2026-10-06 S6 entry's: `_swap_runs` returns the `late_swap` manifests in `sorted()` glob order, run ids are `<UTC second>_<random 8 hex>` (`build_state_manager.create_run`, L113), and S3 mints two swaps (S3b on the parent's salary file, then S3a on a salary file with one player dropped) and read `[-1]` as S3a. Two swaps minted in one second sort by the random suffix, so `[-1]` can be S3b, whose tier is `enriched`. The S6 entry said "No other test in the class takes two swaps"; S3 does, so that sentence was wrong. The failures sit on fast runners: the red runs finished `tests.test_core` in about 250s against about 430s in this container, which is why no local run saw it, and the green `push` run on the same head took 11.5 minutes end to end.
+
+**Reproduction, before the fix.** A scratch harness pins `build_state_manager._utc_now` to one second and stubs `uuid.uuid4` to hand out descending suffixes (the later run sorts first): `AssertionError: 'enriched' != 'proxy'`, Ran 1 test, FAILED. The same test unforced: OK.
+
+**What shipped.** `s3b_run = self._swap_runs(h.root)[-1]` right after the S3b swap, when it is the only swap run, and `s3a_run = next(r for r in self._swap_runs(h.root) if r["run_id"] != s3b_run["run_id"])` after S3a: S6's idiom. Under the forced ordering the test passes.
+
+**R233 grep.** `grep -nE "_runs\([^)]*\)\[-1\]" tests/*.py`: 45443 (S3b, the only swap at that point), 45479 (S4, one swap), 45488 and 45497 (S5, one swap), 45509 (S6's first swap, the only one at that point); S6's second is by identity (45521) and S3a's now is (45460). `grep -n 'glob("\*/manifest.json")' tests/*.py`: 45351 (`_swap_runs` itself), 46226 and 46254 (`next(... late_swap)` after a single swap), 46555 (`_swap_manifests`, whose callers assert `[]` or `len == 1`), 47516 (asserts `len(swap) == 1`). No other test reads a second swap run by order.
+
+**Mutation check.** The fix reverted (`s3a_run = self._swap_runs(h.root)[-1]`) under the forced ordering: red with the CI diff. Restored: green. `python -m unittest tests.test_core.LateSwapEnrichedFrameTests` unforced: OK.
+
+**Gate.** `PASS  v2.26.0  45 modules  3399 tests  4 skipped  {test_core 2242/2242 (4 skipped) skipped_in_place}`, with a Python 3.11.17 venv built from `requirements.lock` (CI's interpreter; this container's 3.13 `.venv` fails `ReplaySlateTests.test_settle_scores_requires_integer_hundredths_so_ties_are_exact` on `sum()`, a host fact). The bracketed warnings describe the host.
+
+**Golden histogram.** Unmoved: no engine change.
+
+## 2026-10-07 — R486: the gate workflow prints the failing suite's tracebacks on a red run
+
+**Scope.**
+- `.github/workflows/gate.yml`: a new last step, `Failing suite detail`, guarded `if: failure()`.
+- `CHANGELOG.md`: this entry.
+- Not touched, by design: `tools/audit.py` (its `--terse` path still ignores `--output`; changing that is an audit change with its own pin and tests, and a workflow step answers the question without one), every test, every pin.
+- Left open: `docs/backlog_inbox/2026-10-06_DEV_gate-failure-line-names-suites-not-tests.md`, the audit-side half (the `--terse` line itself naming failing test ids, so a LOCAL gate says it too). This step is the CI half and does not consume it.
+
+**What was wrong.** The Gate step runs `tools/audit.py --run-tests --terse` and prints that one line. On a failing suite the line names the SUITE (`FAIL  test suite FAILED in tests.test_core (ran 3399); do not build`) and never the test, and `--terse` returns before `--output` is written, so the audit's own `stderr_tail` for the failing suite never reaches the log. PR #126 (a record-only PR adding four files under `data/deliveries/2026-10-07/`) failed its `pull_request` run twice (jobs 112985237214 and 113009846721, the second with runner debug logging on) while its `push` run on the same head passed, and the log held nothing past that line. Every local replay of the same bytes passed `tests.test_core` (2242 run, 4 skipped) under Python 3.11.17: the branch checkout, a one-commit clone of `refs/pull/126/merge`, and a full-history clone detached at the merge commit `ee72dcc` exactly as `actions/checkout` builds it with `fetch-depth: 0`; the full `audit.py --run-tests` on the shallow merge checkout also passed, and so did `tests.test_core` with GitHub's `pull_request` variables set (`GITHUB_EVENT_NAME`, `GITHUB_REF=refs/pull/126/merge`, `GITHUB_HEAD_REF`, `GITHUB_BASE_REF`, `CI=true`). A red gate that names no test cannot be root-caused from the log.
+
+**What shipped.** On a red run only, the new step reads the suites the Gate step named out of `gate.out`, re-runs them with `python -m unittest` the way the audit runs them (`PYTHONHASHSEED=0`, a throwaway `MLB_DFS_ARTIFACT_ROOT` under `$RUNNER_TEMP`), and prints unittest's failure section (from its first `=` separator, capped at 800 lines). When the re-run raises nothing it says so and prints the summary, which is itself the evidence of a failure that does not reproduce on one re-run. It always exits 0 and runs after Gate has decided, so it never changes the verdict, and it costs one suite's runtime on a red run and nothing on a green one. Dry-run against a scratch suite: one failing test printed its `FAIL:` block and traceback; the same suite made green printed `(the re-run raised no failure; its summary follows)` and `OK`; a missing `gate.out` printed `(gate.out names no failing suite)`; every case exited 0. The YAML parses with the new step last, `if: failure()`, `env: PYTHONHASHSEED '0'`.
+
+**R233 grep.** Not applicable: this entry claims no rule now lives in one place.
+
+**Gate.** `PASS  v2.26.0  45 modules  3399 tests  4 skipped  {test_core 2242/2242 (4 skipped) skipped_in_place}`, run with a Python 3.11.17 venv built from `requirements.lock` (CI's interpreter; this container's `.venv` is 3.13, where `ReplaySlateTests.test_settle_scores_requires_integer_hundredths_so_ties_are_exact` fails because `sum()` stopped depending on term order in 3.12, a host fact and not this change). The bracketed warnings describe the host.
+
+**Golden histogram.** Unmoved: no engine, tool or test change.
+
 ## 2026-10-07 — R465(a), R455(b), R197(c): a served conditions bucket is named by what it was built under, `Locked` leaves the projection contract, and the low-owned counter reads what the constraint reads (roadmap Session 134, three commits)
 
 Three controls that existed and never reached the solver, landed as three commits that can each be dropped alone. The register entries as filed (R465, R455 and R197 with their riders) are `git show ebf9333:docs/backlog.md` under their `### R...` headings. The plan was reviewed twice by the advisor before it was approved, and the dfs-premise run that corrected the register's premises is recorded in `data/agent_runs/2026-10-07/`.
