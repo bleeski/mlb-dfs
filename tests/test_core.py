@@ -24759,6 +24759,20 @@ class ServedBucketFactsTests(unittest.TestCase):
         self.assertIsNone(block["unrequested_built_under"]["buckets"][0]["differs_in"])
         self.assertNotIn("disagreement", block)
 
+    def test_a_partial_facts_entry_reads_as_unknown_and_never_fires(self):
+        """A facts dict with no allowance key (a hand edit, a later shape) is not a
+        fact: read as k=None it would fire 'under k=None' on a bucket whose k is
+        simply unrecorded."""
+        bs = self._bs()
+        report = {"anti_correlation": opt.anti_correlation_report([0], requested=0),
+                  "slices": [], "served_from_unrequested_buckets": 4,
+                  "unrequested_buckets": [{"conditions_signature": "PART", "candidates": 4,
+                                           "built_under": {"target": "ceiling"}}]}
+        block = bs.anti_correlation_brief_block(0, report, {}, request={"leverage": {}})
+        self.assertEqual(block["unrequested_built_under"]["allowance_k"], {"unknown": 4})
+        self.assertIsNone(block["unrequested_built_under"]["buckets"][0]["differs_in"])
+        self.assertNotIn("disagreement", block)
+
     def test_a_one_bucket_cache_gives_the_brief_it_gave_before(self):
         """The negative control for every new key: the legacy report shapes give
         the exact dicts `ebf9333` gave (captured before the change)."""
@@ -25220,7 +25234,7 @@ class LowOwnedCounterTests(unittest.TestCase):
         real = opt.score_lineup_candidate
 
         def spy(*args, **kwargs):
-            seen[(inspect.stack()[1].function, kwargs.get("low_owned_threshold_pct"))] += 1
+            seen[kwargs.get("low_owned_threshold_pct")] += 1
             return real(*args, **kwargs)
 
         args = dict(requested_n=1, mode="gpp", target="ceiling",
@@ -25228,11 +25242,12 @@ class LowOwnedCounterTests(unittest.TestCase):
                     min_low_owned_hitters=1)
         with unittest.mock.patch.object(opt, "score_lineup_candidate", spy):
             bank = opt.build_diverse_candidate_bank(frame, low_owned_threshold_pct=6.0, **args)
-        self.assertEqual({fn for fn, _ in seen}, {"build_candidate_lineup_bank", "_try_accept"},
-                         "the base bank and the augmentation both scored")
-        self.assertEqual({bar for _, bar in seen}, {6.0}, "no call site dropped the bar")
         records = bank["candidate_lineups"]
-        self.assertIn("diversity_augmentation", {r.get("source") for r in records})
+        self.assertIn("diversity_augmentation", {r.get("source") for r in records},
+                      "the augmentation pass scored too, so all four sites ran")
+        self.assertEqual(set(seen), {6.0}, "no scorer call dropped the bar")
+        self.assertGreaterEqual(sum(seen.values()), 2 * len(records),
+                                "the base and shape scores of every record")
         at_six = {self._independent(r["lineup"], 6.0) for r in records}
         at_ten = {self._independent(r["lineup"], 10.0) for r in records}
         self.assertNotEqual(at_six, at_ten, "the frame separates the two bars")
@@ -25304,12 +25319,12 @@ class LowOwnedCounterTests(unittest.TestCase):
             self.assertEqual((again["min"], again["median"], again["max"]),
                              (min(gap_sums), sorted(gap_sums)[1], max(gap_sums)))
 
-    def test_the_brief_leverage_block_gains_realized_only_when_applied(self):
-        """Through `run_classic`: the off block is exactly what it was (R246, pinned
-        again at `test_core.py:5009`), and a `--leverage` build's block carries
-        `realized` and `cap_bound` read off the DELIVERED file. The prior is a
-        synthetic file built from the fixture's own ids in a temp dir (no test may
-        read Ben's disk)."""
+    def _leverage_wiring(self):
+        """`run_classic` over the frozen fixture with a faked `run_slate`, a delivered
+        file that is legal AND inside the pool `run_slate` was handed (the fixture's
+        own file takes the cheapest players of the whole salary file, most of whom a
+        real pool never holds), and a synthetic ownership prior in a temp dir (no test
+        may read Ben's disk). Returns `(wiring, good, prior, off_brief)`."""
         wiring = DeadlineGovernorWiringTests(
             "test_the_anti_correlation_flag_reaches_the_controls_the_validator_grades")
         wiring.setUp()
@@ -25317,15 +25332,11 @@ class LowOwnedCounterTests(unittest.TestCase):
         good = {"passed": True, "run_id": "r1", "workflow_valid": True,
                 "selection_certified": True, "allocation_certified": True,
                 "delivered_path": str(wiring._delivered_csv())}
-        code, brief, _calls, err = wiring._run(30, refusal=good)
+        code, off_brief, _calls, err = wiring._run(30, refusal=good)
         self.assertEqual(code, 0, err[-600:])
-        self.assertEqual(brief["leverage"], {"applied": False, "reason": "no --leverage supplied"})
         with wiring._SALARY.open(encoding="utf-8-sig", newline="") as fh:
             salary_rows_ = list(csv.DictReader(fh))
         ids = [row["ID"] for row in salary_rows_]
-        # A delivered file the build could have produced: legal, and inside the pool
-        # `run_slate` was handed (the fixture's own file takes the cheapest players of
-        # the whole salary file, most of whom a real pool never holds).
         pool = {str(r["Player_ID"]) for r in wiring.solve_kwargs[0]["projection_rows"]}
         chosen, teams = [], {}
         for slot in wiring._SLOTS:
@@ -25346,6 +25357,15 @@ class LowOwnedCounterTests(unittest.TestCase):
         prior.write_text(json.dumps({"archetypes": {"large_field_gpp": {
             "own_pct_by_player_id": {pid: 1.0 + (i % 13) for i, pid in enumerate(ids)}}}}),
             encoding="utf-8")
+        return wiring, good, prior, off_brief
+
+    def test_the_brief_leverage_block_gains_realized_only_when_applied(self):
+        """Through `run_classic`: the off block is exactly what it was (R246, pinned
+        again at `test_core.py:5009`), and a `--leverage` build's block carries
+        `realized` and `cap_bound` read off the DELIVERED file."""
+        wiring, good, prior, off_brief = self._leverage_wiring()
+        self.assertEqual(off_brief["leverage"],
+                         {"applied": False, "reason": "no --leverage supplied"})
         for constraints, cap_bound in (({"max_cumulative_ownership_pct": 400}, False),
                                        ({"max_cumulative_ownership_pct": 1.0}, True),
                                        ({"min_low_owned_hitters": 1}, None)):
@@ -25368,6 +25388,29 @@ class LowOwnedCounterTests(unittest.TestCase):
                 self.assertNotIn("cap_bound", realized)
                 self.assertEqual(block["constraints"]["max_cumulative_ownership_pct"],
                                  constraints.get("max_cumulative_ownership_pct"))
+
+    def test_a_failed_realized_block_says_so_and_keeps_cap_bound_present(self):
+        """The guarded call never withholds a brief, and the block keeps its shape
+        when it fails: `realized` carries the error and `cap_bound` is present and
+        null (R237), not a missing key."""
+        wiring, good, prior, _off = self._leverage_wiring()
+        captured = {}
+
+        def boom(*_args, **_kwargs):
+            raise RuntimeError("synthetic failure")
+
+        code, brief, _calls, err = wiring._run(
+            30, refusal=good, capture=captured,
+            on_call=lambda _kw: setattr(captured["mod"], "leverage_realized", boom),
+            args_overrides={"leverage": {"archetype": "large_field_gpp",
+                                         "max_cumulative_ownership_pct": 400},
+                            "ownership_pred": str(prior)})
+        self.assertEqual(code, 0, err[-600:])
+        block = brief["leverage"]
+        self.assertIs(block["applied"], True)
+        self.assertEqual(block["realized"], {"error": "RuntimeError: synthetic failure"})
+        self.assertIn("cap_bound", block)
+        self.assertIsNone(block["cap_bound"])
 
     def test_the_other_tier_reads_are_unchanged(self):
         """c2 is NOT rewired: these outputs are what ebf9333 gave (frozen), so the

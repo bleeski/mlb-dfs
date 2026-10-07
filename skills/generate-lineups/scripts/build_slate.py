@@ -3644,6 +3644,8 @@ def unrequested_built_under_block(buckets, effective_k, request=None) -> tuple:
     by_what: dict = {}
     for row in buckets or []:
         facts = row.get("built_under")
+        if facts is not None and "max_opposing_hitters_per_sp" not in facts:
+            facts = None        # a partial entry (a hand edit, a later shape) is not a fact
         n = int(row.get("candidates") or 0)
         differs = None
         if facts is None:
@@ -5163,6 +5165,7 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
             leverage_brief["realized"] = _realized
         except Exception as exc:  # noqa: BLE001
             leverage_brief["realized"] = {"error": f"{type(exc).__name__}: {exc}"}
+            leverage_brief["cap_bound"] = None      # present, and unknown (R237)
     # R116. The concentration facts join the exposure block, which is where a
     # reader already goes to ask how concentrated this portfolio is. Two
     # provenances on purpose: `distinct_lineups`/`max_lineup_repeat` above are
