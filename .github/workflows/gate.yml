@@ -83,3 +83,28 @@ jobs:
       - name: Gate output
         if: always()
         run: cat gate.out || echo "(the gate produced no output)"
+
+      - name: Failing suite detail
+        # R486, 2026-10-07. The Gate step prints the audit's --terse line, which
+        # names a failing SUITE and never the test, and --terse ignores
+        # --output, so the audit's own stderr tail never reaches this log. PR
+        # #126 failed twice in tests.test_core with nothing else to read, and
+        # every local replay of its exact bytes passed. On a red run only, this
+        # re-runs the suites the Gate step named, the way the audit runs them
+        # (PYTHONHASHSEED 0, a throwaway artifact root), and prints unittest's
+        # failure section. It costs one suite's runtime on a red run and nothing
+        # on a green one, and it never changes the verdict: Gate already decided.
+        if: failure()
+        env:
+          PYTHONHASHSEED: '0'
+        run: |
+          suites=$(sed -n 's/^FAIL  test suite FAILED in \(.*\) (ran .*/\1/p' gate.out 2>/dev/null | tr -d ',')
+          if [ -z "$suites" ]; then echo "(gate.out names no failing suite)"; exit 0; fi
+          export MLB_DFS_ARTIFACT_ROOT="$RUNNER_TEMP/gate-detail-artifacts"
+          mkdir -p "$MLB_DFS_ARTIFACT_ROOT"
+          .venv/bin/python -m unittest $suites > detail.out 2>&1 || true
+          if grep -qE '^={70}$' detail.out; then
+            awk '/^={70}$/{p=1} p' detail.out | head -n 800
+          else
+            echo "(the re-run raised no failure; its summary follows)"; tail -n 3 detail.out
+          fi

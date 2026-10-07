@@ -2,6 +2,23 @@
 
 What changed in the engine, the tools and the contracts, when, and why.
 
+## 2026-10-07 — R486: the gate workflow prints the failing suite's tracebacks on a red run
+
+**Scope.**
+- `.github/workflows/gate.yml`: a new last step, `Failing suite detail`, guarded `if: failure()`.
+- `CHANGELOG.md`: this entry.
+- Not touched, by design: `tools/audit.py` (its `--terse` path still ignores `--output`; changing that is an audit change with its own pin and tests, and a workflow step answers the question without one), every test, every pin.
+
+**What was wrong.** The Gate step runs `tools/audit.py --run-tests --terse` and prints that one line. On a failing suite the line names the SUITE (`FAIL  test suite FAILED in tests.test_core (ran 3399); do not build`) and never the test, and `--terse` returns before `--output` is written, so the audit's own `stderr_tail` for the failing suite never reaches the log. PR #126 (a record-only PR adding four files under `data/deliveries/2026-10-07/`) failed its `pull_request` run twice (jobs 112985237214 and 113009846721, the second with runner debug logging on) while its `push` run on the same head passed, and the log held nothing past that line. Every local replay of the same bytes passed `tests.test_core` (2242 run, 4 skipped) under Python 3.11.17: the branch checkout, a one-commit clone of `refs/pull/126/merge`, and a full-history clone detached at the merge commit `ee72dcc` exactly as `actions/checkout` builds it with `fetch-depth: 0`; the full `audit.py --run-tests` on the shallow merge checkout also passed, and so did `tests.test_core` with GitHub's `pull_request` variables set (`GITHUB_EVENT_NAME`, `GITHUB_REF=refs/pull/126/merge`, `GITHUB_HEAD_REF`, `GITHUB_BASE_REF`, `CI=true`). A red gate that names no test cannot be root-caused from the log.
+
+**What shipped.** On a red run only, the new step reads the suites the Gate step named out of `gate.out`, re-runs them with `python -m unittest` the way the audit runs them (`PYTHONHASHSEED=0`, a throwaway `MLB_DFS_ARTIFACT_ROOT` under `$RUNNER_TEMP`), and prints unittest's failure section (from its first `=` separator, capped at 800 lines). When the re-run raises nothing it says so and prints the summary, which is itself the evidence of a failure that does not reproduce on one re-run. It always exits 0 and runs after Gate has decided, so it never changes the verdict, and it costs one suite's runtime on a red run and nothing on a green one. Dry-run against a scratch suite: one failing test printed its `FAIL:` block and traceback; the same suite made green printed `(the re-run raised no failure; its summary follows)` and `OK`; a missing `gate.out` printed `(gate.out names no failing suite)`; every case exited 0. The YAML parses with the new step last, `if: failure()`, `env: PYTHONHASHSEED '0'`.
+
+**R233 grep.** Not applicable: this entry claims no rule now lives in one place.
+
+**Gate.** `PASS  v2.26.0  45 modules  3399 tests  4 skipped  {test_core 2242/2242 (4 skipped) skipped_in_place}`, run with a Python 3.11.17 venv built from `requirements.lock` (CI's interpreter; this container's `.venv` is 3.13, where `ReplaySlateTests.test_settle_scores_requires_integer_hundredths_so_ties_are_exact` fails because `sum()` stopped depending on term order in 3.12, a host fact and not this change). The bracketed warnings describe the host.
+
+**Golden histogram.** Unmoved: no engine, tool or test change.
+
 ## 2026-10-07 — R465(a), R455(b), R197(c): a served conditions bucket is named by what it was built under, `Locked` leaves the projection contract, and the low-owned counter reads what the constraint reads (roadmap Session 134, three commits)
 
 Three controls that existed and never reached the solver, landed as three commits that can each be dropped alone. The register entries as filed (R465, R455 and R197 with their riders) are `git show ebf9333:docs/backlog.md` under their `### R...` headings. The plan was reviewed twice by the advisor before it was approved, and the dfs-premise run that corrected the register's premises is recorded in `data/agent_runs/2026-10-07/`.
