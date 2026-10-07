@@ -24349,6 +24349,1088 @@ class BankCapPerBucketTests(unittest.TestCase):
             self.assertEqual(cache.count_outside_buckets([]), 3)
 
 
+class ServedBucketFactsTests(unittest.TestCase):
+    """R465. A conditions signature is a hash, so a cache could count the
+    candidates a build was handed from questions it did not ask (R453) and could
+    not NAME them: the brief read `agrees_with_request: true` beside 32 lineups
+    built under k=2 for a k=0 request. The cache now keeps each bucket's FACTS
+    (`conditions_facts`, the signature's inputs from the one normalizer the
+    signature also reads) in a sibling key beside `conditions_index`, and the
+    brief names what a served bucket was built under and fires `disagreement`
+    when it differs from the build-level request (k, target, leverage).
+
+    The served set is unchanged: `as_candidates` still serves the union, on
+    purpose (the filter's hazards are in the CHANGELOG entry and its fragment).
+    """
+
+    # Frozen at ebf9333, BEFORE this change, on the three-game frame: the byte
+    # stream is a compatibility surface (every signature in a live cache file is a
+    # value of it), and the facts refactor must not move one.
+    FROZEN_SIGNATURES = {
+        "base": "4eeba7db5e5413be",
+        "default_call": "0b62061abb7c4d40",
+        "k2": "ff9291bada37a391",
+        "k0_explicit": "4eeba7db5e5413be",
+        "sel": "459a9819a9cc1ef3",
+        "teams": "c3558c2321fc29ca",
+        "teams_empty": "f85fb7ced294822f",
+        "sec": "bc63e71db1ad7377",
+        "lev_int": "807afb771e98ed72",
+        "lev_float": "868792e6d508f215",
+        "lev_three": "29b82fb87bdbf939",
+        "floor": "365662f2f1033a14",
+        "excl": "d1d7e298b97c18d2",
+    }
+
+    @staticmethod
+    def _frame():
+        return BankCapPerBucketTests._frame()
+
+    @staticmethod
+    def _bs():
+        return BankCapPerBucketTests._build_slate()
+
+    def _extend(self, cache, frame, k, cap, **kw):
+        return bank_cache.extend_bank(
+            cache, frame, time_budget_s=120, max_candidates=cap,
+            max_opposing_hitters_per_sp=k, **kw)
+
+    @staticmethod
+    def _report(rep, cache, requested_sigs, stack_min=4):
+        """The sliced door's bank report for a build that asked `requested_sigs`,
+        assembled the way `run_classic` does after its slices and sleeves."""
+        bs = BankCapPerBucketTests._build_slate()
+        rep = dict(rep)
+        rep["stack_min_requested"] = stack_min
+        merged = bs._merge_bank_slice_reports([rep])
+        merged["served_from_unrequested_buckets"] = cache.count_outside_buckets(requested_sigs)
+        merged["unrequested_buckets"] = cache.describe_outside_buckets(requested_sigs)
+        return merged
+
+    # ---- the facts are the signature's inputs ------------------------------
+
+    def test_the_signature_bytes_are_unchanged(self):
+        frame = self._frame()
+        sig = bank_cache.conditions_signature
+        got = {
+            "base": sig(frame, [], 4, 5),
+            "default_call": sig(frame),
+            "k2": sig(frame, [], 4, 5, max_opposing_hitters_per_sp=2),
+            "k0_explicit": sig(frame, [], 4, 5, max_opposing_hitters_per_sp=0),
+            "sel": sig(frame, [], 4, 5, max_selected_from=(["21001", "21002", "21003"], 2)),
+            "teams": sig(frame, [], 4, 5, stack_teams=["A0", "B1"]),
+            "teams_empty": sig(frame, [], 4, 5, stack_teams=[]),
+            "sec": sig(frame, [], 4, 5, secondary_stack=("A1", 3)),
+            "lev_int": sig(frame, [], 4, 5, leverage={"max_cumulative_ownership_pct": 90}),
+            "lev_float": sig(frame, [], 4, 5, leverage={"max_cumulative_ownership_pct": 90.0}),
+            "lev_three": sig(frame, [], 4, 5, leverage={"max_cumulative_ownership_pct": 95,
+                                                        "min_low_owned_hitters": 2,
+                                                        "low_owned_threshold_pct": 6.0}),
+            "floor": sig(frame, [], 4, 5, target="floor"),
+            "excl": sig(frame, ["21003", "21001"], 4, 5),
+        }
+        self.assertEqual(got, self.FROZEN_SIGNATURES)
+        # the two normalizer traps the property test below also hits by name
+        self.assertNotEqual(got["teams"], got["teams_empty"])
+        self.assertNotEqual(got["lev_int"], got["lev_float"],
+                            "json.dumps writes 90 and 90.0 differently")
+        self.assertEqual(sig(frame, None, 4, 5), sig(frame, [], 4, 5))
+
+    def _variations(self, frame):
+        pins = {slot: frame[frame.Position == pos].Player_ID.iloc[0]
+                for slot, pos in (("C", "C"), ("1B", "1B"), ("2B", "2B"),
+                                  ("3B", "3B"), ("SS", "SS"))}
+        return {
+            "base": {},
+            "k0_explicit": {"max_opposing_hitters_per_sp": 0},
+            "k1": {"max_opposing_hitters_per_sp": 1},
+            "k2": {"max_opposing_hitters_per_sp": 2},
+            "target_floor": {"target": "floor"},
+            "excludes": {"excludes": ["21003", "21001"]},
+            "excludes_empty": {"excludes": []},
+            "stack_4_4": {"stack_min": 4, "stack_max": 4},
+            "stack_3_5": {"stack_min": 3, "stack_max": 5},
+            "lev_cap_int": {"leverage": {"max_cumulative_ownership_pct": 150}},
+            "lev_cap_float": {"leverage": {"max_cumulative_ownership_pct": 150.0}},
+            "lev_floor": {"leverage": {"min_low_owned_hitters": 1,
+                                       "low_owned_threshold_pct": 6.0}},
+            "sel": {"max_selected_from": (["21001", "21002", "21003"], 2)},
+            "teams": {"stack_teams": ["A0", "B1"]},
+            "teams_empty": {"stack_teams": []},
+            "sec": {"secondary_stack": ("a1", 3), "job_class": "sleeve_named_stack"},
+            "pinned_hitters_relax_the_floor": {"locked_slot_assignments": pins},
+        }
+
+    def test_persisted_facts_rebuild_the_signature_for_every_input(self):
+        """The anti-drift property. For every input varied through a REAL
+        `extend_bank`, the facts that come back from a save and a reload give
+        the signature stored beside them. A normalizer that drifts from the
+        byte stream (a dropped term, `[]` read as None, a leverage 90 turned
+        into 90.0) fails here, because the reconstruction goes through
+        `signature_from_facts` and the stored signature came from the call."""
+        frame = self._frame()
+        seen = {}
+        for name, kwargs in self._variations(frame).items():
+            with self.subTest(variation=name), tempfile.TemporaryDirectory() as tmp:
+                path = Path(tmp) / "bank.json"
+                rep = bank_cache.extend_bank(
+                    bank_cache.BankCache(path), frame, time_budget_s=3.0, max_candidates=1,
+                    **kwargs)
+                sig = rep["conditions_signature"]
+                reloaded = bank_cache.BankCache(path)
+                facts = reloaded.conditions_facts.get(sig)
+                self.assertIsNotNone(facts, "the bucket the call wrote into has facts")
+                self.assertEqual(bank_cache.signature_from_facts(frame, facts), sig)
+                seen[name] = (sig, json.dumps(facts, sort_keys=True))
+        # negative control: facts differ exactly where the bytes do
+        by_sig = {}
+        for name, (sig, facts_json) in seen.items():
+            by_sig.setdefault(sig, set()).add(facts_json)
+        self.assertTrue(all(len(v) == 1 for v in by_sig.values()),
+                        "one signature, one set of facts")
+        self.assertEqual(len(by_sig), len({f for _s, f in seen.values()}),
+                         "distinct signatures have distinct facts")
+        for same in (("base", "excludes_empty", "k0_explicit"),):
+            self.assertEqual(len({seen[n][0] for n in same}), 1, same)
+        for different in (("teams", "teams_empty"), ("base", "teams_empty"),
+                          ("lev_cap_int", "lev_cap_float"),
+                          ("stack_4_4", "stack_3_5"), ("k1", "k2")):
+            self.assertEqual(len({seen[n][0] for n in different}), len(different), different)
+        # the relaxation is in the facts: five pinned hitter slots leave 3 free
+        facts = json.loads(seen["pinned_hitters_relax_the_floor"][1])
+        self.assertEqual(facts["stack_min"], 3)
+        # the named stack's team is upper-cased, as in the signature
+        self.assertEqual(json.loads(seen["sec"][1])["secondary_stack"],
+                         {"team": "A1", "min": 3})
+        # `job_class` is a per-candidate tag, not a bucket fact: two families can
+        # share one signature, so it is not persisted at all
+        self.assertNotIn("job_class", json.loads(seen["sec"][1]))
+
+    # ---- the cache file ----------------------------------------------------
+
+    def test_an_old_file_without_facts_loads_as_unknown_and_stays_unknown(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "bank.json"
+            roster = [str(i) for i in range(10)]
+            path.write_text(json.dumps({
+                "version": "v1.3",
+                "candidates": [{"roster": roster, "objective": 1.0, "job": "a+b|T||SIG_OLD"}],
+                "attempted": [], "retired_jobs": [],
+                "conditions_index": {"SIG_OLD": "POOL"}}), encoding="utf-8")
+            cache = bank_cache.BankCache(path)
+            self.assertEqual(cache.conditions_facts, {})
+            self.assertEqual(cache.describe_outside_buckets(set()), [
+                {"conditions_signature": "SIG_OLD", "candidates": 1, "built_under": None}])
+            cache.save()
+            again = bank_cache.BankCache(path)
+            self.assertEqual(again.conditions_facts, {}, "a save invents no facts")
+            self.assertEqual(again.conditions_index, {"SIG_OLD": "POOL"})
+            self.assertEqual(json.loads(path.read_text(encoding="utf-8"))["conditions_facts"], {})
+
+    def test_facts_survive_a_save_and_union_writers_and_a_re_request_fills_an_unknown(self):
+        facts_a = bank_cache.conditions_facts([], 4, 5, 2)
+        facts_b = bank_cache.conditions_facts([], 4, 5, 0, target="floor")
+        facts_c = bank_cache.conditions_facts(["9"], 3, 5, 1)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "bank.json"
+            a, b = bank_cache.BankCache(path), bank_cache.BankCache(path)
+            a.register_conditions("SIG_A", "POOL", facts_a)
+            b.register_conditions("SIG_B", "POOL", facts_b)
+            a.save()
+            b.save()
+            merged = bank_cache.BankCache(path)
+            self.assertEqual(merged.conditions_facts, {"SIG_A": facts_a, "SIG_B": facts_b})
+            # a signature an older file held WITHOUT facts is filled by the next
+            # request for the same question, and a facts-less re-registration
+            # leaves what is there alone
+            merged.register_conditions("SIG_C", "POOL")
+            self.assertNotIn("SIG_C", merged.conditions_facts)
+            merged.register_conditions("SIG_C", "POOL", facts_c)
+            merged.register_conditions("SIG_C", "POOL")
+            merged.save()
+            self.assertEqual(bank_cache.BankCache(path).conditions_facts["SIG_C"], facts_c)
+
+    def test_a_corrupt_file_resets_the_facts_with_the_index(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "bank.json"
+            path.write_text("{ not json", encoding="utf-8")
+            cache = bank_cache.BankCache(path)
+            self.assertTrue(cache.corrupt_on_load)
+            self.assertEqual((cache.conditions_index, cache.conditions_facts), ({}, {}))
+            # a hand edit that is not a mapping of mappings reads as no facts
+            path.write_text(json.dumps({"candidates": [], "conditions_facts": [1, 2]}),
+                            encoding="utf-8")
+            self.assertEqual(bank_cache.BankCache(path).conditions_facts, {})
+
+    def test_a_refused_other_held_registers_no_facts(self):
+        frame = self._frame()
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = bank_cache.BankCache(Path(tmp) / "bank.json")
+            with self.assertRaises(ValueError):
+                self._extend(cache, frame, 0, 10, other_held=-1)
+            self.assertEqual((cache.conditions_index, cache.conditions_facts), ({}, {}))
+
+    def test_two_families_that_share_a_signature_share_one_set_of_facts(self):
+        """R469's pinned-pair slice shares the ordinary bucket's signature (its pins
+        are in the job key's lock signature, not the conditions signature), so a
+        bucket-level `job_class` would flip with whichever call registered last.
+        It is a per-candidate tag and is not a persisted bucket fact."""
+        frame = self._frame()
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = bank_cache.BankCache(Path(tmp) / "bank.json")
+            first = self._extend(cache, frame, 0, 3, other_held=0)
+            second = self._extend(cache, frame, 0, 6, other_held=0,
+                                  job_class="consensus_pair")
+            self.assertEqual(first["conditions_signature"], second["conditions_signature"])
+            facts = cache.conditions_facts[first["conditions_signature"]]
+            self.assertNotIn("job_class", facts)
+            self.assertEqual(facts, bank_cache.conditions_facts([], 4, 5, 0))
+            self.assertEqual({e.get("job_class") for e in cache.candidates},
+                             {None, "consensus_pair"}, "the per-candidate tag is untouched")
+
+    def test_describe_outside_buckets_agrees_with_the_count(self):
+        facts = bank_cache.conditions_facts(["x", "y", "z"], 4, 5, 2)
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = bank_cache.BankCache(Path(tmp) / "bank.json")
+            roster = lambda n: [f"p{n}_{i}" for i in range(10)]  # noqa: E731
+            for n, sig in enumerate(["sigA", "sigA", "sigA", "sigB", "sigB", "sigC"]):
+                cache.add(roster(n), 1.0, job=f"a|b||{sig}")
+            cache.add(roster(9), 1.0)                        # keyless
+            cache.register_conditions("sigA", "POOL", facts)
+            for asked in (set(), {"sigA"}, {"sigA", "sigB"}, {"sigA", "sigB", "sigC"},
+                          {"sigA", "sigB", "sigC", ""}):
+                with self.subTest(asked=sorted(asked)):
+                    rows = cache.describe_outside_buckets(asked)
+                    self.assertEqual(sum(r["candidates"] for r in rows),
+                                     cache.count_outside_buckets(asked))
+            rows = cache.describe_outside_buckets(set())
+            self.assertEqual([(r["conditions_signature"], r["candidates"]) for r in rows],
+                             [("sigA", 3), ("sigB", 2), ("", 1), ("sigC", 1)],
+                             "largest first, then signature")
+            shown = rows[0]["built_under"]
+            self.assertEqual(shown["excludes_count"], 3)
+            self.assertNotIn("excludes", shown, "a late-swap bucket's id list stays in the file")
+            self.assertEqual(shown["max_opposing_hitters_per_sp"], 2)
+            self.assertIsNone(rows[2]["built_under"], "a keyless candidate is unknown")
+            self.assertEqual(facts["excludes"], ["x", "y", "z"],
+                             "the persisted facts keep the list the signature needs")
+
+    # ---- the brief ---------------------------------------------------------
+
+    def test_a_k0_build_handed_a_k2_bucket_names_k2_and_disagrees(self):
+        """The entry's own sequence. Before: `agrees_with_request: true`, a count
+        of 32 and nothing that names k=2. After: the 32 are named by what they
+        were built under, `disagreement` fires, and `agrees_with_request` keeps
+        its meaning (this build's own solves)."""
+        frame = self._frame()
+        bs = self._bs()
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "bank.json"
+            first = self._extend(bank_cache.BankCache(path), frame, 2, 32, other_held=0)
+            cache = bank_cache.BankCache(path)               # a later build reads the file
+            second = self._extend(cache, frame, 0, 30, other_held=0)
+            sig2, sig0 = first["conditions_signature"], second["conditions_signature"]
+            report = self._report(second, cache, {sig0})
+            self.assertEqual(report["served_from_unrequested_buckets"], 32)
+            block = bs.anti_correlation_brief_block(0, report, {}, request={"leverage": {}})
+            self.assertIs(block["agrees_with_request"], True)
+            named = block["unrequested_built_under"]
+            self.assertEqual(named["allowance_k"], {"2": 32})
+            self.assertEqual(named["buckets_total"], 1)
+            row = named["buckets"][0]
+            self.assertEqual((row["conditions_signature"], row["candidates"], row["differs_in"]),
+                             (sig2, 32, ["allowance_k"]))
+            self.assertEqual(row["built_under"]["max_opposing_hitters_per_sp"], 2)
+            self.assertIn("32 under k=2", block["disagreement"])
+            self.assertIn("NOT all built under the requested conditions", block["disagreement"])
+            self.assertIn("32 candidate(s)", block["unmeasured"], "the R453 words stand")
+            # the facts agree with a measurement that never reads them: the k=2
+            # bucket really holds hitters against a rostered SP, and no more
+            # than two; the requested k=0 bucket holds none
+            measured = [BankCapPerBucketTests._opposing(e["roster"], frame)
+                        for e in cache.candidates
+                        if bank_cache._key_conditions(e.get("job")) == sig2]
+            self.assertEqual(len(measured), 32)
+            self.assertTrue(0 < max(measured) <= 2)
+            requested = [BankCapPerBucketTests._opposing(e["roster"], frame)
+                         for e in cache.candidates
+                         if bank_cache._key_conditions(e.get("job")) == sig0]
+            self.assertEqual(set(requested), {0})
+            # NEGATIVE CONTROLS. A build that asked both questions was handed
+            # nothing it did not ask: no new keys, no disagreement.
+            both = self._report(second, cache, {sig0, sig2})
+            clean = bs.anti_correlation_brief_block(0, both, {}, request={"leverage": {}})
+            self.assertNotIn("unrequested_built_under", clean)
+            self.assertNotIn("disagreement", clean)
+            # a same-k unrequested bucket (another stack floor) is named and silent
+            third = self._extend(cache, frame, 0, 10, other_held=0, stack_min=3)
+            self.assertNotEqual(third["conditions_signature"], sig0)
+            quiet = bs.anti_correlation_brief_block(
+                0, self._report(second, cache, {sig0, sig2}), {}, request={"leverage": {}})
+            self.assertEqual([r["conditions_signature"] for r in
+                              quiet["unrequested_built_under"]["buckets"]],
+                             [third["conditions_signature"]])
+            self.assertNotIn("disagreement", quiet, "same k, target and leverage: named, silent")
+            only0 = bs.anti_correlation_brief_block(
+                0, self._report(second, cache, {sig0}), {}, request={"leverage": {}})
+            rows = {r["conditions_signature"]: r for r in
+                    only0["unrequested_built_under"]["buckets"]}
+            self.assertEqual(rows[third["conditions_signature"]]["differs_in"], [])
+            self.assertEqual(rows[third["conditions_signature"]]["built_under"]["stack_min"], 3)
+            # the k=2 request against the same cache is told about the k=0 bucket
+            reverse = bs.anti_correlation_brief_block(
+                2, self._report(first, cache, {sig2}, stack_min=4), {}, request={"leverage": {}})
+            self.assertEqual(reverse["unrequested_built_under"]["allowance_k"]["0"], 40,
+                             "the k=0 bucket (30) and the k=0 stack-floor-3 bucket (10)")
+            self.assertIn("under k=0", reverse["disagreement"])
+
+    def test_differs_in_names_target_and_leverage_but_not_stack_bounds(self):
+        frame = self._frame()
+        bs = self._bs()
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = bank_cache.BankCache(Path(tmp) / "bank.json")
+            asked = self._extend(cache, frame, 0, 4, other_held=0)
+            lev = self._extend(cache, frame, 0, 4, other_held=0,
+                               leverage={"max_cumulative_ownership_pct": 150})
+            floor = self._extend(cache, frame, 0, 4, other_held=0, target="floor")
+            bounds = self._extend(cache, frame, 0, 4, other_held=0, stack_min=3, stack_max=3)
+            sigs = {asked["conditions_signature"], lev["conditions_signature"],
+                    floor["conditions_signature"], bounds["conditions_signature"]}
+            self.assertEqual(len(sigs), 4)
+            report = self._report(asked, cache, {asked["conditions_signature"]})
+
+            def differs(request):
+                block = bs.anti_correlation_brief_block(0, report, {}, request=request)
+                return ({r["conditions_signature"]: r["differs_in"]
+                         for r in block["unrequested_built_under"]["buckets"]}, block)
+
+            # a resolve_leverage-shaped mapping also carries the prior itself and
+            # its source; only the three solver keys are compared
+            request = {"leverage": {"max_cumulative_ownership_pct": 95,
+                                    "own_pct_by_player_id": {"1": 5.0}, "source": "x.json"}}
+            got, block = differs(request)
+            self.assertEqual(got[lev["conditions_signature"]], ["leverage"])
+            self.assertEqual(got[floor["conditions_signature"]], ["target", "leverage"])
+            self.assertEqual(got[bounds["conditions_signature"]], ["leverage"],
+                             "the request carries a cap this bucket was not built under; "
+                             "its stack bounds are not what differs")
+            self.assertIn("target ceiling", block["disagreement"])
+            # the SAME three keys compare equal through the filter, whatever else
+            # the mapping carries (the comparison reads `_leverage_kwargs`)
+            same = {"leverage": {"max_cumulative_ownership_pct": 150,
+                                 "own_pct_by_player_id": {"1": 5.0}, "source": "x.json"}}
+            got, _ = differs(same)
+            self.assertEqual(got[lev["conditions_signature"]], [])
+            # no leverage requested: the cap-150 bucket differs, the stack-bounds
+            # bucket does not, and the target bucket differs on target alone
+            got, block = differs({"leverage": {}})
+            self.assertEqual(got[lev["conditions_signature"]], ["leverage"])
+            self.assertEqual(got[floor["conditions_signature"]], ["target"])
+            self.assertEqual(got[bounds["conditions_signature"]], [],
+                             "per-slice inputs (stack bounds) are named, never compared")
+            self.assertIn("disagreement", block)
+            # request=None (every caller before R465) compares k alone
+            got, block = differs(None)
+            self.assertTrue(all(v == [] for v in got.values()), got)
+            self.assertNotIn("disagreement", block)
+
+    def test_the_request_target_is_extend_banks_default(self):
+        """`run_classic` never passes a target to any slice or sleeve, so a
+        bucket's target is `extend_bank`'s default, and the brief's request
+        compares against the literal the block assumes."""
+        default = inspect.signature(bank_cache.extend_bank).parameters["target"].default
+        self.assertEqual(default, "ceiling")
+        src = (Path(__file__).resolve().parents[1] / "mlb_engine" / "pipeline"
+               / "execution_pipeline.py").read_text(encoding="utf-8")
+        calls = [n for n in ast.walk(ast.parse(src)) if isinstance(n, ast.Call)
+                 and getattr(n.func, "id", getattr(n.func, "attr", "")) == "extend_bank"]
+        self.assertTrue(calls)
+        self.assertFalse([c for c in calls if any(k.arg == "target" for k in c.keywords)],
+                         "a family builder that sets a target makes it a per-slice input")
+
+    def test_unknown_facts_are_named_unknown_and_never_fire_a_disagreement(self):
+        bs = self._bs()
+        report = {"anti_correlation": opt.anti_correlation_report([0], requested=0),
+                  "slices": [], "served_from_unrequested_buckets": 5,
+                  "unrequested_buckets": [{"conditions_signature": "OLD", "candidates": 5,
+                                           "built_under": None}]}
+        block = bs.anti_correlation_brief_block(0, report, {}, request={"leverage": {}})
+        self.assertEqual(block["unrequested_built_under"]["allowance_k"], {"unknown": 5})
+        self.assertIsNone(block["unrequested_built_under"]["buckets"][0]["differs_in"])
+        self.assertNotIn("disagreement", block)
+
+    def test_a_partial_facts_entry_reads_as_unknown_and_never_fires(self):
+        """A facts dict with no allowance key (a hand edit, a later shape) is not a
+        fact: read as k=None it would fire 'under k=None' on a bucket whose k is
+        simply unrecorded."""
+        bs = self._bs()
+        report = {"anti_correlation": opt.anti_correlation_report([0], requested=0),
+                  "slices": [], "served_from_unrequested_buckets": 4,
+                  "unrequested_buckets": [{"conditions_signature": "PART", "candidates": 4,
+                                           "built_under": {"target": "ceiling"}}]}
+        block = bs.anti_correlation_brief_block(0, report, {}, request={"leverage": {}})
+        self.assertEqual(block["unrequested_built_under"]["allowance_k"], {"unknown": 4})
+        self.assertIsNone(block["unrequested_built_under"]["buckets"][0]["differs_in"])
+        self.assertNotIn("disagreement", block)
+
+    def test_a_one_bucket_cache_gives_the_brief_it_gave_before(self):
+        """The negative control for every new key: the legacy report shapes give
+        the exact dicts `ebf9333` gave (captured before the change)."""
+        bs = self._bs()
+        acr = opt.anti_correlation_report
+        note = ("a CONVENTION about negative correlation, not a DK rule; `applied` is measured "
+                "from the bank's own solves (R293), never restated from the flag that requested it")
+        unit = "hitters facing ONE rostered SP; per-lineup worst case is twice this on Classic"
+        agree = {"agrees_with_request": True, "applied": 0, "applied_source": "sliced_bank",
+                 "engine_default": 0, "note": note, "observed": [0], "requested": 0,
+                 "served_from_unrequested_buckets": None, "solves_observed": 1, "unit": unit}
+        self.assertEqual(bs.anti_correlation_brief_block(
+            0, {"anti_correlation": acr([0], requested=0), "slices": []}, {}), agree)
+        self.assertEqual(bs.anti_correlation_brief_block(
+            0, {"anti_correlation": acr([0], requested=0), "slices": []}, {},
+            request={"leverage": {}}), agree)
+        for report in ({"served_from_unrequested_buckets": 0},
+                       {"served_from_unrequested_buckets": 0, "unrequested_buckets": []}):
+            self.assertEqual(bs.anti_correlation_brief_block(
+                0, {"anti_correlation": acr([0], requested=0), "slices": [], **report}, {},
+                request={"leverage": {}}),
+                dict(agree, served_from_unrequested_buckets=0))
+        counted = bs.anti_correlation_brief_block(
+            0, {"anti_correlation": acr([0], requested=0), "slices": [],
+                "served_from_unrequested_buckets": 32}, {})
+        self.assertEqual(counted, dict(
+            agree, served_from_unrequested_buckets=32,
+            unmeasured="32 candidate(s) in the served bank sit in conditions buckets this run "
+                       "did not solve for (an earlier run's, on the shared cache; a sleeve "
+                       "bucket the bank already covered is counted here too); `applied` and "
+                       "`agrees_with_request` describe this run's own solves and say nothing "
+                       "about them"))
+        self.assertEqual(bs.anti_correlation_brief_block(
+            3, {"anti_correlation": acr([0, 0], requested=3)}, None),
+            {"agrees_with_request": False, "applied": 0, "applied_source": "sliced_bank",
+             "disagreement": "the build requested k=3 and its bank's solves ran at [0]; the "
+                             "delivered candidates are NOT all built under the requested "
+                             "allowance",
+             "engine_default": 0, "note": note, "observed": [0], "requested": 3,
+             "served_from_unrequested_buckets": None, "solves_observed": 2, "unit": unit})
+
+    # ---- through the sliced door -------------------------------------------
+
+    def _wired(self):
+        """`run_classic` with a faked `run_slate` over the frozen 2026-07-29
+        fixture; `bank_max_candidates` selects the sliced door. Two builds in one
+        harness share one root, so they share one bank cache file."""
+        wiring = DeadlineGovernorWiringTests(
+            "test_the_anti_correlation_flag_reaches_the_controls_the_validator_grades")
+        wiring.setUp()
+        self.addCleanup(wiring.doCleanups)
+        good = {"passed": True, "run_id": "r1", "workflow_valid": True,
+                "selection_certified": True, "allocation_certified": True,
+                "delivered_path": str(wiring._delivered_csv())}
+        return wiring, good
+
+    def _sliced_brief(self, wiring, good, k):
+        code, brief, _calls, err = wiring._run(30, refusal=good, args_overrides={
+            "bank_max_candidates": 60, "max_opposing_hitters_per_sp": k})
+        self.assertEqual(0, code, err[-600:])
+        self.assertEqual("sliced_bank", brief["solve"]["strategy"])
+        return brief
+
+    def test_a_fresh_cache_sliced_build_serves_nothing_it_did_not_request(self):
+        """The requested-set completeness guard (R465 hazard i): every bucket a
+        build creates on a fresh cache, the ordinary slices and the cluster-
+        limited slice included, is in the set `run_classic` calls requested, so
+        a build is never told it was handed what it just built. A repeat of the
+        SAME question names nothing either."""
+        wiring, good = self._wired()
+        for label in ("fresh", "repeat"):
+            brief = self._sliced_brief(wiring, good, 2)
+            block = brief["anti_correlation"]
+            bank = brief["solve"]["bank"]
+            self.assertGreaterEqual(len(bank["slices"]), 3, "ordinary slices and the limited one ran")
+            self.assertEqual(block["served_from_unrequested_buckets"], 0, label)
+            self.assertNotIn("unrequested_built_under", block, label)
+            self.assertNotIn("unmeasured", block, label)
+            self.assertEqual(bank["unrequested_buckets"], [], label)
+
+    def test_a_second_sliced_build_at_another_k_names_the_first_builds_buckets(self):
+        wiring, good = self._wired()
+        first = self._sliced_brief(wiring, good, 2)
+        held = first["solve"]["bank"]["total_candidates"]
+        second = self._sliced_brief(wiring, good, 0)
+        block = second["anti_correlation"]
+        self.assertEqual(block["served_from_unrequested_buckets"], held)
+        named = block["unrequested_built_under"]
+        self.assertEqual(named["allowance_k"], {"2": held})
+        self.assertGreaterEqual(named["buckets_total"], 3,
+                                "the five-stack slice, the ordinary slice and the limited slice")
+        self.assertTrue(all(b["differs_in"] == ["allowance_k"] for b in named["buckets"]))
+        self.assertIn(f"{held} under k=2", block["disagreement"])
+        self.assertIs(block["agrees_with_request"], True, "this run's own solves ran at k=0")
+        self.assertEqual(block["observed"], [0])
+        # the cluster limit rides in the facts of the limited bucket
+        limited = [b for b in named["buckets"] if b["built_under"]["max_selected_from"]]
+        self.assertTrue(limited and limited[0]["built_under"]["max_selected_from"]["m"] >= 1)
+
+    def test_every_sleeve_family_reports_the_bucket_it_creates(self):
+        """What `run_classic` adds to `_requested_sigs` is each sleeve report's
+        `conditions_signature`. A family whose report omitted it would have its
+        lineups counted (and now named, and perhaps flagged) as unrequested on
+        the very build that made them. Every attempted family reports its own
+        bucket, and the buckets in the cache are exactly the ordinary one plus
+        the reported ones (the salary-only family lives in its own file)."""
+        from mlb_engine.optimize import classic_sleeves as cs
+        frame = diverse_projection_frame()
+        with tempfile.TemporaryDirectory() as tmp:
+            full = bank_cache.BankCache(Path(tmp) / "full.json")
+            bank_cache.extend_bank(full, frame, time_budget_s=60)
+            members = ca.consensus_cluster_members(full.as_candidates(None))["member_ids"]
+            thin = bank_cache.BankCache(Path(tmp) / "thin.json")
+            ordinary = bank_cache.extend_bank(thin, frame, time_budget_s=60, max_candidates=2)
+            request = {"active": True, "environment": {"teams": ["T3", "T4"]},
+                       "sleeves": {
+                           cs.SLEEVE_CHALK_FAILS: {"min_candidates": 3},
+                           cs.SLEEVE_ENVIRONMENT: {"min_candidates": 50},
+                           cs.SLEEVE_TAIL: {"expected_entries": 1, "min_candidates_per_team": 2,
+                                            "teams": ["T1"]},
+                           cs.SLEEVE_NAMED_STACK: {"team": "T3", "min": 2, "min_candidates": 3}}}
+            jobs = epi.build_sleeve_jobs(thin, frame, request, consensus_members=members,
+                                         time_budget_s=120)
+            attempted = {name: rep for name, rep in jobs["sleeves"].items() if rep.get("attempted")}
+            self.assertEqual(sorted(attempted), sorted([
+                cs.SLEEVE_CHALK_FAILS, cs.SLEEVE_ENVIRONMENT, cs.SLEEVE_TAIL,
+                cs.SLEEVE_NAMED_STACK]), jobs)
+            for name, rep in attempted.items():
+                self.assertTrue(rep.get("conditions_signature"), f"{name} reports no bucket")
+            reported = {rep["conditions_signature"] for rep in attempted.values()}
+            live = set(thin.live_buckets())
+            self.assertLessEqual(live - {ordinary["conditions_signature"]}, reported,
+                                 "a bucket in the cache that no family reported")
+            for name, rep in attempted.items():
+                if rep.get("built"):
+                    self.assertIn(rep["conditions_signature"], live, name)
+            # a family that found the bank already holding enough builds nothing
+            # and reports no bucket: its earlier bucket is the one a repeat build
+            # counts as unrequested (named, same question, silent)
+            again = epi.build_sleeve_jobs(thin, frame, request, consensus_members=members,
+                                          time_budget_s=120)
+            for rep in again["sleeves"].values():
+                if not rep.get("attempted"):
+                    self.assertNotIn("conditions_signature", rep)
+
+    def test_the_brief_lists_at_most_eight_buckets_and_counts_the_rest(self):
+        bs = self._bs()
+        rows = [{"conditions_signature": f"S{n:02d}", "candidates": n,
+                 "built_under": dict(bank_cache.conditions_facts([], 4, 5, 2), excludes_count=0)}
+                for n in range(12, 0, -1)]
+        block = bs.anti_correlation_brief_block(
+            0, {"anti_correlation": opt.anti_correlation_report([0], requested=0), "slices": [],
+                "served_from_unrequested_buckets": sum(r["candidates"] for r in rows),
+                "unrequested_buckets": rows}, {})
+        named = block["unrequested_built_under"]
+        self.assertEqual(len(named["buckets"]), 8)
+        self.assertEqual(named["buckets_total"], 12)
+        self.assertEqual(named["allowance_k"], {"2": 78}, "the tally covers every bucket")
+        self.assertEqual([b["candidates"] for b in named["buckets"]], [12, 11, 10, 9, 8, 7, 6, 5])
+
+
+class LockedColumnTests(unittest.TestCase):
+    """R455. `Locked` was a core projection column with no reader: a `Locked=True`
+    cell locked nobody, silently (Otto Kemp, 1B/OF at $2,000, left out with the
+    objective unchanged while `locks=[id]` seats him). The decision rule was to
+    drop the column from the contract when its portfolio interaction cannot be
+    made honest inside the row, and it cannot: a frame lock puts the player in
+    EVERY bank candidate, the allocator's R311 check then needs
+    `max_player_exposure_pct` at 1.0 for him and for everyone, and an honest
+    wire needs a per-player exemption in the allocator. So the column leaves the
+    contract and a True cell is COUNTED and NAMED as ignored, never silent. The
+    two default writers stay (frame bytes, and every cache digest, stay put).
+    """
+
+    @staticmethod
+    def _frame():
+        return diverse_projection_frame()
+
+    @staticmethod
+    def _unused_hitter(frame, lineup):
+        used = set(lineup.Player_ID.astype(str))
+        return next(str(p) for p, pos in zip(frame.Player_ID, frame.Position)
+                    if pos != "P" and str(p) not in used)
+
+    def test_a_frame_without_locked_passes_the_schema(self):
+        frame = self._frame().drop(columns=["Locked"])
+        report = opt.validate_projection_schema(frame)
+        self.assertTrue(report["passed"], report)
+        self.assertEqual(report["missing_core_fields"], [])
+        self.assertNotIn("Locked", opt.CORE_PROJECTION_FIELDS)
+        # negative control: the boundary still refuses a frame missing a core column
+        broken = opt.validate_projection_schema(frame.drop(columns=["Excluded"]))
+        self.assertFalse(broken["passed"])
+        self.assertEqual(broken["missing_core_fields"], ["Excluded"])
+        # and a frame that still carries the column (every writer's default) passes unchanged
+        carried = opt.validate_projection_schema(self._frame())
+        self.assertTrue(carried["passed"])
+        self.assertNotIn("ignored_columns", carried)
+
+    def test_a_true_locked_cell_locks_nobody_and_is_counted(self):
+        frame = self._frame()
+        base_lineup, base_obj = opt.build_single_lineup(frame, target="ceiling")
+        pid = self._unused_hitter(frame, base_lineup)
+        locked = frame.copy()
+        locked.loc[locked.Player_ID == pid, "Locked"] = True
+        lineup, obj = opt.build_single_lineup(locked, target="ceiling")
+        self.assertEqual(list(lineup.Player_ID), list(base_lineup.Player_ID))
+        self.assertEqual(obj, base_obj, "the objective is unchanged: the cell locks nobody")
+        self.assertNotIn(pid, set(lineup.Player_ID.astype(str)))
+        prepared, _ = opt._prepare_single_lineup_df(locked, target="ceiling")
+        self.assertEqual(len(prepared), len(locked), "not a pool trim")
+        report = opt.validate_projection_schema(locked)
+        self.assertTrue(report["passed"])
+        self.assertEqual(report["ignored_columns"]["Locked"]["true_cells"], 1)
+        self.assertEqual(report["ignored_columns"]["Locked"]["player_ids"], [pid])
+        self.assertIn("locks", report["ignored_columns"]["Locked"]["note"])
+        # the contrast that keeps a later wiring a deliberate act: the argument seats him
+        seated, _ = opt.build_single_lineup(frame, target="ceiling", locks=[pid])
+        self.assertIn(pid, set(seated.Player_ID.astype(str)))
+
+    def test_blank_false_nan_and_empty_locked_cells_are_not_counted(self):
+        frame = self._frame().head(8).copy()
+        for value in (False, "", None, float("nan"), "false", "no", 0, "  "):
+            with self.subTest(value=repr(value)):
+                frame["Locked"] = pd.Series([value] * len(frame), dtype=object)
+                self.assertEqual(opt.ignored_frame_columns(frame), {})
+                self.assertNotIn("ignored_columns", opt.validate_projection_schema(
+                    self._frame().assign(Locked=value)))
+        for value in (True, "TRUE", "yes", 1, "x"):
+            with self.subTest(value=repr(value)):
+                frame["Locked"] = pd.Series([value] * len(frame), dtype=object)
+                self.assertEqual(
+                    opt.ignored_frame_columns(frame)["Locked"]["true_cells"], len(frame))
+        self.assertEqual(opt.ignored_frame_columns(frame.drop(columns=["Locked"])), {})
+        self.assertEqual(opt.ignored_frame_columns(None), {})
+        many = self._frame().assign(Locked=True)
+        self.assertEqual(len(opt.ignored_frame_columns(many)["Locked"]["player_ids"]), 10,
+                         "the ids are capped; the count is not")
+        self.assertEqual(opt.ignored_frame_columns(many)["Locked"]["true_cells"], len(many))
+
+    def test_locked_and_excluded_on_one_row_the_excluded_path_wins_unchanged(self):
+        frame = self._frame()
+        base_lineup, base_obj = opt.build_single_lineup(frame, target="ceiling")
+        pid = str(base_lineup.Player_ID.iloc[3])
+        both = frame.copy()
+        both.loc[both.Player_ID == pid, ["Excluded", "Locked"]] = True
+        only_excluded = frame.copy()
+        only_excluded.loc[only_excluded.Player_ID == pid, "Excluded"] = True
+        a, obj_a = opt.build_single_lineup(both, target="ceiling")
+        b, obj_b = opt.build_single_lineup(only_excluded, target="ceiling")
+        self.assertEqual(list(a.Player_ID), list(b.Player_ID))
+        self.assertEqual(obj_a, obj_b)
+        self.assertNotIn(pid, set(a.Player_ID.astype(str)))
+        # the Excluded reader's own report is what it was (frozen from ebf9333)
+        mixed = pd.DataFrame({"Player_ID": list("abcdefgh"),
+                              "Excluded": [True, False, "", "yes", "no", None, "maybe", 1]})
+        flags, report = opt.excluded_flags(mixed)
+        self.assertEqual([bool(x) for x in flags],
+                         [True, False, False, True, False, False, False, True])
+        self.assertEqual(report["excluded_true"], 3)
+        self.assertEqual(report["unrecognized_values"], ["maybe"])
+
+    def test_no_production_writer_sets_locked_true(self):
+        """R233. Every writer of the column writes False; a truthy literal would
+        be the first operator-visible control the engine does not read."""
+        repo = Path(__file__).resolve().parents[1]
+        found = []
+        for root in ("mlb_engine", "skills", "tools"):
+            for path in sorted((repo / root).rglob("*.py")):
+                if any(part.startswith("_scratch") for part in path.parts):
+                    continue
+                src = path.read_text(encoding="utf-8")
+                if "Locked" not in src:
+                    continue
+                for node in ast.walk(ast.parse(src)):
+                    value = None
+                    if isinstance(node, ast.Dict):
+                        for k, v in zip(node.keys, node.values):
+                            # a nested dict is the schema report's own `{"Locked": {...}}`
+                            # (what the engine IGNORED), never a cell written into a frame
+                            if (isinstance(k, ast.Constant) and k.value == "Locked"
+                                    and not isinstance(v, ast.Dict)):
+                                value = v
+                    elif isinstance(node, ast.Assign):
+                        for target in node.targets:
+                            if (isinstance(target, ast.Subscript)
+                                    and isinstance(target.slice, ast.Constant)
+                                    and target.slice.value == "Locked"):
+                                value = node.value
+                    elif isinstance(node, ast.keyword) and node.arg == "Locked":
+                        value = node.value
+                    if value is not None:
+                        found.append((str(path.relative_to(repo)).replace("\\", "/"),
+                                      ast.get_source_segment(src, value)))
+                        self.assertFalse(
+                            isinstance(value, ast.Constant) and bool(value.value),
+                            f"{path} writes Locked truthy")
+        self.assertEqual(sorted(found), [
+            ("mlb_engine/intake/slate_intake_manager.py", "False"),
+            ("mlb_engine/projections/projection_builder.py", "False"),
+        ])
+
+    def test_the_contract_docs_no_longer_list_locked_as_a_column(self):
+        repo = Path(__file__).resolve().parents[1]
+        classic = (repo / "MLB_Classic.md").read_text(encoding="utf-8")
+        contract = (repo / "docs" / "MLB_Classic_Integration_Contract.md").read_text(
+            encoding="utf-8")
+        self.assertNotIn("Excluded, Locked", classic)
+        self.assertNotIn("Excluded, Locked", contract)
+        self.assertNotIn("Excluded,\nLocked", contract)
+        self.assertIn("`Player_ID, Name, Team, Opponent, Position, Salary, Game_ID, Floor, "
+                      "Ceiling, Excluded`", classic)
+        for text in (classic, contract):
+            self.assertIn("locked_slot_assignments", text)
+        # the late-swap-pin sense of "locked" is untouched
+        self.assertIn("Locked players remain in their exact DraftKings slots.", classic)
+
+    def test_an_assembled_frame_never_carries_a_true_locked_cell(self):
+        """The premise behind 'a True cell is counted in the schema report and not
+        the brief': `_assemble_projection_frame` builds a fixed key set per row, so
+        an operator's `Locked` cell cannot reach a `run_slate` build at all."""
+        with tempfile.TemporaryDirectory() as tmp:
+            salary = Path(tmp) / "salary.csv"
+            write_salary(salary)
+            rows = [{"Player_ID": raw[3], "Base": 10.0, "Locked": True}
+                    for raw in salary_rows()]
+            frame, _ = epi._assemble_projection_frame(
+                str(salary), rows, "emergency_proxy", None, None, None)
+        self.assertIn("Locked", frame.columns)
+        self.assertFalse(bool(frame["Locked"].any()))
+
+
+class LowOwnedCounterTests(unittest.TestCase):
+    """R197. `_low_owned_hitter_count` counted `Ownership_Tier == 'Low'` and every
+    writer writes 'Mid', so the diagnostic was identically 0 while R154's
+    constraint counted the real thing (`Projected_Ownership_Pct` strictly below
+    the build's threshold, hitters by the slot's required position): five
+    hitters at 4.0% were 5 by the constraint and 0 by the diagnostic, and a
+    build that satisfied `min_low_owned_hitters` 3 reported 0 in its own
+    records. One definition (`_row_is_low_owned`) is now read by both, and the
+    brief's `leverage` block carries what the delivered entries realized. The
+    other readers of the unwritten tier are NOT rewired here (a strategy call):
+    the last test pins them.
+    """
+
+    @staticmethod
+    def _frame():
+        frame = diverse_projection_frame()
+        frame["Projected_Ownership_Pct"] = [2.0 + ((i * 7) % 25) for i in range(len(frame))]
+        return frame
+
+    @staticmethod
+    def _independent(lineup, threshold):
+        """The constraint's measure, written out: hitters by REQUIRED position
+        (never the slot name), predicted ownership strictly below the bar."""
+        return sum(1 for _, r in lineup.iterrows()
+                   if r["Assigned_Position"] in opt.HITTER_POSITIONS
+                   and float(r["Projected_Ownership_Pct"]) < threshold)
+
+    def _five_at_four(self):
+        lineup, _ = opt.build_single_lineup(self._frame(), target="ceiling")
+        lineup = lineup.copy()
+        lineup["Projected_Ownership_Pct"] = 20.0
+        hitters = [i for i, r in lineup.iterrows() if r["Assigned_Position"] != "P"]
+        lineup.loc[hitters[:5], "Projected_Ownership_Pct"] = 4.0
+        lineup.loc[[i for i in lineup.index if i not in hitters],
+                   "Projected_Ownership_Pct"] = 1.0           # pitchers: never counted
+        return lineup
+
+    def test_five_hitters_at_four_percent_count_five(self):
+        lineup = self._five_at_four()
+        self.assertEqual(self._independent(lineup, opt.DEFAULT_LOW_OWNED_THRESHOLD_PCT), 5)
+        self.assertEqual(opt._low_owned_hitter_count(lineup), 5, "HEAD read 0")
+        # a build threshold below 4.0 makes them NOT low, on the same definition
+        self.assertEqual(opt._low_owned_hitter_count(lineup, 3.0), 0)
+        # negative control: five hitters at 20% count none
+        chalk = lineup.copy()
+        chalk["Projected_Ownership_Pct"] = 20.0
+        self.assertEqual(opt._low_owned_hitter_count(chalk), 0)
+
+    def test_the_counter_equals_the_constraints_measure(self):
+        frame = self._frame()
+        solved = 0
+        for floor in (1, 2, 3, 4):
+            for threshold in (None, 6.0, 15.0):
+                with self.subTest(floor=floor, threshold=threshold):
+                    kwargs = {"min_low_owned_hitters": floor}
+                    if threshold is not None:
+                        kwargs["low_owned_threshold_pct"] = threshold
+                    lineup, _ = opt.build_single_lineup(frame, target="ceiling", **kwargs)
+                    if lineup is None:      # a floor this frame cannot reach at that bar
+                        continue
+                    solved += 1
+                    bar = threshold if threshold is not None else opt.DEFAULT_LOW_OWNED_THRESHOLD_PCT
+                    counted = opt._low_owned_hitter_count(lineup, threshold)
+                    self.assertEqual(counted, self._independent(lineup, bar))
+                    self.assertGreaterEqual(counted, floor,
+                                            "a build that satisfied the floor reports it")
+        self.assertGreaterEqual(solved, 8, "most combinations are feasible on this frame")
+        # the boundary: strict <, on both sides of the one definition
+        row = frame.iloc[8].copy()
+        for pct, low in ((9.99, True), (10.0, False), (10.01, False)):
+            row["Projected_Ownership_Pct"] = pct
+            self.assertIs(opt._row_is_low_owned(row), low, pct)
+        self.assertIs(opt._row_is_low_owned(row, 10.01), False, "strict: equal is not low")
+        self.assertIs(opt._row_is_low_owned(row, 10.5), True)
+
+    def test_pitchers_are_never_counted_by_the_slot_name(self):
+        """R154's own bring-up trap: the slot vocabulary is P1/P2, so `slot != 'P'`
+        is true for both pitcher slots."""
+        lineup = self._five_at_four()
+        self.assertEqual(
+            sum(1 for _, r in lineup.iterrows()
+                if r["Assigned_Position"] == "P" and r["Projected_Ownership_Pct"] < 10), 2)
+        self.assertEqual(opt._low_owned_hitter_count(lineup), 5)
+
+    def test_a_frame_with_no_prior_counts_zero_and_the_floor_is_unreachable_in_the_solver(self):
+        frame = diverse_projection_frame()          # no Projected_Ownership_Pct, tier absent
+        lineup, _ = opt.build_single_lineup(frame, target="ceiling")
+        self.assertEqual(opt._low_owned_hitter_count(lineup), 0)
+        status = opt._new_solver_status()
+        result, _ = opt.build_single_lineup(frame, target="ceiling", min_low_owned_hitters=1,
+                                            status_out=status)
+        self.assertIsNone(result)
+        self.assertEqual(status["status"], "low_owned_floor_unreachable",
+                         "both read the same 12.0 fallback, so both say nobody is low")
+
+    def test_the_leverage_constraint_rows_are_unchanged(self):
+        """Frozen from ebf9333 (captured before the edit): the helper the
+        constraint now calls compares exactly what the inline expression did."""
+        frame = self._frame()
+        configs = {
+            "cap90": ({"max_cumulative_ownership_pct": 90}, 162.0,
+                      ["21002", "21019", "21020", "21001", "21022", "21023", "21006",
+                       "20001", "20003", "21005"]),
+            "floor2": ({"min_low_owned_hitters": 2}, 172.0,
+                       ["21026", "21027", "21004", "21025", "21006", "21031", "21032",
+                        "20004", "20001", "21005"]),
+            "floor3_thr6_cap100": ({"min_low_owned_hitters": 3, "low_owned_threshold_pct": 6.0,
+                                    "max_cumulative_ownership_pct": 100}, 163.0,
+                                   ["21018", "21019", "21020", "21001", "21022", "21008",
+                                    "21006", "20001", "20003", "21005"]),
+        }
+        for name, (kwargs, objective, ids) in configs.items():
+            with self.subTest(config=name):
+                lineup, obj = opt.build_single_lineup(frame, target="ceiling", **kwargs)
+                self.assertEqual(round(float(obj), 6), objective)
+                self.assertEqual(list(lineup.sort_values("Assigned_Slot").Player_ID.astype(str)),
+                                 ids)
+
+    def test_a_build_threshold_reaches_the_record(self):
+        """The register's fix ('read it against the module default') disagrees with
+        the constraint on any build that passes its own threshold (1605_2g used
+        6.0). Both bank builders hand the build's bar to the scorer, at all four
+        call sites: the base bank's two and the augmentation's two (`requested_n=1`
+        with a `coverage_target` makes the augmentation pass append candidates)."""
+        frame = self._frame()
+        seen = Counter()
+        real = opt.score_lineup_candidate
+
+        def spy(*args, **kwargs):
+            seen[kwargs.get("low_owned_threshold_pct")] += 1
+            return real(*args, **kwargs)
+
+        args = dict(requested_n=1, mode="gpp", target="ceiling",
+                    contest_shapes=["large_field_gpp"], coverage_target=12,
+                    min_low_owned_hitters=1)
+        with unittest.mock.patch.object(opt, "score_lineup_candidate", spy):
+            bank = opt.build_diverse_candidate_bank(frame, low_owned_threshold_pct=6.0, **args)
+        records = bank["candidate_lineups"]
+        self.assertIn("diversity_augmentation", {r.get("source") for r in records},
+                      "the augmentation pass scored too, so all four sites ran")
+        self.assertEqual(set(seen), {6.0}, "no scorer call dropped the bar")
+        self.assertGreaterEqual(sum(seen.values()), 2 * len(records),
+                                "the base and shape scores of every record")
+        at_six = {self._independent(r["lineup"], 6.0) for r in records}
+        at_ten = {self._independent(r["lineup"], 10.0) for r in records}
+        self.assertNotEqual(at_six, at_ten, "the frame separates the two bars")
+        for r in records:
+            self.assertEqual(r["contest_fit"]["low_owned_hitter_count"],
+                             self._independent(r["lineup"], 6.0))
+        # no bar of its own: the module default, on the same definition
+        plain = opt.build_diverse_candidate_bank(frame, **args)
+        for r in plain["candidate_lineups"]:
+            self.assertEqual(r["contest_fit"]["low_owned_hitter_count"],
+                             self._independent(r["lineup"], opt.DEFAULT_LOW_OWNED_THRESHOLD_PCT))
+
+    # ---- the brief ---------------------------------------------------------
+
+    @staticmethod
+    def _entries(tmp, rosters):
+        path = Path(tmp) / "delivered.csv"
+        header = "Entry ID,Contest Name,Contest ID,Entry Fee," + ",".join(
+            ["P", "P", "C", "1B", "2B", "3B", "SS", "OF", "OF", "OF"]) + "\n"
+        body = "".join(f"{5000 + i},Test,9,$1.00," + ",".join(ids) + "\n"
+                       for i, ids in enumerate(rosters))
+        path.write_text(header + body, encoding="utf-8")
+        return path
+
+    def test_leverage_realized_reports_the_entries_it_was_handed(self):
+        bs = BankCapPerBucketTests._build_slate()
+        frame = diverse_projection_frame()
+        own = {str(p): 10.0 for p in frame.Player_ID}
+        # two pitchers are low-owned too: the count is over HITTER slots only
+        own.update({"21001": 4.0, "21002": 4.0, "21009": 4.0, "20001": 30.0,
+                    "20002": 3.0, "20004": 2.0})
+        frame["Projected_Ownership_Pct"] = [own[str(p)] for p in frame.Player_ID]
+        rosters = [
+            ["20001", "20002", "21001", "21009", "21010", "21011", "21012", "21013", "21014", "21015"],
+            ["20003", "20004", "21017", "21018", "21019", "21020", "21021", "21022", "21023", "21024"],
+            ["20001", "20003", "21001", "21002", "21003", "21004", "21005", "21006", "21007", "21008"],
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._entries(tmp, rosters + [["99999"] * 10])
+            leverage = {"max_cumulative_ownership_pct": 100, "min_low_owned_hitters": 1,
+                        "low_owned_threshold_pct": 6.0, "own_pct_by_player_id": {"1": 1.0},
+                        "source": "x.json"}
+            realized = bs.leverage_realized(path, frame, leverage)
+            sums = [sum(own[p] for p in r) for r in rosters]
+            self.assertEqual(realized["entries"], 3)
+            self.assertEqual(realized["entries_unresolved"], 1)
+            self.assertEqual(realized["threshold_pct"], 6.0)
+            cum = realized["cumulative_ownership_pct"]
+            self.assertEqual((cum["min"], cum["median"], cum["max"]),
+                             (min(sums), sorted(sums)[1], max(sums)))
+            low = realized["low_owned_hitters"]
+            # hitters are slots 2..9; a low-owned pitcher (3.0, 2.0) never counts
+            expected = [sum(1 for p in r[2:] if own[p] < 6.0) for r in rosters]
+            self.assertEqual((low["min"], low["max"]), (min(expected), max(expected)))
+            self.assertEqual(sum(low["distribution"].values()), 3)
+            self.assertEqual(realized["entries_meeting_floor"], sum(1 for n in expected if n >= 1))
+            self.assertIn("labeled prior", realized["source"])
+            # cap_bound: true within 1.0 point (inclusive), false beyond, null with no cap
+            top = max(sums)
+            for cap, want in ((top, True), (top + 1.0, True), (top + 1.01, False), (None, None)):
+                got = bs.leverage_realized(
+                    path, frame, {**leverage, "max_cumulative_ownership_pct": cap})
+                self.assertIs(got["cap_bound"], want, cap)
+            # a player the frame has no prior for reads the 12.0 the constraint reads
+            gap = frame.copy()
+            gap.loc[gap.Player_ID == "21010", "Projected_Ownership_Pct"] = float("nan")
+            again = bs.leverage_realized(path, gap, leverage)["cumulative_ownership_pct"]
+            gap_sums = [sum(12.0 if p == "21010" else own[p] for p in r) for r in rosters]
+            self.assertEqual((again["min"], again["median"], again["max"]),
+                             (min(gap_sums), sorted(gap_sums)[1], max(gap_sums)))
+
+    def _leverage_wiring(self):
+        """`run_classic` over the frozen fixture with a faked `run_slate`, a delivered
+        file that is legal AND inside the pool `run_slate` was handed (the fixture's
+        own file takes the cheapest players of the whole salary file, most of whom a
+        real pool never holds), and a synthetic ownership prior in a temp dir (no test
+        may read Ben's disk). Returns `(wiring, good, prior, off_brief)`."""
+        wiring = DeadlineGovernorWiringTests(
+            "test_the_anti_correlation_flag_reaches_the_controls_the_validator_grades")
+        wiring.setUp()
+        self.addCleanup(wiring.doCleanups)
+        good = {"passed": True, "run_id": "r1", "workflow_valid": True,
+                "selection_certified": True, "allocation_certified": True,
+                "delivered_path": str(wiring._delivered_csv())}
+        code, off_brief, _calls, err = wiring._run(30, refusal=good)
+        self.assertEqual(code, 0, err[-600:])
+        with wiring._SALARY.open(encoding="utf-8-sig", newline="") as fh:
+            salary_rows_ = list(csv.DictReader(fh))
+        ids = [row["ID"] for row in salary_rows_]
+        pool = {str(r["Player_ID"]) for r in wiring.solve_kwargs[0]["projection_rows"]}
+        chosen, teams = [], {}
+        for slot in wiring._SLOTS:
+            for row in sorted(salary_rows_, key=lambda r: (int(r["Salary"]), r["ID"])):
+                if (row["ID"] not in pool or row in chosen
+                        or slot not in str(row["Roster Position"]).split("/")):
+                    continue
+                if slot != "P" and teams.get(row["TeamAbbrev"], 0) >= 5:
+                    continue
+                chosen.append(row)
+                if slot != "P":
+                    teams[row["TeamAbbrev"]] = teams.get(row["TeamAbbrev"], 0) + 1
+                break
+        self.assertEqual(len(chosen), 10, "the pool holds a legal lineup")
+        wiring._legal_ids = lambda: [r["ID"] for r in chosen]
+        good = dict(good, delivered_path=str(wiring._delivered_csv()))
+        prior = Path(wiring.root) / "ownership_pred.json"
+        prior.write_text(json.dumps({"archetypes": {"large_field_gpp": {
+            "own_pct_by_player_id": {pid: 1.0 + (i % 13) for i, pid in enumerate(ids)}}}}),
+            encoding="utf-8")
+        return wiring, good, prior, off_brief
+
+    def test_the_brief_leverage_block_gains_realized_only_when_applied(self):
+        """Through `run_classic`: the off block is exactly what it was (R246, pinned
+        again at `test_core.py:5009`), and a `--leverage` build's block carries
+        `realized` and `cap_bound` read off the DELIVERED file."""
+        wiring, good, prior, off_brief = self._leverage_wiring()
+        self.assertEqual(off_brief["leverage"],
+                         {"applied": False, "reason": "no --leverage supplied"})
+        for constraints, cap_bound in (({"max_cumulative_ownership_pct": 400}, False),
+                                       ({"max_cumulative_ownership_pct": 1.0}, True),
+                                       ({"min_low_owned_hitters": 1}, None)):
+            with self.subTest(constraints=constraints):
+                code, brief, _calls, err = wiring._run(30, refusal=good, args_overrides={
+                    "leverage": {"archetype": "large_field_gpp", **constraints},
+                    "ownership_pred": str(prior)})
+                self.assertEqual(code, 0, err[-600:])
+                block = brief["leverage"]
+                self.assertIs(block["applied"], True)
+                self.assertIs(block["cap_bound"], cap_bound,
+                              "null with no cap, never false for 'nothing to compare'")
+                realized = block["realized"]
+                self.assertEqual(realized["entries"], 2)
+                self.assertEqual(realized["entries_unresolved"], 0)
+                self.assertEqual(realized["threshold_pct"], 10.0)
+                cum = realized["cumulative_ownership_pct"]
+                self.assertEqual(cum["min"], cum["max"], "both entries carry one lineup")
+                self.assertEqual(sum(realized["low_owned_hitters"]["distribution"].values()), 2)
+                self.assertNotIn("cap_bound", realized)
+                self.assertEqual(block["constraints"]["max_cumulative_ownership_pct"],
+                                 constraints.get("max_cumulative_ownership_pct"))
+
+    def test_a_failed_realized_block_says_so_and_keeps_cap_bound_present(self):
+        """The guarded call never withholds a brief, and the block keeps its shape
+        when it fails: `realized` carries the error and `cap_bound` is present and
+        null (R237), not a missing key."""
+        wiring, good, prior, _off = self._leverage_wiring()
+        captured = {}
+
+        def boom(*_args, **_kwargs):
+            raise RuntimeError("synthetic failure")
+
+        code, brief, _calls, err = wiring._run(
+            30, refusal=good, capture=captured,
+            on_call=lambda _kw: setattr(captured["mod"], "leverage_realized", boom),
+            args_overrides={"leverage": {"archetype": "large_field_gpp",
+                                         "max_cumulative_ownership_pct": 400},
+                            "ownership_pred": str(prior)})
+        self.assertEqual(code, 0, err[-600:])
+        block = brief["leverage"]
+        self.assertIs(block["applied"], True)
+        self.assertEqual(block["realized"], {"error": "RuntimeError: synthetic failure"})
+        self.assertIn("cap_bound", block)
+        self.assertIsNone(block["cap_bound"])
+
+    def test_the_other_tier_reads_are_unchanged(self):
+        """c2 is NOT rewired: these outputs are what ebf9333 gave (frozen), so the
+        field-pressure term, the chalk one-off label and the priority key still read
+        the never-written tier, and GOLD is the second guard."""
+        frame = diverse_projection_frame()
+        frame["Notes"] = ""
+        frame["Ownership_Tier"] = "Mid"
+        lineup, _ = opt.build_single_lineup(frame, target="ceiling")
+        self.assertEqual({t: opt._ownership_priority(t) for t in ("Low", "Mid", "High", "weird")},
+                         {"Low": 0, "Mid": 1, "High": 2, "weird": 99})
+        primary = opt._identify_primary_stack(lineup)
+        self.assertEqual(opt._classify_chalk_one_off(
+            lineup, primary, opt._identify_secondary_stack(lineup, primary)), "stack-only")
+        pressure = opt.compute_field_pressure_score(lineup)
+        self.assertEqual(pressure["high_owned_one_offs"], 0)
+        self.assertEqual(pressure["ownership_sum_pct"], 120.0, "the flat 12.0 fallback, 10 players")
+        self.assertEqual(pressure["field_pressure_score"], 4.55)
+
+
 class AutobuildBankCapTests(unittest.TestCase):
     """R415. autobuild raises a capped bank's cap on a refusal, as search effort.
 

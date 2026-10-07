@@ -1644,7 +1644,7 @@ def optimizer_shell_preflight(players: Sequence[SalaryPlayer]) -> Dict[str, Any]
             "Ceiling": 10.0 if "P" not in p.positions else 15.0,
             "Ownership_Tier": "Mid",
             "Confidence_Tier": "NeutralShell",
-            "Locked": False,
+            "Locked": False,  # R455: inert, kept for frame-byte stability
             # R289: KEPT hardcoded, and this is the one of the two sites the
             # post-mortem named that should NOT change. This is the NEUTRAL
             # feasibility shell: it asks whether the salary file's

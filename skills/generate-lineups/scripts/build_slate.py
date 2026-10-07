@@ -3615,7 +3615,90 @@ def salary_cross_check_note(clock: dict) -> str | None:
     )
 
 
-def anti_correlation_brief_block(requested, bank_report, result) -> dict:
+#: R465. How many unrequested buckets the brief lists by name; the rest are
+#: counted in `buckets_total`.
+UNREQUESTED_BUCKETS_LISTED = 8
+
+
+def unrequested_built_under_block(buckets, effective_k, request=None) -> tuple:
+    """R465. ``(block, problems)`` for the unrequested buckets a sliced door serves.
+
+    ``buckets`` is ``BankCache.describe_outside_buckets``: each row says how many
+    candidates a bucket holds and what it was built under (``built_under``, or
+    None when the cache file predates the facts). A known bucket is compared with
+    the BUILD-LEVEL request: the allowance ``effective_k``, and, when ``request``
+    is given, ``target`` and the leverage keys. These are the inputs every slice
+    of one build shares (the sleeve, limited and pair builders forward the same
+    ``leverage`` and k and none passes a target), so a difference is a bucket
+    that answered another question. The per-slice inputs (stack bounds, cluster
+    limit, teams, named stack, excludes) are named, never compared: the build's
+    own requested buckets differ from one another in exactly those. An unknown
+    bucket is counted under ``unknown`` and never fires.
+    """
+    from mlb_engine.optimize.bank_cache import _leverage_kwargs  # lazy: no engine at load
+    asked = (_leverage_kwargs((request or {}).get("leverage"))
+             if request is not None else None)
+    asked_target = (request or {}).get("target", "ceiling") if request is not None else None
+    allowance: dict = {}
+    listed = []
+    by_what: dict = {}
+    for row in buckets or []:
+        facts = row.get("built_under")
+        if facts is not None and "max_opposing_hitters_per_sp" not in facts:
+            facts = None        # a partial entry (a hand edit, a later shape) is not a fact
+        n = int(row.get("candidates") or 0)
+        differs = None
+        if facts is None:
+            allowance["unknown"] = allowance.get("unknown", 0) + n
+        else:
+            k = facts.get("max_opposing_hitters_per_sp")
+            allowance[str(k)] = allowance.get(str(k), 0) + n
+            differs = []
+            if k != effective_k:
+                differs.append("allowance_k")
+                by_what.setdefault("allowance_k", {}).setdefault(f"k={k}", 0)
+                by_what["allowance_k"][f"k={k}"] += n
+            if request is not None:
+                if facts.get("target") != asked_target:
+                    differs.append("target")
+                    by_what.setdefault("target", {}).setdefault(
+                        f"target {facts.get('target')}", 0)
+                    by_what["target"][f"target {facts.get('target')}"] += n
+                if (facts.get("leverage") or {}) != asked:
+                    differs.append("leverage")
+                    label = f"leverage {json.dumps(facts.get('leverage') or {}, sort_keys=True)}"
+                    by_what.setdefault("leverage", {}).setdefault(label, 0)
+                    by_what["leverage"][label] += n
+        listed.append({"conditions_signature": row.get("conditions_signature"),
+                       "candidates": n, "built_under": facts, "differs_in": differs})
+    block = {
+        "allowance_k": dict(sorted(allowance.items())),
+        "buckets": listed[:UNREQUESTED_BUCKETS_LISTED],
+        "buckets_total": len(listed),
+        "note": "what each served bucket was built under, from the facts "
+                "`extend_bank` registered beside the cache's conditions index; "
+                "`unknown` is a bucket a file written before R465 holds, never a guess",
+    }
+    problems = []
+    if by_what:
+        parts = []
+        for what in ("allowance_k", "target", "leverage"):
+            if what in by_what:
+                parts.append(", ".join(f"{n} under {label}"
+                                       for label, n in sorted(by_what[what].items())))
+        wanted = [f"k={effective_k}"]
+        if request is not None:
+            wanted += [f"target {asked_target}", f"leverage {json.dumps(asked, sort_keys=True)}"]
+        problems.append(
+            f"the served bank holds candidates built under another question than this "
+            f"build requested ({' / '.join(wanted)}): {'; '.join(parts)}; they are NOT "
+            f"all built under the requested conditions and the allocator can seat them "
+            f"(see `unrequested_built_under`); `agrees_with_request` describes this "
+            f"run's own solves only")
+    return block, problems
+
+
+def anti_correlation_brief_block(requested, bank_report, result, request=None) -> dict:
     """The brief's `anti_correlation`, with `applied` READ OFF THE SOLVES.
 
     R293. This block used to write `applied` from `args.max_opposing_hitters_per_sp`
@@ -3638,6 +3721,11 @@ def anti_correlation_brief_block(requested, bank_report, result) -> dict:
     `applied` is also null when the observed values DISAGREE, with the values
     listed. That is the R293 condition itself, and a brief that averaged it or
     picked one would be the same lie in a new place.
+
+    R465. ``request`` is the build-level request beyond the allowance
+    (``{"target": ..., "leverage": <the --leverage mapping>}``); with it, the
+    served unrequested buckets are compared on target and leverage as well as k.
+    ``None`` (every caller before R465) compares k alone.
     """
     from mlb_engine.optimize.optimizer_v3 import ANTI_CORRELATION_DEFAULT_MAX
 
@@ -3713,6 +3801,19 @@ def anti_correlation_brief_block(requested, bank_report, result) -> dict:
                 f"so nothing was solved for them under that allowance; raise "
                 f"--bank-max-candidates (counted {[s.get('cap_counted') for s in starved]} "
                 f"against {[s.get('max_candidates') for s in starved]})")
+    # R465. The served buckets this build did not request, NAMED by what they
+    # were built under, and compared with the build-level request. Present only
+    # when the sliced door serves some AND the report carries the bucket list,
+    # so a one-bucket cache, the direct door and every legacy report shape give
+    # the block they always gave. `agrees_with_request` is untouched on purpose:
+    # it is a fact about this run's own solves.
+    served_buckets = ((bank_report or {}).get("unrequested_buckets")
+                      if source == "sliced_bank" else None)
+    if served_buckets:
+        named, named_problems = unrequested_built_under_block(
+            served_buckets, effective, request)
+        block["unrequested_built_under"] = named
+        problems.extend(named_problems)
     if problems:
         block["disagreement"] = "; ".join(problems)
     # R453. Stated beside the count rather than left for a reader to connect:
@@ -4355,6 +4456,10 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         if consensus_pair_jobs.get("conditions_signature"):  # R469
             _requested_sigs.add(consensus_pair_jobs["conditions_signature"])
         bank_report["served_from_unrequested_buckets"] = cache.count_outside_buckets(
+            _requested_sigs)
+        # R465. The same buckets, NAMED: what each was built under (the facts
+        # `extend_bank` registered), or None where the cache file predates them.
+        bank_report["unrequested_buckets"] = cache.describe_outside_buckets(
             _requested_sigs)
         # R453. The cap bounds this build's own buckets, so the union `as_candidates`
         # serves can pass the ceiling `_bank_cap` was clamped to when an earlier
@@ -5051,6 +5156,16 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         # (`verify_failed`, exit 3), so the baseline stays the current file.
         present_baseline_as_current("the enhanced file failed its independent re-read")
     exposure = portfolio_exposure(salary, Path(delivered))
+    # R197. Only on a `--leverage` build (the off block stays exactly what it was), and
+    # guarded: a diagnostic block never withholds a delivered brief.
+    if leverage_brief.get("applied"):
+        try:
+            _realized = leverage_realized(Path(delivered), projections, leverage)
+            leverage_brief["cap_bound"] = _realized.pop("cap_bound")
+            leverage_brief["realized"] = _realized
+        except Exception as exc:  # noqa: BLE001
+            leverage_brief["realized"] = {"error": f"{type(exc).__name__}: {exc}"}
+            leverage_brief["cap_bound"] = None      # present, and unknown (R237)
     # R116. The concentration facts join the exposure block, which is where a
     # reader already goes to ask how concentrated this portfolio is. Two
     # provenances on purpose: `distinct_lineups`/`max_lineup_repeat` above are
@@ -5241,7 +5356,7 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         # not passed and `applied` is the engine default the build actually ran.
         "anti_correlation": anti_correlation_brief_block(
             getattr(args, "max_opposing_hitters_per_sp", None),
-            bank_report, result),
+            bank_report, result, request={"leverage": leverage}),
         "enrichment": enrichment_summary,
         # R407. The tier, the facts that set it, and each control's before and
         # after, as run_slate applied them.
@@ -7910,6 +8025,74 @@ def format_degraded_line(degraded: dict | None) -> str:
 #: engine, so the number is spelled here and a test pins the two equal rather
 #: than letting them drift (R167's class).
 TEAM_FOOTPRINT_MATERIAL = 2
+
+
+def leverage_realized(entries_csv: Path, projections, leverage) -> dict:
+    """R197. What the DELIVERED entries realized under `--leverage`, read the way the
+    solver read the constraints: the same renormalized `Projected_Ownership_Pct` frame
+    `run_classic` holds, through `optimizer_v3._ownership_pct_for_row` (a player with no
+    prior reads the same tier-default 12.0) and `_row_is_low_owned` (strict `<` against
+    the build's `low_owned_threshold_pct`, else the module default).
+
+    Per entry: the cumulative ownership over all ten slots (what
+    `max_cumulative_ownership_pct` bounds) and the low-owned HITTERS (slots 2..9 of
+    the delivered file's slot order; never a slot name). `cap_bound` is `true` when the
+    largest cumulative sum is within 1.0 point of the requested cap (inclusive), `false`
+    when it is further, and `null` when no cap was requested ("nothing to compare" is not
+    `false`, R237). A cap that never bound reads identically to one that did without
+    this block (2140_5g, 2026-09-08). Every figure is a labeled prior's, never a
+    measured share, an ROI or a win rate.
+    """
+    import statistics
+    from mlb_engine.optimize.optimizer_v3 import (
+        _ownership_pct_for_row, _row_is_low_owned, resolve_low_owned_threshold)
+
+    leverage = dict(leverage or {})
+    cap = leverage.get("max_cumulative_ownership_pct")
+    floor = leverage.get("min_low_owned_hitters")
+    threshold = resolve_low_owned_threshold(leverage.get("low_owned_threshold_pct"))
+    by_id = {str(r["Player_ID"]).strip(): r for _, r in projections.iterrows()}
+    sums, lows, unresolved = [], [], 0
+    with Path(entries_csv).open(encoding="utf-8-sig", newline="") as fh:
+        for row in csv.reader(fh):
+            if len(row) < 14 or not row[0].strip().isdigit():
+                continue
+            ids = [c.strip() for c in row[4:14]]
+            if any(p not in by_id for p in ids):
+                unresolved += 1
+                continue
+            frame_rows = [by_id[p] for p in ids]
+            sums.append(sum(_ownership_pct_for_row(r) for r in frame_rows))
+            lows.append(sum(1 for r in frame_rows[2:] if _row_is_low_owned(r, threshold)))
+
+    def spread(values, digits=2):
+        if not values:
+            return {"min": None, "median": None, "max": None}
+        return {"min": round(min(values), digits), "median": round(statistics.median(values), digits),
+                "max": round(max(values), digits)}
+
+    top = max(sums) if sums else None
+    distribution: dict = {}
+    for n in lows:
+        distribution[str(n)] = distribution.get(str(n), 0) + 1
+    return {
+        "entries": len(sums),
+        "entries_unresolved": unresolved,
+        "threshold_pct": threshold,
+        "cumulative_ownership_pct": spread(sums),
+        "low_owned_hitters": {**spread(lows, 0),
+                              "distribution": dict(sorted(distribution.items(),
+                                                          key=lambda kv: int(kv[0])))},
+        "cap_requested": cap,
+        "cap_bound": (None if cap is None or top is None
+                      else bool(top >= float(cap) - 1.0)),
+        "slack_pp": (None if cap is None or top is None else round(float(cap) - top, 2)),
+        "floor_requested": floor,
+        "entries_meeting_floor": (None if floor is None
+                                  else sum(1 for n in lows if n >= int(floor))),
+        "source": "the delivered entries read against the build's renormalized "
+                  "`Projected_Ownership_Pct` (a labeled prior, never a measured share)",
+    }
 
 
 def portfolio_exposure(salary_csv: Path, entries_csv: Path) -> dict:

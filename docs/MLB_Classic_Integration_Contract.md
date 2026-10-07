@@ -87,8 +87,10 @@ is surfaced under `projected_order` (`requested`, `applied_count`,
 ## CORE projection columns (optimizer-ready frame)
 
 `Player_ID, Name, Team, Opponent, Position, Salary, Game_ID, Floor, Ceiling,
-Excluded, Locked`. `Ownership_Tier` is optional; the optimizer defaults it to
-`Mid`. `Ceiling < Floor` is a hard error.
+Excluded`. `Ownership_Tier` is optional; the optimizer defaults it to `Mid`.
+`Ceiling < Floor` is a hard error. There is no frame-level lock column (R455):
+locks enter only through the `locks` and `locked_slot_assignments` arguments; a
+`Locked` column is ignored and a True cell is counted in the schema report.
 
 ## Candidate record contract (allocator input)
 

@@ -160,6 +160,11 @@ class BankCache:
         # difference separates two stored buckets: same pool truth (live, keep)
         # or different pool truth (stale, purge).
         self.conditions_index: Dict[str, str] = {}
+        # R465. conditions signature -> the facts it was built under
+        # (`conditions_facts`). A SIBLING of the index, not a change to its
+        # values, and absent for any bucket a pre-R465 file registered: an
+        # absent entry reads as UNKNOWN, never as a guess.
+        self.conditions_facts: Dict[str, Dict[str, Any]] = {}
         self.corrupt_on_load = False
         # Filled by as_candidates: scored/failed counts for the payload it just
         # emitted, so a silent scoring failure is countable (F15).
@@ -179,6 +184,7 @@ class BankCache:
             self.candidates, self.attempted, self._seen = [], set(), set()
             self._cleared = set()
             self.conditions_index = {}
+            self.conditions_facts = {}
             return
         self.attempted = set(payload.get("attempted") or [])
         self._retired = set(payload.get("retired_jobs") or [])
@@ -186,6 +192,7 @@ class BankCache:
         self.conditions_index = {
             str(k): str(v) for k, v in (payload.get("conditions_index") or {}).items()
         }
+        self.conditions_facts = _read_facts_map(payload.get("conditions_facts"))
         # R101: memory now legitimately holds several buckets at once, so a
         # roster stored twice under two signatures would reach the solve twice
         # and double-count in every exposure denominator. Deduping here keeps
@@ -201,10 +208,23 @@ class BankCache:
             self._seen.add(key)
             self.candidates.append(entry)
 
-    def register_conditions(self, conditions_sig: str, projection_digest: str) -> None:
-        """Record which projection truth a conditions signature was built under."""
+    def register_conditions(self, conditions_sig: str, projection_digest: str,
+                            facts: Optional[Mapping[str, Any]] = None) -> None:
+        """Record which projection truth a conditions signature was built under.
+
+        R465. ``facts`` (``conditions_facts``) is what the bucket was built
+        under, kept beside the index so a brief can NAME a served bucket. It is
+        round-tripped through JSON here so the in-memory view is exactly what a
+        reload will read (an int stays an int, a float stays a float). A caller
+        that passes none leaves any facts already registered for the signature
+        alone: the same signature is the same question, so a later request for
+        it fills in a bucket an older file held without facts.
+        """
         if conditions_sig and projection_digest:
             self.conditions_index[str(conditions_sig)] = str(projection_digest)
+            if facts is not None:
+                self.conditions_facts[str(conditions_sig)] = json.loads(
+                    json.dumps(facts, sort_keys=True, allow_nan=False))
 
     def live_buckets(self) -> List[str]:
         """The distinct conditions signatures currently held in memory, sorted."""
@@ -224,6 +244,31 @@ class BankCache:
         asked = {str(sig) for sig in conditions_sigs}
         return sum(1 for c in self.candidates
                    if _key_conditions(c.get("job")) not in asked)
+
+    def describe_outside_buckets(self, conditions_sigs: Iterable[str]) -> List[Dict[str, Any]]:
+        """R465. The buckets :meth:`count_outside_buckets` counts, NAMED.
+
+        One row per bucket outside ``conditions_sigs``: its signature, how many
+        stored candidates it holds, and what it was built under (``conditions_facts``
+        in display form, ``excludes`` shown as a count because a late-swap bucket
+        carries hundreds of ids and this list rides in the brief). ``built_under``
+        is ``None`` where no facts are registered (a file written before R465, or
+        a keyless candidate, signature ``""``): unknown, never a guess. The
+        candidate counts sum to ``count_outside_buckets``. Largest bucket first,
+        then signature, so the list is deterministic.
+        """
+        asked = {str(sig) for sig in conditions_sigs}
+        held: Dict[str, int] = {}
+        for c in self.candidates:
+            sig = _key_conditions(c.get("job"))
+            if sig not in asked:
+                held[sig] = held.get(sig, 0) + 1
+        rows = []
+        for sig, n in sorted(held.items(), key=lambda kv: (-kv[1], kv[0])):
+            facts = self.conditions_facts.get(sig) if sig else None
+            rows.append({"conditions_signature": sig, "candidates": n,
+                         "built_under": _display_facts(facts)})
+        return rows
 
     def drop_stale_jobs(self, conditions_sig: str, projection_digest: str = "") -> int:
         """Forget candidates and attempts built under a different pool truth.
@@ -363,6 +408,7 @@ class BankCache:
         disk_candidates: List[Dict[str, Any]] = []
         disk_attempted: set[str] = set()
         disk_index: Dict[str, str] = {}
+        disk_facts: Dict[str, Dict[str, Any]] = {}
         if self.path.exists():
             try:
                 payload = json.loads(self.path.read_text(encoding="utf-8"))
@@ -370,6 +416,7 @@ class BankCache:
                 disk_attempted = set(payload.get("attempted") or [])
                 disk_index = {str(k): str(v) for k, v
                               in (payload.get("conditions_index") or {}).items()}
+                disk_facts = _read_facts_map(payload.get("conditions_facts"))
                 self._retired.update(payload.get("retired_jobs") or [])
             except (OSError, ValueError):
                 pass  # unreadable disk state is rebuilt, the same policy as _load
@@ -395,6 +442,10 @@ class BankCache:
             # unordered map makes two identical caches look different.
             "conditions_index": dict(sorted({**disk_index,
                                              **self.conditions_index}.items())),
+            # R465. Unioned on the same principle as the index: another
+            # session's bucket keeps the facts it registered.
+            "conditions_facts": dict(sorted({**disk_facts,
+                                             **self.conditions_facts}.items())),
         }, indent=1), encoding="utf-8")
         os.replace(tmp, self.path)
         self._cleared = set()
@@ -651,6 +702,102 @@ def projection_digest(projections_df) -> str:
     return digest.hexdigest()[:16]
 
 
+def conditions_facts(
+    excludes: Optional[Sequence[str]] = None,
+    stack_min: Optional[int] = None,
+    stack_max: Optional[int] = None,
+    max_opposing_hitters_per_sp: Optional[int] = None,
+    *, target: str = "ceiling", leverage: Optional[Mapping[str, Any]] = None,
+    max_selected_from: Optional[Tuple[Sequence[str], int]] = None,
+    stack_teams: Optional[Sequence[str]] = None,
+    secondary_stack: Optional[Tuple[str, int]] = None,
+) -> Dict[str, Any]:
+    """R465. What a conditions bucket was built under: ``conditions_signature``'s
+    INPUTS, normalized once, JSON-safe, and the only thing
+    :func:`signature_from_facts` reads.
+
+    A conditions signature is a hash, so a stored bucket could not say what it
+    answered, and the brief could count the candidates a build was handed from
+    questions it did not ask but not name them. These facts are registered beside
+    the index (``register_conditions``) and read back by ``describe_outside_buckets``.
+    Every distinction the signature's bytes make survives here, because the
+    reconstruction test would otherwise pass on a normalizer that had drifted:
+    ``stack_teams`` None versus ``[]`` (the second appends ``teams:``), the
+    allowance as the effective int (the signature already reads None as the
+    engine default), leverage with its numeric types (``json.dumps`` writes 90 and
+    90.0 differently), the named stack's team upper-cased. ``job_class`` is NOT
+    here: it is a tag stored on each candidate, not a signature input, and two
+    families can share one signature (the R469 pair slice shares the ordinary
+    bucket's), so a bucket-level job class would flip with whichever call
+    registered last.
+    """
+    selected = None
+    if max_selected_from is not None:
+        ids, m = max_selected_from
+        selected = {"members": sorted(str(x) for x in (ids or [])), "m": int(m)}
+    secondary = None
+    if secondary_stack is not None:
+        secondary = {"team": str(secondary_stack[0]).strip().upper(),
+                     "min": int(secondary_stack[1])}
+    return {
+        "target": target,
+        "excludes": sorted(str(x) for x in (excludes or [])),
+        "stack_min": stack_min,
+        "stack_max": stack_max,
+        "max_opposing_hitters_per_sp": (
+            ANTI_CORRELATION_DEFAULT_MAX if max_opposing_hitters_per_sp is None
+            else int(max_opposing_hitters_per_sp)),
+        "leverage": _leverage_kwargs(leverage),
+        "max_selected_from": selected,
+        "stack_teams": (None if stack_teams is None
+                        else sorted(str(t) for t in stack_teams)),
+        "secondary_stack": secondary,
+    }
+
+
+def signature_from_facts(projections_df, facts: Mapping[str, Any]) -> str:
+    """R465. The ONE place the conditions signature's byte stream is written.
+
+    ``conditions_signature`` is ``signature_from_facts(df, conditions_facts(...))``
+    and ``extend_bank`` computes its bucket the same way, so the facts a cache
+    file stores and the signature stored beside them cannot disagree about what
+    the bucket is. The byte stream is unchanged from v1.2 on purpose: the
+    signatures already written into live cache files keep their meaning.
+    """
+    digest = hashlib.sha256()
+    digest.update(b"v2")
+    digest.update(json.dumps({"target": facts["target"], "leverage": facts["leverage"]},
+                             sort_keys=True, allow_nan=False).encode())
+    digest.update(("|".join(facts["excludes"]) + "\n").encode())
+    digest.update(f"{facts['stack_min']}:{facts['stack_max']}\n".encode())
+    # R288 rider. ``max_opposing_hitters_per_sp`` changes the constraint matrix,
+    # so a candidate built at 0 answers a different question than one built at 2.
+    # Appended ONLY when non-default, so every signature already written to a
+    # live cache file keeps its meaning (the same rule as the v1.2 stream above).
+    if facts["max_opposing_hitters_per_sp"] != ANTI_CORRELATION_DEFAULT_MAX:
+        digest.update(f"opp:{int(facts['max_opposing_hitters_per_sp'])}\n".encode())
+    # R405(c). A cluster-limited job answers a different question (at most m
+    # of these players together), so its candidates bucket apart: the ids and
+    # m are hashed, sorted, and appended ONLY when set (the R288 rule above).
+    selected = facts.get("max_selected_from")
+    if selected is not None:
+        digest.update(
+            f"sel:{int(selected['m'])}:{'|'.join(selected['members'])}\n".encode())
+    # R406. A job grid restricted to some stack teams answers a narrower
+    # question and buckets apart; appended only when set, for the rule above.
+    if facts.get("stack_teams") is not None:
+        digest.update(f"teams:{'|'.join(facts['stack_teams'])}\n".encode())
+    # R434. A job grid whose lineups must carry a NAMED team as a secondary
+    # stack answers a different question and buckets apart. Without this term
+    # its job keys would equal the ordinary bucket's and every job would be
+    # skipped as already attempted. Appended only when set, for the rule above.
+    secondary = facts.get("secondary_stack")
+    if secondary is not None:
+        digest.update(f"sec:{secondary['team']}:{int(secondary['min'])}\n".encode())
+    digest.update(_projection_bytes(projections_df))
+    return digest.hexdigest()[:16]
+
+
 def conditions_signature(
     projections_df,
     excludes: Optional[Sequence[str]] = None,
@@ -669,15 +816,16 @@ def conditions_signature(
     question a stored candidate answered. Whether that bucket is still live is
     :func:`projection_digest`'s call, not this one's (R101).
 
-    The byte stream is unchanged from v1.2 on purpose, so the signatures already
-    written into live cache files keep their meaning across this change.
+    R465: the byte stream lives in :func:`signature_from_facts` and the inputs
+    are normalized by :func:`conditions_facts`, so this is their composition. The
+    stream is unchanged from v1.2, so the signatures already written into live
+    cache files keep their meaning across this change.
 
     R288 rider. ``max_opposing_hitters_per_sp`` changes the constraint matrix,
     so a candidate built at 0 answers a different question than one built at 2 --
     reusing the first for the second would serve a bank that structurally cannot
     contain what was asked for, and the reuse would be invisible. It is appended
-    ONLY when non-default, so every signature already written to a live cache file
-    keeps its meaning, which is the same rule the v1.2 byte stream follows above.
+    ONLY when non-default (see :func:`signature_from_facts`).
 
     NOTE, filed and not fixed here: R246's three leverage controls are NOT in this
     signature and have the same property, so a bank built under
@@ -685,42 +833,32 @@ def conditions_signature(
     R290; the fix is one more append and the measurement of what it invalidates
     is the part that needs a session.
     """
-    digest = hashlib.sha256()
-    digest.update(b"v2")
-    digest.update(json.dumps({"target": target, "leverage": _leverage_kwargs(leverage)},
-                             sort_keys=True, allow_nan=False).encode())
-    digest.update(("|".join(sorted(str(x) for x in (excludes or []))) + "\n").encode())
-    digest.update(f"{stack_min}:{stack_max}\n".encode())
-    if max_opposing_hitters_per_sp not in (None, ANTI_CORRELATION_DEFAULT_MAX):
-        digest.update(
-            f"opp:{int(max_opposing_hitters_per_sp)}\n".encode())
-    # R405(c). A cluster-limited job answers a different question (at most m
-    # of these players together), so its candidates bucket apart: the ids and
-    # m are hashed, sorted, and appended ONLY when set, which keeps every
-    # signature already on disk meaning what it meant (the R288 rule above).
-    if max_selected_from is not None:
-        ids, m = max_selected_from
-        digest.update(
-            f"sel:{int(m)}:{'|'.join(sorted(str(x) for x in (ids or [])))}\n".encode())
-    # R406. A job grid restricted to some stack teams answers a narrower
-    # question and buckets apart; appended only when set, for the rule above.
-    if stack_teams is not None:
-        digest.update(
-            f"teams:{'|'.join(sorted(str(t) for t in stack_teams))}\n".encode())
-    # R434. A job grid whose lineups must carry a NAMED team as a secondary
-    # stack answers a different question and buckets apart. Without this term
-    # its job keys would equal the ordinary bucket's and every job would be
-    # skipped as already attempted. Appended only when set, for the rule above.
-    if secondary_stack is not None:
-        digest.update(
-            f"sec:{str(secondary_stack[0]).strip().upper()}:{int(secondary_stack[1])}\n".encode())
-    digest.update(_projection_bytes(projections_df))
-    return digest.hexdigest()[:16]
+    return signature_from_facts(projections_df, conditions_facts(
+        excludes, stack_min, stack_max, max_opposing_hitters_per_sp,
+        target=target, leverage=leverage, max_selected_from=max_selected_from,
+        stack_teams=stack_teams, secondary_stack=secondary_stack))
 
 
 def _key_conditions(job: Any) -> str:
     """The conditions signature a job key ends with. Empty for a keyless entry."""
     return str(job or "").rpartition("|")[2]
+
+
+def _read_facts_map(raw: Any) -> Dict[str, Dict[str, Any]]:
+    """R465. A file's ``conditions_facts`` as ``{signature: facts}``; anything that
+    is not a mapping of mappings (an absent key, a hand edit) reads as no facts."""
+    if not isinstance(raw, dict):
+        return {}
+    return {str(k): dict(v) for k, v in raw.items() if isinstance(v, dict)}
+
+
+def _display_facts(facts: Optional[Mapping[str, Any]]) -> Optional[Dict[str, Any]]:
+    """R465. Facts as the brief shows them: the ``excludes`` list as a count."""
+    if facts is None:
+        return None
+    shown = {k: v for k, v in facts.items() if k != "excludes"}
+    shown["excludes_count"] = len(facts.get("excludes") or [])
+    return shown
 
 
 def _lock_signature(locked_slot_assignments: Optional[Mapping[str, str]]) -> str:
@@ -890,11 +1028,14 @@ def extend_bank(
     # R101 splits it in two: the pool digest is the half that INVALIDATES, the
     # full signature is the bucket this slice writes into. Register before the
     # drop, so the bucket this call is about to fill is placeable by the next one.
-    conditions_sig = conditions_signature(
-        projections_df, excl, stack_min, stack_max,
-        max_opposing_hitters_per_sp=max_opposing_hitters_per_sp,
+    # R465. The facts and the signature come from ONE normalizer, so the bucket
+    # this call writes into and what the cache file says it was built under
+    # cannot disagree: the settled stack bounds and the R434 floor are in both.
+    facts = conditions_facts(
+        excl, stack_min, stack_max, max_opposing_hitters_per_sp,
         target=target, leverage=leverage, max_selected_from=max_selected_from,
         stack_teams=stack_teams, secondary_stack=secondary)
+    conditions_sig = signature_from_facts(projections_df, facts)
     pool_digest = projection_digest(projections_df)
     # R453. What the caller holds in buckets other than this call's own.
     others: Optional[int] = None
@@ -902,7 +1043,7 @@ def extend_bank(
         others = sum(n for sig, n in held.items() if sig != conditions_sig)
     elif held is not None:
         others = held
-    cache.register_conditions(conditions_sig, pool_digest)
+    cache.register_conditions(conditions_sig, pool_digest, facts)
     superseded = cache.drop_stale_jobs(conditions_sig, projection_digest=pool_digest)
 
     # R453. What counts toward `max_candidates`, fixed once: every add below

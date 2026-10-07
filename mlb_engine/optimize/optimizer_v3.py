@@ -487,9 +487,16 @@ def runtime_preflight():
     }
 
 
+# R455. `Locked` left this contract: nothing ever read the column, and a frame-level
+# lock cannot be honoured by the portfolio (a locked player is in EVERY bank candidate,
+# so the allocator's R311 check needs max_player_exposure_pct at 1.0 for him and for
+# everyone). Locks enter the solver only through the `locks` and `locked_slot_assignments`
+# arguments. A `Locked` column that still arrives (the builders keep writing False, so
+# frame bytes and cache digests stay put) is ignored, and a True cell is COUNTED and
+# NAMED by `ignored_frame_columns`, never silently.
 CORE_PROJECTION_FIELDS = (
     'Player_ID', 'Name', 'Team', 'Opponent', 'Position', 'Salary', 'Game_ID',
-    'Floor', 'Ceiling', 'Excluded', 'Locked',
+    'Floor', 'Ceiling', 'Excluded',
 )
 OPTIONAL_PROJECTION_FIELDS = (
     'Base_Projection', 'Ownership_Tier', 'Confidence_Tier', 'Stack_Group',
@@ -627,12 +634,16 @@ def validate_projection_schema(projections_df):
             comparable = _finite_mask(ceiling) & _finite_mask(floor)
             ceiling_floor_errors = int((comparable & (ceiling < floor - 1e-9)).sum())
     passed = not missing and not errors
+    ignored = ignored_frame_columns(projections_df)
     return {
         'passed': passed,
         'missing_core_fields': missing,
         'available_optional_fields': [c for c in OPTIONAL_PROJECTION_FIELDS if c in projections_df.columns],
         'ceiling_below_floor_rows': ceiling_floor_errors,
         'boundary_errors': errors,
+        # R455. Only when a True cell was ignored, so every other frame's report is
+        # the report it was.
+        **({'ignored_columns': ignored} if ignored else {}),
         'summary': 'Lean projection schema passed' if passed else 'Lean projection schema failed',
     }
 
@@ -912,6 +923,36 @@ def excluded_flags(projections_df):
     return series, report
 
 
+def ignored_frame_columns(projections_df):
+    """R455. Frame columns the engine does not read, where a True cell could be
+    mistaken for a control. ``{}`` when there is nothing to say.
+
+    Today that is ``Locked``: it left the projection contract (see
+    ``CORE_PROJECTION_FIELDS``) and a True cell locks nobody. It is counted and
+    named so an operator who typed one is told it did nothing, instead of the
+    pre-R455 silence. A blank, False or unrecognized cell counts as nothing (R289's
+    rule for ``Excluded``); the scalar rule is :func:`read_excluded_cell`'s, shared
+    so there is one reading of what an affirmative cell is.
+    """
+    if projections_df is None or 'Locked' not in getattr(projections_df, 'columns', []):
+        return {}
+    flags = [read_excluded_cell(value)[0] for value in projections_df['Locked']]
+    if 'Player_ID' in projections_df.columns:
+        ids = [str(pid).strip() for pid in projections_df['Player_ID']]
+    else:
+        ids = [str(i) for i in projections_df.index]
+    true_ids = sorted(pid for pid, flag in zip(ids, flags) if flag)
+    if not true_ids:
+        return {}
+    return {'Locked': {
+        'true_cells': len(true_ids),
+        'player_ids': true_ids[:10],
+        'note': 'the engine has no frame-level lock: these cells lock nobody. Locks '
+                'reach the solver only through the `locks` and `locked_slot_assignments` '
+                'arguments (a bank\'s SP pair, a late swap\'s pins) (R455)',
+    }}
+
+
 def coerce_excluded_column(projections_df):
     """Return a copy whose Excluded column is real booleans, plus the report."""
     if projections_df is None or not hasattr(projections_df, 'columns'):
@@ -1180,11 +1221,7 @@ def _build_single_lineup_scipy(
         }
         add_constraint(own_coefs, -np.inf, float(max_cumulative_ownership_pct))
     if min_low_owned_hitters is not None:
-        threshold = float(
-            low_owned_threshold_pct
-            if low_owned_threshold_pct is not None
-            else DEFAULT_LOW_OWNED_THRESHOLD_PCT
-        )
+        threshold = resolve_low_owned_threshold(low_owned_threshold_pct)  # R197: one resolver
         # Hitters only, keyed on the slot's REQUIRED POSITION and not on the
         # slot name. The DK slot vocabulary is P1/P2, never 'P', so the
         # obvious `slot != 'P'` test is true for both pitcher slots: written
@@ -1195,7 +1232,7 @@ def _build_single_lineup_scipy(
             idx: 1.0
             for (pid, slot), idx in assign_index.items()
             if required_by_slot.get(slot) in HITTER_POSITIONS
-            and _ownership_pct_for_row(row_by_pid[pid]) < threshold
+            and _row_is_low_owned(row_by_pid[pid], threshold)
         }
         if low_coefs:
             add_constraint(low_coefs, float(min_low_owned_hitters), np.inf)
@@ -3270,6 +3307,19 @@ def build_multi_lineup(
 # ============================================================================
 
 DEFAULT_CANDIDATE_BANK_CAP = 150
+# R197. `Ownership_Tier` is never written: every writer writes 'Mid' and the ownership prior
+# deliberately leaves it alone. Five behaviours still read it, and NONE is rewired here (each
+# moves candidate scores, one-off selection or a diversification axis: a strategy call):
+#   1. `_classify_chalk_one_off`'s sort by `_ownership_priority` (a constant key),
+#   2. its label branch (every one-off reads 'mid-one-off', so the DU `chalk_one_off` axis
+#      can only read 'stack-only' or 'mid-one-off'),
+#   3. the same sort in the DU driver selection (`_own_pri`),
+#   4. `compute_field_pressure_score`'s `== 'High'` term (never fires),
+#   5. the tier default below: a FALLBACK for a frame with no `Projected_Ownership_Pct` (a
+#      constant, rank-neutral offset off-leverage; real on every --leverage build, which
+#      attaches the column).
+# The ONE definition of "low owned" is `_row_is_low_owned`, read by R154's constraint and by
+# `_low_owned_hitter_count`.
 DEFAULT_OWNERSHIP_PCT_BY_TIER = {'Low': 5.0, 'Mid': 12.0, 'High': 25.0}
 # R154. What counts as a "low-owned" bat for the min_low_owned_hitters floor.
 # 10.0 is the bar ledger 3.17 already uses for its winner-vs-field comparison,
@@ -3470,6 +3520,29 @@ def _ownership_pct_for_row(row):
     return DEFAULT_OWNERSHIP_PCT_BY_TIER.get(row.get('Ownership_Tier', 'Mid'), 12.0)
 
 
+def resolve_low_owned_threshold(threshold_pct=None):
+    """R197. The low-owned bar a build runs under: its own ``low_owned_threshold_pct``
+    when it passed one, else ``DEFAULT_LOW_OWNED_THRESHOLD_PCT``. The one resolution,
+    read by R154's constraint, by :func:`_row_is_low_owned` and by the brief's
+    ``leverage.realized``."""
+    return float(threshold_pct if threshold_pct is not None
+                 else DEFAULT_LOW_OWNED_THRESHOLD_PCT)
+
+
+def _row_is_low_owned(row, threshold_pct=None):
+    """R197. The ONE definition of a low-owned player: predicted ownership STRICTLY
+    below the bar (the build's ``low_owned_threshold_pct`` when it passed one, else
+    ``DEFAULT_LOW_OWNED_THRESHOLD_PCT``), read through ``_ownership_pct_for_row`` so a
+    player with no prior reads the same tier-default 12.0 the constraint reads.
+
+    R154's ``min_low_owned_hitters`` constraint and the diagnostic
+    ``_low_owned_hitter_count`` both call this, so the counter in a record is the
+    quantity the solver was held to. (The counter used to read ``Ownership_Tier ==
+    'Low'``, which no writer ever writes: it was 0 on every build.)
+    """
+    return _ownership_pct_for_row(row) < resolve_low_owned_threshold(threshold_pct)
+
+
 def _lineup_projected_ownership_sum(lineup_df):
     return sum(_ownership_pct_for_row(row) for _, row in lineup_df.iterrows())
 
@@ -3484,7 +3557,10 @@ def _suppression_trigger_count(lineup_df):
     return sum(1 for _, row in lineup_df.iterrows() if _suppression_trigger(row.get('Notes')) is not None)
 
 
-def _low_owned_hitter_count(lineup_df):
+def _low_owned_hitter_count(lineup_df, threshold_pct=None):
+    """Hitters in the lineup that :func:`_row_is_low_owned` calls low-owned, by the
+    slot's required position (``Assigned_Position``), never the slot name (R154's
+    P1/P2 trap). ``threshold_pct`` is the build's own bar when it set one (R197)."""
     count = 0
     for _, row in lineup_df.iterrows():
         assigned = row.get('Assigned_Position')
@@ -3492,7 +3568,7 @@ def _low_owned_hitter_count(lineup_df):
         is_hitter = (assigned in HITTER_POSITIONS) if assigned is not None else (
             bool(pos_set & HITTER_POSITIONS) and 'P' not in pos_set
         )
-        if is_hitter and row.get('Ownership_Tier') == 'Low':
+        if is_hitter and _row_is_low_owned(row, threshold_pct):
             count += 1
     return count
 
@@ -3932,8 +4008,13 @@ def score_lineup_candidate(
     candidate_id=None,
     requested_n=1,
     contest_shape=None,
+    low_owned_threshold_pct=None,
 ):
     """Score a legal lineup with four decision-relevant components.
+
+    R197: ``low_owned_threshold_pct`` is the build's own low-owned bar (the one
+    R154's constraint was given); the record's ``low_owned_hitter_count`` is read
+    against it, and against the module default when the build set none.
 
     v3.16 deliberately keeps descriptive diagnostics in the return payload, but
     only ceiling/floor, stack correlation, duplication pressure, and joint-MILP
@@ -3952,7 +4033,7 @@ def score_lineup_candidate(
     stack_adjacency_tag = _lineup_stack_adjacency_tag(lineup_df)
     role_elevation = _role_elevation_diagnostics(lineup_df)
     right_tail = _lineup_right_tail_volatility_summary(lineup_df)
-    low_owned_hitters = _low_owned_hitter_count(lineup_df)
+    low_owned_hitters = _low_owned_hitter_count(lineup_df, low_owned_threshold_pct)
     suppression_count = _suppression_trigger_count(lineup_df)
     salary_uniqueness_bonus = 0.40 if salary_used <= 49200 else 0.0
 
@@ -4233,6 +4314,7 @@ def build_candidate_lineup_bank(
             slate_metadata=slate_metadata, meta_lineup_ids=meta_lineup_ids,
             du_signature=sig, candidate_id=idx + 1, requested_n=requested_n,
             contest_shape=primary_shape,
+            low_owned_threshold_pct=single_lineup_kwargs.get('low_owned_threshold_pct'),
         )
         fit_by_shape = {}
         for shape in requested_shapes:
@@ -4242,6 +4324,7 @@ def build_candidate_lineup_bank(
                 slate_metadata=slate_metadata, meta_lineup_ids=meta_lineup_ids,
                 du_signature=sig, candidate_id=idx + 1, requested_n=requested_n,
                 contest_shape=shape,
+                low_owned_threshold_pct=single_lineup_kwargs.get('low_owned_threshold_pct'),
             )
             fit_by_shape[shape] = shape_score['contest_fit_score']
         enriched = dict(record)
@@ -4644,6 +4727,7 @@ def build_diverse_candidate_bank(
             slate_metadata=slate_metadata, meta_lineup_ids=meta_lineup_ids,
             du_signature=sig, candidate_id=next_candidate_id, requested_n=requested_n,
             contest_shape=primary_shape,
+            low_owned_threshold_pct=single_lineup_kwargs.get('low_owned_threshold_pct'),
         )
         fit_by_shape = {}
         for shape in requested_shapes:
@@ -4653,6 +4737,7 @@ def build_diverse_candidate_bank(
                 slate_metadata=slate_metadata, meta_lineup_ids=meta_lineup_ids,
                 du_signature=sig, candidate_id=next_candidate_id, requested_n=requested_n,
                 contest_shape=shape,
+                low_owned_threshold_pct=single_lineup_kwargs.get('low_owned_threshold_pct'),
             )
             fit_by_shape[shape] = shape_score['contest_fit_score']
         enriched = dict(record)
