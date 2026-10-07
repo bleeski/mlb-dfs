@@ -1,0 +1,195 @@
+{
+ "code": {
+  "contest_allocator": "v1.12",
+  "execution_pipeline": "v1.17",
+  "git_dirty": true,
+  "git_sha": "7c0637ec7e02b5cac19f9c4c018c8b5b06a736ab"
+ },
+ "date": "2026-10-07",
+ "exit_code": 3,
+ "host": {
+  "call_budget_s": 630.0,
+  "declared_ceiling_s": 900.0,
+  "host": "claude_code"
+ },
+ "kind": "refusal",
+ "labels": "a refusal is an observed build outcome, never a claim about the slate",
+ "recorded_utc": "2026-10-07T19:43:11.145094+00:00",
+ "refusal": {
+  "argv": [
+   "--salary",
+   "data/slates/2026-10-07/DKSalaries_150.csv",
+   "--entries",
+   "data/slates/2026-10-07/DKEntries_122.csv",
+   "--max-seconds",
+   "105",
+   "--ignore-pool-blockers"
+  ],
+  "baseline": {
+   "controls": {
+    "held": [],
+    "never_relax": [
+     "distinct_lineups_per_contest"
+    ],
+    "opened": {
+     "classic_sleeves": false,
+     "max_consensus_cluster_share_pct": 1.0,
+     "max_game_exposure_pct": 1.0,
+     "max_pitcher_exposure_pct": 1.0,
+     "max_player_exposure_pct": 1.0,
+     "max_primary_stack_exposure_pct": 1.0,
+     "max_shared_players": 9,
+     "max_sp_pair_repetition": 999,
+     "max_team_exposure_pct": 1.0
+    }
+   },
+   "core": {
+    "by_contest": [
+     {
+      "contest_id": "196473097",
+      "fillable": 20,
+      "filled": 20,
+      "held": 0,
+      "partial": 0
+     },
+     {
+      "contest_id": "196473122",
+      "fillable": 5,
+      "filled": 5,
+      "held": 0,
+      "partial": 0
+     },
+     {
+      "contest_id": "196473129",
+      "fillable": 2,
+      "filled": 2,
+      "held": 0,
+      "partial": 0
+     },
+     {
+      "contest_id": "196473134",
+      "fillable": 2,
+      "filled": 2,
+      "held": 0,
+      "partial": 0
+     },
+     {
+      "contest_id": "196473173",
+      "fillable": 2,
+      "filled": 2,
+      "held": 0,
+      "partial": 0
+     },
+     {
+      "contest_id": "196474419",
+      "fillable": 1,
+      "filled": 1,
+      "held": 0,
+      "partial": 0
+     },
+     {
+      "contest_id": "196474420",
+      "fillable": 2,
+      "filled": 2,
+      "held": 0,
+      "partial": 0
+     },
+     {
+      "contest_id": "196474428",
+      "fillable": 1,
+      "filled": 1,
+      "held": 0,
+      "partial": 0
+     },
+     {
+      "contest_id": "196496725",
+      "fillable": 7,
+      "filled": 7,
+      "held": 0,
+      "partial": 0
+     }
+    ],
+    "construction_label": "baseline_construction_proxy",
+    "distinct": 21,
+    "probe_wall_s": 0.2226,
+    "required": 20,
+    "short": 0,
+    "sources": {
+     "grid": 20,
+     "probe": 1
+    },
+    "status": "covered",
+    "stop_reason": "covered",
+    "target": 20,
+    "target_met": true,
+    "timings": {
+     "fill_s": 0.0,
+     "grid_s": 1.1632,
+     "left_s": 24.421,
+     "probe_s": 0.2233,
+     "total_s": 1.3978,
+     "window_s": 25.815,
+     "window_source": "deadline"
+    },
+    "uncovered": 0,
+    "version": "v1.0"
+   },
+   "current": false,
+   "date": "2026-10-07",
+   "errors": [
+    "Failed pre-export gate: lineup_gate_passed"
+   ],
+   "failing_checks": [],
+   "lineage": "baseline",
+   "projection": {
+    "blank_appg_defaulted": {
+     "ids": [],
+     "n": 0,
+     "note": "A row with a blank AvgPointsPerGame cell and no operator Base stays in the pool at Base 0.0, the same emergency prior."
+    },
+    "negative_appg_clipped": {
+     "ids": [],
+     "n": 0,
+     "note": "A finite negative AvgPointsPerGame is not a usable Base. The row stays in the pool at Base 0.0, the declared non-negative emergency prior; the validator still refuses a negative or nonfinite Base an operator supplies.",
+     "original": {}
+    }
+   },
+   "run_id": "20261007T194205Z_e06a4ba9",
+   "status": "refused",
+   "window": {
+    "allocation_s": 0.43,
+    "core_s": 1.59,
+    "left_at_call_s": 104.0,
+    "share": 0.25,
+    "window_s": 26.0
+   }
+  },
+  "errors": [
+   "Failed pre-export gate: lineup_gate_passed"
+  ],
+  "failing_checks": [],
+  "note": "built and refused: the build ran but did not certify, or the pool blocked it",
+  "refusal": "classic_not_certified",
+  "refusal_class": "read_it",
+  "run_id": "20261007T194310Z_a95738ea",
+  "solves": [
+   {
+    "bank": "built",
+    "bank_budget_floored": false,
+    "bank_budget_s": 61.2,
+    "bank_elapsed_s": 61.58,
+    "call": 1,
+    "candidates": 77,
+    "left_at_end_s": 36.1,
+    "left_at_start_s": 101.7,
+    "outcome": "refused",
+    "reason": "initial",
+    "sleeves_elapsed_s": 3.43,
+    "wall_s": 65.6
+   }
+  ],
+  "status": "not_certified"
+ },
+ "schema_version": 1,
+ "slate_tag": "1600_4g"
+}
