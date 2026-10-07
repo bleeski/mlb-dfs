@@ -45440,7 +45440,8 @@ class LateSwapEnrichedFrameTests(unittest.TestCase):
         line = next(l for l in out.splitlines() if l.startswith("projection frame:"))
         self.assertIn("ENRICHED by carry", line)
         self.assertIn("NOT this file's lineage; same slate by pool signature", line)
-        self.assertEqual(self._swap_runs(h.root)[-1]["metadata"]["projection_carry"]["tier"], "enriched")
+        s3b_run = self._swap_runs(h.root)[-1]
+        self.assertEqual(s3b_run["metadata"]["projection_carry"]["tier"], "enriched")
         # S3a: the swap's salary file has another player-ID universe: another slate.
         other = h.root / "DKSalaries_other.csv"
         lines = h.salary.read_text(encoding="utf-8").splitlines()
@@ -45453,7 +45454,11 @@ class LateSwapEnrichedFrameTests(unittest.TestCase):
         line = next(l for l in out.splitlines() if l.startswith("projection frame:"))
         self.assertIn("UNENRICHED", line)
         self.assertIn("another slate", line)
-        self.assertEqual(self._swap_runs(h.root)[-1]["metadata"]["projection_carry"]["tier"], "proxy")
+        # By identity, not by sort order (S6's fix; R487): run ids are `<second>_<random
+        # suffix>`, so S3b and S3a minted in one second sort by the suffix and `[-1]` can
+        # be S3b, whose tier is "enriched" (a CI flake on fast runners).
+        s3a_run = next(r for r in self._swap_runs(h.root) if r["run_id"] != s3b_run["run_id"])
+        self.assertEqual(s3a_run["metadata"]["projection_carry"]["tier"], "proxy")
 
     def test_S4_a_value_the_engine_refuses_builds_unenriched_and_never_refuses(self):
         fx = self._world()
