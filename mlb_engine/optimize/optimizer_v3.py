@@ -487,9 +487,16 @@ def runtime_preflight():
     }
 
 
+# R455. `Locked` left this contract: nothing ever read the column, and a frame-level
+# lock cannot be honoured by the portfolio (a locked player is in EVERY bank candidate,
+# so the allocator's R311 check needs max_player_exposure_pct at 1.0 for him and for
+# everyone). Locks enter the solver only through the `locks` and `locked_slot_assignments`
+# arguments. A `Locked` column that still arrives (the builders keep writing False, so
+# frame bytes and cache digests stay put) is ignored, and a True cell is COUNTED and
+# NAMED by `ignored_frame_columns`, never silently.
 CORE_PROJECTION_FIELDS = (
     'Player_ID', 'Name', 'Team', 'Opponent', 'Position', 'Salary', 'Game_ID',
-    'Floor', 'Ceiling', 'Excluded', 'Locked',
+    'Floor', 'Ceiling', 'Excluded',
 )
 OPTIONAL_PROJECTION_FIELDS = (
     'Base_Projection', 'Ownership_Tier', 'Confidence_Tier', 'Stack_Group',
@@ -627,12 +634,16 @@ def validate_projection_schema(projections_df):
             comparable = _finite_mask(ceiling) & _finite_mask(floor)
             ceiling_floor_errors = int((comparable & (ceiling < floor - 1e-9)).sum())
     passed = not missing and not errors
+    ignored = ignored_frame_columns(projections_df)
     return {
         'passed': passed,
         'missing_core_fields': missing,
         'available_optional_fields': [c for c in OPTIONAL_PROJECTION_FIELDS if c in projections_df.columns],
         'ceiling_below_floor_rows': ceiling_floor_errors,
         'boundary_errors': errors,
+        # R455. Only when a True cell was ignored, so every other frame's report is
+        # the report it was.
+        **({'ignored_columns': ignored} if ignored else {}),
         'summary': 'Lean projection schema passed' if passed else 'Lean projection schema failed',
     }
 
@@ -910,6 +921,36 @@ def excluded_flags(projections_df):
     report['excluded_true'] = int(series.sum())
     report['unrecognized_values'] = sorted(set(unrecognized))[:10]
     return series, report
+
+
+def ignored_frame_columns(projections_df):
+    """R455. Frame columns the engine does not read, where a True cell could be
+    mistaken for a control. ``{}`` when there is nothing to say.
+
+    Today that is ``Locked``: it left the projection contract (see
+    ``CORE_PROJECTION_FIELDS``) and a True cell locks nobody. It is counted and
+    named so an operator who typed one is told it did nothing, instead of the
+    pre-R455 silence. A blank, False or unrecognized cell counts as nothing (R289's
+    rule for ``Excluded``); the scalar rule is :func:`read_excluded_cell`'s, shared
+    so there is one reading of what an affirmative cell is.
+    """
+    if projections_df is None or 'Locked' not in getattr(projections_df, 'columns', []):
+        return {}
+    flags = [read_excluded_cell(value)[0] for value in projections_df['Locked']]
+    if 'Player_ID' in projections_df.columns:
+        ids = [str(pid).strip() for pid in projections_df['Player_ID']]
+    else:
+        ids = [str(i) for i in projections_df.index]
+    true_ids = sorted(pid for pid, flag in zip(ids, flags) if flag)
+    if not true_ids:
+        return {}
+    return {'Locked': {
+        'true_cells': len(true_ids),
+        'player_ids': true_ids[:10],
+        'note': 'the engine has no frame-level lock: these cells lock nobody. Locks '
+                'reach the solver only through the `locks` and `locked_slot_assignments` '
+                'arguments (a bank\'s SP pair, a late swap\'s pins) (R455)',
+    }}
 
 
 def coerce_excluded_column(projections_df):

@@ -155,6 +155,9 @@ def build_projections(
     # caller may hand in a frame that genuinely has no Excluded column.
     if "Excluded" not in frame.columns:
         frame["Excluded"] = False
+    # R455. INERT: `Locked` left the projection contract (nothing reads it). The default
+    # stays so frame bytes, and every cache digest that hashes them, stay put; removing it
+    # is a separate, cache-invalidating change.
     if "Locked" not in frame.columns:
         frame["Locked"] = False
     frame["Projection_Mode"] = mode

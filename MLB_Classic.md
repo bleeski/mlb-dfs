@@ -167,7 +167,9 @@ Manual F5 overrides remain allowed but must be surfaced as overrides with a reas
 
 Core required fields:
 
-`Player_ID, Name, Team, Opponent, Position, Salary, Game_ID, Floor, Ceiling, Excluded, Locked`
+`Player_ID, Name, Team, Opponent, Position, Salary, Game_ID, Floor, Ceiling, Excluded`
+
+There is no frame-level lock column (R455). Locks enter the solver only through the `locks` and `locked_slot_assignments` arguments (a bank's SP pair, a late swap's pins). A `Locked` column in a frame is ignored, and a True cell is counted and named as ignored in the projection schema report (`ignored_columns`), never silently.
 
 `Ceiling >= Floor` is enforced: a Ceiling below Floor is a hard error listing the offending Player_IDs. The builder never silently repairs it.
 

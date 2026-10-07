@@ -24920,6 +24920,177 @@ class ServedBucketFactsTests(unittest.TestCase):
         self.assertEqual([b["candidates"] for b in named["buckets"]], [12, 11, 10, 9, 8, 7, 6, 5])
 
 
+class LockedColumnTests(unittest.TestCase):
+    """R455. `Locked` was a core projection column with no reader: a `Locked=True`
+    cell locked nobody, silently (Otto Kemp, 1B/OF at $2,000, left out with the
+    objective unchanged while `locks=[id]` seats him). The decision rule was to
+    drop the column from the contract when its portfolio interaction cannot be
+    made honest inside the row, and it cannot: a frame lock puts the player in
+    EVERY bank candidate, the allocator's R311 check then needs
+    `max_player_exposure_pct` at 1.0 for him and for everyone, and an honest
+    wire needs a per-player exemption in the allocator. So the column leaves the
+    contract and a True cell is COUNTED and NAMED as ignored, never silent. The
+    two default writers stay (frame bytes, and every cache digest, stay put).
+    """
+
+    @staticmethod
+    def _frame():
+        return diverse_projection_frame()
+
+    @staticmethod
+    def _unused_hitter(frame, lineup):
+        used = set(lineup.Player_ID.astype(str))
+        return next(str(p) for p, pos in zip(frame.Player_ID, frame.Position)
+                    if pos != "P" and str(p) not in used)
+
+    def test_a_frame_without_locked_passes_the_schema(self):
+        frame = self._frame().drop(columns=["Locked"])
+        report = opt.validate_projection_schema(frame)
+        self.assertTrue(report["passed"], report)
+        self.assertEqual(report["missing_core_fields"], [])
+        self.assertNotIn("Locked", opt.CORE_PROJECTION_FIELDS)
+        # negative control: the boundary still refuses a frame missing a core column
+        broken = opt.validate_projection_schema(frame.drop(columns=["Excluded"]))
+        self.assertFalse(broken["passed"])
+        self.assertEqual(broken["missing_core_fields"], ["Excluded"])
+        # and a frame that still carries the column (every writer's default) passes unchanged
+        carried = opt.validate_projection_schema(self._frame())
+        self.assertTrue(carried["passed"])
+        self.assertNotIn("ignored_columns", carried)
+
+    def test_a_true_locked_cell_locks_nobody_and_is_counted(self):
+        frame = self._frame()
+        base_lineup, base_obj = opt.build_single_lineup(frame, target="ceiling")
+        pid = self._unused_hitter(frame, base_lineup)
+        locked = frame.copy()
+        locked.loc[locked.Player_ID == pid, "Locked"] = True
+        lineup, obj = opt.build_single_lineup(locked, target="ceiling")
+        self.assertEqual(list(lineup.Player_ID), list(base_lineup.Player_ID))
+        self.assertEqual(obj, base_obj, "the objective is unchanged: the cell locks nobody")
+        self.assertNotIn(pid, set(lineup.Player_ID.astype(str)))
+        prepared, _ = opt._prepare_single_lineup_df(locked, target="ceiling")
+        self.assertEqual(len(prepared), len(locked), "not a pool trim")
+        report = opt.validate_projection_schema(locked)
+        self.assertTrue(report["passed"])
+        self.assertEqual(report["ignored_columns"]["Locked"]["true_cells"], 1)
+        self.assertEqual(report["ignored_columns"]["Locked"]["player_ids"], [pid])
+        self.assertIn("locks", report["ignored_columns"]["Locked"]["note"])
+        # the contrast that keeps a later wiring a deliberate act: the argument seats him
+        seated, _ = opt.build_single_lineup(frame, target="ceiling", locks=[pid])
+        self.assertIn(pid, set(seated.Player_ID.astype(str)))
+
+    def test_blank_false_nan_and_empty_locked_cells_are_not_counted(self):
+        frame = self._frame().head(8).copy()
+        for value in (False, "", None, float("nan"), "false", "no", 0, "  "):
+            with self.subTest(value=repr(value)):
+                frame["Locked"] = pd.Series([value] * len(frame), dtype=object)
+                self.assertEqual(opt.ignored_frame_columns(frame), {})
+                self.assertNotIn("ignored_columns", opt.validate_projection_schema(
+                    self._frame().assign(Locked=value)))
+        for value in (True, "TRUE", "yes", 1, "x"):
+            with self.subTest(value=repr(value)):
+                frame["Locked"] = pd.Series([value] * len(frame), dtype=object)
+                self.assertEqual(
+                    opt.ignored_frame_columns(frame)["Locked"]["true_cells"], len(frame))
+        self.assertEqual(opt.ignored_frame_columns(frame.drop(columns=["Locked"])), {})
+        self.assertEqual(opt.ignored_frame_columns(None), {})
+        many = self._frame().assign(Locked=True)
+        self.assertEqual(len(opt.ignored_frame_columns(many)["Locked"]["player_ids"]), 10,
+                         "the ids are capped; the count is not")
+        self.assertEqual(opt.ignored_frame_columns(many)["Locked"]["true_cells"], len(many))
+
+    def test_locked_and_excluded_on_one_row_the_excluded_path_wins_unchanged(self):
+        frame = self._frame()
+        base_lineup, base_obj = opt.build_single_lineup(frame, target="ceiling")
+        pid = str(base_lineup.Player_ID.iloc[3])
+        both = frame.copy()
+        both.loc[both.Player_ID == pid, ["Excluded", "Locked"]] = True
+        only_excluded = frame.copy()
+        only_excluded.loc[only_excluded.Player_ID == pid, "Excluded"] = True
+        a, obj_a = opt.build_single_lineup(both, target="ceiling")
+        b, obj_b = opt.build_single_lineup(only_excluded, target="ceiling")
+        self.assertEqual(list(a.Player_ID), list(b.Player_ID))
+        self.assertEqual(obj_a, obj_b)
+        self.assertNotIn(pid, set(a.Player_ID.astype(str)))
+        # the Excluded reader's own report is what it was (frozen from ebf9333)
+        mixed = pd.DataFrame({"Player_ID": list("abcdefgh"),
+                              "Excluded": [True, False, "", "yes", "no", None, "maybe", 1]})
+        flags, report = opt.excluded_flags(mixed)
+        self.assertEqual([bool(x) for x in flags],
+                         [True, False, False, True, False, False, False, True])
+        self.assertEqual(report["excluded_true"], 3)
+        self.assertEqual(report["unrecognized_values"], ["maybe"])
+
+    def test_no_production_writer_sets_locked_true(self):
+        """R233. Every writer of the column writes False; a truthy literal would
+        be the first operator-visible control the engine does not read."""
+        repo = Path(__file__).resolve().parents[1]
+        found = []
+        for root in ("mlb_engine", "skills", "tools"):
+            for path in sorted((repo / root).rglob("*.py")):
+                if any(part.startswith("_scratch") for part in path.parts):
+                    continue
+                src = path.read_text(encoding="utf-8")
+                if "Locked" not in src:
+                    continue
+                for node in ast.walk(ast.parse(src)):
+                    value = None
+                    if isinstance(node, ast.Dict):
+                        for k, v in zip(node.keys, node.values):
+                            # a nested dict is the schema report's own `{"Locked": {...}}`
+                            # (what the engine IGNORED), never a cell written into a frame
+                            if (isinstance(k, ast.Constant) and k.value == "Locked"
+                                    and not isinstance(v, ast.Dict)):
+                                value = v
+                    elif isinstance(node, ast.Assign):
+                        for target in node.targets:
+                            if (isinstance(target, ast.Subscript)
+                                    and isinstance(target.slice, ast.Constant)
+                                    and target.slice.value == "Locked"):
+                                value = node.value
+                    elif isinstance(node, ast.keyword) and node.arg == "Locked":
+                        value = node.value
+                    if value is not None:
+                        found.append((str(path.relative_to(repo)).replace("\\", "/"),
+                                      ast.get_source_segment(src, value)))
+                        self.assertFalse(
+                            isinstance(value, ast.Constant) and bool(value.value),
+                            f"{path} writes Locked truthy")
+        self.assertEqual(sorted(found), [
+            ("mlb_engine/intake/slate_intake_manager.py", "False"),
+            ("mlb_engine/projections/projection_builder.py", "False"),
+        ])
+
+    def test_the_contract_docs_no_longer_list_locked_as_a_column(self):
+        repo = Path(__file__).resolve().parents[1]
+        classic = (repo / "MLB_Classic.md").read_text(encoding="utf-8")
+        contract = (repo / "docs" / "MLB_Classic_Integration_Contract.md").read_text(
+            encoding="utf-8")
+        self.assertNotIn("Excluded, Locked", classic)
+        self.assertNotIn("Excluded, Locked", contract)
+        self.assertNotIn("Excluded,\nLocked", contract)
+        self.assertIn("`Player_ID, Name, Team, Opponent, Position, Salary, Game_ID, Floor, "
+                      "Ceiling, Excluded`", classic)
+        for text in (classic, contract):
+            self.assertIn("locked_slot_assignments", text)
+        # the late-swap-pin sense of "locked" is untouched
+        self.assertIn("Locked players remain in their exact DraftKings slots.", classic)
+
+    def test_an_assembled_frame_never_carries_a_true_locked_cell(self):
+        """The premise behind 'a True cell is counted in the schema report and not
+        the brief': `_assemble_projection_frame` builds a fixed key set per row, so
+        an operator's `Locked` cell cannot reach a `run_slate` build at all."""
+        with tempfile.TemporaryDirectory() as tmp:
+            salary = Path(tmp) / "salary.csv"
+            write_salary(salary)
+            rows = [{"Player_ID": raw[3], "Base": 10.0, "Locked": True}
+                    for raw in salary_rows()]
+            frame, _ = epi._assemble_projection_frame(
+                str(salary), rows, "emergency_proxy", None, None, None)
+        self.assertIn("Locked", frame.columns)
+        self.assertFalse(bool(frame["Locked"].any()))
+
+
 class AutobuildBankCapTests(unittest.TestCase):
     """R415. autobuild raises a capped bank's cap on a refusal, as search effort.
 
