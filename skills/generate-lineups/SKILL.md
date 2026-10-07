@@ -1053,7 +1053,9 @@ holds, so a re-run that changes `--max-opposing-hitters-per-sp`, the five-stack 
 the cluster limit gets its own solves on a cache an earlier build filled (R453); the bank
 it delivers from is still the union: `solve.bank.served_from_unrequested_buckets` (also on
 `anti_correlation`, with an `unmeasured` note) counts the candidates in buckets this run did
-not solve for, and `solve.bank.served_union_over_full_solve_ceiling` reads true when that
+not solve for, `anti_correlation.unrequested_built_under` names what each was built under (R465)
+and `disagreement` fires when one differs from the request in k, target or leverage, and
+`solve.bank.served_union_over_full_solve_ceiling` reads true when that
 union passes the 1,536 the full-bank retry was measured for. Shrink the bank, never the pool.
 Inside the governor's window, or when a re-run has less than the bank floor to
 spend, a thin bank that covers every reserved row is solved instead of returned
