@@ -5154,6 +5154,15 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         # (`verify_failed`, exit 3), so the baseline stays the current file.
         present_baseline_as_current("the enhanced file failed its independent re-read")
     exposure = portfolio_exposure(salary, Path(delivered))
+    # R197. Only on a `--leverage` build (the off block stays exactly what it was), and
+    # guarded: a diagnostic block never withholds a delivered brief.
+    if leverage_brief.get("applied"):
+        try:
+            _realized = leverage_realized(Path(delivered), projections, leverage)
+            leverage_brief["cap_bound"] = _realized.pop("cap_bound")
+            leverage_brief["realized"] = _realized
+        except Exception as exc:  # noqa: BLE001
+            leverage_brief["realized"] = {"error": f"{type(exc).__name__}: {exc}"}
     # R116. The concentration facts join the exposure block, which is where a
     # reader already goes to ask how concentrated this portfolio is. Two
     # provenances on purpose: `distinct_lineups`/`max_lineup_repeat` above are
@@ -8013,6 +8022,74 @@ def format_degraded_line(degraded: dict | None) -> str:
 #: engine, so the number is spelled here and a test pins the two equal rather
 #: than letting them drift (R167's class).
 TEAM_FOOTPRINT_MATERIAL = 2
+
+
+def leverage_realized(entries_csv: Path, projections, leverage) -> dict:
+    """R197. What the DELIVERED entries realized under `--leverage`, read the way the
+    solver read the constraints: the same renormalized `Projected_Ownership_Pct` frame
+    `run_classic` holds, through `optimizer_v3._ownership_pct_for_row` (a player with no
+    prior reads the same tier-default 12.0) and `_row_is_low_owned` (strict `<` against
+    the build's `low_owned_threshold_pct`, else the module default).
+
+    Per entry: the cumulative ownership over all ten slots (what
+    `max_cumulative_ownership_pct` bounds) and the low-owned HITTERS (slots 2..9 of
+    the delivered file's slot order; never a slot name). `cap_bound` is `true` when the
+    largest cumulative sum is within 1.0 point of the requested cap (inclusive), `false`
+    when it is further, and `null` when no cap was requested ("nothing to compare" is not
+    `false`, R237). A cap that never bound reads identically to one that did without
+    this block (2140_5g, 2026-09-08). Every figure is a labeled prior's, never a
+    measured share, an ROI or a win rate.
+    """
+    import statistics
+    from mlb_engine.optimize.optimizer_v3 import (
+        _ownership_pct_for_row, _row_is_low_owned, resolve_low_owned_threshold)
+
+    leverage = dict(leverage or {})
+    cap = leverage.get("max_cumulative_ownership_pct")
+    floor = leverage.get("min_low_owned_hitters")
+    threshold = resolve_low_owned_threshold(leverage.get("low_owned_threshold_pct"))
+    by_id = {str(r["Player_ID"]).strip(): r for _, r in projections.iterrows()}
+    sums, lows, unresolved = [], [], 0
+    with Path(entries_csv).open(encoding="utf-8-sig", newline="") as fh:
+        for row in csv.reader(fh):
+            if len(row) < 14 or not row[0].strip().isdigit():
+                continue
+            ids = [c.strip() for c in row[4:14]]
+            if any(p not in by_id for p in ids):
+                unresolved += 1
+                continue
+            frame_rows = [by_id[p] for p in ids]
+            sums.append(sum(_ownership_pct_for_row(r) for r in frame_rows))
+            lows.append(sum(1 for r in frame_rows[2:] if _row_is_low_owned(r, threshold)))
+
+    def spread(values, digits=2):
+        if not values:
+            return {"min": None, "median": None, "max": None}
+        return {"min": round(min(values), digits), "median": round(statistics.median(values), digits),
+                "max": round(max(values), digits)}
+
+    top = max(sums) if sums else None
+    distribution: dict = {}
+    for n in lows:
+        distribution[str(n)] = distribution.get(str(n), 0) + 1
+    return {
+        "entries": len(sums),
+        "entries_unresolved": unresolved,
+        "threshold_pct": threshold,
+        "cumulative_ownership_pct": spread(sums),
+        "low_owned_hitters": {**spread(lows, 0),
+                              "distribution": dict(sorted(distribution.items(),
+                                                          key=lambda kv: int(kv[0])))},
+        "cap_requested": cap,
+        "cap_bound": (None if cap is None or top is None
+                      else bool(top >= float(cap) - 1.0)),
+        "slack_pp": (None if cap is None or top is None else round(float(cap) - top, 2)),
+        "floor_requested": floor,
+        "entries_meeting_floor": (None if floor is None
+                                  else sum(1 for n in lows if n >= int(floor))),
+        "source": "the delivered entries read against the build's renormalized "
+                  "`Projected_Ownership_Pct` (a labeled prior, never a measured share)",
+    }
 
 
 def portfolio_exposure(salary_csv: Path, entries_csv: Path) -> dict:

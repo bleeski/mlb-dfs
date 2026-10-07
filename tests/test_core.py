@@ -25091,6 +25091,303 @@ class LockedColumnTests(unittest.TestCase):
         self.assertFalse(bool(frame["Locked"].any()))
 
 
+class LowOwnedCounterTests(unittest.TestCase):
+    """R197. `_low_owned_hitter_count` counted `Ownership_Tier == 'Low'` and every
+    writer writes 'Mid', so the diagnostic was identically 0 while R154's
+    constraint counted the real thing (`Projected_Ownership_Pct` strictly below
+    the build's threshold, hitters by the slot's required position): five
+    hitters at 4.0% were 5 by the constraint and 0 by the diagnostic, and a
+    build that satisfied `min_low_owned_hitters` 3 reported 0 in its own
+    records. One definition (`_row_is_low_owned`) is now read by both, and the
+    brief's `leverage` block carries what the delivered entries realized. The
+    other readers of the unwritten tier are NOT rewired here (a strategy call):
+    the last test pins them.
+    """
+
+    @staticmethod
+    def _frame():
+        frame = diverse_projection_frame()
+        frame["Projected_Ownership_Pct"] = [2.0 + ((i * 7) % 25) for i in range(len(frame))]
+        return frame
+
+    @staticmethod
+    def _independent(lineup, threshold):
+        """The constraint's measure, written out: hitters by REQUIRED position
+        (never the slot name), predicted ownership strictly below the bar."""
+        return sum(1 for _, r in lineup.iterrows()
+                   if r["Assigned_Position"] in opt.HITTER_POSITIONS
+                   and float(r["Projected_Ownership_Pct"]) < threshold)
+
+    def _five_at_four(self):
+        lineup, _ = opt.build_single_lineup(self._frame(), target="ceiling")
+        lineup = lineup.copy()
+        lineup["Projected_Ownership_Pct"] = 20.0
+        hitters = [i for i, r in lineup.iterrows() if r["Assigned_Position"] != "P"]
+        lineup.loc[hitters[:5], "Projected_Ownership_Pct"] = 4.0
+        lineup.loc[[i for i in lineup.index if i not in hitters],
+                   "Projected_Ownership_Pct"] = 1.0           # pitchers: never counted
+        return lineup
+
+    def test_five_hitters_at_four_percent_count_five(self):
+        lineup = self._five_at_four()
+        self.assertEqual(self._independent(lineup, opt.DEFAULT_LOW_OWNED_THRESHOLD_PCT), 5)
+        self.assertEqual(opt._low_owned_hitter_count(lineup), 5, "HEAD read 0")
+        # a build threshold below 4.0 makes them NOT low, on the same definition
+        self.assertEqual(opt._low_owned_hitter_count(lineup, 3.0), 0)
+        # negative control: five hitters at 20% count none
+        chalk = lineup.copy()
+        chalk["Projected_Ownership_Pct"] = 20.0
+        self.assertEqual(opt._low_owned_hitter_count(chalk), 0)
+
+    def test_the_counter_equals_the_constraints_measure(self):
+        frame = self._frame()
+        solved = 0
+        for floor in (1, 2, 3, 4):
+            for threshold in (None, 6.0, 15.0):
+                with self.subTest(floor=floor, threshold=threshold):
+                    kwargs = {"min_low_owned_hitters": floor}
+                    if threshold is not None:
+                        kwargs["low_owned_threshold_pct"] = threshold
+                    lineup, _ = opt.build_single_lineup(frame, target="ceiling", **kwargs)
+                    if lineup is None:      # a floor this frame cannot reach at that bar
+                        continue
+                    solved += 1
+                    bar = threshold if threshold is not None else opt.DEFAULT_LOW_OWNED_THRESHOLD_PCT
+                    counted = opt._low_owned_hitter_count(lineup, threshold)
+                    self.assertEqual(counted, self._independent(lineup, bar))
+                    self.assertGreaterEqual(counted, floor,
+                                            "a build that satisfied the floor reports it")
+        self.assertGreaterEqual(solved, 8, "most combinations are feasible on this frame")
+        # the boundary: strict <, on both sides of the one definition
+        row = frame.iloc[8].copy()
+        for pct, low in ((9.99, True), (10.0, False), (10.01, False)):
+            row["Projected_Ownership_Pct"] = pct
+            self.assertIs(opt._row_is_low_owned(row), low, pct)
+        self.assertIs(opt._row_is_low_owned(row, 10.01), False, "strict: equal is not low")
+        self.assertIs(opt._row_is_low_owned(row, 10.5), True)
+
+    def test_pitchers_are_never_counted_by_the_slot_name(self):
+        """R154's own bring-up trap: the slot vocabulary is P1/P2, so `slot != 'P'`
+        is true for both pitcher slots."""
+        lineup = self._five_at_four()
+        self.assertEqual(
+            sum(1 for _, r in lineup.iterrows()
+                if r["Assigned_Position"] == "P" and r["Projected_Ownership_Pct"] < 10), 2)
+        self.assertEqual(opt._low_owned_hitter_count(lineup), 5)
+
+    def test_a_frame_with_no_prior_counts_zero_and_the_floor_is_unreachable_in_the_solver(self):
+        frame = diverse_projection_frame()          # no Projected_Ownership_Pct, tier absent
+        lineup, _ = opt.build_single_lineup(frame, target="ceiling")
+        self.assertEqual(opt._low_owned_hitter_count(lineup), 0)
+        status = opt._new_solver_status()
+        result, _ = opt.build_single_lineup(frame, target="ceiling", min_low_owned_hitters=1,
+                                            status_out=status)
+        self.assertIsNone(result)
+        self.assertEqual(status["status"], "low_owned_floor_unreachable",
+                         "both read the same 12.0 fallback, so both say nobody is low")
+
+    def test_the_leverage_constraint_rows_are_unchanged(self):
+        """Frozen from ebf9333 (captured before the edit): the helper the
+        constraint now calls compares exactly what the inline expression did."""
+        frame = self._frame()
+        configs = {
+            "cap90": ({"max_cumulative_ownership_pct": 90}, 162.0,
+                      ["21002", "21019", "21020", "21001", "21022", "21023", "21006",
+                       "20001", "20003", "21005"]),
+            "floor2": ({"min_low_owned_hitters": 2}, 172.0,
+                       ["21026", "21027", "21004", "21025", "21006", "21031", "21032",
+                        "20004", "20001", "21005"]),
+            "floor3_thr6_cap100": ({"min_low_owned_hitters": 3, "low_owned_threshold_pct": 6.0,
+                                    "max_cumulative_ownership_pct": 100}, 163.0,
+                                   ["21018", "21019", "21020", "21001", "21022", "21008",
+                                    "21006", "20001", "20003", "21005"]),
+        }
+        for name, (kwargs, objective, ids) in configs.items():
+            with self.subTest(config=name):
+                lineup, obj = opt.build_single_lineup(frame, target="ceiling", **kwargs)
+                self.assertEqual(round(float(obj), 6), objective)
+                self.assertEqual(list(lineup.sort_values("Assigned_Slot").Player_ID.astype(str)),
+                                 ids)
+
+    def test_a_build_threshold_reaches_the_record(self):
+        """The register's fix ('read it against the module default') disagrees with
+        the constraint on any build that passes its own threshold (1605_2g used
+        6.0). Both bank builders hand the build's bar to the scorer, at all four
+        call sites: the base bank's two and the augmentation's two (`requested_n=1`
+        with a `coverage_target` makes the augmentation pass append candidates)."""
+        frame = self._frame()
+        seen = Counter()
+        real = opt.score_lineup_candidate
+
+        def spy(*args, **kwargs):
+            seen[(inspect.stack()[1].function, kwargs.get("low_owned_threshold_pct"))] += 1
+            return real(*args, **kwargs)
+
+        args = dict(requested_n=1, mode="gpp", target="ceiling",
+                    contest_shapes=["large_field_gpp"], coverage_target=12,
+                    min_low_owned_hitters=1)
+        with unittest.mock.patch.object(opt, "score_lineup_candidate", spy):
+            bank = opt.build_diverse_candidate_bank(frame, low_owned_threshold_pct=6.0, **args)
+        self.assertEqual({fn for fn, _ in seen}, {"build_candidate_lineup_bank", "_try_accept"},
+                         "the base bank and the augmentation both scored")
+        self.assertEqual({bar for _, bar in seen}, {6.0}, "no call site dropped the bar")
+        records = bank["candidate_lineups"]
+        self.assertIn("diversity_augmentation", {r.get("source") for r in records})
+        at_six = {self._independent(r["lineup"], 6.0) for r in records}
+        at_ten = {self._independent(r["lineup"], 10.0) for r in records}
+        self.assertNotEqual(at_six, at_ten, "the frame separates the two bars")
+        for r in records:
+            self.assertEqual(r["contest_fit"]["low_owned_hitter_count"],
+                             self._independent(r["lineup"], 6.0))
+        # no bar of its own: the module default, on the same definition
+        plain = opt.build_diverse_candidate_bank(frame, **args)
+        for r in plain["candidate_lineups"]:
+            self.assertEqual(r["contest_fit"]["low_owned_hitter_count"],
+                             self._independent(r["lineup"], opt.DEFAULT_LOW_OWNED_THRESHOLD_PCT))
+
+    # ---- the brief ---------------------------------------------------------
+
+    @staticmethod
+    def _entries(tmp, rosters):
+        path = Path(tmp) / "delivered.csv"
+        header = "Entry ID,Contest Name,Contest ID,Entry Fee," + ",".join(
+            ["P", "P", "C", "1B", "2B", "3B", "SS", "OF", "OF", "OF"]) + "\n"
+        body = "".join(f"{5000 + i},Test,9,$1.00," + ",".join(ids) + "\n"
+                       for i, ids in enumerate(rosters))
+        path.write_text(header + body, encoding="utf-8")
+        return path
+
+    def test_leverage_realized_reports_the_entries_it_was_handed(self):
+        bs = BankCapPerBucketTests._build_slate()
+        frame = diverse_projection_frame()
+        own = {str(p): 10.0 for p in frame.Player_ID}
+        # two pitchers are low-owned too: the count is over HITTER slots only
+        own.update({"21001": 4.0, "21002": 4.0, "21009": 4.0, "20001": 30.0,
+                    "20002": 3.0, "20004": 2.0})
+        frame["Projected_Ownership_Pct"] = [own[str(p)] for p in frame.Player_ID]
+        rosters = [
+            ["20001", "20002", "21001", "21009", "21010", "21011", "21012", "21013", "21014", "21015"],
+            ["20003", "20004", "21017", "21018", "21019", "21020", "21021", "21022", "21023", "21024"],
+            ["20001", "20003", "21001", "21002", "21003", "21004", "21005", "21006", "21007", "21008"],
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._entries(tmp, rosters + [["99999"] * 10])
+            leverage = {"max_cumulative_ownership_pct": 100, "min_low_owned_hitters": 1,
+                        "low_owned_threshold_pct": 6.0, "own_pct_by_player_id": {"1": 1.0},
+                        "source": "x.json"}
+            realized = bs.leverage_realized(path, frame, leverage)
+            sums = [sum(own[p] for p in r) for r in rosters]
+            self.assertEqual(realized["entries"], 3)
+            self.assertEqual(realized["entries_unresolved"], 1)
+            self.assertEqual(realized["threshold_pct"], 6.0)
+            cum = realized["cumulative_ownership_pct"]
+            self.assertEqual((cum["min"], cum["median"], cum["max"]),
+                             (min(sums), sorted(sums)[1], max(sums)))
+            low = realized["low_owned_hitters"]
+            # hitters are slots 2..9; a low-owned pitcher (3.0, 2.0) never counts
+            expected = [sum(1 for p in r[2:] if own[p] < 6.0) for r in rosters]
+            self.assertEqual((low["min"], low["max"]), (min(expected), max(expected)))
+            self.assertEqual(sum(low["distribution"].values()), 3)
+            self.assertEqual(realized["entries_meeting_floor"], sum(1 for n in expected if n >= 1))
+            self.assertIn("labeled prior", realized["source"])
+            # cap_bound: true within 1.0 point (inclusive), false beyond, null with no cap
+            top = max(sums)
+            for cap, want in ((top, True), (top + 1.0, True), (top + 1.01, False), (None, None)):
+                got = bs.leverage_realized(
+                    path, frame, {**leverage, "max_cumulative_ownership_pct": cap})
+                self.assertIs(got["cap_bound"], want, cap)
+            # a player the frame has no prior for reads the 12.0 the constraint reads
+            gap = frame.copy()
+            gap.loc[gap.Player_ID == "21010", "Projected_Ownership_Pct"] = float("nan")
+            again = bs.leverage_realized(path, gap, leverage)["cumulative_ownership_pct"]
+            gap_sums = [sum(12.0 if p == "21010" else own[p] for p in r) for r in rosters]
+            self.assertEqual((again["min"], again["median"], again["max"]),
+                             (min(gap_sums), sorted(gap_sums)[1], max(gap_sums)))
+
+    def test_the_brief_leverage_block_gains_realized_only_when_applied(self):
+        """Through `run_classic`: the off block is exactly what it was (R246, pinned
+        again at `test_core.py:5009`), and a `--leverage` build's block carries
+        `realized` and `cap_bound` read off the DELIVERED file. The prior is a
+        synthetic file built from the fixture's own ids in a temp dir (no test may
+        read Ben's disk)."""
+        wiring = DeadlineGovernorWiringTests(
+            "test_the_anti_correlation_flag_reaches_the_controls_the_validator_grades")
+        wiring.setUp()
+        self.addCleanup(wiring.doCleanups)
+        good = {"passed": True, "run_id": "r1", "workflow_valid": True,
+                "selection_certified": True, "allocation_certified": True,
+                "delivered_path": str(wiring._delivered_csv())}
+        code, brief, _calls, err = wiring._run(30, refusal=good)
+        self.assertEqual(code, 0, err[-600:])
+        self.assertEqual(brief["leverage"], {"applied": False, "reason": "no --leverage supplied"})
+        with wiring._SALARY.open(encoding="utf-8-sig", newline="") as fh:
+            salary_rows_ = list(csv.DictReader(fh))
+        ids = [row["ID"] for row in salary_rows_]
+        # A delivered file the build could have produced: legal, and inside the pool
+        # `run_slate` was handed (the fixture's own file takes the cheapest players of
+        # the whole salary file, most of whom a real pool never holds).
+        pool = {str(r["Player_ID"]) for r in wiring.solve_kwargs[0]["projection_rows"]}
+        chosen, teams = [], {}
+        for slot in wiring._SLOTS:
+            for row in sorted(salary_rows_, key=lambda r: (int(r["Salary"]), r["ID"])):
+                if (row["ID"] not in pool or row in chosen
+                        or slot not in str(row["Roster Position"]).split("/")):
+                    continue
+                if slot != "P" and teams.get(row["TeamAbbrev"], 0) >= 5:
+                    continue
+                chosen.append(row)
+                if slot != "P":
+                    teams[row["TeamAbbrev"]] = teams.get(row["TeamAbbrev"], 0) + 1
+                break
+        self.assertEqual(len(chosen), 10, "the pool holds a legal lineup")
+        wiring._legal_ids = lambda: [r["ID"] for r in chosen]
+        good = dict(good, delivered_path=str(wiring._delivered_csv()))
+        prior = Path(wiring.root) / "ownership_pred.json"
+        prior.write_text(json.dumps({"archetypes": {"large_field_gpp": {
+            "own_pct_by_player_id": {pid: 1.0 + (i % 13) for i, pid in enumerate(ids)}}}}),
+            encoding="utf-8")
+        for constraints, cap_bound in (({"max_cumulative_ownership_pct": 400}, False),
+                                       ({"max_cumulative_ownership_pct": 1.0}, True),
+                                       ({"min_low_owned_hitters": 1}, None)):
+            with self.subTest(constraints=constraints):
+                code, brief, _calls, err = wiring._run(30, refusal=good, args_overrides={
+                    "leverage": {"archetype": "large_field_gpp", **constraints},
+                    "ownership_pred": str(prior)})
+                self.assertEqual(code, 0, err[-600:])
+                block = brief["leverage"]
+                self.assertIs(block["applied"], True)
+                self.assertIs(block["cap_bound"], cap_bound,
+                              "null with no cap, never false for 'nothing to compare'")
+                realized = block["realized"]
+                self.assertEqual(realized["entries"], 2)
+                self.assertEqual(realized["entries_unresolved"], 0)
+                self.assertEqual(realized["threshold_pct"], 10.0)
+                cum = realized["cumulative_ownership_pct"]
+                self.assertEqual(cum["min"], cum["max"], "both entries carry one lineup")
+                self.assertEqual(sum(realized["low_owned_hitters"]["distribution"].values()), 2)
+                self.assertNotIn("cap_bound", realized)
+                self.assertEqual(block["constraints"]["max_cumulative_ownership_pct"],
+                                 constraints.get("max_cumulative_ownership_pct"))
+
+    def test_the_other_tier_reads_are_unchanged(self):
+        """c2 is NOT rewired: these outputs are what ebf9333 gave (frozen), so the
+        field-pressure term, the chalk one-off label and the priority key still read
+        the never-written tier, and GOLD is the second guard."""
+        frame = diverse_projection_frame()
+        frame["Notes"] = ""
+        frame["Ownership_Tier"] = "Mid"
+        lineup, _ = opt.build_single_lineup(frame, target="ceiling")
+        self.assertEqual({t: opt._ownership_priority(t) for t in ("Low", "Mid", "High", "weird")},
+                         {"Low": 0, "Mid": 1, "High": 2, "weird": 99})
+        primary = opt._identify_primary_stack(lineup)
+        self.assertEqual(opt._classify_chalk_one_off(
+            lineup, primary, opt._identify_secondary_stack(lineup, primary)), "stack-only")
+        pressure = opt.compute_field_pressure_score(lineup)
+        self.assertEqual(pressure["high_owned_one_offs"], 0)
+        self.assertEqual(pressure["ownership_sum_pct"], 120.0, "the flat 12.0 fallback, 10 players")
+        self.assertEqual(pressure["field_pressure_score"], 4.55)
+
+
 class AutobuildBankCapTests(unittest.TestCase):
     """R415. autobuild raises a capped bank's cap on a refusal, as search effort.
 

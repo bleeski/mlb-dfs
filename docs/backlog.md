@@ -1273,13 +1273,10 @@ checkpoint has both objects in scope roughly 240 lines above.
 - **Why.** A retro run after a late swap answers "no brief tied to this delivery" where the parent build's `elapsed_s` and degraded inputs are the facts a postmortem wants, labeled as the parent's.
 - **Fix.** The manifest's supersession chain already names a swap row's parent (preflight's `--parent` auto-resolve reads it). Walk it in `retro()`, resolve the PARENT row's brief with `resolve_brief`, and label the section as the parent's, so the retro never presents the parent's brief as the swap's own. Test: a swap record whose parent has a brief resolves to it, labeled; one whose parent has none names that.
 
-### R465. The sliced door serves the union of every live conditions bucket, so a build can be handed lineups built under questions it did not ask, and the brief can count them but not name them; across builds the union also grows by up to one cap per distinct question (P1, S) | new 2026-09-29, found closing R453 (Session 125) | Roadmap: Session 134
+### R465. CLOSED 2026-10-07 -- SHIPPED as roadmap Session 134 (a), entry migrated to CHANGELOG.md
 
-> **Rider 2026-10-02 (Session 144, Phase 3, the board rebuild).** Roadmap: Session 134 (2026-10-02), widened to the three controls that exist but never reach the solver (R465, R455, R197); the sweep banded this entry 1 on its own text (the served set ignores the requested k while the brief says `agrees_with_request`).
+The facts a conditions bucket was built under (the signature's nine inputs, from one normalizer the signature also reads, the byte stream unchanged) are persisted beside `conditions_index` in a sibling key, and the sliced door's brief names each served unrequested bucket and fires `disagreement` when a known bucket differs from the build's request in k, `target` or leverage. The served set is still the union: the filter was declined on its hazards (the depth counters and the cluster source read the union, `_requested_sigs` is incomplete for a skipped sleeve, the bank-thin gate counts the served set) after the union-cost measurement fired its stop rule and the advisor held the call; filed with the measurement in `docs/backlog_inbox/2026-10-07_DEV_served-set-filter-with-topup.md`, and the scoring that runs outside the deadline in `2026-10-07_DEV_as-candidates-scoring-outside-the-deadline.md`. Corrections found verifying this entry are in the CHANGELOG entry (the fact list was stale, the R469 pair shares the ordinary bucket's signature, `disagreement` has no consumer). Full text and gate line: `CHANGELOG.md` 2026-10-07.
 
-- **What.** After R453 the requesting bucket gets its solves, and `BankCache.as_candidates` still serves the union of every live bucket. Reproduced offline on the R453 frame (`extend_bank` on a temp cache, ten hitters measured off each served roster): k=2 to 32 candidates, then a k=0 build at cap 30 builds 30 (all with no hitter against a rostered SP) and serves 62, of which the 32 built under a k=2 request hold a hitter against a rostered SP in 30 (`{0: 2, 1: 22, 2: 8}`). The brief now reads `applied: 0`, `agrees_with_request: true`, `served_from_unrequested_buckets: 32` and an `unmeasured` note, all true, and none of it names the k the 32 were built under: a conditions signature is a hash and `conditions_index` maps signature to projection digest only. The union also grows by one cap per distinct question (`resolve_bank_cap` 1,536 at 27+ entries on this host, so up to 3,072 after one k change); R415 measured the full-bank joint MILP at its 30s limit with gap 3.2% at 3,052 candidates, and the certify path is bounded by the prefilter (about 6 per entry). Not measured: `as_candidates` scoring time and the allocator prefilter over a union that size.
-- **Why.** Truthful labels. The operator who asked for k=0 reads `agrees_with_request: true` and believes k=0 held for the file, and the allocator can seat a k=2 lineup. R453 removed the silence about the requesting bucket; this is the same reading one step later.
-- **Fix.** (a) Persist each bucket's facts (the allowance k, the stack bounds, the target, the cluster limit) beside `conditions_index` in `register_conditions`, read in `_load` and written in `_save_locked` (older files read as unknown), so the brief names what a served bucket was built under and fires `disagreement` when it differs from the request. (b) Decide whether the sliced build door filters its served set to the buckets it requested; `tools/late_swap.py`'s per-entry buckets and `contest_allocator._entry_candidate_compatible` depend on the union, so a filter is this door's alone. (c) Measure a union past `BANK_FULL_SOLVE_CEILING` (scoring, prefilter, the R326 full-bank retry) before choosing. `bank_cache.py` (S), `BS` (XS).
 
 ### R464. Contest-title reading, what R446/R447/R17 left: unguarded substring patterns, a stage-0 title reader, and a title-routed contest still labelled `unresolved` (P3, XS-S) | new 2026-09-29, found by Session 123's premise agents | Roadmap: Session 133
 
@@ -1302,12 +1299,9 @@ A pattern whose curated text begins with whitespace matches only as a whole toke
 - **What.** `optimizer_v3.py:1546-1555` (`_identify_primary_stack`) is eligible only at `>= PRIMARY_STACK_MIN_HITTERS`, else `""`; `dk_entries_manager.py:804-809` (`_primary_stack`) takes `max(counts)` with an alphabetical tie and no threshold; `contest_allocator.py:532` reads the optimizer's field and `fixed_portfolio_exposure` (`:812`) the validator's for the swap offsets. A stackless 2-2-2-2 roster carries no bucket in the solve and a bucket (`"AAA"`) in the validator and the swap offsets. Reachable when the floor ladder lands on `None` (its last rung) or a swap's locked slots leave a stackless roster; then the stack cap can fail post-export on a portfolio the solve held.
 - **Fix.** Give `_primary_stack` the same threshold (or import `candidate_primary_stack`'s rule).
 
-### R455. `Locked` is a core projection schema column with no reader: a `Locked=True` cell locks nobody, silently (P3, XS) | new 2026-09-25, found by the 2026-09-25 code review (optimizer area; `review_optimizer/locked_col.py`) | Roadmap: Session 80
+### R455. CLOSED 2026-10-07 -- SHIPPED as roadmap Session 134 (b), entry migrated to CHANGELOG.md
 
-> **Rider 2026-10-02 (Session 144, Phase 3, the board rebuild).** Roadmap: Session 134 (2026-10-02; moved out of Session 80). A `Locked=True` cell locks nobody, a control that exists but never reaches the solver; measured: Otto Kemp `Locked=True` leaves him out with the objective unchanged, `locks=[43205996]` seats him.
-
-- **What.** `optimizer_v3.py:492` requires it in `CORE_PROJECTION_FIELDS`, `projection_builder.py:158-159` defaults it False, `MLB_Classic.md:170` lists it in the contract; a repo-wide grep finds no reader. Locks reach the solver only through the `locks` and `locked_slot_assignments` arguments. Measured: `Locked=True` on Otto Kemp leaves him out of the lineup with the objective unchanged; `locks=[43205996]` seats him. No production writer sets it True, so this is the same operator-edit path R289 hardened for `Excluded`.
-- **Fix.** Read it in `_prepare_single_lineup_df` beside `Excluded` (one reader, counted like `excluded_flags`), or drop it from the contract.
+`Locked` left the projection contract (decided: dropped, not wired). A frame-level lock puts the player in every bank candidate, the allocator's R311 check then needs `max_player_exposure_pct` at 1.0 for everyone, and no per-player exemption exists, so the interaction cannot be made honest inside the row; in production the cell cannot even arrive (`_assemble_projection_frame` builds a fixed key set). A True cell is counted and named as ignored in the schema report (`ignored_columns`). The two default writers stay so frame bytes and cache digests stay put (`docs/backlog_inbox/2026-10-07_DEV_inert-locked-writers-and-adjacent-stale-comments.md`). Full text and gate line: `CHANGELOG.md` 2026-10-07.
 
 
 ### R443. CLOSED 2026-09-29 -- SHIPPED as roadmap Session 116 (c), entry in CHANGELOG.md
@@ -2128,83 +2122,10 @@ entry.
   low-owned bats for a top-heavy large field. Grades belong in the ledger,
   which is ARCHIVE's write.
 
-### R197. `_low_owned_hitter_count` reads a key no writer writes, so it is identically 0 while R154's constraint counts the real thing (P2, XS) | new 2026-08-23, merged from ARCHIVE fragment `2026-08-22_ARCHIVE_low-owned-diagnostic-false-signal.md`; VERIFIED-repro by the filing session
+### R197. CLOSED 2026-10-07 -- SHIPPED as roadmap Session 134 (c), entry migrated to CHANGELOG.md
 
-> **Rider 2026-10-02 (Session 144, Phase 3, the board rebuild).** Roadmap: Session 134 (2026-10-02; moved out of Session 47). R246 made `--leverage` live, and this entry's 2026-09-09 rider shows the dead low-owned counter on a live leverage build, so the defect is live, not latent: a control that exists but never reaches the solver.
+`_low_owned_hitter_count` reads the quantity R154's constraint reads (one definition, `_row_is_low_owned`, with the build's own bar threaded to all four scorer call sites) and the `--leverage` brief's block carries `realized` and `cap_bound` (null with no cap). The tier class was five behaviours, not four, and none of the other four is rewired (a strategy call; measured on the vendored slate and filed in `docs/backlog_inbox/2026-10-07_DEV_ownership-tier-reads.md`); `Ownership_Tier` stays. Full text and gate line: `CHANGELOG.md` 2026-10-07.
 
-- **What:** `optimizer_v3._low_owned_hitter_count` counts rows where
-  `Ownership_Tier == 'Low'`. Every writer of `Ownership_Tier` in the tree
-  writes the literal `"Mid"` and that is the complete set
-  (`slate_intake_manager.py:1353`, `execution_pipeline.py:3070`, `:3384`,
-  `:3661`), so `low_owned_hitter_count` in every candidate record is 0. R154
-  (landed 08-19) added the REAL low-owned test as a MILP constraint on
-  `Projected_Ownership_Pct` against `DEFAULT_LOW_OWNED_THRESHOLD_PCT = 10.0`,
-  and left the old diagnostic standing beside it. Repro'd directly: a frame of
-  five hitters at 4.0% ownership gives 5 by the constraint's measure and 0 by
-  the diagnostic's.
-- **Why:** the 2026-08-15 false-signal batch closed on the stated theme that
-  "the underlying computation was already correct, but the line reporting it
-  either couldn't fire, blamed the wrong control, or pointed at a key that
-  didn't exist." This is that, and it arrived four days AFTER the batch closed.
-  A build satisfying a `min_low_owned_hitters` floor of 4 reports 0 low-owned
-  hitters in its own record. Nothing calls `attach_projected_ownership` on the
-  production path yet, so the disagreement is latent rather than live — the
-  cheapest possible moment to fix it, and also the moment at which it is
-  easiest to ship a build whose counters lie.
-- **Fix:** read the diagnostic off the same quantity the constraint reads
-  (`_ownership_pct_for_row(row) < DEFAULT_LOW_OWNED_THRESHOLD_PCT`), hitters
-  only, keyed on the slot's required POSITION and not the slot name — R154's
-  own bring-up already found `slot != 'P'` is true for P1/P2. One definition of
-  low-owned in the module, the way R154 put one definition of the threshold in
-  it. Then decide whether `Ownership_Tier` should exist at all now that
-  `Projected_Ownership_Pct` is the live column; if it stays, a guard that fails
-  loudly when a behaviour-bearing read finds only the default would have caught
-  this and R10's original inertness both.
-- **RIDER 2026-08-24, and the class is FOUR reads, not one (Codex spec D19,
-  every site re-verified here).** This entry names one dead read. The tree has
-  four, all downstream of the same never-written column, and one of them is not
-  a diagnostic. `optimizer_v3.py:3043` (`== 'Low'`, the filed one, identically
-  0); `:3454` (`== 'High'` in the field-pressure score, identically False, so
-  the off-primary chalk term never fires); `:1354` and `:2010`
-  (`_ownership_priority` over the tier, a constant ordering key that therefore
-  breaks no ties); and **`:3018`,
-  `DEFAULT_OWNERSHIP_PCT_BY_TIER.get(row.get('Ownership_Tier', 'Mid'), 12.0)`,
-  which returns a flat 12.0 for every player on the slate** and feeds the
-  ownership-total contribution the field-pressure score is built from. That
-  last one is the reason this rider matters: the filed item reads as "one
-  counter says 0", and the actual condition is that a scoring term has a
-  constant input while `has_duplication_signal` can still read True. Writer
-  line numbers in the What have also moved (`execution_pipeline.py:3099`,
-  `:3412-3413`, `:3689`; `slate_intake_manager.py:1353` unchanged). This is
-  ed7 §1.2's finding shape applied to this board's own entry: when an item
-  names one site, count the sites before believing one. Fix scope grows
-  accordingly — decide `Ownership_Tier`'s existence FIRST, because three of the
-  four reads want deleting rather than repointing.
-
-**Rider 2026-09-09, from BUILD fragment
-`2026-09-08_BUILD_2140_5g-no-game-level-exposure-control.md` (second half): the
-realized leverage numbers are not in the brief either, and the skill's starting
-cap is a constant against a bind point that moves.** On 2140_5g (5 games, 208
-priced hitter rows, top hitter 14.7%) `--leverage` at the skill's recommended
-`max_cumulative_ownership_pct: 95` never bound: the delivered entries' ten-slot
-sums ran 53.5 to 93.9, low-owned carry was 0 of 15 in BOTH builds, and only
-`min_low_owned_hitters: 1` moved anything (entries carrying at most one of the
-top trio 8 -> 10, apex 1975.69 -> 1956.34, -1.0%). The brief's `leverage` block
-(`execution_pipeline.py:4946-4952`) carries `applied` and the three REQUESTED
-values and no realized figure, so the session computed the sums by hand from
-the delivered file; a cap that never bound reads identically to one that did.
-SKILL.md's leverage paragraph said "an unconstrained lineup lands near 100-105
-and a cap of 90 is a real bind ... Start at 90-95", true on 1605_2g (cap 90,
--7.72%) and 2210_2g (cap 95, -22.1%) and false here: the bind point scales with
-the prior's spread, and on a wide slate 95 sits ABOVE the unconstrained sum.
-Fix, same XS: the `leverage` block gains `realized` (per-entry cumulative
-ownership sum as min/median/max, and per-entry low-owned count, the latter being
-THIS item's count computed the way R154's constraint computes it) plus
-`cap_bound: bool` (max realized sum within 1pp of the cap). SKILL.md's paragraph
-was corrected on 2026-09-09 to carry the third reading and to say the start is
-read off the build's own sums rather than a constant; the brief field is what
-makes that instruction followable, and until it lands the sums come from the
-delivered file.
 
 ### R83. Per-run calibration provenance: persist the factor audit, hash-bind enrichment inputs, golden-replay one real manifest row (S) | audit 2026-08-04
 

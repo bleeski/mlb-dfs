@@ -569,11 +569,12 @@ Five things to know before you use it:
   priced hitter rows, top hitter 14.7%) the delivered ten-slot sums ran 53.5 to
   93.9 under cap 95, low-owned carry stayed 0 of 15 in both builds, and only
   `min_low_owned_hitters: 1` moved the file. So the start is a little under the
-  UNCONSTRAINED build's own maximum ten-slot sum, not a constant. The brief does
-  not print that sum yet (R197 rider, 2026-09-09): until it does, sum
-  `Projected_Ownership_Pct` over each delivered lineup before choosing a cap,
-  and if the cap sits above that maximum say so in the handoff rather than
-  reporting a leverage build.
+  UNCONSTRAINED build's own maximum ten-slot sum, not a constant. The brief prints
+  that sum since R197: `leverage.realized` (per-entry cumulative `Projected_Ownership_Pct`
+  min/median/max, and the per-entry low-owned hitter count at the build's threshold) and
+  `leverage.cap_bound` (true when the largest sum is within 1 point of the cap, null with no
+  cap). Read them off the first build before choosing a cap, and if `cap_bound` is false say
+  so in the handoff rather than reporting a leverage build.
 - **Since R342(a) the cap binds at its FACE value, and every reading above was measured on the raw
   map.** The prior spends 1000 points over the whole salary file and the engine's frame is the pool,
   so the map is now rescaled to the pool (hitters to 800, pitchers to 200) before the solver reads
