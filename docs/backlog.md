@@ -1520,59 +1520,9 @@ rank_delta of 8, and the side whose prior was untouched stays silent. Roadmap:
 Batch (2 of 2) beside R253, the other projection-factor refinement, with (a)
 landable earlier if Ben pulls it.
 
-### R332. The handedness backfill that takes `f4_platoon_applied` from 0 to 90 of 90 on a DK-covered slate is a per-slate hand-roll in a gitignored scratch file (P2, S) | new 2026-09-08, merged from BUILD fragment `2026-09-08_BUILD_1835_5g-anticorrelation-unobserved-and-handedness-backfill.md` (half (b); half (a) shipped in the same commit and is in CHANGELOG.md); measured on 1835_5g with a full rebuild
+### R332. CLOSED 2026-10-08 -- SHIPPED as roadmap Session 33 part 3, entry migrated to CHANGELOG.md
 
-**What.** R143's zero-fetch path is the NORMAL state of a fully DK-covered
-slate: on 1835_5g `dk_order_coverage` reported 10 of 10 sides, `sides_left_to_feed`
-empty, and nothing wrote a feed. The documented cost is that DK ships no
-handedness, so F4's platoon half goes neutral and `f4_handedness_unavailable`
-names every side. BUILD closed it by hand and the route works; the generator
-lives in `tools/_scratch_1835_5g/gen_paste.py`, which is gitignored, slate-scoped
-and swept at slate close, so the next DK-covered slate hand-rolls the map again.
-
-**The route, which is the thing to make first-class.** (1) `WebFetch` on
-`statsapi.mlb.com/api/v1/teams/<id>/roster?rosterType=40Man&hydrate=person&fields=...batSide,pitchHand...`,
-one call per team -- WebFetch is served Anthropic-side and is not subject to the
-container's egress proxy, which mattered here because `statsapi.mlb.com` and
-`api.the-odds-api.com` were both 403 from the device VM AND the container that
-session (R316's standing instruction: measure the egress, in both directions).
-(2) Generate an mlb.com-shaped paste whose NAMES and BATTING ORDER come from the
-DKSalaries file itself, so DK stays authoritative per R143 and no
-`dk_batting_order.disagreements` entry can be minted, with bat side as the only
-added column. (3) `tools/lineups_from_paste.py` -> ordinary feed ->
-`build_slate.py --lineups`. Result: `f4_platoon_applied` 0 -> **90 of 90**,
-`f4_handedness_unavailable: []`, `disagreements: []`, zero blockers, no
-`--resolve` needed.
-
-**Why it is not decoration, measured rather than argued.** It changed the
-portfolio, not just the report. LAA came back with the slate's HIGHEST mean F4
-(1.063) on eight righty bats against LHP Sandoval while carrying the slate's
-LOWEST F1 (0.924), and took 2 of 9 primary stacks; BOS came back with the LOWEST
-mean F4 (0.909), lefty-leaning into LHP Detmers, and took 1. Neither ordering is
-visible with the platoon term neutral, so on a fully DK-covered slate the
-zero-fetch build is not merely missing half of F4 -- it is blind to the one axis
-that separated the two sides of that slate's only LHP-vs-LHP game pair.
-
-**Fix (S).** `tools/handedness_paste.py --salary <csv>`, taking a bat-side map on
-stdin or from a cached `data/reference/handedness.csv` and emitting the paste.
-Handedness is a stable player attribute, so the cached reference refreshed on the
-same footing as the Savant files removes the per-team fetches entirely; age it
-per player against its own stamp rather than per file, which is R317(b)'s lesson
-arriving before the file exists rather than after. A tool plus a reference file
-is its own session, which is why this is filed rather than ridden into the
-commit that shipped the fragment's other half. Roadmap: Session 9, with the
-platoon cluster it shares a subject with.
-
-**Rider 2026-09-09, Showdown sighting, from BUILD fragment
-`2026-09-08_BUILD_2210_1g_sd_appg-is-blind-to-opponent-quality.md` §2.** On
-2210_1g_sd (CIN@LAD, 2026-09-08, both sides posted by DK)
-`construction.platoon_unresolved_teams` read `["CIN", "LAD"]`: the handedness
-was in neither DK's `Starting` column nor the staged feed, which belonged to the
-day's earlier five-game slates. Honest, and the NORMAL state of a fully
-DK-covered Showdown slate, so F4's platoon half is structurally unavailable
-where one game makes it matter most. Same fix, same session; the Showdown path
-is the second consumer the tool and the reference serve, and the acceptance test
-runs once on each format.
+`tools/handedness_feed.py` (renamed from the filed `handedness_paste.py`: it emits the lineups FEED, because a paste cannot say "hand unknown") seeds and upserts `data/reference/handedness.csv` (per-row `stamped` and `source`, aged per player) and builds a DK-covered slate's feed through `dk_starting_only_feed` with `bat_side` and each probable's `hand` stamped from it; a player the cache lacks stays blank and is named. Acceptance run on both formats (the Showdown rider). Pinned by `test_core.HandednessTests`. Gate and commit: the CHANGELOG entry.
 
 ### R328. CLOSED 2026-09-20 -- SHIPPED across two commits, entries migrated to CHANGELOG.md
 
