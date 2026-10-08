@@ -5486,9 +5486,54 @@ def showdown_handedness(args, slate_dir: Path, df) -> tuple[dict, dict, dict]:
     of seven aliases in ``DK_ABBREV_REMAP``; the six FanGraphs spellings
     (``WSN`` ``TBR`` ``CHW`` ``KCR`` ``SDP`` ``SFG``) reach this same boundary
     from a pasted or FanGraphs-sourced feed.
+
+    R399(b). The bat-side map is keyed by ``(accent-folded name, DK team)`` and
+    counted the same way, because it was keyed by the feed's raw name and looked
+    up by DK's: `Luis García Jr.` against `Luis Garcia Jr.` and `Yandy Díaz`
+    against `Yandy Diaz` both missed (16 of 18 on 1830_1g_sd) and took the flat
+    1.00 with `teams_without_hand: []` and nothing naming them. A key two feed
+    hitters share with DIFFERENT sides is ambiguous and resolves to no side,
+    never a guess; every pool hitter left without a side is named in
+    ``note["hitters_without_side"]`` and on one stderr line. A warning, never a
+    refusal.
     """
     from mlb_engine.intake.live_data_adapters import to_dk_abbrev
-    note: dict = {"source": None, "hitters_with_side": 0, "teams_with_hand": 0}
+    from mlb_engine.optimize import showdown_theses as _st
+    note: dict = {"source": None, "hitters_with_side": 0, "teams_with_hand": 0,
+                  "hitters_without_side": []}
+    ambiguous_keys: set = set()
+
+    def _tally(side_map: dict) -> None:
+        """Count the pool's hitters that resolve a side and name the rest."""
+        by_key, by_name, _ = _st.index_bat_sides(side_map)
+        hitters = df
+        if len(df) and "Batting_Order" in df.columns:
+            hitters = df[df["Batting_Order"].notna()]
+        seen: set = set()
+        with_side, without = 0, []
+        for name, team in zip(hitters["Name"], hitters["Team"]) if len(hitters) else ():
+            if (name, team) in seen:
+                continue
+            seen.add((name, team))
+            if _st.lookup_bat_side(by_key, by_name, name, team):
+                with_side += 1
+            else:
+                key = _st.hitter_key(name, team)
+                without.append({
+                    "name": str(name), "team": str(team),
+                    "reason": ("ambiguous in the feed (two hitters share the key "
+                               "with different sides)" if key in ambiguous_keys
+                               else "no bat side in the feed")})
+        note["hitters_with_side"] = with_side
+        note["hitters_without_side"] = sorted(
+            without, key=lambda r: (r["team"], r["name"]))
+        if without:
+            names = ", ".join(f"{r['name']} ({r['team']})" for r in note[
+                "hitters_without_side"][:12])
+            more = len(without) - 12
+            print(f"showdown handedness: {len(without)} of {with_side + len(without)} "
+                  f"hitters have no bat side and take the flat 1.00 platoon factor: "
+                  f"{names}{f' (+{more} more)' if more > 0 else ''}", file=sys.stderr)
     feed_path = Path(args.lineups) if args.lineups else slate_dir / "lineups_feed.json"
     feed = None
     if feed_path.exists():
@@ -5504,10 +5549,11 @@ def showdown_handedness(args, slate_dir: Path, df) -> tuple[dict, dict, dict]:
             note["source"] = "fetched"
         except Exception as exc:
             note["warning"] = f"lineups feed unavailable ({exc}); platoon stays flat"
+            _tally({})
             return {}, {}, note
 
     teams = set(df["Team"].unique()) if len(df) else set()
-    bat_side: dict = {}
+    seen_sides: dict = {}
     hand: dict = {}
     for game in (feed.get("games") or []):
         for side in ("away", "home"):
@@ -5518,11 +5564,15 @@ def showdown_handedness(args, slate_dir: Path, df) -> tuple[dict, dict, dict]:
                                   or block.get("abbrev"))
             for hitter in (block.get("lineup") or []):
                 if hitter.get("bat_side") and hitter.get("name"):
-                    bat_side[str(hitter["name"])] = str(hitter["bat_side"])
+                    seen_sides.setdefault(
+                        _st.hitter_key(hitter["name"], abbrev), set()).add(
+                        str(hitter["bat_side"]).strip().upper()[:1])
             pitcher = block.get("probable_pitcher") or block.get("probable") or {}
             if abbrev and pitcher.get("hand"):
                 hand[str(abbrev)] = str(pitcher["hand"])
-    note["hitters_with_side"] = sum(1 for n in bat_side if n in set(df["Name"]))
+    ambiguous_keys.update(k for k, v in seen_sides.items() if len(v) > 1)
+    bat_side: dict = {k: next(iter(v)) for k, v in seen_sides.items() if len(v) == 1}
+    _tally(bat_side)
     note["teams_with_hand"] = len([t for t in hand if t in teams])
     # pitcher_hand is keyed by the team a hitter FACES, so invert: a hitter on
     # LAD is graded against the NYM starter's hand.
@@ -7280,6 +7330,10 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
             "bullpen_teams": (ladder_meta.get("shape") or {}).get("bullpen_teams"),
             "platoon_unresolved_teams": list(
                 (priced.attrs.get("platoon_unresolved_teams") or [])),
+            # R122 (report). The hitters beside the teams: a bat with no side on
+            # a side whose arm resolved took the flat 1.00 and was named nowhere.
+            "platoon_unresolved_hitters": list(
+                (priced.attrs.get("platoon_unresolved_hitters") or [])),
             "handedness": feed_note,
             "odds": odds_note,
             "lineups": report.get("lineups"),

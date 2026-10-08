@@ -453,6 +453,8 @@ the batch's named rider and did not get pulled.
 
 ### R122, REWRITTEN 2026-09-01 to its surviving remainder. The platoon factor dies at the HITTER intake, per player and silently, and the field that exists to report it is keyed on the PITCHER (P1, XS-S) | new 2026-08-14; **the ed6 rider and the LHP-only face are both CLOSED**, see below
 
+> **Rider 2026-10-08 (Session 33, commit 2).** The REPORT half LANDED (CHANGELOG, `test_showdown.PerHitterPlatoonTests`): `apply_base_prior` sets `platoon_unresolved_hitters` (a non-switch hitter with no bat side, named with his team and reason) beside `platoon_unresolved_teams`, and the Showdown brief's `construction` carries it. The SOLVER half (a per-hitter shrunk split in place of the flat 0.94 / 1.04) remains in Session 33; it needs a captured splits file the tree does not have.
+
 > **Rider 2026-10-02 (Session 144, Phase 3, the board rebuild).** premise re-verified at HEAD e4588bc, HOLDS, and SPLIT: the flat 1.00 factor at `showdown_theses.py:131-134` goes into `Base_Prior` and then `Base` (:139-142) and reaches the ladder solver; no per-hitter unresolved field exists. (report) name the unresolved hitters: band 3, XS. (solver) the riders' per-hitter shrunk split, Showdown only: band 1 (1940_1g_sd Turang 4 -> 2 entries and off captain, not re-run), S-M. Both stay in Session 33; the row names the parts.
 
 **Rider 2026-09-09, from BUILD fragment
@@ -5521,9 +5523,9 @@ The refusal was `mlb_engine/intake/paste_odds.py`'s, and the pool's `excluded_po
 - **What.** On 1840_5g, WSH ran Cornelio (PO) then Kent (PLR). `--declare-pitcher` made Kent rosterable, but `extract_opposing_probables` (`live_data_adapters.py:1423`) read the feed's probable, so DET hitters were graded against Cornelio (.296) instead of Kent (.351). Measured on the same inputs: DET mean F4 0.911 → 1.059, primary stacks 0 → 1.
 - **Fix.** When a side is PO and a declared bulk arm exists, grade against the bulk arm or a PA-weighted blend, and name the substitution in `pool_report`.
 
-### R399. Five small defects from the 1915_1g_sd Showdown build (P2, XS each) | new 2026-09-22, from `docs/backlog_inbox/2026-09-22_BUILD_showdown-1915-small-defects.md`; (a)(e) SHIPPED 2026-09-23 as roadmap Session 04 (a), migrated to CHANGELOG.md | Roadmap: (b) Session 33, (c)(d) 63
+### R399. Five small defects from the 1915_1g_sd Showdown build (P2, XS each) | new 2026-09-22, from `docs/backlog_inbox/2026-09-22_BUILD_showdown-1915-small-defects.md`; (a)(e) SHIPPED 2026-09-23 as roadmap Session 04 (a), migrated to CHANGELOG.md | Roadmap: (c)(d) 63; (b) CLOSED 2026-10-08 (Session 33)
 
-- **(b)** `showdown_handedness` misses accented names (14 of 18 matched). Reuse the NFKD normalization and WARN.
+- **(b) CLOSED 2026-10-08** (roadmap Session 33, migrated to CHANGELOG.md): `showdown_handedness` and `apply_base_prior` join on `(accent-folded name, DK team)` through one helper, an ambiguous key is named and never guessed, and every pool hitter left without a side is named and warned. Pinned by `test_showdown.PerHitterPlatoonTests`.
 - **(c)** `f1.prior.factor_by_team` records the first row per team, which is the pinned SP's 1.0.
 - **(d)** `qa_portfolio` prints "F1 NEUTRAL" on a Showdown brief that applied F1, because it reads the Classic `enrichment` shape.
 

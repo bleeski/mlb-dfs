@@ -87,10 +87,65 @@ TOP, MIDDLE, BOTTOM = (1, 2, 3), (4, 5, 6), (7, 8, 9)
 
 
 # --------------------------------------------------------------------------- #
+# Bat-side join (R399(b))
+# --------------------------------------------------------------------------- #
+def hitter_key(name: Any, team: Any) -> tuple:
+    """The join key for a hitter's bat side: accent-folded name AND DK team.
+
+    R399(b). The map was keyed by the feed's raw name and looked up by DK's, so
+    `Luis García Jr.` against `Luis Garcia Jr.` and `Yandy Díaz` against `Yandy
+    Diaz` both missed (16 of 18 on 1830_1g_sd) and took the flat 1.00 with nothing
+    saying so. `normalize_name` folds diacritics and STRIPS Jr./Sr./III, so the
+    name alone would collapse `Luis Garcia Jr.` and `Luis Garcia` into one key
+    where exact-string never collided; the team keeps them apart.
+    """
+    from mlb_engine.intake.slate_intake_manager import normalize_name
+    return (normalize_name(name), str(team or "").strip().upper())
+
+
+def index_bat_sides(bat_side: Optional[Mapping[Any, Any]]) -> tuple:
+    """`(by_key, by_name, ambiguous)` from a caller's bat-side map.
+
+    A key is `(normalized name, team)` (what `showdown_handedness` builds; the
+    name is taken as already normalized, an empty team makes it a name-only
+    entry) or a plain name string (the older shape, normalized here so a raw
+    name-keyed caller keeps working). A key two entries share with DIFFERENT
+    sides is ambiguous and resolves to no side: unmatched or ambiguous is
+    skipped, never guessed.
+    """
+    from mlb_engine.intake.slate_intake_manager import normalize_name
+    seen_key: Dict[tuple, set] = {}
+    seen_name: Dict[str, set] = {}
+    for key, value in dict(bat_side or {}).items():
+        side = str(value or "").strip().upper()[:1]
+        if not side:
+            continue
+        if isinstance(key, tuple) and len(key) == 2:
+            team = str(key[1] or "").strip().upper()
+            if team:
+                seen_key.setdefault((str(key[0]), team), set()).add(side)
+            else:
+                seen_name.setdefault(str(key[0]), set()).add(side)
+        else:
+            seen_name.setdefault(normalize_name(key), set()).add(side)
+    by_key = {k: next(iter(v)) for k, v in seen_key.items() if len(v) == 1}
+    by_name = {k: next(iter(v)) for k, v in seen_name.items() if len(v) == 1}
+    ambiguous = sorted(k for k, v in seen_key.items() if len(v) > 1)
+    return by_key, by_name, ambiguous
+
+
+def lookup_bat_side(by_key: Mapping[tuple, str], by_name: Mapping[str, str],
+                    name: Any, team: Any) -> str:
+    """The bat side for one hitter, '' when the map has none or is ambiguous."""
+    key = hitter_key(name, team)
+    return by_key.get(key) or by_name.get(key[0]) or ""
+
+
+# --------------------------------------------------------------------------- #
 # Base prior
 # --------------------------------------------------------------------------- #
 def apply_base_prior(df: pd.DataFrame,
-                     bat_side: Optional[Mapping[str, str]] = None,
+                     bat_side: Optional[Mapping[Any, str]] = None,
                      pitcher_hand: Optional[Mapping[str, str]] = None) -> pd.DataFrame:
     """Replace Base (raw AvgPointsPerGame) with a labeled prior:
     salary-regressed APPG x batting-order PA factor x platoon factor.
@@ -104,9 +159,17 @@ def apply_base_prior(df: pd.DataFrame,
     every hitter and the platoon component contributed nothing while still
     appearing in the prior_note. ``pitcher_hand`` maps a TEAM to its declared
     starter's hand; a team missing from it gets a flat factor and is reported.
+
+    R122 (report). A hitter whose bat side the map does not carry is named in
+    ``out.attrs["platoon_unresolved_hitters"]`` beside the teams list: the teams
+    list fires only on a missing OPPOSING hand, so a hitter with no side on a side
+    whose arm resolved took the flat 1.00 and appeared nowhere (1920_1g_sd: 11 of
+    18). ``bat_side`` is keyed by ``hitter_key`` (name AND team) or by a plain name;
+    see ``index_bat_sides``. A switch hitter resolves to a flat 1.00 on purpose and
+    is not unresolved.
     """
     out = df.copy()
-    bat_side = dict(bat_side or {})
+    by_key, by_name, _ambiguous = index_bat_sides(bat_side)
     pitcher_hand = {k: str(v).upper()[:1] for k, v in (pitcher_hand or {}).items()}
 
     hit = out["Batting_Order"].notna()
@@ -120,17 +183,22 @@ def apply_base_prior(df: pd.DataFrame,
     out["APPG_Raw"] = out["Base"].astype(float)
 
     unresolved: set[str] = set()
+    unresolved_hitters: list[dict] = []
 
     def prior(row):
         if pd.isna(row["Batting_Order"]):
             return float(row["APPG_Raw"])                    # pitchers keep APPG
         blended = 0.60 * float(row["Salary_Fit"]) + 0.40 * float(row["APPG_Raw"])
         f_order = ORDER_FACTOR[int(row["Batting_Order"])]
-        side = str(bat_side.get(row["Name"], "")).upper()[:1]
+        side = lookup_bat_side(by_key, by_name, row["Name"], row.get("Team"))
         opp_hand = pitcher_hand.get(row["Opponent"], "")
         if not side or not opp_hand or side == "S":
             if not opp_hand:
                 unresolved.add(str(row["Opponent"]))
+            if not side:
+                unresolved_hitters.append({
+                    "name": str(row["Name"]), "team": str(row.get("Team") or ""),
+                    "reason": "no bat side"})
             f_plat = 1.00
         elif side == opp_hand:                               # same-handed: penalty
             f_plat = 0.94
@@ -141,6 +209,8 @@ def apply_base_prior(df: pd.DataFrame,
     out["Base_Prior"] = out.apply(prior, axis=1)
     out["Base"] = out["Base_Prior"]
     out.attrs["platoon_unresolved_teams"] = sorted(unresolved)
+    out.attrs["platoon_unresolved_hitters"] = sorted(
+        unresolved_hitters, key=lambda r: (r["team"], r["name"]))
     return out
 
 
