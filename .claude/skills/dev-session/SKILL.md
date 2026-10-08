@@ -8,7 +8,7 @@ argument-hint: [Session NN or R-number, optional]
 
 You are DEV. CLAUDE.md is the contract and it has already loaded; this skill is the procedure. The SessionStart hook has printed HEAD, held claims, dirt, the git log, the NEXT pointer, and any git locks; if it did not, run step 1 by hand.
 
-**Done means** the item's verification command passes, the gate prints its PASS line, the CHANGELOG entry and the roadmap row land in the same commit, and the PR merges on a green `gate`. Between here and there, stop only for a fact only Ben has or the nod §2 requires; `/land` and `/ship` are yours to run. A status note rides in the same message as the next action.
+**Done means** the item's verification command passes, the gate prints its PASS line, the CHANGELOG entry and the roadmap row land in the same commit, the PR merges on a green `gate`, and `/handoff` has run (`/ship` runs it) so Ben has the next-session prompt. Between here and there, stop only for a fact only Ben has or the nod §2 requires; `/land` and `/ship` are yours to run. A status note rides in the same message as the next action.
 
 ## 1. Orient (no writes yet)
 
@@ -21,7 +21,7 @@ You are DEV. CLAUDE.md is the contract and it has already loaded; this skill is 
 
 ## 2. Plan before code
 
-Write the plan as a short list Ben could read: what is wrong (verified against the tree, not the entry), which files, which tests, what the gate line and golden histogram should look like after. For an M item or anything touching `optimizer_v3.py`, `contest_allocator.py`, or `execution_pipeline.py`, use plan mode and get Ben's nod before editing. Reproduce first: the filed diagnosis has been wrong about the mechanism more often than right (see `.claude/rules/engine.md`).
+Write the plan as a short list Ben could read: what is wrong (verified against the tree, not the entry), which files, which tests, what the gate line and golden histogram should look like after. For an M item or anything touching `optimizer_v3.py`, `contest_allocator.py`, or `execution_pipeline.py`, use plan mode and get Ben's nod before editing. A session started from a `/handoff` prompt opens in `/plan` for any item; that prompt is Ben's override of this threshold (2026-10-08). Reproduce first: the filed diagnosis has been wrong about the mechanism more often than right (see `.claude/rules/engine.md`).
 
 ## 3. Implement
 
@@ -35,7 +35,7 @@ Write the plan as a short list Ben could read: what is wrong (verified against t
 
 Run `/land`. It is the checklist: full gate, CHANGELOG entry in the same commit, roadmap row Complete, NEXT advanced and ledger row, register migration, explicit-path add and commit, subject at most 100 characters, release the claim, then `/ship` (R353 made the push, the PR and the merge the session's).
 
-End the session's last message in this order: what is blocked on Ben (a question, or a declined part that needs his call), then what changed (the PR or merge sha and the gate line), then what you found and filed.
+End the session's last message in this order: what is blocked on Ben (a question, or a declined part that needs his call), then what changed (the PR or merge sha and the gate line), then what you found and filed, then `/handoff`'s PowerShell block and next-session prompt, which stay last so the prompt is what gets copied.
 
 ## Gotchas that have each cost a session
 

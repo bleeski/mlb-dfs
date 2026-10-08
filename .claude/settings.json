@@ -1,5 +1,5 @@
 {
-  "$comment": "Project-shared Claude Code settings for mlb-dfs (R301 2026-09-15, R353 2026-09-17, R372 2026-09-19, R424 2026-09-25: the Fable advisor). Personal overrides go in .claude/settings.local.json (gitignored). Deny rules are enforced by the client; CLAUDE.md is advisory. The command guard hook covers the regex cases a prefix rule cannot. Hosts: docs/hosts.md.",
+  "$comment": "Project-shared Claude Code settings for mlb-dfs (R301 2026-09-15, R353 2026-09-17, R372 2026-09-19, R424 2026-09-25: the Fable advisor, R491 2026-10-08: /handoff). Personal overrides go in .claude/settings.local.json (gitignored). Deny rules are enforced by the client; CLAUDE.md is advisory. The command guard hook covers the regex cases a prefix rule cannot. Hosts: docs/hosts.md.",
   "advisorModel": "fable",
   "env": {
     "BASH_DEFAULT_TIMEOUT_MS": "900000",
@@ -11,6 +11,7 @@
       "Bash(python tools/claim.py*)",
       "Bash(python tools/solver_probe.py*)",
       "Bash(python tools/sync_check.py*)",
+      "Bash(python tools/handoff.py*)",
       "Bash(python tools/awaiting_standings.py*)",
       "Bash(python tools/qa_portfolio.py*)",
       "Bash(python tools/preflight_upload.py*)",
@@ -28,6 +29,7 @@
       "PowerShell(python tools/claim.py*)",
       "PowerShell(python tools/solver_probe.py*)",
       "PowerShell(python tools/sync_check.py*)",
+      "PowerShell(python tools/handoff.py*)",
       "PowerShell(python tools/awaiting_standings.py*)",
       "PowerShell(python tools/qa_portfolio.py*)",
       "PowerShell(python tools/preflight_upload.py*)",

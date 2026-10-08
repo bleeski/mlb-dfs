@@ -78,11 +78,18 @@ five are absent optional files, on every host including CI. A sixth is a finding
 ## 5. Merge
 
 Once `gate` is green and there is no conflict, merge it and delete the branch.
-Then report. Lead with anything waiting on Ben (a question, a declined part that
-needs his call); then one line: the merge sha, the gate line, and what Ben would
-notice.
 
-## 6. If you cannot finish
+## 6. Hand off
+
+Run `/handoff` (R491). It levels this checkout and Ben's clone with GitHub,
+deletes only the branches already on `main`, and writes his next-session prompt;
+a merge is not finished until it has run, because the container cannot do any of
+that after the session ends. Then report. Lead with anything waiting on Ben (a
+question, a declined part that needs his call, a branch `/handoff` left for his
+decision); then one line: the merge sha, the gate line, and what Ben would
+notice; then `/handoff`'s PowerShell block and, last, its prompt.
+
+## 7. If you cannot finish
 
 A cloud container is reclaimed when the session ends, so an unpushed commit is a
 lost commit. If you have to stop, push the branch first, even mid-work, and say
