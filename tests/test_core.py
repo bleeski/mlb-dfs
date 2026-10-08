@@ -48148,3 +48148,355 @@ class AutobuildOpenerSlateTests(unittest.TestCase):
         self.assertEqual(stop["pool_blockers"], self.HARD + self.SOFT)
         self.assertIn("lineup_gate_passed", stop["why"])
         self.assertNotIn("raise_bank_cap", [r["action"] for r in records])
+
+
+class HandoffToolTests(unittest.TestCase):
+    """R491, 2026-10-08. `tools/handoff.py`: what a session does after its dev PR merges.
+
+    The branch tests run REAL git against a bare origin, a work clone and a second
+    clone, because the property that matters is git's own answer about ancestry and
+    remote tips, and a mock would assert the mock. The prompt tests read the live
+    ROADMAP once (a tracked file) and a synthetic one for every branch of the row
+    parser, so a roadmap format change fails here before it fails a handoff.
+    """
+
+    ROOT = Path(__file__).resolve().parents[1]
+
+    ROADMAP = (
+        "# ROADMAP\n\n**NEXT:** Session 77\n\n"
+        "- **Path key:**\n"
+        "  - `BS` = `skills/generate-lineups/scripts/build_slate.py`\n"
+        "  - `EP` = `mlb_engine/pipeline/execution_pipeline.py`\n\n"
+        "| Session ID | Packaging Type | Work Unit & Scope | Source Origin | Gate "
+        "Classification | Target Files | Verification Command / Breakpoint | Status |\n"
+        "|---|---|---|---|---|---|---|---|\n"
+        "| **Session 77** | Standalone | R900: the headline is wrong. <br>• (a) fix it in "
+        "`BS`. <br>Needs D-9 and nothing else. <br>**Rank 3.** Band 1; effort M; est. "
+        "~120 KB; breakpoint: (a) alone. Why here: because. | Ben | Process (P) | `BS`, "
+        "`tests/test_core.py` | `UT test_core.ThingTests` | Pending |\n")
+
+    @classmethod
+    def _tool(cls):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "handoff_under_test", cls.ROOT / "tools" / "handoff.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    @staticmethod
+    def _git(cwd, *args):
+        done = subprocess.run(
+            ["git", "-c", "user.name=t", "-c", "user.email=t@example.com",
+             "-c", "commit.gpgsign=false", *args],
+            cwd=str(cwd), capture_output=True, text=True, check=True)
+        return done.stdout.strip()
+
+    def _commit(self, work, name, text=None):
+        (work / f"{name}.txt").write_text(text or name, encoding="utf-8")
+        self._git(work, "add", f"{name}.txt")
+        self._git(work, "commit", "-q", "-m", name)
+
+    def _scenario(self):
+        """A bare origin and a work clone holding one branch of every class."""
+        tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+        self.addCleanup(tmp.cleanup)
+        base = Path(tmp.name)
+        origin, work = base / "origin.git", base / "work"
+        self._git(base, "init", "-q", "--bare", "--initial-branch=main", str(origin))
+        self._git(base, "clone", "-q", str(origin), str(work))
+        (work / "docs").mkdir()
+        (work / "docs" / "ROADMAP.md").write_text(
+            self.ROADMAP + "\nBuild it from `cited-feature`.\n", encoding="utf-8")
+        (work / "docs" / "backlog.md").write_text("register\n", encoding="utf-8")
+        (work / "CHANGELOG.md").write_text("changelog\n", encoding="utf-8")
+        self._git(work, "add", ".")
+        self._git(work, "commit", "-q", "-m", "base")
+        self._git(work, "push", "-q", "-u", "origin", "main")
+        # merged on origin, with a local copy that still tracks it
+        self._git(work, "switch", "-q", "-c", "merged-feature")
+        self._commit(work, "merged-feature")
+        self._git(work, "push", "-q", "-u", "origin", "merged-feature")
+        self._git(work, "switch", "-q", "main")
+        self._git(work, "merge", "-q", "--no-ff", "-m", "merge", "merged-feature")
+        self._git(work, "push", "-q", "origin", "main")
+        self._git(work, "branch", "merged-local", "merged-feature")
+        # no commits of its own: a branch just taken, local and pushed (R359's mutex)
+        self._git(work, "branch", "fresh")
+        self._git(work, "push", "-q", "origin", "fresh:refs/heads/fresh-pushed")
+        # unmerged and named by the roadmap; unmerged and named by its tip sha;
+        # unmerged and named by nothing. Remote only, so the local copy is dropped.
+        for name in ("cited-feature", "sha-cited", "orphan-feature"):
+            self._git(work, "switch", "-q", "-c", name, "main")
+            self._commit(work, name)
+            self._git(work, "push", "-q", "-u", "origin", name)
+            self._git(work, "switch", "-q", "main")
+            self._git(work, "branch", "-q", "-D", name)
+        sha7 = self._git(work, "rev-parse", "--short=7", "origin/sha-cited")
+        with (work / "docs" / "backlog.md").open("a", encoding="utf-8") as fh:
+            fh.write(f"start from {sha7}\n")
+        self._git(work, "commit", "-q", "-am", "name the sha")
+        self._git(work, "push", "-q", "origin", "main")
+        # a local-only unmerged branch, and the branch this checkout stands on
+        self._git(work, "switch", "-q", "-c", "local-only", "main")
+        self._commit(work, "local-only")
+        self._git(work, "switch", "-q", "-c", "cur-feature", "main")
+        self._commit(work, "cur-feature")
+        return base, origin, work
+
+    def _classes(self, report):
+        return {(r["where"], r["name"]): r["class"] for r in report["rows"]}
+
+    # --- branches ---------------------------------------------------------
+
+    def test_every_branch_lands_in_the_class_that_loses_nothing(self):
+        _, _, work = self._scenario()
+        got = self._classes(self._tool().collect_branches(work))
+        self.assertEqual(got, {
+            ("remote", "merged-feature"): "DELETE",
+            ("local", "merged-feature"): "DELETE",
+            ("local", "merged-local"): "DELETE",
+            ("local", "fresh"): "KEEP-ON-MAIN",
+            ("remote", "fresh-pushed"): "KEEP-ON-MAIN",
+            ("remote", "cited-feature"): "KEEP-CITED",
+            ("remote", "sha-cited"): "KEEP-CITED",
+            ("remote", "orphan-feature"): "ASK",
+            ("local", "local-only"): "ASK",
+            ("local", "cur-feature"): "KEEP-CHECKED-OUT",
+        })
+
+    def test_classify_order_is_checked_out_then_merged_then_cited(self):
+        classify = self._tool().classify
+        row = {"checked_out": True, "merged": True, "cited_in": ["CHANGELOG.md"]}
+        self.assertEqual(classify(row), "KEEP-CHECKED-OUT")
+        self.assertEqual(classify({**row, "checked_out": False}), "DELETE")
+        self.assertEqual(classify({**row, "checked_out": False, "on_main_line": True}),
+                         "KEEP-ON-MAIN")
+        self.assertEqual(classify({**row, "checked_out": False, "merged": False}),
+                         "KEEP-CITED")
+        self.assertEqual(classify({**row, "checked_out": False, "merged": False,
+                                   "cited_in": []}), "ASK")
+
+    def test_apply_deletes_the_merged_class_and_nothing_else(self):
+        _, origin, work = self._scenario()
+        tool = self._tool()
+        report = tool.collect_branches(work)
+        log = tool.apply_deletions(work, report["rows"])
+        self.assertEqual(sum(1 for line in log if line.startswith("deleted")), 3, log)
+        remote = self._git(work, "ls-remote", "--heads", str(origin))
+        self.assertNotIn("refs/heads/merged-feature", remote)
+        for kept in ("cited-feature", "sha-cited", "orphan-feature", "fresh-pushed", "main"):
+            self.assertIn(f"refs/heads/{kept}", remote)
+        local = self._git(work, "for-each-ref", "--format=%(refname:short)", "refs/heads")
+        self.assertEqual(sorted(local.split()),
+                         ["cur-feature", "fresh", "local-only", "main"])
+
+    def test_apply_leaves_a_remote_branch_whose_tip_moved_after_the_fetch(self):
+        base, origin, work = self._scenario()
+        tool = self._tool()
+        rows = tool.collect_branches(work)["rows"]
+        other = base / "other"
+        self._git(base, "clone", "-q", str(origin), str(other))
+        self._git(other, "switch", "-q", "merged-feature")
+        self._commit(other, "late-work")
+        self._git(other, "push", "-q", "origin", "merged-feature")
+        log = tool.apply_deletions(work, rows)
+        self.assertTrue(any("tip moved" in line and "merged-feature" in line
+                            for line in log), log)
+        self.assertIn("refs/heads/merged-feature",
+                      self._git(work, "ls-remote", "--heads", str(origin)))
+
+    def test_apply_refuses_an_unmerged_branch_even_when_handed_a_row_labelled_delete(self):
+        _, origin, work = self._scenario()
+        tool = self._tool()
+        rows = tool.collect_branches(work)["rows"]
+        for row in rows:
+            if row["name"] in ("orphan-feature", "local-only"):
+                row["class"] = "DELETE"
+        log = tool.apply_deletions(work, rows)
+        self.assertEqual(sum("no longer an ancestor" in line for line in log), 2, log)
+        self.assertIn("refs/heads/orphan-feature",
+                      self._git(work, "ls-remote", "--heads", str(origin)))
+        self.assertIn("local-only", self._git(
+            work, "for-each-ref", "--format=%(refname:short)", "refs/heads"))
+
+    def test_apply_leaves_a_local_branch_that_moved_after_the_report(self):
+        _, _, work = self._scenario()
+        tool = self._tool()
+        rows = tool.collect_branches(work)["rows"]
+        self._git(work, "switch", "-q", "merged-local")
+        self._commit(work, "after-the-report")
+        self._git(work, "switch", "-q", "cur-feature")
+        log = tool.apply_deletions(work, rows)
+        self.assertTrue(any("merged-local" in line and "moved" in line for line in log), log)
+        self.assertIn("merged-local", self._git(
+            work, "for-each-ref", "--format=%(refname:short)", "refs/heads"))
+
+    def test_ask_rows_print_the_delete_and_the_restore_command_and_exit_2(self):
+        _, _, work = self._scenario()
+        tool = self._tool()
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = tool.main(["--root", str(work), "branches"])
+        text = out.getvalue()
+        sha = self._git(work, "rev-parse", "origin/orphan-feature")
+        self.assertEqual(code, 2)
+        self.assertIn("git push origin --delete orphan-feature", text)
+        self.assertIn(f"git push origin {sha}:refs/heads/orphan-feature", text)
+        self.assertIn("do not delete; named in docs/ROADMAP.md", text)
+        self.assertNotIn("--force", text)
+
+    def test_a_clean_repo_exits_0(self):
+        _, _, work = self._scenario()
+        tool = self._tool()
+        self._git(work, "switch", "-q", "main")
+        for name in ("local-only", "cur-feature"):
+            self._git(work, "branch", "-q", "-D", name)
+        self._git(work, "push", "-q", "origin", "--delete", "orphan-feature")
+        self._git(work, "fetch", "-q", "--prune", "origin")
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(tool.main(["--root", str(work), "branches"]), 0)
+
+    # --- powershell -------------------------------------------------------
+
+    def test_the_powershell_block_only_fast_forwards_and_never_forces(self):
+        tool = self._tool()
+        block = tool.powershell_block("5768E57")
+        self.assertIn("git fetch --prune origin", block)
+        self.assertIn("git merge --ff-only origin/main", block)
+        self.assertIn("git branch -d $n", block)
+        self.assertIn("5768e57", block)
+        self.assertIn("IN SYNC", block)
+        for banned in (" -D", "--force", "git push", "git reset", "git stash",
+                       "git clean", "git checkout", "git restore"):
+            self.assertNotIn(banned, block, banned)
+
+    def test_the_powershell_block_refuses_a_dirty_tree_before_it_changes_anything(self):
+        block = self._tool().powershell_block("5768e57")
+        self.assertLess(block.index("git status --porcelain"),
+                        block.index("git merge --ff-only"))
+        self.assertLess(block.index("git status --porcelain"),
+                        block.index("git branch -d"))
+        # an untracked file cannot block a fast-forward, so it must not stop the block
+        self.assertIn("git status --porcelain --untracked-files=no", block)
+
+    def test_the_powershell_block_runs_nothing_if_the_folder_or_the_fetch_is_wrong(self):
+        block = self._tool().powershell_block("5768e57")
+        self.assertLess(block.index("Test-Path -LiteralPath"), block.index("Set-Location"))
+        self.assertLess(block.index("Set-Location"), block.index("git fetch --prune origin"))
+        self.assertLess(block.index("$LASTEXITCODE -ne 0"), block.index("git merge --ff-only"))
+        self.assertIn("STOP: the fetch failed", block)
+
+    def test_the_powershell_block_takes_only_a_hex_sha_and_escapes_the_path(self):
+        tool = self._tool()
+        for bad in ("5768e57; Remove-Item x", "", "main", "zzzz"):
+            with self.assertRaises(ValueError, msg=bad):
+                tool.powershell_block(bad)
+        self.assertIn("'C:\\Users\\o''brien\\repo'",
+                      tool.powershell_block("5768e57", r"C:\Users\o'brien\repo"))
+
+    # --- prompt -----------------------------------------------------------
+
+    def test_the_prompt_opens_in_plan_mode_and_carries_the_three_answers(self):
+        result = self._tool().build_prompt(self.ROADMAP)
+        text = result["prompt"]
+        self.assertEqual(result["session"], "77")
+        self.assertTrue(text.startswith("/plan Session 77: R900: the headline is wrong"))
+        for heading in ("## 1. What to do", "## 2. How much effort",
+                        "## 3. How to verify", "## Advisor"):
+            self.assertIn(heading, text)
+        self.assertIn("`UT test_core.ThingTests`", text)          # verification, verbatim
+        self.assertIn("effort M; est. ~120 KB; breakpoint: (a) alone", text)
+        self.assertIn("`skills/generate-lineups/scripts/build_slate.py` (BS)", text)
+        self.assertNotIn("Why here", text)
+
+    def test_the_prompt_makes_the_advisor_a_gate_on_the_plan_and_a_check_after_it(self):
+        text = self._tool().build_prompt(self.ROADMAP)["prompt"]
+        before, _, after = text.partition("## Advisor")[2].partition("\n2. ")
+        self.assertIn("Before you present the plan", before)
+        self.assertIn("call the advisor", before)
+        self.assertLess(before.index("call the advisor"), before.index("ExitPlanMode"))
+        self.assertIn("After I approve", after)
+        self.assertIn("before you declare done", after)
+        self.assertIn("no edits", text.split("\n\n")[1])
+
+    def test_a_decision_only_ben_can_make_is_named_and_warned(self):
+        result = self._tool().build_prompt(self.ROADMAP)
+        self.assertEqual(result["needs_ben"], ["D-9"])
+        self.assertIn("ask me for it before planning around it", result["prompt"])
+        self.assertTrue(any("D-9" in w for w in result["warnings"]))
+
+    def test_reasoning_effort_follows_the_size_and_floors_at_high_for_core_work(self):
+        level = self._tool().reasoning_level
+        self.assertEqual(level("XS", "Batched", "`tools/x.py`")[0], "medium")
+        self.assertEqual(level("S", "Batched", "`tools/x.py`")[0], "medium")
+        self.assertEqual(level("S-M", "Batched", "`tools/x.py`")[0], "high")
+        self.assertEqual(level("L", "Batched", "`tools/x.py`")[0], "xhigh")
+        self.assertEqual(level("XS", "Standalone", "`tools/x.py`")[0], "high")
+        self.assertEqual(level("S", "Batched",
+                               "`mlb_engine/optimize/optimizer_v3.py`")[0], "high")
+        self.assertEqual(level(None, "Batched", "x")[0], "high")
+        self.assertIn("Standalone", level("XS", "Standalone", "x")[1])
+
+    def test_a_finished_row_or_a_row_without_a_rank_line_is_warned_not_hidden(self):
+        done = self.ROADMAP.replace("| Pending |", "| Complete 2026-10-01 |")
+        self.assertTrue(any("not open work" in w
+                            for w in self._tool().build_prompt(done)["warnings"]))
+        bare = self.ROADMAP.replace("<br>**Rank 3.** Band 1; effort M; est. ~120 KB; "
+                                    "breakpoint: (a) alone. Why here: because.", "")
+        result = self._tool().build_prompt(bare)
+        self.assertTrue(any("no rank line" in w for w in result["warnings"]))
+        self.assertIn("The row states no size", result["prompt"])
+
+    def test_a_missing_session_is_an_error_not_a_guess(self):
+        with self.assertRaises(ValueError):
+            self._tool().build_prompt(self.ROADMAP, "78")
+        with self.assertRaises(ValueError):
+            self._tool().build_prompt("# no next line\n")
+
+    def test_the_fence_outgrows_any_backtick_run_in_the_body(self):
+        fence = self._tool().fence
+        self.assertTrue(fence("plain").startswith("```text\n"))
+        self.assertTrue(fence("a ```code``` b").startswith("````text\n"))
+
+    def test_the_prompt_is_read_from_origin_main_not_from_the_working_copy(self):
+        _, _, work = self._scenario()
+        (work / "docs" / "ROADMAP.md").write_text(
+            self.ROADMAP.replace("Session 77", "Session 88"), encoding="utf-8")
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = self._tool().main(["--root", str(work), "prompt"])
+        self.assertEqual(code, 0)
+        self.assertIn("/plan Session 77:", out.getvalue())
+        self.assertIn("origin/main @", out.getvalue())
+
+    def test_an_unreadable_origin_main_is_a_warning_not_a_silent_fallback(self):
+        _, _, work = self._scenario()
+        err = io.StringIO()
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(err):
+            self._tool().main(["--root", str(work), "prompt", "--ref", "origin/absent"])
+        self.assertIn("is unreadable here", err.getvalue())
+
+    def test_a_merge_that_is_not_on_origin_main_yet_says_to_fetch(self):
+        _, _, work = self._scenario()
+        self._git(work, "switch", "-q", "main")
+        self._commit(work, "unpushed")
+        sha = self._git(work, "rev-parse", "HEAD")
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            self._tool().main(["--root", str(work), "prompt", "--merge-sha", sha])
+        self.assertIn("is NOT on it yet, so fetch before trusting this prompt",
+                      out.getvalue())
+
+    def test_the_live_roadmap_yields_a_complete_prompt_for_its_next_row(self):
+        text = (self.ROOT / "docs" / "ROADMAP.md").read_text(encoding="utf-8")
+        tool = self._tool()
+        result = tool.build_prompt(text)
+        self.assertEqual(result["session"], tool.next_session(text))
+        prompt = result["prompt"]
+        self.assertTrue(prompt.startswith(f"/plan Session {result['session']}: "))
+        for heading in ("## 1. What to do", "## 2. How much effort",
+                        "## 3. How to verify", "## Advisor"):
+            self.assertIn(heading, prompt)
+        self.assertIn("Reasoning effort:", prompt)
+        self.assertNotIn("NONE STATED", prompt)

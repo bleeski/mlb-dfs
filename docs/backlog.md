@@ -6195,6 +6195,8 @@ which is R196's. Filed there, not here.
 
 ## Workstream 6 — Infrastructure, tests, environment, coordination, and docs
 
+### R491. CLOSED 2026-10-08 (Session 156). A merged dev PR now ends in `/handoff` (`tools/handoff.py`): `branches` deletes only a branch whose tip is already an ancestor of `origin/main` and reports every other one (`KEEP-CITED` when the roadmap, the register or the CHANGELOG names it, `ASK` otherwise, with the delete and the restore command); `powershell` prints the self-contained block that levels Ben's clone with GitHub and ends `IN SYNC` or `NOT IN SYNC`; `prompt` writes the next-session prompt from the roadmap's NEXT row (what, effort, verify), opening in `/plan` with the advisor before the plan is presented and again after approval. `/ship` section 6 runs it. Ben's 2026-10-08 instruction. Gate and commit in CHANGELOG.md.
+
 ### R475. CLOSED 2026-10-02 -- SHIPPED as roadmap Session 144 in three commits (e4588bc Phase 1, 0803986 Phases 2-3, the landing commit Phases 4-7); the entry's text migrated to CHANGELOG.md (the 2026-10-02 "R475 Phases 4-7" entry). LINT exit 0; the Phase 7 board assertions at 0 problems; the gate unchanged because no engine, tool, test or skill line moved.
 
 ### R478. Thirteen gated tests assume the executing host is posix, so the gate has been red on Ben's Windows machine since R349 and hides the real Windows failures (P2, S; P) | new 2026-10-02, from the independent code review `docs/2026-10-02_code_review_codex.md` F-05 and its §1 failure triage (Codex, pinned 9adc891; re-adjudicated at HEAD by Session 144 with a `dfs-premise` agent; Session 144's own gate on this host is the live reproduction) | Roadmap: Session 146
