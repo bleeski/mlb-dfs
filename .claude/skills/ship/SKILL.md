@@ -77,7 +77,7 @@ five are absent optional files, on every host including CI. A sixth is a finding
 
 ## 5. Merge
 
-Once `gate` is green and there is no conflict, merge it and delete the branch.
+Once `gate` is green and there is no conflict, merge it with a merge commit (`gh pr merge --merge`, never squash or rebase: `/handoff` reads ancestry to tell a merged branch from an unmerged one) and delete the branch.
 
 ## 6. Hand off
 

@@ -1,0 +1,7 @@
+# 2026-10-08 DEV (Session 156, R491): `tools/audit.py --run-tests` on a red run prints failure COUNTS, never the failing test names
+
+**Observed (benbook, 2026-10-08, the R491 gate).** `python tools/audit.py --run-tests --terse` printed `FAIL test suite FAILED in tests.test_core, tests.test_greenfield_regressions, tests.test_showdown (ran 3447)`. The non-terse run's JSON carries `failures` and `errors_count` per suite (test_core 16 and 1, greenfield 1, showdown 2 and 2) and the first traceback tail of one test, and no list of names. CLAUDE.local.md says this host is red for documented reasons (R477/R478, read-only archive fixtures, `.pylibs`), but a session cannot tell whether a red run is exactly that set or that set plus its own regression: the only recourse was a second 13-minute run in a worktree, and the read-only-fixture errors do not reproduce there.
+
+**Why it matters.** The local gate is the only evidence a DEV session has on this host before CI answers, and "red for host reasons" is currently asserted from counts. `/land` step 1 and the PR evidence section both need the names.
+
+**Candidate item.** In the audit's suite runner, collect each failing test's id (unittest `result.failures` and `result.errors`, pytest `FAILED` lines) into the result under `failing_tests`, and print them after the FAIL line outside `--terse` only (`--terse` stays one line). A test: a suite with two seeded failures reports both ids. Effort XS. Nothing here is a lift, an edge or a win rate.
