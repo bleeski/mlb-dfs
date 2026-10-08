@@ -3298,6 +3298,11 @@ def pool_brief_block(report: dict, pool: dict, salary_path=None) -> dict:
     prior could only guess the pool. ``members`` is the membership and what
     intake carried about each row (`pool_members_record`); ``salary_path`` is the
     file this build read, hashed into it.
+
+    R442 / R148(b). ``handedness`` is the per-HITTER view of F4's platoon input:
+    how many pool hitters carry a bat side, from the feed or from the platoon
+    reference that supplied a TBD side's order, and the ones that carry none, by
+    name. Present unconditionally (an empty block is a fact; an absent key is not).
     """
     return {
         "teams": len(report.get("teams") or {}),
@@ -3308,6 +3313,7 @@ def pool_brief_block(report: dict, pool: dict, salary_path=None) -> dict:
             report.get("opposing_probables_incomplete") or {}),
         "dk_batting_order": report.get("dk_batting_order"),
         "excluded_column": report.get("excluded_column") or {},
+        "handedness": report.get("handedness") or {},
         "members": pool_members_record(pool, salary_path),
     }
 

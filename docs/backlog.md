@@ -2712,11 +2712,9 @@ replaced.
 
 ### R470. CLOSED 2026-09-30 (Session 139). A declared bulk arm is projected at a bulk arm's workload: a labeled prior, `ip / 5.5` capped at 1.0 (3.0 IP default for `viable_bulk_or_alt_sp`, so 0.545), `--declare-pitcher ID=ROLE:ip=N` for any role; stamped on the arm's pool row (P-eligible only), applied to Base before `build_projections` so Floor and Ceiling scale with it, tagged in Notes; never an exclusion (the salary-only sleeve reprices from salary by design); the brief's `declared_arm_workload` and `declared_pitcher_workload`, a printed `workload prior:` line; late swap inherits typed innings and sheds them on re-declaration; `ID:ip=N` refused at exit 4 in both grammar copies. Goldens unmoved. Full text and gate line: `CHANGELOG.md` 2026-09-30.
 
-### R442. The platoon term is dead on every TBD side, although the platoon reference carries every projected hitter's bat side (P1, XS-S) | new 2026-09-25, found by the 2026-09-25 code review (model area; `review_model/frame_0603.py`) | Roadmap: Session 33
+### R442. CLOSED 2026-10-08 -- SHIPPED as roadmap Session 33 part 1, entry migrated to CHANGELOG.md
 
-- **What.** `batter_hands` comes ONLY from `extract_batter_hands(lineups_feed, ...)`, posted lineups carrying `bat_side` (`live_data_adapters.py:2512`, `:1468-1507`). `platoon_order_adapter.build_projected_order` (`:201`) emits `{Player_ID: slot}` and drops the reference row's `bats`, which every row in `data/reference/fangraphs_platoon_lineups.json` carries as `L`, `R` or `S`. On 06-03 with SD and PHI marked `tbd` and the reference supplied: `platoon_order applied to: 16 hitters; reference carries a bats value for 22 SD/PHI player rows; batter_hands by team: {'BAL': 9, 'BOS': 9}` (zero for SD and PHI); `compute_f4_factors ... platoon_component_applied 18` of 36 while the opposing hand is known for all four sides.
-- **Why.** Any build before lineups post, the normal early build, drops the +-4-6% platoon split on every projected side; the counter is honest (18 of 36) and the only remedy today is R332's per-slate hand-roll, which needs a network this container does not have. This one needs none.
-- **Fix.** `build_projected_order` returns `{Player_ID: bats}` beside the slot map; `build_slate_pool` merges it under the feed's hands (the feed wins). Lands with R332 and R122 (Session 33).
+`build_projected_order` keeps its two-value return and its report now carries `bats_by_player_id` (the matched hitters' bat sides from the same reference rows that gave the slots); `build_slate_pool` merges them UNDER the feed's hands for the TBD sides it ordered, so `compute_f4_factors` applies the platoon term to a side that has not posted (the pool fixture's `platoon_component_applied` 27 -> 36 of 36). Pinned by `test_core.ProjectedOrderHandsTests`. Gate and commit: the CHANGELOG entry.
 
 
 ### R440. `lineups_from_paste.merge_feeds` collapses two pasted doubleheader legs onto the LAST one and fills it with the API's OTHER leg's lineup, which reaches the status map as a CONFIRMED order on the slate's leg (P1, S) | new 2026-09-25, found by the 2026-09-25 code review (intake area), reproduced on the frozen 2026-07-29 fixture | Roadmap: Session 75
@@ -6714,7 +6712,7 @@ together.
   preflight, GitHub and PAT facts, a hand-built fallback procedure) that no repo
   file governs and no check watches.
 
-### R148(b). Handedness is reported per side while the data is per hitter (P2, XS) | new 2026-08-17, from the R142-R146 review; **(a) CLOSED 2026-08-18, migrated to CHANGELOG.md**
+### R148(b). CLOSED 2026-10-08 -- SHIPPED as roadmap Session 33 part 1 ((a) closed 2026-08-18); entry migrated to CHANGELOG.md
 
 - **(a) IS DONE.** The default branch is read from the remote through
   `ls-remote --symref` when the fetch reaches it, `default_branch_source` says
@@ -6758,17 +6756,7 @@ together.
   against a cache presented as "the default branch" is the original defect
   wearing a label, and a cache the remote disagrees with is its own finding
   (`origin_head_cache_stale`).
-- **(b) `f4_handedness_unavailable` is per-SIDE while the data is per-HITTER.**
-  R143 names a side only when NO hitter on it carries `bat_side`, so a MIXED
-  side is silent. It is reachable through R143's own disagreement path: DK's
-  order wins, a hitter DK names and the feed did not has no prior to inherit
-  from, and he gets `bat_side: ""` on a side that is not reported. The cost is
-  bounded — `platoon_hand_factor` returns a neutral 1.0 for an unknown hand, so
-  it is a missing prior and never a wrong one, on the handful of players a
-  disagreement swaps. It is still the thing R143's own entry says this repo has
-  already paid for once, named at the wrong grain. **Fix:** report the count of
-  hitters without a hand per side rather than an all-or-nothing team list, and
-  keep the existing key's meaning by deriving it from `count == 9`.
+- **(b) CLOSED 2026-10-08.** The premise was partly stale (R159(d) had already added the per-side count `f4_handedness_partial` on the DK-merge report). What shipped is the pool-level per-HITTER view: `pool_report["handedness"]` (and the brief's `pool.handedness`) names every pool hitter with no bat side, by source, TBD sides included; `f4_handedness_unavailable` keeps its meaning. Pinned by `test_core.ProjectedOrderHandsTests`. Gate and commit: the CHANGELOG entry.
 
 ### R150. Does an arm in a game belong in a washout count? (P2, XS + one decision) | new 2026-08-17, measured while landing R126
 
