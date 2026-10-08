@@ -19,7 +19,7 @@ Ben's instruction, 2026-10-08, to support cloud sessions: when a dev PR merges, 
 
 **R233 enumeration** (`grep -rn "handoff" CLAUDE.md .claude/skills .claude/settings.json`): `CLAUDE.md:53`; `.claude/skills/dev-session/SKILL.md:11,24,38`; `.claude/skills/ship/SKILL.md:84,88,90`; `.claude/skills/handoff/SKILL.md` (the skill itself); `.claude/settings.json:2,14,32`. `docs/hosts.md:51` and `skills/generate-lineups/SKILL.md:577` match the word and are unrelated.
 
-**Gate.** Local, on benbook (CLAUDE.local.md: the gate is red here for host reasons): `FAIL test suite FAILED in tests.test_core, tests.test_greenfield_regressions, tests.test_showdown (ran 3447)`; the failing names are compared against the documented host-red set on the PR. `HandoffToolTests` 23/23 in isolation. CI `gate` (ubuntu, cp311) is the merge authority: GATE_PENDING
+**Gate.** CI `gate` on the PR (ubuntu, cp311): `PASS  v2.26.0  45 modules  3447 tests  5 skipped  {test_core 2290/2290 (4 skipped) skipped_in_place; test_showdown 431/431 (1 skipped) skipped_in_place}`, the five documented absent-optional-file skips, test_core 2267 -> 2290. Local on benbook, red for the host reasons CLAUDE.local.md records (counts only, since the audit prints no names): test_core 16 failures and 1 error, test_greenfield_regressions 1 failure, test_showdown 2 failures and 2 errors; `HandoffToolTests` 23/23 here.
 
 ## 2026-10-07 — R488, R489, R490: an opener game resolves from DK's file, a bare PLR declaration is refused, and autobuild reads the gate's blockers, asserts on the working channel and takes the sliced bank (roadmap Session 155)
 
