@@ -484,19 +484,22 @@ def failed_gates_of(brief: Dict[str, Any]) -> List[str]:
     return [str(gates)] if isinstance(gates, str) else [str(g) for g in gates]
 
 
-def _direct_door_completeness_unknown(brief: Dict[str, Any]) -> bool:
-    """R490(iii). A direct-door refusal whose bank completeness is unknown.
+def _direct_door_interaction_refusal(brief: Dict[str, Any]) -> bool:
+    """R490(iii). The direct door's "no single control binding" refusal.
 
     Typed facts only (R285: no branch reads errors[]): the door is ``direct``,
-    the job list is neither exhausted nor partial but absent (the direct door
-    has none), and no pre-export gate failed. A failed gate is a fact about the
-    pool, the slate or the inputs, and no bank fixes it: 1600_4g's attempt 2
-    had this door and this remedy and failed ``lineup_gate_passed``.
+    its job list is absent (the direct door has none, so completeness is
+    unknown, not exhausted), no pre-export gate failed (a failed gate is a pool
+    or input fact no bank fixes: 1600_4g's attempt 2), and the allocator PROVED
+    infeasibility with an empty binding set (``binding_constraints == []``,
+    absent on any other outcome). A refusal with a control binding is not this
+    one: R415 keeps it on the direct door (AutobuildBankCapTests).
     """
     facts = brief.get("refusal_facts") or {}
     door = facts.get("door") or brief.get("solve_strategy")
     return (door == "direct" and facts.get("job_list_exhausted") is None
-            and not failed_gates_of(brief))
+            and not failed_gates_of(brief)
+            and brief.get("binding_constraints") == [])
 
 
 def parse_brief(stdout: str) -> Dict[str, Any]:
@@ -1296,7 +1299,7 @@ def _supervise(ctx: Dict[str, Any]) -> int:
                     from_door="direct", to=cap, source="host_default")
             continue
         elif (remedy == "none" and dec.bank_max_candidates is None
-              and _direct_door_completeness_unknown(brief)):
+              and _direct_door_interaction_refusal(brief)):
             # R490(iii). The direct door's bank is built per run and reports no
             # job list, so "none" there means "cannot say whether the bank was
             # complete", not "exhausted"; its own refusal prose says to pass
@@ -1307,13 +1310,14 @@ def _supervise(ctx: Dict[str, Any]) -> int:
             cap = bank_max_candidates(max(1, int(brief.get("entries") or 1)))
             dec.bank_max_candidates = cap
             dec.add(attempt, "raise_bank_cap",
-                    "refusal on the direct door, whose bank is built per run and "
-                    "cannot report whether it was complete (job list unknown, "
-                    "not exhausted); the next attempt takes the sliced bank at "
-                    "this host's default cap, whose job list can say. Search "
-                    "effort, not strategy (CLAUDE.md delegates growing the bank)",
+                    "proven infeasible on the direct door with no single control "
+                    "binding, and that door's bank is built per run and cannot "
+                    "report whether it was complete (job list unknown, not "
+                    "exhausted); the next attempt takes the sliced bank at this "
+                    "host's default cap, whose job list can say. Search effort, "
+                    "not strategy (CLAUDE.md delegates growing the bank)",
                     from_door="direct", to=cap, source="host_default",
-                    trigger="completeness_unknown")
+                    trigger="interaction_unknown_completeness")
             continue
 
         checks = ((brief.get("feasibility") or {}).get("checks")) or []

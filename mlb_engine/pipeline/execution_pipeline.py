@@ -280,6 +280,19 @@ def _json_safe(value: Any) -> Any:
     return str(value)
 
 
+def proven_binding_constraints(allocation: Mapping[str, Any]) -> Optional[List[str]]:
+    """R490(iii). The allocator's binding controls for a PROVEN infeasibility
+    (scipy status 2), else None: a time limit or an unverified incumbent
+    established nothing, and None says so where ``[]`` would claim the
+    interaction refusal ("no single control is arithmetically binding"). Read
+    off ``allocation_solver_report``, which the allocator already writes, so a
+    supervisor branches on data rather than on the sentence in errors[]."""
+    report = (allocation or {}).get("allocation_solver_report") or {}
+    if report.get("scipy_status") != 2:
+        return None
+    return [str(b) for b in report.get("binding_constraints") or []]
+
+
 def _blocked_result(run: Dict[str, Any], errors: Sequence[str], diagnostics: Dict[str, Any]) -> Dict[str, Any]:
     run_dir = Path(run["run_dir"])
     diagnostic_path = run_dir / "final" / "diagnostics.json"
@@ -750,6 +763,10 @@ def execute_portfolio(
             # supervisor branches on these rather than on the prose in errors[].
             if allocation.get("bank_limits"):
                 blocked["bank_limits"] = allocation["bank_limits"]
+            # R490(iii). And which controls bind, on a PROVEN infeasibility only.
+            binding = proven_binding_constraints(allocation)
+            if binding is not None:
+                blocked["binding_constraints"] = binding
             return blocked
 
         bank_coverage = _bank_coverage(projections, candidates) if compute_bank_coverage else None

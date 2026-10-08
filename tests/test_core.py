@@ -48062,6 +48062,7 @@ class AutobuildOpenerSlateTests(unittest.TestCase):
                  "errors": ["entry-level joint MILP proven infeasible: no single control "
                             "is arithmetically binding against this bank"],
                  "solve_strategy": "direct", "feasibility": {"checks": []},
+                 "binding_constraints": [],
                  "refusal_facts": {"class": "badly_shaped", "remedy": "none",
                                    "bank_limited": False, "door": "direct",
                                    "job_list_exhausted": None, "jobs_attempted": None,
@@ -48077,11 +48078,61 @@ class AutobuildOpenerSlateTests(unittest.TestCase):
         raised = [r for r in records if r["action"] == "raise_bank_cap"]
         self.assertEqual(len(raised), 1, records)
         self.assertEqual((raised[0]["from_door"], raised[0]["trigger"]),
-                         ("direct", "completeness_unknown"))
+                         ("direct", "interaction_unknown_completeness"))
         self.assertNotIn("--bank-max-candidates", cmds[0])
         self.assertIn("--bank-max-candidates", cmds[1])
         self.assertEqual(cmds[1][cmds[1].index("--bank-max-candidates") + 1],
                          str(raised[0]["to"]))
+
+    def test_a_binding_control_or_no_proof_keeps_the_direct_door(self):
+        """R415's line (AutobuildBankCapTests): a refusal with a control
+        binding names that control, and no proof of infeasibility (the key
+        absent) establishes nothing; neither is a bank lever."""
+        for extra in ({"binding_constraints": ["max_team_exposure_pct binds"]},
+                      {"binding_constraints": None}):
+            with self.subTest(extra=extra):
+                brief = self._direct_refusal(**extra)
+                if brief["binding_constraints"] is None:
+                    del brief["binding_constraints"]
+                code, records, cmds, _logs = self._run(
+                    lambda n, c, k, b=brief: self._proc(3, brief=b))
+                self.assertEqual((code, len(cmds)), (3, 1))
+                self.assertNotIn("raise_bank_cap", [r["action"] for r in records])
+
+    def test_the_pipeline_carries_the_binding_set_only_on_a_proof(self):
+        """`proven_binding_constraints` on the allocator's real refusals:
+        TypedRefusalTests' three-cap interaction gives [], a single cap binding
+        names it, and an outcome that proved nothing gives None."""
+        fx = TypedRefusalTests()
+        interaction = ca.select_and_assign_entries(
+            fx._every_cap_restores(), fx.ENTRIES, dict(fx.CONTROLS))
+        self.assertFalse(interaction["passed"])
+        self.assertIn("the interaction of the active controls is", interaction["errors"][0])
+        self.assertEqual(epi.proven_binding_constraints(interaction), [])
+        same = [fx._cand("A", ["x1", "x2", *[f"a{i}" for i in range(8)]], 100, "S1"),
+                fx._cand("B", ["y1", "y2", *[f"b{i}" for i in range(8)]], 99, "S1")]
+        singleton = ca.select_and_assign_entries(
+            same, fx.ENTRIES, {"max_primary_stack_exposure_pct": 0.5})
+        self.assertFalse(singleton["passed"])
+        self.assertTrue(epi.proven_binding_constraints(singleton))
+        self.assertIsNone(epi.proven_binding_constraints(
+            {"allocation_solver_report": {"scipy_status": 1, "binding_constraints": []}}))
+        self.assertIsNone(epi.proven_binding_constraints({}))
+
+    def test_the_brief_carries_the_binding_set_from_the_result(self):
+        """run_classic copies the pipeline's binding set onto the refusal brief,
+        and writes nothing when the result carries none."""
+        harness = DeadlineGovernorWiringTests(
+            "test_the_anti_correlation_flag_reaches_the_controls_the_validator_grades")
+        harness.setUp()
+        self.addCleanup(harness.doCleanups)
+        code, payload, _calls, _err = harness._run(
+            30, refusal=dict(harness._REFUSAL, binding_constraints=[]))
+        self.assertEqual(code, 3)
+        self.assertEqual(payload["binding_constraints"], [])
+        code, payload, _calls, _err = harness._run(30)
+        self.assertEqual(code, 3)
+        self.assertNotIn("binding_constraints", payload)
 
     def test_a_failed_gate_on_the_direct_door_is_not_a_bank_lever(self):
         """1600_4g's attempt 2: the same door and remedy, and a failed

@@ -1953,9 +1953,10 @@ def main() -> int:
     # parent's bare declaration (the brief stores the defaulted role, so bare
     # and typed cannot be told apart): named, not refused, like the PO case,
     # because it also outranks R488's bulk admission in this swap's pool.
-    for arm in _build_slate_module().plr_declarations_without_role(
-            salary, [pid for pid, role in sorted(inherited_only.items())
-                     if role == "declared_probable_sp"]):
+    inherited_starters = [pid for pid, role in sorted(inherited_only.items())
+                          if role == "declared_probable_sp"]
+    for arm in (_build_slate_module().plr_declarations_without_role(
+            salary, inherited_starters) if inherited_starters else []):
         print(f"WARN declared arm {arm['name']} ({arm['player_id']}, {arm['team']}) "
               f"is inherited from the parent as declared_probable_sp (a starter's "
               f"workload) and DK tags him Starting=PLR on {salary.name}; re-declare "

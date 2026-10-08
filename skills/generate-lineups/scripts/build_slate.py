@@ -5099,6 +5099,11 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
             payload["refusal_remedy"], strategy)
         if result.get("interaction_probe") is not None:
             payload["interaction_probe"] = result["interaction_probe"]
+        # R490(iii). The allocator's binding controls on a proven infeasibility
+        # (absent otherwise); [] is the interaction refusal, the one autobuild
+        # may answer with the sliced bank.
+        if result.get("binding_constraints") is not None:
+            payload["binding_constraints"] = list(result["binding_constraints"])
         for remedy in payload["refusal_remedy"]:
             print(f"REMEDY: {format_typed_remedy(remedy)}", file=sys.stderr)
         # R28(5): the refusal writes the brief too. This used to return an empty
