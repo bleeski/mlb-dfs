@@ -2436,6 +2436,34 @@ def resolve_declared_pitchers(entries_path: Path, entries_sha256: str,
     return resolved
 
 
+def dk_opener_bulk_arms_for(salary: Mapping[str, Mapping[str, str]],
+                            rep: Report) -> Dict[str, Dict[str, Any]]:
+    """R488. ``{bulk arm id: shape}`` for the sides DK stages as opener games.
+
+    The rule's one owner is `slate_intake_manager.dk_opener_bulk_arms`, which
+    the pool admits the arm by; reading it here keeps the referee from
+    hard-failing an arm the build rostered on DK's own tokens. Classic only (a
+    Showdown file has no P roster slot). The import is lazy and guarded like
+    every engine read in this tool, and a failure is REPORTED: with no rule,
+    such an arm fails as absent, which is the closed direction.
+    """
+    if salary_export_is_showdown(salary):
+        return {}
+    try:
+        if str(REPO_ROOT) not in sys.path:
+            sys.path.insert(0, str(REPO_ROOT))
+        from mlb_engine.intake.slate_intake_manager import (  # noqa: PLC0415
+            dk_opener_bulk_arms)
+    except Exception as exc:  # pragma: no cover - the bare-root copy
+        rep.info["feed_dk_opener_shape"] = (
+            f"not read: mlb_engine is not importable from {REPO_ROOT} "
+            f"({type(exc).__name__}); an arm admitted from DK's opener shape "
+            f"fails as absent")
+        return {}
+    return {shape["bulk_id"]: shape
+            for shape in dk_opener_bulk_arms(salary.values()).values()}
+
+
 def check_feed(entries: Sequence[EntryRow], salary: Dict[str, Dict[str, str]],
                feed_source: Any, strict: bool, rep: Report,
                declared_pitchers: Optional[Mapping[str, str]] = None) -> None:
@@ -2531,6 +2559,7 @@ def check_feed(entries: Sequence[EntryRow], salary: Dict[str, Dict[str, str]],
         row = salary.get(pid)
         if row is not None:
             declared_person.setdefault(person_key(row), role)
+    dk_bulk = dk_opener_bulk_arms_for(salary, rep)
     posted: Dict[str, set[str]] = {}
     posted_hitters: Dict[str, int] = {}
     declared_probable: Dict[str, str] = {}
@@ -2581,6 +2610,7 @@ def check_feed(entries: Sequence[EntryRow], salary: Dict[str, Dict[str, str]],
     projected: Dict[tuple, int] = {}
     overdrawn: List[str] = []
     acknowledged: Dict[tuple, int] = {}
+    dk_admitted: Dict[tuple, int] = {}
     bats_only_arms: Dict[tuple, int] = {}
     misdeclared: Dict[tuple, int] = {}
     for e in entries:
@@ -2607,6 +2637,16 @@ def check_feed(entries: Sequence[EntryRow], salary: Dict[str, Dict[str, str]],
                 # -- and still not observed, which is what the warning says.
                 acknowledged[(name, team, role)] = acknowledged.get(
                     (name, team, role), 0) + 1
+                continue
+            shape = dk_bulk.get(pid) if is_pitcher else None
+            if shape is not None and declared_probable.get(team) in (
+                    None, _norm_name(shape["opener_name"])):
+                # R488. The build admits this arm from DK's own opener shape
+                # when the feed names no arm or names the barred opener; the
+                # same rule, from its one owner, so the referee agrees with the
+                # pool. A feed that names some other arm still contradicts him.
+                key = (name, team, shape["opener_name"])
+                dk_admitted[key] = dk_admitted.get(key, 0) + 1
                 continue
             if team in confirmed_teams:
                 if is_pitcher and team in confirmed_bats_only:
@@ -2653,6 +2693,20 @@ def check_feed(entries: Sequence[EntryRow], salary: Dict[str, Dict[str, str]],
         for (name, team, role), n in sorted(acknowledged.items())}
     rep.info["feed_bats_only_arms"] = {
         f"{name} ({team})": n for (name, team), n in sorted(bats_only_arms.items())}
+    rep.info["feed_dk_opener_admitted"] = {
+        f"{name} ({team})": {"behind_opener": opener, "entries": n,
+                             "evidence": "dk_opener_shape"}
+        for (name, team, opener), n in sorted(dk_admitted.items())}
+    if dk_admitted:
+        rep.warn(
+            f"{len(dk_admitted)} rostered pitcher(s) absent from the posted lineup "
+            f"but admitted from DK's opener shape (R488), acknowledged rather than "
+            f"failed: "
+            + "; ".join(f"{name} ({team}) in {n} of {total}, the PLR behind {opener} (PO)"
+                        for (name, team, opener), n in
+                        sorted(dk_admitted.items(), key=lambda kv: (-kv[1], kv[0])))
+            + ". Evidence: dk_opener_shape, the salary file's own Starting tokens and "
+              "prices, not confirmation from the feed")
     if acknowledged:
         rep.warn(
             f"{len(acknowledged)} rostered pitcher(s) absent from the posted "

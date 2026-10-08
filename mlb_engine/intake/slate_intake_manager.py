@@ -443,6 +443,84 @@ DK_ORDER_SLOTS = 9
 # bar in `live_data_adapters` does; that module re-exports it.
 DK_STARTING_OPENER_TOKENS = frozenset({"PO"})
 
+# DraftKings' Starting token for a projected long reliever (R104). Here beside
+# the opener set for the same reason: R489's CLI check reads it before the
+# dependency check, and `live_data_adapters` re-exports it.
+DK_STARTING_LONG_RELIEVER_TOKENS = frozenset({"PLR"})
+
+# R488. The role an arm admitted by `dk_opener_bulk_arms` carries: the bulk role
+# R470's workload prior already scales (3.0 of 5.5 IP).
+DK_OPENER_BULK_ROLE = "viable_bulk_or_alt_sp"
+
+
+def _p_eligible(record: Any) -> bool:
+    """Is this salary record an arm? ``SalaryPlayer.positions`` first, else the
+    DK row's ``Roster Position`` (a Classic token; a Showdown row is CPT/UTIL,
+    so a Showdown file yields no arm here, which is the point)."""
+    positions = getattr(record, "positions", None)
+    if positions is None and isinstance(record, Mapping):
+        positions = record.get("positions")
+    if positions is not None:
+        return "P" in tuple(positions)
+    roster = str(_row_field(record, "roster_position", "Roster Position") or "")
+    return "P" in {p.strip().upper() for p in roster.split("/")}
+
+
+def dk_opener_bulk_arms(records: Iterable[Any]) -> Dict[str, Dict[str, Any]]:
+    """R488. ``{team: shape}`` for each side DK's file stages as an opener game.
+
+    The shape: the team's P-eligible rows carry exactly two ``Starting`` tokens,
+    one ``PO`` and one ``PLR`` (so no ``SP``/``P``), and the PLR is priced
+    STRICTLY above the PO. That side's PLR arm is the bulk arm. Every other shape
+    (a tie, the PO dearer, no PLR, two PLR, two PO, a PLR beside a starter) is
+    absent from the result, and its blocker stands.
+
+    Why both conditions (Ben, 2026-10-07). R125(a)'s token-only rule was
+    falsified on 2026-09-04 (NYY: Fried, PO at $9,000, started over Warren, PLR
+    at $7,000), and graded against realized fpts on the 20 PO+PLR team-days with
+    an outcome on benbook, the arm with more points was the PLR on 8 of the 9
+    PLR-dearer days, while the token alone picked it on 12 of 20 (counts, not
+    rates). DK prices the arm it expects to carry the innings, and the token says
+    which arm DK calls the opener; the rule fires only where the two agree.
+
+    One owner, two readers: the pool (`live_data_adapters.build_slate_pool`)
+    admits the arm, and preflight's posted-lineup check acknowledges it. Takes
+    ``SalaryPlayer`` records or raw DK row mappings, in any order; the result is
+    keyed and built in sorted order.
+    """
+    by_team: Dict[str, List[Tuple[str, Any]]] = defaultdict(list)
+    for record in records:
+        token = str(_row_field(record, "starting", "Starting") or "").strip().upper()
+        if not token or not _p_eligible(record):
+            continue
+        team = str(_row_field(record, "team", "TeamAbbrev") or "").strip().upper()
+        by_team[team].append((token, record))
+    out: Dict[str, Dict[str, Any]] = {}
+    for team in sorted(by_team):
+        arms = by_team[team]
+        openers = [r for t, r in arms if t in DK_STARTING_OPENER_TOKENS]
+        bulks = [r for t, r in arms if t in DK_STARTING_LONG_RELIEVER_TOKENS]
+        if not team or len(arms) != 2 or len(openers) != 1 or len(bulks) != 1:
+            continue
+        opener, bulk = openers[0], bulks[0]
+        opener_salary = parse_money(_row_field(opener, "salary", "Salary"))
+        bulk_salary = parse_money(_row_field(bulk, "salary", "Salary"))
+        if not bulk_salary > opener_salary:
+            continue
+        out[team] = {
+            "team": team,
+            "opener_id": normalize_player_id(_row_field(opener, "player_id", "ID")),
+            "opener_name": str(_row_field(opener, "name", "Name") or "").strip(),
+            "opener_token": "PO", "opener_salary": opener_salary,
+            "bulk_id": normalize_player_id(_row_field(bulk, "player_id", "ID")),
+            "bulk_name": str(_row_field(bulk, "name", "Name") or "").strip(),
+            "bulk_token": "PLR", "bulk_salary": bulk_salary,
+            "role": DK_OPENER_BULK_ROLE,
+            "rule": ("R488: the side's only DK arms are one PO and one PLR, and the "
+                     "PLR is priced above the PO"),
+        }
+    return out
+
 # The fields DK must spell the same way on a person's CPT and UTIL rows.
 # ``TeamAbbrev`` is in the person key already, and is checked anyway: the key is
 # built from a normalized name plus the team, so a caller passing a different

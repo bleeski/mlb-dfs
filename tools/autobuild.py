@@ -162,9 +162,11 @@ def default_per_build_seconds(budget: Optional[float] = None) -> int:
 BUILD_SLATE_CONTRACT_CODES = (0, 3, 4, 7, 10)
 
 # lineup_gate_passed derives from the pool report, so overriding a benign pool
-# blocker is not enough on its own: the gate keeps reading the same finding and
-# --assume-gates cannot clear an evidenced False. The two decisions share one
-# piece of evidence, so they are taken together or not at all.
+# blocker is not enough on its own: the gate keeps reading the same finding. The
+# two decisions share one piece of evidence, so they are taken together or not
+# at all. R490(ii): build_asserted carries the assertion through build_slate's
+# --assume-gates, the one channel R133(4) lets promote this gate against an
+# evidenced False; it used to supply `workflow_gates`, which R338 refuses there.
 GATE_IMPLIED_BY_POOL_OVERRIDE = "lineup_gate_passed"
 
 # Mirrors build_slate.STRUCTURAL_FEASIBILITY_CHECKS. Kept as a literal so this
@@ -476,6 +478,27 @@ def refusal_remedy_of(brief: Dict[str, Any], bank: Dict[str, Any]) -> str:
     return bank_remedy(bank, door=brief.get("solve_strategy"), bank_limited=False)
 
 
+def failed_gates_of(brief: Dict[str, Any]) -> List[str]:
+    """The refusal's failed pre-export gates, as a list whatever the shape."""
+    gates = brief.get("failed_gates") or []
+    return [str(gates)] if isinstance(gates, str) else [str(g) for g in gates]
+
+
+def _direct_door_completeness_unknown(brief: Dict[str, Any]) -> bool:
+    """R490(iii). A direct-door refusal whose bank completeness is unknown.
+
+    Typed facts only (R285: no branch reads errors[]): the door is ``direct``,
+    the job list is neither exhausted nor partial but absent (the direct door
+    has none), and no pre-export gate failed. A failed gate is a fact about the
+    pool, the slate or the inputs, and no bank fixes it: 1600_4g's attempt 2
+    had this door and this remedy and failed ``lineup_gate_passed``.
+    """
+    facts = brief.get("refusal_facts") or {}
+    door = facts.get("door") or brief.get("solve_strategy")
+    return (door == "direct" and facts.get("job_list_exhausted") is None
+            and not failed_gates_of(brief))
+
+
 def parse_brief(stdout: str) -> Dict[str, Any]:
     decoder = json.JSONDecoder()
     found = []
@@ -743,7 +766,9 @@ def _supervise(ctx: Dict[str, Any]) -> int:
     ap.add_argument("--declare-pitcher", dest="declare_pitcher", action="append",
                     default=None, metavar='ID[=ROLE[:ip=N][:evidence="..."]]',
                     help="forwarded verbatim to build_slate's --declare-pitcher "
-                         "(repeatable; a bare ID means declared_probable_sp). "
+                         "(repeatable; a bare ID means declared_probable_sp, "
+                         "and build_slate refuses a bare ID on a Classic "
+                         "Starting=PLR arm, R489). "
                          "Recorded in the decision log as an operator input, "
                          "never as a decision this supervisor took. One inside "
                          "--passthrough is lifted out and forwarded with these. "
@@ -1177,18 +1202,30 @@ def _supervise(ctx: Dict[str, Any]) -> int:
         # code 3: built but refused, or blocked before building.
         status = brief.get("status")
         if status == "pool_blocked" and not ignore_pool:
-            blockers = brief.get("blockers") or []
+            # R490(i). The HARD and the SOFT list: the gate this override asserts
+            # reads the pool report's whole list (execution_pipeline's
+            # lineup_gate_passed), so classifying the hard half only was a
+            # promise about blockers it never read. On 1600_4g it classified the
+            # 2 hard of 4, logged "every", and the gate failed on the other 2.
+            blockers = (list(brief.get("blockers") or [])
+                        + list(brief.get("soft_blockers") or []))
             verdicts = {b: classify_pool_blocker(b) for b in blockers}
+            classified = {b: v for b, v in verdicts.items() if v}
             unclassified = [b for b, v in verdicts.items() if not v]
             if unclassified:
                 dec.add(attempt, "stop",
-                        "pool blocker outside the benign classification; a human "
-                        "decides this one", unclassified=unclassified)
+                        f"{len(unclassified)} of {len(verdicts)} pool blocker(s), "
+                        f"hard and soft, are outside the benign classification, and "
+                        f"{GATE_IMPLIED_BY_POOL_OVERRIDE} reads them all, so no "
+                        f"assertion can hold; a human decides these, and each one "
+                        f"names the input that clears it",
+                        unclassified=unclassified, classified=classified)
                 _write(dec, brief, salary=a.salary)
                 return 3
             ignore_pool = True
             dec.add(attempt, "override_pool_blockers",
-                    "every blocker matched a benign classification; asserting "
+                    f"all {len(verdicts)} pool blocker(s), hard and soft, matched a "
+                    f"benign classification; asserting "
                     f"{GATE_IMPLIED_BY_POOL_OVERRIDE} on the same evidence, since "
                     "that gate derives from the pool report and would otherwise "
                     "keep failing on findings already classified",
@@ -1257,6 +1294,26 @@ def _supervise(ctx: Dict[str, Any]) -> int:
                     "sliced bank at this host's default cap. Search effort, "
                     "not strategy (CLAUDE.md delegates growing the bank)",
                     from_door="direct", to=cap, source="host_default")
+            continue
+        elif (remedy == "none" and dec.bank_max_candidates is None
+              and _direct_door_completeness_unknown(brief)):
+            # R490(iii). The direct door's bank is built per run and reports no
+            # job list, so "none" there means "cannot say whether the bank was
+            # complete", not "exhausted"; its own refusal prose says to pass
+            # --bank-max-candidates. On 1600_4g it refused at 85 candidates with
+            # no single control binding, and the same inputs certified through
+            # the sliced bank on a replay. CLAUDE.md's first remedy, search
+            # effort; never on a failed gate, which is a pool fact.
+            cap = bank_max_candidates(max(1, int(brief.get("entries") or 1)))
+            dec.bank_max_candidates = cap
+            dec.add(attempt, "raise_bank_cap",
+                    "refusal on the direct door, whose bank is built per run and "
+                    "cannot report whether it was complete (job list unknown, "
+                    "not exhausted); the next attempt takes the sliced bank at "
+                    "this host's default cap, whose job list can say. Search "
+                    "effort, not strategy (CLAUDE.md delegates growing the bank)",
+                    from_door="direct", to=cap, source="host_default",
+                    trigger="completeness_unknown")
             continue
 
         checks = ((brief.get("feasibility") or {}).get("checks")) or []
@@ -1329,8 +1386,19 @@ def _supervise(ctx: Dict[str, Any]) -> int:
         # exhausted bank. The build's typed remedies (the probe's single
         # controls and their steps) ride the stop, so the escalation to Ben
         # carries the number the four-build search on 1240_6g had to find.
-        dec.add(attempt, "stop", "refused with no remedy this supervisor may take",
+        # R490(ii). A failed lineup_gate_passed is the pool report talking; its
+        # blockers each name the input that clears them (a typed
+        # --declare-pitcher, an exclusion), so the stop carries them rather
+        # than leaving the operator one gate name to work back from.
+        lineup_blockers = ((brief.get("pool_blockers") or [])
+                           if GATE_IMPLIED_BY_POOL_OVERRIDE in failed_gates_of(brief)
+                           else [])
+        dec.add(attempt, "stop", "refused with no remedy this supervisor may take"
+                + (f"; {GATE_IMPLIED_BY_POOL_OVERRIDE} failed on the pool "
+                   f"report's blockers, each naming the input that clears it"
+                   if lineup_blockers else ""),
                 errors=(brief.get("errors") or [])[:2],
+                **({"pool_blockers": list(lineup_blockers)} if lineup_blockers else {}),
                 **({"refusal_remedy": brief["refusal_remedy"]}
                    if brief.get("refusal_remedy") else {}))
         _write(dec, brief, salary=a.salary)

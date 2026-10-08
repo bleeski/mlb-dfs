@@ -1930,6 +1930,15 @@ def main() -> int:
                   f"from {salary}'s Starting column. Nothing was swapped.",
                   file=sys.stderr)
             return 4
+        # R489. The same wall for a PLR arm typed bare on this command line;
+        # inherited declarations stored a defaulted role, so bare is unknowable.
+        plr_arms = _build_slate_module().plr_declarations_without_role(
+            salary, args.declare_pitcher)
+        if plr_arms:
+            print(f"{_build_slate_module().plr_role_refusal_error(plr_arms)}. Read "
+                  f"from {salary}'s Starting column. Nothing was swapped.",
+                  file=sys.stderr)
+            return 4
     # R471. An inherited arm the swap's salary file tags PO with no recorded
     # note is named, not refused: the tag may have posted after the build.
     inherited_only = {k: v for k, v in declared_pitchers.items()

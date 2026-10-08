@@ -13,11 +13,19 @@ hitters because DK never priced a called-up starter: true, verified, and
 harmless, since DK owns eligibility and an unpriced player is unrosterable by
 anyone. The build was correct and could not certify.
 
-`run_slate` already has the right instrument. Caller-supplied `workflow_gates`
-override derived values and land in `caller_asserted_gates` in the artifact, so
-the file states that a human asserted the gate rather than implying the check
-ran. This wrapper supplies them and changes nothing else: same pool, same
-postures, same bank cache, same certification path.
+R490(ii), 2026-10-07. That paragraph's remedy stopped working on 2026-09-11.
+R133(4) made `--assume-gates lineup_gate_passed` the one sanctioned override
+of a DERIVED False (`execution_pipeline.OVERRIDABLE_GATES`), and R338 then
+refused every caller-supplied `workflow_gates` value against a derived False
+("supplied value cannot bypass an observed failure"). This wrapper still
+supplied `workflow_gates`, so every pool override it carried failed the gate
+it asserted (1600_4g: `caller_asserted_gates` held the gate and
+`overridden_gates` was empty). `lineup_gate_passed` now rides build_slate's own
+`--assume-gates`, which reaches the deadline baseline and the main build alike
+and is recorded as `overridden_gates` with the evidence it contradicts. Any
+other gate still goes through `workflow_gates`, where it fills an undetermined
+gate and is refused, on the record, against a derived False. Nothing else
+changes: same pool, same postures, same bank cache, same certification path.
 
 Use it when you have READ the blocker and know what it is. It is not a way past
 a gate you have not investigated, and every assertion is written into the
@@ -46,6 +54,37 @@ VALID_GATES = {
 }
 
 
+# R490(ii). The gate R133(4) lets an explicit assumption promote against a
+# derived False (`execution_pipeline.OVERRIDABLE_GATES`), so it rides that
+# channel, build_slate's own `--assume-gates`, and not `workflow_gates`.
+ASSUME_CHANNEL_GATE = "lineup_gate_passed"
+
+
+def with_assumed_gate(argv: list[str], gate: str) -> list[str]:
+    """``argv`` with ``gate`` in its one ``--assume-gates`` value.
+
+    build_slate reads the flag as one comma list and argparse keeps the LAST
+    occurrence, so a second flag appended here would drop the operator's own.
+    Every occurrence (either spelling) is lifted out, the value build_slate
+    would have read is kept, the gate is added to it, and one flag goes back.
+    """
+    out: list[str] = []
+    names: list[str] = []
+    i = 0
+    while i < len(argv):
+        token = argv[i]
+        if token == "--assume-gates" and i + 1 < len(argv):
+            names, i = [n.strip() for n in argv[i + 1].split(",") if n.strip()], i + 2
+        elif token.startswith("--assume-gates="):
+            names = [n.strip() for n in token.split("=", 1)[1].split(",") if n.strip()]
+            i += 1
+        else:
+            out.append(token)
+            i += 1
+    return out + ["--assume-gates", ",".join(names + [gate] if gate not in names
+                                             else names)]
+
+
 def main() -> int:
     argv = sys.argv[1:]
     asserted: dict[str, bool] = {}
@@ -72,6 +111,13 @@ def main() -> int:
               file=sys.stderr)
         return 4
 
+    # R490(ii). The overridable gate goes through build_slate's --assume-gates.
+    if asserted.pop(ASSUME_CHANNEL_GATE, False):
+        passthrough = with_assumed_gate(passthrough, ASSUME_CHANNEL_GATE)
+        print(f"caller-asserted gate {ASSUME_CHANNEL_GATE} -> build_slate "
+              f"--assume-gates (R133(4)); recorded as overridden_gates with the "
+              f"evidence it contradicts", file=sys.stderr)
+
     import mlb_engine.pipeline.execution_pipeline as ep
 
     original = ep.run_slate
@@ -85,7 +131,8 @@ def main() -> int:
               f"(recorded in the artifact, not silently defaulted)", file=sys.stderr)
         return original(*args, **kwargs)
 
-    ep.run_slate = run_slate_asserting
+    if asserted:
+        ep.run_slate = run_slate_asserting
 
     spec = importlib.util.spec_from_file_location("build_slate_mod", BUILD)
     mod = importlib.util.module_from_spec(spec)

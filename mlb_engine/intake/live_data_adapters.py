@@ -62,7 +62,8 @@ from mlb_engine.swap.late_swap_manager import (
     CONFIRMED_STARTER, PROJECTED_STARTER, UNKNOWN, PlayerLineupStatus,
 )
 from mlb_engine.intake.slate_intake_manager import (
-    DK_ORDER_SLOTS, DK_STARTING_OPENER_TOKENS, normalize_name)
+    DK_OPENER_BULK_ROLE, DK_ORDER_SLOTS, DK_STARTING_LONG_RELIEVER_TOKENS,
+    DK_STARTING_OPENER_TOKENS, dk_opener_bulk_arms, normalize_name)
 # R289: the ONE reading of the Excluded column, imported rather than restated.
 # The front door decides pool MEMBERSHIP, so a second token rule here would be
 # the F21 defect in the one place it costs the most.
@@ -97,7 +98,11 @@ STALE_PLATOON_POLICIES = ("block", "warn")
 # decides via declared_pitchers (build_slate.py's repeatable --declare-pitcher).
 # R471. The opener set is defined once, in `slate_intake_manager` (imported
 # below with the other intake names), so the CLI check reads the same set.
-DK_STARTING_LONG_RELIEVER_TOKENS = frozenset({"PLR"})
+# R489 moved the long-reliever set there too, for the same reason; both are
+# re-exported from this module. R488 answers the web search for exactly one
+# shape: a side whose only DK arms are one PO and one dearer PLR resolves from
+# the salary file itself (`slate_intake_manager.dk_opener_bulk_arms`), which is
+# authoritative and replays byte for byte. Every other PLR is still surfaced.
 
 # R104. The role a barred opener carries. Deliberately absent from
 # dk_entries_manager.ALLOWED_PITCHER_ROLES, optimizer_v3.OPTIONAL_SP_AUDIT_STATUSES
@@ -144,9 +149,13 @@ def declared_arm_workload(role: Any, ip: Any = None) -> Tuple[float, Optional[fl
 def workload_prior_lines(pool_report: Any) -> List[str]:
     """R470. One printable line per declared arm the workload prior touched,
     for the build's and the swap's pool review (the pool report's
-    ``declared_arm_workload`` lists every declared arm)."""
+    ``declared_arm_workload`` lists every declared arm). R488: and per arm
+    admitted from DK's opener shape (``dk_opener_admissions``), which carries
+    the same prior and is not a declaration."""
     lines: List[str] = []
-    for arm in (pool_report or {}).get("declared_arm_workload") or []:
+    report = pool_report or {}
+    for arm in list(report.get("declared_arm_workload") or []) + list(
+            report.get("dk_opener_admissions") or []):
         if arm.get("ip_source") == "starter_workload":
             continue
         ip = arm.get("ip")
@@ -2548,6 +2557,34 @@ def build_slate_pool(
         barred_opener_teams = {t: n for t, n in barred_opener_teams.items()
                                if t in barred_now}
 
+    # R488. A side DK stages as an opener game (one PO, one dearer PLR, no other
+    # arm; `dk_opener_bulk_arms`) takes its PLR arm as the bulk arm, from the
+    # salary file, which is authoritative and replays. Only a side with no
+    # rosterable arm yet: a feed probable that is not the barred opener, or any
+    # operator declaration, outranks it. The PO arm stays barred (or absent).
+    dk_opener_admissions: List[Dict[str, Any]] = []
+    teams_with_arm_before = {by_id[pid].team for pid in pitcher_roles if pid in by_id}
+    for team, shape in dk_opener_bulk_arms(by_id.values()).items():
+        pid = shape["bulk_id"]
+        sp = by_id.get(pid)
+        if sp is None or team in excluded_teams or team in teams_with_arm_before:
+            continue
+        pitcher_roles[pid] = DK_OPENER_BULK_ROLE
+        keep.setdefault(pid, _pool_row(sp, batting_order=None))
+        factor, ip_used, ip_source = declared_arm_workload(DK_OPENER_BULK_ROLE)
+        if factor < 1.0:
+            keep[pid]["Workload_Factor"] = factor
+        dk_opener_admissions.append({
+            **shape, "player_id": pid, "name": sp.name, "ip": ip_used,
+            "ip_source": ip_source, "reference_ip": STARTER_REFERENCE_IP,
+            "factor": factor, "evidence": "dk_starting_tokens_and_salary"})
+        warnings.append(
+            f"{team} {sp.name} ({pid}): DK Starting=PLR at ${shape['bulk_salary']:,.0f} "
+            f"behind {shape['opener_name']} ({shape['opener_id']}, Starting=PO, "
+            f"${shape['opener_salary']:,.0f}), the side's only DK arms; admitted as "
+            f"{DK_OPENER_BULK_ROLE} from the salary file (R488), workload "
+            f"x{factor:.3f}. A --declare-pitcher on this side outranks it.")
+
     # R104. PLR is a projected long reliever, a role claim DK is making, and this
     # module used to document it as meaningless -- so a PLR arm who was not also
     # the feed probable never entered the pool at all. Live case: DET Ty Madden
@@ -2570,7 +2607,10 @@ def build_slate_pool(
         blockers.append(
             f"{sp.team} {sp.name} ({pid_str}): DK Starting=PLR, a projected long "
             f"reliever, and he is not in the pool. Confirm the role, then either "
-            f"leave him out or add him with --declare-pitcher {pid_str}[=<role>]. "
+            f"leave him out or add him with --declare-pitcher "
+            f"{pid_str}=viable_bulk_or_alt_sp (bulk innings, R470's prior) or "
+            f"{pid_str}=declared_probable_sp (a starter's workload); a bare id is "
+            f"refused (R489). "
             f"Surfaced, never auto-resolved: the confirm step is a web search and "
             f"a replayable build must not contain one."
         )
@@ -2747,6 +2787,11 @@ def build_slate_pool(
             # (factor 1.0 for a starter's workload), a labeled prior.
             "declared_arm_workload": sorted(declared_arm_rows,
                                             key=lambda a: (a["team"], a["player_id"])),
+            # R488. Arms admitted from DK's opener shape, with the DK evidence
+            # (both tokens and both prices) and the workload prior applied.
+            # Not declarations, so never in the list above.
+            "dk_opener_admissions": sorted(dk_opener_admissions,
+                                           key=lambda a: (a["team"], a["player_id"])),
             "unmatched_feed_players": status.get("unmatched_feed_players"),
             "partial_lineup_teams": status.get("partial_lineup_teams") or [],
             "platoon_age_days": platoon_age_days,

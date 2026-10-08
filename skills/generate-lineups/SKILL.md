@@ -142,7 +142,7 @@ Ben has delegated build decisions (CLAUDE.md, Autonomy). Start here:
 python <repo>/tools/autobuild.py \
   --salary <DKSalaries.csv> --entries <DKEntries.csv> \
   --lineups <feed.json> --postures '<id>=<posture>,...' \
-  --stop-after-minutes 12   # + --declare-pitcher <id>[=<role>] per PLR/PO arm (R345)
+  --stop-after-minutes 12   # + --declare-pitcher <id>=<role> per PLR/PO arm (R345; bare PLR refused, R489)
 ```
 
 A `viable_bulk_or_alt_sp` declaration projects the arm at 3.0 of a starter's

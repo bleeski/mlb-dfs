@@ -46434,7 +46434,10 @@ class DeclaredPitcherEvidenceTests(unittest.TestCase):
         self.assertEqual(code, 3, "the patched build's own exit")
 
     def test_a_non_po_arm_declared_bare_reaches_the_build(self):
-        code, payload, reached, _staged = self._run([self.SP_ARM, self.PLR_ARM])
+        # R489: the PLR arm now types its role; a bare PLR id is refused
+        # (PlrBareDeclarationTests), and the SP arm still reaches it bare.
+        code, payload, reached, _staged = self._run(
+            [self.SP_ARM, f"{self.PLR_ARM}=viable_bulk_or_alt_sp"])
         self.assertTrue(reached, payload)
         self.assertEqual(code, 3)
 
@@ -47669,3 +47672,386 @@ class LateSwapStandingsGateTests(unittest.TestCase):
         self.assertIn(self.REFUSAL_HEAD, err, "exactly the refusal the swap makes without the flag")
         self.assertIn("  7001 [large_field_gpp] -5.00", err[err.index(self.REFUSAL_HEAD):])
         self.assertNotIn("exempted by standings (", err)
+
+
+class DkOpenerBulkArmTests(unittest.TestCase):
+    """R488 (roadmap Session 155). A side DK stages as an opener game takes its
+    PLR arm as the bulk arm, from the salary file.
+
+    2026-10-07 (1600_4g): CLE had Espino `PO` $4,000 and Griffin `PLR` $8,000,
+    CWS had Newcomb `PO` $4,000 and Martin `PLR` $6,600, and nothing else.
+    R104 barred the openers and surfaced the PLR arms, so neither side had a
+    rosterable arm and the build stopped on four blockers. The rule fires only
+    where DK's token and DK's price agree (one PO, one PLR, PLR strictly
+    dearer), because the token alone was falsified on 2026-09-04 (NYY: Fried,
+    PO $9,000, started over Warren, PLR $7,000). Every other shape keeps its
+    blocker.
+    """
+
+    def _salary(self, tmp, arms):
+        """The pool fixture with ``arms`` = {name: (Starting token, salary)}."""
+        path = Path(tmp) / "salary.csv"
+        pool_salary_csv(path)
+        with path.open(newline="", encoding="utf-8") as fh:
+            rows = list(csv.reader(fh))
+        body = []
+        for row in rows[1:]:
+            token, salary = arms.get(row[2], ("", None))
+            if salary is not None:
+                row[5] = str(salary)
+            body.append(row + [token])
+        with path.open("w", newline="", encoding="utf-8") as fh:
+            csv.writer(fh).writerows([rows[0] + ["Starting"]] + body)
+        return path
+
+    def _pool(self, arms, *, feed=None, declared=None):
+        with tempfile.TemporaryDirectory() as tmp:
+            salary = self._salary(tmp, arms)
+            ids = {sp.name: sp.player_id for sp in sim.parse_dk_salary_csv(str(salary))}
+            pool = lda.build_slate_pool(salary, feed or pool_lineups_feed(t4_confirmed=True),
+                                        declared_pitchers=declared)
+        return pool, ids
+
+    @staticmethod
+    def _t4_blockers(pool):
+        return [b for b in pool["pool_report"]["blockers"] if b.startswith("T4")]
+
+    def test_the_1600_4g_shape_admits_the_dearer_plr_at_the_bulk_prior(self):
+        pool, ids = self._pool({"T4 Ace": ("PO", 4000), "T4 Pen1": ("PLR", 8000)})
+        bulk, opener = ids["T4 Pen1"], ids["T4 Ace"]
+        report = pool["pool_report"]
+        self.assertEqual(pool["pitcher_roles"][bulk], "viable_bulk_or_alt_sp")
+        self.assertNotIn(opener, pool["pitcher_roles"], "the PO bar is unchanged")
+        self.assertEqual([a["player_id"] for a in report["non_rosterable_arms"]], [opener])
+        self.assertEqual(self._t4_blockers(pool), [], "the side has an arm")
+        [row] = report["dk_opener_admissions"]
+        self.assertEqual((row["bulk_id"], row["opener_id"], row["bulk_salary"],
+                          row["opener_salary"], row["bulk_token"], row["opener_token"]),
+                         (bulk, opener, 8000.0, 4000.0, "PLR", "PO"))
+        self.assertAlmostEqual(row["factor"], 3.0 / 5.5)
+        self.assertEqual(row["ip_source"], "bulk_default")
+        frame = {r["Player_ID"]: r for r in pool["projection_rows"]}
+        self.assertAlmostEqual(frame[bulk]["Workload_Factor"], 3.0 / 5.5,
+                               msg="the prior rides the row run_slate scales")
+        self.assertNotIn(bulk, [a["player_id"] for a in report["declared_arm_workload"]],
+                         "an admission is not a declaration")
+        self.assertTrue(any("R488" in w and "T4 Pen1" in w for w in report["warnings"]))
+        self.assertTrue(any("T4 Pen1" in line and "x0.545" in line
+                            for line in lda.workload_prior_lines(report)))
+
+    def test_a_tie_or_a_dearer_opener_keeps_both_blockers(self):
+        for po, plr in ((6000, 6000), (9000, 7000)):
+            with self.subTest(po=po, plr=plr):
+                pool, ids = self._pool({"T4 Ace": ("PO", po), "T4 Pen1": ("PLR", plr)})
+                self.assertEqual(pool["pool_report"]["dk_opener_admissions"], [])
+                self.assertNotIn(ids["T4 Pen1"], pool["pitcher_roles"])
+                blockers = self._t4_blockers(pool)
+                self.assertTrue(any("no ROSTERABLE starter" in b for b in blockers), blockers)
+                self.assertTrue(any("projected long reliever" in b for b in blockers), blockers)
+
+    def test_an_opener_with_no_long_reliever_keeps_the_blocker(self):
+        pool, _ids = self._pool({"T4 Ace": ("PO", 4000)})
+        self.assertEqual(pool["pool_report"]["dk_opener_admissions"], [])
+        self.assertTrue(any("no ROSTERABLE starter" in b for b in self._t4_blockers(pool)))
+
+    def test_an_opener_with_two_long_relievers_keeps_every_blocker(self):
+        pool, ids = self._pool({"T4 Ace": ("PO", 4000), "T4 Pen1": ("PLR", 8000),
+                                "T4 Pen2": ("PLR", 7000)})
+        self.assertEqual(pool["pool_report"]["dk_opener_admissions"], [])
+        self.assertNotIn(ids["T4 Pen1"], pool["pitcher_roles"])
+        self.assertNotIn(ids["T4 Pen2"], pool["pitcher_roles"])
+        self.assertEqual(len(self._t4_blockers(pool)), 3, self._t4_blockers(pool))
+
+    def test_a_long_reliever_beside_a_starter_is_still_surfaced(self):
+        pool, ids = self._pool({"T4 Ace": ("SP", 9200), "T4 Pen1": ("PLR", 9800)})
+        self.assertEqual(pool["pool_report"]["dk_opener_admissions"], [])
+        self.assertEqual(pool["pitcher_roles"][ids["T4 Ace"]], "declared_probable_sp")
+        self.assertNotIn(ids["T4 Pen1"], pool["pitcher_roles"])
+        self.assertEqual(len([b for b in self._t4_blockers(pool)
+                              if "projected long reliever" in b]), 1)
+
+    def test_a_long_reliever_named_as_the_feed_probable_is_not_re_roled(self):
+        """The feed names the PLR arm (T4 Ace) and DK names a cheaper PO behind
+        him: the shape holds, but the side already has an arm, so the rule
+        never fires and the probable keeps his role."""
+        pool, ids = self._pool({"T4 Ace": ("PLR", 9200), "T4 Pen1": ("PO", 4000)})
+        self.assertEqual(pool["pitcher_roles"][ids["T4 Ace"]], "declared_probable_sp")
+        self.assertNotIn(ids["T4 Pen1"], pool["pitcher_roles"])
+        self.assertEqual(pool["pool_report"]["dk_opener_admissions"], [])
+        self.assertEqual(self._t4_blockers(pool), [])
+
+    def test_an_operator_declaration_outranks_the_rule(self):
+        arms = {"T4 Ace": ("PO", 4000), "T4 Pen1": ("PLR", 8000)}
+        _pool, ids = self._pool(arms)
+        for declared in ({ids["T4 Pen2"]: "declared_probable_sp"},
+                         {ids["T4 Pen1"]: "declared_probable_sp"}):
+            with self.subTest(declared=declared):
+                pool, _ = self._pool(arms, declared=declared)
+                self.assertEqual(pool["pool_report"]["dk_opener_admissions"], [])
+                for pid, role in declared.items():
+                    self.assertEqual(pool["pitcher_roles"][pid], role)
+
+    def test_the_rule_reads_raw_dk_rows_the_way_preflight_holds_them(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            salary = self._salary(tmp, {"T4 Ace": ("PO", 4000), "T4 Pen1": ("PLR", 8000),
+                                        "T2 Ace": ("PO", 9000), "T2 Pen1": ("PLR", 7000)})
+            from tools.preflight_upload import load_salary
+            raw = sim.dk_opener_bulk_arms(load_salary(salary).values())
+            parsed = sim.dk_opener_bulk_arms(sim.parse_dk_salary_csv(str(salary)))
+        self.assertEqual(sorted(raw), ["T4"], "T2's PO is dearer: no call")
+        self.assertEqual(raw, parsed)
+
+    def test_preflight_acknowledges_the_admitted_arm_only_behind_the_opener(self):
+        from tools.preflight_upload import Report, check_feed, load_salary
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._salary(tmp, {"T4 Ace": ("PO", 4000), "T4 Pen1": ("PLR", 8000)})
+            salary = load_salary(path)
+        bulk = next(pid for pid, row in salary.items() if row["Name"] == "T4 Pen1")
+        entries = [types.SimpleNamespace(entry_id=str(9000 + i), cells=[bulk]) for i in range(3)]
+        rep = Report()
+        check_feed(entries, salary, pool_lineups_feed(t4_confirmed=True), True, rep)
+        self.assertEqual(rep.failures, [], "the referee must agree with the pool")
+        self.assertEqual(rep.info["feed_dk_opener_admitted"]["T4 Pen1 (T4)"]["entries"], 3)
+        self.assertTrue(any("dk_opener_shape" in w for w in rep.warnings), rep.warnings)
+        # A feed that names some OTHER arm still contradicts him. (Not "T4
+        # Pen2": preflight's _norm_name drops digits, so that would read as him.)
+        feed = pool_lineups_feed(t4_confirmed=True)
+        feed["games"][1]["home"]["probable_pitcher"]["name"] = "Other Starter"
+        rep = Report()
+        check_feed(entries, salary, feed, True, rep)
+        self.assertTrue(rep.failures, "a feed naming another arm is a contradiction")
+        self.assertEqual(rep.info["feed_dk_opener_admitted"], {})
+
+
+class PlrBareDeclarationTests(unittest.TestCase):
+    """R489 (roadmap Session 155). A bare `--declare-pitcher` on a DK `PLR`
+    arm is refused at exit 4, as R471 refuses a PO arm without evidence.
+
+    A bare id means `declared_probable_sp`, a starter's workload. On
+    2026-10-07 (1600_4g) the session declared Griffin (PLR, 44418095) bare: he
+    projected 16.0 against R470's 8.7 and rode 15 of 42 entries, and nothing
+    said so. The role is typed, never inferred. The fixture is the vendored
+    1910_6g file, whose PIT side is R488's shape (Ramirez PO $4,000, Barco PLR
+    $5,500), so the refusal also says no declaration is needed there.
+    """
+
+    SALARY = DeclaredPitcherEvidenceTests.SALARY
+    PO_ARM, SP_ARM, PLR_ARM = (DeclaredPitcherEvidenceTests.PO_ARM,
+                               DeclaredPitcherEvidenceTests.SP_ARM,
+                               DeclaredPitcherEvidenceTests.PLR_ARM)
+    _bs = staticmethod(DeclaredPitcherEvidenceTests._bs)
+    _salary_with = DeclaredPitcherEvidenceTests._salary_with
+    _run = DeclaredPitcherEvidenceTests._run
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+
+    def test_a_bare_plr_declaration_is_refused_naming_the_arm(self):
+        code, payload, reached, staged = self._run([self.PLR_ARM])
+        self.assertEqual((code, reached, staged), (4, False, []))
+        self.assertEqual(payload["status"], "cli_value_invalid")
+        [arm] = payload["plr_arms_without_role"]
+        self.assertEqual((arm["player_id"], arm["dk_starting"], arm["dk_opener_shape"]),
+                         (self.PLR_ARM, "PLR", True))
+        self.assertIn(f"{self.PLR_ARM}=viable_bulk_or_alt_sp", payload["error"])
+        self.assertIn("drop the flag", payload["error"], "R488 already admits him")
+
+    def test_an_empty_role_with_options_is_still_bare(self):
+        code, payload, reached, _staged = self._run([f"{self.PLR_ARM}=:ip=3"])
+        self.assertEqual((code, reached), (4, False))
+        self.assertEqual([a["player_id"] for a in payload["plr_arms_without_role"]],
+                         [self.PLR_ARM])
+
+    def test_a_plr_beside_a_starter_is_refused_without_the_shape_note(self):
+        salary = self._salary_with({self.PO_ARM: "SP"})
+        code, payload, reached, _staged = self._run([self.PLR_ARM], salary=salary)
+        self.assertEqual((code, reached), (4, False))
+        self.assertFalse(payload["plr_arms_without_role"][0]["dk_opener_shape"])
+        self.assertNotIn("drop the flag", payload["error"])
+
+    def test_a_typed_plr_declaration_and_a_bare_starter_reach_the_build(self):
+        for declared in ([f"{self.PLR_ARM}=viable_bulk_or_alt_sp"],
+                         [f"{self.PLR_ARM}=declared_probable_sp:ip=5"],
+                         [self.SP_ARM]):
+            with self.subTest(declared=declared):
+                code, payload, reached, _staged = self._run(declared)
+                self.assertTrue(reached, payload)
+                self.assertEqual(code, 3, "the patched build's own exit")
+
+    def test_showdown_is_not_checked(self):
+        bs = self._bs()
+        source = REPO / "tests" / "fixtures" / "showdown" / "DKSalaries_showdown_MIN_CHC.csv"
+        salary = self._salary_with({"43628708": "PLR"}, source=source)
+        self.assertEqual(bs.detect_contest_type(salary, salary), "showdown")
+        args = types.SimpleNamespace(
+            date="2026-07-18", salary=str(salary), entries_csv=str(salary),
+            declare_pitcher=["43628708"], controls_override=None, leverage=None,
+            postures=None, assume_gates=None, captain_sleeve=None)
+        self.assertIsNone(bs.validate_cli_values(args))
+
+    def test_a_swap_refuses_an_explicit_bare_plr_declaration(self):
+        harness = LateSwapDeclaredPitcherTests("test_the_grammar_is_build_slates_own_parser")
+        harness.setUp()
+        self.addCleanup(harness.doCleanups)
+        with harness.salary.open(newline="", encoding="utf-8") as fh:
+            rows = list(csv.reader(fh))
+        arm = {row[2]: row[3] for row in rows[1:]}["T4 Pen1"]
+        rows[0].append("Starting")
+        for row in rows[1:]:
+            row.append("PLR" if row[3] == arm else "")
+        salary = harness.root / "DKSalaries_plr.csv"
+        with salary.open("w", newline="", encoding="utf-8") as fh:
+            csv.writer(fh).writerows(rows)
+        harness._brief()
+        code, _out, err = harness._run("--salary", str(salary), "--declare-pitcher", arm)
+        self.assertEqual(code, 4, err[-1500:])
+        self.assertIn(f"T4 Pen1 ({arm}, T4) Starting=PLR", err)
+        self.assertIn("Nothing was swapped", err)
+
+
+class AutobuildOpenerSlateTests(unittest.TestCase):
+    """R490 (roadmap Session 155). autobuild on 2026-10-07 (1600_4g).
+
+    (i) It classified the 2 HARD pool blockers, logged "every blocker matched a
+    benign classification", and overrode; the gate read all 4 and failed.
+    (ii) The override's assertion went through build_asserted's
+    `workflow_gates`, which R338 refuses against a derived False, so it could
+    never hold; R133(4)'s channel is build_slate's `--assume-gates`.
+    (iii) The direct door refused at 85 candidates with no single control
+    binding and a typed remedy of `none`, so autobuild stopped with no lever,
+    although its own prose said to take the sliced bank.
+    """
+
+    def setUp(self):
+        import importlib
+        self.ab = importlib.import_module("tools.autobuild")
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.salary = (REPO / "tests" / "fixtures" / "slates"
+                       / "DKSalaries_frozen_2026-07-29.csv")
+
+    _run = SupervisorLostWindowTests._run
+    _proc = staticmethod(SupervisorLostWindowTests._proc)
+
+    HARD = ["CLE: no ROSTERABLE starter. DK's only declared arm is Daniel Espino, a "
+            "probable opener barred from pitcher slots; declare the bulk arm behind him "
+            "via declared_pitchers, or that side has no rosterable arm"]
+    SOFT = ["CLE Foster Griffin (44418095): DK Starting=PLR, a projected long reliever, "
+            "and he is not in the pool. Confirm the role, then either leave him out or add "
+            "him with --declare-pitcher 44418095=viable_bulk_or_alt_sp"]
+
+    def _certified(self):
+        return self._proc(0, brief={"status": "certified", "date": "2026-07-29",
+                                    "delivered_sha256": "a" * 64,
+                                    "delivered_path": "fixture.csv"})
+
+    def test_soft_blockers_are_classified_and_a_partial_match_never_says_every(self):
+        def blocked(n, cmd, kwargs):
+            return self._proc(3, brief={"status": "pool_blocked", "date": "2026-07-29",
+                                        "blockers": self.HARD, "soft_blockers": self.SOFT})
+        code, records, cmds, _logs = self._run(blocked)
+        self.assertEqual((code, len(cmds)), (3, 1), "no override, no second build")
+        stop = records[-1]
+        self.assertEqual(stop["action"], "stop")
+        self.assertEqual(stop["unclassified"], self.SOFT)
+        self.assertEqual(list(stop["classified"]), self.HARD)
+        self.assertIn("1 of 2", stop["why"])
+        self.assertNotIn("every", " ".join(r["why"] for r in records))
+
+    def test_a_fully_benign_list_still_overrides(self):
+        def first_blocked(n, cmd, kwargs):
+            if n == 1:
+                return self._proc(3, brief={"status": "pool_blocked", "date": "2026-07-29",
+                                            "blockers": self.HARD, "soft_blockers": []})
+            return self._certified()
+        code, records, cmds, _logs = self._run(first_blocked)
+        self.assertEqual(code, 0)
+        self.assertIn("override_pool_blockers", [r["action"] for r in records])
+        self.assertIn("build_asserted.py", " ".join(cmds[1]))
+
+    def test_build_asserted_carries_the_gate_on_the_assume_channel(self):
+        import importlib
+        saved_path = list(sys.path)
+        ba = importlib.import_module("tools.build_asserted")
+        sys.path[:] = saved_path   # its module-level .pylibs insert stays out of the suite
+        self.assertEqual(ba.with_assumed_gate(["--salary", "s"], "lineup_gate_passed"),
+                         ["--salary", "s", "--assume-gates", "lineup_gate_passed"])
+        self.assertEqual(
+            ba.with_assumed_gate(["--assume-gates", "odds_gate_passed", "--x",
+                                  "--assume-gates=weather_gate_passed"], "lineup_gate_passed"),
+            ["--x", "--assume-gates", "weather_gate_passed,lineup_gate_passed"],
+            "argparse keeps the LAST occurrence, so that value is the one kept")
+        # The whole wrapper, with a stand-in build_slate that records its argv.
+        seen = Path(self.tmp.name) / "argv.json"
+        fake = Path(self.tmp.name) / "fake_build_slate.py"
+        fake.write_text(
+            "import json, sys\n"
+            "from pathlib import Path\n"
+            "def _main_recording_refusals():\n"
+            f"    Path({str(seen)!r}).write_text(json.dumps(sys.argv), encoding='utf-8')\n"
+            "    return 0\n", encoding="utf-8")
+        original = epi.run_slate
+        with unittest.mock.patch.object(ba, "BUILD", fake), \
+                unittest.mock.patch.object(sys, "argv", [
+                    "build_asserted.py", "--assert-gate", "lineup_gate_passed",
+                    "--salary", "s.csv", "--ignore-pool-blockers"]):
+            self.assertEqual(ba.main(), 0)
+        argv = json.loads(seen.read_text(encoding="utf-8"))
+        self.assertEqual(argv[-2:], ["--assume-gates", "lineup_gate_passed"])
+        self.assertNotIn("--assert-gate", argv)
+        self.assertIs(epi.run_slate, original, "no workflow_gates wrapper for this gate")
+        # And the channel is the one the pipeline lets through, run for real.
+        derived = {"lineup_gate_passed": False}
+        evidence = {"lineup_gate_passed": "pool report: 4 blockers"}
+        gates, _assumed, overridden, _refused = epi.resolve_gate_assertions(
+            derived, {}, ["lineup_gate_passed"], derived, evidence)
+        self.assertIs(gates["lineup_gate_passed"], True)
+        self.assertEqual([o["gate"] for o in overridden], ["lineup_gate_passed"])
+        gates, *_rest = epi.resolve_gate_assertions(
+            derived, {"lineup_gate_passed": True}, [], derived, evidence)
+        self.assertIs(gates["lineup_gate_passed"], False,
+                      "the supplied channel build_asserted used to take cannot hold")
+
+    def _direct_refusal(self, **extra):
+        brief = {"status": "not_certified", "refusal": "classic_not_certified",
+                 "refusal_class": "badly_shaped", "date": "2026-07-29", "entries": 42,
+                 "errors": ["entry-level joint MILP proven infeasible: no single control "
+                            "is arithmetically binding against this bank"],
+                 "solve_strategy": "direct", "feasibility": {"checks": []},
+                 "refusal_facts": {"class": "badly_shaped", "remedy": "none",
+                                   "bank_limited": False, "door": "direct",
+                                   "job_list_exhausted": None, "jobs_attempted": None,
+                                   "jobs_total": None, "bank_stop_reason": None}}
+        brief.update(extra)
+        return brief
+
+    def test_a_direct_door_refusal_of_unknown_completeness_takes_the_sliced_bank(self):
+        def refuse_then_certify(n, cmd, kwargs):
+            return self._proc(3, brief=self._direct_refusal()) if n == 1 else self._certified()
+        code, records, cmds, _logs = self._run(refuse_then_certify)
+        self.assertEqual(code, 0)
+        raised = [r for r in records if r["action"] == "raise_bank_cap"]
+        self.assertEqual(len(raised), 1, records)
+        self.assertEqual((raised[0]["from_door"], raised[0]["trigger"]),
+                         ("direct", "completeness_unknown"))
+        self.assertNotIn("--bank-max-candidates", cmds[0])
+        self.assertIn("--bank-max-candidates", cmds[1])
+        self.assertEqual(cmds[1][cmds[1].index("--bank-max-candidates") + 1],
+                         str(raised[0]["to"]))
+
+    def test_a_failed_gate_on_the_direct_door_is_not_a_bank_lever(self):
+        """1600_4g's attempt 2: the same door and remedy, and a failed
+        lineup_gate_passed. A bank cannot clear a pool fact; the stop names the
+        blockers, each with the input that clears it."""
+        brief = self._direct_refusal(failed_gates=["lineup_gate_passed"],
+                                     pool_blockers=self.HARD + self.SOFT,
+                                     errors=["Failed pre-export gate: lineup_gate_passed"])
+        code, records, cmds, _logs = self._run(lambda n, c, k: self._proc(3, brief=brief))
+        self.assertEqual((code, len(cmds)), (3, 1))
+        stop = records[-1]
+        self.assertEqual(stop["action"], "stop")
+        self.assertEqual(stop["pool_blockers"], self.HARD + self.SOFT)
+        self.assertIn("lineup_gate_passed", stop["why"])
+        self.assertNotIn("raise_bank_cap", [r["action"] for r in records])
