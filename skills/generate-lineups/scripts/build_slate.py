@@ -3214,11 +3214,16 @@ def pool_members_record(pool: dict, salary_path=None) -> dict:
         roles = set(stable_union(list(kwargs.get("pitcher_roles") or {})))
         declared = set(stable_union(
             [a.get("player_id") for a in (report.get("declared_arm_workload") or [])]))
+        admitted = set(stable_union(
+            [a.get("player_id") for a in (report.get("dk_opener_admissions") or [])]))
         source: dict = {}
         for row in rows:
             pid = str(row["Player_ID"])
             if pid in declared:
                 source[pid] = "declared_pitcher"
+            elif pid in admitted:
+                # R488. Admitted from DK's opener shape, not declared or probable.
+                source[pid] = "dk_opener_shape"
             elif pid in roles:
                 source[pid] = "probable_sp"
             elif pid in confirmed:
@@ -5094,6 +5099,11 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
             payload["refusal_remedy"], strategy)
         if result.get("interaction_probe") is not None:
             payload["interaction_probe"] = result["interaction_probe"]
+        # R490(iii). The allocator's binding controls on a proven infeasibility
+        # (absent otherwise); [] is the interaction refusal, the one autobuild
+        # may answer with the sliced bank.
+        if result.get("binding_constraints") is not None:
+            payload["binding_constraints"] = list(result["binding_constraints"])
         for remedy in payload["refusal_remedy"]:
             print(f"REMEDY: {format_typed_remedy(remedy)}", file=sys.stderr)
         # R28(5): the refusal writes the brief too. This used to return an empty
@@ -5132,6 +5142,7 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         payload["declared_pitcher_workload"] = declared_pitcher_workload(args.declare_pitcher)
         payload["declared_pitcher_evidence"] = declared_pitcher_evidence(args.declare_pitcher)
         payload["declared_arm_workload"] = report.get("declared_arm_workload") or []
+        payload["dk_opener_admissions"] = report.get("dk_opener_admissions") or []
         payload["non_rosterable_arms"] = report.get("non_rosterable_arms") or []
         return 3, payload
 
@@ -5283,6 +5294,8 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         # declaration over DK's PO tag cannot reach here without one.
         "declared_pitcher_evidence": declared_pitcher_evidence(args.declare_pitcher),
         "declared_arm_workload": report.get("declared_arm_workload") or [],
+        # R488. Arms admitted from DK's opener shape, with both tokens and prices.
+        "dk_opener_admissions": report.get("dk_opener_admissions") or [],
         "non_rosterable_arms": report.get("non_rosterable_arms") or [],
         "run_id": result.get("run_id"),
         # R40. The resolved objective, per contest, recorded in the artifact
@@ -8403,6 +8416,53 @@ def po_evidence_refusal_error(arms) -> str:
             f"season norm is an opener's line (Luzardo, 2026-09-29: 2.5 against "
             f"Sale's 7.5). DK's tag stands until you state otherwise")
 
+def plr_declarations_without_role(salary_path, values) -> list:
+    """R489. The declared arms DK tags ``PLR`` whose declaration types no role.
+
+    A bare ``--declare-pitcher ID`` means ``declared_probable_sp``, a starter's
+    workload (`parse_declared_pitcher_options` defaults it), so declaring a
+    projected long reliever bare priced him as a starter with nothing said: on
+    2026-10-07 (1600_4g) Griffin projected 16.0 against R470's 8.7 and rode 15
+    of 42 entries. Read from the RAW flag values, because the parser has already
+    filled the default by the time any other reader sees a role. Each row says
+    whether R488's opener shape already admits the arm, in which case the
+    declaration is not needed at all. Stdlib-only, like R471's check.
+    """
+    from mlb_engine.intake.slate_intake_manager import (  # noqa: PLC0415
+        DK_STARTING_LONG_RELIEVER_TOKENS, dk_opener_bulk_arms, parse_dk_salary_csv)
+    bare = set()
+    for raw in (values or []):
+        pid, _, rest = str(raw).strip().partition("=")
+        if pid.strip() and not rest.partition(":")[0].strip():
+            bare.add(pid.strip())
+    if not bare:
+        return []
+    players = parse_dk_salary_csv(str(salary_path))
+    admitted = {shape["bulk_id"] for shape in dk_opener_bulk_arms(players).values()}
+    return sorted(
+        ({"player_id": sp.player_id, "name": sp.name, "team": sp.team,
+          "dk_starting": sp.starting, "dk_opener_shape": sp.player_id in admitted}
+         for sp in players
+         if sp.player_id in bare and sp.starting in DK_STARTING_LONG_RELIEVER_TOKENS),
+        key=lambda row: row["player_id"])
+
+
+def plr_role_refusal_error(arms) -> str:
+    """R489. One sentence naming every PLR arm declared without a role."""
+    named = "; ".join(f"{a['name']} ({a['player_id']}, {a['team']})" for a in arms)
+    pid = arms[0]["player_id"]
+    text = (f"DK tags {named} Starting=PLR (projected long reliever), and a bare "
+            f"declaration would price him on a starter's workload: type the role, "
+            f"{pid}=viable_bulk_or_alt_sp (bulk innings, R470's x0.545 prior) or "
+            f"{pid}=declared_probable_sp (a starter's workload)")
+    shaped = [a for a in arms if a.get("dk_opener_shape")]
+    if shaped:
+        text += (f". {', '.join(a['name'] for a in shaped)}: DK's file stages that "
+                 f"side as an opener game, so the build admits him as "
+                 f"viable_bulk_or_alt_sp with no declaration (R488); drop the flag")
+    return text
+
+
 ASSUMABLE_GATES = ("salary_gate_passed", "entry_grid_gate_passed",
                    "lineup_gate_passed", "pitcher_audit_gate_passed",
                    "weather_gate_passed", "odds_gate_passed")
@@ -8617,6 +8677,7 @@ def validate_cli_values(args) -> dict | None:
     salary = getattr(args, "salary", None)
     entries = getattr(args, "entries_csv", None)
     arms = []
+    plr_arms = []
     if (values and salary and entries and Path(salary).is_file()
             and Path(entries).is_file()):
         try:
@@ -8624,10 +8685,11 @@ def validate_cli_values(args) -> dict | None:
                 arms = po_declarations_without_evidence(
                     salary, parse_declared_pitchers(values),
                     declared_pitcher_evidence(values))
+                plr_arms = plr_declarations_without_role(salary, values)
         except (OSError, ValueError, csv.Error):
             # A salary file this parser cannot read builds nothing: the pool
             # reads it with the same parser and refuses it there, by name.
-            arms = []
+            arms, plr_arms = [], []
     if arms:
         return {
             "status": "cli_value_invalid",
@@ -8640,6 +8702,20 @@ def validate_cli_values(args) -> dict | None:
                      "recorded in the brief as declared_pitcher_evidence, and "
                      "never a correction of DK's tag. Nothing was staged and "
                      "no run directory was created."),
+        }
+    # R489. A bare declaration of a DK `PLR` arm took a starter's workload in
+    # silence (2026-10-07: Griffin at 16.0, in 15 of 42). The role is typed,
+    # never inferred: the same wall as R471's, one token over.
+    if plr_arms:
+        return {
+            "status": "cli_value_invalid",
+            "date": getattr(args, "date", None),
+            "flag": "--declare-pitcher",
+            "error": plr_role_refusal_error(plr_arms),
+            "plr_arms_without_role": plr_arms,
+            "note": ("read from the salary file's Starting column, which is "
+                     "authoritative. Nothing was staged and no run directory "
+                     "was created."),
         }
     # R434. The named secondary stack: the grammar, then what a typo would
     # silently turn into a no-op.
@@ -8735,12 +8811,16 @@ def main() -> int:
     ap.add_argument("--declare-pitcher", dest="declare_pitcher", action="append",
                     default=[], metavar='ID[=ROLE[:ip=N][:evidence="..."]]',
                     help="R104. Repeatable. State that a DK player ID is a "
-                         "startable arm, e.g. --declare-pitcher 43755567 or "
+                         "startable arm, e.g. "
                          "--declare-pitcher 43755567=viable_bulk_or_alt_sp. This "
                          "is the operator's answer to a PLR (projected long "
                          "reliever) soft blocker, and the documented way past the "
                          "PO (probable opener) bar. Bare ID means "
-                         "declared_probable_sp. Recorded verbatim in the brief on "
+                         "declared_probable_sp, and R489 refuses a bare ID on a "
+                         "Classic Starting=PLR arm: type its role. R488: a side "
+                         "whose only DK arms are one PO and one dearer PLR needs "
+                         "no declaration; the build admits the PLR as "
+                         "viable_bulk_or_alt_sp. Recorded verbatim in the brief on "
                          "BOTH geometries (R304(d)), where preflight_upload and "
                          "verify_export read it back and stop failing the arm as "
                          "absent. It reaches the POOL on Classic only: the "

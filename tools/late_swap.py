@@ -1930,6 +1930,15 @@ def main() -> int:
                   f"from {salary}'s Starting column. Nothing was swapped.",
                   file=sys.stderr)
             return 4
+        # R489. The same wall for a PLR arm typed bare on this command line;
+        # inherited declarations stored a defaulted role, so bare is unknowable.
+        plr_arms = _build_slate_module().plr_declarations_without_role(
+            salary, args.declare_pitcher)
+        if plr_arms:
+            print(f"{_build_slate_module().plr_role_refusal_error(plr_arms)}. Read "
+                  f"from {salary}'s Starting column. Nothing was swapped.",
+                  file=sys.stderr)
+            return 4
     # R471. An inherited arm the swap's salary file tags PO with no recorded
     # note is named, not refused: the tag may have posted after the build.
     inherited_only = {k: v for k, v in declared_pitchers.items()
@@ -1940,6 +1949,22 @@ def main() -> int:
               f"is inherited from the parent and DK tags him Starting=PO on "
               f"{salary.name}, with no recorded evidence; check his strikeout prop, "
               f"and re-declare him with :evidence=\"...\" or drop him")
+    # R489. An inherited declared_probable_sp on an arm DK tags PLR may be a
+    # parent's bare declaration (the brief stores the defaulted role, so bare
+    # and typed cannot be told apart): named, not refused, like the PO case,
+    # because it also outranks R488's bulk admission in this swap's pool.
+    inherited_starters = [pid for pid, role in sorted(inherited_only.items())
+                          if role == "declared_probable_sp"]
+    for arm in (_build_slate_module().plr_declarations_without_role(
+            salary, inherited_starters) if inherited_starters else []):
+        print(f"WARN declared arm {arm['name']} ({arm['player_id']}, {arm['team']}) "
+              f"is inherited from the parent as declared_probable_sp (a starter's "
+              f"workload) and DK tags him Starting=PLR on {salary.name}; re-declare "
+              f"him with a typed role ({arm['player_id']}=viable_bulk_or_alt_sp for "
+              f"bulk innings) or drop him"
+              + ("; DK's file stages his side as an opener game, so the build admits "
+                 "him as viable_bulk_or_alt_sp with no declaration (R488)"
+                 if arm.get("dk_opener_shape") else ""))
     if declared_evidence:
         print("declared evidence: "
               + "; ".join(f"{k}: {v}" for k, v in declared_evidence.items()))
