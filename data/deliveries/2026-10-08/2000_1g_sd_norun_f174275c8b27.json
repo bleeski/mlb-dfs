@@ -3,7 +3,7 @@
   "contest_allocator": "v1.12",
   "execution_pipeline": "v1.17",
   "git_dirty": true,
-  "git_sha": "ba3ab835f3afecc8ab0140690e0dda9efe89e777"
+  "git_sha": "e348c1abc20d85f1dcb2b28b26c0c31621035466"
  },
  "controls": {
   "max_cpt_exposure_pct": 0.25,
@@ -482,7 +482,7 @@
   }
  ],
  "entries_binding": {
-  "source": "outputs/2026-10-08/DO_NOT_UPLOAD_DKEntries_showdown_2000_1g_sd.86094d1fb643.csv",
+  "source": "outputs/2026-10-08/DO_NOT_UPLOAD_DKEntries_showdown_2000_1g_sd.91c87eae2134.csv",
   "source_sha256": "f174275c8b2767f7e1db6e5f133bf50f0b001fb4bf3c4251b25d01ce3745798f",
   "status": "bound"
  },
@@ -514,7 +514,7 @@
   "entries": 31,
   "notes": "Showdown ships review-grade; it does not pass the three certification gates. See CLAUDE.md.",
   "projection_tier": "unknown",
-  "recorded_utc": "2026-10-08T23:31:54.231356+00:00",
+  "recorded_utc": "2026-10-08T23:38:46.952409+00:00",
   "run_id": null,
   "sha256": "f174275c8b2767f7e1db6e5f133bf50f0b001fb4bf3c4251b25d01ce3745798f",
   "slate_tag": "2000_1g_sd",
@@ -524,7 +524,7 @@
    "state": "unknown"
   }
  },
- "recorded_utc": "2026-10-08T23:31:54.233030+00:00",
+ "recorded_utc": "2026-10-08T23:38:46.954197+00:00",
  "relaxations": {
   "both_relaxed": 0,
   "captain_cap_relaxed": 0,
