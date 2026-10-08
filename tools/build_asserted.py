@@ -73,8 +73,10 @@ def with_assumed_gate(argv: list[str], gate: str) -> list[str]:
     i = 0
     while i < len(argv):
         token = argv[i]
-        if token == "--assume-gates" and i + 1 < len(argv):
-            names, i = [n.strip() for n in argv[i + 1].split(",") if n.strip()], i + 2
+        if token == "--assume-gates":
+            # A trailing flag with no value names nothing; it is not kept as a token.
+            value = argv[i + 1] if i + 1 < len(argv) else ""
+            names, i = [n.strip() for n in value.split(",") if n.strip()], i + 2
         elif token.startswith("--assume-gates="):
             names = [n.strip() for n in token.split("=", 1)[1].split(",") if n.strip()]
             i += 1

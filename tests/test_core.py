@@ -47826,6 +47826,24 @@ class DkOpenerBulkArmTests(unittest.TestCase):
         check_feed(entries, salary, feed, True, rep)
         self.assertTrue(rep.failures, "a feed naming another arm is a contradiction")
         self.assertEqual(rep.info["feed_dk_opener_admitted"], {})
+        # And a side the operator declared an arm on: the pool skips the rule
+        # there, so the referee does too (the opener is declared here; "T4
+        # Pen2" would read as the same person under _norm_name).
+        ace = next(pid for pid, row in salary.items() if row["Name"] == "T4 Ace")
+        rep = Report()
+        check_feed(entries, salary, pool_lineups_feed(t4_confirmed=True), True, rep,
+                   declared_pitchers={ace: "declared_probable_sp"})
+        self.assertTrue(rep.failures, "a declared side does not take the rule's arm")
+        self.assertEqual(rep.info["feed_dk_opener_admitted"], {})
+
+    def test_the_brief_pool_record_tags_the_admitted_arm(self):
+        """The R342(c) pool record reads `declared_arm_workload` as declared; an
+        admitted arm is in `dk_opener_admissions`, not there, and is tagged."""
+        pool, ids = self._pool({"T4 Ace": ("PO", 4000), "T4 Pen1": ("PLR", 8000)})
+        rec = DeclaredPitcherEvidenceTests._bs().pool_members_record(pool)
+        self.assertTrue(rec["recorded"], rec)
+        self.assertEqual(rec["role_source"][ids["T4 Pen1"]], "dk_opener_shape")
+        self.assertEqual(rec["role_source_counts"]["dk_opener_shape"], 1)
 
 
 class PlrBareDeclarationTests(unittest.TestCase):
@@ -47896,7 +47914,8 @@ class PlrBareDeclarationTests(unittest.TestCase):
             postures=None, assume_gates=None, captain_sleeve=None)
         self.assertIsNone(bs.validate_cli_values(args))
 
-    def test_a_swap_refuses_an_explicit_bare_plr_declaration(self):
+    def _plr_swap(self):
+        """LateSwapDeclaredPitcherTests' harness with T4 Pen1 tagged PLR."""
         harness = LateSwapDeclaredPitcherTests("test_the_grammar_is_build_slates_own_parser")
         harness.setUp()
         self.addCleanup(harness.doCleanups)
@@ -47909,11 +47928,26 @@ class PlrBareDeclarationTests(unittest.TestCase):
         salary = harness.root / "DKSalaries_plr.csv"
         with salary.open("w", newline="", encoding="utf-8") as fh:
             csv.writer(fh).writerows(rows)
+        return harness, salary, arm
+
+    def test_a_swap_refuses_an_explicit_bare_plr_declaration(self):
+        harness, salary, arm = self._plr_swap()
         harness._brief()
         code, _out, err = harness._run("--salary", str(salary), "--declare-pitcher", arm)
         self.assertEqual(code, 4, err[-1500:])
         self.assertIn(f"T4 Pen1 ({arm}, T4) Starting=PLR", err)
         self.assertIn("Nothing was swapped", err)
+
+    def test_an_inherited_starter_role_on_a_plr_arm_is_named_not_refused(self):
+        """A parent that declared the PLR arm bare stored `declared_probable_sp`;
+        the swap cannot tell bare from typed, so it names him and still swaps."""
+        harness, salary, arm = self._plr_swap()
+        harness._brief(declared={**harness.declared, arm: "declared_probable_sp"})
+        code, out, err = harness._run("--salary", str(salary))
+        self.assertEqual(code, 0, err[-1500:])
+        self.assertIn(f"WARN declared arm T4 Pen1 ({arm}, T4) is inherited from the parent "
+                      f"as declared_probable_sp", out)
+        self.assertIn(f"{arm}=viable_bulk_or_alt_sp", out)
 
 
 class AutobuildOpenerSlateTests(unittest.TestCase):
@@ -47988,6 +48022,9 @@ class AutobuildOpenerSlateTests(unittest.TestCase):
                                   "--assume-gates=weather_gate_passed"], "lineup_gate_passed"),
             ["--x", "--assume-gates", "weather_gate_passed,lineup_gate_passed"],
             "argparse keeps the LAST occurrence, so that value is the one kept")
+        self.assertEqual(ba.with_assumed_gate(["--x", "--assume-gates"], "lineup_gate_passed"),
+                         ["--x", "--assume-gates", "lineup_gate_passed"],
+                         "a trailing flag with no value is not left behind as a token")
         # The whole wrapper, with a stand-in build_slate that records its argv.
         seen = Path(self.tmp.name) / "argv.json"
         fake = Path(self.tmp.name) / "fake_build_slate.py"

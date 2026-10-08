@@ -2560,6 +2560,10 @@ def check_feed(entries: Sequence[EntryRow], salary: Dict[str, Dict[str, str]],
         if row is not None:
             declared_person.setdefault(person_key(row), role)
     dk_bulk = dk_opener_bulk_arms_for(salary, rep)
+    # R488. The pool admits that arm only on a side with no declared arm, so a
+    # side the operator declared an arm on is not acknowledged here either.
+    declared_teams = {str(salary[pid].get("TeamAbbrev") or "").upper()
+                      for pid in declared if pid in salary and is_pitcher_row(salary[pid])}
     posted: Dict[str, set[str]] = {}
     posted_hitters: Dict[str, int] = {}
     declared_probable: Dict[str, str] = {}
@@ -2639,8 +2643,9 @@ def check_feed(entries: Sequence[EntryRow], salary: Dict[str, Dict[str, str]],
                     (name, team, role), 0) + 1
                 continue
             shape = dk_bulk.get(pid) if is_pitcher else None
-            if shape is not None and declared_probable.get(team) in (
-                    None, _norm_name(shape["opener_name"])):
+            if (shape is not None and team not in declared_teams
+                    and declared_probable.get(team) in (
+                        None, _norm_name(shape["opener_name"]))):
                 # R488. The build admits this arm from DK's own opener shape
                 # when the feed names no arm or names the barred opener; the
                 # same rule, from its one owner, so the referee agrees with the

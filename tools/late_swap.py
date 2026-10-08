@@ -1949,6 +1949,21 @@ def main() -> int:
               f"is inherited from the parent and DK tags him Starting=PO on "
               f"{salary.name}, with no recorded evidence; check his strikeout prop, "
               f"and re-declare him with :evidence=\"...\" or drop him")
+    # R489. An inherited declared_probable_sp on an arm DK tags PLR may be a
+    # parent's bare declaration (the brief stores the defaulted role, so bare
+    # and typed cannot be told apart): named, not refused, like the PO case,
+    # because it also outranks R488's bulk admission in this swap's pool.
+    for arm in _build_slate_module().plr_declarations_without_role(
+            salary, [pid for pid, role in sorted(inherited_only.items())
+                     if role == "declared_probable_sp"]):
+        print(f"WARN declared arm {arm['name']} ({arm['player_id']}, {arm['team']}) "
+              f"is inherited from the parent as declared_probable_sp (a starter's "
+              f"workload) and DK tags him Starting=PLR on {salary.name}; re-declare "
+              f"him with a typed role ({arm['player_id']}=viable_bulk_or_alt_sp for "
+              f"bulk innings) or drop him"
+              + ("; DK's file stages his side as an opener game, so the build admits "
+                 "him as viable_bulk_or_alt_sp with no declaration (R488)"
+                 if arm.get("dk_opener_shape") else ""))
     if declared_evidence:
         print("declared evidence: "
               + "; ".join(f"{k}: {v}" for k, v in declared_evidence.items()))
