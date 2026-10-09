@@ -960,7 +960,7 @@ becomes the game's VENUE, DK's `Starting` fallback supplies a name with a null
 id and an empty hand, which kills F4's Savant join AND its platoon prior, and
 the slate still certifies with `f4_non_neutral: 0`. So: if the tool prints
 `DK STARTING` for every side of a paste that clearly named pitchers, the hand line
-is a THIRD render and the parse warning names the line it could not read. Two
+is a THIRD render and the parse warning names the line it could not read. `lineups_from_paste.py` prints `probables named in the paste: N of M side(s)` (and the sides with none); a short count on a paste that named pitchers is a render the parser did not read. A CT, MT or PT clock and a one-line `Name RHP` are read (R189(3)); MST is not (Arizona) and is named. Two
 surfaces answer this after the build without re-reading the log --
 `pool_report.opposing_probables_incomplete` names the sides whose opposing
 probable carries no id or no hand, and the brief's `factors_inert`, printed as the

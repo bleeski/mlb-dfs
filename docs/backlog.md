@@ -7236,34 +7236,9 @@ Write a random `session_token` into owner.json at take and echo it; `release` re
   is Ben's grant (mount refuses unlink) — listed in Tier 4 as the decision.
   Any wanted fixture already exists under `evals/inputs/`.
 
-### R189(3). Two mlb.com paste render shapes still drop both probables — R117's remainder, now R189's (P1, XS-S) | new 2026-08-22, from the greenfield sixth edition; layer (3) re-scoped at ec832cf. **(1) and (2) CLOSED 2026-08-24, migrated to CHANGELOG.md**
+### R189(3). CLOSED 2026-10-09 -- SHIPPED as roadmap Session 32 (c), entry migrated to CHANGELOG.md
 
-- **Landed 2026-08-24 and not repeated here:** (1) the paste module's "every
-  player carries an MLBAM id in the URL" premise was false for Ben's browser
-  copies (verified on `paste_1910_6g.txt`: all six games `mlbam_id=None`) and
-  the docstring now says so; (2) a NAMED probable with an empty id scored a
-  silent 1.0 in `compute_f4_factors` with `sp_quality_available: True` and no
-  bucket, so F4's SP-quality term was dead on every plain-text-paste slate —
-  now recovered by the Savant `last_name, first_name` join and, where it still
-  cannot join, named in `sp_quality_unavailable` with a per-team reason. Both
-  rode the R159 + R160 commit, which is why this item keeps its number and
-  loses two thirds of its scope.
-- **What (open):** R117's fix landed `_HAND_WITH_STATS`, so the
-  hand-plus-stats render now parses. Two shapes still drop BOTH probables with
-  zero warnings: the one-line `"Name RHP"` render (promotion still requires
-  the hand on its OWN line after a held name), and a clock the `_CLOCK` regex
-  misses (`"7:10 PM CT"` — the regex admits only an optional ET suffix), which
-  also loses the venue.
-- **Why it did not ride with (2):** the F4 half is a REPORTING fix in the
-  projection builder and this is a PARSER change in `paste_lineups.py`, needing
-  real paste fixtures in both shapes to verify. Landing them together would
-  have put an unverified regex beside a mutation-tested report. It stays P1
-  because a dropped probable is still the F4-dead path, and (2) only softens
-  the cost: the quality term now resolves by name IF a name arrives, and these
-  two shapes are exactly the case where no name arrives at all.
-- **Fix:** accept name+hand on one line; widen `_CLOCK`, or warn per game when
-  two headers parse and pitchers == 0. Batches with the R122 rider (both are
-  handedness reaching the build).
+`paste_lineups.py` reads a CT, MT or PT clock (converted to ET by the zone's fixed offset; a clock that crosses midnight in ET reads as None) and the one-line `Name RHP` / `Name RHP <statline>` / `[Name](url) RHP` pitcher, an unknown-zone clock still marks the clock position and is named, a game whose clock and both lineups parsed with no pitcher line warns, and the report and the tool print how many probables the paste named. The F4 neutral side was already named at build time; the silent part was the parse-layer cause. Pinned by `PitcherOnOneLineTests`, `ZoneClockTests`, `ZoneClockDoubleheaderTests` and `NoPitcherLineWarningTests`. Gate and commit: the CHANGELOG entry.
 
 ### R322. CLOSED 2026-09-08 -- SHIPPED, entry migrated to CHANGELOG.md
 

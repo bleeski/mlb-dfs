@@ -1558,7 +1558,8 @@ EXPECTED_SUITE_COUNTS = {
     # that disagree (against an exact repeat, which does not block), a price
     # inside the +/-100 gap, and a header the parser cannot read.
     # R397, 2026-09-23: 98 -> 106, the eight OddsPastePostponedTests (no signal still refuses and names the flags; an operator-named game is exempt; the name resolves through the paste's team rule; a feed marking the game postponed, cancelled or suspended exempts it; a priced row for an exempt game is dropped; a name on no slate game warns and the game still blocks; an unreadable feed warns by path; DK's Postponed literal is named).
-    "tests.test_paste_lineups": 106,
+    # R189(3), 2026-10-09: 106 -> 126, the 20 that pin the paste parser reading a zone clock and a one-line pitcher (`PitcherOnOneLineTests`, `ZoneClockTests`, `ZoneClockDoubleheaderTests`, `NoPitcherLineWarningTests`: four one-line renders derived from the real fixture yielding the same six probables, a CT/MT/PT restatement resolving to a byte-identical feed, the cross-check and the doubleheader selecting on the converted clock, midnight reading None, an unknown zone parsing and saying so, the zero-pitcher warning and its two non-triggers, and the tool printing the probable count); 12 hand mutations killed.
+    "tests.test_paste_lineups": 126,
     # R338 step 5, 2026-09-11. Two pytest suites the thirteenth edition wrote
     # and this gate could not see (R180(e)). Both pins are counted off a run
     # under the pinned `requirements-production.lock` stack, not off the

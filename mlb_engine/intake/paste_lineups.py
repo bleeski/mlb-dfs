@@ -135,8 +135,31 @@ _HAND = re.compile(r"^(?P<hand>[RL])HP\s*$")
 # line opening with those three letters names a hand.
 _HAND_STATLINE = re.compile(
     r"^(?P<hand>[RL])HP[\s,]+(?P<stats>\d{1,3}-\d{1,3}\b.*|.*\b(?:ERA|SO)\b.*)$")
+# R189(3). The probable's NAME and HAND on one line, "Hayden Wesneski RHP", with the
+# statline optionally trailing it ("... RHP 0-0, 4.76 ERA, 4 SO") and the name
+# optionally a link. The held-name flow needs the hand on its OWN line, so this render
+# dropped both probables of a game. The name has to be something before the hand,
+# so a standalone "RHP 8-7, 3.87 ERA" line (R117) is not this shape.
+_PITCHER_INLINE = re.compile(
+    r"^(?P<name>[A-Za-z].*?)\s+(?P<hand>[RL])HP"
+    r"(?:[\s,]+(?:\d{1,3}-\d{1,3}\b.*|.*\b(?:ERA|SO)\b.*))?$")
 _RECORD = re.compile(r"^\(\d{1,3}-\d{1,3}\)$")
-_CLOCK = re.compile(r"^(?P<h>\d{1,2}):(?P<m>\d{2})\s*(?P<ap>[AP]M)?\s*(?:ET)?$", re.I)
+# R189(3). The clock used to admit only an optional ET suffix, so "7:10 PM CT"
+# never matched: `seen_clock` stayed False, the venue was never taken and no probable
+# was ever held, and both pitchers of the game vanished with zero warnings. Ben pastes
+# from New Orleans, so Central will recur. The zones are the US ones mlb.com renders;
+# MST is left out on purpose (Arizona keeps it all year, so it is ambiguous with PT
+# in summer) and falls to the zero-pitcher warning in `_assign`.
+_CLOCK = re.compile(
+    r"^(?P<h>\d{1,2}):(?P<m>\d{2})\s*(?P<ap>[AP]M)?"
+    r"(?:\s*(?P<tz>ET|EDT|EST|CT|CDT|CST|MT|MDT|PT|PDT|PST))?$", re.I)
+# Hours to ADD to a clock in that zone to read it in ET. Exact, not a guess: the
+# four US zones change on the same dates, so the offset never moves.
+# Any line shaped like a clock. One `_CLOCK` does not read (a zone outside the table)
+# still marks where the clock sits, so the venue and the probables after it parse.
+_CLOCK_SHAPED = re.compile(r"^\d{1,2}:\d{2}\b")
+_ZONE_TO_ET_HOURS = {"ET": 0, "EDT": 0, "EST": 0, "CT": 1, "CDT": 1, "CST": 1,
+                     "MT": 2, "MDT": 2, "PT": 3, "PDT": 3, "PST": 3}
 _STATLINE = re.compile(r"\bERA\b|\bSO\b")
 # R32 round 2. "1. TBD" under a header, and a bare "TBD" where a probable's name
 # would go, are POSITIVE information that the side is unposted. Both hold a slot.
@@ -316,7 +339,7 @@ def parse_paste(text: str) -> Tuple[List[PastedGame], List[str]]:
         if current is None:
             return
         _flush_pending()
-        _assign(current, headers, blocks, pitchers)
+        _assign(current, headers, blocks, pitchers, seen_clock)
         games.append(current)
         current, headers, blocks, pitchers = None, [], [], []
         seen_clock = False
@@ -381,6 +404,18 @@ def parse_paste(text: str) -> Tuple[List[PastedGame], List[str]]:
             pending_name = None
             continue
 
+        inline = _PITCHER_INLINE.match(stripped)
+        if inline and seen_clock and not blocks and _looks_like_name(inline.group("name")) \
+                and not _BARE_TBD.match(inline.group("name")):
+            # Tested BEFORE the statline branch below: "Name RHP 0-0, 4.76 ERA" carries
+            # an ERA, and that branch would take it for decoration and blame the
+            # venue (R117's warning named 'Angel Stadium' as the dropped probable).
+            _flush_pending()
+            pitchers.append(PastedPitcher(display_name=inline.group("name").strip(),
+                                          mlbam_id=ids[0] if ids else None,
+                                          hand=inline.group("hand").upper()))
+            continue
+
         if _RECORD.match(stripped):
             continue
         if _STATLINE.search(stripped):
@@ -404,6 +439,16 @@ def parse_paste(text: str) -> Tuple[List[PastedGame], List[str]]:
         clock = _CLOCK.match(stripped)
         if clock:
             current.clock_text = stripped
+            seen_clock = True
+            continue
+        if _CLOCK_SHAPED.match(stripped) and not seen_clock:
+            # R189(3). A clock in a zone the table does not know (MST, a typo). The
+            # line still marks where the clock sits, so the venue and both probables
+            # parse; what is lost is the cross-check, and the warning says so.
+            current.warnings.append(
+                f"clock {stripped!r} is in a zone this parser does not read (it "
+                f"knows ET, CT, MT and PT); the game is parsed but this clock is "
+                f"not compared with the salary file")
             seen_clock = True
             continue
 
@@ -466,7 +511,8 @@ def _dk_team(code: str, club: str, warnings: List[str]) -> str:
 
 def _assign(game: PastedGame, headers: Sequence[str],
             blocks: Sequence[List[PastedPlayer]],
-            pitchers: Sequence[Optional[PastedPitcher]]) -> None:
+            pitchers: Sequence[Optional[PastedPitcher]],
+            clock_seen: bool = False) -> None:
     """Attach headers, blocks and pitchers to a game, or refuse to guess.
 
     This is the paired-header trap. Both ``HOU Lineup`` and ``LAA Lineup`` appear
@@ -513,6 +559,19 @@ def _assign(game: PastedGame, headers: Sequence[str],
     if len(pitchers) == 2:
         game.away_pitcher = pitchers[0]
         game.home_pitcher = pitchers[1]
+    elif not pitchers and clock_seen and len(blocks) == 2:
+        # R189(3). Zero pitcher lines used to be silent ("nothing was pasted").
+        # mlb.com always renders a pitcher line or a bare TBD per side, so a game
+        # whose clock and both lineups parsed and whose pitchers did not is a render
+        # shape this parser does not read, and the cost is silent: DK's Starting
+        # column backfills a NAME with no hand, so F4's platoon term goes neutral
+        # for every opposing bat, and where DK posted none the side has no probable.
+        game.warnings.append(
+            f"no probable pitcher line was read for the 2 headers "
+            f"{headers[0]}/{headers[1]} although the clock and both lineups parsed; "
+            f"if the paste names pitchers, their render is a shape this parser does "
+            f"not know. DK's Starting column backfills a probable's name with no "
+            f"hand, so F4's platoon term is neutral for the opposing bats")
     elif len(pitchers) != 0:
         game.warnings.append(
             f"found {len(pitchers)} probable pitcher line(s) for the 2 headers "
@@ -755,6 +814,10 @@ def resolve_paste_to_feed(
     dk_probables: List[Dict[str, str]] = []
     resolved_count = 0
     hitters_pasted = 0
+    # R189(3). How many sides the paste NAMED a probable for, so a render shape the
+    # parser does not read shows as a count and not as DK-backfilled names.
+    sides_used = 0
+    no_pasted_probable: List[str] = []
 
     for game in games:
         if not game.away_team or not game.home_team:
@@ -794,6 +857,9 @@ def resolve_paste_to_feed(
             side_blocked = False
             side_absent = 0
             hitters_pasted += len(lineup)
+            sides_used += 1
+            if pitcher is None:
+                no_pasted_probable.append(team)
             for player in sorted(lineup, key=lambda p: p.order):
                 matched, blocker = _resolve_one(
                     player.display_name, team, hitter_index, overrides)
@@ -960,6 +1026,11 @@ def resolve_paste_to_feed(
         },
         "unrostered_starters": unrostered,
         "dk_declared_probables": dk_probables,
+        # R189(3). Per side: a probable the paste named, and the sides it did not
+        # (a bare TBD, or a render the parser could not read; the warnings say which).
+        "probables_pasted": sides_used - len(no_pasted_probable),
+        "sides_used": sides_used,
+        "sides_without_pasted_probable": sorted(no_pasted_probable),
         "unrostered_policy": {
             "hitters_pasted": hitters_pasted,
             "hitters_absent_from_dk": slate_absent,
@@ -983,10 +1054,14 @@ def _utc():
 
 
 def _paste_clock_hm(game: PastedGame) -> Optional[Tuple[int, int]]:
-    """The paste's bare clock as (hour, minute) in ET, or None when unreadable.
+    """The paste's clock as (hour, minute) in ET, or None when unreadable.
 
-    mlb.com renders Eastern and the salary file's Game Info is Eastern, so the
-    two are directly comparable without a zone conversion.
+    The salary file's Game Info is Eastern, so a clock with no zone (the shape
+    the fixtures carry) or an ET suffix compares directly. R189(3): a CT, MT or PT
+    clock is moved to ET by the zone's fixed offset. A clock that crosses midnight
+    in ET (10:10 PM PT is 1:10 AM ET, the next day, which a bare clock cannot say)
+    reads as None: the doubleheader rule then blocks it and the cross-check skips
+    it, never a wrong date.
     """
     match = _CLOCK.match(game.clock_text or "")
     if not match:
@@ -994,6 +1069,9 @@ def _paste_clock_hm(game: PastedGame) -> Optional[Tuple[int, int]]:
     hour = int(match.group("h")) % 12
     if (match.group("ap") or "PM").upper() == "PM":
         hour += 12
+    hour += _ZONE_TO_ET_HOURS[(match.group("tz") or "ET").upper()]
+    if hour >= 24:
+        return None
     return hour, int(match.group("m"))
 
 
@@ -1084,13 +1162,10 @@ def _cross_check_clock(game: PastedGame, start: datetime, warnings: List[str]) -
     wrong-slate detector: mlb.com renders Eastern, and the salary file's Game
     Info is Eastern too.
     """
-    match = _CLOCK.match(game.clock_text or "")
-    if not match:
+    clock = _paste_clock_hm(game)
+    if clock is None:
         return
-    hour = int(match.group("h")) % 12
-    if (match.group("ap") or "PM").upper() == "PM":
-        hour += 12
-    if (hour, int(match.group("m"))) != (start.hour, start.minute):
+    if clock != (start.hour, start.minute):
         warnings.append(
             f"{game.game_id}: paste says {game.clock_text} and the salary file "
             f"says {start.strftime('%I:%M %p ET').lstrip('0')}; if these are "

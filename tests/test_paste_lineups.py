@@ -1729,3 +1729,306 @@ class OddsPastePostponedTests(unittest.TestCase):
                          [{"game": None, "teams": ["ATH", "BOS"],
                            "signals": ["salary Game Info 'Postponed'"],
                            "priced_books_dropped": []}])
+
+
+def _pitcher_line_render(text: str, *, linked: bool, stats: bool) -> str:
+    """The same paste with each probable's name, hand and statline on ONE line.
+
+    R189(3). Derived from the real fixture rather than hand-written, as
+    `_joined_render` is (R136's fixture lesson): the identical slate must resolve
+    to the identical pitchers in every render. `linked=False` is a plain-text
+    browser copy, which keeps the link TEXT and drops the href, so no MLBAM id.
+    """
+    import re
+
+    def _one(match):
+        name = match.group("name")
+        if not linked:
+            name = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", name)
+        tail = f" {match.group('stats')}" if stats else ""
+        return f"{name} {match.group('hand')}{tail}"
+
+    return re.sub(
+        r"(?P<name>\[[^\]\n]+\]\([^)\n]*\))\n(?P<hand>[RL]HP)\n(?P<stats>[^\n]*ERA[^\n]*)",
+        _one, text)
+
+
+def _arms(games):
+    return [(g.game_id, side, arm.display_name, arm.hand)
+            for g in games
+            for side, arm in (("away", g.away_pitcher), ("home", g.home_pitcher))
+            if arm is not None]
+
+
+class PitcherOnOneLineTests(unittest.TestCase):
+    """R189(3). "Name RHP" on one line dropped BOTH probables of a game.
+
+    The held-name flow promoted a name only when the hand sat on its OWN line,
+    so the one-line render attached zero pitchers with no warning (the held name
+    became the venue, or was dropped silently), and the statline variant was
+    swallowed by the ERA branch and blamed the venue. DK's `Starting` column
+    then supplied a name with no hand, so F4's platoon term went neutral.
+    """
+
+    RENDERS = {"linked with stats": (True, True), "linked bare": (True, False),
+               "plain with stats": (False, True), "plain bare": (False, False)}
+
+    def setUp(self):
+        self.base_games, self.base_warnings = parse_paste(_text())
+
+    def test_every_render_is_actually_different(self):
+        """Guard the guard: a no-op transform would make the tests below pass."""
+        for label, (linked, stats) in self.RENDERS.items():
+            with self.subTest(label):
+                text = _pitcher_line_render(_text(), linked=linked, stats=stats)
+                self.assertNotEqual(text, _text())
+                self.assertNotIn("\nRHP\n", text)
+                self.assertNotIn("\nLHP\n", text)
+
+    def test_each_render_yields_the_same_six_probables_with_hands(self):
+        base = _arms(self.base_games)
+        self.assertEqual(len(base), 6)
+        for label, (linked, stats) in self.RENDERS.items():
+            with self.subTest(label):
+                games, warnings = parse_paste(
+                    _pitcher_line_render(_text(), linked=linked, stats=stats))
+                self.assertEqual(warnings, [])
+                self.assertEqual(_arms(games), base)
+                self.assertEqual([g.venue for g in games],
+                                 [g.venue for g in self.base_games],
+                                 "a held name must not leak into the venue")
+                self.assertEqual([g.clock_text for g in games],
+                                 [g.clock_text for g in self.base_games])
+
+    def test_a_link_keeps_its_id_and_plain_text_has_none(self):
+        linked, _ = parse_paste(_pitcher_line_render(_text(), linked=True, stats=True))
+        plain, _ = parse_paste(_pitcher_line_render(_text(), linked=False, stats=True))
+        self.assertEqual(linked[0].away_pitcher.mlbam_id, "669713")
+        self.assertIsNone(plain[0].away_pitcher.mlbam_id)
+
+    def test_the_statline_variant_no_longer_blames_the_venue(self):
+        """The pre-fix warning read "held 'Angel Stadium' as a probable's name"."""
+        games, warnings = parse_paste(
+            _pitcher_line_render(_text(), linked=False, stats=True))
+        self.assertNotIn("Angel Stadium", " ".join(warnings))
+        self.assertEqual(games[0].venue, "Angel Stadium")
+
+    def test_a_name_and_hand_after_the_lineups_is_not_a_probable(self):
+        """The pitcher area is before the first hitter block, as for a held name:
+        a stray "Name LHP" line below the lineups adds no pitcher."""
+        text = _text().replace("[Gameday](https://www.mlb.com/gameday/824002)",
+                               "Stray Reliever LHP\n[Gameday](https://www.mlb.com/gameday/824002)", 1)
+        self.assertNotEqual(text, _text())
+        self.assertEqual(_arms(parse_paste(text)[0]), _arms(self.base_games))
+
+    def test_a_standalone_hand_line_is_still_not_a_pitcher_with_a_name(self):
+        """R117's `RHP 8-7, 3.87 ERA` has nothing before the hand, so it is the
+        hand line of a held name and not this shape."""
+        text = _joined_render(_text())
+        self.assertEqual(_arms(parse_paste(text)[0]), _arms(self.base_games))
+
+    def test_the_one_line_render_resolves_to_the_same_feed_apart_from_ids(self):
+        stamp = "2026-08-13T22:10:00Z"
+        base = resolve_paste_to_feed(_text(), str(SALARY), resolve_overrides=RESOLVE,
+                                     fetched_at=stamp)
+        plain = resolve_paste_to_feed(
+            _pitcher_line_render(_text(), linked=False, stats=True), str(SALARY),
+            resolve_overrides=RESOLVE, fetched_at=stamp)
+        self.assertEqual(plain["report"]["blockers"], [])
+        self.assertEqual(plain["report"].get("dk_declared_probables") or [], [],
+                         "the paste named every probable; DK's column is not needed")
+
+        def _probables(out):
+            return [(g["away"]["team_abbrev"], g["away"]["probable_pitcher"]["name"],
+                     g["away"]["probable_pitcher"]["hand"],
+                     g["home"]["probable_pitcher"]["name"],
+                     g["home"]["probable_pitcher"]["hand"])
+                    for g in out["feed"]["games"]]
+
+        self.assertEqual(_probables(plain), _probables(base))
+        self.assertEqual(plain["report"]["probables_pasted"], 6)
+        self.assertEqual(plain["report"]["sides_used"], 6)
+        self.assertEqual(plain["report"]["sides_without_pasted_probable"], [])
+
+
+def _zoned(text: str, zone: str) -> str:
+    """The fixture's three ET clocks restated in ``zone`` (CT -1h, MT -2h, PT -3h)."""
+    shift = {"ET": 0, "CT": 1, "MT": 2, "PT": 3}[zone]
+    out = text
+    for et, hour in (("9:38 PM", 9), ("9:40 PM", 9), ("10:10 PM", 10)):
+        minute = et.split(":")[1]
+        out = out.replace(f"\n{et}\n", f"\n{hour - shift}:{minute} {zone}\n")
+    return out
+
+
+class ZoneClockTests(unittest.TestCase):
+    """R189(3). A clock with a CT, MT or PT suffix lost the venue and both
+    probables of its game, and nothing said so.
+
+    `_CLOCK` admitted only an optional ET suffix, so "8:38 PM CT" never matched,
+    `seen_clock` stayed False, the venue was never taken and no probable was ever
+    held. Ben pastes from New Orleans. The zone is converted by its fixed offset
+    (the four US zones change on the same dates), so the wrong-slate cross-check
+    and the doubleheader leg selection keep working on his own zone.
+    """
+
+    def setUp(self):
+        self.base_games, _ = parse_paste(_text())
+
+    def test_each_zone_restates_the_same_clock_and_is_actually_different(self):
+        for zone in ("CT", "MT", "PT"):
+            with self.subTest(zone):
+                text = _zoned(_text(), zone)
+                self.assertNotEqual(text, _text())
+                self.assertIn(f" {zone}\n", text)
+
+    def test_a_zone_clock_keeps_the_venue_and_both_probables(self):
+        for zone in ("CT", "MT", "PT"):
+            with self.subTest(zone):
+                games, warnings = parse_paste(_zoned(_text(), zone))
+                self.assertEqual(warnings, [])
+                self.assertEqual([g.venue for g in games],
+                                 [g.venue for g in self.base_games])
+                self.assertEqual(_arms(games), _arms(self.base_games))
+
+    def test_a_zone_clock_reads_as_the_same_eastern_time(self):
+        from mlb_engine.intake.paste_lineups import PastedGame, _paste_clock_hm
+        for text, expected in (("9:38 PM", (21, 38)), ("9:38 PM ET", (21, 38)),
+                               ("8:38 PM CT", (21, 38)), ("8:38 PM cdt", (21, 38)),
+                               ("7:38 PM MT", (21, 38)), ("6:38 PM PT", (21, 38)),
+                               ("12:05 PM CT", (13, 5)), ("11:30 AM PT", (14, 30))):
+            with self.subTest(text):
+                self.assertEqual(_paste_clock_hm(PastedGame(clock_text=text)), expected)
+
+    def test_a_clock_that_crosses_midnight_in_eastern_reads_as_none(self):
+        """10:10 PM PT is 1:10 AM ET, the next day, which a bare clock cannot say.
+        None, never a wrong date: a doubleheader then blocks and the cross-check
+        skips."""
+        from mlb_engine.intake.paste_lineups import PastedGame, _paste_clock_hm
+        self.assertIsNone(_paste_clock_hm(PastedGame(clock_text="10:10 PM PT")))
+        self.assertIsNone(_paste_clock_hm(PastedGame(clock_text="11:00 PM CT")))
+
+    def test_a_zone_paste_resolves_to_the_same_feed_with_no_new_warning(self):
+        stamp = "2026-08-13T22:10:00Z"
+        base = resolve_paste_to_feed(_text(), str(SALARY), resolve_overrides=RESOLVE,
+                                     fetched_at=stamp)
+        for zone in ("CT", "PT"):
+            with self.subTest(zone):
+                out = resolve_paste_to_feed(_zoned(_text(), zone), str(SALARY),
+                                            resolve_overrides=RESOLVE, fetched_at=stamp)
+                self.assertEqual(out["report"]["warnings"], base["report"]["warnings"])
+                self.assertEqual(json.dumps(out["feed"], sort_keys=True, default=str),
+                                 json.dumps(base["feed"], sort_keys=True, default=str))
+
+    def test_the_wrong_slate_cross_check_still_fires_on_a_zone_clock(self):
+        """"9:38 PM CT" is 10:38 PM ET; the salary file says 9:38 PM ET."""
+        text = _text().replace("\n9:38 PM\n", "\n9:38 PM CT\n")
+        self.assertNotEqual(text, _text())
+        out = resolve_paste_to_feed(text, str(SALARY), resolve_overrides=RESOLVE)
+        self.assertTrue(any("wrong slate" in w and "9:38 PM CT" in w
+                            for w in out["report"]["warnings"]),
+                        out["report"]["warnings"])
+
+    def test_a_zone_the_table_does_not_know_still_parses_and_says_so(self):
+        """Arizona keeps MST all year, so it is ambiguous with PT in summer and is
+        left out of the table rather than guessed. Before this the line matched
+        nothing, `seen_clock` stayed False and the game lost its venue and both
+        probables in silence. Now the line still marks the clock position, the
+        game parses, and the warning names what was lost: the cross-check."""
+        text = _text().replace("\n9:38 PM\n", "\n7:38 PM MST\n")
+        self.assertNotEqual(text, _text())
+        games, warnings = parse_paste(text)
+        self.assertEqual(games[0].venue, "Angel Stadium")
+        self.assertEqual(_arms(games), _arms(self.base_games))
+        self.assertEqual(games[0].clock_text, "", "no clock is claimed")
+        hits = [w for w in warnings if "zone this parser does not read" in w]
+        self.assertEqual(len(hits), 1, warnings)
+        self.assertIn("7:38 PM MST", hits[0])
+        out = resolve_paste_to_feed(text, str(SALARY), resolve_overrides=RESOLVE)
+        self.assertFalse(any("wrong slate" in w for w in out["report"]["warnings"]),
+                         "an unreadable clock is not compared, so it cannot disagree")
+
+
+class ZoneClockDoubleheaderTests(unittest.TestCase):
+    """R189(3). A Central-time doubleheader paste: the legs are told apart by the
+    CONVERTED clock, and two legs the converted clock cannot separate still block."""
+
+    for _name in ("AWAY", "HOME", "SLOTS", "DK_SLOTS", "_salary", "_side", "_paste",
+                  "_resolve"):
+        locals()[_name] = DoubleheaderPastedLegTests.__dict__[_name]
+    del _name
+
+    def test_ct_legs_select_the_night_leg_the_salary_file_prices(self):
+        # 1:05 PM ET matinee = 12:05 PM CT; the 9:38 PM ET night leg = 8:38 PM CT.
+        out, _times, (kept, dropped) = self._resolve(legs=[
+            ("12:05 PM CT", "Matinee Arm", "Matinee"),
+            ("8:38 PM CT", "Night Arm", "Night")])
+        self.assertEqual(out["report"]["blockers"], [])
+        self.assertEqual(len(kept), 1)
+        self.assertEqual(len(dropped), 1)
+        self.assertEqual(kept[0]["away"]["probable_pitcher"]["name"], "Night Arm")
+        self.assertTrue(any("doubleheader" in w and "8:38 PM CT" in w
+                            for w in out["report"]["warnings"]),
+                        out["report"]["warnings"])
+
+    def test_ct_legs_at_the_same_converted_clock_still_block(self):
+        out, _t, _s = self._resolve(legs=[("8:38 PM CT", "Matinee Arm", "Matinee"),
+                                          ("9:38 PM ET", "Night Arm", "Night")])
+        self.assertTrue(any("cannot be told apart by clock" in b
+                            for b in out["report"]["blockers"]),
+                        out["report"]["blockers"])
+
+
+class NoPitcherLineWarningTests(unittest.TestCase):
+    """R189(3). A game whose clock and both lineups parsed and whose pitchers did
+    not is a render shape the parser does not read; zero pitcher lines used to be
+    silent by design ("nothing was pasted")."""
+
+    NO_PITCHERS = (
+        "[Hayden Wesneski](https://www.mlb.com/player/hayden-wesneski-669713)\nRHP\n"
+        "0-0, 4.76 ERA, 4 SO\n"
+        "[Grayson Rodriguez](https://www.mlb.com/player/grayson-rodriguez-680570)\nRHP\n"
+        "3-3, 7.98 ERA, 36 SO\n")
+
+    def test_a_game_with_no_pitcher_lines_warns_and_the_report_counts_it(self):
+        text = _text().replace(self.NO_PITCHERS, "")
+        self.assertNotEqual(text, _text())
+        games, warnings = parse_paste(text)
+        hits = [w for w in warnings if "no probable pitcher line was read" in w]
+        self.assertEqual(len(hits), 1, warnings)
+        self.assertTrue(hits[0].startswith("HOU@LAA:"))
+        out = resolve_paste_to_feed(text, str(SALARY), resolve_overrides=RESOLVE)
+        self.assertEqual(out["report"]["sides_without_pasted_probable"], ["HOU", "LAA"])
+        self.assertEqual(out["report"]["probables_pasted"], 4)
+
+    def test_a_bare_tbd_per_side_is_not_a_missing_render(self):
+        """mlb.com's own placeholder holds its slot, so two TBDs are two pitcher
+        entries and nothing is warned: the side is unannounced, not unread."""
+        text = _text().replace(self.NO_PITCHERS, "TBD\nTBD\n")
+        _games, warnings = parse_paste(text)
+        self.assertFalse(any("no probable pitcher line" in w for w in warnings),
+                         warnings)
+
+    def test_a_lineups_only_paste_with_no_clock_is_not_warned(self):
+        text = _text().replace(self.NO_PITCHERS, "").replace("9:38 PM\n", "")
+        _games, warnings = parse_paste(text)
+        self.assertFalse(any("no probable pitcher line" in w for w in warnings),
+                         warnings)
+
+    def test_the_tool_prints_how_many_probables_the_paste_named(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            for label, text, expected in (
+                    ("all six", _text(), "probables named in the paste: 6 of 6 side(s)\n"),
+                    ("HOU@LAA unread", _text().replace(self.NO_PITCHERS, ""),
+                     "probables named in the paste: 4 of 6 side(s); none for HOU, LAA\n")):
+                with self.subTest(label):
+                    paste = Path(tmp) / "paste.txt"
+                    paste.write_text(text, encoding="utf-8")
+                    result = subprocess.run(
+                        [sys.executable, str(REPO / "tools" / "lineups_from_paste.py"),
+                         "--salary", str(SALARY), "--paste", str(paste),
+                         "--resolve", "W Wilson=Weston Wilson",
+                         "--out", str(Path(tmp) / "feed.json")],
+                        capture_output=True, text=True)
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    self.assertIn(expected, result.stdout)
