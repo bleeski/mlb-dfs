@@ -2,6 +2,29 @@
 
 What changed in the engine, the tools and the contracts, when, and why.
 
+## 2026-10-09 — R493: the next-session prompt is plain text, because the app's slash-command line rejects backticks, @-mentions, other slash commands, links and markdown (roadmap Session 158)
+
+Ben, 2026-10-09, pasting the R491 prompt: "A command takes file @-mentions but no other @-mentions, slash commands, links, or inline formatting, so nothing was sent. Remove them." The prompt opens with `/plan` (Ben's R491 instruction), and the app treats everything after a leading command as that command's argument, which it accepts as plain text and file mentions only. Filed and completed in one commit, like R491 and R492; NEXT does not move (Session 32).
+
+**Scope.** `tools/handoff.py` (`command_unsafe`, `command_safe`, `_UNSAFE`, `_COMMAND`, the prompt's own wording, a stderr warning in `main`), `.claude/skills/handoff/SKILL.md` (section 4), `tests/test_core.py` (`HandoffToolTests`: 5 new tests, 4 existing pins updated), `tools/audit.py` (the test_core pin 2331 -> 2336), `CHANGELOG.md`, `docs/backlog.md`, `docs/ROADMAP.md` (the Session 158 row, a Progress Ledger row, and Session 157's `(backfill)` filled with its merge `333f41f`).
+
+**What was wrong.** R491's `build_prompt` wrote a markdown document: `## ` headings, `- ` bullets, backticks around every path and command, `origin/main @ <sha>`, and the words `/dev-session`, `/land`, `/ship`, `/handoff` and `(/advisor)` in running text, plus whatever backticks, bold and `<br>` the roadmap's cells carried. Pasted into the message box it was refused whole, so the session it was written to start could not start. The R491 and R492 tests pinned the headings and the backticks, so they asserted the broken shape.
+
+**What shipped.**
+- The prompt's own wording is plain: numbered section labels in place of `##`, no bullets, "origin/main at <sha>", "the dev-session skill", "the land and ship skills", "the advisor tool", "the handoff skill". `command_safe` is the net for what the roadmap's cells bring in: it unwraps markdown links, drops `https://`, unwraps `<placeholder>`, deletes backticks and asterisks, turns `@` into "at", drops the slash from a word that starts with one (`/land` becomes `land`, `tests/test_core.py` and `origin/main` are untouched), and strips heading and bullet markers. The leading command (`/plan`) is left alone, matched by `^/\S+` so a command followed straight by a newline cannot swallow the next token.
+- `command_unsafe` names what survives, in the same seven classes, and `main` prints a stderr `WARNING` if any does, so a future edit that reintroduces one is reported at the point of use instead of at Ben's message box. `fence` is unchanged: the fence is in the chat message and is never sent.
+- The `/handoff` skill says the prompt is plain on purpose and not to add formatting back through `--note`.
+
+**What I could not verify.** I cannot send a message from the app, so the exact set the app rejects is the one its error names (@-mentions, slash commands, links, inline formatting); headings, bullets and angle brackets are removed as well, conservatively, because the message does not say whether block markdown is refused. If Ben's next paste is still refused, the next thing to strip is the `•` bullets and the parentheses the roadmap's cells carry, and `_UNSAFE` is the one table to extend.
+
+**R233 enumeration (every producer of text meant for the message box).** `grep -rn "def build_prompt\|/plan " tools .claude skills docs/ROADMAP.md --include=*.py --include=*.md` hits `tools/handoff.py` (the only producer, changed) and the `/handoff` skill and CLAUDE.md prose that describe it (no prompt text). `.claude/skills/dev-session/SKILL.md` section 2 mentions a `/handoff` prompt opening in `/plan` as a description, not as pasted text, and is unchanged.
+
+**Declined or deferred.** (1) Dropping the leading `/plan` so the message could carry formatting: Ben asked for it, and a plain prompt keeps it. (2) Putting the body in a file and sending only a one-line `/plan Read <file>`: a cloud container's file is not on Ben's disk, and the prompt is meant to survive being pasted into any session.
+
+**Verified.** The Session 32 prompt printed by `python tools/handoff.py prompt --merge-sha 333f41f` has no backtick, asterisk, at sign, link, angle bracket, leading slash word, heading or bullet after `/plan`. 47 `HandoffToolTests` pass (42 plus 5). 11 hand mutations (the sanitizer unused, backticks and asterisks kept, the at sign kept, slash words kept, links kept, headings and bullets kept, the leading command dropped, `main` never warning, the base line keeping the at sign, the detector blind to headings, the detector reading the leading command) each turned a named test red and were restored byte-identical, except the base-line one: it survives because `command_safe` turns the at sign into "at" anyway, so the output is identical (an equivalent mutant; the plain wording stays as the first line of defense).
+
+**Gate.** (filled after CI)
+
 ## 2026-10-08 — R492: the post-merge close-out (branch cleanup, sync with GitHub, next-session prompt) runs after DEV merges only, decided by `handoff.py scope` from the paths a merge changed (roadmap Session 157)
 
 Ben's instruction, 2026-10-08: the next-session prompt, the repo sync and the branch cleanup should trigger only after a dev session; a lineup generation run does not need them. Two design questions went to Ben and he chose: detect by what the merged PR changed (not by the session's declared role), and DEV only (BUILD and ARCHIVE sessions both stop at the merge). Filed and completed in one commit, like R491; NEXT does not move (Session 32).

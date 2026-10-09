@@ -465,6 +465,44 @@ def fence(body: str) -> str:
     return f"{mark}text\n{body}\n{mark}"
 
 
+_COMMAND = re.compile(r"^/\S+")
+_UNSAFE = (
+    ("a backtick", re.compile(r"`")),
+    ("an asterisk", re.compile(r"\*")),
+    ("an at sign", re.compile(r"@")),
+    ("a link", re.compile(r"https?://|\]\(")),
+    ("angle brackets", re.compile(r"<[^<>\n]{1,24}>")),
+    ("a leading slash word", re.compile(r"(?<![\w./:-])/(?=[A-Za-z])")),
+    ("a markdown heading or bullet", re.compile(r"(?m)^\s*(?:#{1,6}\s|-\s)")),
+)
+
+
+def command_unsafe(text: str) -> list[str]:
+    """What the app's slash-command line would reject, after the leading command.
+
+    `/plan <text>` takes plain text and file mentions only; a second slash
+    command, an @-mention, a link or inline formatting makes it send nothing
+    ("A command takes file @-mentions but no other @-mentions, slash commands,
+    links, or inline formatting", Ben, 2026-10-09; R493).
+    """
+    rest = text[len(_COMMAND.match(text).group()):] if _COMMAND.match(text) else text
+    return [name for name, rx in _UNSAFE if rx.search(rest)]
+
+
+def command_safe(text: str) -> str:
+    """Strip those out, keeping the words. The leading command is left alone."""
+    found = _COMMAND.match(text)
+    head, rest = (found.group(), text[found.end():]) if found else ("", text)
+    rest = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", rest)
+    rest = re.sub(r"https?://", "", rest)
+    rest = re.sub(r"<([^<>\n]{1,24})>", r"\1", rest)
+    rest = re.sub(r"[`*]", "", rest)
+    rest = rest.replace("@", "at")
+    rest = re.sub(r"(?<![\w./:-])/(?=[A-Za-z])", "", rest)
+    rest = re.sub(r"(?m)^(\s*)(?:#{1,6}\s+|-\s+)", r"\1", rest)
+    return head + rest
+
+
 def build_prompt(roadmap: str, session: str | None = None, *, base: str = "",
                  merged: str = "", notes: list[str] | None = None) -> dict:
     """The next-session prompt for `session` (default: the NEXT row).
@@ -473,6 +511,11 @@ def build_prompt(roadmap: str, session: str | None = None, *, base: str = "",
     roadmap already keeps them: WHAT is the Work Unit cell, EFFORT is its rank
     line, VERIFY is its Verification cell. Nothing here is composed from memory,
     so a row that is thin produces a thin prompt that SAYS it is thin.
+
+    The text is PLAIN on purpose (R493): it opens with `/plan`, and the app's slash
+    command line rejects a message that also carries backticks, an @-mention, a
+    second slash command, a link or markdown. `command_safe` strips what the row's
+    own cells bring in, and `main` warns if anything survives.
     """
     session = session or next_session(roadmap)
     if session is None:
@@ -507,13 +550,13 @@ def build_prompt(roadmap: str, session: str | None = None, *, base: str = "",
     headline = title if len(title) <= 110 else title[:107].rstrip() + "..."
     out = [f"/plan Session {session}: {headline}", ""]
     out.append("You are DEV on the mlb-dfs engine. Start in plan mode and stay there: no edits, "
-               "no engine claim and no gate run until I approve the plan. If /plan did not "
+               "no engine claim and no gate run until I approve the plan. If the plan command did not "
                "switch modes, treat this session as read-only until I say go.")
     if base:
-        out.append(f"Base: {base}. Run `git fetch origin` first; "
+        out.append(f"Base: {base}. Run git fetch origin first; "
                    + (f"{merged}. " if merged else "")
-                   + "CLAUDE.md is the contract and /dev-session is the procedure.")
-    out += ["", "## 1. What to do",
+                   + "CLAUDE.md is the contract and the dev-session skill is the procedure.")
+    out += ["", "1. What to do",
             f"docs/ROADMAP.md row Session {session} ({packaging}; {gate_class}; source: {source}).",
             f"{title}."]
     out += body
@@ -528,37 +571,38 @@ def build_prompt(roadmap: str, session: str | None = None, *, base: str = "",
                "right (.claude/rules/engine.md).")
     for note in notes or []:
         out.append(f"Carry-over from the last session: {note}")
-    out += ["", "## 2. How much effort",
+    out += ["", "2. How much effort",
             (sizing_line or "The row states no size.") ,
             f"Reasoning effort: {level} ({level_why}). Set the session's effort control to match "
             "if you want it enforced; this line is guidance, not a setting.",
             "If the context window runs hot, stop at the "
             + (f"row's breakpoint ({breakpoint_.group(1)})" if breakpoint_ and breakpoint_.group(1)
                else "row's named breakpoint")
-            + ": land that part with /land and /ship and say what remains, rather than "
+            + ": land that part with the land and ship skills and say what remains, rather than "
             "half-landing all of it.",
             "Stop only for a fact only I have (CLAUDE.md, Autonomy); otherwise keep going and "
             "put the status note in the same message as the next action.",
-            "", "## 3. How to verify",
-            f"- The row's verification, verbatim (UT, GOLD, PROBE, LINT and GATE are defined under "
+            "", "3. How to verify",
+            f"The row's verification, verbatim (UT, GOLD, PROBE, LINT and GATE are defined under "
             f"'Commands' in docs/ROADMAP.md): {verify or 'NONE STATED: say so in the plan and propose one'}",
-            "- `python tools/plan_status.py --check` exits 0, and `python tools/audit.py --run-tests "
-            "--terse` prints `PASS  <version>  <N> modules  <N> tests` with nothing appended "
+            "python tools/plan_status.py --check exits 0, and python tools/audit.py --run-tests "
+            "--terse prints PASS, then the version, module count and test count, with nothing appended "
             "(docs/hosts.md has its time on this host; the PR's `gate` check is the merge authority "
             "wherever the local gate is red for host reasons).",
-            "- Every new test is mutation-checked: revert the fix, expect red, restore.",
-            "- Merge only on a green `gate`, then run /handoff.",
-            "- End with: what is blocked on me, what changed (PR or merge sha and the gate line), "
+            "Every new test is mutation-checked: revert the fix, expect red, restore.",
+            "Merge only on a green gate check, then run the handoff skill.",
+            "End with: what is blocked on me, what changed (PR or merge sha and the gate line), "
             "then what you found and filed.",
-            "", "## Advisor",
+            "", "Advisor",
             "1. Before you present the plan: draft it (what is wrong, verified against the tree; "
             "the files; the tests; the gate line and golden histogram you expect), call the "
-            "advisor (/advisor) on the draft, fold its answer in or say why you disagree, and "
+            "advisor tool on the draft, fold its answer in or say why you disagree, and "
             "only then present it with ExitPlanMode.",
             "2. After I approve it: call the advisor again before the first edit if the approach "
             "is not settled, whenever you are stuck or a result does not fit, and once more "
             "before you declare done (commit the work first so it survives the call)."]
-    return {"session": session, "prompt": "\n".join(out), "reasoning_effort": level,
+    return {"session": session, "prompt": command_safe("\n".join(out)),
+            "reasoning_effort": level,
             "needs_ben": needs_ben, "warnings": warnings}
 
 
@@ -637,12 +681,16 @@ def main(argv=None) -> int:
                       f"merge {args.merge_sha[:7]} is NOT on it yet, so fetch before trusting this prompt")
         result = build_prompt(
             roadmap, args.session.replace("Session", "").strip() if args.session else None,
-            base=f"{label} @ {sha}" if sha else f"{label} (no {args.ref} here)",
+            base=f"{label} at {sha}" if sha else f"{label} (no {args.ref} here)",
             merged=merged, notes=args.note)
         if label != args.ref:
             result["warnings"].append(
                 f"{args.ref} is unreadable here, so NEXT came from the working tree, "
                 "which may be stale: fetch and rerun")
+        leftover = command_unsafe(result["prompt"])
+        if leftover:
+            result["warnings"].append("the prompt still carries " + ", ".join(leftover)
+                                      + ", which the app's /plan line rejects: edit them out")
         for warning in result["warnings"]:
             print(f"WARNING  {warning}", file=sys.stderr)
         print(fence(result["prompt"]))
