@@ -49465,3 +49465,119 @@ class BulkArmMatchupTests(unittest.TestCase):
         self.assertTrue(t3_hitters)
         for pid in t3_hitters:
             self.assertGreater(after[pid], before[pid], pid)
+
+
+class PoRefusalTextTests(unittest.TestCase):
+    """R125(a) refusal-text half (roadmap Session 32). The no-starter refusal on
+    a side DK stages with a barred `PO` names the opener, his price, the side's
+    other tokened arms with theirs, and the exact `--declare-pitcher` forms.
+
+    Before this the feed-path text named the opener and nothing else, and the
+    DK-only text ("no probable or declared starter") named nobody: a PO side
+    never enters `DK_STARTING_PROBABLE_TOKENS`, so the operator read a feed gap
+    where DK had named an opener. The decision half is recorded, not built: a
+    tie or a dearer PO keeps its blocker (R488's conjunction was Ben's choice on
+    2026-10-07, and graded on benbook the PLR outscored the dearer PO on 3 of 4
+    such days with outcomes, so "declare the dearer arm" is not supported).
+    """
+
+    _salary = DkOpenerBulkArmTests._salary
+    _pool = DkOpenerBulkArmTests._pool
+
+    TIE = {"T4 Ace": ("PO", 6000), "T4 Pen1": ("PLR", 6000)}
+    GENERIC_PREFIX = ("T4: no probable or declared starter; declare one via "
+                      "declared_pitchers or that side has no rosterable arm")
+
+    def _t4(self, arms, feed=None):
+        pool, ids = self._pool(arms, feed=feed)
+        hits = [b for b in pool["pool_report"]["blockers"]
+                if b.startswith("T4:") and "no " in b and "starter" in b]
+        self.assertEqual(len(hits), 1, pool["pool_report"]["blockers"])
+        return hits[0], ids
+
+    def _dk_only(self):
+        return pool_lineups_feed(t4_confirmed=True, drop_t4_probable=True)
+
+    def test_the_feed_path_refusal_names_the_arms_their_prices_and_both_flags(self):
+        text, ids = self._t4(self.TIE)
+        self.assertTrue(text.startswith("T4: no ROSTERABLE starter."), text)
+        self.assertIn(f"T4 Ace ({ids['T4 Ace']}) Starting=PO $6,000", text)
+        self.assertIn(f"T4 Pen1 ({ids['T4 Pen1']}) Starting=PLR $6,000", text)
+        self.assertIn(f"--declare-pitcher '{ids['T4 Pen1']}=viable_bulk_or_alt_sp'", text)
+        self.assertIn(f"--declare-pitcher '{ids['T4 Ace']}=declared_probable_sp:evidence=", text)
+        self.assertIn("a tie or a dearer PO is the operator's call", text)
+
+    def test_the_dk_only_refusal_names_the_opener_and_keeps_its_prefix(self):
+        text, ids = self._t4({"T4 Ace": ("PO", 4000)}, feed=self._dk_only())
+        self.assertTrue(text.startswith(self.GENERIC_PREFIX), text)
+        self.assertIn("DK tags T4 Ace Starting=PO", text)
+        self.assertIn(f"T4 Ace ({ids['T4 Ace']}) Starting=PO $4,000", text)
+        self.assertIn(f"--declare-pitcher '{ids['T4 Ace']}=declared_probable_sp:evidence=", text)
+        # No PLR on the side, so the bulk flag cannot name an id and says so.
+        self.assertIn("--declare-pitcher '<the bulk arm's Player_ID>=viable_bulk_or_alt_sp'", text)
+        self.assertNotIn("no rosterable starter", text.lower(),
+                         "autobuild treats that phrase as benign")
+
+    def test_a_side_with_no_opener_keeps_its_refusal_byte_for_byte(self):
+        text, _ = self._t4({}, feed=self._dk_only())
+        self.assertEqual(text, self.GENERIC_PREFIX)
+
+    def test_a_dearer_opener_shows_both_prices(self):
+        text, ids = self._t4({"T4 Ace": ("PO", 9000), "T4 Pen1": ("PLR", 7000)})
+        self.assertIn(f"T4 Ace ({ids['T4 Ace']}) Starting=PO $9,000; "
+                      f"T4 Pen1 ({ids['T4 Pen1']}) Starting=PLR $7,000", text)
+
+    def test_two_long_relievers_list_both_and_name_no_bulk_id(self):
+        """Which PLR is the bulk arm is the operator's call: the flag carries a
+        placeholder, never the first one."""
+        text, ids = self._t4({"T4 Ace": ("PO", 4000), "T4 Pen1": ("PLR", 8000),
+                              "T4 Pen2": ("PLR", 7000)})
+        # The opener first, then the others dearest first, so the order is the
+        # same whatever order DK listed them in.
+        self.assertIn(f"T4 Ace ({ids['T4 Ace']}) Starting=PO $4,000; "
+                      f"T4 Pen1 ({ids['T4 Pen1']}) Starting=PLR $8,000; "
+                      f"T4 Pen2 ({ids['T4 Pen2']}) Starting=PLR $7,000", text)
+        self.assertIn("--declare-pitcher '<the bulk arm's Player_ID>=viable_bulk_or_alt_sp'", text)
+
+    def test_untokened_relievers_are_not_listed(self):
+        text, _ = self._t4(self.TIE)
+        self.assertNotIn("T4 Pen2", text)
+        self.assertNotIn("T4 Pen3", text)
+
+    def test_the_suggested_flags_are_ones_the_cli_accepts(self):
+        """A refusal that names a flag the validator refuses is the defect this
+        class exists to remove. Both strings are run through build_slate's own
+        parser and its R471 and R489 checks, against the same salary file."""
+        bs = DeclaredPitcherEvidenceTests._bs()
+        with tempfile.TemporaryDirectory() as tmp:
+            salary = self._salary(tmp, self.TIE)
+            pool, ids = self._pool(self.TIE)
+            text = next(b for b in pool["pool_report"]["blockers"]
+                        if b.startswith("T4: no ROSTERABLE starter"))
+            flags = re.findall(r"--declare-pitcher '([^']+)'", text)
+            self.assertEqual(len(flags), 2, flags)
+            for flag in flags:
+                with self.subTest(flag=flag):
+                    options = bs.parse_declared_pitcher_options([flag])
+                    declared = bs.parse_declared_pitchers([flag])
+                    evidence = bs.declared_pitcher_evidence([flag])
+                    self.assertEqual(bs.po_declarations_without_evidence(
+                        salary, declared, evidence), [], options)
+                    self.assertEqual(bs.plr_declarations_without_role(salary, [flag]), [])
+            self.assertEqual(
+                {pid: spec["role"] for pid, spec in
+                 bs.parse_declared_pitcher_options(flags).items()},
+                {ids["T4 Pen1"]: "viable_bulk_or_alt_sp",
+                 ids["T4 Ace"]: "declared_probable_sp"})
+
+    def test_autobuild_still_reads_the_two_phrasings_differently(self):
+        """`classify_pool_blocker` keys on the lowercased phrase "no rosterable
+        starter": benign for the feed-path text, a human's call for the DK-only
+        text. Rewording the second into the first would change autobuild's
+        behavior on every DK-only opener slate."""
+        import importlib
+        ab = importlib.import_module("tools.autobuild")
+        feed_text, _ = self._t4(self.TIE)
+        dk_text, _ = self._t4({"T4 Ace": ("PO", 4000)}, feed=self._dk_only())
+        self.assertIsNotNone(ab.classify_pool_blocker(feed_text))
+        self.assertIsNone(ab.classify_pool_blocker(dk_text))

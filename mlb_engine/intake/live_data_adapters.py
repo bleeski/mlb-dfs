@@ -1655,6 +1655,42 @@ def barred_opener_rows(
     return out
 
 
+def po_side_detail(
+    team: str, players: Iterable[Any], pitcher_roles: Mapping[str, str],
+) -> str:
+    """R125(a). The sentence a no-starter refusal appends for a side DK stages
+    with a barred ``PO``: the opener, the side's other TOKENED arms with their
+    prices (so a tie or a dearer opener is visible beside the PLR), and the two
+    exact flags. ``""`` when the side has no barred opener, so a side with none
+    keeps its refusal byte for byte. Tokened arms only (SP/P/PO/PLR); a side's
+    untokened relievers are not the decision."""
+    rows = [sp for sp in players if sp.team == team and "P" in tuple(sp.positions)]
+    openers = barred_opener_rows(rows, pitcher_roles).get(team)
+    if not openers:
+        return ""
+    tokened = (DK_STARTING_PROBABLE_TOKENS | DK_STARTING_OPENER_TOKENS
+               | DK_STARTING_LONG_RELIEVER_TOKENS)
+    arms = sorted(
+        (sp for sp in rows if str(sp.starting).strip().upper() in tokened),
+        key=lambda sp: (str(sp.starting).strip().upper() not in DK_STARTING_OPENER_TOKENS,
+                        -float(sp.salary), str(sp.player_id)))
+    listed = "; ".join(
+        f"{sp.name} ({sp.player_id}) Starting={str(sp.starting).strip().upper()} "
+        f"${float(sp.salary):,.0f}" for sp in arms)
+    bulk = [sp for sp in arms
+            if str(sp.starting).strip().upper() in DK_STARTING_LONG_RELIEVER_TOKENS]
+    bulk_id = bulk[0].player_id if len(bulk) == 1 else "<the bulk arm's Player_ID>"
+    return (
+        f". DK's tokened arms on this side: {listed}. To roster the bulk arm "
+        f"behind the opener: --declare-pitcher '{bulk_id}=viable_bulk_or_alt_sp'; "
+        f"to declare the opener himself the starter, with the evidence behind it "
+        f"(R471): --declare-pitcher "
+        f"'{openers[0].player_id}=declared_probable_sp:evidence=\"<what you "
+        f"read>\"'. R488 admits a PLR on its own only when he is the side's "
+        f"one other arm and strictly dearer than the PO; a tie or a dearer PO is "
+        f"the operator's call")
+
+
 def substitute_bulk_arm_probables(
     opposing: Mapping[str, Mapping[str, Any]],
     players_by_id: Mapping[str, Any],
@@ -2731,11 +2767,24 @@ def build_slate_pool(
                 f"{', '.join(sorted(barred_opener_teams[team]))}, a probable "
                 f"opener barred from pitcher slots; declare the bulk arm behind "
                 f"him via declared_pitchers, or that side has no rosterable arm"
+                + po_side_detail(team, by_id.values(), pitcher_roles)
             )
             continue
+        # R125(a). A DK-only PO side never enters `probable_ids` (PO is not in
+        # `DK_STARTING_PROBABLE_TOKENS`), so it lands here and the text names
+        # nothing. The detail is appended only when DK did name an opener; the
+        # prefix is unchanged, and must not read "no rosterable starter":
+        # `tools/autobuild.classify_pool_blocker` treats that phrase as benign and
+        # auto-overrides it, and this one is a human's decision.
+        po_detail = po_side_detail(team, by_id.values(), pitcher_roles)
+        po_names = ", ".join(
+            o.name for o in barred_opener_rows(by_id.values(), pitcher_roles).get(team, []))
         blockers.append(
             f"{team}: no probable or declared starter; declare one via "
             f"declared_pitchers or that side has no rosterable arm"
+            + (f". DK tags {po_names} Starting=PO (a probable opener, barred from "
+               f"pitcher slots), so he is not a probable{po_detail}"
+               if po_detail else "")
         )
 
     rows = sorted(keep.values(), key=lambda r: (r["Team"], r["Player_ID"]))
