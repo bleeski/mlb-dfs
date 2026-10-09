@@ -63,7 +63,8 @@ from mlb_engine.swap.late_swap_manager import (
 )
 from mlb_engine.intake.slate_intake_manager import (
     DK_OPENER_BULK_ROLE, DK_ORDER_SLOTS, DK_STARTING_LONG_RELIEVER_TOKENS,
-    DK_STARTING_OPENER_TOKENS, dk_opener_bulk_arms, normalize_name)
+    DK_STARTING_OPENER_TOKENS, dk_opener_bulk_arms, infer_opponent_and_game_id,
+    normalize_name)
 # R289: the ONE reading of the Excluded column, imported rather than restated.
 # The front door decides pool MEMBERSHIP, so a second token rule here would be
 # the F21 defect in the one place it costs the most.
@@ -1638,6 +1639,109 @@ def extract_opposing_probables(
     return out
 
 
+def barred_opener_rows(
+    players: Iterable[Any], pitcher_roles: Mapping[str, str],
+) -> Dict[str, List[Any]]:
+    """R398 / R125(a). ``{team: [salary rows]}``: each side's BARRED openers, the
+    P-eligible rows DK tags ``PO`` that nothing rostered (no feed probable
+    survived R104's bar, no declaration lifted it). Sorted by Player_ID."""
+    out: Dict[str, List[Any]] = {}
+    for sp in sorted(players, key=lambda p: str(p.player_id)):
+        if str(sp.starting).strip().upper() not in DK_STARTING_OPENER_TOKENS:
+            continue
+        if "P" not in tuple(sp.positions) or str(sp.player_id) in pitcher_roles:
+            continue
+        out.setdefault(sp.team, []).append(sp)
+    return out
+
+
+def substitute_bulk_arm_probables(
+    opposing: Mapping[str, Mapping[str, Any]],
+    players_by_id: Mapping[str, Any],
+    pitcher_roles: Mapping[str, str],
+    excluded_teams: Iterable[str] = (),
+    declared_workload: Optional[Mapping[str, float]] = None,
+) -> Tuple[Dict[str, Dict[str, Any]], List[Dict[str, Any]]]:
+    """R398. ``(opposing', report)``: F4 grades the arm that throws the innings.
+
+    ``opposing`` is keyed by the HITTING team (see ``extract_opposing_probables``)
+    and names the feed's probable, which on an opener game is the opener. When a
+    side's DK file stages an opener (a barred ``PO`` row) and the only arm the
+    build rostered for it is a bulk arm (``BULK_ARM_ROLES``: operator-declared, or
+    R488's PLR admission), the opposing hitters' record becomes that bulk arm,
+    ``{"id": "", "name": <arm>, "hand": None}``. The opener's id and hand are
+    DROPPED, not carried: his hand would grade the platoon term against an arm
+    who does not pitch. DK ships no id and no hand for the bulk arm, so F4 joins
+    his quality by name (R189(2)) and the platoon term is neutral.
+
+    Never fires when any non-bulk arm is rostered for the side (a declared
+    starter, a surviving probable), so an opener the operator declared a starter
+    (R471) keeps his feed record. A side whose feed probable is neither the
+    opener nor the bulk arm is reported ``applied: False`` and left alone. Two
+    bulk arms: the larger declared innings is graded, ties by Player_ID, the
+    other is named. A bulk arm alone, never a blend: no weight exists for the
+    opener's innings, and F4 takes one probable per team. A deterministic prior,
+    never a probability.
+    """
+    out: Dict[str, Dict[str, Any]] = {t: dict(rec) for t, rec in opposing.items()}
+    excluded = set(excluded_teams)
+    openers_by_team = barred_opener_rows(players_by_id.values(), pitcher_roles)
+    arms_by_team: Dict[str, List[Tuple[str, Any]]] = {}
+    for pid in sorted(pitcher_roles):
+        sp = players_by_id.get(pid)
+        if sp is not None:
+            arms_by_team.setdefault(sp.team, []).append((pid, sp))
+    report: List[Dict[str, Any]] = []
+    for team in sorted(openers_by_team):
+        if team in excluded:
+            continue
+        arms = arms_by_team.get(team, [])
+        bulk = [(pid, sp) for pid, sp in arms if pitcher_roles[pid] in BULK_ARM_ROLES]
+        if not bulk or len(bulk) != len(arms):
+            continue
+
+        def _ip(item: Tuple[str, Any]) -> Tuple[float, str]:
+            ip = declared_arm_workload(
+                pitcher_roles[item[0]], (declared_workload or {}).get(item[0]))[1]
+            return (-(ip or 0.0), item[0])
+
+        bulk.sort(key=_ip)
+        pid, sp = bulk[0]
+        _, ip_used, ip_source = declared_arm_workload(
+            pitcher_roles[pid], (declared_workload or {}).get(pid))
+        graded = sp.opponent or infer_opponent_and_game_id(team, sp.game_info)[0]
+        openers = openers_by_team[team]
+        entry: Dict[str, Any] = {
+            "pitching_team": team, "graded_team": graded, "applied": False,
+            "openers": [{"player_id": str(o.player_id), "name": o.name,
+                         "dk_starting": str(o.starting).strip().upper(),
+                         "salary": float(o.salary)} for o in openers],
+            "bulk_arm": {"player_id": pid, "name": sp.name,
+                         "role": pitcher_roles[pid], "salary": float(sp.salary),
+                         "ip": ip_used, "ip_source": ip_source},
+            "bulk_arms_not_graded": [
+                {"player_id": p, "name": s.name} for p, s in bulk[1:]],
+            "replaced_probable": None,
+        }
+        report.append(entry)
+        if not graded:
+            entry["reason"] = "no opponent in the salary file's Game Info"
+            continue
+        current = out.get(graded) or {}
+        current_name = normalize_name(str(current.get("name") or ""))
+        staged = {normalize_name(o.name) for o in openers} | {
+            normalize_name(s.name) for _, s in bulk}
+        if current_name and current_name not in staged:
+            entry["reason"] = (
+                f"the feed's probable for {team} is {current.get('name')!r}, "
+                f"neither the opener nor the bulk arm; F4 stays on him")
+            continue
+        entry["replaced_probable"] = dict(current) if current else None
+        out[graded] = {"id": "", "name": sp.name, "hand": None}
+        entry["applied"] = True
+    return out, report
+
+
 def extract_batter_hands(
     feed: Mapping[str, Any],
     salary_players: Any,
@@ -2756,23 +2860,54 @@ def build_slate_pool(
     # lines is what read as routine, and the fact is about the slate.
     opposing_probables = extract_opposing_probables(
         lineups_feed, _salary_game_times(salary_map))
+    # R398. On an opener game the feed's probable is the opener, and the arm that
+    # throws the innings is the declared or R488-admitted bulk arm. F4 grades the
+    # bulk arm; the substitution is named in the pool report and a warning.
+    opposing_probables, f4_substitutions = substitute_bulk_arm_probables(
+        opposing_probables, by_id, pitcher_roles, excluded_teams, declared_workload)
+    substituted_teams = {e["graded_team"] for e in f4_substitutions if e["applied"]}
+    for entry in f4_substitutions:
+        if entry["applied"]:
+            continue
+        warnings.append(
+            f"{entry['pitching_team']}: DK stages "
+            f"{', '.join(o['name'] for o in entry['openers'])} (Starting=PO) and the "
+            f"pool rostered {entry['bulk_arm']['name']} as the bulk arm, but "
+            f"{entry['reason']} (R398)")
+    if substituted_teams:
+        warnings.append(
+            "F4 grades the BULK ARM, not the opener, for the hitters of "
+            + "; ".join(
+                f"{e['graded_team']} (against {e['bulk_arm']['name']} "
+                f"[{e['bulk_arm']['player_id']}, {e['bulk_arm']['role']}], behind "
+                f"{', '.join(o['name'] for o in e['openers'])}, Starting=PO)"
+                for e in f4_substitutions if e["applied"])
+            + " (R398). DK ships the bulk arm no MLBAM id and no hand, so his SP "
+            "quality joins by name from the pitching table and the platoon term "
+            "stays 1.0 for those bats; a feed or paste names the opener and "
+            "cannot restore it. A labeled prior, never a probability")
     probables_no_id = sorted(
         team for team, rec in opposing_probables.items()
         if not str((rec or {}).get("id") or "").strip())
     probables_no_hand = sorted(
         team for team, rec in opposing_probables.items()
         if str((rec or {}).get("hand") or "").strip().upper() not in ("R", "L"))
-    if probables_no_id or probables_no_hand:
+    # The incomplete-probable warning below tells the operator to supply a feed or
+    # a paste, which cannot reach a substituted side (it names the opener), so the
+    # sentence covers only the other sides. The lists in the report keep every one.
+    warn_no_id = [t for t in probables_no_id if t not in substituted_teams]
+    warn_no_hand = [t for t in probables_no_hand if t not in substituted_teams]
+    if warn_no_id or warn_no_hand:
         detail = []
-        if probables_no_id:
+        if warn_no_id:
             detail.append(
                 f"no MLBAM id for the opposing probable of "
-                f"{', '.join(probables_no_id)} (the Savant join key, so F4's "
+                f"{', '.join(warn_no_id)} (the Savant join key, so F4's "
                 f"SP-quality term stays 1.0 for those bats)")
-        if probables_no_hand:
+        if warn_no_hand:
             detail.append(
                 f"no handedness for the opposing probable of "
-                f"{', '.join(probables_no_hand)} (so F4's platoon term stays "
+                f"{', '.join(warn_no_hand)} (so F4's platoon term stays "
                 f"1.0 for those bats)")
         warnings.append(
             "opposing probables reached the pool named but incomplete: "
@@ -2867,6 +3002,11 @@ def build_slate_pool(
                 "no_mlbam_id": probables_no_id,
                 "no_hand": probables_no_hand,
             },
+            # R398. Sides whose opposing hitters F4 grades against the bulk arm
+            # instead of the feed's opener (`applied`), and the sides that staged
+            # the shape but kept the feed's probable, with the reason. A labeled
+            # deterministic prior; the replaced record is kept for the audit.
+            "f4_bulk_arm_substitutions": f4_substitutions,
             # R133(3). Which teams are short of nine hitters, split at the bar
             # that decides what being short MEANS. Two lists rather than one
             # because the remedies differ and only one of them is fatal: under

@@ -5340,12 +5340,9 @@ of `--max-attempts`, or resuming with them spent, writes a stop record.
 
 The refusal was `mlb_engine/intake/paste_odds.py`'s, and the pool's `excluded_postponed` comes from a feed this tool never read. `--feed` (the pool's classifier) and `--exclude-game` exempt a salary game that is not being played; each is named under `excluded_postponed` with its signal, a priced row for it is dropped, DK's `Postponed` literal is named where it was silent, and a name matching no game or an unreadable feed warns and exempts nothing. Gate `PASS  v2.26.0  42 modules  2480 tests  5 skipped` (the five absent-file skips).
 
-### R398. F4 grades hitters against the opener, not the declared bulk arm (P2, S) | new 2026-09-22, from `docs/backlog_inbox/2026-09-22_BUILD_f4-grades-against-opener-not-bulk-arm.md` | Roadmap: Session 32
+### R398. CLOSED 2026-10-09 -- SHIPPED as roadmap Session 32 (a), entry migrated to CHANGELOG.md
 
-> **Rider 2026-10-02 (Session 144, Phase 3, the board rebuild).** premise re-verified at HEAD e4588bc, PARTLY: `extract_opposing_probables` (`live_data_adapters.py:1587`) is untouched since 2026-08-05; R470 writes the declared arm's own row and R471 adds the PO evidence check, and neither touches `opposing_probables`, so F4 never grades against the bulk arm on any path. 'Grades against the opener' holds on the feed path only: on a DK-only slate `DK_STARTING_PROBABLE_TOKENS={SP,P}` (:568) leaves a PO side with NO probable, so its opponents get a neutral F4. Band 1 (1840_5g DET mean F4 0.911 -> 1.059, primary stacks 0 -> 1, not re-run); S.
-
-- **What.** On 1840_5g, WSH ran Cornelio (PO) then Kent (PLR). `--declare-pitcher` made Kent rosterable, but `extract_opposing_probables` (`live_data_adapters.py:1423`) read the feed's probable, so DET hitters were graded against Cornelio (.296) instead of Kent (.351). Measured on the same inputs: DET mean F4 0.911 → 1.059, primary stacks 0 → 1.
-- **Fix.** When a side is PO and a declared bulk arm exists, grade against the bulk arm or a PA-weighted blend, and name the substitution in `pool_report`.
+`live_data_adapters.substitute_bulk_arm_probables`, called in `build_slate_pool`, replaces the feed's probable for the opposing hitters with the declared or R488-admitted bulk arm when DK stages a barred `PO` on the side and every arm rostered for it is a bulk arm (the opener's id and hand dropped, the platoon term neutral, `pool_report.f4_bulk_arm_substitutions` naming each side), on the feed path and on a DK-only slate. A bulk arm alone, not a blend. Pinned by `test_core.BulkArmMatchupTests`. Gate and commit: the CHANGELOG entry.
 
 ### R399. Five small defects from the 1915_1g_sd Showdown build (P2, XS each) | new 2026-09-22, from `docs/backlog_inbox/2026-09-22_BUILD_showdown-1915-small-defects.md`; (a)(e) SHIPPED 2026-09-23 as roadmap Session 04 (a), migrated to CHANGELOG.md | Roadmap: (c)(d) 63; (b) CLOSED 2026-10-08 (Session 33)
 

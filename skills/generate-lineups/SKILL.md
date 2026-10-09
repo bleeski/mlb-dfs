@@ -966,6 +966,10 @@ surfaces answer this after the build without re-reading the log --
 probable carries no id or no hand, and the brief's `factors_inert`, printed as the
 `factors:` line beside the frontier line, names any factor that scored rows and
 moved none of them.
+On an opener game (a barred `PO` and a rostered bulk arm on the side),
+`pool_report.f4_bulk_arm_substitutions` names the sides whose hitters F4 grades
+against the bulk arm instead of the feed's opener (R398); that arm has no hand,
+so those hitters' platoon term is neutral, and a feed or paste cannot restore it.
 
 **Fall back only for what the paste does not cover.** If some games are still TBD,
 fetch a feed for those and pass it as `--merge-feed <api_feed.json>`. A pasted
