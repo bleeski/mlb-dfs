@@ -49514,7 +49514,7 @@ class PoRefusalTextTests(unittest.TestCase):
         self.assertIn(f"T4 Ace ({ids['T4 Ace']}) Starting=PO $4,000", text)
         self.assertIn(f"--declare-pitcher '{ids['T4 Ace']}=declared_probable_sp:evidence=", text)
         # No PLR on the side, so the bulk flag cannot name an id and says so.
-        self.assertIn("--declare-pitcher '<the bulk arm's Player_ID>=viable_bulk_or_alt_sp'", text)
+        self.assertIn("--declare-pitcher '<bulk_arm_id>=viable_bulk_or_alt_sp'", text)
         self.assertNotIn("no rosterable starter", text.lower(),
                          "autobuild treats that phrase as benign")
 
@@ -49537,7 +49537,50 @@ class PoRefusalTextTests(unittest.TestCase):
         self.assertIn(f"T4 Ace ({ids['T4 Ace']}) Starting=PO $4,000; "
                       f"T4 Pen1 ({ids['T4 Pen1']}) Starting=PLR $8,000; "
                       f"T4 Pen2 ({ids['T4 Pen2']}) Starting=PLR $7,000", text)
-        self.assertIn("--declare-pitcher '<the bulk arm's Player_ID>=viable_bulk_or_alt_sp'", text)
+        self.assertIn("--declare-pitcher '<bulk_arm_id>=viable_bulk_or_alt_sp'", text)
+
+    def test_two_openers_name_no_opener_id_and_a_placeholder_survives_shlex(self):
+        """With two PO rows the feed's opener is not `openers[0]` (the lowest
+        Player_ID), so the declare-himself flag carries a placeholder, and the
+        generic text speaks of them in the plural. Every flag in the text is one
+        `shlex` can split: an apostrophe inside the quoted token cannot be."""
+        import shlex
+        feed = pool_lineups_feed(t4_confirmed=True)
+        feed["games"][1]["home"]["probable_pitcher"]["name"] = "T4 Pen1"
+        arms = {"T4 Ace": ("PO", 4000), "T4 Pen1": ("PO", 6000)}
+        text, ids = self._t4(arms, feed=feed)
+        self.assertIn("DK's only declared arm is T4 Pen1", text)
+        self.assertIn("--declare-pitcher '<opener_id>=declared_probable_sp:evidence=", text)
+        self.assertNotIn(f"'{ids['T4 Ace']}=declared_probable_sp", text)
+        dk_text, _ = self._t4(arms, feed=self._dk_only())
+        self.assertIn("T4 Ace, T4 Pen1 Starting=PO", dk_text)
+        self.assertIn("they are not probables", dk_text)
+        for blocker in (text, dk_text):
+            opened = blocker.count("--declare-pitcher '")
+            closed = re.findall(r"--declare-pitcher ('[^']*')(?=[;.\s]|$)", blocker)
+            self.assertGreaterEqual(opened, 2, blocker)
+            # A stray apostrophe inside a token ends it early, so the closing quote
+            # no longer sits before a delimiter and the counts differ.
+            self.assertEqual(len(closed), opened, blocker)
+            for flag in closed:
+                self.assertEqual(len(shlex.split(flag)), 1, flag)
+
+    def test_an_sp_tagged_arm_nothing_rostered_gets_the_flag_that_clears_it(self):
+        """The feed named the PO (a stale feed) and DK tags another arm SP: the
+        side has no rostered arm, so the move that clears it is declaring him."""
+        text, ids = self._t4({"T4 Ace": ("PO", 4000), "T4 Pen1": ("SP", 9000)})
+        self.assertIn("DK also tags T4 Pen1 Starting=SP", text)
+        self.assertIn(f"--declare-pitcher '{ids['T4 Pen1']}=declared_probable_sp'", text)
+        bs = DeclaredPitcherEvidenceTests._bs()
+        self.assertEqual(bs.parse_declared_pitchers([f"{ids['T4 Pen1']}=declared_probable_sp"]),
+                         {ids["T4 Pen1"]: "declared_probable_sp"})
+        plain, _ = self._t4(self.TIE)
+        self.assertNotIn("DK also tags", plain, "no SP/P arm on the side, no clause")
+        # Two SP-tagged arms: which one starts is the operator's call.
+        two, _ = self._t4({"T4 Ace": ("PO", 4000), "T4 Pen1": ("SP", 9000),
+                           "T4 Pen2": ("SP", 8000)})
+        self.assertIn("DK also tags T4 Pen1, T4 Pen2 Starting=SP", two)
+        self.assertIn("--declare-pitcher '<starter_id>=declared_probable_sp'", two)
 
     def test_untokened_relievers_are_not_listed(self):
         text, _ = self._t4(self.TIE)

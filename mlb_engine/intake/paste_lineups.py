@@ -141,7 +141,7 @@ _HAND_STATLINE = re.compile(
 # dropped both probables of a game. The name has to be something before the hand,
 # so a standalone "RHP 8-7, 3.87 ERA" line (R117) is not this shape.
 _PITCHER_INLINE = re.compile(
-    r"^(?P<name>[A-Za-z].*?)\s+(?P<hand>[RL])HP"
+    r"^(?P<name>[^\W\d_].*?)\s+(?P<hand>[RL])HP"
     r"(?:[\s,]+(?:\d{1,3}-\d{1,3}\b.*|.*\b(?:ERA|SO)\b.*))?$")
 _RECORD = re.compile(r"^\(\d{1,3}-\d{1,3}\)$")
 # R189(3). The clock used to admit only an optional ET suffix, so "7:10 PM CT"
@@ -157,7 +157,7 @@ _CLOCK = re.compile(
 # four US zones change on the same dates, so the offset never moves.
 # Any line shaped like a clock. One `_CLOCK` does not read (a zone outside the table)
 # still marks where the clock sits, so the venue and the probables after it parse.
-_CLOCK_SHAPED = re.compile(r"^\d{1,2}:\d{2}\b")
+_CLOCK_SHAPED = re.compile(r"^\d{1,2}:\d{2}(?!\d)")
 _ZONE_TO_ET_HOURS = {"ET": 0, "EDT": 0, "EST": 0, "CT": 1, "CDT": 1, "CST": 1,
                      "MT": 2, "MDT": 2, "PT": 3, "PDT": 3, "PST": 3}
 _STATLINE = re.compile(r"\bERA\b|\bSO\b")

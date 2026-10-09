@@ -1679,14 +1679,27 @@ def po_side_detail(
         f"${float(sp.salary):,.0f}" for sp in arms)
     bulk = [sp for sp in arms
             if str(sp.starting).strip().upper() in DK_STARTING_LONG_RELIEVER_TOKENS]
-    bulk_id = bulk[0].player_id if len(bulk) == 1 else "<the bulk arm's Player_ID>"
+    starters = [sp for sp in arms
+                if str(sp.starting).strip().upper() in DK_STARTING_PROBABLE_TOKENS]
+    # An id is named only when ONE arm fits; otherwise a placeholder the operator
+    # replaces (no apostrophe in it, so the quoted token survives `shlex`).
+    bulk_id = bulk[0].player_id if len(bulk) == 1 else "<bulk_arm_id>"
+    opener_id = openers[0].player_id if len(openers) == 1 else "<opener_id>"
+    starter_id = starters[0].player_id if len(starters) == 1 else "<starter_id>"
+    # DK tags an arm SP or P that nothing rostered (a stale feed named the PO): the
+    # move that clears that is declaring HIM, which R471's wall does not touch.
+    starter_flag = (
+        f"; DK also tags {', '.join(sp.name for sp in starters)} "
+        f"Starting={'/'.join(sorted({str(sp.starting).strip().upper() for sp in starters}))}, "
+        f"so to roster the starter DK names: --declare-pitcher "
+        f"'{starter_id}=declared_probable_sp'" if starters else "")
     return (
         f". DK's tokened arms on this side: {listed}. To roster the bulk arm "
         f"behind the opener: --declare-pitcher '{bulk_id}=viable_bulk_or_alt_sp'; "
         f"to declare the opener himself the starter, with the evidence behind it "
         f"(R471): --declare-pitcher "
-        f"'{openers[0].player_id}=declared_probable_sp:evidence=\"<what you "
-        f"read>\"'. R488 admits a PLR on its own only when he is the side's "
+        f"'{opener_id}=declared_probable_sp:evidence=\"<what you read>\"'"
+        f"{starter_flag}. R488 admits a PLR on its own only when he is the side's "
         f"one other arm and strictly dearer than the PO; a tie or a dearer PO is "
         f"the operator's call")
 
@@ -2777,13 +2790,13 @@ def build_slate_pool(
         # `tools/autobuild.classify_pool_blocker` treats that phrase as benign and
         # auto-overrides it, and this one is a human's decision.
         po_detail = po_side_detail(team, by_id.values(), pitcher_roles)
-        po_names = ", ".join(
-            o.name for o in barred_opener_rows(by_id.values(), pitcher_roles).get(team, []))
+        po_rows = barred_opener_rows(by_id.values(), pitcher_roles).get(team, [])
+        po_names = ", ".join(o.name for o in po_rows)
         blockers.append(
             f"{team}: no probable or declared starter; declare one via "
             f"declared_pitchers or that side has no rosterable arm"
             + (f". DK tags {po_names} Starting=PO (a probable opener, barred from "
-               f"pitcher slots), so he is not a probable{po_detail}"
+               f"pitcher slots), so {'he is not a probable' if len(po_rows) == 1 else 'they are not probables'}{po_detail}"
                if po_detail else "")
         )
 

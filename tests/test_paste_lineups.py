@@ -1813,6 +1813,21 @@ class PitcherOnOneLineTests(unittest.TestCase):
         self.assertNotIn("Angel Stadium", " ".join(warnings))
         self.assertEqual(games[0].venue, "Angel Stadium")
 
+    def test_an_accented_name_on_one_line_still_parses(self):
+        """`[A-Za-z]` opened the pattern, so a pitcher whose first letter is
+        accented (Ángel Zerpa, Édgar Santana) missed the one-line shape while the
+        own-line path handled him: both probables dropped and the warning blamed
+        a TBD render."""
+        text = _pitcher_line_render(_text(), linked=False, stats=True).replace(
+            "Grayson Rodriguez LHP", "Grayson Rodriguez RHP").replace(
+            "Grayson Rodriguez RHP 3-3, 7.98 ERA, 36 SO", "Ángel Zerpa LHP 3-3, 3.10 ERA, 36 SO")
+        self.assertIn("Ángel Zerpa LHP", text)
+        games, warnings = parse_paste(text)
+        self.assertEqual((games[0].home_pitcher.display_name, games[0].home_pitcher.hand),
+                         ("Ángel Zerpa", "L"))
+        self.assertEqual(warnings, [])
+        self.assertEqual(games[0].venue, "Angel Stadium")
+
     def test_a_name_and_hand_after_the_lineups_is_not_a_probable(self):
         """The pitcher area is before the first hitter block, as for a held name:
         a stray "Name LHP" line below the lineups adds no pitcher."""
@@ -1947,6 +1962,18 @@ class ZoneClockTests(unittest.TestCase):
         out = resolve_paste_to_feed(text, str(SALARY), resolve_overrides=RESOLVE)
         self.assertFalse(any("wrong slate" in w for w in out["report"]["warnings"]),
                          "an unreadable clock is not compared, so it cannot disagree")
+
+
+    def test_an_unknown_zone_with_no_space_before_the_meridiem_is_still_the_clock(self):
+        """`7:10PM MST`: `\\b` has no boundary between the minute and the P, so the
+        clock-shaped pattern missed it, `seen_clock` stayed False and the game lost
+        its venue and probables with no warning at all."""
+        text = _text().replace("\n9:38 PM\n", "\n7:10PM MST\n")
+        games, warnings = parse_paste(text)
+        self.assertEqual(games[0].venue, "Angel Stadium")
+        self.assertEqual(_arms(games), _arms(self.base_games))
+        self.assertEqual(len([w for w in warnings if "zone this parser does not read" in w]), 1,
+                         warnings)
 
 
 class ZoneClockDoubleheaderTests(unittest.TestCase):
