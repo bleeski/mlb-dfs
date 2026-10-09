@@ -1209,6 +1209,11 @@ A refusal writes a record too, keyed `<date>_<tag>_<utc>` with `kind: refusal`
 and the exit code. Commit those the same way. A night that shipped nothing is
 the night the record is worth most.
 
+The record PR ends at its merge: no `/handoff`, branch sweep, sync block or
+next-session prompt, which are for DEV merges only (R492; `python
+tools/handoff.py scope --merge-sha <sha> --fetch` prints RUN or SKIP, and RUN only
+if that PR also changed DEV paths).
+
 ## Always run the preflight before presenting a file
 
 Between "build finished" and "Ben uploads," run this on every deliverable,
