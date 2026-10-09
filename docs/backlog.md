@@ -451,133 +451,9 @@ the batch's named rider and did not get pulled.
 - **Fix, decision first:** the accepted shape is Showdown through the EXISTING three gates — a Showdown-aware front door beside or inside `run_slate` — not the GF spec's unified roster-contract rewrite (A-16, rejected; see do-not-build). Two decisions before code: (1) sequencing, because this competes with R37's build work for the same DEV slots and touches the same solver surfaces; (2) relaxation policy, because Showdown's counted relaxations (overlap, then captain lock, then thesis) currently ship review-grade, and certification must state whether a nonzero relaxation count blocks the certified label or rides it as a named warning. Done when: a Showdown build produces a certified artifact through the same three gates Classic passes, `run_late_swap` can refine a promoted Showdown run, and CLAUDE.md's Showdown section retires the review-grade carve-out.
 - **Rider 2026-08-12, from the GF spec third edition's F-20 residual, verified in tree:** the empty-`Starting` fallback to an `all_healthy` pool (`showdown.py:109-175`) is deliberate, stamped `Pool_Basis` on every row, pinned by `test_showdown.py:111/141`, and reaches the checkpoint via `build_slate.py:1912/2069` — honest at review grade, which is all Showdown ships today. When this item brings Showdown under the gates, pool basis joins the certification evidence beside the relaxation counts: a pool built on `all_healthy` can certify only as what it is, never as starter-restricted, the same shape as decision (2)'s nonzero-relaxation question and decidable in the same pass.
 
-### R122, REWRITTEN 2026-09-01 to its surviving remainder. The platoon factor dies at the HITTER intake, per player and silently, and the field that exists to report it is keyed on the PITCHER (P1, XS-S) | new 2026-08-14; **the ed6 rider and the LHP-only face are both CLOSED**, see below
+### R122. CLOSED 2026-10-08 -- SHIPPED as roadmap Session 33 (report half in part 2, solver half in part 4), entry migrated to CHANGELOG.md
 
-> **Rider 2026-10-02 (Session 144, Phase 3, the board rebuild).** premise re-verified at HEAD e4588bc, HOLDS, and SPLIT: the flat 1.00 factor at `showdown_theses.py:131-134` goes into `Base_Prior` and then `Base` (:139-142) and reaches the ladder solver; no per-hitter unresolved field exists. (report) name the unresolved hitters: band 3, XS. (solver) the riders' per-hitter shrunk split, Showdown only: band 1 (1940_1g_sd Turang 4 -> 2 entries and off captain, not re-run), S-M. Both stay in Session 33; the row names the parts.
-
-**Rider 2026-09-09, from BUILD fragment
-`2026-09-08_BUILD_2210_1g_sd_appg-is-blind-to-opponent-quality.md` (addendum):
-the fix shape below is right about READING a per-hitter split and wrong about
-how to SHRINK it, measured on 2210_1g_sd (CIN@LAD, 2026-09-08) across three
-hand-built priors.** Three corrections. (1) Shrink toward the LEAGUE PLATOON
-PATTERN, not toward 1.0: the multiplier below pulls a thin sample toward
-no-effect, and the population effect is not zero. The v3 rule that delivered
-clean used one constant (150) for both terms: the batter shrunk toward LHH 0.92
-/ RHH 1.05 / switch 1.02 of his own overall OPS, the arm shrunk toward a LHP
-allowing 0.93 of its own overall OPS to LHB and 1.03 to RHB. (2) The ARM's
-split needs the same treatment as the batter's. v2 shrank the batter by PA and
-read each arm's vs-side OPS off 91-92 BF unshrunk: Hector Rodriguez (99 season
-PA, .600 vs LHP in 25 PA) went 1 -> 4 of 9 and Alex Call reached 5 of 9, a 55.6%
-realized exposure against the 50% cap with one relaxed slot and
-`counted_relaxations.clean: false`. A ranking repair became a cap breach through
-the one term nobody shrank. Under v3 Skubal's L/R edge compressed 1.300 -> 1.074
-and Lodolo's 1.106 -> 0.992, and the file went back to clean. (3) The flat sign
-is not safe even as a fallback for THESE arms: both Skubal (.720 OPS vs LHB /
-.554 vs RHB) and Lodolo (.942 / .852) were WORSE against left-handers in 2026,
-so v1's uniform 0.736 LHH discount penalised exactly the bats the arms were most
-vulnerable to; it cost Max Muncy (.837 vs LHP, pool-leading power) 2 of 9 with
-one captain slot while Will Smith (.409 vs LHP, 62 PA) sat at 4 of 9. The flat
-0.94/1.04 below stays the no-sample fallback; what changes is that the arm's own
-split is read and shrunk beside the hitter's, and a shrunk arm split that
-inverts the flat sign wins. Fetch cost unchanged: `statSplits` with
-`sitCodes=vl,vr` returned 2026 splits for both arms and 18 bats inside the ~20
-seconds this entry already budgets. The rule, stated once: a platoon term read
-off fewer than ~150 observations is shrunk toward the league platoon pattern,
-and the arm's split gets the same rule as the batter's. Cross-ref R334 (the
-opponent-QUALITY half from the same slate) and R320 (the Showdown brief's
-missing platoon counter, which is why none of this is visible in a brief today).
-
-**What survives, and it was MEASURED on a delivered brief rather than read.** On
-`1920_1g_sd` (CIN@CHC, 2026-08-30) the delivered
-`build_brief_showdown_1920_1g_sd.json` carries
-`teams_with_hand: 2`, `teams_without_hand: []` and
-`construction.platoon_unresolved_teams: []` -- every platoon-reporting field
-clean -- while `hitters_with_side: 7` of 18. **Eleven of eighteen hitters took a
-flat 1.00 platoon factor and are named nowhere**, because the CHC block in that
-slate's feed carried zero hitters while still carrying its probable's hand.
-`apply_base_prior` adds to `platoon_unresolved_teams` only on `not opp_hand`
-(`showdown_theses.py:111-112`), so a resolved pitcher hand makes the report say
-"resolved" for a side whose bats have no handedness at all. That is R122's
-original headline -- a factor claimed and not applied -- arriving through the
-hitter intake on a slate where the pitcher intake worked.
-
-**Fix.** Two lines and one field. `apply_base_prior` names the hitters it could
-not resolve (a `platoon_unresolved_hitters` beside the teams list, the same shape
-R190 gave `teams_without_hand`), and the flat-factor condition stops being a
-one-sided team fact. `showdown_handedness` already computes `hitters_with_side`;
-the missing half is the complement, by name. Severity follows the
-`stale_platoon_policy` precedent already adopted: loud, one warning per slate.
-
-**What CLOSED, with the evidence, so nobody re-derives it.**
-- **The LHP-only face is fixed and is a DIFFERENT defect from the one this item
-  filed.** `apply_base_prior` moved to `showdown_theses.py:71` and applies 0.94
-  same-handed / 1.04 opposite for both starter hands (`:114-117`); its docstring
-  records the LHP-only round in the past tense and two tests pin it
-  (`tests/test_showdown.py:554`, `:570`). A 2026-09-01 handoff read that
-  docstring as evidence THIS item was closed. It is not: R122 named
-  `showdown_handedness`'s `if ... and pitcher.get("hand")` guard and the static
-  `prior_note`, and both are unchanged at `build_slate.py:2174` and
-  `showdown_theses.py:1670`.
-- **The `prior_note` half is DEMOTED, not fixed, and the reason is that it is
-  DEAD.** `portfolio_report` still emits an unconditional "x platoon factor"
-  string, but an AST-and-grep sweep finds no production reader: `build_slate`
-  reads `lineups`, `player_exposure`, `all_unique_rosters`, `captain_exposure`
-  and `max_pairwise_overlap` off that dict and never `prior_note`, and the two
-  other `prior_note` keys in the repo (`ownership_pred.py:473`,
-  `qa_portfolio.py`) are the ownership prior's, a different subject. So the
-  mislabel cannot reach an operator through that key. The live label surface is
-  the brief's `construction` block, which is what the remainder above is about.
-- **The ed6 rider (`all_healthy`) is CLOSED.** `build_slate.py:2360` gates the
-  whole ladder path on `basis == "declared_starters" and posted >= 18`, so on an
-  `all_healthy` pool `apply_base_prior`, `build_thesis_ladder`, `describe_slate`
-  and `portfolio_report` are all unreachable -- each has exactly one production
-  caller and it is inside that branch. The brief's `construction` block reads
-  `mode: points_max_bank` with a reason naming the basis and the posted count.
-  None of the rider's three symptoms can occur.
-
-**Rider added 2026-09-01, from BUILD fragment
-`2026-09-01_BUILD_showdown_flat_platoon_factor.md`. This is the FIRST measurement
-of what the flat factor costs, and it names a shape for the fix.** The remainder
-above says the factor is flat and silently so; the fragment says it also points
-the WRONG WAY often enough to move a captain. `apply_base_prior` applies **0.94
-same-handed / 1.04 opposite-handed**, keyed on the two hands alone and never on
-the hitter's own split. On 1940_1g_sd (MIL@CHC, both starters LHP, both sides
-posted, 100+ PA of 2026 vs-LHP on nearly every bat) the flat prior was
-directionally wrong for **four of eighteen posted hitters**, and under-credited
-three more:
-
-| hitter | B | vs-LHP 2026 | engine | evidence | error |
-|---|---|---|---|---|---|
-| Brice Turang | L | .530 OPS, 167 PA | 0.94 | 0.80 | under-penalized 14% |
-| Cooper Pratt | R | .465 OPS, 48 PA | **1.04** | 0.89 | wrong sign |
-| Pete Crow-Armstrong | L | .978 OPS, 201 PA | **0.94** | 1.02 | wrong sign |
-| Jake Bauers | L | .935 OPS, 132 PA | **0.94** | 1.03 | wrong sign |
-| Michael Busch | L | .741 OPS, 182 PA | **0.94** | 1.00 | wrong sign |
-| Carson Kelly | R | .953 OPS, 125 PA | 1.04 | 1.15 | under-credited 11% |
-| Andrew Vaughn | R | 1.009 OPS, 110 PA | 1.04 | 1.10 | under-credited 6% |
-
-**Delivered consequence, which is what makes this P1 rather than a modelling
-preference:** Turang was in 4 of 11 entries **and held a captain slot** at a .530
-vs-LHP OPS, while Vaughn (1.009 vs LHP, $5,400, batting 5th) sat at 2 of 11.
-Re-running the same prior chain with only the platoon factor swapped for a
-sample-shrunk evidence multiplier — `1 + PA/(PA+100) * (OPS_vsL/OPS_overall - 1)`,
-clipped 0.80–1.20 — moved Turang 4 -> 2 and **off the captain slot**, Pratt 2 -> 0,
-Vaughn 2 -> 5, PCA 4 -> 5, and put Bauers on a captain slot. Review proxy median
-53.26 -> 54.76, zero relaxations either way.
-
-**Shape for the fix, and the cost bound that makes it safe:** keep 0.94/1.04 as
-the FALLBACK for a hitter with no sample, and read a per-hitter split where one
-exists. StatsAPI `statSplits` with `sitCodes=vl,vr` returned a season split for 17
-of 18 bats in about 20 seconds. That bound is what scopes this to SHOWDOWN: two
-calls per hitter is fine for one game and is not fine for a 15-game Classic slate,
-so the entry is scoped to the Showdown path deliberately rather than by omission.
-The shrink term is doing real work — Pratt's 48 PA is exactly the sample the flat
-prior is defensible for — so ship the shrink with the read, not after it.
-
-**Also measured in the same fragment and worth carrying:** `max_shared_players=3`
-is infeasible on a Showdown pool this size and the engine says so honestly —
-tightening 4 -> 3 returned `overlap_relaxed_slots: 2` and `max_pairwise_overlap: 4`
-anyway. No defect; recorded so nobody re-derives it under a clock.
+`apply_base_prior` names every hitter with no bat side (`platoon_unresolved_hitters`, on the Showdown brief's `construction`), and `--platoon-splits <csv>` replaces the flat 0.94 / 1.04 with the hitter's own OPS split against the opposing hand, shrunk toward that flat pattern by plate appearances (150 PA weigh the two equally, clip 0.80 / 1.20); no file is byte-identical. The ARM's own shrunk split (the rider's correction (2)) is NOT built and is filed in `docs/backlog_inbox/2026-10-08_DEV_platoon-split-arm-half.md`. Pinned by `test_showdown.PerHitterPlatoonTests`. Gate and commit: the CHANGELOG entry.
 
 ### R123. The Showdown ladder has no per-player exposure cap, relaxes the captain cap untargeted, and deals contests in ladder order (P1, S-M) | new 2026-08-14, merged from the same fragment, findings 2-4
 
@@ -1518,59 +1394,9 @@ rank_delta of 8, and the side whose prior was untouched stays silent. Roadmap:
 Batch (2 of 2) beside R253, the other projection-factor refinement, with (a)
 landable earlier if Ben pulls it.
 
-### R332. The handedness backfill that takes `f4_platoon_applied` from 0 to 90 of 90 on a DK-covered slate is a per-slate hand-roll in a gitignored scratch file (P2, S) | new 2026-09-08, merged from BUILD fragment `2026-09-08_BUILD_1835_5g-anticorrelation-unobserved-and-handedness-backfill.md` (half (b); half (a) shipped in the same commit and is in CHANGELOG.md); measured on 1835_5g with a full rebuild
+### R332. CLOSED 2026-10-08 -- SHIPPED as roadmap Session 33 part 3, entry migrated to CHANGELOG.md
 
-**What.** R143's zero-fetch path is the NORMAL state of a fully DK-covered
-slate: on 1835_5g `dk_order_coverage` reported 10 of 10 sides, `sides_left_to_feed`
-empty, and nothing wrote a feed. The documented cost is that DK ships no
-handedness, so F4's platoon half goes neutral and `f4_handedness_unavailable`
-names every side. BUILD closed it by hand and the route works; the generator
-lives in `tools/_scratch_1835_5g/gen_paste.py`, which is gitignored, slate-scoped
-and swept at slate close, so the next DK-covered slate hand-rolls the map again.
-
-**The route, which is the thing to make first-class.** (1) `WebFetch` on
-`statsapi.mlb.com/api/v1/teams/<id>/roster?rosterType=40Man&hydrate=person&fields=...batSide,pitchHand...`,
-one call per team -- WebFetch is served Anthropic-side and is not subject to the
-container's egress proxy, which mattered here because `statsapi.mlb.com` and
-`api.the-odds-api.com` were both 403 from the device VM AND the container that
-session (R316's standing instruction: measure the egress, in both directions).
-(2) Generate an mlb.com-shaped paste whose NAMES and BATTING ORDER come from the
-DKSalaries file itself, so DK stays authoritative per R143 and no
-`dk_batting_order.disagreements` entry can be minted, with bat side as the only
-added column. (3) `tools/lineups_from_paste.py` -> ordinary feed ->
-`build_slate.py --lineups`. Result: `f4_platoon_applied` 0 -> **90 of 90**,
-`f4_handedness_unavailable: []`, `disagreements: []`, zero blockers, no
-`--resolve` needed.
-
-**Why it is not decoration, measured rather than argued.** It changed the
-portfolio, not just the report. LAA came back with the slate's HIGHEST mean F4
-(1.063) on eight righty bats against LHP Sandoval while carrying the slate's
-LOWEST F1 (0.924), and took 2 of 9 primary stacks; BOS came back with the LOWEST
-mean F4 (0.909), lefty-leaning into LHP Detmers, and took 1. Neither ordering is
-visible with the platoon term neutral, so on a fully DK-covered slate the
-zero-fetch build is not merely missing half of F4 -- it is blind to the one axis
-that separated the two sides of that slate's only LHP-vs-LHP game pair.
-
-**Fix (S).** `tools/handedness_paste.py --salary <csv>`, taking a bat-side map on
-stdin or from a cached `data/reference/handedness.csv` and emitting the paste.
-Handedness is a stable player attribute, so the cached reference refreshed on the
-same footing as the Savant files removes the per-team fetches entirely; age it
-per player against its own stamp rather than per file, which is R317(b)'s lesson
-arriving before the file exists rather than after. A tool plus a reference file
-is its own session, which is why this is filed rather than ridden into the
-commit that shipped the fragment's other half. Roadmap: Session 9, with the
-platoon cluster it shares a subject with.
-
-**Rider 2026-09-09, Showdown sighting, from BUILD fragment
-`2026-09-08_BUILD_2210_1g_sd_appg-is-blind-to-opponent-quality.md` §2.** On
-2210_1g_sd (CIN@LAD, 2026-09-08, both sides posted by DK)
-`construction.platoon_unresolved_teams` read `["CIN", "LAD"]`: the handedness
-was in neither DK's `Starting` column nor the staged feed, which belonged to the
-day's earlier five-game slates. Honest, and the NORMAL state of a fully
-DK-covered Showdown slate, so F4's platoon half is structurally unavailable
-where one game makes it matter most. Same fix, same session; the Showdown path
-is the second consumer the tool and the reference serve, and the acceptance test
-runs once on each format.
+`tools/handedness_feed.py` (renamed from the filed `handedness_paste.py`: it emits the lineups FEED, because a paste cannot say "hand unknown") seeds and upserts `data/reference/handedness.csv` (per-row `stamped` and `source`, aged per player) and builds a DK-covered slate's feed through `dk_starting_only_feed` with `bat_side` and each probable's `hand` stamped from it; a player the cache lacks stays blank and is named. Acceptance run on both formats (the Showdown rider). Pinned by `test_core.HandednessTests`. Gate and commit: the CHANGELOG entry.
 
 ### R328. CLOSED 2026-09-20 -- SHIPPED across two commits, entries migrated to CHANGELOG.md
 
@@ -2712,11 +2538,9 @@ replaced.
 
 ### R470. CLOSED 2026-09-30 (Session 139). A declared bulk arm is projected at a bulk arm's workload: a labeled prior, `ip / 5.5` capped at 1.0 (3.0 IP default for `viable_bulk_or_alt_sp`, so 0.545), `--declare-pitcher ID=ROLE:ip=N` for any role; stamped on the arm's pool row (P-eligible only), applied to Base before `build_projections` so Floor and Ceiling scale with it, tagged in Notes; never an exclusion (the salary-only sleeve reprices from salary by design); the brief's `declared_arm_workload` and `declared_pitcher_workload`, a printed `workload prior:` line; late swap inherits typed innings and sheds them on re-declaration; `ID:ip=N` refused at exit 4 in both grammar copies. Goldens unmoved. Full text and gate line: `CHANGELOG.md` 2026-09-30.
 
-### R442. The platoon term is dead on every TBD side, although the platoon reference carries every projected hitter's bat side (P1, XS-S) | new 2026-09-25, found by the 2026-09-25 code review (model area; `review_model/frame_0603.py`) | Roadmap: Session 33
+### R442. CLOSED 2026-10-08 -- SHIPPED as roadmap Session 33 part 1, entry migrated to CHANGELOG.md
 
-- **What.** `batter_hands` comes ONLY from `extract_batter_hands(lineups_feed, ...)`, posted lineups carrying `bat_side` (`live_data_adapters.py:2512`, `:1468-1507`). `platoon_order_adapter.build_projected_order` (`:201`) emits `{Player_ID: slot}` and drops the reference row's `bats`, which every row in `data/reference/fangraphs_platoon_lineups.json` carries as `L`, `R` or `S`. On 06-03 with SD and PHI marked `tbd` and the reference supplied: `platoon_order applied to: 16 hitters; reference carries a bats value for 22 SD/PHI player rows; batter_hands by team: {'BAL': 9, 'BOS': 9}` (zero for SD and PHI); `compute_f4_factors ... platoon_component_applied 18` of 36 while the opposing hand is known for all four sides.
-- **Why.** Any build before lineups post, the normal early build, drops the +-4-6% platoon split on every projected side; the counter is honest (18 of 36) and the only remedy today is R332's per-slate hand-roll, which needs a network this container does not have. This one needs none.
-- **Fix.** `build_projected_order` returns `{Player_ID: bats}` beside the slot map; `build_slate_pool` merges it under the feed's hands (the feed wins). Lands with R332 and R122 (Session 33).
+`build_projected_order` keeps its two-value return and its report now carries `bats_by_player_id` (the matched hitters' bat sides from the same reference rows that gave the slots); `build_slate_pool` merges them UNDER the feed's hands for the TBD sides it ordered, so `compute_f4_factors` applies the platoon term to a side that has not posted (the pool fixture's `platoon_component_applied` 27 -> 36 of 36). Pinned by `test_core.ProjectedOrderHandsTests`. Gate and commit: the CHANGELOG entry.
 
 
 ### R440. `lineups_from_paste.merge_feeds` collapses two pasted doubleheader legs onto the LAST one and fills it with the API's OTHER leg's lineup, which reaches the status map as a CONFIRMED order on the slate's leg (P1, S) | new 2026-09-25, found by the 2026-09-25 code review (intake area), reproduced on the frozen 2026-07-29 fixture | Roadmap: Session 75
@@ -5523,9 +5347,9 @@ The refusal was `mlb_engine/intake/paste_odds.py`'s, and the pool's `excluded_po
 - **What.** On 1840_5g, WSH ran Cornelio (PO) then Kent (PLR). `--declare-pitcher` made Kent rosterable, but `extract_opposing_probables` (`live_data_adapters.py:1423`) read the feed's probable, so DET hitters were graded against Cornelio (.296) instead of Kent (.351). Measured on the same inputs: DET mean F4 0.911 → 1.059, primary stacks 0 → 1.
 - **Fix.** When a side is PO and a declared bulk arm exists, grade against the bulk arm or a PA-weighted blend, and name the substitution in `pool_report`.
 
-### R399. Five small defects from the 1915_1g_sd Showdown build (P2, XS each) | new 2026-09-22, from `docs/backlog_inbox/2026-09-22_BUILD_showdown-1915-small-defects.md`; (a)(e) SHIPPED 2026-09-23 as roadmap Session 04 (a), migrated to CHANGELOG.md | Roadmap: (b) Session 33, (c)(d) 63
+### R399. Five small defects from the 1915_1g_sd Showdown build (P2, XS each) | new 2026-09-22, from `docs/backlog_inbox/2026-09-22_BUILD_showdown-1915-small-defects.md`; (a)(e) SHIPPED 2026-09-23 as roadmap Session 04 (a), migrated to CHANGELOG.md | Roadmap: (c)(d) 63; (b) CLOSED 2026-10-08 (Session 33)
 
-- **(b)** `showdown_handedness` misses accented names (14 of 18 matched). Reuse the NFKD normalization and WARN.
+- **(b) CLOSED 2026-10-08** (roadmap Session 33, migrated to CHANGELOG.md): `showdown_handedness` and `apply_base_prior` join on `(accent-folded name, DK team)` through one helper, an ambiguous key is named and never guessed, and every pool hitter left without a side is named and warned. Pinned by `test_showdown.PerHitterPlatoonTests`.
 - **(c)** `f1.prior.factor_by_team` records the first row per team, which is the pinned SP's 1.0.
 - **(d)** `qa_portfolio` prints "F1 NEUTRAL" on a Showdown brief that applied F1, because it reads the Classic `enrichment` shape.
 
@@ -6714,7 +6538,7 @@ together.
   preflight, GitHub and PAT facts, a hand-built fallback procedure) that no repo
   file governs and no check watches.
 
-### R148(b). Handedness is reported per side while the data is per hitter (P2, XS) | new 2026-08-17, from the R142-R146 review; **(a) CLOSED 2026-08-18, migrated to CHANGELOG.md**
+### R148(b). CLOSED 2026-10-08 -- SHIPPED as roadmap Session 33 part 1 ((a) closed 2026-08-18); entry migrated to CHANGELOG.md
 
 - **(a) IS DONE.** The default branch is read from the remote through
   `ls-remote --symref` when the fetch reaches it, `default_branch_source` says
@@ -6758,17 +6582,7 @@ together.
   against a cache presented as "the default branch" is the original defect
   wearing a label, and a cache the remote disagrees with is its own finding
   (`origin_head_cache_stale`).
-- **(b) `f4_handedness_unavailable` is per-SIDE while the data is per-HITTER.**
-  R143 names a side only when NO hitter on it carries `bat_side`, so a MIXED
-  side is silent. It is reachable through R143's own disagreement path: DK's
-  order wins, a hitter DK names and the feed did not has no prior to inherit
-  from, and he gets `bat_side: ""` on a side that is not reported. The cost is
-  bounded — `platoon_hand_factor` returns a neutral 1.0 for an unknown hand, so
-  it is a missing prior and never a wrong one, on the handful of players a
-  disagreement swaps. It is still the thing R143's own entry says this repo has
-  already paid for once, named at the wrong grain. **Fix:** report the count of
-  hitters without a hand per side rather than an all-or-nothing team list, and
-  keep the existing key's meaning by deriving it from `count == 9`.
+- **(b) CLOSED 2026-10-08.** The premise was partly stale (R159(d) had already added the per-side count `f4_handedness_partial` on the DK-merge report). What shipped is the pool-level per-HITTER view: `pool_report["handedness"]` (and the brief's `pool.handedness`) names every pool hitter with no bat side, by source, TBD sides included; `f4_handedness_unavailable` keeps its meaning. Pinned by `test_core.ProjectedOrderHandsTests`. Gate and commit: the CHANGELOG entry.
 
 ### R150. Does an arm in a game belong in a washout count? (P2, XS + one decision) | new 2026-08-17, measured while landing R126
 

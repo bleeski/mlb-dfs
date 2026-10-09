@@ -4938,7 +4938,10 @@ class PoolMembersRecordTests(unittest.TestCase):
                "blockers": report.get("blockers") or [],
                "opposing_probables_incomplete": report.get("opposing_probables_incomplete") or {},
                "dk_batting_order": report.get("dk_batting_order"),
-               "excluded_column": report.get("excluded_column") or {}}
+               "excluded_column": report.get("excluded_column") or {},
+               # R442: the eighth key, the per-hitter handedness view, read off
+               # the same report; the record (`members`) is still the only addition.
+               "handedness": report.get("handedness") or {}}
         self.assertEqual(old, {k: v for k, v in block.items() if k != "members"})
         self.assertEqual({"members"}, set(block) - set(old))
         json.dumps(block)      # a brief is JSON: the record must serialise as it stands
@@ -5008,6 +5011,516 @@ class PoolMembersRecordTests(unittest.TestCase):
                 self.assertEqual({"applied": False, "reason": "no --leverage supplied"},
                                  brief["leverage"],
                                  "the record is there with leverage off")
+
+
+class ProjectedOrderHandsTests(unittest.TestCase):
+    """R442 / R148(b). A TBD side's bat sides ride in on the platoon reference row that
+    supplied its projected order, merged UNDER the feed's, and the pool says per HITTER
+    who still has none.
+
+    Before this `batter_hands` had one writer (`extract_batter_hands`, posted lineups
+    only), so a side that had not posted had a projected order and no hands and F4's
+    platoon term stayed 1.0 for every one of its hitters. Fixtures are synthetic: the
+    live reference is refreshed, so no count here is read off it.
+    """
+
+    @staticmethod
+    def _bats_platoon(teams=("T4",)):
+        # L/R alternating, the ninth a switch hitter, in both views.
+        rows = lambda: [{"player": "", "slot": i + 1,
+                         "bats": "S" if i == 8 else ("L" if i % 2 else "R")}
+                        for i in range(9)]
+        out = {"collected_date": "2026-07-10", "teams": []}
+        for team in teams:
+            vs_r, vs_l = rows(), rows()
+            for view in (vs_r, vs_l):
+                for i, row in enumerate(view):
+                    row["player"] = f"{team} Hitter{i+1}"
+            out["teams"].append({"abbrev": team, "page_updated": "2026-07-10",
+                                 "vs_RHP": vs_r, "vs_LHP": vs_l})
+        return out
+
+    def _pool(self, tmp, feed=None, platoon="bats"):
+        salary = Path(tmp) / "salary.csv"
+        pool_salary_csv(salary)
+        if platoon == "bats":
+            platoon = self._bats_platoon()
+        return lda.build_slate_pool(
+            salary, feed if feed is not None else pool_lineups_feed(),
+            platoon_json=platoon)
+
+    @staticmethod
+    def _f4_report(pool):
+        from mlb_engine.projections.projection_builder import compute_f4_factors
+        return compute_f4_factors(
+            pool["team_by_player_id"], pool["opposing_probables"], None,
+            pool["batter_hands"])[1]
+
+    def test_the_report_carries_bats_for_exactly_the_matched_hitters(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            salary = Path(tmp) / "salary.csv"
+            ids = write_salary(salary)
+            platoon = {"collected_date": "2026-06-30", "teams": [{
+                "abbrev": "AAA",
+                "vs_RHP": [
+                    {"slot": 1, "player": "AAA C", "bats": "R"},
+                    {"slot": 2, "player": "AAA 1B", "bats": "L"},
+                    {"slot": 3, "player": "AAA 2B", "bats": "s"},      # case-folded
+                    {"slot": 4, "player": "AAA Ghost", "bats": "R"}],  # no salary row
+                "vs_LHP": []}]}
+            result = poa.build_projected_order(platoon, salary, {"AAA": "R"})
+            self.assertEqual(2, len(result), "the tuple stays two values: nine callers unpack it")
+            order, report = result
+            self.assertEqual({ids["AAA C"]: "R", ids["AAA 1B"]: "L", ids["AAA 2B"]: "S"},
+                             report["bats_by_player_id"])
+            self.assertEqual(set(order), set(report["bats_by_player_id"]),
+                             "a bat side for every matched hitter, and for no one else")
+
+    def test_an_unreadable_bats_token_is_dropped_and_counted_and_a_missing_one_is_absent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            salary = Path(tmp) / "salary.csv"
+            ids = write_salary(salary)
+            platoon = {"collected_date": "2026-06-30", "teams": [{
+                "abbrev": "AAA",
+                "vs_RHP": [{"slot": 1, "player": "AAA C", "bats": "B"},
+                           {"slot": 2, "player": "AAA 1B"},
+                           {"slot": 3, "player": "AAA 2B", "bats": "L"}],
+                "vs_LHP": []}]}
+            order, report = poa.build_projected_order(platoon, salary, {"AAA": "R"})
+            self.assertEqual({ids["AAA 2B"]: "L"}, report["bats_by_player_id"])
+            self.assertEqual([{"player": "AAA C", "team": "AAA", "bats": "B"}],
+                             report["bats_unreadable"],
+                             "an unreadable value is named; an absent one is not an error")
+            self.assertEqual(3, len(order), "the slot map is unchanged by a bad bats cell")
+
+    def test_a_tbd_side_takes_its_hands_from_the_reference_and_f4_platoon_applies(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pool = self._pool(tmp)
+            t4 = sorted(p for p, t in pool["team_by_player_id"].items() if t == "T4")
+            self.assertEqual(9, len(t4))
+            self.assertEqual({"L", "R", "S"}, {pool["batter_hands"][p] for p in t4})
+            report = self._f4_report(pool)
+            # The S bat scores 1.02 in F4_PLATOON_PRIOR and counts as applied
+            # (Showdown's apply_base_prior scores S flat: an existing asymmetry).
+            self.assertEqual(36, report["platoon_component_applied"])
+            self.assertEqual(36, report["hitters_scored"])
+            # The control: the same pool with a bats-less reference is HEAD's 27.
+            bare = self._pool(tmp, platoon=pool_platoon_json())
+            self.assertEqual(27, self._f4_report(bare)["platoon_component_applied"])
+
+    def test_the_feed_hand_beats_the_reference_hand(self):
+        feed = pool_lineups_feed()
+        home = feed["games"][1]["home"]
+        home["lineup_status"] = "partial"
+        # Reference says Hitter1 bats R and Hitter2 bats L; the feed says the opposite.
+        home["lineup"] = [{"name": "T4 Hitter1", "order": 1, "bat_side": "L"},
+                          {"name": "T4 Hitter2", "order": 2, "bat_side": "R"}]
+        with tempfile.TemporaryDirectory() as tmp:
+            pool = self._pool(tmp, feed=feed)
+            by_name = {r["Name"]: r["Player_ID"] for r in pool["projection_rows"]}
+            hands = pool["batter_hands"]
+            self.assertEqual("L", hands[by_name["T4 Hitter1"]])
+            self.assertEqual("R", hands[by_name["T4 Hitter2"]])
+            self.assertEqual("R", hands[by_name["T4 Hitter3"]],
+                             "a hitter the feed gave no hand still takes the reference's")
+            counts = pool["pool_report"]["handedness"]["by_team"]["T4"]
+            self.assertEqual({"hitters": 9, "from_feed": 2, "from_platoon_reference": 7,
+                              "without_hand": 0}, counts)
+
+    def test_a_confirmed_side_never_takes_reference_hands(self):
+        feed = pool_lineups_feed()
+        for hitter in feed["games"][0]["away"]["lineup"]:           # T1, posted
+            hitter.pop("bat_side")
+        with tempfile.TemporaryDirectory() as tmp:
+            pool = self._pool(tmp, feed=feed, platoon=self._bats_platoon(("T1", "T4")))
+            t1 = [p for p, t in pool["team_by_player_id"].items() if t == "T1"]
+            self.assertEqual(9, len(t1))
+            self.assertFalse(any(p in pool["batter_hands"] for p in t1),
+                             "the reference supplies TBD sides only; a confirmed side the "
+                             "feed carried no hands for stays handless and is named")
+            block = pool["pool_report"]["handedness"]
+            self.assertEqual(9, block["by_team"]["T1"]["without_hand"])
+            self.assertEqual(9, block["by_team"]["T4"]["from_platoon_reference"])
+
+    def test_the_handedness_block_names_every_hitter_without_a_hand(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            pool = self._pool(tmp, platoon=pool_platoon_json())     # no `bats` anywhere
+            block = pool["pool_report"]["handedness"]
+            self.assertEqual({"hitters": 36, "with_hand": 27, "from_feed": 27,
+                              "from_platoon_reference": 0}, {
+                k: block[k] for k in ("hitters", "with_hand", "from_feed",
+                                      "from_platoon_reference")})
+            named = block["hitters_without_hand"]
+            self.assertEqual(9, len(named))
+            self.assertEqual({"T4"}, {n["team"] for n in named})
+            self.assertEqual({f"T4 Hitter{i}" for i in range(1, 10)},
+                             {n["name"] for n in named})
+            self.assertTrue(all(n["player_id"] for n in named))
+
+    def test_a_side_the_reference_ordered_but_gave_no_bats_is_warned_once(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            bare = self._pool(tmp, platoon=pool_platoon_json())["pool_report"]["warnings"]
+            hit = [w for w in bare if "0 bat sides read" in w]
+            self.assertEqual(1, len(hit))
+            self.assertTrue(hit[0].startswith("T4:"))
+            full = self._pool(tmp)["pool_report"]["warnings"]
+            self.assertFalse([w for w in full if "bat sides" in w],
+                             "a side that merely lacks some hands is the block, not a warning")
+
+    def test_the_brief_pool_block_carries_handedness_unconditionally(self):
+        import importlib.util
+        path = (Path(__file__).resolve().parents[1] / "skills"
+                / "generate-lineups" / "scripts" / "build_slate.py")
+        spec = importlib.util.spec_from_file_location("bs_r442", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        with tempfile.TemporaryDirectory() as tmp:
+            pool = self._pool(tmp)
+            block = module.pool_brief_block(pool["pool_report"], pool)
+            self.assertEqual(pool["pool_report"]["handedness"], block["handedness"])
+            json.dumps(block["handedness"])
+        self.assertEqual({}, module.pool_brief_block({}, {})["handedness"],
+                         "present and empty on a malformed pool, never an absent key")
+
+
+class HandednessTests(unittest.TestCase):
+    """R332. `tools/handedness_feed.py`: a per-player-aged bat-side cache and the
+    lineups feed it stamps for a DK-covered slate.
+
+    On a fully DK-covered slate nothing writes a feed, DK ships no handedness, and
+    F4's platoon half goes neutral (1835_5g: `f4_platoon_applied` 0 of 90 until a
+    per-slate scratch generator filled it). Every test here runs the production
+    function or the real `main()`; the CSV is a temp file, never Ben's disk.
+    """
+
+    SHOWDOWN_SAL = (Path(__file__).resolve().parent / "fixtures" / "showdown"
+                    / "DKSalaries_showdown_MIN_CHC.csv")
+
+    @staticmethod
+    def _tool():
+        from tools import handedness_feed
+        return handedness_feed
+
+    @staticmethod
+    def _starting_salary(tmp):
+        """The four-team pool with DK's `Starting` posted for every side."""
+        path = Path(tmp) / "salary.csv"
+        pool_salary_csv(path)
+        with path.open(newline="", encoding="utf-8") as fh:
+            rows = list(csv.reader(fh))
+        header, body = rows[0], rows[1:]
+        header.append("Starting")
+        for row in body:
+            name = row[2]
+            token = ""
+            if " Hitter" in name:
+                token = name.split("Hitter")[1]
+            elif name.endswith(" Ace"):
+                token = "SP"
+            row.append(token)
+        with path.open("w", newline="", encoding="utf-8") as fh:
+            writer = csv.writer(fh)
+            writer.writerow(header)
+            writer.writerows(body)
+        return path
+
+    @staticmethod
+    def _rows(stamped="2026-10-01", skip=(), throws="R"):
+        out = []
+        for team in ("T1", "T2", "T3", "T4"):
+            for i in range(1, 10):
+                name = f"{team} Hitter{i}"
+                if name in skip:
+                    continue
+                out.append({"name": name, "team": team,
+                            "bats": "S" if i == 9 else ("L" if i % 2 else "R"),
+                            "throws": "", "stamped": stamped, "source": "operator_capture"})
+            out.append({"name": f"{team} Ace", "team": team, "bats": "", "throws": throws,
+                        "stamped": stamped, "source": "operator_capture"})
+        return out
+
+    def _run(self, argv, stdin=None):
+        tool = self._tool()
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err), \
+                unittest.mock.patch("sys.stdin", io.StringIO(stdin or "")):
+            code = tool.main(argv)
+        return code, out.getvalue(), err.getvalue()
+
+    # -- the reference rows --------------------------------------------------- #
+
+    def test_the_platoon_reference_seeds_one_row_per_player_stamped_with_its_own_date(self):
+        tool = self._tool()
+        platoon = {"collected_date": "2026-09-29", "teams": [
+            {"abbrev": "TBR", "vs_RHP": [{"player": "Yandy Díaz", "bats": "r"},
+                                         {"player": "No Hand"},
+                                         {"player": "Odd Token", "bats": "B"}],
+             "vs_LHP": [{"player": "Yandy Díaz", "bats": "R"},
+                        {"player": "Switch Guy", "bats": "S"}]}]}
+        rows, report = tool.rows_from_platoon(platoon)
+        self.assertEqual(["Switch Guy", "Yandy Díaz"], [r["name"] for r in rows])
+        self.assertEqual({"TB"}, {r["team"] for r in rows}, "a FanGraphs code is DK-coded")
+        self.assertEqual({"2026-09-29"}, {r["stamped"] for r in rows})
+        self.assertEqual({"fangraphs_platoon"}, {r["source"] for r in rows})
+        self.assertEqual(2, report["unreadable_bats"], "a missing and an odd token are counted")
+        with self.assertRaises(tool.HandednessError):
+            tool.rows_from_platoon({"collected_date": "last Tuesday", "teams": []})
+
+    def test_a_newer_stamp_wins_a_row_and_a_changed_hand_is_reported(self):
+        tool = self._tool()
+        old = [{"name": "A One", "team": "T1", "bats": "L", "throws": "", "stamped": "2026-06-01",
+                "source": "fangraphs_platoon"}]
+        new = [{"name": "A One", "team": "T1", "bats": "R", "throws": "L", "stamped": "2026-10-01",
+                "source": "operator_capture"}]
+        rows, report = tool.upsert(old, new)
+        self.assertEqual([{"name": "A One", "team": "T1", "bats": "R", "throws": "L",
+                           "stamped": "2026-10-01", "source": "operator_capture"}], rows)
+        self.assertEqual([{"name": "A One", "team": "T1", "field": "bats", "was": "L", "now": "R"}],
+                         report["changed_hands"])
+        self.assertEqual((0, 1), (report["added"], report["refreshed"]))
+
+    def test_an_older_stamp_never_overwrites_a_newer_row_and_a_blank_field_is_kept(self):
+        tool = self._tool()
+        have = [{"name": "A One", "team": "T1", "bats": "R", "throws": "L", "stamped": "2026-10-01",
+                 "source": "operator_capture"}]
+        older = [{"name": "A One", "team": "T1", "bats": "L", "throws": "", "stamped": "2026-06-01",
+                  "source": "fangraphs_platoon"}]
+        rows, report = tool.upsert(have, older)
+        self.assertEqual(have, rows)
+        self.assertEqual(1, report["kept_newer"])
+        # A newer row that lacks a field keeps the old value for it.
+        newer_no_throw = [{"name": "A One", "team": "T1", "bats": "R", "throws": "",
+                           "stamped": "2026-10-05", "source": "operator_capture"}]
+        rows, _ = tool.upsert(have, newer_no_throw)
+        self.assertEqual(("L", "2026-10-05"), (rows[0]["throws"], rows[0]["stamped"]))
+
+    def test_a_capture_with_any_bad_line_writes_nothing(self):
+        tool = self._tool()
+        with tempfile.TemporaryDirectory() as tmp:
+            csv_path = Path(tmp) / "h.csv"
+            code, _o, err = self._run(
+                ["seed", "--stdin", "--as-of", "2026-10-08", "--csv", str(csv_path)],
+                stdin="name,team,bats,throws\nGood Guy,T1,L\nBad Guy,T1,Q\nShort,T1\n")
+            self.assertEqual(2, code)
+            self.assertIn("Bad Guy", err)
+            self.assertIn("line 4", err)
+            self.assertFalse(csv_path.exists(), "a refused capture writes no file at all")
+            code, _o, _e = self._run(
+                ["seed", "--stdin", "--as-of", "2026-10-08", "--csv", str(csv_path)],
+                stdin="name,team,bats,throws\nGood Guy,T1,L\n")
+            self.assertEqual(0, code)
+            rows, report = tool.read_handedness(csv_path)
+            self.assertEqual([("Good Guy", "L")], [(r["name"], r["bats"]) for r in rows])
+            self.assertEqual([], report["rejected"])
+
+    def test_seed_refuses_to_rewrite_a_file_with_an_unreadable_row(self):
+        tool = self._tool()
+        with tempfile.TemporaryDirectory() as tmp:
+            csv_path = Path(tmp) / "h.csv"
+            csv_path.write_text(
+                ",".join(tool.FIELDS) + "\n"
+                "Good Guy,T1,L,,2026-10-01,operator_capture\n"
+                "Broken Row,T1,Q,,2026-10-01,operator_capture\n", encoding="utf-8")
+            before = csv_path.read_bytes()
+            code, _o, err = self._run(
+                ["seed", "--stdin", "--as-of", "2026-10-08", "--csv", str(csv_path)],
+                stdin="New Guy,T2,R\n")
+            self.assertEqual(2, code)
+            self.assertIn("Broken Row", err)
+            self.assertEqual(before, csv_path.read_bytes(),
+                             "a rewrite that would drop a row it could not read never happens")
+
+    def test_the_csv_is_written_in_one_deterministic_order_with_no_temp_left(self):
+        tool = self._tool()
+        rows = self._rows()
+        with tempfile.TemporaryDirectory() as tmp:
+            one, two = Path(tmp) / "one.csv", Path(tmp) / "two.csv"
+            tool.write_handedness(one, rows)
+            tool.write_handedness(two, list(reversed(rows)))
+            self.assertEqual(one.read_bytes(), two.read_bytes(),
+                             "the order is the file's, not the caller's")
+            self.assertEqual([], [p.name for p in Path(tmp).glob("*.tmp")])
+            back, report = tool.read_handedness(one)
+            self.assertEqual(len(rows), len(back))
+            self.assertEqual([], report["rejected"])
+
+    def test_the_vendored_reference_is_a_clean_per_player_stamped_file(self):
+        tool = self._tool()
+        rows, report = tool.read_handedness(tool.DEFAULT_CSV)
+        self.assertEqual([], report["rejected"])
+        self.assertGreater(len(rows), 300, "seeded from the platoon reference's thirty teams")
+        from mlb_engine.team_codes import to_dk_abbrev
+        self.assertTrue(all(to_dk_abbrev(r["team"]) == r["team"] for r in rows),
+                        "every team is a DK code")
+        keys = [tool.key_of(r["name"], r["team"]) for r in rows]
+        self.assertEqual(len(keys), len(set(keys)), "one row per player")
+
+    def test_a_platoon_reseed_never_overwrites_an_operator_captured_hand(self):
+        tool = self._tool()
+        have = [{"name": "A One", "team": "T1", "bats": "R", "throws": "", "stamped": "2026-06-01",
+                 "source": "operator_capture"}]
+        newer_platoon = [{"name": "A One", "team": "T1", "bats": "L", "throws": "", "stamped": "2026-09-29",
+                          "source": "fangraphs_platoon"}]
+        rows, report = tool.upsert(have, newer_platoon)
+        self.assertEqual("R", rows[0]["bats"], "a roster-derived hand outranks a projected-lineup page")
+        self.assertEqual(1, report["kept_newer"])
+        # and the other way round a capture always replaces the platoon row
+        rows, report = tool.upsert(newer_platoon, [dict(have[0])])
+        self.assertEqual(("R", "operator_capture"), (rows[0]["bats"], rows[0]["source"]))
+
+    def test_a_bad_platoon_file_or_an_empty_csv_or_a_leading_blank_line_is_named_not_a_crash(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            bad = Path(tmp) / "platoon.json"
+            bad.write_text("{not json", encoding="utf-8")
+            csv_path = Path(tmp) / "h.csv"
+            code, _o, err = self._run(["seed", "--from-platoon", str(bad), "--csv", str(csv_path)])
+            self.assertEqual(2, code)
+            self.assertIn("not readable JSON", err)
+            self.assertFalse(csv_path.exists())
+            csv_path.write_bytes(b"")                      # a zero-byte file is an empty reference
+            code, _o, err = self._run(
+                ["seed", "--stdin", "--as-of", "2026-10-08", "--csv", str(csv_path)],
+                stdin="\n\nname,team,bats,throws\nGood Guy,T1,L\n")
+            self.assertEqual(0, code, err)
+            rows, _r = self._tool().read_handedness(csv_path)
+            self.assertEqual(["Good Guy"], [r["name"] for r in rows],
+                             "the header after blank lines is still a header")
+
+    # -- the feed ------------------------------------------------------------- #
+
+    def test_the_feed_stamps_hands_from_the_csv_and_names_the_blank_and_the_age(self):
+        tool = self._tool()
+        rows = self._rows(stamped="2026-10-01", skip=("T1 Hitter3",))
+        rows[0]["stamped"] = "2024-01-01"                  # one row far past its stamp
+        with tempfile.TemporaryDirectory() as tmp:
+            salary = self._starting_salary(tmp)
+            csv_path, out = Path(tmp) / "h.csv", Path(tmp) / "feed.json"
+            tool.write_handedness(csv_path, rows)
+            code, stdout, err = self._run(
+                ["feed", "--salary", str(salary), "--date", "2026-07-10", "--out", str(out),
+                 "--csv", str(csv_path), "--json"])
+            self.assertEqual(0, code, err)
+            report = json.loads(stdout)
+            feed = json.loads(out.read_text(encoding="utf-8"))
+            sides = {}
+            for game in feed["games"]:
+                for key in ("away", "home"):
+                    sides[game[key]["team_abbrev"]] = game[key]
+            t1 = {h["name"]: h["bat_side"] for h in sides["T1"]["lineup"]}
+            self.assertEqual("", t1["T1 Hitter3"], "a player the CSV lacks stays BLANK, never guessed")
+            self.assertEqual("L", t1["T1 Hitter1"])
+            self.assertEqual("S", t1["T1 Hitter9"])
+            self.assertEqual("R", sides["T1"]["probable_pitcher"]["hand"])
+            self.assertEqual(35, report["with_bat_side"])
+            self.assertEqual(36, report["hitters"])
+            blank = [s for s in report["sides"] if s["blank_hitters"]]
+            self.assertEqual([("T1", ["T1 Hitter3"])], [(s["team"], s["blank_hitters"]) for s in blank])
+            stale = report["age_days"]["stale_gt_400"]
+            self.assertEqual([("T1 Hitter1", "T1")],
+                             [(s["name"], s["team"]) for s in stale])
+            self.assertEqual(35 + 4 - 1, report["age_days"]["fresh_le_30"],
+                             "every other used row is fresh against --date")
+
+    def test_classic_acceptance_every_dk_covered_hitter_reaches_batter_hands(self):
+        """The R332 acceptance on the Classic format: DK covers every side, the feed
+        is the tool's, and F4's platoon half is fed for all 36 hitters where a
+        no-feed build reads 0 of 36."""
+        from mlb_engine.projections.projection_builder import compute_f4_factors
+        tool = self._tool()
+        with tempfile.TemporaryDirectory() as tmp:
+            salary = self._starting_salary(tmp)
+            csv_path, out = Path(tmp) / "h.csv", Path(tmp) / "feed.json"
+            tool.write_handedness(csv_path, self._rows())
+            code, _o, err = self._run(
+                ["feed", "--salary", str(salary), "--date", "2026-07-10", "--out", str(out),
+                 "--csv", str(csv_path)])
+            self.assertEqual(0, code, err)
+            feed = json.loads(out.read_text(encoding="utf-8"))
+            bare = lda.build_slate_pool(salary, None, platoon_json={})
+            self.assertEqual({}, bare["batter_hands"], "DK ships no handedness: the control")
+            pool = lda.build_slate_pool(salary, feed, platoon_json={})
+            self.assertEqual(36, len(pool["batter_hands"]))
+            dk = pool["pool_report"]["dk_batting_order"]
+            self.assertEqual([], dk["f4_handedness_unavailable"])
+            self.assertEqual([], dk["disagreements"])
+            self.assertEqual([], pool["pool_report"]["blockers"])
+            f4, rep = compute_f4_factors(pool["team_by_player_id"], pool["opposing_probables"],
+                                         None, pool["batter_hands"])
+            self.assertEqual(36, rep["platoon_component_applied"])
+            self.assertEqual([], pool["pool_report"]["handedness"]["hitters_without_hand"])
+
+    def test_showdown_acceptance_every_dk_posted_hitter_has_a_side(self):
+        """The same acceptance on the Showdown format (the R332 rider): the tool's
+        feed through `showdown_handedness` reads every posted hitter and both hands."""
+        tool = self._tool()
+        from mlb_engine.optimize import showdown as sd
+        raw = sd.melt_showdown_salary_csv(str(self.SHOWDOWN_SAL))
+        hitters = raw[raw["Batting_Order"].notna()]
+        self.assertEqual(18, len(hitters))
+        pitchers = raw[(raw["Batting_Order"].isna()) & (raw["Position"].astype(str) == "P")] \
+            if "Position" in raw.columns else raw.iloc[0:0]
+        rows = [{"name": n, "team": t, "bats": "L" if i % 2 else "R", "throws": "",
+                 "stamped": "2026-10-01", "source": "operator_capture"}
+                for i, (n, t) in enumerate(zip(hitters["Name"], hitters["Team"]))]
+        with tempfile.TemporaryDirectory() as tmp:
+            csv_path, out = Path(tmp) / "h.csv", Path(tmp) / "feed.json"
+            tool.write_handedness(csv_path, rows)
+            # Probables: whatever arm DK declared, read back from the engine's own feed.
+            from mlb_engine.intake.live_data_adapters import dk_starting_only_feed
+            feed0, _note = dk_starting_only_feed(self.SHOWDOWN_SAL, "2026-07-18")
+            for game in feed0["games"]:
+                for key in ("away", "home"):
+                    probable = (game[key].get("probable_pitcher") or {})
+                    if probable.get("name"):
+                        rows.append({"name": probable["name"],
+                                     "team": game[key]["team_abbrev"], "bats": "",
+                                     "throws": "R", "stamped": "2026-10-01",
+                                     "source": "operator_capture"})
+            tool.write_handedness(csv_path, rows)
+            code, _o, err = self._run(
+                ["feed", "--salary", str(self.SHOWDOWN_SAL), "--date", "2026-07-18",
+                 "--out", str(out), "--csv", str(csv_path)])
+            self.assertEqual(0, code, err)
+            import importlib.util
+            path = (Path(__file__).resolve().parents[1] / "skills" / "generate-lineups"
+                    / "scripts" / "build_slate.py")
+            spec = importlib.util.spec_from_file_location("bs_r332", path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+
+            class Args:
+                lineups = str(out)
+                date = "2026-07-18"
+            with contextlib.redirect_stderr(io.StringIO()):
+                bat_side, facing, note = module.showdown_handedness(Args(), Path(tmp), raw)
+        self.assertEqual(18, note["hitters_with_side"])
+        self.assertEqual([], note["hitters_without_side"])
+        self.assertEqual(2, note["teams_with_hand"], "both declared arms carry their hand")
+        self.assertEqual({"R"}, set(facing.values()))
+
+    def test_a_slate_dk_does_not_cover_is_refused_with_the_engines_wording_and_writes_nothing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            salary = Path(tmp) / "salary.csv"
+            pool_salary_csv(salary)                       # no Starting column at all
+            out = Path(tmp) / "feed.json"
+            code, _o, err = self._run(
+                ["feed", "--salary", str(salary), "--date", "2026-07-10", "--out", str(out),
+                 "--csv", str(Path(tmp) / "h.csv")])
+            self.assertEqual(2, code)
+            self.assertIn("Starting", err)
+            self.assertFalse(out.exists())
+
+    def test_an_existing_feed_is_never_overwritten(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            salary = self._starting_salary(tmp)
+            out = Path(tmp) / "feed.json"
+            out.write_text("{\"mine\": true}", encoding="utf-8")
+            code, _o, err = self._run(
+                ["feed", "--salary", str(salary), "--date", "2026-07-10", "--out", str(out),
+                 "--csv", str(Path(tmp) / "h.csv")])
+            self.assertEqual(2, code)
+            self.assertIn("never overwrites", err)
+            self.assertEqual("{\"mine\": true}", out.read_text(encoding="utf-8"))
 
 
 class BuildSlatePoolTests(unittest.TestCase):

@@ -87,11 +87,197 @@ TOP, MIDDLE, BOTTOM = (1, 2, 3), (4, 5, 6), (7, 8, 9)
 
 
 # --------------------------------------------------------------------------- #
+# Bat-side join (R399(b))
+# --------------------------------------------------------------------------- #
+def hitter_key(name: Any, team: Any) -> tuple:
+    """The join key for a hitter's bat side: accent-folded name AND DK team.
+
+    R399(b). The map was keyed by the feed's raw name and looked up by DK's, so
+    `Luis García Jr.` against `Luis Garcia Jr.` and `Yandy Díaz` against `Yandy
+    Diaz` both missed (16 of 18 on 1830_1g_sd) and took the flat 1.00 with nothing
+    saying so. `normalize_name` folds diacritics and STRIPS Jr./Sr./III, so the
+    name alone would collapse `Luis Garcia Jr.` and `Luis Garcia` into one key
+    where exact-string never collided; the team keeps them apart.
+    """
+    from mlb_engine.intake.slate_intake_manager import normalize_name
+    return (normalize_name(name), str(team or "").strip().upper())
+
+
+def index_bat_sides(bat_side: Optional[Mapping[Any, Any]]) -> tuple:
+    """`(by_key, by_name, ambiguous)` from a caller's bat-side map.
+
+    A key is `(normalized name, team)` (what `showdown_handedness` builds; the
+    name is taken as already normalized, an empty team makes it a name-only
+    entry) or a plain name string (the older shape, normalized here so a raw
+    name-keyed caller keeps working). A key two entries share with DIFFERENT
+    sides is ambiguous and resolves to no side: unmatched or ambiguous is
+    skipped, never guessed.
+    """
+    from mlb_engine.intake.slate_intake_manager import normalize_name
+    seen_key: Dict[tuple, set] = {}
+    seen_name: Dict[str, set] = {}
+    for key, value in dict(bat_side or {}).items():
+        side = str(value or "").strip().upper()[:1]
+        if not side:
+            continue
+        if isinstance(key, tuple) and len(key) == 2:
+            team = str(key[1] or "").strip().upper()
+            if team:
+                seen_key.setdefault((str(key[0]), team), set()).add(side)
+            else:
+                seen_name.setdefault(str(key[0]), set()).add(side)
+        else:
+            seen_name.setdefault(normalize_name(key), set()).add(side)
+    by_key = {k: next(iter(v)) for k, v in seen_key.items() if len(v) == 1}
+    by_name = {k: next(iter(v)) for k, v in seen_name.items() if len(v) == 1}
+    ambiguous = sorted(k for k, v in seen_key.items() if len(v) > 1)
+    return by_key, by_name, ambiguous
+
+
+def lookup_bat_side(by_key: Mapping[tuple, str], by_name: Mapping[str, str],
+                    name: Any, team: Any) -> str:
+    """The bat side for one hitter, '' when the map has none or is ambiguous."""
+    key = hitter_key(name, team)
+    return by_key.get(key) or by_name.get(key[0]) or ""
+
+
+# --------------------------------------------------------------------------- #
+# Per-hitter platoon split (R122, solver half)
+# --------------------------------------------------------------------------- #
+#: The sample, in plate appearances, at which a hitter's own split and the league
+#: platoon pattern weigh the same. The rider's rule: a platoon term read off fewer
+#: than ~150 observations is shrunk toward the league pattern, not toward 1.0, and
+#: the population effect is not zero (0.94 same-handed / 1.04 opposite is that
+#: pattern). A labeled prior, never fitted to a slate.
+PLATOON_SPLIT_SHRINK_PA = 150
+PLATOON_SPLIT_CLIP = (0.80, 1.20)
+
+_SPLIT_REQUIRED = ("name", "team", "ops_overall", "pa_vs_l", "ops_vs_l", "pa_vs_r", "ops_vs_r")
+
+
+def read_platoon_splits(path) -> tuple[Dict[tuple, Dict[str, Any]], Dict[str, Any]]:
+    """Read a captured per-hitter platoon-splits CSV. Returns (by_key, report).
+
+    Columns, matched case-insensitively: ``name, team, ops_overall, pa_vs_L,
+    ops_vs_L, pa_vs_R, ops_vs_R`` (``bats`` and ``pa_overall`` are accepted and
+    unused: the bat side comes from the feed). The engine reads captured bytes and
+    fetches nothing; the session captures them (StatsAPI ``statSplits`` with
+    ``sitCodes=vl,vr``). Keyed by ``hitter_key`` (accent-folded name, DK team).
+
+    R242's rule, as ``read_supplied_base`` states it: a file the operator named
+    and the engine could not use is an ERROR, never an empty map. A missing file,
+    a missing required column, a non-finite or negative number, a duplicate
+    hitter and an empty result are each refused by name. A blank per-hand cell is
+    not an error: that hand has no evidence for the hitter and he keeps the flat
+    factor against it; a blank ``ops_overall`` skips the row, counted.
+    """
+    import csv
+    import hashlib
+    import math
+    from pathlib import Path
+
+    from mlb_engine.team_codes import to_dk_abbrev
+
+    p = Path(path)
+    if not p.exists():
+        raise FileNotFoundError(f"platoon splits file not found: {p}")
+    raw = p.read_bytes()
+    sha = hashlib.sha256(raw).hexdigest()
+    reader = csv.DictReader(raw.decode("utf-8-sig", errors="replace").splitlines())
+    header = [(h or "").strip().lower() for h in (reader.fieldnames or [])]
+    missing = [c for c in _SPLIT_REQUIRED if c not in header]
+    if missing:
+        raise ValueError(f"platoon splits file {p} lacks column(s) {missing}; needs "
+                         f"{list(_SPLIT_REQUIRED)}")
+    out: Dict[tuple, Dict[str, Any]] = {}
+    skipped = 0
+    rejected: list[str] = []
+    duplicated: list[str] = []
+
+    def number(cell, what, who):
+        text = str(cell if cell is not None else "").strip()
+        if text == "":
+            return None
+        try:
+            value = float(text)
+        except ValueError:
+            rejected.append(f"{who} {what}={text!r} (not a number)")
+            return "bad"
+        if not math.isfinite(value):
+            rejected.append(f"{who} {what}={text!r} (not a finite number)")
+            return "bad"
+        if value < 0:
+            rejected.append(f"{who} {what}={text!r} (negative)")
+            return "bad"
+        return value
+
+    for row in reader:
+        lower = {(k or "").strip().lower(): v for k, v in row.items()}
+        name = str(lower.get("name") or "").strip()
+        team = to_dk_abbrev(str(lower.get("team") or "").strip().upper())
+        if not name or not team:
+            skipped += 1
+            continue
+        who = f"{name} ({team})"
+        vals = {c: number(lower.get(c), c, who) for c in _SPLIT_REQUIRED[2:]}
+        if "bad" in vals.values():
+            continue
+        if vals["ops_overall"] is None or vals["ops_overall"] <= 0:
+            skipped += 1
+            continue
+        key = hitter_key(name, team)
+        if key in out:
+            duplicated.append(who)
+            continue
+        out[key] = {"name": name, "team": team, "ops_overall": vals["ops_overall"],
+                    "pa_vs_L": vals["pa_vs_l"], "ops_vs_L": vals["ops_vs_l"],
+                    "pa_vs_R": vals["pa_vs_r"], "ops_vs_R": vals["ops_vs_r"]}
+    if rejected or duplicated:
+        detail = "; ".join(rejected[:10])
+        if duplicated:
+            detail += (" ; " if detail else "") + f"duplicate hitter: {sorted(set(duplicated))[:10]}"
+        raise ValueError(
+            f"platoon splits file {p} carries {len(rejected) + len(duplicated)} unusable "
+            f"row(s): {detail}. The splits move a hitter's price, so a bad row is refused "
+            "rather than carried into the solve")
+    if not out:
+        raise ValueError(f"platoon splits file {p} carried no usable rows ({skipped} "
+                         "skipped); refusing rather than building without the input "
+                         "that was asked for")
+    return out, {"source": str(p), "sha256": sha, "rows_usable": len(out),
+                 "rows_skipped": skipped}
+
+
+def split_platoon_factor(rec: Mapping[str, Any], opp_hand: str, flat: float) -> Optional[Dict[str, Any]]:
+    """The shrunk per-hitter platoon factor against ``opp_hand``, or None.
+
+    ``w = pa_vs / (pa_vs + K)``, ``r = ops_vs / ops_overall``, factor
+    ``clip(w * r + (1 - w) * flat)``: his own split, pulled toward the league
+    platoon pattern (``flat``: 0.94 same-handed, 1.04 opposite, 1.00 switch) by how
+    little of it there is. None when the row has no evidence against this hand, or
+    no plate appearances against it (``w`` would be 0: the flat factor stands).
+    """
+    pa = rec.get(f"pa_vs_{opp_hand}")
+    ops = rec.get(f"ops_vs_{opp_hand}")
+    overall = rec.get("ops_overall")
+    if pa is None or ops is None or not overall or pa <= 0:
+        return None
+    w = float(pa) / (float(pa) + PLATOON_SPLIT_SHRINK_PA)
+    ratio = float(ops) / float(overall)
+    low, high = PLATOON_SPLIT_CLIP
+    factor = min(high, max(low, w * ratio + (1.0 - w) * flat))
+    return {"factor": factor, "weight": w, "ratio": ratio, "pa_vs": float(pa),
+            "ops_vs": float(ops), "ops_overall": float(overall), "flat": flat}
+
+
+# --------------------------------------------------------------------------- #
 # Base prior
 # --------------------------------------------------------------------------- #
 def apply_base_prior(df: pd.DataFrame,
-                     bat_side: Optional[Mapping[str, str]] = None,
-                     pitcher_hand: Optional[Mapping[str, str]] = None) -> pd.DataFrame:
+                     bat_side: Optional[Mapping[Any, str]] = None,
+                     pitcher_hand: Optional[Mapping[str, str]] = None,
+                     platoon_splits: Optional[Mapping[tuple, Mapping[str, Any]]] = None,
+                     platoon_splits_read: Optional[Mapping[str, Any]] = None) -> pd.DataFrame:
     """Replace Base (raw AvgPointsPerGame) with a labeled prior:
     salary-regressed APPG x batting-order PA factor x platoon factor.
 
@@ -104,9 +290,27 @@ def apply_base_prior(df: pd.DataFrame,
     every hitter and the platoon component contributed nothing while still
     appearing in the prior_note. ``pitcher_hand`` maps a TEAM to its declared
     starter's hand; a team missing from it gets a flat factor and is reported.
+
+    R122 (report). A hitter whose bat side the map does not carry is named in
+    ``out.attrs["platoon_unresolved_hitters"]`` beside the teams list: the teams
+    list fires only on a missing OPPOSING hand, so a hitter with no side on a side
+    whose arm resolved took the flat 1.00 and appeared nowhere (1920_1g_sd: 11 of
+    18). ``bat_side`` is keyed by ``hitter_key`` (name AND team) or by a plain name;
+    see ``index_bat_sides``. A switch hitter resolves to a flat 1.00 on purpose and
+    is not unresolved.
+
+    R122 (solver). ``platoon_splits`` (``read_platoon_splits``) replaces the flat
+    0.94 / 1.04 / 1.00 with the hitter's OWN split, shrunk toward that flat league
+    pattern by plate appearances (``split_platoon_factor``), for a hitter whose side
+    and opposing hand both resolve and whose row carries a sample against that
+    hand. Everyone else keeps the flat factor, so no file, or a hitter the file
+    lacks, is byte-identical to the older behavior. The flat factor pointed the
+    wrong way often enough to move a captain on 1940_1g_sd (Turang L, .530 OPS in
+    167 PA against LHP, took the same 0.94 as every lefty and held a captain slot).
+    A review prior built from an OPS ratio: not a projection, a rate, or an edge.
     """
     out = df.copy()
-    bat_side = dict(bat_side or {})
+    by_key, by_name, _ambiguous = index_bat_sides(bat_side)
     pitcher_hand = {k: str(v).upper()[:1] for k, v in (pitcher_hand or {}).items()}
 
     hit = out["Batting_Order"].notna()
@@ -120,28 +324,90 @@ def apply_base_prior(df: pd.DataFrame,
     out["APPG_Raw"] = out["Base"].astype(float)
 
     unresolved: set[str] = set()
+    unresolved_hitters: list[dict] = []
+    split_index = dict(platoon_splits or {})
+    basis_counts = {"split": 0, "flat": 0, "unresolved": 0}
+    split_hitters: list[dict] = []
 
     def prior(row):
         if pd.isna(row["Batting_Order"]):
             return float(row["APPG_Raw"])                    # pitchers keep APPG
         blended = 0.60 * float(row["Salary_Fit"]) + 0.40 * float(row["APPG_Raw"])
         f_order = ORDER_FACTOR[int(row["Batting_Order"])]
-        side = str(bat_side.get(row["Name"], "")).upper()[:1]
+        side = lookup_bat_side(by_key, by_name, row["Name"], row.get("Team"))
         opp_hand = pitcher_hand.get(row["Opponent"], "")
         if not side or not opp_hand or side == "S":
             if not opp_hand:
                 unresolved.add(str(row["Opponent"]))
+            if not side:
+                unresolved_hitters.append({
+                    "name": str(row["Name"]), "team": str(row.get("Team") or ""),
+                    "reason": "no bat side"})
             f_plat = 1.00
         elif side == opp_hand:                               # same-handed: penalty
             f_plat = 0.94
         else:                                                # opposite hands: edge
             f_plat = 1.04
+        basis = "unresolved" if (not side or not opp_hand) else "flat"
+        if split_index and side and opp_hand:
+            rec = split_index.get(hitter_key(row["Name"], row.get("Team")))
+            shrunk = split_platoon_factor(rec, opp_hand, f_plat) if rec else None
+            if shrunk is not None:
+                split_hitters.append({
+                    "name": str(row["Name"]), "team": str(row.get("Team") or ""),
+                    "bats": side, "opp_hand": opp_hand, "pa_vs": shrunk["pa_vs"],
+                    "ops_vs": shrunk["ops_vs"], "ops_overall": shrunk["ops_overall"],
+                    "flat": f_plat, "factor": round(shrunk["factor"], 6)})
+                f_plat, basis = shrunk["factor"], "split"
+        basis_counts[basis] += 1
         return blended * f_order * f_plat
 
     out["Base_Prior"] = out.apply(prior, axis=1)
     out["Base"] = out["Base_Prior"]
     out.attrs["platoon_unresolved_teams"] = sorted(unresolved)
+    out.attrs["platoon_unresolved_hitters"] = sorted(
+        unresolved_hitters, key=lambda r: (r["team"], r["name"]))
+    # Present on every call, `applied: False` when no file was given: absent is not
+    # an answer to "did the platoon term read the hitter's own split".
+    read = dict(platoon_splits_read or {})
+    out.attrs["platoon_splits"] = ({
+        "applied": True, "source": read.get("source"), "sha256": read.get("sha256"),
+        "rows_usable": read.get("rows_usable", len(split_index)),
+        "rows_skipped": read.get("rows_skipped"),
+        "hitters_with_split": basis_counts["split"],
+        "hitters_flat": basis_counts["flat"],
+        "hitters_unresolved": basis_counts["unresolved"],
+        "shrink_pa": PLATOON_SPLIT_SHRINK_PA, "clip": list(PLATOON_SPLIT_CLIP),
+        "split_hitters": sorted(split_hitters, key=lambda r: (r["team"], r["name"])),
+        "label": "a hitter's own OPS split against the opposing hand, shrunk toward "
+                 "the flat league pattern by plate appearances; a review prior, never "
+                 "a projection, rate or edge",
+    } if split_index else {"applied": False, "source": None})
     return out
+
+
+def supersede_platoon_splits(df: pd.DataFrame) -> pd.DataFrame:
+    """Re-state ``attrs["platoon_splits"]`` after ``apply_supplied_base``.
+
+    A supplied Base is the finished prior and no factor touches it, so a hitter
+    whose Base the operator supplied did not take his split even though
+    ``apply_base_prior`` computed one. Counting him would say a factor was applied
+    that the price never carried (R122's own headline). Those hitters move from
+    ``split_hitters`` to ``superseded_by_supplied_base`` and out of
+    ``hitters_with_split``. A no-op without a splits block or a supplied Base.
+    """
+    block = df.attrs.get("platoon_splits") or {}
+    if not block.get("applied") or "Base_Supplied" not in df.columns:
+        return df
+    supplied = {(str(n), str(t)) for n, t, b in zip(df["Name"], df["Team"], df["Base_Supplied"])
+                if bool(b)}
+    kept = [r for r in block["split_hitters"] if (r["name"], r["team"]) not in supplied]
+    gone = [r for r in block["split_hitters"] if (r["name"], r["team"]) in supplied]
+    if gone:
+        df.attrs["platoon_splits"] = {**block, "split_hitters": kept,
+                                      "hitters_with_split": len(kept),
+                                      "superseded_by_supplied_base": gone}
+    return df
 
 
 # --------------------------------------------------------------------------- #

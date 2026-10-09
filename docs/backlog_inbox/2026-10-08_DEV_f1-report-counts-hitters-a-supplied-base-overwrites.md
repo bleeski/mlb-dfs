@@ -1,0 +1,3 @@
+# 2026-10-08 DEV (Session 33): the Showdown F1 report counts hitters whose Base `--projections` then replaces
+
+Found while fixing the same overlap for `--platoon-splits` (`supersede_platoon_splits`). `price_showdown_pool` applies `apply_base_prior`, then `apply_f1_prior`, then `apply_supplied_base`, deliberately: a supplied number is the finished prior and no factor touches it. `apply_f1_prior`'s report (`f1_report`, the brief's F1 block) counts every hitter it scaled, including ones whose Base the supplied file then overwrote, so the brief can say F1 moved a price it never moved. Same shape and same fix as `supersede_platoon_splits` (read `Base_Supplied` after the supplied step and restate the F1 counts); verify the F1 report's field names first.

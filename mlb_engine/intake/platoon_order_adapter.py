@@ -173,10 +173,16 @@ def build_projected_order(
     falls back to default_hand and is recorded under hand_assumed_teams. Returns
     (order_map, report). The report's note states that these teams must NOT be
     passed as confirmed_teams.
+
+    R442. The report's ``bats_by_player_id`` carries each matched hitter's bat
+    side from the same reference row (the tuple stays two values: nine callers
+    unpack it), so a TBD side keeps F4's platoon term before lineups post.
     """
     name_idx = _salary_name_index(salary_csv)
     collected = str(platoon.get("collected_date") or "")
     order: Dict[str, int] = {}
+    bats_by_pid: Dict[str, str] = {}
+    bats_unreadable: List[dict] = []
     matched: List[dict] = []
     unmatched: List[dict] = []
     stale: List[dict] = []
@@ -201,6 +207,16 @@ def build_projected_order(
                 order[pid_list[0]] = int(row["slot"])
                 matched.append({"player": row.get("player"), "player_id": pid_list[0],
                                 "team": team, "slot": int(row["slot"]), "hand_used": hand_used})
+                # R442. The reference row's bat side rides beside the slot. It
+                # was dropped here, so a TBD side had a projected order and no
+                # hands, and F4's platoon term stayed 1.0 for every one of its
+                # hitters while the reference carried all nine.
+                bats = str(row.get("bats") or "").strip().upper()
+                if bats in ("L", "R", "S"):
+                    bats_by_pid[pid_list[0]] = bats
+                elif bats:
+                    bats_unreadable.append({"player": row.get("player"), "team": team,
+                                            "bats": row.get("bats")})
             else:
                 unmatched.append({"player": row.get("player"), "team": team,
                                   "reason": "no salary match" if not pid_list else "ambiguous salary match"})
@@ -223,6 +239,10 @@ def build_projected_order(
         "matched": matched,
         "unmatched": unmatched,
         "filled_by_team": dict(sorted(filled.items())),
+        # R442. {Player_ID: L|R|S} for exactly the hitters matched above, from the
+        # same reference rows; build_slate_pool merges it UNDER the feed's hands.
+        "bats_by_player_id": dict(sorted(bats_by_pid.items())),
+        "bats_unreadable": bats_unreadable,
         "zero_fill_teams": zero_fill,
         "teams_missing_from_file": missing_from_file,
         "stale_teams": stale,

@@ -505,8 +505,10 @@ VERIFY_CLASSIC_FAILURE_CLASS = {
 # be discovered, because "which exits does the governor not reach" is the
 # question the item makes the governor answer out loud.
 #
-# EXIT 4, TWENTY sites (run_classic:1 through leverage_unresolved,
-# run_showdown:5, main:14). R388(b) added `never_relax_not_holdable`. R382
+# EXIT 4, TWENTY-TWO sites (run_classic:1 through leverage_unresolved,
+# run_showdown:6, main:15). R122 added two (`platoon_splits_unreadable`,
+# `platoon_splits_not_supported_on_classic`). R388(b) added
+# `never_relax_not_holdable`. R382
 # added two (`captain_prior_unresolved`,
 # `captain_prior_not_supported_on_classic`) and found the sentence already
 # stale by three before that: it read "fourteen (1/3/10)" against a tree
@@ -3298,6 +3300,11 @@ def pool_brief_block(report: dict, pool: dict, salary_path=None) -> dict:
     prior could only guess the pool. ``members`` is the membership and what
     intake carried about each row (`pool_members_record`); ``salary_path`` is the
     file this build read, hashed into it.
+
+    R442 / R148(b). ``handedness`` is the per-HITTER view of F4's platoon input:
+    how many pool hitters carry a bat side, from the feed or from the platoon
+    reference that supplied a TBD side's order, and the ones that carry none, by
+    name. Present unconditionally (an empty block is a fact; an absent key is not).
     """
     return {
         "teams": len(report.get("teams") or {}),
@@ -3308,6 +3315,7 @@ def pool_brief_block(report: dict, pool: dict, salary_path=None) -> dict:
             report.get("opposing_probables_incomplete") or {}),
         "dk_batting_order": report.get("dk_batting_order"),
         "excluded_column": report.get("excluded_column") or {},
+        "handedness": report.get("handedness") or {},
         "members": pool_members_record(pool, salary_path),
     }
 
@@ -5480,9 +5488,54 @@ def showdown_handedness(args, slate_dir: Path, df) -> tuple[dict, dict, dict]:
     of seven aliases in ``DK_ABBREV_REMAP``; the six FanGraphs spellings
     (``WSN`` ``TBR`` ``CHW`` ``KCR`` ``SDP`` ``SFG``) reach this same boundary
     from a pasted or FanGraphs-sourced feed.
+
+    R399(b). The bat-side map is keyed by ``(accent-folded name, DK team)`` and
+    counted the same way, because it was keyed by the feed's raw name and looked
+    up by DK's: `Luis García Jr.` against `Luis Garcia Jr.` and `Yandy Díaz`
+    against `Yandy Diaz` both missed (16 of 18 on 1830_1g_sd) and took the flat
+    1.00 with `teams_without_hand: []` and nothing naming them. A key two feed
+    hitters share with DIFFERENT sides is ambiguous and resolves to no side,
+    never a guess; every pool hitter left without a side is named in
+    ``note["hitters_without_side"]`` and on one stderr line. A warning, never a
+    refusal.
     """
     from mlb_engine.intake.live_data_adapters import to_dk_abbrev
-    note: dict = {"source": None, "hitters_with_side": 0, "teams_with_hand": 0}
+    from mlb_engine.optimize import showdown_theses as _st
+    note: dict = {"source": None, "hitters_with_side": 0, "teams_with_hand": 0,
+                  "hitters_without_side": []}
+    ambiguous_keys: set = set()
+
+    def _tally(side_map: dict) -> None:
+        """Count the pool's hitters that resolve a side and name the rest."""
+        by_key, by_name, _ = _st.index_bat_sides(side_map)
+        hitters = df
+        if len(df) and "Batting_Order" in df.columns:
+            hitters = df[df["Batting_Order"].notna()]
+        seen: set = set()
+        with_side, without = 0, []
+        for name, team in zip(hitters["Name"], hitters["Team"]) if len(hitters) else ():
+            if (name, team) in seen:
+                continue
+            seen.add((name, team))
+            if _st.lookup_bat_side(by_key, by_name, name, team):
+                with_side += 1
+            else:
+                key = _st.hitter_key(name, team)
+                without.append({
+                    "name": str(name), "team": str(team),
+                    "reason": ("ambiguous in the feed (two hitters share the key "
+                               "with different sides)" if key in ambiguous_keys
+                               else "no bat side in the feed")})
+        note["hitters_with_side"] = with_side
+        note["hitters_without_side"] = sorted(
+            without, key=lambda r: (r["team"], r["name"]))
+        if without:
+            names = ", ".join(f"{r['name']} ({r['team']})" for r in note[
+                "hitters_without_side"][:12])
+            more = len(without) - 12
+            print(f"showdown handedness: {len(without)} of {with_side + len(without)} "
+                  f"hitters have no bat side and take the flat 1.00 platoon factor: "
+                  f"{names}{f' (+{more} more)' if more > 0 else ''}", file=sys.stderr)
     feed_path = Path(args.lineups) if args.lineups else slate_dir / "lineups_feed.json"
     feed = None
     if feed_path.exists():
@@ -5498,10 +5551,11 @@ def showdown_handedness(args, slate_dir: Path, df) -> tuple[dict, dict, dict]:
             note["source"] = "fetched"
         except Exception as exc:
             note["warning"] = f"lineups feed unavailable ({exc}); platoon stays flat"
+            _tally({})
             return {}, {}, note
 
     teams = set(df["Team"].unique()) if len(df) else set()
-    bat_side: dict = {}
+    seen_sides: dict = {}
     hand: dict = {}
     for game in (feed.get("games") or []):
         for side in ("away", "home"):
@@ -5512,11 +5566,15 @@ def showdown_handedness(args, slate_dir: Path, df) -> tuple[dict, dict, dict]:
                                   or block.get("abbrev"))
             for hitter in (block.get("lineup") or []):
                 if hitter.get("bat_side") and hitter.get("name"):
-                    bat_side[str(hitter["name"])] = str(hitter["bat_side"])
+                    seen_sides.setdefault(
+                        _st.hitter_key(hitter["name"], abbrev), set()).add(
+                        str(hitter["bat_side"]).strip().upper()[:1])
             pitcher = block.get("probable_pitcher") or block.get("probable") or {}
             if abbrev and pitcher.get("hand"):
                 hand[str(abbrev)] = str(pitcher["hand"])
-    note["hitters_with_side"] = sum(1 for n in bat_side if n in set(df["Name"]))
+    ambiguous_keys.update(k for k, v in seen_sides.items() if len(v) > 1)
+    bat_side: dict = {k: next(iter(v)) for k, v in seen_sides.items() if len(v) == 1}
+    _tally(bat_side)
     note["teams_with_hand"] = len([t for t in hand if t in teams])
     # pitcher_hand is keyed by the team a hitter FACES, so invert: a hitter on
     # LAD is graded against the NYM starter's hand.
@@ -5756,7 +5814,9 @@ def resolve_captain_prior(args, slate_tag: str, df) -> tuple[dict, dict]:
 def price_showdown_pool(df, *, use_ladder: bool, bat_side: dict, pitcher_hand: dict,
                         supplied_base: dict, supplied_read: dict,
                         f1_by_player_key: dict | None = None,
-                        f1_report: dict | None = None):
+                        f1_report: dict | None = None,
+                        platoon_splits: dict | None = None,
+                        platoon_splits_read: dict | None = None):
     """The ONE place Base is finalised for a Showdown build, whichever path runs.
 
     R249. This exists as a function rather than as two call sites because the
@@ -5786,11 +5846,14 @@ def price_showdown_pool(df, *, use_ladder: bool, bat_side: dict, pitcher_hand: d
     from mlb_engine.optimize import showdown_theses as theses
 
     priced = (theses.apply_base_prior(df, bat_side=bat_side,
-                                      pitcher_hand=pitcher_hand)
+                                      pitcher_hand=pitcher_hand,
+                                      platoon_splits=platoon_splits,
+                                      platoon_splits_read=platoon_splits_read)
               if use_ladder else df)
     priced = theses.apply_f1_prior(priced, f1_by_player_key, f1_report)
     if supplied_base:
         priced = theses.apply_supplied_base(priced, supplied_base, supplied_read)
+        priced = theses.supersede_platoon_splits(priced)
     return priced
 
 
@@ -6312,6 +6375,21 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                               "projections": str(args.projections),
                               "error": str(exc)}, indent=1))
             return 4, {}
+    # R122 (solver). A captured per-hitter splits file, read here for the same
+    # reason `--projections` is: a file the operator named and the engine cannot
+    # use is a refusal before any solve, never a build that quietly fell back to
+    # the flat factor. The brief says whether it was consumed (the points-max
+    # path computes no platoon prior and says so).
+    platoon_splits: dict = {}
+    platoon_splits_read: dict = {}
+    if getattr(args, "platoon_splits", None):
+        try:
+            platoon_splits, platoon_splits_read = st.read_platoon_splits(args.platoon_splits)
+        except (OSError, ValueError) as exc:
+            print(json.dumps({"status": "platoon_splits_unreadable", "date": args.date,
+                              "platoon_splits": str(args.platoon_splits),
+                              "error": str(exc)}, indent=1))
+            return 4, {}
 
     # R381 (CC-5, R307 batch 1). Resolved here, against the MELT and before any
     # solve, for the same reason R291(c)'s exclusion block is read where it is:
@@ -6396,7 +6474,9 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                                      supplied_base=supplied_base,
                                      supplied_read=supplied_read,
                                      f1_by_player_key=f1_by_player_key,
-                                     f1_report=f1_report)
+                                     f1_report=f1_report,
+                                     platoon_splits=platoon_splits,
+                                     platoon_splits_read=platoon_splits_read)
     else:
         # R249. Same seam through the same function, with no prior to
         # bypass: on this path Base IS raw AvgPointsPerGame, so a supplied
@@ -7274,6 +7354,14 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
             "bullpen_teams": (ladder_meta.get("shape") or {}).get("bullpen_teams"),
             "platoon_unresolved_teams": list(
                 (priced.attrs.get("platoon_unresolved_teams") or [])),
+            # R122 (report). The hitters beside the teams: a bat with no side on
+            # a side whose arm resolved took the flat 1.00 and was named nowhere.
+            "platoon_unresolved_hitters": list(
+                (priced.attrs.get("platoon_unresolved_hitters") or [])),
+            # R122 (solver). Present on every ladder brief, `applied: false` when
+            # no file was given.
+            "platoon_splits": (priced.attrs.get("platoon_splits")
+                               or {"applied": False, "source": None}),
             "handedness": feed_note,
             "odds": odds_note,
             "lineups": report.get("lineups"),
@@ -7284,6 +7372,15 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         } if use_ladder else {
             "mode": "points_max_bank",
             "reason": ladder_gate_reason,
+            # R122 (solver). The points-max bank ranks on raw AvgPointsPerGame and
+            # applies no platoon prior, so a supplied splits file was NOT consumed;
+            # said here rather than left for the operator to assume it was.
+            "platoon_splits": ({
+                "applied": False, "source": platoon_splits_read.get("source"),
+                "sha256": platoon_splits_read.get("sha256"),
+                "reason": "the points-max bank applies no platoon prior, so the "
+                          "supplied splits were not used"}
+                if platoon_splits else {"applied": False, "source": None}),
             "thesis_deal": {
                 "applied": False, "changed": False,
                 "reason": ("the points-max bank carries no thesis and no side to "
@@ -9072,6 +9169,19 @@ def main() -> int:
                          "the sha256, how many players differ from APPG and the "
                          "min/median/max ratio. A labeled operator input, never "
                          "a projection this engine produced or graded.")
+    # R122 (solver). Showdown's second captured input. The engine fetches nothing;
+    # the session captures StatsAPI statSplits (sitCodes=vl,vr) into this CSV, and
+    # R402(a) owns where captures live by default, so there is no implicit path.
+    ap.add_argument("--platoon-splits", default=None,
+                    help="Showdown only: CSV of per-hitter platoon splits (name,team,"
+                         "ops_overall,pa_vs_L,ops_vs_L,pa_vs_R,ops_vs_R). Replaces the "
+                         "flat 0.94 same-handed / 1.04 opposite-handed platoon factor "
+                         "with the hitter's own OPS split against the opposing hand, "
+                         "shrunk toward that flat pattern by plate appearances (150 PA "
+                         "weighs the two equally). A hitter the file lacks keeps the "
+                         "flat factor. Used on the thesis-ladder path only; the brief "
+                         "records the path, sha256 and who took a split. A labeled "
+                         "review prior, never a projection.")
     ap.add_argument("--feed-max-age-minutes", type=float, default=90.0,
                     help="refetch a disk-cached lineups feed older than this "
                          "(default 90). Lineups confirm through the afternoon, so "
@@ -9286,6 +9396,19 @@ def main() -> int:
                      "builds its projection through the F1-F5 enrichment stack, "
                      "so a supplied Base has no defined place in it. Nothing "
                      "was staged and no run directory was created."),
+        }, indent=1))
+        return 4
+
+    if getattr(args, "platoon_splits", None) and contest != "showdown":
+        print(json.dumps({
+            "status": "platoon_splits_not_supported_on_classic",
+            "date": args.date,
+            "platoon_splits": args.platoon_splits,
+            "contest": contest,
+            "note": ("--platoon-splits feeds the Showdown base prior's platoon "
+                     "factor. Classic's platoon term is F4, which reads bat sides "
+                     "and the opposing hand and has no per-hitter split input. "
+                     "Nothing was staged and no run directory was created."),
         }, indent=1))
         return 4
 

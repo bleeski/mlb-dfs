@@ -2684,6 +2684,66 @@ def build_slate_pool(
         r["Player_ID"]: r["Team"] for r in rows if r["Player_ID"] not in pitcher_roles
     }
 
+    # R442. A TBD side's bat sides come from the platoon reference row that
+    # supplied its projected order, merged UNDER the feed's: a posted hitter's
+    # own `bat_side` wins, and only a hitter the feed gave no hand takes the
+    # reference's. Before this, `batter_hands` had one writer (the feed), so a side
+    # that had not posted had an order and no hands and F4's platoon term stayed
+    # 1.0 for it (06-03: 18 of 36 applied while the reference carried all 22 SD and
+    # PHI bats). Scoped to the hitters in the pool, and to TBD sides by
+    # construction: `build_projected_order` is built with `only_teams=tbd_teams`,
+    # so a confirmed side the feed carried no hand for is never filled from it.
+    feed_hands = extract_batter_hands(
+        lineups_feed, salary_map, _salary_game_times(salary_map))
+    reference_bats = (platoon_report or {}).get("bats_by_player_id") or {}
+    reference_hands = {
+        pid: str(reference_bats[pid]) for pid in sorted(team_by_player_id)
+        if pid in reference_bats and pid not in feed_hands
+    }
+    batter_hands = {**feed_hands, **reference_hands}
+
+    # R148(b). Per HITTER, not per side: R159(d)'s `f4_handedness_partial` counts a
+    # side's missing hands on the DK merge and names nobody, and a TBD side never
+    # reached it. This names every pool hitter F4 has no bat side for, by team.
+    hands_by_team: Dict[str, Dict[str, int]] = {}
+    hitters_without_hand: List[Dict[str, Any]] = []
+    for pid, team in sorted(team_by_player_id.items(), key=lambda kv: (kv[1], kv[0])):
+        slot = hands_by_team.setdefault(team, {
+            "hitters": 0, "from_feed": 0, "from_platoon_reference": 0,
+            "without_hand": 0})
+        slot["hitters"] += 1
+        if pid in feed_hands:
+            slot["from_feed"] += 1
+        elif pid in reference_hands:
+            slot["from_platoon_reference"] += 1
+        else:
+            slot["without_hand"] += 1
+            hitters_without_hand.append({
+                "player_id": pid, "name": by_id[pid].name if pid in by_id else "",
+                "team": team})
+    handedness_report = {
+        "hitters": len(team_by_player_id),
+        "with_hand": len(team_by_player_id) - len(hitters_without_hand),
+        "from_feed": sum(v["from_feed"] for v in hands_by_team.values()),
+        "from_platoon_reference": len(reference_hands),
+        "by_team": dict(sorted(hands_by_team.items())),
+        "hitters_without_hand": hitters_without_hand,
+        "label": "bat side per pool hitter; a hitter without one keeps F4's "
+                 "platoon term at 1.0",
+    }
+    # The one new warning is the crosswalk-failure shape, like `zero_fill_teams`:
+    # the reference supplied a side's projected order and not one bat side. A
+    # side that merely lacks some hands is the table above, not noise per team.
+    for team in platoon_used_teams:
+        counts = hands_by_team.get(team) or {}
+        if counts.get("hitters") and not (
+                counts["from_feed"] or counts["from_platoon_reference"]):
+            warnings.append(
+                f"{team}: projected order from the platoon reference but 0 bat "
+                "sides read (its rows carry no readable `bats`); F4's platoon "
+                "term stays 1.0 for the whole side"
+            )
+
     # R117(b). A probable that reaches the pool NAMED but with no MLBAM id or no
     # hand is a dead F4 wearing a live probable's clothes: the empty id fails the
     # join to the Savant pitching table so the quality term is 1.0, and the empty
@@ -2743,8 +2803,7 @@ def build_slate_pool(
         # doubleheader and a matinee build takes the night starter's F4 quality
         # and the night side's bat hands.
         "opposing_probables": opposing_probables,
-        "batter_hands": extract_batter_hands(
-            lineups_feed, salary_map, _salary_game_times(salary_map)),
+        "batter_hands": batter_hands,
         "clock": clock,
         "lock_time_by_game_id": status.get("lock_time_by_game_id"),
         "pool_report": {
@@ -2765,6 +2824,8 @@ def build_slate_pool(
             # feed still had to cover, and where DK and the feed disagreed.
             # A session reads this to know whether a fetch was needed at all.
             "dk_batting_order": dk_order_report,
+            # R442 / R148(b): bat side per pool hitter, by source, named.
+            "handedness": handedness_report,
             # R26: the bucket that stayed empty on 2026-07-28. One key, so a
             # caller checks postponement exclusions without walking teams.
             "excluded_postponed_teams": sorted(excluded_teams),
