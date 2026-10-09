@@ -49141,17 +49141,17 @@ class HandoffToolTests(unittest.TestCase):
         text = result["prompt"]
         self.assertEqual(result["session"], "77")
         self.assertTrue(text.startswith("/plan Session 77: R900: the headline is wrong"))
-        for heading in ("## 1. What to do", "## 2. How much effort",
-                        "## 3. How to verify", "## Advisor"):
+        for heading in ("\n1. What to do\n", "\n2. How much effort\n",
+                        "\n3. How to verify\n", "\nAdvisor\n"):
             self.assertIn(heading, text)
-        self.assertIn("`UT test_core.ThingTests`", text)          # verification, verbatim
+        self.assertIn("UT test_core.ThingTests", text)          # verification, verbatim
         self.assertIn("effort M; est. ~120 KB; breakpoint: (a) alone", text)
-        self.assertIn("`skills/generate-lineups/scripts/build_slate.py` (BS)", text)
+        self.assertIn("skills/generate-lineups/scripts/build_slate.py (BS)", text)
         self.assertNotIn("Why here", text)
 
     def test_the_prompt_makes_the_advisor_a_gate_on_the_plan_and_a_check_after_it(self):
         text = self._tool().build_prompt(self.ROADMAP)["prompt"]
-        before, _, after = text.partition("## Advisor")[2].partition("\n2. ")
+        before, _, after = text.partition("\nAdvisor\n")[2].partition("\n2. ")
         self.assertIn("Before you present the plan", before)
         self.assertIn("call the advisor", before)
         self.assertLess(before.index("call the advisor"), before.index("ExitPlanMode"))
@@ -49193,6 +49193,72 @@ class HandoffToolTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self._tool().build_prompt("# no next line\n")
 
+    # --- the prompt is plain text (R493) ---------------------------------
+
+    def test_the_prompt_carries_nothing_the_slash_command_line_rejects(self):
+        # Ben, 2026-10-09: "A command takes file @-mentions but no other @-mentions,
+        # slash commands, links, or inline formatting, so nothing was sent."
+        tool = self._tool()
+        noisy = self.ROADMAP.replace(
+            "fix it in `BS`.",
+            "fix it in `BS`, see **the note** at https://x.io/a and [a link](http://y), "
+            "then run /land and ask @someone").replace("Needs D-9", "- Needs D-9")
+        for roadmap in (self.ROADMAP, noisy):
+            prompt = tool.build_prompt(roadmap, base="origin/main at abc1234",
+                                       merged="merge abc1234 is on it")["prompt"]
+            self.assertEqual(tool.command_unsafe(prompt), [], prompt)
+            self.assertTrue(prompt.startswith("/plan Session 77: "))
+
+    def test_command_safe_strips_each_rejected_form_and_keeps_the_words(self):
+        safe = self._tool().command_safe
+        keep = "/plan paths stay: tests/test_core.py and origin/main"
+        cases = {
+            "/plan x `code` y": "/plan x code y",
+            "/plan **bold** word": "/plan bold word",
+            "/plan origin/main @ abc": "/plan origin/main at abc",
+            "/plan see [the doc](https://x.io/a) now": "/plan see the doc now",
+            "/plan open https://x.io/a now": "/plan open x.io/a now",
+            "/plan run /land and (/advisor)": "/plan run land and (advisor)",
+            "/plan PASS <version> <N>": "/plan PASS version N",
+            "/plan\n## 1. Heading\n- item": "/plan\n1. Heading\nitem",
+            keep: keep,
+        }
+        for raw, want in cases.items():
+            self.assertEqual(safe(raw), want, raw)
+        self.assertEqual(safe("no command `here`"), "no command here")
+
+    def test_command_unsafe_names_each_form_and_ignores_the_leading_command(self):
+        unsafe = self._tool().command_unsafe
+        self.assertEqual(unsafe("/plan plain words, tests/test_core.py, origin/main"), [])
+        for raw, name in (("/plan a `b`", "a backtick"), ("/plan **b**", "an asterisk"),
+                          ("/plan a @ b", "an at sign"), ("/plan http://x", "a link"),
+                          ("/plan [a](b)", "a link"), ("/plan <version>", "angle brackets"),
+                          ("/plan run /land", "a leading slash word"),
+                          ("/plan\n## h", "a markdown heading or bullet"),
+                          ("/plan\n- item", "a markdown heading or bullet")):
+            self.assertIn(name, unsafe(raw), raw)
+
+    def test_main_warns_when_anything_unsafe_survives_the_prompt(self):
+        _, _, work = self._scenario()
+        tool = self._tool()
+        err = io.StringIO()
+        with unittest.mock.patch.object(tool, "command_safe", lambda text: text), \
+                contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(err):
+            tool.main(["--root", str(work), "prompt"])
+        self.assertIn("still carries a backtick", err.getvalue())
+        err = io.StringIO()
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(err):
+            tool.main(["--root", str(work), "prompt"])
+        self.assertNotIn("still carries", err.getvalue())
+
+    def test_the_base_line_says_at_not_the_at_sign(self):
+        _, _, work = self._scenario()
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+            self._tool().main(["--root", str(work), "prompt"])
+        self.assertRegex(out.getvalue(), r"Base: origin/main at [0-9a-f]{7}\.")
+        self.assertNotIn("@", out.getvalue())
+
     def test_the_fence_outgrows_any_backtick_run_in_the_body(self):
         fence = self._tool().fence
         self.assertTrue(fence("plain").startswith("```text\n"))
@@ -49207,7 +49273,7 @@ class HandoffToolTests(unittest.TestCase):
             code = self._tool().main(["--root", str(work), "prompt"])
         self.assertEqual(code, 0)
         self.assertIn("/plan Session 77:", out.getvalue())
-        self.assertIn("origin/main @", out.getvalue())
+        self.assertIn("origin/main at", out.getvalue())
 
     def test_an_unreadable_origin_main_is_a_warning_not_a_silent_fallback(self):
         _, _, work = self._scenario()
@@ -49234,11 +49300,12 @@ class HandoffToolTests(unittest.TestCase):
         self.assertEqual(result["session"], tool.next_session(text))
         prompt = result["prompt"]
         self.assertTrue(prompt.startswith(f"/plan Session {result['session']}: "))
-        for heading in ("## 1. What to do", "## 2. How much effort",
-                        "## 3. How to verify", "## Advisor"):
+        for heading in ("\n1. What to do\n", "\n2. How much effort\n",
+                        "\n3. How to verify\n", "\nAdvisor\n"):
             self.assertIn(heading, prompt)
         self.assertIn("Reasoning effort:", prompt)
         self.assertNotIn("NONE STATED", prompt)
+        self.assertEqual(tool.command_unsafe(prompt), [])
 
 
 class BulkArmMatchupTests(unittest.TestCase):
