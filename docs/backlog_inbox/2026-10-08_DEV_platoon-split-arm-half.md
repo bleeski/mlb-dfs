@@ -1,0 +1,9 @@
+# 2026-10-08 DEV (Session 33): R122's arm half, the opposing arm's own shrunk split, was not built
+
+**What shipped, and what did not.** Session 33 built the HITTER half of R122's rider: `--platoon-splits` replaces the flat 0.94 / 1.04 with `clip(w * ops_vs / ops_overall + (1 - w) * flat, 0.80, 1.20)`, `w = pa_vs / (pa_vs + 150)` (the rider's correction (1): shrink toward the league pattern, not toward 1.0). The rider's correction (2) is NOT built: the ARM's own split against the hitter's bat side, "shrunk beside the hitter's", with "a shrunk arm split that inverts the flat sign wins".
+
+**Why it was left.** It needs a second capture (the arm's `statSplits` against LHB and RHB), and the rider does not say how the two terms combine into one multiplier. The two evidence terms overlap (a hitter's split against LHP already reflects the LHP arms he faced), so a product double-counts and the right combination is a decision, not a transcription. The hitter-only evidence (the original 1940_1g_sd table: Turang, Pratt, Crow-Armstrong, Vaughn) does not need it.
+
+**The caution to carry.** The rider's v2 measurement: shrinking the batter by PA and reading each arm's vs-side OPS off 91-92 BF UNSHRUNK sent Hector Rodriguez (99 season PA, .600 vs LHP in 25 PA) from 1 to 4 of 9 and Alex Call to 5 of 9, a 55.6% realized exposure against the 50% cap with `counted_relaxations.clean: false`. A ranking repair became a cap breach through the one term nobody shrank. Whoever builds the arm half shrinks it by BF with the same constant and measures the cap before shipping.
+
+**Acceptance shape.** The arm's columns in the captured CSV (`bf_vs_L`, `ops_vs_L`, `bf_vs_R`, `ops_vs_R`, `ops_overall_allowed`), one stated combination rule with its reason, `PerHitterPlatoonTests` extended, and a run on a Showdown fixture that reports `counted_relaxations` before and after. No ROI, edge or win-rate claim: an OPS ratio is a review prior.

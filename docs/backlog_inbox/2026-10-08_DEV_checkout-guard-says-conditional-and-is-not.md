@@ -1,0 +1,7 @@
+# 2026-10-08 DEV (Session 33): the `git checkout` guard's message says "while any claim you do not own is live" and the guard is unconditional
+
+**Observed.** On 2026-10-08 `git checkout -b claude/session-33-...` was denied with `CLAUDE.md multi-session contract: no git checkout while any claim you do not own is live` while the only held claim was this session's own (`python tools/claim.py check`: `HELD engine_2026-10-08 role=DEV`, everything else `released`). `git switch -c <branch>` (which creates a branch from HEAD without rewriting the tree) was allowed.
+
+**Mechanism (read in `.claude/hooks/guard_commands.py:253-255`).** `judge_segment` returns the deny for any subcommand in `GIT_BANNED_SUBCOMMANDS` without consulting `claims/`. The message promises a condition the code never evaluates, so the guard answers the same whatever the world holds, which is the false-signal shape R148(a) names.
+
+**Two honest fixes, Ben's choice.** (1) Make the guard conditional as worded: read `claims/*/owner.json`, deny only when a live claim's role or session is not this one's. (2) Keep it unconditional and reword the message ("`git checkout` is denied outright; use `git switch -c` to branch, `git restore` is banned too"), and name the allowed alternative in `/ship` and `/dev-session`, which today tell the session to "branch" without saying how. (2) is the smaller change and matches what the hook does.

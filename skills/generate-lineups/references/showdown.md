@@ -117,6 +117,21 @@ With a prior read, the sleeve's selector form works:
   edge, an ROI, a win rate or a probability, and R225 comes before any
   first-place read: large-field Showdown is about half duplicates.
 
+## The per-hitter platoon split (R122)
+
+The ladder's base prior takes a flat 0.94 same-handed / 1.04 opposite-handed platoon factor,
+which pointed the wrong way often enough to move a captain on 1940_1g_sd. `--platoon-splits <csv>`
+(Showdown only, thesis-ladder path only, no default path: R402(a) owns capture locations) replaces
+it, for a hitter whose side and opposing hand both resolve and whose row has a sample against that
+hand, with `clip(w * ops_vs / ops_overall + (1 - w) * flat, 0.80, 1.20)`, `w = pa_vs / (pa_vs + 150)`:
+his own split, pulled toward the flat league pattern by how little of it there is. A hitter the file
+lacks keeps the flat factor, so a build without the file is unchanged. Columns (any case):
+`name, team, ops_overall, pa_vs_L, ops_vs_L, pa_vs_R, ops_vs_R`. The session captures them with its
+web tool (StatsAPI `statSplits`, `sitCodes=vl,vr`, ~20 s for 18 bats); the engine fetches nothing,
+and an unusable file is an exit-4 refusal before any solve. The brief's `construction.platoon_splits`
+names the file, its sha256 and who took a split. A review prior from an OPS ratio, never a projection.
+The arm's own split is not wired (filed).
+
 ## Status, stated plainly
 
 `mlb_engine/optimize/showdown.py` is `VERSION = "0.3-review"`, and

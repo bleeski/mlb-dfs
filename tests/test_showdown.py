@@ -6788,8 +6788,8 @@ class R382CaptainPriorWiringTests(unittest.TestCase):
                         n += 1
                 counts[fn.name] = n
         total = sum(counts.values())
-        self.assertIn(f"# EXIT 4, TWENTY sites", self.src)
-        self.assertEqual(total, 20, counts)
+        self.assertIn(f"# EXIT 4, TWENTY-TWO sites", self.src)
+        self.assertEqual(total, 22, counts)
         self.assertIn(f"run_showdown:{counts['run_showdown']}, "
                       f"main:{counts['main']})", self.src)
 
@@ -8980,3 +8980,227 @@ class PerHitterPlatoonTests(_ShowdownExitDoorHarness, unittest.TestCase):
         self.assertEqual([left_out], [x["name"] for x in handed["hitters_without_side"]])
         self.assertEqual(len(hitters) - 1, handed["hitters_with_side"],
                          "the accented name resolves through the real door")
+
+    # ---- R122 (solver): the per-hitter shrunk split ------------------------ #
+
+    @staticmethod
+    def _split(name, team, overall, pa_l=None, ops_l=None, pa_r=None, ops_r=None):
+        return {"name": name, "team": team, "ops_overall": overall, "pa_vs_L": pa_l,
+                "ops_vs_L": ops_l, "pa_vs_R": pa_r, "ops_vs_R": ops_r}
+
+    def _splits_csv(self, rows, header=None, name="splits.csv"):
+        header = header or "name,team,ops_overall,pa_vs_L,ops_vs_L,pa_vs_R,ops_vs_R"
+        path = Path(tempfile.mkdtemp()) / name
+        self.addCleanup(shutil.rmtree, path.parent, True)
+        path.write_text("\n".join([header, *rows]) + "\n", encoding="utf-8")
+        return path
+
+    def test_the_shrunk_factor_at_the_ends_and_the_middle(self):
+        rec = self._split("A", "T", 0.800, pa_l=150, ops_l=0.600)
+        got = st.split_platoon_factor(rec, "L", 0.94)
+        # 150 PA is the point where the hitter's own split and the league pattern weigh
+        # the same: w = 0.5, r = 0.75, so 0.5 * 0.75 + 0.5 * 0.94.
+        self.assertAlmostEqual(0.845, got["factor"], places=9)
+        self.assertAlmostEqual(0.5, got["weight"], places=9)
+        big = st.split_platoon_factor(self._split("A", "T", 0.800, pa_l=1.5e9, ops_l=0.880), "L", 0.94)
+        self.assertAlmostEqual(1.10, big["factor"], places=6, msg="a huge sample IS his split")
+        self.assertIsNone(st.split_platoon_factor(self._split("A", "T", 0.8, pa_l=0, ops_l=0.9), "L", 0.94),
+                          "no plate appearances against the hand: the flat factor stands")
+        self.assertIsNone(st.split_platoon_factor(rec, "R", 0.94),
+                          "a blank cell for the other hand is no evidence, not a zero")
+        high = st.split_platoon_factor(self._split("A", "T", 0.5, pa_l=1e6, ops_l=2.0), "L", 0.94)
+        low = st.split_platoon_factor(self._split("A", "T", 0.9, pa_l=1e6, ops_l=0.1), "L", 0.94)
+        self.assertEqual((1.2, 0.8), (high["factor"], low["factor"]), "the 0.80 / 1.20 clip binds")
+
+    def test_1940_shaped_hitters_move_the_way_the_evidence_points(self):
+        """The 1940_1g_sd table: both starters LHP, 100+ PA of 2026 against LHP on nearly
+        every bat. The flat factor was directionally wrong for Pratt, Crow-Armstrong and
+        the like; the shrunk split flips the sign where the evidence is real and leaves
+        Pratt's 48 PA mostly on the league pattern."""
+        rows = [("Brice Turang", "MIL", "CHC"), ("Cooper Pratt", "MIL", "CHC"),
+                ("Andrew Vaughn", "MIL", "CHC"), ("Pete Crow-Armstrong", "CHC", "MIL")]
+        df = self._frame(rows)
+        sides = {"Brice Turang": "L", "Cooper Pratt": "R", "Andrew Vaughn": "R",
+                 "Pete Crow-Armstrong": "L"}
+        bat = {st.hitter_key(n, t): sides[n] for n, t, _o in rows}
+        hand = {"CHC": "L", "MIL": "L"}
+        splits = {
+            st.hitter_key("Brice Turang", "MIL"): self._split(
+                "Brice Turang", "MIL", 0.700, pa_l=167, ops_l=0.530),
+            st.hitter_key("Cooper Pratt", "MIL"): self._split(
+                "Cooper Pratt", "MIL", 0.700, pa_l=48, ops_l=0.465),
+            st.hitter_key("Andrew Vaughn", "MIL"): self._split(
+                "Andrew Vaughn", "MIL", 0.800, pa_l=110, ops_l=1.009),
+            st.hitter_key("Pete Crow-Armstrong", "CHC"): self._split(
+                "Pete Crow-Armstrong", "CHC", 0.850, pa_l=201, ops_l=0.978)}
+        flat = st.apply_base_prior(df, bat_side=bat, pitcher_hand=hand)
+        out = st.apply_base_prior(df, bat_side=bat, pitcher_hand=hand, platoon_splits=splits,
+                                  platoon_splits_read={"source": "x", "sha256": "y"})
+        ratio = (out.set_index("Name")["Base_Prior"] / flat.set_index("Name")["Base_Prior"])
+        # factor / flat: the flat factors are 0.94 (L vs L), 1.04 (R vs L).
+        got = {n: float(ratio[n]) * f for n, f in (("Brice Turang", 0.94), ("Cooper Pratt", 1.04),
+                                                   ("Andrew Vaughn", 1.04),
+                                                   ("Pete Crow-Armstrong", 0.94))}
+        self.assertAlmostEqual(0.8437, got["Brice Turang"], places=3)
+        self.assertLess(got["Brice Turang"], 0.94, "under-penalised by the flat factor")
+        self.assertLess(got["Cooper Pratt"], 1.0, "the wrong-sign case turns over")
+        self.assertGreater(got["Cooper Pratt"], 0.9, "but 48 PA is mostly the league pattern")
+        self.assertGreater(got["Andrew Vaughn"], 1.04, "under-credited by the flat factor")
+        self.assertGreater(got["Pete Crow-Armstrong"], 1.0, "a lefty on the wrong side of 1.0")
+        report = out.attrs["platoon_splits"]
+        self.assertTrue(report["applied"])
+        self.assertEqual(4, report["hitters_with_split"])
+        self.assertEqual((150, [0.8, 1.2]), (report["shrink_pa"], report["clip"]))
+        self.assertEqual("y", report["sha256"])
+        self.assertEqual({"Andrew Vaughn", "Brice Turang", "Cooper Pratt", "Pete Crow-Armstrong"},
+                         {r["name"] for r in report["split_hitters"]})
+
+    def test_no_file_is_byte_identical_to_the_flat_prior_and_says_not_applied(self):
+        raw = sd.melt_showdown_salary_csv(SAL)
+        hitters = raw[raw["Batting_Order"].notna()]
+        bat = {st.hitter_key(n, t): ("L" if i % 2 else "R")
+               for i, (n, t) in enumerate(zip(hitters["Name"], hitters["Team"]))}
+        hand = {"MIN": "R", "CHC": "L"}
+        base = st.apply_base_prior(raw, bat_side=bat, pitcher_hand=hand)
+        for none_like in (None, {}):
+            again = st.apply_base_prior(raw, bat_side=bat, pitcher_hand=hand,
+                                        platoon_splits=none_like)
+            pd.testing.assert_frame_equal(base, again)
+        self.assertEqual({"applied": False, "source": None}, base.attrs["platoon_splits"])
+
+    def test_a_hitter_without_evidence_keeps_the_flat_factor_and_an_unresolved_one_is_not_rescued(self):
+        rows = [("Has Split", "WSH", "NYY"), ("Not In File", "WSH", "NYY"),
+                ("No Plate Apps", "WSH", "NYY"), ("No Side Known", "WSH", "NYY"),
+                ("Other Hand Only", "WSH", "NYY")]
+        df = self._frame(rows)
+        bat = {st.hitter_key(n, t): "R" for n, t, _o in rows if n != "No Side Known"}
+        hand = {"NYY": "R"}                          # WSH hitters face NYY's arm: R
+        splits = {
+            st.hitter_key("Has Split", "WSH"): self._split("Has Split", "WSH", 0.7, pa_r=300, ops_r=0.9),
+            st.hitter_key("No Plate Apps", "WSH"): self._split("No Plate Apps", "WSH", 0.7, pa_r=0, ops_r=0.9),
+            st.hitter_key("No Side Known", "WSH"): self._split("No Side Known", "WSH", 0.7, pa_r=300, ops_r=0.9),
+            st.hitter_key("Other Hand Only", "WSH"): self._split("Other Hand Only", "WSH", 0.7, pa_l=300, ops_l=0.9)}
+        flat = st.apply_base_prior(df, bat_side=bat, pitcher_hand=hand)
+        out = st.apply_base_prior(df, bat_side=bat, pitcher_hand=hand, platoon_splits=splits)
+        same = out.set_index("Name")["Base_Prior"] == flat.set_index("Name")["Base_Prior"]
+        self.assertEqual({"Has Split": False, "Not In File": True, "No Plate Apps": True,
+                          "No Side Known": True, "Other Hand Only": True}, same.to_dict())
+        rep = out.attrs["platoon_splits"]
+        self.assertEqual((1, 3, 1), (rep["hitters_with_split"], rep["hitters_flat"],
+                                     rep["hitters_unresolved"]))
+        self.assertEqual(["No Side Known"],
+                         [r["name"] for r in out.attrs["platoon_unresolved_hitters"]])
+
+    def test_the_factor_reaches_base_and_the_solver(self):
+        """`Base` is what the ladder solver reads, so the factor has to be in it, and a
+        hitter the evidence crushes has to be able to leave the lineup."""
+        raw = sd.melt_showdown_salary_csv(SAL)
+        hitters = raw[raw["Batting_Order"].notna()]
+        bat = {st.hitter_key(n, t): "R" for n, t in zip(hitters["Name"], hitters["Team"])}
+        hand = {"MIN": "L", "CHC": "L"}
+        flat = st.apply_base_prior(raw, bat_side=bat, pitcher_hand=hand)
+        before = sd.build_showdown_lineup(flat)
+        hit_names = set(hitters["Name"])
+        target = next(p for p in before["players"] if p["name"] in hit_names)
+        key = st.hitter_key(target["name"], target["team"])
+        crush = {key: self._split(target["name"], target["team"], 0.800,
+                                  pa_l=1000, ops_l=0.300, pa_r=1000, ops_r=0.300)}
+        out = st.apply_base_prior(raw, bat_side=bat, pitcher_hand=hand, platoon_splits=crush)
+        row = out.loc[out["Name"] == target["name"]].iloc[0]
+        was = float(flat.loc[flat["Name"] == target["name"], "Base"].iloc[0])
+        self.assertEqual(float(row["Base_Prior"]), float(row["Base"]))
+        self.assertAlmostEqual(0.80 / 1.04, float(row["Base"]) / was, places=9)
+        after = sd.build_showdown_lineup(out)
+        self.assertNotIn(target["name"], [p["name"] for p in after["players"]],
+                         "the solver no longer takes the hitter the evidence crushed")
+        self.assertEqual(len(before["players"]), len(after["players"]))
+
+    def test_the_reader_refuses_by_name_and_joins_on_the_folded_name_and_dk_team(self):
+        with self.assertRaises(FileNotFoundError):
+            st.read_platoon_splits(Path(tempfile.gettempdir()) / "no_such_splits_file.csv")
+        with self.assertRaises(ValueError) as ctx:
+            st.read_platoon_splits(self._splits_csv(["A One,WSH,0.7,10,0.7"],
+                                                    header="name,team,ops_overall,pa_vs_L,ops_vs_L"))
+        self.assertIn("pa_vs_r", str(ctx.exception))
+        for bad, why in (("A One,WSH,nan,10,0.7,10,0.7", "not a finite"),
+                         ("A One,WSH,0.7,-5,0.7,10,0.7", "negative"),
+                         ("A One,WSH,0.7,ten,0.7,10,0.7", "not a number")):
+            with self.assertRaises(ValueError) as ctx:
+                st.read_platoon_splits(self._splits_csv([bad]))
+            self.assertIn(why, str(ctx.exception))
+            self.assertIn("A One (WSH)", str(ctx.exception))
+        with self.assertRaises(ValueError) as ctx:
+            st.read_platoon_splits(self._splits_csv(["A One,WSH,0.7,10,0.7,10,0.7",
+                                                     "A One,WSH,0.8,10,0.8,10,0.8"]))
+        self.assertIn("duplicate", str(ctx.exception))
+        with self.assertRaises(ValueError) as ctx:
+            st.read_platoon_splits(self._splits_csv(["A One,WSH,,10,0.7,10,0.7"]))
+        self.assertIn("no usable rows", str(ctx.exception))
+        path = self._splits_csv([
+            "Luis García Jr.,WSH,0.700,167,0.530,300,0.720",     # accented, a blank-free row
+            "Yandy Díaz,TBR,0.800,,,200,0.850",                   # a FanGraphs team code, no vs-L
+            "Skipped Man,WSH,,10,0.7,10,0.7"])                        # no overall OPS: skipped
+        by_key, report = st.read_platoon_splits(path)
+        import hashlib
+        self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(), report["sha256"])
+        self.assertEqual((2, 1), (report["rows_usable"], report["rows_skipped"]))
+        self.assertIn(st.hitter_key("Luis Garcia Jr.", "WSH"), by_key,
+                      "the DK spelling finds the captured accented row")
+        self.assertIn(st.hitter_key("Yandy Diaz", "TB"), by_key, "TBR is DK-coded TB")
+        self.assertIsNone(by_key[st.hitter_key("Yandy Diaz", "TB")]["pa_vs_L"])
+
+    def test_the_real_door_consumes_the_file_and_says_so_and_refuses_a_bad_one(self):
+        raw = sd.melt_showdown_salary_csv(SAL)
+        hitters = raw[raw["Batting_Order"].notna()]
+        by_team = {t: list(g["Name"]) for t, g in hitters.groupby("Team")}
+        teams = sorted(by_team)
+        feed = {"games": [self._game(
+            teams[0], [{"name": n, "bat_side": "L" if i % 2 else "R"}
+                       for i, n in enumerate(by_team[teams[0]])],
+            teams[1], [{"name": n, "bat_side": "L" if i % 2 else "R"}
+                       for i, n in enumerate(by_team[teams[1]])])]}
+        root = self._root()
+        feed_path = root / "feed.json"
+        feed_path.write_text(json.dumps(feed), encoding="utf-8")
+        rows = [f"{n},{t},0.750,150,0.600,150,0.700" for t in teams for n in by_team[t][:3]]
+        splits = self._splits_csv(rows)
+        r = self._build(root, args_extra={"lineups": str(feed_path),
+                                          "platoon_splits": str(splits)})
+        self.assertEqual(0, r.code, r.err[-3000:])
+        block = r.brief["construction"]["platoon_splits"]
+        import hashlib
+        self.assertTrue(block["applied"])
+        self.assertEqual(hashlib.sha256(splits.read_bytes()).hexdigest(), block["sha256"])
+        self.assertEqual(6, block["hitters_with_split"])
+        self.assertEqual({"label", "split_hitters"} <= set(block), True)
+        # No file: the block is present and says not applied.
+        r2 = self._build(self._root("again"), args_extra={"lineups": str(feed_path)})
+        self.assertEqual({"applied": False, "source": None},
+                         r2.brief["construction"]["platoon_splits"])
+        # An unusable file is an exit-4 refusal before any solve, never a quiet fallback.
+        bad = self._splits_csv(["A One,WSH,nan,10,0.7,10,0.7"], name="bad.csv")
+        r3 = self._build(self._root("bad"), args_extra={"lineups": str(feed_path),
+                                                        "platoon_splits": str(bad)})
+        self.assertEqual(4, r3.code)
+        self.assertIn("platoon_splits_unreadable", r3.out)
+        self.assertIn("not a finite number", r3.out)
+
+    def test_a_classic_build_refuses_the_flag_before_anything_is_staged(self):
+        mod = self._module()
+        root = self._root()
+        sal, ent = root / "DKSalaries.csv", root / "DKEntries.csv"
+        shutil.copy2(SAL, sal)
+        shutil.copy2(ENT, ent)
+        splits = self._splits_csv(["A One,WSH,0.7,10,0.7,10,0.7"])
+        argv = ["build_slate.py", "--date", self._DATE, "--salary", str(sal),
+                "--entries", str(ent), "--platoon-splits", str(splits)]
+        out = io.StringIO()
+        with unittest.mock.patch.object(sys, "argv", argv), \
+                unittest.mock.patch.object(mod, "detect_contest_type", lambda *_a, **_k: "classic"), \
+                unittest.mock.patch.object(mod, "REPO", root), \
+                contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+            code = mod.main()
+        self.assertEqual(4, code)
+        self.assertEqual("platoon_splits_not_supported_on_classic", json.loads(out.getvalue())["status"])
+        self.assertEqual(["DKEntries.csv", "DKSalaries.csv"], sorted(p.name for p in root.iterdir()),
+                         "nothing was staged and no run directory was created")

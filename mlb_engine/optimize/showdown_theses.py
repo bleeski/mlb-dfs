@@ -142,11 +142,142 @@ def lookup_bat_side(by_key: Mapping[tuple, str], by_name: Mapping[str, str],
 
 
 # --------------------------------------------------------------------------- #
+# Per-hitter platoon split (R122, solver half)
+# --------------------------------------------------------------------------- #
+#: The sample, in plate appearances, at which a hitter's own split and the league
+#: platoon pattern weigh the same. The rider's rule: a platoon term read off fewer
+#: than ~150 observations is shrunk toward the league pattern, not toward 1.0, and
+#: the population effect is not zero (0.94 same-handed / 1.04 opposite is that
+#: pattern). A labeled prior, never fitted to a slate.
+PLATOON_SPLIT_SHRINK_PA = 150
+PLATOON_SPLIT_CLIP = (0.80, 1.20)
+
+_SPLIT_REQUIRED = ("name", "team", "ops_overall", "pa_vs_l", "ops_vs_l", "pa_vs_r", "ops_vs_r")
+
+
+def read_platoon_splits(path) -> tuple[Dict[tuple, Dict[str, Any]], Dict[str, Any]]:
+    """Read a captured per-hitter platoon-splits CSV. Returns (by_key, report).
+
+    Columns, matched case-insensitively: ``name, team, ops_overall, pa_vs_L,
+    ops_vs_L, pa_vs_R, ops_vs_R`` (``bats`` and ``pa_overall`` are accepted and
+    unused: the bat side comes from the feed). The engine reads captured bytes and
+    fetches nothing; the session captures them (StatsAPI ``statSplits`` with
+    ``sitCodes=vl,vr``). Keyed by ``hitter_key`` (accent-folded name, DK team).
+
+    R242's rule, as ``read_supplied_base`` states it: a file the operator named
+    and the engine could not use is an ERROR, never an empty map. A missing file,
+    a missing required column, a non-finite or negative number, a duplicate
+    hitter and an empty result are each refused by name. A blank per-hand cell is
+    not an error: that hand has no evidence for the hitter and he keeps the flat
+    factor against it; a blank ``ops_overall`` skips the row, counted.
+    """
+    import csv
+    import hashlib
+    import math
+    from pathlib import Path
+
+    from mlb_engine.team_codes import to_dk_abbrev
+
+    p = Path(path)
+    if not p.exists():
+        raise FileNotFoundError(f"platoon splits file not found: {p}")
+    raw = p.read_bytes()
+    sha = hashlib.sha256(raw).hexdigest()
+    reader = csv.DictReader(raw.decode("utf-8-sig", errors="replace").splitlines())
+    header = [(h or "").strip().lower() for h in (reader.fieldnames or [])]
+    missing = [c for c in _SPLIT_REQUIRED if c not in header]
+    if missing:
+        raise ValueError(f"platoon splits file {p} lacks column(s) {missing}; needs "
+                         f"{list(_SPLIT_REQUIRED)}")
+    out: Dict[tuple, Dict[str, Any]] = {}
+    skipped = 0
+    rejected: list[str] = []
+    duplicated: list[str] = []
+
+    def number(cell, what, who):
+        text = str(cell if cell is not None else "").strip()
+        if text == "":
+            return None
+        try:
+            value = float(text)
+        except ValueError:
+            rejected.append(f"{who} {what}={text!r} (not a number)")
+            return "bad"
+        if not math.isfinite(value):
+            rejected.append(f"{who} {what}={text!r} (not a finite number)")
+            return "bad"
+        if value < 0:
+            rejected.append(f"{who} {what}={text!r} (negative)")
+            return "bad"
+        return value
+
+    for row in reader:
+        lower = {(k or "").strip().lower(): v for k, v in row.items()}
+        name = str(lower.get("name") or "").strip()
+        team = to_dk_abbrev(str(lower.get("team") or "").strip().upper())
+        if not name or not team:
+            skipped += 1
+            continue
+        who = f"{name} ({team})"
+        vals = {c: number(lower.get(c), c, who) for c in _SPLIT_REQUIRED[2:]}
+        if "bad" in vals.values():
+            continue
+        if vals["ops_overall"] is None or vals["ops_overall"] <= 0:
+            skipped += 1
+            continue
+        key = hitter_key(name, team)
+        if key in out:
+            duplicated.append(who)
+            continue
+        out[key] = {"name": name, "team": team, "ops_overall": vals["ops_overall"],
+                    "pa_vs_L": vals["pa_vs_l"], "ops_vs_L": vals["ops_vs_l"],
+                    "pa_vs_R": vals["pa_vs_r"], "ops_vs_R": vals["ops_vs_r"]}
+    if rejected or duplicated:
+        detail = "; ".join(rejected[:10])
+        if duplicated:
+            detail += (" ; " if detail else "") + f"duplicate hitter: {sorted(set(duplicated))[:10]}"
+        raise ValueError(
+            f"platoon splits file {p} carries {len(rejected) + len(duplicated)} unusable "
+            f"row(s): {detail}. The splits move a hitter's price, so a bad row is refused "
+            "rather than carried into the solve")
+    if not out:
+        raise ValueError(f"platoon splits file {p} carried no usable rows ({skipped} "
+                         "skipped); refusing rather than building without the input "
+                         "that was asked for")
+    return out, {"source": str(p), "sha256": sha, "rows_usable": len(out),
+                 "rows_skipped": skipped}
+
+
+def split_platoon_factor(rec: Mapping[str, Any], opp_hand: str, flat: float) -> Optional[Dict[str, Any]]:
+    """The shrunk per-hitter platoon factor against ``opp_hand``, or None.
+
+    ``w = pa_vs / (pa_vs + K)``, ``r = ops_vs / ops_overall``, factor
+    ``clip(w * r + (1 - w) * flat)``: his own split, pulled toward the league
+    platoon pattern (``flat``: 0.94 same-handed, 1.04 opposite, 1.00 switch) by how
+    little of it there is. None when the row has no evidence against this hand, or
+    no plate appearances against it (``w`` would be 0: the flat factor stands).
+    """
+    pa = rec.get(f"pa_vs_{opp_hand}")
+    ops = rec.get(f"ops_vs_{opp_hand}")
+    overall = rec.get("ops_overall")
+    if pa is None or ops is None or not overall or pa <= 0:
+        return None
+    w = float(pa) / (float(pa) + PLATOON_SPLIT_SHRINK_PA)
+    ratio = float(ops) / float(overall)
+    low, high = PLATOON_SPLIT_CLIP
+    factor = min(high, max(low, w * ratio + (1.0 - w) * flat))
+    return {"factor": factor, "weight": w, "ratio": ratio, "pa_vs": float(pa),
+            "ops_vs": float(ops), "ops_overall": float(overall), "flat": flat}
+
+
+# --------------------------------------------------------------------------- #
 # Base prior
 # --------------------------------------------------------------------------- #
 def apply_base_prior(df: pd.DataFrame,
                      bat_side: Optional[Mapping[Any, str]] = None,
-                     pitcher_hand: Optional[Mapping[str, str]] = None) -> pd.DataFrame:
+                     pitcher_hand: Optional[Mapping[str, str]] = None,
+                     platoon_splits: Optional[Mapping[tuple, Mapping[str, Any]]] = None,
+                     platoon_splits_read: Optional[Mapping[str, Any]] = None) -> pd.DataFrame:
     """Replace Base (raw AvgPointsPerGame) with a labeled prior:
     salary-regressed APPG x batting-order PA factor x platoon factor.
 
@@ -167,6 +298,16 @@ def apply_base_prior(df: pd.DataFrame,
     18). ``bat_side`` is keyed by ``hitter_key`` (name AND team) or by a plain name;
     see ``index_bat_sides``. A switch hitter resolves to a flat 1.00 on purpose and
     is not unresolved.
+
+    R122 (solver). ``platoon_splits`` (``read_platoon_splits``) replaces the flat
+    0.94 / 1.04 / 1.00 with the hitter's OWN split, shrunk toward that flat league
+    pattern by plate appearances (``split_platoon_factor``), for a hitter whose side
+    and opposing hand both resolve and whose row carries a sample against that
+    hand. Everyone else keeps the flat factor, so no file, or a hitter the file
+    lacks, is byte-identical to the older behavior. The flat factor pointed the
+    wrong way often enough to move a captain on 1940_1g_sd (Turang L, .530 OPS in
+    167 PA against LHP, took the same 0.94 as every lefty and held a captain slot).
+    A review prior built from an OPS ratio: not a projection, a rate, or an edge.
     """
     out = df.copy()
     by_key, by_name, _ambiguous = index_bat_sides(bat_side)
@@ -184,6 +325,9 @@ def apply_base_prior(df: pd.DataFrame,
 
     unresolved: set[str] = set()
     unresolved_hitters: list[dict] = []
+    split_index = dict(platoon_splits or {})
+    basis_counts = {"split": 0, "flat": 0, "unresolved": 0}
+    split_hitters: list[dict] = []
 
     def prior(row):
         if pd.isna(row["Batting_Order"]):
@@ -204,6 +348,18 @@ def apply_base_prior(df: pd.DataFrame,
             f_plat = 0.94
         else:                                                # opposite hands: edge
             f_plat = 1.04
+        basis = "unresolved" if (not side or not opp_hand) else "flat"
+        if split_index and side and opp_hand:
+            rec = split_index.get(hitter_key(row["Name"], row.get("Team")))
+            shrunk = split_platoon_factor(rec, opp_hand, f_plat) if rec else None
+            if shrunk is not None:
+                split_hitters.append({
+                    "name": str(row["Name"]), "team": str(row.get("Team") or ""),
+                    "bats": side, "opp_hand": opp_hand, "pa_vs": shrunk["pa_vs"],
+                    "ops_vs": shrunk["ops_vs"], "ops_overall": shrunk["ops_overall"],
+                    "flat": f_plat, "factor": round(shrunk["factor"], 6)})
+                f_plat, basis = shrunk["factor"], "split"
+        basis_counts[basis] += 1
         return blended * f_order * f_plat
 
     out["Base_Prior"] = out.apply(prior, axis=1)
@@ -211,6 +367,22 @@ def apply_base_prior(df: pd.DataFrame,
     out.attrs["platoon_unresolved_teams"] = sorted(unresolved)
     out.attrs["platoon_unresolved_hitters"] = sorted(
         unresolved_hitters, key=lambda r: (r["team"], r["name"]))
+    # Present on every call, `applied: False` when no file was given: absent is not
+    # an answer to "did the platoon term read the hitter's own split".
+    read = dict(platoon_splits_read or {})
+    out.attrs["platoon_splits"] = ({
+        "applied": True, "source": read.get("source"), "sha256": read.get("sha256"),
+        "rows_usable": read.get("rows_usable", len(split_index)),
+        "rows_skipped": read.get("rows_skipped"),
+        "hitters_with_split": basis_counts["split"],
+        "hitters_flat": basis_counts["flat"],
+        "hitters_unresolved": basis_counts["unresolved"],
+        "shrink_pa": PLATOON_SPLIT_SHRINK_PA, "clip": list(PLATOON_SPLIT_CLIP),
+        "split_hitters": sorted(split_hitters, key=lambda r: (r["team"], r["name"])),
+        "label": "a hitter's own OPS split against the opposing hand, shrunk toward "
+                 "the flat league pattern by plate appearances; a review prior, never "
+                 "a projection, rate or edge",
+    } if split_index else {"applied": False, "source": None})
     return out
 
 
