@@ -49390,6 +49390,66 @@ class BulkArmMatchupTests(unittest.TestCase):
                 salary, pool_lineups_feed(t4_confirmed=True), declared_pitchers=declared)
         self.assertEqual(pool["opposing_probables"]["T3"]["name"], "T4 Pen1")
 
+    def test_a_feed_record_that_already_names_the_bulk_arm_stands_whole(self):
+        """The feed names the PLR (id 777001, hand L) and the operator declares him
+        the bulk arm, the remedy the PLR blocker offers: replacing his complete
+        record with an id-less one would lose the exact Savant join and the
+        platoon term, and "a feed names the opener" would be false."""
+        feed = pool_lineups_feed(t4_confirmed=True)
+        feed["games"][1]["home"]["probable_pitcher"] = {
+            "name": "T4 Pen1", "hand": "L", "id": 777001}
+        _p, ids = self._pool({"T4 Ace": ("PO", 4000)})
+        pool, _ = self._pool({"T4 Ace": ("PO", 4000)}, feed=feed,
+                             declared={ids["T4 Pen1"]: "viable_bulk_or_alt_sp"})
+        self.assertEqual(pool["opposing_probables"]["T3"],
+                         {"id": "777001", "name": "T4 Pen1", "hand": "L"})
+        [entry] = pool["pool_report"]["f4_bulk_arm_substitutions"]
+        self.assertFalse(entry["applied"])
+        self.assertTrue(entry["kept_feed_record"])
+        self.assertFalse(any("grades the BULK ARM" in w or "R398" in w
+                             for w in pool["pool_report"]["warnings"]),
+                         pool["pool_report"]["warnings"])
+        self.assertNotIn("T3", pool["pool_report"]["opposing_probables_incomplete"]["no_hand"])
+
+    def test_typed_innings_are_read_only_for_a_declared_arm(self):
+        """An R488 admission carries the bulk default; a stray `ip=` for his id
+        (which the pool warns it ignores) must not reach the report."""
+        with tempfile.TemporaryDirectory() as tmp:
+            salary = self._salary(tmp, self.OPENER_GAME)
+            ids = {sp.name: sp.player_id for sp in sim.parse_dk_salary_csv(str(salary))}
+            pool = lda.build_slate_pool(salary, pool_lineups_feed(t4_confirmed=True),
+                                        declared_workload={ids["T4 Pen1"]: 4.0})
+        [entry] = self._applied(pool)
+        self.assertEqual((entry["bulk_arm"]["ip"], entry["bulk_arm"]["ip_source"]),
+                         (3.0, "bulk_default"))
+        [admission] = pool["pool_report"]["dk_opener_admissions"]
+        self.assertEqual((admission["ip"], admission["ip_source"]), (3.0, "bulk_default"))
+
+    def test_the_brief_records_the_substitution_wherever_it_records_the_admissions(self):
+        """Both brief sites (the refusal payload and the delivered brief) carry
+        R488's `dk_opener_admissions`; the F4 substitution is the same kind of
+        build input and rides beside it. A drift guard on the source, because a
+        running check needs a certified build."""
+        import ast
+        path = REPO / "skills" / "generate-lineups" / "scripts" / "build_slate.py"
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+
+        def _sites(key):
+            found = 0
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Dict):
+                    found += sum(1 for k in node.keys
+                                 if isinstance(k, ast.Constant) and k.value == key)
+                elif (isinstance(node, ast.Subscript)
+                      and isinstance(node.slice, ast.Constant) and node.slice.value == key
+                      and isinstance(node.ctx, ast.Store)):
+                    found += 1
+            return found
+
+        self.assertGreaterEqual(_sites("dk_opener_admissions"), 2)
+        self.assertEqual(_sites("f4_bulk_arm_substitutions"),
+                         _sites("dk_opener_admissions"))
+
     def test_a_postponed_game_substitutes_nothing(self):
         pool, _ = self._pool(self.OPENER_GAME,
                              feed=pool_lineups_feed(t4_confirmed=True, postpone_game2=True))

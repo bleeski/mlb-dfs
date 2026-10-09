@@ -5151,6 +5151,7 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         payload["declared_pitcher_evidence"] = declared_pitcher_evidence(args.declare_pitcher)
         payload["declared_arm_workload"] = report.get("declared_arm_workload") or []
         payload["dk_opener_admissions"] = report.get("dk_opener_admissions") or []
+        payload["f4_bulk_arm_substitutions"] = report.get("f4_bulk_arm_substitutions") or []
         payload["non_rosterable_arms"] = report.get("non_rosterable_arms") or []
         return 3, payload
 
@@ -5304,6 +5305,9 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         "declared_arm_workload": report.get("declared_arm_workload") or [],
         # R488. Arms admitted from DK's opener shape, with both tokens and prices.
         "dk_opener_admissions": report.get("dk_opener_admissions") or [],
+        # R398. Which opposing hitters F4 graded against a bulk arm, not the feed's
+        # opener, and the record each replaced: an input to this build.
+        "f4_bulk_arm_substitutions": report.get("f4_bulk_arm_substitutions") or [],
         "non_rosterable_arms": report.get("non_rosterable_arms") or [],
         "run_id": result.get("run_id"),
         # R40. The resolved objective, per contest, recorded in the artifact

@@ -1710,6 +1710,7 @@ def substitute_bulk_arm_probables(
     pitcher_roles: Mapping[str, str],
     excluded_teams: Iterable[str] = (),
     declared_workload: Optional[Mapping[str, float]] = None,
+    declared_ids: Iterable[str] = (),
 ) -> Tuple[Dict[str, Dict[str, Any]], List[Dict[str, Any]]]:
     """R398. ``(opposing', report)``: F4 grades the arm that throws the innings.
 
@@ -1729,11 +1730,20 @@ def substitute_bulk_arm_probables(
     opener nor the bulk arm is reported ``applied: False`` and left alone. Two
     bulk arms: the larger declared innings is graded, ties by Player_ID, the
     other is named. A bulk arm alone, never a blend: no weight exists for the
-    opener's innings, and F4 takes one probable per team. A deterministic prior,
-    never a probability.
+    opener's innings, and F4 takes one probable per team. A feed record that
+    already names the bulk arm stands, id and hand included (`kept_feed_record`):
+    replacing a complete record for the same man with an id-less one would lose
+    the exact join and the platoon term. Typed innings (``declared_workload``) are
+    read only for ids the operator DECLARED (``declared_ids``), because that is
+    the only place the optimizer's row applies them; an R488 admission carries the
+    bulk default whatever a stray `ip=` says. A deterministic prior, never a
+    probability.
     """
     out: Dict[str, Dict[str, Any]] = {t: dict(rec) for t, rec in opposing.items()}
     excluded = set(excluded_teams)
+    declared = {str(i) for i in declared_ids}
+    typed_ip = {str(pid): ip for pid, ip in (declared_workload or {}).items()
+                if str(pid) in declared}
     openers_by_team = barred_opener_rows(players_by_id.values(), pitcher_roles)
     arms_by_team: Dict[str, List[Tuple[str, Any]]] = {}
     for pid in sorted(pitcher_roles):
@@ -1751,13 +1761,13 @@ def substitute_bulk_arm_probables(
 
         def _ip(item: Tuple[str, Any]) -> Tuple[float, str]:
             ip = declared_arm_workload(
-                pitcher_roles[item[0]], (declared_workload or {}).get(item[0]))[1]
+                pitcher_roles[item[0]], typed_ip.get(item[0]))[1]
             return (-(ip or 0.0), item[0])
 
         bulk.sort(key=_ip)
         pid, sp = bulk[0]
         _, ip_used, ip_source = declared_arm_workload(
-            pitcher_roles[pid], (declared_workload or {}).get(pid))
+            pitcher_roles[pid], typed_ip.get(pid))
         graded = sp.opponent or infer_opponent_and_game_id(team, sp.game_info)[0]
         openers = openers_by_team[team]
         entry: Dict[str, Any] = {
@@ -1770,7 +1780,7 @@ def substitute_bulk_arm_probables(
                          "ip": ip_used, "ip_source": ip_source},
             "bulk_arms_not_graded": [
                 {"player_id": p, "name": s.name} for p, s in bulk[1:]],
-            "replaced_probable": None,
+            "replaced_probable": None, "kept_feed_record": False,
         }
         report.append(entry)
         if not graded:
@@ -1778,6 +1788,11 @@ def substitute_bulk_arm_probables(
             continue
         current = out.get(graded) or {}
         current_name = normalize_name(str(current.get("name") or ""))
+        if current_name and current_name == normalize_name(sp.name):
+            entry["kept_feed_record"] = True
+            entry["reason"] = ("the feed already names the bulk arm; his own record "
+                               "(id, hand) stands")
+            continue
         staged = {normalize_name(o.name) for o in openers} | {
             normalize_name(s.name) for _, s in bulk}
         if current_name and current_name not in staged:
@@ -2926,10 +2941,11 @@ def build_slate_pool(
     # throws the innings is the declared or R488-admitted bulk arm. F4 grades the
     # bulk arm; the substitution is named in the pool report and a warning.
     opposing_probables, f4_substitutions = substitute_bulk_arm_probables(
-        opposing_probables, by_id, pitcher_roles, excluded_teams, declared_workload)
+        opposing_probables, by_id, pitcher_roles, excluded_teams, declared_workload,
+        declared_pitchers or ())
     substituted_teams = {e["graded_team"] for e in f4_substitutions if e["applied"]}
     for entry in f4_substitutions:
-        if entry["applied"]:
+        if entry["applied"] or entry["kept_feed_record"]:
             continue
         warnings.append(
             f"{entry['pitching_team']}: DK stages "
