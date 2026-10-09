@@ -4556,6 +4556,8 @@ Session 15 gave every Classic build one frozen `Deadline(end, reserve)` (`mlb_en
 
 ### R125. Autonomy defaults: bullpen-day auto-declaration, posture fallback, and a counted Classic relaxation ladder (P2, S-M; (b) and (c) decided 2026-09-22 by R386) | new 2026-08-14, merged from the delivery-guarantee fragment's autonomy section
 
+**Rider 2026-10-09 (Session 32): (a) is CLOSED.** The refusal-text half landed (`live_data_adapters.po_side_detail`: both no-starter refusals on a barred-`PO` side name the opener, every tokened arm with its price, and the exact `--declare-pitcher` forms; pinned by `test_core.PoRefusalTextTests`; the text is in the CHANGELOG entry "2026-10-09 -- R398, R125(a), R189(3)"). The PO-dearer and tie halves are DECIDED, not built: no auto-declaration, both blockers stand, because declaring a PO arm lifts R104's bar and needs R471's evidence, and the register's benbook grading (observed counts, not reproduced in the cloud container) found the PLR outscoring the dearer PO on 3 of 4 such days with outcomes and the PO outscoring on 6 of 7 ties. What stays open here is (b) (Session 21) and (c) (Session 19), decided 2026-09-22 by R386.
+
 **Rider 2026-10-07 (Session 155, R488): (a)'s PLR-dearer half landed, with the PO bar kept.** A side whose only DK arms are one PO and one dearer PLR now takes the PLR as `viable_bulk_or_alt_sp` from the salary file. Graded on benbook before it shipped (observed counts over the 20 PO+PLR team-days with outcomes in `data/archive/*/mined_*.json`; the arm with more realized fpts read as the arm that carried the innings): the price-and-token conjunction 8 right, 1 wrong (07-30 PIT), 11 no call; the token rule 12 right, 8 wrong. The table above (13/7/8 over 28) reproduces exactly on this host, plus 6 newer rows. What remains in (a) is the PO-dearer half (the PLR outscored the dearer PO on 3 of 4 such days with outcomes, against this entry's "declare the dearer arm"; 09-04 NYY has no outcome here), ties (the PO outscored on 6 of 7), and the refusal-text half; Session 32(b) carries them.
 
 **Rider 2026-09-23 (Session 07): the refusal-text half did not ride R207.** The text ("no probable or declared starter; declare one via declared_pitchers") is `live_data_adapters.py`'s (the unconfirmed-side branch), outside Session 07's files, and it belongs with (a)'s PO/PLR handling in Session 32, which now carries it: name the PO arm, its price and `--declare-pitcher` in the refusal.
@@ -5340,12 +5342,9 @@ of `--max-attempts`, or resuming with them spent, writes a stop record.
 
 The refusal was `mlb_engine/intake/paste_odds.py`'s, and the pool's `excluded_postponed` comes from a feed this tool never read. `--feed` (the pool's classifier) and `--exclude-game` exempt a salary game that is not being played; each is named under `excluded_postponed` with its signal, a priced row for it is dropped, DK's `Postponed` literal is named where it was silent, and a name matching no game or an unreadable feed warns and exempts nothing. Gate `PASS  v2.26.0  42 modules  2480 tests  5 skipped` (the five absent-file skips).
 
-### R398. F4 grades hitters against the opener, not the declared bulk arm (P2, S) | new 2026-09-22, from `docs/backlog_inbox/2026-09-22_BUILD_f4-grades-against-opener-not-bulk-arm.md` | Roadmap: Session 32
+### R398. CLOSED 2026-10-09 -- SHIPPED as roadmap Session 32 (a), entry migrated to CHANGELOG.md
 
-> **Rider 2026-10-02 (Session 144, Phase 3, the board rebuild).** premise re-verified at HEAD e4588bc, PARTLY: `extract_opposing_probables` (`live_data_adapters.py:1587`) is untouched since 2026-08-05; R470 writes the declared arm's own row and R471 adds the PO evidence check, and neither touches `opposing_probables`, so F4 never grades against the bulk arm on any path. 'Grades against the opener' holds on the feed path only: on a DK-only slate `DK_STARTING_PROBABLE_TOKENS={SP,P}` (:568) leaves a PO side with NO probable, so its opponents get a neutral F4. Band 1 (1840_5g DET mean F4 0.911 -> 1.059, primary stacks 0 -> 1, not re-run); S.
-
-- **What.** On 1840_5g, WSH ran Cornelio (PO) then Kent (PLR). `--declare-pitcher` made Kent rosterable, but `extract_opposing_probables` (`live_data_adapters.py:1423`) read the feed's probable, so DET hitters were graded against Cornelio (.296) instead of Kent (.351). Measured on the same inputs: DET mean F4 0.911 → 1.059, primary stacks 0 → 1.
-- **Fix.** When a side is PO and a declared bulk arm exists, grade against the bulk arm or a PA-weighted blend, and name the substitution in `pool_report`.
+`live_data_adapters.substitute_bulk_arm_probables`, called in `build_slate_pool`, replaces the feed's probable for the opposing hitters with the declared or R488-admitted bulk arm when DK stages a barred `PO` on the side and every arm rostered for it is a bulk arm (the opener's id and hand dropped, the platoon term neutral, `pool_report.f4_bulk_arm_substitutions` naming each side), on the feed path and on a DK-only slate. A bulk arm alone, not a blend. Pinned by `test_core.BulkArmMatchupTests`. Gate and commit: the CHANGELOG entry.
 
 ### R399. Five small defects from the 1915_1g_sd Showdown build (P2, XS each) | new 2026-09-22, from `docs/backlog_inbox/2026-09-22_BUILD_showdown-1915-small-defects.md`; (a)(e) SHIPPED 2026-09-23 as roadmap Session 04 (a), migrated to CHANGELOG.md | Roadmap: (c)(d) 63; (b) CLOSED 2026-10-08 (Session 33)
 
@@ -7239,34 +7238,9 @@ Write a random `session_token` into owner.json at take and echo it; `release` re
   is Ben's grant (mount refuses unlink) — listed in Tier 4 as the decision.
   Any wanted fixture already exists under `evals/inputs/`.
 
-### R189(3). Two mlb.com paste render shapes still drop both probables — R117's remainder, now R189's (P1, XS-S) | new 2026-08-22, from the greenfield sixth edition; layer (3) re-scoped at ec832cf. **(1) and (2) CLOSED 2026-08-24, migrated to CHANGELOG.md**
+### R189(3). CLOSED 2026-10-09 -- SHIPPED as roadmap Session 32 (c), entry migrated to CHANGELOG.md
 
-- **Landed 2026-08-24 and not repeated here:** (1) the paste module's "every
-  player carries an MLBAM id in the URL" premise was false for Ben's browser
-  copies (verified on `paste_1910_6g.txt`: all six games `mlbam_id=None`) and
-  the docstring now says so; (2) a NAMED probable with an empty id scored a
-  silent 1.0 in `compute_f4_factors` with `sp_quality_available: True` and no
-  bucket, so F4's SP-quality term was dead on every plain-text-paste slate —
-  now recovered by the Savant `last_name, first_name` join and, where it still
-  cannot join, named in `sp_quality_unavailable` with a per-team reason. Both
-  rode the R159 + R160 commit, which is why this item keeps its number and
-  loses two thirds of its scope.
-- **What (open):** R117's fix landed `_HAND_WITH_STATS`, so the
-  hand-plus-stats render now parses. Two shapes still drop BOTH probables with
-  zero warnings: the one-line `"Name RHP"` render (promotion still requires
-  the hand on its OWN line after a held name), and a clock the `_CLOCK` regex
-  misses (`"7:10 PM CT"` — the regex admits only an optional ET suffix), which
-  also loses the venue.
-- **Why it did not ride with (2):** the F4 half is a REPORTING fix in the
-  projection builder and this is a PARSER change in `paste_lineups.py`, needing
-  real paste fixtures in both shapes to verify. Landing them together would
-  have put an unverified regex beside a mutation-tested report. It stays P1
-  because a dropped probable is still the F4-dead path, and (2) only softens
-  the cost: the quality term now resolves by name IF a name arrives, and these
-  two shapes are exactly the case where no name arrives at all.
-- **Fix:** accept name+hand on one line; widen `_CLOCK`, or warn per game when
-  two headers parse and pitchers == 0. Batches with the R122 rider (both are
-  handedness reaching the build).
+`paste_lineups.py` reads a CT, MT or PT clock (converted to ET by the zone's fixed offset; a clock that crosses midnight in ET reads as None) and the one-line `Name RHP` / `Name RHP <statline>` / `[Name](url) RHP` pitcher, an unknown-zone clock still marks the clock position and is named, a game whose clock and both lineups parsed with no pitcher line warns, and the report and the tool print how many probables the paste named. The F4 neutral side was already named at build time; the silent part was the parse-layer cause. Pinned by `PitcherOnOneLineTests`, `ZoneClockTests`, `ZoneClockDoubleheaderTests` and `NoPitcherLineWarningTests`. Gate and commit: the CHANGELOG entry.
 
 ### R322. CLOSED 2026-09-08 -- SHIPPED, entry migrated to CHANGELOG.md
 

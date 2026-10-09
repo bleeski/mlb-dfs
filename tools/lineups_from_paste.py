@@ -244,6 +244,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
               f"name(s) resolved to DK rows")
         print("confirmed from the paste (never fetched): "
               + (", ".join(report["confirmed_teams"]) or "none"))
+        # R189(3): a probable the parser could not read shows here as a short count.
+        print(f"probables named in the paste: {report['probables_pasted']} of "
+              f"{report['sides_used']} side(s)"
+              + (f"; none for {', '.join(report['sides_without_pasted_probable'])}"
+                 if report["sides_without_pasted_probable"] else ""))
         for row in report["partial_teams"]:
             print(f"PARTIAL  {row['team']} {row['hitters_posted']}/9 "
                   f"({row['reason']}) -- projected, not confirmed")

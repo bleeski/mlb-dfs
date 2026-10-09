@@ -49306,3 +49306,448 @@ class HandoffToolTests(unittest.TestCase):
         self.assertIn("Reasoning effort:", prompt)
         self.assertNotIn("NONE STATED", prompt)
         self.assertEqual(tool.command_unsafe(prompt), [])
+
+
+class BulkArmMatchupTests(unittest.TestCase):
+    """R398 (roadmap Session 32). F4 grades the arm that throws the innings.
+
+    `extract_opposing_probables` reads only the feed's `probable_pitcher`, which
+    on an opener game is the opener. The declared or R488-admitted bulk arm never
+    reached `opposing_probables`, so the hitters facing a staged opener game were
+    graded against the opener (1840_5g, WSH Cornelio then Kent: DET mean F4 0.911
+    where Kent's own quality gave 1.059), and on a DK-only slate a PO side had no
+    probable at all, so its opponents graded 1.0. `substitute_bulk_arm_probables`
+    replaces the record for the hitters of the opposing team and the pool report
+    names it. The fixture's game 2 is T3 (away) at T4 (home); T4's arms are the
+    feed probable `T4 Ace` (id 600000, hand R) and the bench arms `T4 Pen1-3`.
+    """
+
+    _salary = DkOpenerBulkArmTests._salary
+    _pool = DkOpenerBulkArmTests._pool
+
+    OPENER_GAME = {"T4 Ace": ("PO", 4000), "T4 Pen1": ("PLR", 8000)}
+
+    def _applied(self, pool):
+        return [e for e in pool["pool_report"]["f4_bulk_arm_substitutions"]
+                if e["applied"]]
+
+    def test_the_admitted_bulk_arm_replaces_the_feed_opener_for_the_opposing_hitters(self):
+        pool, ids = self._pool(self.OPENER_GAME)
+        record = pool["opposing_probables"]["T3"]
+        self.assertEqual(record, {"id": "", "name": "T4 Pen1", "hand": None})
+        # The opener's id and hand are DROPPED: his hand would grade the platoon
+        # term against an arm who does not pitch.
+        self.assertNotEqual(record["id"], "600000")
+        self.assertNotEqual(record["hand"], "R")
+        [entry] = self._applied(pool)
+        self.assertEqual((entry["pitching_team"], entry["graded_team"]), ("T4", "T3"))
+        self.assertEqual(entry["bulk_arm"]["player_id"], ids["T4 Pen1"])
+        self.assertEqual(entry["bulk_arm"]["role"], "viable_bulk_or_alt_sp")
+        self.assertEqual(entry["bulk_arm"]["ip_source"], "bulk_default")
+        self.assertEqual([o["player_id"] for o in entry["openers"]], [ids["T4 Ace"]])
+        self.assertEqual(entry["replaced_probable"],
+                         {"id": "600000", "name": "T4 Ace", "hand": "R"},
+                         "the record the feed supplied is kept for the audit")
+        # The other side of the game is untouched: T3's own probable still grades T4.
+        self.assertEqual(pool["opposing_probables"]["T4"],
+                         {"id": "600000", "name": "T3 Ace", "hand": "R"})
+
+    def test_a_dk_only_po_side_has_an_arm_to_grade_against(self):
+        """No feed probable for T4 and a PO row that never enters
+        `DK_STARTING_PROBABLE_TOKENS`: before this, T3's hitters had NO record."""
+        feed = pool_lineups_feed(t4_confirmed=True, drop_t4_probable=True)
+        pool, _ids = self._pool(self.OPENER_GAME, feed=feed)
+        self.assertEqual(pool["opposing_probables"]["T3"]["name"], "T4 Pen1")
+        [entry] = self._applied(pool)
+        self.assertIsNone(entry["replaced_probable"], "there was nothing to replace")
+
+    def test_an_operator_declared_bulk_arm_grades_and_carries_its_typed_innings(self):
+        _p, ids = self._pool({"T4 Ace": ("PO", 4000)})
+        declared = {ids["T4 Pen1"]: "viable_bulk_or_alt_sp"}
+        with tempfile.TemporaryDirectory() as tmp:
+            salary = self._salary(tmp, {"T4 Ace": ("PO", 4000)})
+            pool = lda.build_slate_pool(salary, pool_lineups_feed(t4_confirmed=True),
+                                        declared_pitchers=declared,
+                                        declared_workload={ids["T4 Pen1"]: 4.0})
+        self.assertEqual(pool["opposing_probables"]["T3"]["name"], "T4 Pen1")
+        [entry] = self._applied(pool)
+        self.assertEqual((entry["bulk_arm"]["ip"], entry["bulk_arm"]["ip_source"]),
+                         (4.0, "--declare-pitcher ip="))
+
+    def test_no_substitution_where_the_innings_are_a_starters(self):
+        """The operator declared the opener himself (R471's wall), or a real
+        starter is rostered beside the bulk arm: the feed's record stands."""
+        feed_record = {"id": "600000", "name": "T4 Ace", "hand": "R"}
+        _p, ids = self._pool(self.OPENER_GAME)
+        cases = {
+            "opener declared a starter": {ids["T4 Ace"]: "declared_probable_sp"},
+            "a declared starter beside the bulk arm": {
+                ids["T4 Pen1"]: "viable_bulk_or_alt_sp",
+                ids["T4 Pen2"]: "declared_probable_sp"},
+        }
+        for label, declared in cases.items():
+            with self.subTest(label):
+                pool, _ = self._pool(self.OPENER_GAME, declared=declared)
+                self.assertEqual(pool["opposing_probables"]["T3"], feed_record)
+                self.assertEqual(pool["pool_report"]["f4_bulk_arm_substitutions"], [])
+
+    def test_no_substitution_without_a_rostered_bulk_arm(self):
+        """A tie, a dearer opener, two long relievers and a lone opener are the
+        shapes R488 and R125(a) leave blocked: no bulk arm is rostered, so there
+        is no arm to grade against and the feed's record stands."""
+        for label, arms in {
+            "tie": {"T4 Ace": ("PO", 6000), "T4 Pen1": ("PLR", 6000)},
+            "PO dearer": {"T4 Ace": ("PO", 9000), "T4 Pen1": ("PLR", 7000)},
+            "two PLR": {"T4 Ace": ("PO", 4000), "T4 Pen1": ("PLR", 8000),
+                        "T4 Pen2": ("PLR", 7000)},
+            "lone opener": {"T4 Ace": ("PO", 4000)},
+        }.items():
+            with self.subTest(label):
+                pool, _ = self._pool(arms)
+                self.assertEqual(pool["pool_report"]["f4_bulk_arm_substitutions"], [])
+                self.assertEqual(pool["opposing_probables"]["T3"]["name"], "T4 Ace")
+
+    def test_a_bulk_role_arm_without_a_staged_opener_changes_nothing(self):
+        """`viable_bulk_or_alt_sp` also names an alternate starter. With no PO row
+        on the side there is no opener game, so the feed's record (here, none:
+        T4 has no probable) is not touched."""
+        feed = pool_lineups_feed(t4_confirmed=True, drop_t4_probable=True)
+        _p, ids = self._pool({})
+        pool, _ = self._pool({}, feed=feed, declared={ids["T4 Pen1"]: "viable_bulk_or_alt_sp"})
+        self.assertEqual(pool["pitcher_roles"][ids["T4 Pen1"]], "viable_bulk_or_alt_sp")
+        self.assertEqual(pool["pool_report"]["f4_bulk_arm_substitutions"], [])
+        self.assertNotIn("T3", pool["opposing_probables"])
+
+    def test_the_helper_itself_skips_an_excluded_team(self):
+        """The pool never rosters an arm on a postponed game, so this guard is
+        defence in depth: pinned on the helper, which is a public function."""
+        pool, ids = self._pool(self.OPENER_GAME)
+        by_id = {r["Player_ID"]: types.SimpleNamespace(
+            player_id=r["Player_ID"], name=r["Name"], team=r["Team"],
+            starting=r.get("DK_Starting", ""), positions=("P",), salary=r["Salary"],
+            opponent="T3", game_info="T3@T4 07/10/2026 07:05PM ET")
+            for r in pool["projection_rows"] if r["Name"] in ("T4 Ace", "T4 Pen1")}
+        by_id[ids["T4 Ace"]] = types.SimpleNamespace(
+            player_id=ids["T4 Ace"], name="T4 Ace", team="T4", starting="PO",
+            positions=("P",), salary=4000.0, opponent="T3", game_info="T3@T4 x")
+        roles = {ids["T4 Pen1"]: "viable_bulk_or_alt_sp"}
+        feed_record = {"T3": {"id": "600000", "name": "T4 Ace", "hand": "R"}}
+        out, report = lda.substitute_bulk_arm_probables(feed_record, by_id, roles, ())
+        self.assertEqual(out["T3"]["name"], "T4 Pen1", report)
+        out, report = lda.substitute_bulk_arm_probables(feed_record, by_id, roles, {"T4"})
+        self.assertEqual((out, report), (feed_record, []))
+
+    def test_two_declared_bulk_arms_grade_the_larger_innings_and_name_the_other(self):
+        _p, ids = self._pool({"T4 Ace": ("PO", 4000)})
+        with tempfile.TemporaryDirectory() as tmp:
+            salary = self._salary(tmp, {"T4 Ace": ("PO", 4000)})
+            declared = {ids["T4 Pen1"]: "viable_bulk_or_alt_sp",
+                        ids["T4 Pen2"]: "viable_bulk_or_alt_sp"}
+            pool = lda.build_slate_pool(
+                salary, pool_lineups_feed(t4_confirmed=True), declared_pitchers=declared,
+                declared_workload={ids["T4 Pen2"]: 4.5})
+        self.assertEqual(pool["opposing_probables"]["T3"]["name"], "T4 Pen2")
+        [entry] = self._applied(pool)
+        self.assertEqual(entry["bulk_arms_not_graded"],
+                         [{"player_id": ids["T4 Pen1"], "name": "T4 Pen1"}])
+        # Equal innings: the lower Player_ID, deterministically.
+        with tempfile.TemporaryDirectory() as tmp:
+            salary = self._salary(tmp, {"T4 Ace": ("PO", 4000)})
+            pool = lda.build_slate_pool(
+                salary, pool_lineups_feed(t4_confirmed=True), declared_pitchers=declared)
+        self.assertEqual(pool["opposing_probables"]["T3"]["name"], "T4 Pen1")
+
+    def test_a_feed_record_that_already_names_the_bulk_arm_stands_whole(self):
+        """The feed names the PLR (id 777001, hand L) and the operator declares him
+        the bulk arm, the remedy the PLR blocker offers: replacing his complete
+        record with an id-less one would lose the exact Savant join and the
+        platoon term, and "a feed names the opener" would be false."""
+        feed = pool_lineups_feed(t4_confirmed=True)
+        feed["games"][1]["home"]["probable_pitcher"] = {
+            "name": "T4 Pen1", "hand": "L", "id": 777001}
+        _p, ids = self._pool({"T4 Ace": ("PO", 4000)})
+        pool, _ = self._pool({"T4 Ace": ("PO", 4000)}, feed=feed,
+                             declared={ids["T4 Pen1"]: "viable_bulk_or_alt_sp"})
+        self.assertEqual(pool["opposing_probables"]["T3"],
+                         {"id": "777001", "name": "T4 Pen1", "hand": "L"})
+        [entry] = pool["pool_report"]["f4_bulk_arm_substitutions"]
+        self.assertFalse(entry["applied"])
+        self.assertTrue(entry["kept_feed_record"])
+        self.assertFalse(any("grades the BULK ARM" in w or "R398" in w
+                             for w in pool["pool_report"]["warnings"]),
+                         pool["pool_report"]["warnings"])
+        self.assertNotIn("T3", pool["pool_report"]["opposing_probables_incomplete"]["no_hand"])
+
+    def test_typed_innings_are_read_only_for_a_declared_arm(self):
+        """An R488 admission carries the bulk default; a stray `ip=` for his id
+        (which the pool warns it ignores) must not reach the report."""
+        with tempfile.TemporaryDirectory() as tmp:
+            salary = self._salary(tmp, self.OPENER_GAME)
+            ids = {sp.name: sp.player_id for sp in sim.parse_dk_salary_csv(str(salary))}
+            pool = lda.build_slate_pool(salary, pool_lineups_feed(t4_confirmed=True),
+                                        declared_workload={ids["T4 Pen1"]: 4.0})
+        [entry] = self._applied(pool)
+        self.assertEqual((entry["bulk_arm"]["ip"], entry["bulk_arm"]["ip_source"]),
+                         (3.0, "bulk_default"))
+        [admission] = pool["pool_report"]["dk_opener_admissions"]
+        self.assertEqual((admission["ip"], admission["ip_source"]), (3.0, "bulk_default"))
+
+    def test_the_brief_records_the_substitution_wherever_it_records_the_admissions(self):
+        """Both brief sites (the refusal payload and the delivered brief) carry
+        R488's `dk_opener_admissions`; the F4 substitution is the same kind of
+        build input and rides beside it. A drift guard on the source, because a
+        running check needs a certified build."""
+        import ast
+        path = REPO / "skills" / "generate-lineups" / "scripts" / "build_slate.py"
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+
+        def _sites(key):
+            found = 0
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Dict):
+                    found += sum(1 for k in node.keys
+                                 if isinstance(k, ast.Constant) and k.value == key)
+                elif (isinstance(node, ast.Subscript)
+                      and isinstance(node.slice, ast.Constant) and node.slice.value == key
+                      and isinstance(node.ctx, ast.Store)):
+                    found += 1
+            return found
+
+        self.assertGreaterEqual(_sites("dk_opener_admissions"), 2)
+        self.assertEqual(_sites("f4_bulk_arm_substitutions"),
+                         _sites("dk_opener_admissions"))
+
+    def test_a_postponed_game_substitutes_nothing(self):
+        pool, _ = self._pool(self.OPENER_GAME,
+                             feed=pool_lineups_feed(t4_confirmed=True, postpone_game2=True))
+        self.assertEqual(pool["pool_report"]["f4_bulk_arm_substitutions"], [])
+
+    def test_a_feed_probable_that_is_neither_arm_is_named_and_kept(self):
+        """Disagreements are NAMED, never silently resolved (build contract 1)."""
+        feed = pool_lineups_feed(t4_confirmed=True)
+        feed["games"][1]["home"]["probable_pitcher"]["name"] = "Somebody Else"
+        pool, _ = self._pool(self.OPENER_GAME, feed=feed)
+        self.assertEqual(pool["opposing_probables"]["T3"]["name"], "Somebody Else")
+        [entry] = pool["pool_report"]["f4_bulk_arm_substitutions"]
+        self.assertFalse(entry["applied"])
+        self.assertIn("neither the opener nor the bulk arm", entry["reason"])
+        self.assertTrue(any("Somebody Else" in w and "R398" in w
+                            for w in pool["pool_report"]["warnings"]))
+
+    def test_the_substitution_is_named_and_the_feed_remedy_is_not_offered_for_it(self):
+        feed = pool_lineups_feed(t4_confirmed=True)
+        feed["games"][0]["away"]["probable_pitcher"]["hand"] = None   # T2's opponent
+        pool, _ = self._pool(self.OPENER_GAME, feed=feed)
+        report = pool["pool_report"]
+        # The machine-readable lists keep every incomplete side, T3 included.
+        self.assertIn("T3", report["opposing_probables_incomplete"]["no_hand"])
+        self.assertIn("T2", report["opposing_probables_incomplete"]["no_hand"])
+        named = [w for w in report["warnings"] if "grades the BULK ARM" in w]
+        self.assertEqual(len(named), 1, report["warnings"])
+        self.assertIn("T3", named[0])
+        self.assertIn("T4 Pen1", named[0])
+        self.assertIn("cannot restore it", named[0])
+        # The generic incomplete-probable sentence ("supply a lineups feed...")
+        # still fires for T2 and no longer names T3, which a feed cannot reach.
+        generic = [w for w in report["warnings"]
+                   if "reached the pool named but incomplete" in w]
+        self.assertEqual(len(generic), 1, report["warnings"])
+        self.assertIn("T2", generic[0])
+        self.assertNotIn("T3", generic[0])
+
+    def test_no_warning_and_no_report_row_without_an_opener_game(self):
+        pool, _ = self._pool({})
+        self.assertEqual(pool["pool_report"]["f4_bulk_arm_substitutions"], [])
+        self.assertFalse(any("grades the BULK ARM" in w
+                             for w in pool["pool_report"]["warnings"]))
+
+    def test_f4_grades_the_bulk_arm_through_build_slate_s_consumer(self):
+        """End to end through `build_slate.build_f4_map`, which reads
+        `pool["opposing_probables"]`: the opener's quality is far below the
+        league mean and the bulk arm's far above it, so substituting him moves
+        every T3 hitter from under 1.0 to over it. The bulk arm carries no id,
+        so the Savant join is the NAME join (R189(2))."""
+        pool, _ = self._pool(self.OPENER_GAME)
+        bs = DeclaredPitcherEvidenceTests._bs()
+        with tempfile.TemporaryDirectory() as tmp:
+            savant = Path(tmp) / "pitching.csv"
+            with savant.open("w", newline="", encoding="utf-8") as fh:
+                writer = csv.writer(fh)
+                writer.writerow(["last_name, first_name", "player_id", "pa", "woba",
+                                 "est_woba"])
+                writer.writerow(["Ace, T4", "600000", 300, 0.30, 0.280])
+                writer.writerow(["Pen1, T4", "800", 300, 0.30, 0.380])
+                writer.writerow(["Filler, X", "901", 300, 0.30, 0.320])
+            after, after_report = bs.build_f4_map(pool, savant)
+            before_pool = {**pool, "opposing_probables": {
+                **pool["opposing_probables"],
+                "T3": {"id": "600000", "name": "T4 Ace", "hand": "R"}}}
+            before, before_report = bs.build_f4_map(before_pool, savant)
+        self.assertLess(before_report["quality_factor_by_team"]["T3"], 1.0)
+        self.assertGreater(after_report["quality_factor_by_team"]["T3"], 1.0)
+        self.assertEqual([j["probable"] for j in after_report["sp_quality_name_joined"]
+                          if j["team"] == "T3"], ["T4 Pen1"])
+        t3_hitters = [pid for pid, team in pool["team_by_player_id"].items()
+                      if team == "T3"]
+        self.assertTrue(t3_hitters)
+        for pid in t3_hitters:
+            self.assertGreater(after[pid], before[pid], pid)
+
+
+class PoRefusalTextTests(unittest.TestCase):
+    """R125(a) refusal-text half (roadmap Session 32). The no-starter refusal on
+    a side DK stages with a barred `PO` names the opener, his price, the side's
+    other tokened arms with theirs, and the exact `--declare-pitcher` forms.
+
+    Before this the feed-path text named the opener and nothing else, and the
+    DK-only text ("no probable or declared starter") named nobody: a PO side
+    never enters `DK_STARTING_PROBABLE_TOKENS`, so the operator read a feed gap
+    where DK had named an opener. The decision half is recorded, not built: a
+    tie or a dearer PO keeps its blocker (R488's conjunction was Ben's choice on
+    2026-10-07, and graded on benbook the PLR outscored the dearer PO on 3 of 4
+    such days with outcomes, so "declare the dearer arm" is not supported).
+    """
+
+    _salary = DkOpenerBulkArmTests._salary
+    _pool = DkOpenerBulkArmTests._pool
+
+    TIE = {"T4 Ace": ("PO", 6000), "T4 Pen1": ("PLR", 6000)}
+    GENERIC_PREFIX = ("T4: no probable or declared starter; declare one via "
+                      "declared_pitchers or that side has no rosterable arm")
+
+    def _t4(self, arms, feed=None):
+        pool, ids = self._pool(arms, feed=feed)
+        hits = [b for b in pool["pool_report"]["blockers"]
+                if b.startswith("T4:") and "no " in b and "starter" in b]
+        self.assertEqual(len(hits), 1, pool["pool_report"]["blockers"])
+        return hits[0], ids
+
+    def _dk_only(self):
+        return pool_lineups_feed(t4_confirmed=True, drop_t4_probable=True)
+
+    def test_the_feed_path_refusal_names_the_arms_their_prices_and_both_flags(self):
+        text, ids = self._t4(self.TIE)
+        self.assertTrue(text.startswith("T4: no ROSTERABLE starter."), text)
+        self.assertIn(f"T4 Ace ({ids['T4 Ace']}) Starting=PO $6,000", text)
+        self.assertIn(f"T4 Pen1 ({ids['T4 Pen1']}) Starting=PLR $6,000", text)
+        self.assertIn(f"--declare-pitcher '{ids['T4 Pen1']}=viable_bulk_or_alt_sp'", text)
+        self.assertIn(f"--declare-pitcher '{ids['T4 Ace']}=declared_probable_sp:evidence=", text)
+        self.assertIn("a tie or a dearer PO is the operator's call", text)
+
+    def test_the_dk_only_refusal_names_the_opener_and_keeps_its_prefix(self):
+        text, ids = self._t4({"T4 Ace": ("PO", 4000)}, feed=self._dk_only())
+        self.assertTrue(text.startswith(self.GENERIC_PREFIX), text)
+        self.assertIn("DK tags T4 Ace Starting=PO", text)
+        self.assertIn(f"T4 Ace ({ids['T4 Ace']}) Starting=PO $4,000", text)
+        self.assertIn(f"--declare-pitcher '{ids['T4 Ace']}=declared_probable_sp:evidence=", text)
+        # No PLR on the side, so the bulk flag cannot name an id and says so.
+        self.assertIn("--declare-pitcher '<bulk_arm_id>=viable_bulk_or_alt_sp'", text)
+        self.assertNotIn("no rosterable starter", text.lower(),
+                         "autobuild treats that phrase as benign")
+
+    def test_a_side_with_no_opener_keeps_its_refusal_byte_for_byte(self):
+        text, _ = self._t4({}, feed=self._dk_only())
+        self.assertEqual(text, self.GENERIC_PREFIX)
+
+    def test_a_dearer_opener_shows_both_prices(self):
+        text, ids = self._t4({"T4 Ace": ("PO", 9000), "T4 Pen1": ("PLR", 7000)})
+        self.assertIn(f"T4 Ace ({ids['T4 Ace']}) Starting=PO $9,000; "
+                      f"T4 Pen1 ({ids['T4 Pen1']}) Starting=PLR $7,000", text)
+
+    def test_two_long_relievers_list_both_and_name_no_bulk_id(self):
+        """Which PLR is the bulk arm is the operator's call: the flag carries a
+        placeholder, never the first one."""
+        text, ids = self._t4({"T4 Ace": ("PO", 4000), "T4 Pen1": ("PLR", 8000),
+                              "T4 Pen2": ("PLR", 7000)})
+        # The opener first, then the others dearest first, so the order is the
+        # same whatever order DK listed them in.
+        self.assertIn(f"T4 Ace ({ids['T4 Ace']}) Starting=PO $4,000; "
+                      f"T4 Pen1 ({ids['T4 Pen1']}) Starting=PLR $8,000; "
+                      f"T4 Pen2 ({ids['T4 Pen2']}) Starting=PLR $7,000", text)
+        self.assertIn("--declare-pitcher '<bulk_arm_id>=viable_bulk_or_alt_sp'", text)
+
+    def test_two_openers_name_no_opener_id_and_a_placeholder_survives_shlex(self):
+        """With two PO rows the feed's opener is not `openers[0]` (the lowest
+        Player_ID), so the declare-himself flag carries a placeholder, and the
+        generic text speaks of them in the plural. Every flag in the text is one
+        `shlex` can split: an apostrophe inside the quoted token cannot be."""
+        import shlex
+        feed = pool_lineups_feed(t4_confirmed=True)
+        feed["games"][1]["home"]["probable_pitcher"]["name"] = "T4 Pen1"
+        arms = {"T4 Ace": ("PO", 4000), "T4 Pen1": ("PO", 6000)}
+        text, ids = self._t4(arms, feed=feed)
+        self.assertIn("DK's only declared arm is T4 Pen1", text)
+        self.assertIn("--declare-pitcher '<opener_id>=declared_probable_sp:evidence=", text)
+        self.assertNotIn(f"'{ids['T4 Ace']}=declared_probable_sp", text)
+        dk_text, _ = self._t4(arms, feed=self._dk_only())
+        self.assertIn("T4 Ace, T4 Pen1 Starting=PO", dk_text)
+        self.assertIn("they are not probables", dk_text)
+        for blocker in (text, dk_text):
+            opened = blocker.count("--declare-pitcher '")
+            closed = re.findall(r"--declare-pitcher ('[^']*')(?=[;.\s]|$)", blocker)
+            self.assertGreaterEqual(opened, 2, blocker)
+            # A stray apostrophe inside a token ends it early, so the closing quote
+            # no longer sits before a delimiter and the counts differ.
+            self.assertEqual(len(closed), opened, blocker)
+            for flag in closed:
+                self.assertEqual(len(shlex.split(flag)), 1, flag)
+
+    def test_an_sp_tagged_arm_nothing_rostered_gets_the_flag_that_clears_it(self):
+        """The feed named the PO (a stale feed) and DK tags another arm SP: the
+        side has no rostered arm, so the move that clears it is declaring him."""
+        text, ids = self._t4({"T4 Ace": ("PO", 4000), "T4 Pen1": ("SP", 9000)})
+        self.assertIn("DK also tags T4 Pen1 Starting=SP", text)
+        self.assertIn(f"--declare-pitcher '{ids['T4 Pen1']}=declared_probable_sp'", text)
+        bs = DeclaredPitcherEvidenceTests._bs()
+        self.assertEqual(bs.parse_declared_pitchers([f"{ids['T4 Pen1']}=declared_probable_sp"]),
+                         {ids["T4 Pen1"]: "declared_probable_sp"})
+        plain, _ = self._t4(self.TIE)
+        self.assertNotIn("DK also tags", plain, "no SP/P arm on the side, no clause")
+        # Two SP-tagged arms: which one starts is the operator's call.
+        two, _ = self._t4({"T4 Ace": ("PO", 4000), "T4 Pen1": ("SP", 9000),
+                           "T4 Pen2": ("SP", 8000)})
+        self.assertIn("DK also tags T4 Pen1, T4 Pen2 Starting=SP", two)
+        self.assertIn("--declare-pitcher '<starter_id>=declared_probable_sp'", two)
+
+    def test_untokened_relievers_are_not_listed(self):
+        text, _ = self._t4(self.TIE)
+        self.assertNotIn("T4 Pen2", text)
+        self.assertNotIn("T4 Pen3", text)
+
+    def test_the_suggested_flags_are_ones_the_cli_accepts(self):
+        """A refusal that names a flag the validator refuses is the defect this
+        class exists to remove. Both strings are run through build_slate's own
+        parser and its R471 and R489 checks, against the same salary file."""
+        bs = DeclaredPitcherEvidenceTests._bs()
+        with tempfile.TemporaryDirectory() as tmp:
+            salary = self._salary(tmp, self.TIE)
+            pool, ids = self._pool(self.TIE)
+            text = next(b for b in pool["pool_report"]["blockers"]
+                        if b.startswith("T4: no ROSTERABLE starter"))
+            flags = re.findall(r"--declare-pitcher '([^']+)'", text)
+            self.assertEqual(len(flags), 2, flags)
+            for flag in flags:
+                with self.subTest(flag=flag):
+                    options = bs.parse_declared_pitcher_options([flag])
+                    declared = bs.parse_declared_pitchers([flag])
+                    evidence = bs.declared_pitcher_evidence([flag])
+                    self.assertEqual(bs.po_declarations_without_evidence(
+                        salary, declared, evidence), [], options)
+                    self.assertEqual(bs.plr_declarations_without_role(salary, [flag]), [])
+            self.assertEqual(
+                {pid: spec["role"] for pid, spec in
+                 bs.parse_declared_pitcher_options(flags).items()},
+                {ids["T4 Pen1"]: "viable_bulk_or_alt_sp",
+                 ids["T4 Ace"]: "declared_probable_sp"})
+
+    def test_autobuild_still_reads_the_two_phrasings_differently(self):
+        """`classify_pool_blocker` keys on the lowercased phrase "no rosterable
+        starter": benign for the feed-path text, a human's call for the DK-only
+        text. Rewording the second into the first would change autobuild's
+        behavior on every DK-only opener slate."""
+        import importlib
+        ab = importlib.import_module("tools.autobuild")
+        feed_text, _ = self._t4(self.TIE)
+        dk_text, _ = self._t4({"T4 Ace": ("PO", 4000)}, feed=self._dk_only())
+        self.assertIsNotNone(ab.classify_pool_blocker(feed_text))
+        self.assertIsNone(ab.classify_pool_blocker(dk_text))
