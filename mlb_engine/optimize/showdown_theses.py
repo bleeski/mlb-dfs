@@ -386,6 +386,30 @@ def apply_base_prior(df: pd.DataFrame,
     return out
 
 
+def supersede_platoon_splits(df: pd.DataFrame) -> pd.DataFrame:
+    """Re-state ``attrs["platoon_splits"]`` after ``apply_supplied_base``.
+
+    A supplied Base is the finished prior and no factor touches it, so a hitter
+    whose Base the operator supplied did not take his split even though
+    ``apply_base_prior`` computed one. Counting him would say a factor was applied
+    that the price never carried (R122's own headline). Those hitters move from
+    ``split_hitters`` to ``superseded_by_supplied_base`` and out of
+    ``hitters_with_split``. A no-op without a splits block or a supplied Base.
+    """
+    block = df.attrs.get("platoon_splits") or {}
+    if not block.get("applied") or "Base_Supplied" not in df.columns:
+        return df
+    supplied = {(str(n), str(t)) for n, t, b in zip(df["Name"], df["Team"], df["Base_Supplied"])
+                if bool(b)}
+    kept = [r for r in block["split_hitters"] if (r["name"], r["team"]) not in supplied]
+    gone = [r for r in block["split_hitters"] if (r["name"], r["team"]) in supplied]
+    if gone:
+        df.attrs["platoon_splits"] = {**block, "split_hitters": kept,
+                                      "hitters_with_split": len(kept),
+                                      "superseded_by_supplied_base": gone}
+    return df
+
+
 # --------------------------------------------------------------------------- #
 # Supplied Base (R249)
 # --------------------------------------------------------------------------- #

@@ -5853,6 +5853,7 @@ def price_showdown_pool(df, *, use_ladder: bool, bat_side: dict, pitcher_hand: d
     priced = theses.apply_f1_prior(priced, f1_by_player_key, f1_report)
     if supplied_base:
         priced = theses.apply_supplied_base(priced, supplied_base, supplied_read)
+        priced = theses.supersede_platoon_splits(priced)
     return priced
 
 

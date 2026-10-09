@@ -5355,6 +5355,37 @@ class HandednessTests(unittest.TestCase):
         keys = [tool.key_of(r["name"], r["team"]) for r in rows]
         self.assertEqual(len(keys), len(set(keys)), "one row per player")
 
+    def test_a_platoon_reseed_never_overwrites_an_operator_captured_hand(self):
+        tool = self._tool()
+        have = [{"name": "A One", "team": "T1", "bats": "R", "throws": "", "stamped": "2026-06-01",
+                 "source": "operator_capture"}]
+        newer_platoon = [{"name": "A One", "team": "T1", "bats": "L", "throws": "", "stamped": "2026-09-29",
+                          "source": "fangraphs_platoon"}]
+        rows, report = tool.upsert(have, newer_platoon)
+        self.assertEqual("R", rows[0]["bats"], "a roster-derived hand outranks a projected-lineup page")
+        self.assertEqual(1, report["kept_newer"])
+        # and the other way round a capture always replaces the platoon row
+        rows, report = tool.upsert(newer_platoon, [dict(have[0])])
+        self.assertEqual(("R", "operator_capture"), (rows[0]["bats"], rows[0]["source"]))
+
+    def test_a_bad_platoon_file_or_an_empty_csv_or_a_leading_blank_line_is_named_not_a_crash(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            bad = Path(tmp) / "platoon.json"
+            bad.write_text("{not json", encoding="utf-8")
+            csv_path = Path(tmp) / "h.csv"
+            code, _o, err = self._run(["seed", "--from-platoon", str(bad), "--csv", str(csv_path)])
+            self.assertEqual(2, code)
+            self.assertIn("not readable JSON", err)
+            self.assertFalse(csv_path.exists())
+            csv_path.write_bytes(b"")                      # a zero-byte file is an empty reference
+            code, _o, err = self._run(
+                ["seed", "--stdin", "--as-of", "2026-10-08", "--csv", str(csv_path)],
+                stdin="\n\nname,team,bats,throws\nGood Guy,T1,L\n")
+            self.assertEqual(0, code, err)
+            rows, _r = self._tool().read_handedness(csv_path)
+            self.assertEqual(["Good Guy"], [r["name"] for r in rows],
+                             "the header after blank lines is still a header")
+
     # -- the feed ------------------------------------------------------------- #
 
     def test_the_feed_stamps_hands_from_the_csv_and_names_the_blank_and_the_age(self):

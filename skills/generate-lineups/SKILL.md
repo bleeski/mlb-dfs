@@ -886,11 +886,7 @@ Four things to read off it rather than rediscover:
   precedence, since DK outranks it on order either way, and it carries
   `(R)/(L)/(S)`, which is what keeps F4 alive. The zero-fetch path is for when
   there is no paste, not a reason to stop asking for one.
-- **With no paste, stamp the hands from the cache (R332).** `python tools/handedness_feed.py
-  feed --salary <csv> --date <date> --out data/slates/<date>/lineups_feed.json` builds the
-  DK-only feed and stamps `bat_side` and each probable's `hand` from
-  `data/reference/handedness.csv` (aged per player; a player it lacks stays blank and is named),
-  and `--lineups` reads it. Add rows with `seed --stdin --as-of <date>` (`name,team,bats[,throws]`).
+- **With no paste, stamp the hands from the cache (R332):** `python tools/handedness_feed.py --help`.
 - **Where DK and a paste disagree on the same posted side,** DK wins and the
   difference is NAMED in `dk_batting_order.disagreements`. Never resolve it
   yourself: the CSV is a point-in-time download and a paste has no timestamp, so

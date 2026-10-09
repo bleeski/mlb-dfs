@@ -9204,3 +9204,22 @@ class PerHitterPlatoonTests(_ShowdownExitDoorHarness, unittest.TestCase):
         self.assertEqual("platoon_splits_not_supported_on_classic", json.loads(out.getvalue())["status"])
         self.assertEqual(["DKEntries.csv", "DKSalaries.csv"], sorted(p.name for p in root.iterdir()),
                          "nothing was staged and no run directory was created")
+
+    def test_a_supplied_base_supersedes_the_split_and_the_brief_says_so(self):
+        raw = sd.melt_showdown_salary_csv(SAL)
+        hitters = raw[raw["Batting_Order"].notna()]
+        bat = {st.hitter_key(n, t): "R" for n, t in zip(hitters["Name"], hitters["Team"])}
+        names = list(hitters["Name"][:2])
+        teams = dict(zip(hitters["Name"], hitters["Team"]))
+        splits = {st.hitter_key(n, teams[n]): self._split(n, teams[n], 0.8, pa_l=300, ops_l=0.6)
+                  for n in names}
+        ids = dict(zip(raw["Name"], raw["UTIL_ID"]))
+        out = self._module().price_showdown_pool(
+            raw, use_ladder=True, bat_side=bat, pitcher_hand={"MIN": "L", "CHC": "L"},
+            supplied_base={str(ids[names[0]]): 9.0}, supplied_read={},
+            platoon_splits=splits, platoon_splits_read={"source": "x", "sha256": "y"})
+        block = out.attrs["platoon_splits"]
+        self.assertEqual(1, block["hitters_with_split"])
+        self.assertEqual([names[1]], [r["name"] for r in block["split_hitters"]])
+        self.assertEqual([names[0]], [r["name"] for r in block["superseded_by_supplied_base"]])
+        self.assertEqual(9.0, float(out.loc[out["Name"] == names[0], "Base"].iloc[0]))

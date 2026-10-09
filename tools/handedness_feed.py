@@ -59,6 +59,9 @@ from mlb_engine.team_codes import to_dk_abbrev  # noqa: E402
 DEFAULT_CSV = REPO / "data" / "reference" / "handedness.csv"
 DEFAULT_PLATOON = REPO / "data" / "reference" / "fangraphs_platoon_lineups.json"
 FIELDS = ("name", "team", "bats", "throws", "stamped", "source")
+#: A hand read off a roster by the operator outranks one read off a projected lineup
+#: page: a routine re-seed from the platoon reference never undoes a correction.
+SOURCE_RANK = {"operator_capture": 2, "fangraphs_platoon": 1}
 BATS = frozenset("LRS")
 THROWS = frozenset("LR")
 #: A row this many days past its own stamp is NAMED. A bat side is stable, so this
@@ -98,6 +101,8 @@ def read_handedness(path: Path) -> Tuple[List[Dict[str, str]], Dict[str, Any]]:
         return [], report
     with path.open(newline="", encoding="utf-8") as handle:
         reader = csv.DictReader(handle)
+        if reader.fieldnames is None:                      # a zero-byte file is an empty reference
+            return [], report
         if tuple(reader.fieldnames or ()) != FIELDS:
             raise HandednessError(
                 f"{path}: header {tuple(reader.fieldnames or ())} is not {FIELDS}")
@@ -180,11 +185,13 @@ def rows_from_capture(text: str, as_of: str) -> List[Dict[str, str]]:
     stamped = _iso(as_of, "--as-of").isoformat()
     out: List[Dict[str, str]] = []
     bad: List[str] = []
+    first = True
     for number, record in enumerate(csv.reader(io.StringIO(text)), start=1):
         if not record or not "".join(record).strip():
             continue
         cells = [c.strip() for c in record]
-        if number == 1 and [c.lower() for c in cells[:3]] == ["name", "team", "bats"]:
+        header_candidate, first = first, False             # the first NON-BLANK line
+        if header_candidate and [c.lower() for c in cells[:3]] == ["name", "team", "bats"]:
             continue
         if len(cells) < 3 or len(cells) > 4:
             bad.append(f"line {number}: expected name,team,bats[,throws], got {len(cells)} cells")
@@ -216,7 +223,8 @@ def upsert(existing: Sequence[Mapping[str, str]],
         if old is None:
             merged[key] = dict(row)
             added += 1
-        elif row["stamped"] >= old["stamped"]:
+        elif (SOURCE_RANK.get(row["source"], 0), row["stamped"]) >= (
+                SOURCE_RANK.get(old["source"], 0), old["stamped"]):
             new = dict(old)
             for field in ("bats", "throws"):
                 if row[field]:
@@ -360,7 +368,10 @@ def _seed(args: argparse.Namespace) -> int:
     incoming: List[Dict[str, str]] = []
     report: Dict[str, Any] = {"csv": str(path)}
     if args.from_platoon:
-        platoon = json.loads(Path(args.from_platoon).read_text(encoding="utf-8"))
+        try:
+            platoon = json.loads(Path(args.from_platoon).read_text(encoding="utf-8"))
+        except ValueError as exc:
+            raise HandednessError(f"{args.from_platoon} is not readable JSON: {exc}") from exc
         rows, report["platoon"] = rows_from_platoon(platoon)
         incoming += rows
     if args.stdin:
