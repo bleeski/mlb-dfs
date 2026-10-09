@@ -6,9 +6,15 @@ ends, so everything that should follow a merge was left to whoever remembered:
 stale branches piled up on GitHub and on Ben's disk, "is my disk in sync?" had
 no answer a cloud session could give (it cannot see his disk), and the next
 chunk of work was a prompt Ben wrote by hand. `/handoff` is the procedure; this
-is its three deterministic parts, each a subcommand so a session prints them
+is its four deterministic parts, each a subcommand so a session prints them
 rather than composing them from memory.
 
+THE CLOSE-OUT IS FOR DEV MERGES ONLY (Ben, 2026-10-08; R492). A lineup run ends in
+a `record: ... delivery` PR, a standings or ledger session ends in an ARCHIVE PR, and
+neither needs a branch sweep, a sync block or a next-session prompt. `scope` is the
+check: it reads what the merge changed and prints RUN or SKIP.
+
+  scope       RUN or SKIP the close-out for one merge, from the paths it changed.
   branches    classify every branch against origin/main; with --apply delete
               ONLY the class that loses nothing.
   powershell  the copy/paste block that brings Ben's Windows clone level with
@@ -46,12 +52,25 @@ an ancestor of origin/main, which is the whole of what `-d` checks; it uses `-D`
 only because `-d` tests the CURRENT branch rather than origin/main, so it
 refuses a branch that is merged. It never force-pushes.
 
+WHAT `scope` DECIDES. It diffs `<sha>^1..<sha>`. For a merge commit `^1` is main
+before the PR, so that is exactly what the PR brought in; for a non-merge sha (a
+fast-forward, a lone commit) `^1` is its only parent, so it is that commit's own
+diff. SKIP needs POSITIVE evidence: at least one path, and every path is a
+create-only fragment or lies in the BUILD or ARCHIVE write set (`claim.WRITE_SETS`,
+`claim.FRAGMENT_PREFIXES`, the same lists `claim.py dirt` uses). Anything else is RUN:
+a DEV path, a path no role owns, an empty diff. Wrongly running the close-out costs
+one message; wrongly skipping it silently loses the sync check and the next prompt.
+So a lineup run that also lands a code fix is a dev session, and reads RUN. The merge
+sha is usually not local yet (this is the first call after `gh pr merge`), so
+`--fetch` mirrors `branches --fetch`. Exit 3 means "could not decide": treat it as RUN.
+
 Exit codes, matching claim.py and sync_check.py:
-  0  nothing waits on Ben
+  0  nothing waits on Ben (`scope` exits 0 for RUN and for SKIP alike)
   2  `branches` found an ASK branch
-  3  usage or IO error
+  3  usage or IO error (`scope`: an unreadable sha or a failed fetch)
 
 Usage:
+    python tools/handoff.py scope --merge-sha <sha> [--fetch] [--json]
     python tools/handoff.py branches [--fetch] [--apply] [--json]
     python tools/handoff.py powershell --merge-sha <sha> [--repo-path PATH]
     python tools/handoff.py prompt [--session NN] [--merge-sha <sha>] [--note TEXT]
@@ -68,6 +87,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[1]
 if str(Path(__file__).resolve().parent) not in sys.path:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
+import claim  # noqa: E402  (WRITE_SETS and FRAGMENT_PREFIXES: `scope` reads the role surfaces, never restates them)
 import plan_status  # noqa: E402  (split_row, ROW and NEXT: one parser for the roadmap)
 
 BASE_REF = "origin/main"
@@ -318,6 +338,70 @@ def powershell_block(merge_sha: str, repo_path: str = WINDOWS_REPO) -> str:
 
 
 # --------------------------------------------------------------------------
+# scope
+# --------------------------------------------------------------------------
+
+def _under(path: str, surfaces) -> bool:
+    """claim.py's own match: equal to a file entry, or under a directory entry."""
+    return any(path == s or path.startswith(s) for s in surfaces)
+
+
+def classify_scope(paths: list[str]) -> dict:
+    """RUN or SKIP the close-out for a merge that changed `paths` (R492).
+
+    Per path, in this order: a create-only fragment is ignored (every role writes
+    them); a path in the DEV write set is `other` even if a record surface also
+    claims it, so a future overlap fails toward RUN; a path in the BUILD or ARCHIVE
+    write set is a `record`; everything else, including a path no role owns, is
+    `other`. SKIP needs at least one path and no `other`.
+    """
+    record_surfaces = tuple(sorted(set(claim.WRITE_SETS["BUILD"])
+                                   | set(claim.WRITE_SETS["ARCHIVE"])))
+    fragment: list[str] = []
+    record: list[str] = []
+    other: list[str] = []
+    for raw in sorted({p.replace("\\", "/") for p in paths if p}):
+        if _under(raw, claim.FRAGMENT_PREFIXES):
+            fragment.append(raw)
+        elif _under(raw, claim.WRITE_SETS["DEV"]):
+            other.append(raw)
+        elif _under(raw, record_surfaces):
+            record.append(raw)
+        else:
+            other.append(raw)
+    total = len(fragment) + len(record) + len(other)
+    if total == 0:
+        verdict, why = "RUN", ("the merge changed no paths, so nothing shows it was "
+                               "record-only")
+    elif other:
+        shown = ", ".join(other[:3]) + (f", +{len(other) - 3} more" if len(other) > 3 else "")
+        verdict, why = "RUN", (f"{len(other)} of {total} changed paths are outside the "
+                               f"delivery, archive and fragment surfaces: {shown}")
+    else:
+        verdict, why = "SKIP", (f"all {total} changed paths are delivery or archive "
+                                "records or create-only fragments: not a dev merge")
+    return {"verdict": verdict, "why": why, "fragment": fragment, "record": record,
+            "other": other}
+
+
+def merge_paths(root: Path, merge_sha: str) -> list[str]:
+    """Paths the merge brought into main: `git diff <sha>^1 <sha>`, NUL-separated so
+    a quoted or non-ASCII path arrives as itself."""
+    sha = merge_sha.strip().lower()
+    if not _SHA.match(sha):
+        raise ValueError(f"not a commit sha: {merge_sha!r}")
+    # --no-renames: with rename detection on, a moved file lists only its destination,
+    # so tools/x.py moved into data/reference/ would read as a record-only merge.
+    code, out, err = git(root, "diff", "--name-only", "--no-renames", "-z",
+                         f"{sha}^1", sha)
+    if code != 0:
+        raise ValueError(f"cannot diff {sha[:7]} against its first parent "
+                         f"({err.splitlines()[0] if err else f'rc {code}'}); "
+                         "pass --fetch if the merge is only on origin")
+    return [p for p in out.split("\0") if p]
+
+
+# --------------------------------------------------------------------------
 # prompt
 # --------------------------------------------------------------------------
 
@@ -498,6 +582,10 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description="the close-out after a dev PR merges")
     ap.add_argument("--root", type=Path, default=REPO, help=argparse.SUPPRESS)
     sub = ap.add_subparsers(dest="cmd", required=True)
+    s = sub.add_parser("scope", help="RUN or SKIP the close-out for one merge (DEV merges only)")
+    s.add_argument("--merge-sha", required=True)
+    s.add_argument("--fetch", action="store_true", help="git fetch --prune origin first")
+    s.add_argument("--json", action="store_true", dest="as_json")
     b = sub.add_parser("branches", help="classify branches; --apply deletes only the merged class")
     b.add_argument("--fetch", action="store_true", help="git fetch --prune origin first")
     b.add_argument("--apply", action="store_true", help="delete the DELETE class")
@@ -513,6 +601,17 @@ def main(argv=None) -> int:
     args = ap.parse_args(argv)
     root = args.root
     try:
+        if args.cmd == "scope":
+            if args.fetch and git(root, "fetch", "--prune", "origin", timeout=120)[0] != 0:
+                print("ERROR  git fetch failed; the merge may not be local, so no verdict. "
+                      "Treat this as RUN.", file=sys.stderr)
+                return 3
+            result = classify_scope(merge_paths(root, args.merge_sha))
+            if args.as_json:
+                print(json.dumps(result, indent=1, sort_keys=True))
+            else:
+                print(f"HANDOFF: {result['verdict']}  {result['why']}")
+            return 0
         if args.cmd == "powershell":
             print(powershell_block(args.merge_sha, args.repo_path))
             return 0

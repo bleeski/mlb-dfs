@@ -79,15 +79,25 @@ five are absent optional files, on every host including CI. A sixth is a finding
 
 Once `gate` is green and there is no conflict, merge it with a merge commit (`gh pr merge --merge`, never squash or rebase: `/handoff` reads ancestry to tell a merged branch from an unmerged one) and delete the branch.
 
-## 6. Hand off
+## 6. Hand off, for a DEV merge only
 
-Run `/handoff` (R491). It levels this checkout and Ben's clone with GitHub,
-deletes only the branches already on `main`, and writes his next-session prompt;
-a merge is not finished until it has run, because the container cannot do any of
-that after the session ends. Then report. Lead with anything waiting on Ben (a
-question, a declined part that needs his call, a branch `/handoff` left for his
-decision); then one line: the merge sha, the gate line, and what Ben would
-notice; then `/handoff`'s PowerShell block and, last, its prompt.
+First ask whether this merge gets the close-out at all (R492; Ben, 2026-10-08):
+
+```
+python tools/handoff.py scope --merge-sha <the merge sha> --fetch
+```
+
+- `HANDOFF: SKIP` (a lineup run's `record:` PR, a standings or ledger PR): stop at
+  the merge. Report anything waiting on Ben, then the merge sha and the gate line.
+  No `/handoff`, no branch sweep, no PowerShell block, no next-session prompt.
+- `HANDOFF: RUN`, or exit 3 (could not decide, so treat it as RUN): run `/handoff`
+  (R491). It levels this checkout and Ben's clone with GitHub, deletes only the
+  branches already on `main`, and writes his next-session prompt; a DEV merge is not
+  finished until it has run, because the container cannot do any of that after the
+  session ends. Then report. Lead with anything waiting on Ben (a question, a
+  declined part that needs his call, a branch `/handoff` left for his decision);
+  then one line: the merge sha, the gate line, and what Ben would notice; then
+  `/handoff`'s PowerShell block and, last, its prompt.
 
 ## 7. If you cannot finish
 

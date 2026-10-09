@@ -1,11 +1,19 @@
 ---
 name: handoff
-description: Close out after an mlb-dfs dev PR merges: level this checkout and Ben's clone with GitHub, delete only the branches that lose nothing, and write the next-session prompt (plan mode, the advisor, what to do, how much effort, how to verify). /ship runs it after every merge; run it by hand when Ben merged a PR himself, or when he says "hand off", "next prompt", "clean up branches" or "sync my disk".
+description: Close out after an mlb-dfs DEV PR merges: level this checkout and Ben's clone with GitHub, delete only the branches that lose nothing, and write the next-session prompt (plan mode, the advisor, what to do, how much effort, how to verify). DEV merges only: a lineup run's record PR, a standings PR or a ledger PR stops at the merge. /ship runs it after a DEV merge; run it by hand when Ben merged a DEV PR himself, or when he says "hand off", "next prompt", "clean up branches" or "sync my disk".
 ---
 
-# Hand off after a merge
+# Hand off after a DEV merge
 
-`/ship` ends at the merge. A cloud container is reclaimed when the session ends and cannot see Ben's disk, so whatever should follow a merge is done here, in this message, or it is not done (R491). Each part is a subcommand of `tools/handoff.py`: print its output, do not compose it from memory.
+`/ship` ends at the merge. A cloud container is reclaimed when the session ends and cannot see Ben's disk, so whatever should follow a DEV merge is done here, in this message, or it is not done (R491). Each part is a subcommand of `tools/handoff.py`: print its output, do not compose it from memory.
+
+## 0. Is this a DEV merge? (R492; Ben, 2026-10-08)
+
+```
+python tools/handoff.py scope --merge-sha <the merge sha> --fetch
+```
+
+The close-out is for DEV sessions only. A lineup run ends in a `record:` delivery PR, a standings or ledger session ends in an ARCHIVE PR, and neither needs a branch sweep, a sync block or a next-session prompt. `scope` reads what the merge brought into `main` and prints one line. `HANDOFF: SKIP` means every changed path is a delivery or archive record or a create-only fragment: stop here, run none of parts 1 to 4, and report the merge sha and anything waiting on Ben. `HANDOFF: RUN` means it changed something a DEV session owns, or something no role owns: go on. Exit 3 means it could not decide (an unknown sha, a failed fetch): treat that as RUN. A lineup run that also lands a DEV change reads RUN, which is the intent. It passes `--fetch` because the merge is usually only on origin when you run it. When Ben asks outright ("hand off", "next prompt", "sync my disk"), run the parts he asked for whatever `scope` says.
 
 ## 1. Level this checkout with GitHub
 
@@ -47,4 +55,4 @@ It reads **NEXT** from `origin/main` after the fetch, so `/land` having advanced
 
 ## The message
 
-In this order: what waits on Ben (an `ASK` or `KEEP-CITED` branch with its commands, a decision the next row needs), then the merge sha with the gate line and the sync evidence, then the PowerShell block if you printed one, then the prompt last, so the last thing on the screen is the thing he copies.
+For a `RUN`, in this order: what waits on Ben (an `ASK` or `KEEP-CITED` branch with its commands, a decision the next row needs), then the merge sha with the gate line and the sync evidence, then the PowerShell block if you printed one, then the prompt last, so the last thing on the screen is the thing he copies.

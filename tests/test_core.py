@@ -48870,6 +48870,232 @@ class HandoffToolTests(unittest.TestCase):
         with contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(tool.main(["--root", str(work), "branches"]), 0)
 
+    # --- scope (R492) -----------------------------------------------------
+
+    def _scope_repo(self):
+        """A bare origin and a work clone on main with one base commit."""
+        tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+        self.addCleanup(tmp.cleanup)
+        base = Path(tmp.name)
+        origin, work = base / "origin.git", base / "work"
+        self._git(base, "init", "-q", "--bare", "--initial-branch=main", str(origin))
+        self._git(base, "clone", "-q", str(origin), str(work))
+        (work / "base.txt").write_text("base", encoding="utf-8")
+        self._git(work, "add", "base.txt")
+        self._git(work, "commit", "-q", "-m", "base")
+        self._git(work, "push", "-q", "-u", "origin", "main")
+        return base, origin, work
+
+    def _merge_pr(self, work, paths, name="pr"):
+        """Merge a branch that adds `paths` into main with a merge commit; its sha."""
+        self._git(work, "switch", "-q", "-c", name, "main")
+        if not paths:
+            self._git(work, "commit", "-q", "--allow-empty", "-m", name)
+        for rel in paths:
+            target = work / rel
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(f"{name}:{rel}", encoding="utf-8")
+            self._git(work, "add", rel)
+        if paths:
+            self._git(work, "commit", "-q", "-m", name)
+        self._git(work, "switch", "-q", "main")
+        self._git(work, "merge", "-q", "--no-ff", "-m", f"merge {name}", name)
+        return self._git(work, "rev-parse", "HEAD")
+
+    def _scope(self, work, sha, *extra):
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = self._tool().main(
+                ["--root", str(work), "scope", "--merge-sha", sha, *extra])
+        return code, out.getvalue(), err.getvalue()
+
+    def test_a_record_only_merge_skips_the_close_out(self):
+        _, _, work = self._scope_repo()
+        sha = self._merge_pr(work, ["data/deliveries/2026-10-08/1600_4g_run.json",
+                                    "data/agent_runs/2026-10-08/session.jsonl"])
+        code, out, _ = self._scope(work, sha)
+        self.assertEqual(code, 0)
+        self.assertTrue(out.startswith("HANDOFF: SKIP"), out)
+
+    def test_an_archive_merge_and_a_fragment_only_merge_skip_it_too(self):
+        _, _, work = self._scope_repo()
+        archive = self._merge_pr(work, ["ledger/MLB_Classic_Calibration_Ledger.md",
+                                        "data/archive/2026-10-08/contest.csv",
+                                        "data/standings/inbox/standings.csv"], "archive")
+        fragments = self._merge_pr(work, ["docs/backlog_inbox/2026-10-08_BUILD_x.md",
+                                          "ledger/inbox/2026-10-08_BUILD_y.md"], "fragments")
+        for sha in (archive, fragments):
+            self.assertTrue(self._scope(work, sha)[1].startswith("HANDOFF: SKIP"), sha)
+
+    def test_a_merge_that_touches_a_dev_path_runs(self):
+        _, _, work = self._scope_repo()
+        engine = self._merge_pr(work, ["tools/new_tool.py"], "tool")
+        log = self._merge_pr(work, ["CHANGELOG.md"], "changelog")
+        for sha, path in ((engine, "tools/new_tool.py"), (log, "CHANGELOG.md")):
+            code, out, _ = self._scope(work, sha)
+            self.assertEqual(code, 0)
+            self.assertTrue(out.startswith("HANDOFF: RUN"), out)
+            self.assertIn(path, out)
+
+    def test_record_paths_beside_one_dev_path_run(self):
+        # PR #126 had this shape: a record PR that also carried tests, the CHANGELOG
+        # and the workflow. A lineup run that lands a DEV change is a dev session.
+        _, _, work = self._scope_repo()
+        sha = self._merge_pr(work, ["data/deliveries/2026-10-07/a.json",
+                                    "data/deliveries/2026-10-07/b.json",
+                                    "tests/test_new.py"])
+        out = self._scope(work, sha)[1]
+        self.assertTrue(out.startswith("HANDOFF: RUN"), out)
+        self.assertIn("1 of 3 changed paths", out)
+
+    def test_a_path_no_role_owns_runs_rather_than_skips(self):
+        _, _, work = self._scope_repo()
+        alone = self._merge_pr(work, ["scratch_new_dir/thing.txt"], "alone")
+        beside = self._merge_pr(work, ["data/deliveries/2026-10-08/a.json",
+                                       "unowned.txt"], "beside")
+        for sha in (alone, beside):
+            self.assertTrue(self._scope(work, sha)[1].startswith("HANDOFF: RUN"), sha)
+
+    def test_an_empty_merge_runs(self):
+        _, _, work = self._scope_repo()
+        sha = self._merge_pr(work, [], "empty")
+        out = self._scope(work, sha)[1]
+        self.assertTrue(out.startswith("HANDOFF: RUN"), out)
+        self.assertIn("changed no paths", out)
+
+    def test_a_plain_commit_is_read_as_its_own_diff(self):
+        _, _, work = self._scope_repo()
+        for rel, verdict in (("data/deliveries/2026-10-08/a.json", "SKIP"),
+                             ("tools/plain.py", "RUN")):
+            target = work / rel
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(rel, encoding="utf-8")
+            self._git(work, "add", rel)
+            self._git(work, "commit", "-q", "-m", rel)
+            sha = self._git(work, "rev-parse", "HEAD")
+            self.assertTrue(self._scope(work, sha)[1].startswith(f"HANDOFF: {verdict}"), rel)
+
+    def test_a_moved_dev_file_still_runs_because_renames_are_not_collapsed(self):
+        # with rename detection on, name-only lists just the destination, which here
+        # is a record surface
+        _, _, work = self._scope_repo()
+        self._merge_pr(work, ["tools/moved.py"], "add")
+        self._git(work, "switch", "-q", "-c", "move", "main")
+        (work / "data" / "reference").mkdir(parents=True)
+        self._git(work, "mv", "tools/moved.py", "data/reference/moved.py")
+        self._git(work, "commit", "-q", "-m", "move")
+        self._git(work, "switch", "-q", "main")
+        self._git(work, "merge", "-q", "--no-ff", "-m", "merge move", "move")
+        out = self._scope(work, self._git(work, "rev-parse", "HEAD"))[1]
+        self.assertTrue(out.startswith("HANDOFF: RUN"), out)
+        self.assertIn("tools/moved.py", out)
+
+    def test_an_unreadable_sha_exits_3(self):
+        _, _, work = self._scope_repo()
+        for sha, said in (("deadbeef", "cannot diff"), ("zz;rm", "not a commit sha")):
+            code, out, err = self._scope(work, sha)
+            self.assertEqual(code, 3, sha)
+            self.assertEqual(out, "")
+            self.assertIn(said, err)
+
+    def test_a_sha_shaped_like_an_option_never_reaches_git(self):
+        # `git diff --output=<file>` writes that file, so a sha is hex or it is refused
+        _, _, work = self._scope_repo()
+        with self.assertRaisesRegex(ValueError, "not a commit sha"):
+            self._tool().merge_paths(work, "--output=pwned.txt")
+        self.assertFalse((work / "pwned.txt").exists())
+
+    def test_fetch_reaches_a_merge_that_exists_only_on_origin(self):
+        base, origin, work = self._scope_repo()
+        other = base / "other"
+        self._git(base, "clone", "-q", str(origin), str(other))
+        sha = self._merge_pr(other, ["data/deliveries/2026-10-08/a.json"])
+        self._git(other, "push", "-q", "origin", "main")
+        code, out, err = self._scope(work, sha)
+        self.assertEqual((code, out), (3, ""))
+        self.assertIn("--fetch", err)
+        code, out, _ = self._scope(work, sha, "--fetch")
+        self.assertEqual(code, 0)
+        self.assertTrue(out.startswith("HANDOFF: SKIP"), out)
+
+    def test_a_failed_fetch_exits_3_and_says_to_treat_it_as_run(self):
+        base, _, work = self._scope_repo()
+        sha = self._merge_pr(work, ["data/deliveries/2026-10-08/a.json"])
+        self._git(work, "remote", "set-url", "origin", str(base / "nowhere.git"))
+        code, out, err = self._scope(work, sha, "--fetch")
+        self.assertEqual((code, out), (3, ""))
+        self.assertIn("Treat this as RUN", err)
+
+    def test_every_write_set_entry_classifies_the_way_its_role_does(self):
+        tool = self._tool()
+
+        def probe(entry):
+            return entry + "probe.txt" if entry.endswith("/") else entry
+
+        for role, verdict in (("DEV", "RUN"), ("BUILD", "SKIP"), ("ARCHIVE", "SKIP")):
+            for entry in tool.claim.WRITE_SETS[role]:
+                got = tool.classify_scope([probe(entry)])["verdict"]
+                self.assertEqual(got, verdict, f"{role} entry {entry} reads {got}")
+        for entry in tool.claim.FRAGMENT_PREFIXES:
+            self.assertEqual(tool.classify_scope([probe(entry)])["verdict"], "SKIP", entry)
+
+    def test_a_path_a_record_set_and_the_dev_set_both_claim_runs(self):
+        # a future overlap between a record surface and the DEV set fails toward RUN
+        tool = self._tool()
+        widened = {"ARCHIVE": (*tool.claim.WRITE_SETS["ARCHIVE"], "tools/")}
+        with unittest.mock.patch.dict(tool.claim.WRITE_SETS, widened):
+            self.assertEqual(tool.classify_scope(["tools/x.py"])["verdict"], "RUN")
+            self.assertEqual(tool.classify_scope(
+                ["tools/x.py", "data/deliveries/d/a.json"])["verdict"], "RUN")
+
+    def test_json_names_the_paths_in_each_class(self):
+        _, _, work = self._scope_repo()
+        sha = self._merge_pr(work, ["data/deliveries/2026-10-08/a.json",
+                                    "docs/backlog_inbox/2026-10-08_BUILD_x.md",
+                                    "tools/x.py"])
+        code, out, _ = self._scope(work, sha, "--json")
+        got = json.loads(out)
+        self.assertEqual(code, 0)
+        self.assertEqual(got["verdict"], "RUN")
+        self.assertEqual(got["record"], ["data/deliveries/2026-10-08/a.json"])
+        self.assertEqual(got["fragment"], ["docs/backlog_inbox/2026-10-08_BUILD_x.md"])
+        self.assertEqual(got["other"], ["tools/x.py"])
+
+    def _doc(self, *parts):
+        return self.ROOT.joinpath(*parts).read_text(encoding="utf-8")
+
+    def test_the_ship_skill_runs_the_check_with_fetch_before_the_close_out(self):
+        section = self._doc(".claude", "skills", "ship", "SKILL.md").split(
+            "## 6.", 1)[1].split("## 7.", 1)[0]
+        self.assertIn("python tools/handoff.py scope --merge-sha <the merge sha> --fetch",
+                      section)
+        self.assertLess(section.index("handoff.py scope"), section.index("run `/handoff`"))
+        for needle in ("HANDOFF: SKIP", "HANDOFF: RUN", "treat it as RUN"):
+            self.assertIn(needle, section)
+
+    def test_the_handoff_skill_opens_with_the_check_and_treats_exit_3_as_run(self):
+        text = self._doc(".claude", "skills", "handoff", "SKILL.md")
+        self.assertIn("DEV merges only", text.split("---", 2)[1])
+        zero = text.split("## 0.", 1)[1].split("## 1.", 1)[0]
+        self.assertIn("python tools/handoff.py scope --merge-sha <the merge sha> --fetch",
+                      zero)
+        for needle in ("HANDOFF: SKIP", "HANDOFF: RUN", "Exit 3", "treat that as RUN"):
+            self.assertIn(needle, zero)
+
+    def test_claude_md_states_the_dev_only_rule_and_names_the_check(self):
+        bullet = next(ln for ln in self._doc("CLAUDE.md").splitlines()
+                      if ln.startswith("- Shipping is the session's"))
+        self.assertIn("A DEV merge then gets `/handoff`", bullet)
+        self.assertIn("`record:` PR", bullet)
+        self.assertIn("gets none of that unless it also changed DEV paths", bullet)
+        self.assertIn("python tools/handoff.py scope --merge-sha <sha> --fetch", bullet)
+
+    def test_the_lineup_skill_says_the_record_pr_ends_at_the_merge(self):
+        flat = " ".join(self._doc("skills", "generate-lineups", "SKILL.md").split())
+        self.assertIn("The record PR ends at its merge: no `/handoff`", flat)
+        self.assertIn("RUN only if that PR also changed DEV paths", flat)
+        self.assertIn("tools/handoff.py scope --merge-sha <sha> --fetch", flat)
+
     # --- powershell -------------------------------------------------------
 
     def test_the_powershell_block_only_fast_forwards_and_never_forces(self):
