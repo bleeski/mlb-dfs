@@ -938,13 +938,24 @@ labelled `partial`, and the slot is named in `unrostered_starters`. In bulk it
 DOES block, because it stops being N facts: past half of one posted side, or a
 quarter of the whole paste with at least six, the paste and the salary file are
 not the same slate. If that fires, check the pairing before anything else.
+Two lines look alike and are not (R319): `NAME FORM  LAD slot 9: pasted 'E Hernandez'
+read as DK 'Kike Hernandez'` is the nickname table matching a first name DK files
+differently, and `NAME FORM MISMATCH` is a name nothing matched whose surname and team
+match exactly one DK hitter no other starter claims. The second ships non-fatal and
+holds the side PARTIAL until you confirm it with the `--resolve "<pasted>=<DK name>"`
+it prints, so read it before the build, not after.
 
 **Paste every game, including the ones nobody has posted.** An unposted side
 renders `1. TBD` and an unannounced probable renders a bare `TBD`. Both are
 positional facts the parser needs: they hold the empty slot so the counts line up
 and each lineup goes to the side that posted it. Trimming them out is what makes
 a half-posted game ambiguous, and the tool will then refuse the game rather than
-guess. Paste the page as it comes.
+guess. Paste the page as it comes. Three renders are read (R429): the matchup on one
+line or on three (`Twins` / `@` / `Giants`), hitters numbered or not (`B Rice (L) DH`,
+ordered by their place in the block, printed as `batting orders read by position`), and
+an unposted side as `1. TBD` or a bare `TBD`. A paste it cannot read exits 2 and names
+the lines: zero games from a non-empty paste, or a game whose two lineup headers were
+read with no hitter and at least nine lines dropped after them.
 
 **A side the paste leaves unnamed gets its probable from DK.** The salary file's
 `Starting` column (SP/P) is a first-class source, printed as `DK STARTING`. On

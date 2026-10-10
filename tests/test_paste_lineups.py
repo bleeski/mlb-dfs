@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import csv
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -2059,3 +2060,474 @@ class NoPitcherLineWarningTests(unittest.TestCase):
                         capture_output=True, text=True)
                     self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                     self.assertIn(expected, result.stdout)
+
+
+# ---------------------------------------------------------------------------
+# R429: the third mlb.com render
+# ---------------------------------------------------------------------------
+
+_MATCHUP_LINE = re.compile(r"^(?P<away>[^@\d]+)@(?P<home>[^@\d]+)$")
+_NUMBERED_ROW = re.compile(r"^\d{1,2}\.\s*(?P<row>.+\([RLS]\)\s*[A-Z0-9/]{1,4})$")
+_ANY_ROW = re.compile(r"^(?P<name>.+) \((?P<bats>[RLS])\) (?P<pos>[A-Z0-9/]{1,4})$")
+
+
+def _third_render(text: str, *, split_matchup: bool = True) -> str:
+    """The vendored real paste restated in the third render's shape (R429).
+
+    CONSTRUCTED, and says so: the raw 2026-09-23 paste is on Ben's disk and in no
+    tracked file, so this applies the three differences the filed entry names to the
+    real 07-29 paste, mechanically. Links are stripped (a plain-text copy keeps the
+    link text and drops the href, so no MLBAM id and no Gameday id survive), the
+    matchup becomes `Club` / `@` / `Club` on three lines, and the hitters lose their
+    order number (`B Rice (L) DH`).
+    """
+    out = []
+    for line in re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", text).splitlines():
+        shown = line.strip()
+        matchup = _MATCHUP_LINE.match(shown)
+        if matchup and split_matchup:
+            out += [matchup.group("away").strip(), "@", matchup.group("home").strip()]
+            continue
+        row = _NUMBERED_ROW.match(shown)
+        out.append(row.group("row") if row else line)
+    return "\n".join(out) + "\n"
+
+
+def _tbd_for_block(text: str, first_row: str) -> str:
+    """Replace the nine rows that open with ``first_row`` by a bare ``TBD``."""
+    lines = text.splitlines()
+    at = lines.index(first_row)
+    return "\n".join(lines[:at] + ["TBD"] + lines[at + 9:]) + "\n"
+
+
+HOU_FIRST, LAA_FIRST = "J Peña (R) SS", "Z Neto (R) SS"
+
+
+def _fed(text: str, **kw):
+    return resolve_paste_to_feed(text, str(SALARY), resolve_overrides=RESOLVE,
+                                 fetched_at="2026-10-10T00:00:00Z", **kw)
+
+
+def _tool(text: str, *extra: str, out: bool = False):
+    """Run the CLI on ``text``; returns (completed process, feed text or None)."""
+    with tempfile.TemporaryDirectory() as tmp:
+        paste = Path(tmp) / "paste.txt"
+        paste.write_text(text, encoding="utf-8")
+        feed = Path(tmp) / "feed.json"
+        cmd = [sys.executable, str(REPO / "tools" / "lineups_from_paste.py"),
+               "--salary", str(SALARY), "--paste", str(paste),
+               "--resolve", "W Wilson=Weston Wilson", *extra]
+        if out:
+            cmd += ["--out", str(feed)]
+        done = subprocess.run(cmd, capture_output=True, text=True)
+        return done, (feed.read_text(encoding="utf-8") if feed.exists() else None)
+
+
+class ThirdRenderTests(unittest.TestCase):
+    """R429. mlb.com's third render, and the exits that make an unread one loud.
+
+    The render splits the matchup over three lines (`Twins` / `@` / `Giants`),
+    drops the order number from every hitter row and marks an unposted side with a
+    bare `TBD` under the two lineup headers. The parser read none of it: zero games
+    at exit 0 with an empty feed, and its half-read sibling (matchup joined, hitters
+    unnumbered) parsed three games with ZERO hitters, six probables and no blocker,
+    which on a fully posted slate kills F4's platoon term (bat_side comes from the
+    paste) while the SP term lives.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.third = _third_render(_text())
+        cls.numbered = _fed(_text())
+
+    def test_the_fixture_really_is_the_third_render(self):
+        self.assertIn("Astros\n@\nAngels\n", self.third)
+        self.assertIn("\nJ Peña (R) SS\n", self.third)
+        self.assertNotRegex(self.third, r"(?m)^\d{1,2}\. ")
+
+    def test_three_line_matchups_open_games_and_nothing_warns(self):
+        games, warnings = parse_paste(self.third)
+        self.assertEqual([g.game_id for g in games], ["HOU@LAA", "BOS@ATH", "SEA@LAD"])
+        self.assertEqual([(g.away_club, g.home_club) for g in games],
+                         [("Astros", "Angels"), ("Red Sox", "Athletics"),
+                          ("Mariners", "Dodgers")])
+        self.assertEqual(warnings, [])
+
+    def test_the_matchup_join_is_exact_about_what_it_joins(self):
+        from mlb_engine.intake.paste_lineups import _join_split_matchups
+        self.assertEqual(_join_split_matchups(["Twins", "@", "Giants"]),
+                         ["Twins@Giants", "", ""])
+        self.assertEqual(_join_split_matchups(
+            ["[Twins](https://www.mlb.com/twins)", "", "@", "[Giants](https://x)"]),
+            ["[Twins](https://www.mlb.com/twins)@[Giants](https://x)", "", "", ""])
+        # A digit in either name is not a club, and a middle line that is not '@' joins nothing.
+        for lines in (["Twins", "@", "(54-55)"], ["Twins", "vs", "Giants"],
+                      ["9:38 PM", "@", "Giants"]):
+            with self.subTest(lines):
+                self.assertEqual(_join_split_matchups(lines), lines)
+
+    def test_the_third_render_resolves_to_the_numbered_feed(self):
+        """Every field the build reads is identical. What differs is only what a
+        plain-text copy cannot carry: the MLBAM ids and the Gameday id, both of which
+        live in link hrefs."""
+        out = _fed(self.third)
+        self.assertEqual(out["report"]["blockers"], [])
+        self.assertEqual(out["report"]["warnings"], self.numbered["report"]["warnings"])
+
+        def _core(feed):
+            games = json.loads(json.dumps(feed["games"]))
+            for game in games:
+                game.pop("game_pk")
+                for side in ("away", "home"):
+                    for row in game[side]["lineup"]:
+                        row.pop("id")
+                    (game[side]["probable_pitcher"] or {}).pop("id", None)
+            return games
+
+        self.assertEqual(_core(out["feed"]), _core(self.numbered["feed"]))
+        self.assertEqual(out["report"]["resolved"], self.numbered["report"]["resolved"])
+        self.assertEqual(out["report"]["confirmed_teams"],
+                         self.numbered["report"]["confirmed_teams"])
+
+    def test_every_position_read_order_matches_dks_starting_slot(self):
+        """The in-repo analogue of the filed 135 of 135: the order a hitter is given
+        by his place in the block is the slot DK's Starting column posts for him."""
+        from mlb_engine.intake.slate_intake_manager import parse_dk_salary_csv
+        starting = {str(p.player_id): str(p.starting or "").strip()
+                    for p in parse_dk_salary_csv(str(SALARY))}
+        checked, mismatched = 0, []
+        for game in _fed(self.third)["feed"]["games"]:
+            for side in ("away", "home"):
+                for row in game[side]["lineup"]:
+                    posted = starting[row["dk_player_id"]]
+                    if posted:
+                        checked += 1
+                        if posted != str(row["order"]):
+                            mismatched.append((row["name"], row["order"], posted))
+        self.assertGreaterEqual(checked, 18, "the fixture must exercise the comparison")
+        self.assertEqual(mismatched, [])
+
+    def test_the_report_names_the_games_whose_orders_were_read_by_position(self):
+        self.assertEqual(_fed(self.third)["report"]["games_with_positional_orders"],
+                         ["BOS@ATH", "HOU@LAA", "SEA@LAD"])
+        self.assertEqual(self.numbered["report"]["games_with_positional_orders"], [])
+
+    def test_blank_lines_are_not_separators(self):
+        """The layout between the two blocks is not known, and the rule has to hold
+        under all of them: none, one, or a blank after every row."""
+        for label, text in (
+                ("none", "\n".join(l for l in self.third.splitlines() if l.strip()) + "\n"),
+                ("between every line", "\n\n".join(self.third.splitlines()) + "\n")):
+            with self.subTest(label):
+                out = _fed(text)
+                self.assertEqual(out["report"]["blockers"], [])
+                self.assertEqual(out["report"]["confirmed_teams"],
+                                 self.numbered["report"]["confirmed_teams"])
+
+    def test_a_bare_tbd_side_holds_its_place_in_either_position(self):
+        """`[9 HOU][TBD]` and `[TBD][9 LAA]`: the posted nine goes to the team that
+        posted it, and the TBD is an empty block, not a third pitcher."""
+        for label, text, posted, unposted in (
+                ("home TBD", _tbd_for_block(self.third, LAA_FIRST), "HOU", "LAA"),
+                ("away TBD", _tbd_for_block(self.third, HOU_FIRST), "LAA", "HOU")):
+            with self.subTest(label):
+                out = _fed(text)
+                game = out["feed"]["games"][0]
+                self.assertEqual(out["report"]["blockers"], [])
+                side = {"HOU": game["away"], "LAA": game["home"]}
+                self.assertEqual(side[posted]["lineup_status"], "confirmed")
+                self.assertEqual([r["order"] for r in side[posted]["lineup"]],
+                                 list(range(1, 10)))
+                self.assertEqual(side[unposted]["lineup_status"], "tbd")
+                self.assertEqual(side[unposted]["lineup"], [])
+                self.assertFalse(any("probable pitcher line" in w
+                                     for w in out["report"]["warnings"]),
+                                 out["report"]["warnings"])
+                self.assertEqual(out["report"]["probables_pasted"], 6)
+
+    def test_a_bare_tbd_before_the_headers_is_still_a_probable_slot(self):
+        """The header gate: the same bare `TBD` in the probable's place stays a
+        pitcher entry, and the lineups it sits beside are untouched."""
+        arms = ("Hayden Wesneski\nRHP\n0-0, 4.76 ERA, 4 SO\n"
+                "Grayson Rodriguez\nRHP\n3-3, 7.98 ERA, 36 SO\n")
+        self.assertIn(arms, self.third)
+        out = _fed(self.third.replace(arms, "TBD\nTBD\n"))
+        self.assertEqual(out["report"]["blockers"], [])
+        self.assertEqual(out["report"]["sides_without_pasted_probable"], ["HOU", "LAA"])
+        game = out["feed"]["games"][0]
+        self.assertEqual(game["away"]["lineup_status"], "confirmed")
+        self.assertEqual(game["home"]["lineup_status"], "confirmed")
+
+    def test_a_run_that_cannot_say_where_a_side_ends_is_refused_and_named(self):
+        """Nine HOU rows and eight LAA rows with nothing between them is seventeen
+        rows in a row: not one side, not two full ones. Guessing hangs LAA's first
+        hitter on HOU, so none are attached and the exit names the dropped lines."""
+        text = self.third.replace("T Heineman (S) C\n", "")
+        games, warnings = parse_paste(text)
+        self.assertEqual(games[0].away_lineup, [])
+        self.assertEqual(games[0].home_lineup, [])
+        self.assertTrue(any("17 hitter rows with no order number ran together" in w
+                            for w in warnings), warnings)
+        blockers = _fed(text)["report"]["blockers"]
+        self.assertEqual(len(blockers), 1, blockers)
+        self.assertIn("HOU@LAA: both '<TEAM> Lineup' headers were read and no hitter was",
+                      blockers[0])
+        # The 17 rows plus the page's own `Gameday` line, which is name-shaped and held.
+        self.assertRegex(blockers[0], r"but 18 name-shaped line\(s\) follow them")
+        self.assertIn("J Peña (R) SS", blockers[0])
+
+    def _unknown_render(self, rows: int = 18) -> str:
+        """The first ``rows`` hitter rows (HOU@LAA's) as `Name - POS`: no bat side,
+        so no pattern reads them. Pitchers and every other game are untouched."""
+        out, count = [], 0
+        for line in self.third.splitlines():
+            row = _ANY_ROW.match(line)
+            if row and count < rows:
+                out.append(f"{row.group('name')} - {row.group('pos')}")
+                count += 1
+            else:
+                out.append(line)
+        self.assertEqual(count, rows)
+        return "\n".join(out) + "\n"
+
+    def test_a_lineup_render_nothing_reads_blocks_and_names_the_lines(self):
+        """A fully posted game, both probables read, no hitter read: the pass the
+        literal 'zero probables' trigger would give. Only that game blocks."""
+        out = _fed(self._unknown_render())
+        blockers = out["report"]["blockers"]
+        self.assertEqual(len(blockers), 1, blockers)
+        self.assertIn("HOU@LAA: both '<TEAM> Lineup' headers were read and no hitter was",
+                      blockers[0])
+        self.assertIn("name-shaped line(s) follow them and were dropped", blockers[0])
+        self.assertIn("J Peña - SS", blockers[0])
+        game = parse_paste(self._unknown_render())[0][0]
+        self.assertIsNotNone(game.away_pitcher)
+        self.assertIsNotNone(game.home_pitcher,
+                             "both probables read fine, which is why this passed")
+        self.assertEqual(game.away_lineup + game.home_lineup, [])
+
+    def test_the_cli_exits_2_writes_no_feed_and_names_the_game(self):
+        done, feed = _tool(self._unknown_render(), out=True)
+        self.assertEqual(done.returncode, 2, done.stdout + done.stderr)
+        self.assertIn("BLOCKER  HOU@LAA: both '<TEAM> Lineup' headers were read",
+                      done.stderr)
+        self.assertIsNone(feed, "a blocker never writes the feed")
+
+    def test_the_same_unread_render_on_a_game_off_the_slate_does_not_block(self):
+        text = (self._unknown_render().replace("Astros\n@\nAngels", "Guardians\n@\nTigers")
+                .replace("HOU Lineup", "CLE Lineup").replace("LAA Lineup", "DET Lineup"))
+        out = _fed(text)
+        self.assertEqual(out["report"]["blockers"], [])
+        self.assertTrue(any("CLE@DET" in w and "absent from the salary file" in w
+                            for w in out["report"]["warnings"]), out["report"]["warnings"])
+
+    def test_a_game_nobody_posted_with_a_stray_line_does_not_block(self):
+        """The nine-line floor: one line of page decoration between the headers and
+        two bare TBDs is not a posted lineup the parser failed to read."""
+        text = _tbd_for_block(_tbd_for_block(self.third, HOU_FIRST), LAA_FIRST)
+        text = text.replace("LAA Lineup\n", "LAA Lineup\nLineups not yet posted\n")
+        games, _ = parse_paste(text)
+        self.assertEqual(games[0].unread, ["Lineups not yet posted"])
+        self.assertEqual(_fed(text)["report"]["blockers"], [])
+
+    def test_zero_games_from_a_non_empty_paste_is_a_blocker(self):
+        out = resolve_paste_to_feed("Lineups are not out yet\nCheck back later\n",
+                                    str(SALARY))
+        self.assertEqual(out["report"]["games_parsed"], 0)
+        self.assertEqual(len(out["report"]["blockers"]), 1, out["report"]["blockers"])
+        self.assertTrue(out["report"]["blockers"][0].startswith(
+            "0 games parsed from a paste of 2 line(s)"), out["report"]["blockers"])
+        self.assertIn("'Lineups are not out yet'", out["report"]["blockers"][0])
+
+    def test_the_cli_refuses_zero_games_at_exit_2_with_no_feed(self):
+        done, feed = _tool("Twins\n@\n(54-55)\n9:38 PM\nOracle Park\n", out=True)
+        self.assertEqual(done.returncode, 2, done.stdout + done.stderr)
+        self.assertIn("BLOCKER  0 games parsed from a paste of 5 line(s)", done.stderr)
+        self.assertIsNone(feed)
+
+    def test_an_empty_paste_is_still_an_empty_feed_at_exit_0(self):
+        """The row's trigger is a NON-empty paste. A paste of nothing is a no-op feed
+        the --merge-feed path can fill, so the boundary is held on purpose."""
+        for text in ("", "\n  \n"):
+            with self.subTest(repr(text)):
+                self.assertEqual(resolve_paste_to_feed(text, str(SALARY))["report"]["blockers"], [])
+        done, feed = _tool("", out=True)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertEqual(json.loads(feed)["games"], [])
+
+    def test_the_tool_prints_the_order_provenance_only_when_it_applies(self):
+        done, feed = _tool(self.third, out=True)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn("3 game(s) parsed, 3 on this slate", done.stdout)
+        self.assertIn("batting orders read by position, the paste printed no order "
+                      "numbers: BOS@ATH, HOU@LAA, SEA@LAD", done.stdout)
+        self.assertEqual(len(json.loads(feed)["games"]), 3)
+        numbered, _ = _tool(_text())
+        self.assertEqual(numbered.returncode, 0, numbered.stdout + numbered.stderr)
+        self.assertNotIn("read by position", numbered.stdout)
+
+
+# ---------------------------------------------------------------------------
+# R319: two name-form defects on the one input that turns on F4
+# ---------------------------------------------------------------------------
+
+def _lad_slot9(name: str) -> str:
+    """The real paste with LAD's #9 (D Rushing) restated as ``name`` (R319b)."""
+    text = _text().replace("[D Rushing]", f"[{name}]")
+    assert text != _text()
+    return text
+
+
+def _salary_copy(tmp: str, *, swap_muncys: bool = False, kike_starting: str = None) -> str:
+    """The vendored 07-29 salary file, optionally with the two Max Muncy rows swapped
+    in file order and/or Kike Hernandez's Starting slot set."""
+    with open(SALARY, newline="", encoding="utf-8") as fh:
+        rows = list(csv.reader(fh))
+    header, body = rows[0], rows[1:]
+    name, start = header.index("Name"), header.index("Starting")
+    if swap_muncys:
+        at = [i for i, row in enumerate(body) if row[name] == "Max Muncy"]
+        assert len(at) == 2
+        body[at[0]], body[at[1]] = body[at[1]], body[at[0]]
+    if kike_starting is not None:
+        hit = [row for row in body if row[name] == "Kike Hernandez"]
+        assert len(hit) == 1
+        hit[0][start] = kike_starting
+    out = Path(tmp) / "DKSalaries.csv"
+    with out.open("w", newline="", encoding="utf-8") as fh:
+        csv.writer(fh).writerows([header] + body)
+    return str(out)
+
+
+class NameFormTests(unittest.TestCase):
+    """R319. Two defects, one family: the paste's name against DK's.
+
+    (a) A warning that "the salary file puts him on LAD" fired when two DK rows shared a
+    normalized name. `_resolve_one` is team-scoped, so the matched row's team is the
+    pasted team by construction; the warning compared it with a team looked up BY NAME
+    (first row wins), so every firing was false. Both Muncys resolved correctly; only the
+    warning was wrong, and on 2026-09-04 a session cited it as a reason not to rebuild.
+
+    (b) mlb.com prints LAD's #9 as `E Hernandez` and DK files him as `Kike Hernandez`.
+    First initial + surname + team missed, the side fell to PARTIAL 8/9 and the line said
+    he was unrosterable. The slate's best stack routed through the TBD path on a build
+    that had a complete confirmed lineup.
+    """
+
+    ATH_SLOT9 = "9. [A Williams]"
+
+    def _ath_muncy(self) -> str:
+        text = _text().replace(self.ATH_SLOT9, "9. [M Muncy]")
+        assert text != _text()
+        return text
+
+    def test_two_dk_rows_sharing_a_name_each_resolve_to_their_own_row_with_no_warning(self):
+        for label, swap in (("file order LAD first", False), ("file order ATH first", True)):
+            with self.subTest(label), tempfile.TemporaryDirectory() as tmp:
+                salary = _salary_copy(tmp, swap_muncys=swap)
+                out = resolve_paste_to_feed(self._ath_muncy(), salary,
+                                            resolve_overrides=RESOLVE)
+                self.assertEqual(out["report"]["blockers"], [])
+                self.assertEqual(out["report"]["warnings"], [])
+                ids = {g["home"]["team_abbrev"]: [r["dk_player_id"] for r in g["home"]["lineup"]
+                                                  if r["name"] == "Max Muncy"]
+                       for g in out["feed"]["games"]}
+                self.assertEqual(ids["ATH"], ["43706848"])
+                self.assertEqual(ids["LAD"], ["43706618"])
+
+    def test_the_nickname_table_matches_e_hernandez_to_kike_and_the_side_stays_confirmed(self):
+        out = resolve_paste_to_feed(_lad_slot9("E Hernandez"), str(SALARY),
+                                    resolve_overrides=RESOLVE)
+        report = out["report"]
+        self.assertEqual(report["blockers"], [])
+        self.assertEqual(report["unrostered_starters"], [])
+        self.assertIn("LAD", report["confirmed_teams"])
+        self.assertEqual(report["partial_teams"], [])
+        lad = [g for g in out["feed"]["games"] if g["home"]["team_abbrev"] == "LAD"][0]["home"]
+        by_name = {r["name"]: r for r in lad["lineup"]}
+        self.assertEqual(by_name["Kike Hernandez"]["dk_player_id"], "43706616")
+        self.assertEqual(by_name["Kike Hernandez"]["pasted_as"], "E Hernandez")
+        self.assertEqual(by_name["Kike Hernandez"]["order"], 9)
+        # Teoscar is T Hernandez in the same nine, and the initial still separates them.
+        self.assertEqual(by_name["Teoscar Hernandez"]["dk_player_id"], "43706629")
+        self.assertEqual(report["name_form_aliases"], [{
+            "team": "LAD", "order": "9", "pasted_name": "E Hernandez",
+            "dk_name": "Kike Hernandez", "via": "nickname table"}])
+
+    def test_an_unaliased_first_name_form_is_a_distinct_non_fatal_line(self):
+        out = resolve_paste_to_feed(_lad_slot9("X Hernandez"), str(SALARY),
+                                    resolve_overrides=RESOLVE)
+        report = out["report"]
+        self.assertEqual(report["blockers"], [], "non-fatal: a call-up must still ship")
+        (row,) = report["unrostered_starters"]
+        self.assertEqual(row["name_form_candidate"], "Kike Hernandez")
+        self.assertIn("matches no DK LAD hitter by first initial", row["note"])
+        self.assertIn('--resolve "X Hernandez=Kike Hernandez"', row["note"])
+        self.assertNotIn("unrosterable", row["note"])
+        # Teoscar is claimed by `T Hernandez` in the same nine, so he is not a second
+        # candidate, which is what makes the surname unambiguous here.
+        (partial,) = report["partial_teams"]
+        self.assertEqual(partial["cause"], "name_form")
+        self.assertNotIn("unrosterable", partial["reason"])
+        self.assertEqual(report["posted_sides_incomplete"],
+                         {"mlb_short": [], "dk_unrostered": [], "name_form": ["LAD"]})
+
+    def test_the_command_the_line_prints_closes_the_loop(self):
+        text = _lad_slot9("X Hernandez")
+        first = resolve_paste_to_feed(text, str(SALARY), resolve_overrides=RESOLVE)
+        printed = re.search(r'--resolve "([^"]+)=([^"]+)"',
+                            first["report"]["unrostered_starters"][0]["note"])
+        self.assertIsNotNone(printed)
+        out = resolve_paste_to_feed(
+            text, str(SALARY), resolve_overrides={**RESOLVE, printed.group(1): printed.group(2)})
+        self.assertEqual(out["report"]["unrostered_starters"], [])
+        self.assertIn("LAD", out["report"]["confirmed_teams"])
+        self.assertEqual(out["report"]["name_form_aliases"][0]["via"], "--resolve")
+
+    def test_two_unclaimed_teammates_with_the_surname_is_a_guess_and_is_not_made(self):
+        """Slots 8 and 9 both restated, so BOTH LAD Hernandezes are unclaimed: neither
+        pasted name has one candidate, and the rows stay the plain not-in-pool kind."""
+        text = _text().replace("[T Hernández]", "[X Hernandez]").replace(
+            "[D Rushing]", "[Y Hernandez]")
+        report = resolve_paste_to_feed(text, str(SALARY), resolve_overrides=RESOLVE)["report"]
+        self.assertEqual(len(report["unrostered_starters"]), 2)
+        for row in report["unrostered_starters"]:
+            self.assertNotIn("name_form_candidate", row)
+            self.assertIn("unrosterable", row["note"])
+        self.assertEqual(report["posted_sides_incomplete"]["name_form"], [])
+        self.assertEqual(report["posted_sides_incomplete"]["dk_unrostered"], ["LAD"])
+
+    def test_a_starter_with_no_same_surname_teammate_is_still_not_in_the_pool(self):
+        report = resolve_paste_to_feed(_lad_slot9("Q Zzzzmann"), str(SALARY),
+                                       resolve_overrides=RESOLVE)["report"]
+        (row,) = report["unrostered_starters"]
+        self.assertNotIn("name_form_candidate", row)
+        self.assertIn("unrosterable", row["note"])
+        self.assertEqual(report["posted_sides_incomplete"]["dk_unrostered"], ["LAD"])
+
+    def test_dks_starting_slot_is_named_as_the_evidence_when_it_has_one(self):
+        for starting, expected in (
+                ("9", "DK's Starting column posts him at slot 9, the slot the paste gives "
+                      "this name"),
+                ("7", "DK's Starting column posts him at slot 7 and the paste has this "
+                      "name at 9")):
+            with self.subTest(starting), tempfile.TemporaryDirectory() as tmp:
+                salary = _salary_copy(tmp, kike_starting=starting)
+                report = resolve_paste_to_feed(_lad_slot9("X Hernandez"), salary,
+                                               resolve_overrides=RESOLVE)["report"]
+                self.assertIn(expected, report["unrostered_starters"][0]["note"])
+
+    def test_the_tool_prints_each_kind_under_its_own_label_and_exits_0(self):
+        done, _ = _tool(_lad_slot9("E Hernandez"))
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn("NAME FORM  LAD slot 9: pasted 'E Hernandez' read as DK "
+                      "'Kike Hernandez' (nickname table)", done.stdout)
+        self.assertNotIn("NOT IN DK POOL", done.stdout)
+        self.assertNotIn("PARTIAL", done.stdout)
+        done, _ = _tool(_lad_slot9("X Hernandez"))
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn("NAME FORM MISMATCH  LAD slot 9: X Hernandez -- ", done.stdout)
+        self.assertNotIn("NOT IN DK POOL", done.stdout)
+        done, _ = _tool(_lad_slot9("Q Zzzzmann"))
+        self.assertIn("NOT IN DK POOL  LAD slot 9: Q Zzzzmann", done.stdout)
+        self.assertNotIn("NAME FORM", done.stdout)
