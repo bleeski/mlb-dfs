@@ -96,6 +96,20 @@ without the flag. `--dry-run` checks the `--standings` flags but returns before 
 verdicts are read; read them without a swap with `python tools/standings_read.py
 --help` (the standalone reader).
 
+### `--ownership-report` (R141): where the field's chalk sits now
+
+Opt-in and report-only. It recomputes the structural ownership prior (`predict_ownership`,
+R135) over the swap's own pool with the lineups the swap just read, and lists the
+unlocked High-tier players the parent file holds (entries holding each) with the
+same-team, same-slot alternatives already in the bank. It prints before the solve, so it
+also prints under `--dry-run`, when which entries to authorize is still open. Locked games
+and players with no status are left out of the listing, never out of the computation (the
+prior spreads its budget over whatever it is given). It is computed over the swap pool,
+not the salary file, so its tiers are not the build's `ownership_pred` tiers and must not
+be compared with them. An UNCALIBRATED STRUCTURAL PRIOR, a review proxy, never a
+probability, edge or ROI; it changes no rail, control or candidate, and an exception in
+it prints `OWNERSHIP VIEW FAILED` and the swap continues.
+
 ## The command
 
 ```bash
@@ -115,7 +129,7 @@ authorizes every reserved entry in the file.
 The swap builds one general bank, then one targeted slice per pinned entry, each
 passing an `excludes` list computed from that entry's own roster. The general
 bank and every targeted slice survive each other regardless of scope (R101), so
-scoping decides what may move, not how big the bank is.
+scoping decides what may move, not how big the bank is. The flag is split on commas and each token stripped, so `7001,` is `7001`; a value that names no id (`,`) is exit 4 before anything is read, an id that is in no row of the parent file (`9999`, or `7001 7002` with a space) is exit 4 before the pool is built, and an empty `--entry-ids ""` is the default, every reserved entry (R68).
 
 - **Name the entries you actually want to change, for the ordinary reason.**
   A tight `--entry-ids` limits what may move in the file.
@@ -153,6 +167,19 @@ A general bank covers entries with nothing locked. Entries with pins need
 candidates built against those exact pins, or the allocator reports "no compatible
 candidate". `mlb_engine/optimize/bank_cache.extend_bank` takes
 `locked_slot_assignments` and `excludes` for this.
+
+**The sizes the bank is asked for (R284).** The swap resolves its controls (the parent's
+recorded ones by default) before the first slice and asks the bank for what they ask the
+allocator: `resolve_bank_stack_request` gives `[5, 4]` when a five-stack floor or quota is
+in force and `[4]` otherwise. The general slice walks the sizes five first at the build
+door's clamped budget share (the four keeps at least a quarter); each pinned entry gets the
+four as always and then the five only while a full second of `--budget` is left (the general
+slice drains a budget on a large grid, so on a big slate the pinned five rarely runs; the pinned
+entries then rest on the general five-stack candidates and the four bucket's own fives). With no five
+requested the calls are the ones this always made, and a line `bank stack request (R284)`
+prints only when a five is asked for. A swap never reuses the build's stored bank (its
+frame's digest differs), so without this a five-stack parent was refined by a bank built
+for fours.
 
 Three constraints it handles that are easy to miss:
 

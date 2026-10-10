@@ -921,6 +921,7 @@ def fixed_portfolio_exposure(
     game_counts: Counter = Counter()
     team_counts: Counter = Counter()
     signatures_by_contest: Dict[str, List[List[str]]] = defaultdict(list)
+    contest_by_entry: Dict[str, str] = {}
     for entry in parse_dk_entry_rows(path):
         if not entry.is_complete or entry.entry_id in solved:
             continue
@@ -947,6 +948,7 @@ def fixed_portfolio_exposure(
                     min_hitters):
                 team_counts[team] += 1
         signatures_by_contest[entry.contest_id].append(sorted(roster))
+        contest_by_entry[entry.entry_id] = entry.contest_id
     return {
         "row_count": len(entry_ids),
         "entry_ids": entry_ids,
@@ -959,6 +961,9 @@ def fixed_portfolio_exposure(
         "team_counts": dict(team_counts),
         "team_counts_min_hitters": min_hitters,
         "signatures_by_contest": {k: v for k, v in signatures_by_contest.items()},
+        # R445. Which contest each fixed row sits in, parallel to `entry_ids`, so a
+        # same-contest duplicate among the untouchable rows can name its rows.
+        "contest_by_entry": contest_by_entry,
         "stacks_derived": bool(players),
     }
 

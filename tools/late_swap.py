@@ -35,7 +35,7 @@ Usage:
         [--salary runs/<run_id>/inputs/DKSalaries.csv] \
         [--budget 30] [--solver-budget 15] [--lineups <fresh feed.json>] \
         [--entry-ids 123,456] [--dry-run] \
-        [--postures <contest_id>=cash,...] [--accept-downgrade]
+        [--postures <contest_id>=cash,...] [--accept-downgrade] [--ownership-report]
         [--declare-pitcher ID[=ROLE[:ip=N][:evidence="..."]] ...]
 
 The money-and-entry wall still applies: this writes a CSV. Nothing here uploads,
@@ -100,6 +100,8 @@ from mlb_engine.pipeline.execution_pipeline import (  # noqa: E402
     CONTROL_ID_MAP_KEYS, parent_realized_controls,
     promote_deferred_run, raise_on_engine_crash, run_late_swap,
     unresolved_contest_blockers,
+    BANK_FIVE_STACK_BUDGET_MAX_SHARE, BANK_FIVE_STACK_BUDGET_MIN_SHARE,
+    resolve_bank_stack_request,
 )
 from mlb_engine.swap.late_swap_manager import build_entry_requirements  # noqa: E402
 
@@ -1077,6 +1079,104 @@ def parent_consensus_cluster(runs_root: Path, parent_run_id):
     return ((diag.get("allocation") or {}).get("consensus_cluster")) or None
 
 
+OWNERSHIP_VIEW_LIMIT = 8
+OWNERSHIP_VIEW_LABEL = ("UNCALIBRATED STRUCTURAL PRIOR, a review proxy: never a "
+                        "probability, edge or ROI")
+
+
+def ownership_view_lines(projections, status: dict, as_of, parent_rosters: dict,
+                         candidates, shapes, limit: int = OWNERSHIP_VIEW_LIMIT) -> list[str]:
+    """R141. Report-only: where the field's chalk sits NOW among the unlocked players
+    the parent file holds, and what the bank already offers beside them.
+
+    Recomputes the structural prior (`predict_ownership`, R135) over the swap's own
+    frame with the lineups the swap just read, lists the unlocked players in its
+    High tier by how many parent entries hold them, and names the same-team,
+    same-slot bank candidates in a lower tier. It changes nothing: no rail, no
+    control, no candidate.
+
+    Two things are deliberate. The prior spreads its 800/200 budget over whatever
+    list it is given, so locked games are filtered from the OUTPUT, never the input
+    (one posted team moved a hitter from 30.11 to 58.48 in the probe), and the
+    inputs are named on the first line because this is the swap POOL, not the whole
+    salary file the build's `ownership_pred_<tag>.json` is computed over: the tiers
+    are not comparable with it. A player with no lineup status is treated as
+    locked, the swap's own `missing_status_policy`.
+    """
+    from collections import Counter
+
+    from mlb_engine.field.ownership_prior import (
+        DEFAULT_ARCHETYPE, archetype_for_contest_shape, predict_ownership,
+    )
+
+    rows = []
+    for rec in projections.to_dict("records"):
+        tokens = [t for t in str(rec.get("Position") or "").replace("/", ",").split(",") if t]
+        pitcher = any(t.strip().upper() in ("P", "SP", "RP") for t in tokens)
+        rows.append({"Player_ID": str(rec["Player_ID"]), "Name": str(rec.get("Name") or ""),
+                     "Team": str(rec.get("Team") or ""), "Salary": rec.get("Salary") or 0.0,
+                     "Position": "P" if pitcher else (tokens[0] if tokens else "UTIL")})
+    by_id = {r["Player_ID"]: r for r in rows}
+    orders = {str(k): int(v) for k, v in (status.get("confirmed_order_by_player_id") or {}).items()}
+    probables = [str(x) for x in (status.get("probable_pitcher_ids") or [])]
+    kinds = Counter(a[0] for a in (archetype_for_contest_shape(x) for x in shapes) if a)
+    archetype = kinds.most_common(1)[0][0] if kinds else DEFAULT_ARCHETYPE
+    prior = predict_ownership(rows, archetype, batting_order_by_player_id=orders,
+                              probable_sp_ids=probables)
+    own, tier = prior["own_pct_by_player_id"], prior["tier_by_player_id"]
+    hitters = [r for r in rows if r["Position"] != "P"]
+    posted = sum(1 for r in hitters if r["Player_ID"] in orders)
+    lines = [
+        f"ownership view (R141, report-only; {OWNERSHIP_VIEW_LABEL}), archetype "
+        f"{archetype}, computed over the {len(rows)}-player swap pool and NOT the salary "
+        f"file, so these tiers are not the build's ownership prior and must not be compared "
+        f"with it. Inputs: a posted batting order for {posted} of {len(hitters)} hitters"
+        + ("" if posted == len(hitters) else " (a hitter without one gets the prior's flat "
+                                            "no-order adjustment)")
+        + f", {len(probables)} probable pitcher(s), implied totals none, base projection "
+        f"none. Locked games and players with no status are left out of the listing, not "
+        f"out of the computation."]
+
+    def unlocked(pid):
+        st = (status.get("status_by_player_id") or {}).get(pid)
+        return st is not None and not st.is_locked(as_of)
+
+    rosters = [list(r) for r in (parent_rosters or {}).values() if len(r) == 10]
+    held = Counter(pid for roster in rosters for pid in roster)
+    limit = max(1, int(limit))
+    chalk = sorted((pid for pid, t in tier.items()
+                    if t == "High" and held.get(pid) and unlocked(pid)),
+                   key=lambda pid: (-held[pid], -own.get(pid, 0.0), by_id[pid]["Name"]))
+    if not chalk:
+        lines.append("  no unlocked High-tier player is held by the parent file")
+        return lines
+    for pid in chalk[:limit]:
+        slots = Counter(roster.index(pid) for roster in rosters
+                        if pid in roster and len(roster) == 10)
+        alts = Counter()
+        if slots:
+            slot = slots.most_common(1)[0][0]
+            for cand in candidates or []:
+                ids = [str(x) for x in (cand.get("roster_slot_ids") or [])]
+                if len(ids) != 10 or ids[slot] == pid or ids[slot] not in by_id:
+                    continue
+                alt = ids[slot]
+                if (by_id[alt]["Team"] == by_id[pid]["Team"] and tier.get(alt) != "High"
+                        and unlocked(alt)):
+                    alts[alt] += 1
+        shown = ", ".join(f"{by_id[a]['Name']} ({own.get(a, 0.0):.1f}%, in {n} bank lineup(s))"
+                          for a, n in sorted(alts.items(),
+                                             key=lambda kv: (own.get(kv[0], 0.0), kv[0]))[:3])
+        lines.append(
+            f"  {by_id[pid]['Name']} ({by_id[pid]['Team']} {by_id[pid]['Position']}): "
+            f"structural own {own.get(pid, 0.0):.1f}%, High tier, held in {held[pid]} of "
+            f"{len(rosters)} parent entries; same-team same-slot bank alternatives: "
+            + (shown or "none in the bank"))
+    if len(chalk) > limit:
+        lines.append(f"  and {len(chalk) - limit} more unlocked High-tier player(s) held")
+    return lines
+
+
 # Every portfolio-control violation the entries validator can report, mapped to
 # the control that produced it. R29(3): a swap that fails on one of these has a
 # controls problem, and a swap that fails on "no compatible candidate" has a
@@ -1207,15 +1307,20 @@ def classify_swap_failure(errors, controls, bank_report=None) -> list[str]:
 
 
 def _load_entry_rosters(path: Path) -> dict[str, list[str]]:
-    """Entry ID -> its ten current Player_IDs, read from a DKEntries file."""
-    import csv
+    """Entry ID -> its current Player_IDs, read from a DKEntries file.
 
-    out: dict[str, list[str]] = {}
-    with path.open(encoding="utf-8-sig", newline="") as fh:
-        for row in csv.reader(fh):
-            if len(row) >= 14 and row[0].strip().isdigit():
-                out[row[0].strip()] = [c.strip() for c in row[4:14] if c.strip()]
-    return out
+    R68(a). Through `parse_dk_entry_rows`, which this script already calls on the
+    parent file, so a roster cell has one definition: `normalize_player_id` maps
+    "Jose Ramirez (12345678)" (what `repair_entry.py` writes into a repaired slot,
+    and what a hand-edited or DK-redownloaded file can carry) to its id, and empty
+    cells are dropped. This reader used to keep `row[4:14]` raw, so a repaired
+    entry never compared equal to the engine's bare-id rewrite of it, scored as
+    "not comparable", and could not be refused as a downgrade; the standings read
+    and the consensus-pair guard read the same dict. It needs the DK header, which
+    both callers' files have already passed, and skips a row with no numeric
+    contest id.
+    """
+    return {str(row.entry_id): list(row.roster_ids) for row in parse_dk_entry_rows(path)}
 
 
 def _parse_postures(value: str | None) -> dict[str, str]:
@@ -1648,6 +1753,16 @@ def main() -> int:
     ap.add_argument("--target-rank", dest="target_rank", type=int, default=None,
                     help="with --standings: the rank whose points define 'live for "
                          "the target' (default 1)")
+    ap.add_argument("--ownership-report", dest="ownership_report", action="store_true",
+                    help="R141. Report-only, off by default: recompute the structural "
+                         "ownership prior over this swap's pool and list the unlocked "
+                         "High-tier players the parent file holds, with the same-team "
+                         "same-slot alternatives already in the bank, before the solve "
+                         "(so it also prints under --dry-run, when the choice of which "
+                         "entries to authorize is still open). Changes no rail, control "
+                         "or candidate; an exception in it prints and never withholds "
+                         "the file. An UNCALIBRATED STRUCTURAL PRIOR, never a "
+                         "probability, edge or ROI.")
     ap.add_argument("--allow-parent-mismatch", action="store_true",
                     help="proceed when --parent-entries matches no run's export "
                          "(R268(b): the parent is found by the file's bytes, so "
@@ -1761,6 +1876,20 @@ def main() -> int:
             print(f"{exc}. Nothing was read and no swap was attempted.", file=sys.stderr)
             return 4
 
+    # R68(b). `--entry-ids 5001,` used to split to ['5001', ''] and reach the engine
+    # as an Entry ID present in no file: a ValueError traceback at exit 1, after the
+    # pool and the projection frame had been built. Tokens are split, stripped and
+    # emptied here, before anything is read. A flag that names tokens and leaves no
+    # id (`,`) is refused like the other bad flags; `--entry-ids ""` is falsy and
+    # stays the documented default, every reserved entry.
+    authorized = None
+    if args.entry_ids:
+        authorized = [t for t in (e.strip() for e in args.entry_ids.split(",")) if t]
+        if not authorized:
+            print(f"--entry-ids {args.entry_ids!r} names no Entry ID. Nothing was "
+                  f"read and no swap was attempted.", file=sys.stderr)
+            return 4
+
     slate = REPO / "data" / "slates" / args.date
     # R29(4): the salary path was hardcoded to the shared, date-keyed staged
     # name. On 2026-07-29 a concurrent Showdown build for the same date
@@ -1861,6 +1990,18 @@ def main() -> int:
     # supplied one, so a Double Up and a satellite were refined on the same
     # ceiling-max objective. Resolve identity the way the build does.
     reserved_rows = list(parse_dk_entry_rows(args.parent_entries))
+    # R68(b), found by the landing review. An authorized Entry ID that is in no row of
+    # the parent file (`--entry-ids 9999`, `7001 7002` with a space, `7001;7002`) was
+    # the same ValueError traceback at exit 1 out of `build_entry_requirements`,
+    # after the pool and the projection frame were built. The rows are parsed here,
+    # so it is refused here, in the house style of the other bad flags.
+    if authorized:
+        unknown = sorted(set(authorized) - {str(r.entry_id) for r in reserved_rows})
+        if unknown:
+            print(f"--entry-ids names Entry ID(s) that are in no row of "
+                  f"{args.parent_entries}: {unknown}. Nothing was swapped.",
+                  file=sys.stderr)
+            return 4
     postures = _resolve_contest_postures(
         reserved_rows, _parse_postures(args.postures), None)
     unresolved = unresolved_contest_blockers(postures)
@@ -2044,12 +2185,40 @@ def main() -> int:
     print(carry_label_text)
     projection_carry = carry_record(carry_info, carry_report, carry_label_text)
 
-    authorized = [e.strip() for e in args.entry_ids.split(",")] if args.entry_ids else None
     requirements = build_entry_requirements(
         args.parent_entries, status["status_by_player_id"], now, contest_shapes,
         mode="reoptimize", authorized_entry_ids=authorized,
         missing_status_policy="treat_as_locked",
     )
+
+    # R284. The controls are resolved BEFORE the bank, because the bank is asked
+    # for what they ask of the allocator: `resolve_bank_stack_request` reads the
+    # merged controls (the parent's recorded ones by default, R268(a)), and a swap
+    # that resolved them after its slices built a bank for four-stacks and then
+    # enforced a five-stack floor over it. Resolution only: every print of them
+    # stays where it was, so `--dry-run` (which returns before those lines) says
+    # what it always said.
+    swap_stripped: dict = {}
+    # R268(a). Inherit what the parent shipped by default. A parent recorded
+    # before R268 carries no controls and is re-derived, and says so.
+    inherited = None
+    if (swap_parent is not None and swap_parent["current_matches_parent_export"]
+            and not args.rederive_controls):
+        inherited = parent_realized_controls(swap_parent["run_dir"])
+    if inherited is not None:
+        controls = inherit_swap_controls(
+            inherited, args.controls_override, args.solver_budget,
+            projections=projections, stripped_out=swap_stripped)
+    else:
+        controls = resolve_swap_controls(
+            postures, args.controls_override, args.solver_budget,
+            requirements=requirements, projections=projections,
+            stripped_out=swap_stripped, never_relax=swap_never_relax)
+    bank_request = resolve_bank_stack_request(controls)
+    bank_sizes = [int(size) for size in bank_request["sizes"]]
+    if bank_request["wants_five"]:
+        print(f"bank stack request (R284): sizes {bank_sizes}, the five first, "
+              f"then the four; {bank_request['reason']}")
 
     cache_path = REPO / "runs" / f"bank_cache_{args.date}_{pool_signature(salary)}.json"
     cache = BankCache(cache_path)
@@ -2067,13 +2236,31 @@ def main() -> int:
     # A general bank covers entries with no locked slots. Entries that already hold
     # locked players need candidates built against those exact pins and against the
     # excluded-new-teams rule, or the allocator reports "no compatible candidate".
-    report = extend_bank(cache, projections, time_budget_s=_slice_budget())
+    # R284. One call per size the controls ask the bank for, the five first
+    # (the sliced build door's rule, `build_slate.py`: the five takes the quota's
+    # share of what is left, CLAMPED so the four keeps at least a quarter, and
+    # whatever the five does not spend rolls into the four). With no five
+    # requested `bank_sizes` is [4] and this is the one call this line always was.
+    general_reports = []
+    for idx, size in enumerate(bank_sizes):
+        left = _slice_budget()
+        if idx < len(bank_sizes) - 1:
+            share = min(BANK_FIVE_STACK_BUDGET_MAX_SHARE,
+                        max(BANK_FIVE_STACK_BUDGET_MIN_SHARE,
+                            float(bank_request["five_share_target"])))
+            left = max(1.0, left * share)
+        general = extend_bank(cache, projections, time_budget_s=left, stack_min=size)
+        general["stack_min_requested"] = size
+        general_reports.append(general)
+    report = (general_reports[0] if len(general_reports) == 1
+              else _build_slate_module()._merge_bank_slice_reports(general_reports))
     # R415. Why the slice stopped. Late swap has no candidate cap, so this reads
-    # time_budget (raise --budget; the cache resumes) or the list's end.
+    # time_budget (raise --budget; the cache resumes) or the list's end. A merged
+    # report carries it as `bank_stop_reason` (the merge pops the last slice's).
     print(f"bank after the general slice: {report['total_candidates']} candidates "
           f"(+{report['built_this_slice']} this slice, "
           f"{report['jobs_attempted']}/{report['jobs_total']} jobs, "
-          f"stopped: {report.get('stop_reason')})")
+          f"stopped: {report.get('stop_reason', report.get('bank_stop_reason'))})")
     if report["superseded_jobs_dropped"]:
         # R101: post-split this can only mean the PROJECTIONS moved since the
         # cache was written, or the file predates the conditions index. Either
@@ -2101,14 +2288,25 @@ def main() -> int:
         current |= {str(pid) for pid in lsa.values()}
         excludes = [p for p in all_ids
                     if team_by_id.get(p) in excluded_teams and p not in current]
-        slice_report = extend_bank(
-            cache, projections, time_budget_s=_slice_budget(),
-            locked_slot_assignments=lsa, excludes=excludes,
-        )
-        last_report = slice_report
-        print(f"  entry {requirement['entry_id']}: pinned {sorted(lsa)}, "
-              f"+{slice_report['built_this_slice']} targeted candidates "
-              f"(bank now {slice_report['total_candidates']})")
+        # R284. The four first, exactly the call this loop always made, then the
+        # five only while a full second of the slicing budget is left:
+        # `_slice_budget()` floors at one second, so a second call started with
+        # less would run past --budget (and an unconditional one would add a floor
+        # per pinned entry). `extend_bank` relaxes the size to the entry's free
+        # hitter slots itself (a second size that relaxes to the first's is the
+        # same bucket, a no-op).
+        for p_idx, size in enumerate(reversed(bank_sizes)):
+            if p_idx and slice_deadline - time.monotonic() < 1.0:
+                break
+            slice_report = extend_bank(
+                cache, projections, time_budget_s=_slice_budget(),
+                locked_slot_assignments=lsa, excludes=excludes, stack_min=size,
+            )
+            last_report = slice_report
+            print(f"  entry {requirement['entry_id']}: pinned {sorted(lsa)}, "
+                  f"+{slice_report['built_this_slice']} targeted candidates "
+                  f"(bank now {slice_report['total_candidates']})"
+                  + (f", stack {size}" if len(bank_sizes) > 1 else ""))
 
     # R101. Before the conditions-signature split this number did not exist:
     # each targeted slice discarded the previous ones, so what the joint solve
@@ -2144,6 +2342,15 @@ def main() -> int:
           f"collapsed across buckets, shapes {payload_report.get('shapes_scored')}")
     for reason, count in sorted((payload_report.get("scoring_failure_reasons") or {}).items()):
         print(f"  scoring failure x{count}: {reason}", file=sys.stderr)
+    if args.ownership_report:
+        try:
+            for line in ownership_view_lines(
+                    projections, status, now, parent_rosters, candidates,
+                    [r.get("contest_shape") for r in requirements]):
+                print(line)
+        except Exception as exc:  # noqa: BLE001 - a report never withholds the file
+            print(f"OWNERSHIP VIEW FAILED ({type(exc).__name__}: {exc}); the swap "
+                  f"continues without it.", file=sys.stderr)
     if args.dry_run:
         print(json.dumps({"entries": len(requirements),
                           "candidates": len(candidates),
@@ -2151,22 +2358,6 @@ def main() -> int:
                           "candidate_scoring": payload_report}, indent=1))
         return 0
 
-    swap_stripped: dict = {}
-    # R268(a). Inherit what the parent shipped by default. A parent recorded
-    # before R268 carries no controls and is re-derived, and says so.
-    inherited = None
-    if (swap_parent is not None and swap_parent["current_matches_parent_export"]
-            and not args.rederive_controls):
-        inherited = parent_realized_controls(swap_parent["run_dir"])
-    if inherited is not None:
-        controls = inherit_swap_controls(
-            inherited, args.controls_override, args.solver_budget,
-            projections=projections, stripped_out=swap_stripped)
-    else:
-        controls = resolve_swap_controls(
-            postures, args.controls_override, args.solver_budget,
-            requirements=requirements, projections=projections,
-            stripped_out=swap_stripped, never_relax=swap_never_relax)
     if swap_stripped:
         print(f"consensus-cluster cap NOT enforced on a late swap (R405): stripped "
               f"{', '.join(f'{k}={v}' for k, v in sorted(swap_stripped.items()))} "

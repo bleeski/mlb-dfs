@@ -49751,3 +49751,737 @@ class PoRefusalTextTests(unittest.TestCase):
         dk_text, _ = self._t4({"T4 Ace": ("PO", 4000)}, feed=self._dk_only())
         self.assertIsNotNone(ab.classify_pool_blocker(feed_text))
         self.assertIsNone(ab.classify_pool_blocker(dk_text))
+
+
+class LateSwapRailsTests(unittest.TestCase):
+    """Roadmap Session 29: the late-swap rails (R284 stack_min half, R68, R141).
+
+    Every test drives the real `late_swap.main()` through the R468 harness
+    (`LateSwapDeclaredPitcherTests`, composed so its own tests do not run twice)
+    or a production function the swap calls, never a string pin on the source.
+    """
+
+    # -- R284: the swap's bank is asked for what its controls ask the allocator -- #
+
+    QUOTA = {"min_five_stack_share_pct": 0.6, "five_stack_min_size": 5}
+    FLOOR = {"primary_stack_min_size": 5}
+
+    def _h(self):
+        h = LateSwapDeclaredPitcherTests(
+            "test_a_parent_with_a_locked_declared_arm_swaps_and_certifies")
+        h.setUp()
+        self.addCleanup(h.doCleanups)
+        h._brief()
+        return h
+
+    def _swap(self, *extra, clock=None, leave=None):
+        """A real swap with a spy on `extend_bank` (delegating to the real one) and on
+        the two control resolvers. ``clock`` is a dict whose "t" replaces
+        `late_swap.time.monotonic`; after each pinned call it is advanced 10000s, or,
+        with ``leave``, set so that many seconds of the 20s `--budget` remain."""
+        h = self._h()
+        calls, events, started = [], [], {}
+        real_extend = h.ls.extend_bank
+
+        def spy_extend(cache, projections, **kw):
+            events.append("bank")
+            if clock is not None:
+                started.setdefault("t0", clock["t"])
+            calls.append({"stack_min": kw.get("stack_min", "<default>"),
+                          "pinned": tuple(sorted(kw.get("locked_slot_assignments") or {})),
+                          "budget": float(kw.get("time_budget_s"))})
+            result = real_extend(cache, projections, **kw)
+            if clock is not None and kw.get("locked_slot_assignments"):
+                if leave is None:
+                    clock["t"] += 10000.0
+                else:
+                    clock["t"] = started["t0"] + 20.0 - leave
+            return result
+
+        h.ls.extend_bank = spy_extend
+        for name in ("inherit_swap_controls", "resolve_swap_controls"):
+            def wrap(*a, _real=getattr(h.ls, name), **kw):
+                events.append("controls")
+                return _real(*a, **kw)
+            setattr(h.ls, name, wrap)
+        if clock is not None:
+            h.ls.time = types.SimpleNamespace(time=time.time, monotonic=lambda: clock["t"])
+        code, out, err = h._run(*extra)
+        return code, calls, events, out, err
+
+    @staticmethod
+    def _override(controls):
+        return ["--controls-override", json.dumps(controls)]
+
+    def test_a_quota_request_reaches_the_general_slice_five_first_then_four(self):
+        code, calls, _, out, err = self._swap(*self._override(self.QUOTA))
+        self.assertEqual(code, 0, err[-1500:])
+        general = [c for c in calls if not c["pinned"]]
+        self.assertEqual([c["stack_min"] for c in general], [5, 4])
+        # --budget 20: the five takes the quota's share (0.6) of what is left, and
+        # the four takes the rest, which is more than it would have had at 0.4.
+        self.assertAlmostEqual(general[0]["budget"], 12.0, delta=0.5)
+        self.assertGreater(general[1]["budget"], general[0]["budget"])
+        self.assertIn("bank stack request (R284): sizes [5, 4]", out)
+
+    def test_a_floor_of_five_asks_for_five_with_the_share_clamped_at_three_quarters(self):
+        code, calls, _, out, err = self._swap(*self._override(self.FLOOR))
+        self.assertEqual(code, 0, err[-1500:])
+        general = [c for c in calls if not c["pinned"]]
+        self.assertEqual([c["stack_min"] for c in general], [5, 4])
+        # target 1.0, clamped to BANK_FIVE_STACK_BUDGET_MAX_SHARE: the four is never starved
+        self.assertAlmostEqual(general[0]["budget"], 20.0 * epi.BANK_FIVE_STACK_BUDGET_MAX_SHARE,
+                               delta=0.5)
+        self.assertGreaterEqual(general[1]["budget"], 20.0 * (1 - epi.BANK_FIVE_STACK_BUDGET_MAX_SHARE) - 0.5)
+
+    def test_pinned_slices_ask_the_four_first_and_then_the_five(self):
+        code, calls, _, _, err = self._swap(*self._override(self.QUOTA))
+        self.assertEqual(code, 0, err[-1500:])
+        by_pin: dict = {}
+        for c in calls:
+            if c["pinned"]:
+                by_pin.setdefault(c["pinned"], []).append(c["stack_min"])
+        self.assertEqual(len(by_pin), 3, "the harness parent has three pinned entries")
+        for pinned, sizes in by_pin.items():
+            self.assertEqual(sizes, [4, 5], pinned)
+
+    def test_a_pinned_five_is_skipped_once_the_slicing_budget_is_gone(self):
+        """`_slice_budget()` floors at one second, so an unconditional second call
+        would add a floor per pinned entry beyond --budget. The four always runs."""
+        clock = {"t": time.monotonic()}
+        code, calls, _, _, err = self._swap(*self._override(self.QUOTA), clock=clock)
+        self.assertEqual(code, 0, err[-1500:])
+        pinned = [c["stack_min"] for c in calls if c["pinned"]]
+        self.assertEqual(pinned, [4, 4, 4])
+
+    def test_the_pinned_five_needs_a_whole_second_left_not_just_a_clock_that_has_not_passed(self):
+        """`_slice_budget()` floors at one second, so a five started with 0.5s left would
+        run past --budget. With 1.5s left it runs."""
+        clock = {"t": time.monotonic()}
+        code, calls, _, _, err = self._swap(*self._override(self.QUOTA), clock=clock, leave=0.5)
+        self.assertEqual(code, 0, err[-1500:])
+        self.assertEqual([c["stack_min"] for c in calls if c["pinned"]], [4, 4, 4])
+        clock = {"t": time.monotonic()}
+        code, calls, _, _, err = self._swap(*self._override(self.QUOTA), clock=clock, leave=1.5)
+        self.assertEqual(code, 0, err[-1500:])
+        self.assertEqual([c["stack_min"] for c in calls if c["pinned"]], [4, 5, 4, 5, 4, 5])
+
+    def test_without_a_request_every_call_asks_the_default_and_nothing_new_prints(self):
+        code, calls, _, out, err = self._swap()
+        self.assertEqual(code, 0, err[-1500:])
+        self.assertEqual(len(calls), 4, "one general call and one per pinned entry")
+        for c in calls:
+            self.assertIn(c["stack_min"], (4, "<default>"), "four is the default")
+        self.assertNotIn("bank stack request", out)
+        self.assertNotIn("stack 4", "".join(l for l in out.splitlines() if l.startswith("  entry")))
+
+    def test_the_controls_are_resolved_before_the_first_bank_slice(self):
+        _, _, events, _, _ = self._swap(*self._override(self.QUOTA))
+        self.assertIn("bank", events)
+        self.assertEqual(events[0], "controls", events)
+
+    def test_a_merged_general_report_still_says_why_the_bank_stopped(self):
+        """`_merge_bank_slice_reports` pops the last slice's `stop_reason` for
+        `bank_stop_reason`; the printed line must read whichever the report has."""
+        _, _, _, out, _ = self._swap(*self._override(self.QUOTA))
+        line = next(l for l in out.splitlines() if l.startswith("bank after the general slice"))
+        self.assertNotIn("stopped: None", line)
+
+    def test_a_dry_run_names_the_request_too(self):
+        code, calls, _, out, err = self._swap("--dry-run", *self._override(self.QUOTA))
+        self.assertEqual(code, 0, err[-1500:])
+        self.assertIn("bank stack request (R284): sizes [5, 4]", out)
+        self.assertEqual([c["stack_min"] for c in calls if not c["pinned"]], [5, 4])
+
+    # -- R68: "Name (ID)" cells and a hostile --entry-ids ------------------------- #
+
+    @staticmethod
+    def _entries_file(path, rows):
+        """A DKEntries file from ``{entry_id: (contest_id, cells)}``; the cells are
+        written exactly as given, so a "Name (ID)" cell stays one."""
+        with Path(path).open("w", newline="", encoding="utf-8") as fh:
+            writer = csv.writer(fh)
+            writer.writerow(HEADER)
+            for entry_id, (contest_id, cells) in rows.items():
+                writer.writerow([entry_id, "Test", contest_id, "$1", *cells, "", ""])
+        return Path(path)
+
+    @staticmethod
+    def _named(roster):
+        return [f"Some Name ({pid})" for pid in roster]
+
+    PAIR = ("30001", "30002")
+    HOLDS = ["30001", "30002", *[f"4000{i}" for i in range(8)]]
+    LOSES = ["30003", "30004", *[f"4000{i}" for i in range(8)]]
+
+    def test_a_name_and_id_cell_reads_as_its_player_id(self):
+        h = self._h()
+        tool = h.ls
+        plain = tool._load_entry_rosters(h.parent_file)
+        with h.parent_file.open(newline="", encoding="utf-8") as fh:
+            rows = list(csv.reader(fh))
+        names = {}
+        with h.salary.open(newline="", encoding="utf-8") as fh:
+            for r in list(csv.reader(fh))[1:]:
+                names[r[3]] = r[2]
+        for r in rows:
+            if r and r[0] == "7001":
+                r[4:14] = [f"{names[c]} ({c})" for c in r[4:14]]
+        repaired_file = h.root / "DKEntries_repaired.csv"
+        with repaired_file.open("w", newline="", encoding="utf-8") as fh:
+            csv.writer(fh).writerows(rows)
+        repaired = tool._load_entry_rosters(repaired_file)
+        self.assertEqual(repaired, plain)
+        frame = epi._assemble_projection_frame(
+            str(h.salary), [{"Player_ID": pid, "AvgPointsPerGame": 10.0} for pid in names],
+            "emergency_proxy", None, None, None)[0]
+        score = tool._score_roster(frame, repaired["7001"], "large_wta")
+        self.assertIsNotNone(score, "a raw 'Name (ID)' roster scored None, so the downgrade "
+                                    "guard could never refuse it")
+        self.assertEqual(score, tool._score_roster(frame, plain["7001"], "large_wta"))
+
+    def test_a_repaired_entry_is_scored_by_a_real_swap_not_skipped_as_not_comparable(self):
+        h = self._h()
+        names = {}
+        with h.salary.open(newline="", encoding="utf-8") as fh:
+            for r in list(csv.reader(fh))[1:]:
+                names[r[3]] = r[2]
+        with h.parent_file.open(newline="", encoding="utf-8") as fh:
+            rows = list(csv.reader(fh))
+        for r in rows:
+            if r and r[0] == "7001":
+                r[4:14] = [f"{names[c]} ({c})" for c in r[4:14]]
+        repaired_file = h.root / "DKEntries_repaired.csv"
+        with repaired_file.open("w", newline="", encoding="utf-8") as fh:
+            csv.writer(fh).writerows(rows)
+        h.parent_file = repaired_file
+        code, out, err = h._run("--allow-parent-mismatch", "--declare-pitcher",
+                                f"{h.pen}=viable_bulk_or_alt_sp")
+        self.assertEqual(code, 0, err[-1500:])
+        self.assertNotIn("not comparable", out)
+        self.assertRegex(out, r"7001 \[\w+\]: [\d.]+ -> [\d.]+ \([+-][\d.]+\)")
+
+    def test_the_pair_guard_sees_a_repaired_pair_holder_the_swap_strips(self):
+        """Before: the repaired cells read as no pair, so a contest that lost its last
+        pair lineup was reported as losing nothing."""
+        tool = LateSwapDeclaredPitcherTests._tool()
+        parent = self._entries_file(self.tmp_path("parent.csv"),
+                                    {"5001": ("900", self._named(self.HOLDS))})
+        after = self._entries_file(self.tmp_path("after.csv"), {"5001": ("900", self.LOSES)})
+        lost = tool.consensus_pair_seats_lost(
+            tool._load_entry_rosters(parent), tool._load_entry_rosters(after),
+            {"5001": "900"}, self.PAIR)
+        self.assertEqual(lost, [{"contest_id": "900", "entries": ["5001"]}])
+
+    def test_the_pair_guard_does_not_refuse_a_swap_that_leaves_a_repaired_holder_in_place(self):
+        """Before: entry B (repaired form) stayed in the contest holding the pair, but
+        read as not holding it, so stripping entry A looked like losing the last one."""
+        tool = LateSwapDeclaredPitcherTests._tool()
+        parent = self._entries_file(self.tmp_path("parent.csv"), {
+            "5001": ("900", self.HOLDS), "5002": ("900", self._named(self.HOLDS[:9] + ["40099"]))})
+        after = self._entries_file(self.tmp_path("after.csv"), {
+            "5001": ("900", self.LOSES), "5002": ("900", self._named(self.HOLDS[:9] + ["40099"]))})
+        lost = tool.consensus_pair_seats_lost(
+            tool._load_entry_rosters(parent), tool._load_entry_rosters(after),
+            {"5001": "900", "5002": "900"}, self.PAIR)
+        self.assertEqual(lost, [])
+
+    def tmp_path(self, name):
+        if not hasattr(self, "_tmp_dir"):
+            self._tmp_dir = tempfile.TemporaryDirectory()
+            self.addCleanup(self._tmp_dir.cleanup)
+        return Path(self._tmp_dir.name) / name
+
+    def _score_block(self, out):
+        block, on = [], False
+        for line in out.splitlines():
+            if line.startswith("entry scores"):
+                on = True
+            elif on and line.startswith("  "):
+                block.append(line)
+            elif on:
+                break
+        return block
+
+    def test_a_trailing_comma_in_entry_ids_is_the_same_swap_as_without_it(self):
+        code, out, err = self._swap_plain("--entry-ids", "7001")
+        self.assertEqual(code, 0, err[-1500:])
+        for flag in ("7001,", " 7001 , ", ",7001"):
+            with self.subTest(flag=flag):
+                code2, out2, err2 = self._swap_plain("--entry-ids", flag)
+                self.assertEqual(code2, 0, err2[-1500:])
+                self.assertEqual(self._score_block(out2), self._score_block(out))
+
+    def _swap_plain(self, *extra):
+        h = self._h()
+        return h._run(*extra)
+
+    def test_a_flag_that_names_no_entry_id_is_refused_at_exit_4_before_anything_is_read(self):
+        for flag in (",", " , ,", " "):
+            with self.subTest(flag=flag):
+                code, out, err = self._swap_plain("--entry-ids", flag)
+                self.assertEqual(code, 4, err[-800:])
+                self.assertIn("names no Entry ID. Nothing was read and no swap was attempted",
+                              err)
+                self.assertNotIn("Traceback", err)
+                self.assertNotIn("salary:", out, "refused before the inputs were resolved")
+
+    def test_an_entry_id_in_no_row_is_refused_at_exit_4_not_a_traceback(self):
+        """Found by the landing review: `5001,` cleaned to `['5001']` and still raised
+        when 5001 is in no row. Any id the parent file does not hold is exit 4 now,
+        before the pool and the frame are built, under --dry-run too."""
+        for flag, extra in (("9999", ()), ("7001 7002", ()), ("7001;7002", ()),
+                            ("7001,9999", ()), ("9999", ("--dry-run",))):
+            with self.subTest(flag=flag, extra=extra):
+                code, out, err = self._swap_plain("--entry-ids", flag, *extra)
+                self.assertEqual(code, 4, err[-800:])
+                self.assertIn("that are in no row of", err)
+                self.assertIn("Nothing was swapped.", err)
+                self.assertNotIn("Traceback", err)
+                self.assertNotIn("projection frame:", out, "refused before the frame was built")
+        code, out, err = self._swap_plain("--entry-ids", "7001,7002")
+        self.assertEqual(code, 0, err[-1500:])
+
+    def test_an_empty_entry_ids_flag_keeps_meaning_every_reserved_entry(self):
+        code, out, err = self._swap_plain("--entry-ids", "")
+        self.assertEqual(code, 0, err[-1500:])
+        code2, out2, _ = self._swap_plain()
+        self.assertEqual(self._score_block(out), self._score_block(out2))
+
+
+    # -- R141: the post-lock ownership view, report-only ------------------------- #
+
+    OWN_NOW = datetime(2026, 7, 10, 22, 0, tzinfo=timezone.utc)
+
+    def _ownership_world(self):
+        """Two teams, ten hitters and two pitchers each. Salaries ascend with the index
+        and BBB's sit 50 above AAA's, so the structural High tier is AAA P1, BBB H10,
+        AAA H10 and BBB H9. AAA's game has not started; BBB's has."""
+        rows, status, orders = [], {}, {}
+        for team, game, bump, lock in (("AAA", "AAA@CCC", 0.0, self.OWN_NOW + timedelta(hours=3)),
+                                       ("BBB", "BBB@DDD", 50.0, self.OWN_NOW - timedelta(hours=1))):
+            for i in range(1, 11):
+                pid = str({"AAA": 50000, "BBB": 60000}[team] + i)
+                rows.append({"Player_ID": pid, "Name": f"{team} H{i}", "Team": team,
+                             "Position": ("C", "1B", "2B", "3B", "SS", "OF", "OF", "OF", "OF", "OF")[i - 1],
+                             "Salary": 3000.0 + 100 * i + bump})
+                status[pid] = PlayerLineupStatus(pid, f"{team} H{i}", team, game, lock,
+                                                 "Confirmed_Starter", batting_order=min(i, 9))
+                orders[pid] = min(i, 9)
+            for k in (1, 2):
+                pid = str({"AAA": 70000, "BBB": 80000}[team] + k)
+                rows.append({"Player_ID": pid, "Name": f"{team} P{k}", "Team": team,
+                             "Position": "SP", "Salary": 8000.0 + 100 * k})
+                status[pid] = PlayerLineupStatus(pid, f"{team} P{k}", team, game, lock, "Probable")
+        return (pd.DataFrame(rows),
+                {"status_by_player_id": status, "confirmed_order_by_player_id": orders,
+                 "probable_pitcher_ids": ["70001", "80001"]})
+
+    @staticmethod
+    def _roster(slot7):
+        # P1 P2 C 1B 2B 3B SS OF1 OF2 OF3
+        return ["70001", "80001", "50001", "50002", "50003", "50004", "50005", slot7, "50007", "50008"]
+
+    def _view(self, **kw):
+        tool = LateSwapDeclaredPitcherTests._tool()
+        frame, status = self._ownership_world()
+        parent = {"E1": self._roster("50010"), "E2": self._roster("50010"),
+                  "E3": self._roster("60010")}
+        candidates = [{"roster_slot_ids": self._roster("50006")},
+                      {"roster_slot_ids": self._roster("50006")},
+                      {"roster_slot_ids": self._roster("50008")},
+                      {"roster_slot_ids": self._roster("60006")},     # BBB: another team, never offered
+                      {"roster_slot_ids": self._roster("50010")}]     # the incumbent himself
+        args = dict(projections=frame, status=status, as_of=self.OWN_NOW, parent_rosters=parent,
+                    candidates=candidates, shapes=["large_wta"])
+        args.update(kw)
+        return tool, tool.ownership_view_lines(**args)
+
+    def test_the_ownership_view_lists_unlocked_chalk_the_parent_holds_with_bank_alternatives(self):
+        # BBB H6 is made unlocked on purpose: only the team test, not the lock test,
+        # keeps him out of an AAA player's alternatives.
+        frame, status = self._ownership_world()
+        status["status_by_player_id"]["60006"] = PlayerLineupStatus(
+            "60006", "BBB H6", "BBB", "BBB@DDD", self.OWN_NOW + timedelta(hours=3),
+            "Confirmed_Starter", batting_order=6)
+        _, lines = self._view(status=status)
+        self.assertTrue(lines[0].startswith("ownership view (R141, report-only; UNCALIBRATED "
+                                            "STRUCTURAL PRIOR, a review proxy: never a "
+                                            "probability, edge or ROI)"))
+        self.assertIn("computed over the 24-player swap pool and NOT the salary file", lines[0])
+        self.assertIn("a posted batting order for 20 of 20 hitters", lines[0])
+        self.assertIn("2 probable pitcher(s), implied totals none, base projection none", lines[0])
+        self.assertTrue(lines[1].startswith("  AAA P1 (AAA P): structural own"), lines)
+        self.assertIn("held in 3 of 3 parent entries", lines[1])
+        chalk = [l for l in lines[1:] if l.startswith("  AAA H10")]
+        self.assertEqual(len(chalk), 1, lines)
+        self.assertIn("High tier, held in 2 of 3 parent entries", chalk[0])
+        self.assertIn("same-team same-slot bank alternatives: AAA H6", chalk[0])
+        self.assertIn("in 2 bank lineup(s)", chalk[0])
+        self.assertNotIn("BBB", chalk[0], "another team's player is never an alternative")
+        self.assertNotIn("AAA H10 (", chalk[0].split("alternatives:")[1],
+                         "the incumbent is not offered as his own alternative")
+
+    def test_locked_games_are_filtered_from_the_output_not_the_input(self):
+        """BBB H10 is the field's most owned hitter and the parent holds him, but his game
+        has started, so he is not listed; he is still in the computation, so AAA H10's
+        own% is the full-pool number and not what an AAA-only input gives."""
+        tool, lines = self._view()
+        self.assertFalse([l for l in lines if "BBB H10" in l], lines)
+        frame, status = self._ownership_world()
+        from mlb_engine.field.ownership_prior import predict_ownership
+        rows = [{**r, "Position": "P" if r["Position"] == "SP" else r["Position"]}
+                for r in frame.to_dict("records")]
+        full = predict_ownership(rows, "wta_satellite",
+                                 batting_order_by_player_id=status["confirmed_order_by_player_id"],
+                                 probable_sp_ids=status["probable_pitcher_ids"])
+        listed = next(l for l in lines if l.startswith("  AAA H10"))
+        self.assertIn(f"structural own {full['own_pct_by_player_id']['50010']:.1f}%", listed)
+        filtered = predict_ownership([r for r in rows if r["Team"] == "AAA"], "wta_satellite")
+        self.assertNotAlmostEqual(filtered["own_pct_by_player_id"]["50010"],
+                                  full["own_pct_by_player_id"]["50010"], places=1)
+
+    def test_a_player_with_no_status_is_treated_as_locked(self):
+        frame, status = self._ownership_world()
+        status["status_by_player_id"].pop("50010")
+        _, lines = self._view(status=status)
+        self.assertEqual([l for l in lines if l.startswith("  AAA H10")], [])
+        self.assertTrue(any(l.startswith("  AAA P1") for l in lines))
+        status["status_by_player_id"].pop("70001")
+        _, lines = self._view(status=status)
+        self.assertEqual(lines[-1], "  no unlocked High-tier player is held by the parent file")
+
+    def test_the_listing_is_capped_and_says_how_many_more(self):
+        for limit in (1, 0):
+            with self.subTest(limit=limit):
+                _, lines = self._view(limit=limit)
+                self.assertEqual(len([l for l in lines if l.startswith("  AAA")]), 1, lines)
+                self.assertEqual(lines[-1], "  and 1 more unlocked High-tier player(s) held")
+
+    def test_a_blank_or_partial_parent_row_is_not_an_entry_in_the_denominator(self):
+        parent = {"E1": self._roster("50010"), "E2": [], "E3": self._roster("50010")[:9]}
+        _, lines = self._view(parent_rosters=parent)
+        listed = next(l for l in lines if l.startswith("  AAA H10"))
+        self.assertIn("held in 1 of 1 parent entries", listed)
+
+    def test_a_real_swap_prints_the_view_only_with_the_flag_and_changes_nothing_else(self):
+        code, out, err = self._swap_plain("--ownership-report")
+        self.assertEqual(code, 0, err[-1500:])
+        self.assertTrue([l for l in out.splitlines() if l.startswith("ownership view (R141")])
+        code2, out2, err2 = self._swap_plain()
+        self.assertEqual(code2, 0, err2[-1500:])
+        self.assertNotIn("ownership view", out2)
+        self.assertEqual(self._score_block(out), self._score_block(out2))
+
+    def test_the_view_also_prints_under_dry_run(self):
+        code, out, err = self._swap_plain("--ownership-report", "--dry-run")
+        self.assertEqual(code, 0, err[-1500:])
+        self.assertIn("ownership view (R141", out)
+
+    def test_an_exception_in_the_view_never_withholds_the_file(self):
+        h = self._h()
+
+        def boom(*a, **kw):
+            raise RuntimeError("prior exploded")
+
+        h.ls.ownership_view_lines = boom
+        code, out, err = h._run("--ownership-report")
+        self.assertEqual(code, 0, err[-1500:])
+        self.assertIn("OWNERSHIP VIEW FAILED (RuntimeError: prior exploded); the swap continues "
+                      "without it.", err)
+        self.assertIn("gates: workflow_valid=True selection=True allocation=True", out)
+
+class FixedPairConflictTests(unittest.TestCase):
+    """R445 (roadmap Session 29): two untouchable rows against EACH OTHER.
+
+    `_untouchable_cap_conflicts` counted caps over the rows a solve cannot change
+    and never looked at them pairwise, while the export validator grades every
+    pair of legal rosters against `max_shared_players` (identical lineups exempt)
+    and every contest for the same lineup twice (F-3). So a solve whose frozen rows
+    already breached either between themselves certified, and the file was then
+    refused naming two rows the solve never touched, with a diagnosis that pointed
+    at the cap. Reproduced through the production chain: `fixed_portfolio_exposure`
+    -> `select_and_assign_entries` -> the validator on the same file.
+
+    The overlap half is a late swap's only (`refuse_fixed_pair_overlap`, stamped in
+    `execute_portfolio` from `mode`): on an initial build the same breach fails the
+    validator at S and ships review-grade under R388(d), which a refusal would
+    remove. F-3 is a V failure with no file either way, so it is refused in both.
+    """
+
+    GATES = {g: True for g in (
+        "salary_gate_passed", "entry_grid_gate_passed", "lineup_gate_passed",
+        "pitcher_audit_gate_passed", "weather_gate_passed", "odds_gate_passed",
+        "projection_schema_gate_passed", "optimizer_gate_passed")}
+    OPEN = {"max_player_exposure_pct": 1.0, "max_pitcher_exposure_pct": 1.0,
+            "max_primary_stack_exposure_pct": 1.0, "max_sp_pair_repetition": 3}
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.salary = self.root / "salary.csv"
+        self.ids = write_salary(self.salary)
+        ids = self.ids
+        self.r1, self.r2 = legal_rosters(ids)
+        self.r1_nine = list(self.r1)
+        self.r1_nine[-1] = ids["CCC OF3"]            # shares 9 of 10 with r1
+        self.r3 = [ids["Pitcher A"], ids["Pitcher C"], ids["AAA C"], ids["CCC 1B"],
+                   ids["CCC 2B"], ids["CCC 3B"], ids["CCC SS"], ids["AAA OF1"],
+                   ids["AAA OF2"], ids["CCC OF2"]]   # 7 shared with r1, 6 with r1_nine, 5 with r2
+        self.frame = projection_frame(ids)
+
+    # -- fixtures ------------------------------------------------------------ #
+
+    def _entries(self, rosters, contests, name="DKEntries.csv"):
+        path = self.root / name
+        write_entries(path, rosters, contests)
+        return path
+
+    def _fixed(self, entries, solved=("5003",), swap=True):
+        fixed = fixed_portfolio_exposure(entries, list(solved), salary_csv_path=self.salary)
+        fixed["refuse_fixed_pair_overlap"] = bool(swap)
+        return fixed
+
+    def _allocate(self, fixed, controls, solved=("5003",)):
+        bank = [candidate("X", [f"x{i}" for i in range(10)], 50),
+                candidate("Y", [f"y{i}" for i in range(10)], 49)]
+        reqs = [{"entry_id": e, "contest_id": "900", "contest_shape": "large_wta"}
+                for e in solved]
+        return select_and_assign_entries(bank, reqs, controls, fixed_exposure=fixed)
+
+    def _validate(self, entries, controls):
+        return validate_dk_entries_file(entries, self.salary, portfolio_controls=controls)
+
+    def _swap(self, current, authorized, controls, candidates, locked=()):
+        statuses = {pid: PlayerLineupStatus(
+                        pid, pid, "AAA", "AAA@BBB",
+                        NOW - timedelta(hours=1) if pid in locked else NOW + timedelta(hours=2),
+                        "Confirmed_Starter")
+                    for pid in self.ids.values()}
+        parent = self._parent()
+        return run_late_swap(
+            runs_root=self.root / "runs", current_entries_csv=current,
+            status_by_player_id=statuses, as_of=NOW, salary_csv=self.salary,
+            projections=self.frame, candidates=candidates, workflow_gates=self.GATES,
+            authorized_entry_ids=list(authorized), allow_parent_mismatch=True,
+            portfolio_controls={**self.OPEN, **controls}), parent
+
+    def _reqs(self, *entry_ids):
+        return [{"entry_id": e, "contest_id": "900", "contest_name": "Test WTA",
+                 "contest_shape": "large_wta"} for e in entry_ids]
+
+    def _parent(self):
+        """A promoted run for `allow_parent_mismatch` to resolve: built at the
+        looser `max_shared_players` 9 a deadline-rung parent ships at."""
+        entries = self._entries([None, None, None], ["900"] * 3, "DKEntries_parent.csv")
+        parent = run_initial_build(
+            runs_root=self.root / "runs", salary_csv=self.salary, entries_csv=entries,
+            projections=self.frame,
+            candidates=[candidate("A", self.r1, 100), candidate("B", self.r1_nine, 99),
+                        candidate("C", self.r2, 98, "CCC")],
+            entry_requirements=self._reqs("5001", "5002", "5003"),
+            workflow_gates=self.GATES,
+            portfolio_controls={**self.OPEN, "max_shared_players": 9})
+        self.assertTrue(parent["passed"], parent.get("errors"))
+        return parent
+
+    # -- the pre-check ------------------------------------------------------- #
+
+    def test_a_frozen_pair_over_the_cap_is_refused_naming_both_rows(self):
+        entries = self._entries([self.r1, self.r1_nine, self.r2], ["900"] * 3)
+        controls = {"max_shared_players": 8}
+        result = self._allocate(self._fixed(entries), controls)
+        self.assertFalse(result["passed"])
+        self.assertEqual(result["refusal"], "untouchable_rows_exceed_cap")
+        self.assertFalse(result["allocation_certified"])
+        self.assertEqual(
+            result["errors"][0],
+            "max_shared_players: entries 5001 and 5002, rows this solve cannot "
+            "change, already share 9 players, against a cap of 8")
+        self.assertIn("authorize", " ".join(result["errors"]))
+        self.assertIn("authorizing a row of it that still has an unlocked slot clears it",
+                      result["errors"][-1])
+        # what the validator says about the same file: the refusal this replaces
+        self.assertIn("entries 5001/5002 share 9>8", self._validate(entries, controls)["errors"])
+
+    def test_the_same_pair_before_the_fix_certified(self):
+        """The defect, kept visible: without the stamp (an initial build, or a hand
+        dict) the allocator certifies this solve, which is what a swap did."""
+        entries = self._entries([self.r1, self.r1_nine, self.r2], ["900"] * 3)
+        result = self._allocate(self._fixed(entries, swap=False), {"max_shared_players": 8})
+        self.assertTrue(result["passed"], result.get("errors"))
+        self.assertTrue(result["allocation_certified"])
+
+    def test_equal_to_the_cap_is_not_a_conflict(self):
+        entries = self._entries([self.r1, self.r1_nine, self.r2], ["900"] * 3)
+        controls = {"max_shared_players": 9}
+        result = self._allocate(self._fixed(entries), controls)
+        self.assertTrue(result["passed"], result.get("errors"))
+        self.assertNotIn("share", " ".join(self._validate(entries, controls)["errors"]))
+
+    def test_identical_lineups_in_two_contests_are_reuse_not_overlap_and_not_F3(self):
+        """The validator exempts an identical roster from the overlap test (approved
+        cross-contest reuse) and F-3 is per contest."""
+        entries = self._entries([self.r1, self.r1, self.r2], ["900", "901", "900"])
+        controls = {"max_shared_players": 8}
+        result = self._allocate(self._fixed(entries), controls)
+        self.assertTrue(result["passed"], result.get("errors"))
+        errors = " ".join(self._validate(entries, controls)["errors"])
+        self.assertNotIn("share", errors)
+        self.assertNotIn("duplicate roster", errors)
+
+    def test_the_overlap_half_needs_the_swap_stamp(self):
+        entries = self._entries([self.r1, self.r1_nine, self.r2], ["900"] * 3)
+        fixed = self._fixed(entries)
+        controls = {"max_shared_players": 8}
+        total = 3
+        self.assertTrue(ca._untouchable_cap_conflicts(fixed, controls, total))
+        for stamp in (False, None):
+            with self.subTest(stamp=stamp):
+                bare = dict(fixed)
+                if stamp is None:
+                    bare.pop("refuse_fixed_pair_overlap")
+                else:
+                    bare["refuse_fixed_pair_overlap"] = stamp
+                self.assertEqual(ca._untouchable_cap_conflicts(bare, controls, total), [])
+        self.assertEqual(ca._untouchable_cap_conflicts(fixed, {}, total), [],
+                         "no max_shared_players, no overlap check")
+
+    def test_two_identical_rows_in_one_contest_are_refused_by_F3_naming_them(self):
+        entries = self._entries([self.r1, self.r1, self.r2], ["900"] * 3)
+        for label, controls, swap in (("swap", {"max_shared_players": 8}, True),
+                                      ("no overlap control", {}, True),
+                                      ("initial build", {"max_shared_players": 8}, False)):
+            with self.subTest(case=label):
+                result = self._allocate(self._fixed(entries, swap=swap), controls)
+                self.assertFalse(result["passed"])
+                self.assertEqual(result["refusal"], "untouchable_rows_exceed_cap")
+                self.assertEqual(
+                    result["errors"][0],
+                    "F-3: contest 900 already holds the same lineup in 2 row(s) this "
+                    "solve cannot change (entries 5001, 5002)")
+                self.assertIn("never relaxed", result["errors"][-1])
+                self.assertIn("blank it on an initial build", result["errors"][-1])
+                self.assertNotIn("restate that value", " ".join(result["errors"]),
+                                 "F-3 never relaxes: the cap-loosening remedies do not apply")
+        self.assertIn("Contest 900: duplicate roster appears 2 times",
+                      self._validate(entries, {})["errors"])
+
+    def test_F3_names_only_the_rows_of_the_contest_that_holds_the_duplicate(self):
+        """The same lineup in contest 901 is legal reuse; it must not be named."""
+        entries = self._entries([self.r1, self.r1, self.r1], ["900", "900", "901"])
+        lines = ca._untouchable_cap_conflicts(
+            self._fixed(entries, solved=()), {}, 3)
+        self.assertEqual(
+            lines[0], "F-3: contest 900 already holds the same lineup in 2 row(s) this "
+                      "solve cannot change (entries 5001, 5002)")
+        self.assertEqual([l for l in lines if l.startswith("F-3: contest")], lines[:1])
+
+    def test_fixed_portfolio_exposure_carries_the_contest_of_every_fixed_row(self):
+        entries = self._entries([self.r1, self.r1_nine, self.r2], ["900", "901", "902"])
+        fixed = fixed_portfolio_exposure(entries, ["5003"], salary_csv_path=self.salary)
+        self.assertEqual(fixed["entry_ids"], ["5001", "5002"])
+        self.assertEqual(fixed["contest_by_entry"], {"5001": "900", "5002": "901"})
+
+    def test_a_hand_built_dict_without_ids_or_contests_still_names_rows(self):
+        def roster(extra):
+            return ["p1", "p2", *[f"h{i}" for i in range(7)], extra]
+        fixed = {"row_count": 2, "refuse_fixed_pair_overlap": True,
+                 "rosters": [roster("a"), roster("b")],
+                 "signatures_by_contest": {"c1": [sorted(roster("a")), sorted(roster("a"))]}}
+        lines = ca._untouchable_cap_conflicts(fixed, {"max_shared_players": 8}, 3)
+        self.assertEqual(lines[0], "max_shared_players: entries fixed row 1 and fixed row 2, "
+                                   "rows this solve cannot change, already share 9 players, "
+                                   "against a cap of 8")
+        f3 = next(l for l in lines if l.startswith("F-3: "))
+        self.assertEqual(f3, "F-3: contest c1 already holds the same lineup in 2 row(s) this "
+                             "solve cannot change", "no contest map, so no ids")
+
+    def test_pairs_are_listed_worst_first_ten_then_a_count(self):
+        def roster(i, shared):
+            core = [f"s{k}" for k in range(shared)]
+            return core + [f"u{i}_{k}" for k in range(10 - shared)]
+        rosters = [roster(i, 9) for i in range(6)]            # 15 pairs at 9 shared
+        fixed = {"row_count": 6, "refuse_fixed_pair_overlap": True,
+                 "entry_ids": [str(7000 + i) for i in range(6)], "rosters": rosters}
+        lines = ca._untouchable_cap_conflicts(fixed, {"max_shared_players": 8}, 8)
+        pair_lines = [l for l in lines if l.startswith("max_shared_players: entries ")]
+        self.assertEqual(len(pair_lines), 10)
+        self.assertEqual(pair_lines, sorted(pair_lines), "a stable order")
+        self.assertIn("max_shared_players: 5 more pair(s) of rows this solve cannot "
+                      "change share more than 8", lines)
+        # row order puts the worst pair LAST: rows 1 and 2 share 9, row 0 shares 1 with each
+        mixed = [["s0"] + [f"u0_{k}" for k in range(9)], roster(1, 9), roster(2, 9)]
+        worst = ca._untouchable_cap_conflicts(
+            {"row_count": 3, "refuse_fixed_pair_overlap": True, "entry_ids": ["1", "2", "3"],
+             "rosters": mixed}, {"max_shared_players": 0}, 3)
+        shared = [int(l.split("share ")[1].split(" ")[0]) for l in worst
+                  if l.startswith("max_shared_players: entries ")]
+        self.assertEqual(shared, sorted(shared, reverse=True), "worst first")
+
+    def test_no_new_line_is_re_steered_by_the_swap_classifier(self):
+        """`classify_swap_failure` annotates any line starting with a mapped error
+        prefix (`entries `, `player `, ...) and would drag the cap-loosening trailer
+        in behind it. The new lines start `max_shared_players:` and `F-3:`."""
+        ls = SwapControlsInheritanceTests._late_swap()
+        entries = self._entries([self.r1, self.r1_nine, self.r1_nine], ["900"] * 3)
+        lines = ca._untouchable_cap_conflicts(
+            self._fixed(entries, solved=()), {"max_shared_players": 8}, 3)
+        self.assertTrue(any(l.startswith("F-3: ") for l in lines), lines)
+        self.assertTrue(any(l.startswith("max_shared_players: entries ") for l in lines))
+        for line in lines:
+            with self.subTest(line=line[:50]):
+                self.assertEqual(
+                    [], [c for p, c in ls._CONTROL_BY_ERROR_PREFIX if line.startswith(p)])
+        self.assertEqual(
+            ls.classify_swap_failure(lines, {"max_shared_players": 8}),
+            [f"  {l}" for l in lines])
+
+    # -- by mode, through the real execute_portfolio -------------------------- #
+
+    def test_a_late_swap_refuses_the_frozen_pair_and_authorizing_one_row_clears_it(self):
+        current = self._entries([self.r1, self.r1_nine, self.r2], ["900"] * 3,
+                                "DKEntries_current.csv")
+        refused, _ = self._swap(current, ["5003"], {"max_shared_players": 8},
+                                [candidate("C", self.r2, 98, "CCC")])
+        self.assertFalse(refused["passed"])
+        self.assertTrue(any(e.startswith("max_shared_players: entries 5001 and 5002")
+                            for e in refused["errors"]), refused["errors"])
+        cleared, _ = self._swap(current, ["5002", "5003"], {"max_shared_players": 8},
+                                [candidate("C", self.r2, 98, "CCC"),
+                                 candidate("D", self.r3, 97, "CCC")])
+        self.assertTrue(cleared["passed"], cleared.get("errors"))
+        self.assertTrue(cleared["selection_certified"])
+        validated = self._validate(Path(cleared["output_path"]), {"max_shared_players": 8})
+        self.assertTrue(validated["passed"], validated["errors"])
+
+    def test_authorizing_a_fully_locked_row_does_not_clear_the_pair_and_the_message_says_so(self):
+        """`build_entry_requirements` skips a row whose every game has started even when
+        it is authorized, so it stays frozen and the refusal stands. The reviewer's
+        catch: the trailer used to promise that authorizing either row clears it."""
+        current = self._entries([self.r1, self.r1_nine, self.r2], ["900"] * 3,
+                                "DKEntries_current.csv")
+        refused, _ = self._swap(current, ["5002", "5003"], {"max_shared_players": 8},
+                                [candidate("C", self.r2, 98, "CCC"),
+                                 candidate("D", self.r3, 97, "CCC")],
+                                locked=set(self.r1_nine))
+        self.assertFalse(refused["passed"])
+        errors = " ".join(refused["errors"])
+        self.assertIn("max_shared_players: entries 5001 and 5002", errors)
+        self.assertIn("a row whose every game has started cannot be changed", errors)
+
+    def test_an_initial_build_around_a_held_pair_over_the_cap_still_ships_review_grade(self):
+        """The regression guard (R386, delivery first). The allocator must not refuse
+        here: today the validator fails S and R388(d) hands back a review-grade file."""
+        held = self._entries([self.r1, self.r1_nine, None], ["900"] * 3, "DKEntries_held.csv")
+        result = run_initial_build(
+            runs_root=self.root / "runs_initial", salary_csv=self.salary, entries_csv=held,
+            projections=self.frame,
+            candidates=[candidate("C", self.r2, 98, "CCC"), candidate("D", self.r3, 97, "CCC")],
+            entry_requirements=self._reqs("5003"), workflow_gates=self.GATES,
+            portfolio_controls={**self.OPEN, "max_shared_players": 8})
+        self.assertNotEqual((result.get("allocation") or {}).get("refusal"),
+                            "untouchable_rows_exceed_cap")
+        self.assertEqual(result["errors"], ["entries 5001/5002 share 9>8"])
+        self.assertTrue(result.get("review_grade_export"), sorted(result))

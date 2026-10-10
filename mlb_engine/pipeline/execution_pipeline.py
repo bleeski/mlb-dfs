@@ -738,6 +738,17 @@ def execute_portfolio(
                 # cap they were never measured against.
                 team_exposure_min_hitters=controls.get("team_exposure_min_hitters"),
             )
+            # R445. Whether the allocator may REFUSE on two untouchable rows that
+            # breach `max_shared_players` between themselves. On a late swap it
+            # may: the export validator refuses the file on those rows (S) and a
+            # swap has no review-grade path, so the early refusal only names the
+            # remedy. On an initial build it may not: the same breach there fails
+            # the validator at S and R388(d) ships the file review-grade, which a
+            # refusal here would remove. F-3 (a V failure, no file either way) is
+            # refused in both and does not read this flag. (`is not None`: a test
+            # patches this seam to return None to show what the seam is for.)
+            if fixed_exposure is not None:
+                fixed_exposure["refuse_fixed_pair_overlap"] = (mode == "late_swap")
         # R98(2): the bank record travels with the candidates it produced. The
         # allocator can prove infeasibility against a bank; it cannot see whether
         # that bank was a completed search or a slice, and that difference decides

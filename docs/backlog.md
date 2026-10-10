@@ -918,7 +918,9 @@ contains `_replay`, on BOTH contest types, is what the 08-16 commit lacked.
 manifest is what Ben checks a sha256 against before entering a contest, and a
 replay row for a played slate is a second answer to "what was delivered".
 
-### R284. A leverage cap binds at BUILD and not at REFINE: `late_swap.py` calls `extend_bank` twice with no `leverage` (P2, S) | new 2026-09-01, from R246's class-A R233 enumeration; verified in tree by AST, with production callers
+### R284. REMAINDER, the stack_min half SHIPPED 2026-10-10 (Session 29): the build's other bank controls bind at BUILD and not at REFINE, `late_swap.py` calls `extend_bank` twice with no `leverage` and no `max_opposing_hitters_per_sp` (P3, S) | new 2026-09-01, from R246's class-A R233 enumeration; verified in tree by AST, with production callers | Roadmap: Session 159
+
+> **Rider 2026-10-10 (Session 29: the stack_min half SHIPPED, migrated to CHANGELOG.md; this entry is its open remainder).** `late_swap.py` now resolves its controls before the bank and asks `extend_bank` for `resolve_bank_stack_request(controls)`'s sizes (general slice five first at the sliced door's clamped share; pinned slices the four, then the five while a full second of `--budget` is left). What stays open, all on the same two call sites: (i) `leverage`, DORMANT (`--leverage` defaults None, autobuild never passes it, 0 of 127 delivery records carry it): report-only first (print the parent brief's leverage block), enforce only after measuring at what pin count a cap the parent satisfied turns infeasible; the 06-03 measurements in the CHANGELOG say pin shape and the clock bind a pinned slice's yield, not the stack ask. (ii) `max_opposing_hitters_per_sp` (R293 rider i): monotone widening, so no refusal risk; needs the parent brief's `anti_correlation` read or a flag, and `R293BankOnEveryRungTests.EXPECTED_CENSUS` moves `("tools/late_swap.py", "extend_bank")` from (0, 2) to (2, 2). (iii) the R405 cluster cap and the R434 sleeve and seat stamps (fragment `2026-10-06_DEV_late-swap-carries-no-sleeve-or-seat-stamps.md`). (iv) the five-share clamp in `late_swap.py` is a deliberate copy of `build_slate.py:4343-4376`; one helper would dedupe both. Scheduled: Session 159 (band 3, Rank 105).
 
 > **Rider 2026-10-02 (Session 144, Phase 3, the board rebuild).** premise re-verified at HEAD e4588bc: HOLDS but DORMANT for leverage. Neither `extend_bank` call (`late_swap.py:1580`, `:1614`) passes leverage and `run_late_swap` has none, but `--leverage` defaults to None (`build_slate.py:8390`), autobuild never passes it, and 0 of 127 delivery records carry it, so no leveraged delivered parent exists for the gap to bite on. The `stack_min` rider is LIVE on every swap (the swap builds at the default 4 while the build passed its own value). Split: (stack_min) ranks in band 1 inside Session 29; (leverage) rides band 3 until a leveraged build is delivered. S report-only, M enforced.
 
@@ -2347,6 +2349,8 @@ SE per cell, blocks by slate DATE — ~26 dates is the effective n, not
 
 ### R261. The own-portfolio scenario bank: predict P(top-1%) and P(washout) pre-lock, grade at archive time, steer nothing until graded (P1, M-L; gated only by its own inputs R258–R260) | new 2026-08-27, from Ben's greenfield instruction; designed inside the sim gate's clauses, not around them
 
+**Rider 2026-10-10 (Session 29, from R141).** R141's report-only swap view shipped (`late_swap.py --ownership-report`, `ownership_view_lines`). Its 2026-08-28 rider moves here: once this grades, that pass can also re-emit P-hat(top) and P-hat(washout) CONDITIONAL on locked scores and the games still to play (re-simulate unresolved games only; locked points fixed), still report-only, same rails. "Ahead plays safe, behind plays narrow" arrives from those conditionals or not at all, never as a hard-coded rule.
+
 **Rider 2026-09-10 (thirteenth edition): an implementation seed, not a design change.** `production/simulation.py` (team + game + residual latent factors, moment-matched lognormal hitters, negative opponent loading on arms, PCG64 common random numbers across proposals) is the machinery this entry needs; its loadings are configuration, not estimates, and R260 supplies them. Take the code, not the numbers.
 
 **What.** Sample joint player outcomes (R259 marginals, R260 team/game
@@ -3734,12 +3738,12 @@ A crash inside a governor-rung or R407 re-solve stranded solve 1's mirrored UNCE
 - **Why.** Bounded clock waste inside `BANK_SLEEVE_BUDGET_SHARE` (30% of the slice budget) on exactly the builds where the sleeve then falls back to `projection` (counted). Not a legality risk.
 - **Fix.** Skip a depth job when the ordinary bucket's key for the same (pair, team, lock_sig) is already in `cache.attempted`, or count `held` off the union before sizing.
 
-### R445. Two UNTOUCHABLE rows that breach `max_shared_players` (or F-3) between themselves are pre-checked by nothing: the swap's joint MILP certifies, then the validator refuses naming two rows the solve never touched, and a late swap has no review-grade path (P1, S) | new 2026-09-25, found by the 2026-09-25 code review (allocator area; `review_allocator/repro_fixed_pair.py`); the count-cap version is why `_untouchable_cap_conflicts` exists (R29(3)/R61, CHANGELOG 2026-08-09, the 1305_12g swap) and the PAIRWISE controls were left out | Roadmap: Session 29
+### R445. A refused late swap whose own failures are all S or P gets no review-grade file: the early-errors verdict runs on `mode == "initial_build"` only (P2, S) | new 2026-09-25; the pairwise pre-check half SHIPPED 2026-10-10 (Session 29), this is the rider filed 2026-09-27 at Session 101 | Roadmap: Session 90
 
-- **Rider 2026-09-27 (declined at Session 101, R414's own rider, moved here as the open entry whose mechanism it shares).** This entry's own title already names the gap ("a late swap has no review-grade path"), but its Fix below is narrower (a pairwise pre-check that avoids ONE class of refusal); the general mechanism is still missing. `execute_portfolio`'s early-errors review-grade verdict (`_review_grade_fields`, `mirror_review_grade`) runs on `mode == "initial_build"` only (`execution_pipeline.py`, R388(d)'s own design: "a refused swap run never gets a verdict"), so a late swap whose own failures are all S or P is refused at exit 3 and never mirrored UNCERTIFIED; the refused swap leaves the parent delivery live, so it is not a washout, but the operator gets no review-grade file to look at either. Lifting the guard needs the swap's never-relax set threaded into `run_late_swap` (trivial, it already forwards `**kwargs`) AND a decision on what `_review_grade_fields`/`mirror_review_grade` mean for a REFINEMENT rather than an initial build (a swap's mirror already retires other lineages differently, R389(b)); that second part is an `execution_pipeline.py` change and belongs behind plan mode (`.claude/skills/dev-session/SKILL.md` §2), not folded into R445's own pairwise fix. Whoever takes this row decides whether the general mechanism lands with R445's narrower fix or files onward again.
-- **What.** `contest_allocator.py:1289` (`_untouchable_cap_conflicts`) checks player, pitcher, stack, team, cluster counts, the SP pair and game caps; overlap blocking at `:3418-3437` and the F-3 seed at `:3440-3452` are candidate-vs-fixed only. `dk_entries_manager.py:1149` grades every legal-roster pair, fixed-vs-fixed included, and `:1075-1089` F-3 over every complete row; `execution_pipeline.py:463` `_review_grade_fields` returns `{}` for `mode != "initial_build"`, so `:796-823` sends the refusal to `_blocked_result`. Measured on the certified 18-row 06-03 file with 17 rows frozen and one authorized: (A) two frozen rows sharing 9 > `max_shared_players` 8: `allocator passed=True allocation_certified=True`, then the validator `passed=False` naming three fixed-vs-fixed pairs; (B) two identical frozen rows in one contest: the allocator certifies, the validator refuses `duplicate roster appears 2 times`. Reachable whenever the swap's cap is tighter than the file shipped under (`--rederive-controls`, a pre-R268 parent, a deadline-rung parent shipped at `max_shared_players=9` then swapped at the posture 5/6, a re-downloaded template mixing two builds) or when the template already carries a duplicate.
-- **Why.** A legal swap refused at T-minutes with a diagnosis that points at the solve; the remedy (authorize one of the two rows) is not stated.
-- **Fix.** Extend `_untouchable_cap_conflicts` with pairwise overlap over `fixed["rosters"]` against `max_shared_players` (identical rosters exempt, as the validator does) and a per-contest duplicate check over `fixed["signatures_by_contest"]`, returning the existing "authorize the rows with `--entry-ids`" remedy.
+- **Shipped 2026-10-10 (Session 29; migrated to CHANGELOG.md).** `_untouchable_cap_conflicts` pre-checks the frozen rows against each other: `max_shared_players` on a late swap only (an initial build with held rows fails the validator at S and ships review-grade under R388(d), which a refusal would remove), F-3 everywhere (a V failure, no file either way), each naming the rows; `fixed_portfolio_exposure` carries `contest_by_entry`; one stamp in `execute_portfolio`.
+- **What remains.** `execute_portfolio`'s early-errors review-grade verdict (`_review_grade_fields`, `mirror_review_grade`) runs on `mode == "initial_build"` only (`execution_pipeline.py:477`, R388(d)'s own design: "a refused swap run never gets a verdict"), so a late swap whose own failures are all S or P is refused at exit 3 and never mirrored UNCERTIFIED; the refused swap leaves the parent delivery live, so it is not a washout, but the operator gets no review-grade file to look at either. Lifting the guard needs the swap's never-relax set threaded into `run_late_swap` (trivial, it already forwards `**kwargs`) AND a decision on what `_review_grade_fields` and `mirror_review_grade` mean for a REFINEMENT rather than an initial build (a swap's mirror already retires other lineages differently, R389(b)); that second part is an `execution_pipeline.py` change behind plan mode (`.claude/skills/dev-session/SKILL.md` §2). It also covers the sibling fragment `2026-10-04_DEV_untouchable-cap-refusal-late-swap-wording-on-initial-build.md` (an allocator refusal on an initial build hands back no review-grade file either, and says `--entry-ids`).
+- **Why Session 90.** What review-grade means for a refinement is a decision Ben nods in plan mode before any edit.
+
 
 ### R448. CLOSED 2026-10-04 (Session 124). An initial build treats the complete rows of a template as fixed: `run_slate` builds its requirements over the blank and half-entered rows and refuses a template with nothing left to fill by name; `execute_portfolio` opens the `R61-tail` seam for an initial build (only when a complete row sits outside the solve) so the allocator counts the held rows at the file's denominator and holds their lineups out of their contests; the baseline reads `initial_build_requirements` (blank and partial rows fillable, complete rows held) and `every_row_requirements` is retired. The filed "at minimum" (baseline reader only) gives no file, and Session 22 was never a prerequisite. A held lineup that is itself illegal under today's confirmations still blocks as V (R388(c), Session 13). Full text, the premise corrections, the decisions, the real-door evidence, the R233 enumeration and the gate line: `CHANGELOG.md` 2026-10-04. Filed from it: two `docs/backlog_inbox/` fragments (`build_slate`'s `n_entries` counting held rows; the untouchable-rows cap refusal's late-swap wording on an initial build).
 
@@ -4598,19 +4602,9 @@ their slot rather than this decision-first entry.
   expected state and 7 of 8 passing is a clean run — but do not expect R66(a)
   to change that.
 
-### R68. late_swap operator rails: downgrade guard inert on "Name (ID)" cells; hostile flag and feed parsing at T-minutes (P2, S) | audit 2026-08-04, verified in tree
+### R68. CLOSED 2026-10-10 -- (a) and (b) SHIPPED, (c) already shipped at filing, roadmap Session 29, entry migrated to CHANGELOG.md
 
-**Rider 2026-09-25 (the code review, delivery area; `review_delivery/repro_r68_f3.py`): the producer of the "Name (ID)" cell is in the tree.** `tools/repair_entry.py:478` writes `f"{best['name']} ({best['player_id']})"`; `tools/late_swap.py:540-549` keeps `row[4:14]` raw and `:1136-1137` treats the entry as "not comparable" with no refusal, so a swap off a repaired file (under `--allow-parent-mismatch`, since it matches no run's export) has the net-downgrade guard inert for every repaired entry: `_score_roster` on `'1029'` gives 144.94, on `'CCC Ives (1029)'` None. Fix: `_load_entry_rosters` maps cells through `normalize_player_id` (or `parse_dk_entry_rows`). XS.
-
-
-- **What:** (a) `_load_entry_rosters` (`tools/late_swap.py:229`) never normalizes roster cells, unlike every other reader on the path: a DK-redownloaded or hand-edited parent file ("Jose Ramirez (12345678)") makes `_score_roster` return None for every entry, every changed entry prints "not comparable", and the net-downgrade refusal silently never triggers — a strictly worse swap ships without `--accept-downgrade`. (b) `--entry-ids 4711612345,` (trailing comma) raises a raw ValueError traceback (`:508`). (c) the `--lineups` feed is `json.loads`-ed unguarded (`:451`; same at `build_slate.py:2209` and `solver_probe.py:85`) — a truncated file prints a JSONDecodeError instead of the mapped-blocker style the odds files get.
-- **Fix:** normalize cells with `normalize_player_id`; filter empty tokens; wrap the three parses in the "unreadable feed: <exc>" pattern.
-- **The name-fold half of (a) is no longer hypothetical (R151, 2026-08-17).** The
-  same family — a reader on the intake path comparing raw strings while the rest
-  of the intake normalizes — cost ten hitters their MLBAM id and bat side on a
-  real slate through `merge_dk_starting_into_feed`, and produced seven false
-  disagreement reports on top. This entry's "Jose Ramirez (12345678)" example is
-  that defect one function over. Take the two together if either is taken.
+`_load_entry_rosters` reads roster cells through `parse_dk_entry_rows` (one definition; the downgrade guard, standings and the R469 pair guard read it) and `--entry-ids` is split, emptied and checked against the parent file's rows before the pool is built (a flag naming no id, or an id in no row, exits 4). (c) was false at filing: R296(c), R213 and R296(g) had guarded all three feed parses. The three raw `row[4:14]` readers left in `build_slate.py` are the fragment `docs/backlog_inbox/2026-10-10_DEV_raw-roster-cell-readers-in-build-slate.md`.
 
 ### R267(d). A build-time repair-feasibility count, so a thin price band is visible before it is load-bearing (P2, S; report only) | remainder after (a), (b) and (c) SHIPPED 2026-08-31; filed as an observation by BUILD, not a proposal
 
@@ -4644,31 +4638,9 @@ scratch, but the fact that if one happens there is no legal repair.
 
 A late swap finds its parent by the file's own bytes (`late_swap_manager.resolve_parent_run`): the verified pointer run, then any promoted, certified-unpromoted or review-grade run, and a file matching none is still the hard error. `late_swap.py` resolves it before any bank slice and inherits the controls the parent recorded in its diagnostics (`portfolio_controls`, new); `--rederive-controls` re-derives them. A swap's label is never better than its parent's.
 
-### R141. Late-swap leverage pass: post-lock, report-only (P2, S) | new 2026-08-16, from the leverage ideation fragment
+### R141. CLOSED 2026-10-10 -- SHIPPED, roadmap Session 29, entry migrated to CHANGELOG.md
 
-- **What:** after first lock, scratches and posted lineups move the field's
-  remaining chalk, and the swap path today optimizes projection under rails
-  with no leverage view at all.
-- **Fix:** a report-only mode on the swap path: recompute the structural
-  prior on the post-lock slate state, list unlocked exposures now sitting in
-  the top structural-own tier, and show the differentiated
-  same-team/same-slot alternatives already in the bank. Operator decides;
-  `run_late_swap` rails unchanged; locked games stay closed (build contract
-  item 5).
-- **Sequencing:** behind R135 — it recomputes R135's prior, and without one
-  it has nothing to recompute. **R135 CLOSED 2026-08-17**, so this is unblocked:
-  the file is `outputs/<date>/ownership_pred_<tag>.json` and the recompute is
-  `predict_ownership` again on the post-lock state. Tier 5, opportunistic.
-- **Audit fields.** Moves: leverage (swap window). Acceptance: fixture
-  post-lock state → tier list plus alternatives, zero engine mutation.
-  Falsifier: none — reporting. FOSS: existing. Owner: none. Rollback: flag
-  off.
-- **Rider 2026-08-28 (ed9 §4.8, accepted as the gated upgrade):** once
-  R261 grades, this pass can also re-emit P̂(top) / P̂(washout)
-  CONDITIONAL on locked scores and remaining games (re-simulate unresolved
-  games only; locked points fixed) — still report-only, same rails.
-  "Ahead plays safe, behind plays narrow" arrives from those conditionals
-  or not at all, never as a hard-coded rule.
+`late_swap.py --ownership-report` (opt-in, report-only): the structural prior over the swap pool, the unlocked High-tier players the parent holds with the same-team same-slot bank alternatives, locked games filtered from the output and never the input, labelled UNCALIBRATED STRUCTURAL PRIOR. The 2026-08-28 rider (re-emit P-hat(top) and P-hat(washout) conditional on locked scores, gated on R261) moved onto R261.
 
 ### R71(b)(c)(d). Allocator/entries counted-honesty batch, remainder (P2, S) | audit 2026-08-04, verified in tree; (a) CLOSED 2026-08-15, migrated to CHANGELOG.md
 
