@@ -2365,3 +2365,169 @@ class ThirdRenderTests(unittest.TestCase):
         numbered, _ = _tool(_text())
         self.assertEqual(numbered.returncode, 0, numbered.stdout + numbered.stderr)
         self.assertNotIn("read by position", numbered.stdout)
+
+
+# ---------------------------------------------------------------------------
+# R319: two name-form defects on the one input that turns on F4
+# ---------------------------------------------------------------------------
+
+def _lad_slot9(name: str) -> str:
+    """The real paste with LAD's #9 (D Rushing) restated as ``name`` (R319b)."""
+    text = _text().replace("[D Rushing]", f"[{name}]")
+    assert text != _text()
+    return text
+
+
+def _salary_copy(tmp: str, *, swap_muncys: bool = False, kike_starting: str = None) -> str:
+    """The vendored 07-29 salary file, optionally with the two Max Muncy rows swapped
+    in file order and/or Kike Hernandez's Starting slot set."""
+    with open(SALARY, newline="", encoding="utf-8") as fh:
+        rows = list(csv.reader(fh))
+    header, body = rows[0], rows[1:]
+    name, start = header.index("Name"), header.index("Starting")
+    if swap_muncys:
+        at = [i for i, row in enumerate(body) if row[name] == "Max Muncy"]
+        assert len(at) == 2
+        body[at[0]], body[at[1]] = body[at[1]], body[at[0]]
+    if kike_starting is not None:
+        hit = [row for row in body if row[name] == "Kike Hernandez"]
+        assert len(hit) == 1
+        hit[0][start] = kike_starting
+    out = Path(tmp) / "DKSalaries.csv"
+    with out.open("w", newline="", encoding="utf-8") as fh:
+        csv.writer(fh).writerows([header] + body)
+    return str(out)
+
+
+class NameFormTests(unittest.TestCase):
+    """R319. Two defects, one family: the paste's name against DK's.
+
+    (a) A warning that "the salary file puts him on LAD" fired when two DK rows shared a
+    normalized name. `_resolve_one` is team-scoped, so the matched row's team is the
+    pasted team by construction; the warning compared it with a team looked up BY NAME
+    (first row wins), so every firing was false. Both Muncys resolved correctly; only the
+    warning was wrong, and on 2026-09-04 a session cited it as a reason not to rebuild.
+
+    (b) mlb.com prints LAD's #9 as `E Hernandez` and DK files him as `Kike Hernandez`.
+    First initial + surname + team missed, the side fell to PARTIAL 8/9 and the line said
+    he was unrosterable. The slate's best stack routed through the TBD path on a build
+    that had a complete confirmed lineup.
+    """
+
+    ATH_SLOT9 = "9. [A Williams]"
+
+    def _ath_muncy(self) -> str:
+        text = _text().replace(self.ATH_SLOT9, "9. [M Muncy]")
+        assert text != _text()
+        return text
+
+    def test_two_dk_rows_sharing_a_name_each_resolve_to_their_own_row_with_no_warning(self):
+        for label, swap in (("file order LAD first", False), ("file order ATH first", True)):
+            with self.subTest(label), tempfile.TemporaryDirectory() as tmp:
+                salary = _salary_copy(tmp, swap_muncys=swap)
+                out = resolve_paste_to_feed(self._ath_muncy(), salary,
+                                            resolve_overrides=RESOLVE)
+                self.assertEqual(out["report"]["blockers"], [])
+                self.assertEqual(out["report"]["warnings"], [])
+                ids = {g["home"]["team_abbrev"]: [r["dk_player_id"] for r in g["home"]["lineup"]
+                                                  if r["name"] == "Max Muncy"]
+                       for g in out["feed"]["games"]}
+                self.assertEqual(ids["ATH"], ["43706848"])
+                self.assertEqual(ids["LAD"], ["43706618"])
+
+    def test_the_nickname_table_matches_e_hernandez_to_kike_and_the_side_stays_confirmed(self):
+        out = resolve_paste_to_feed(_lad_slot9("E Hernandez"), str(SALARY),
+                                    resolve_overrides=RESOLVE)
+        report = out["report"]
+        self.assertEqual(report["blockers"], [])
+        self.assertEqual(report["unrostered_starters"], [])
+        self.assertIn("LAD", report["confirmed_teams"])
+        self.assertEqual(report["partial_teams"], [])
+        lad = [g for g in out["feed"]["games"] if g["home"]["team_abbrev"] == "LAD"][0]["home"]
+        by_name = {r["name"]: r for r in lad["lineup"]}
+        self.assertEqual(by_name["Kike Hernandez"]["dk_player_id"], "43706616")
+        self.assertEqual(by_name["Kike Hernandez"]["pasted_as"], "E Hernandez")
+        self.assertEqual(by_name["Kike Hernandez"]["order"], 9)
+        # Teoscar is T Hernandez in the same nine, and the initial still separates them.
+        self.assertEqual(by_name["Teoscar Hernandez"]["dk_player_id"], "43706629")
+        self.assertEqual(report["name_form_aliases"], [{
+            "team": "LAD", "order": "9", "pasted_name": "E Hernandez",
+            "dk_name": "Kike Hernandez", "via": "nickname table"}])
+
+    def test_an_unaliased_first_name_form_is_a_distinct_non_fatal_line(self):
+        out = resolve_paste_to_feed(_lad_slot9("X Hernandez"), str(SALARY),
+                                    resolve_overrides=RESOLVE)
+        report = out["report"]
+        self.assertEqual(report["blockers"], [], "non-fatal: a call-up must still ship")
+        (row,) = report["unrostered_starters"]
+        self.assertEqual(row["name_form_candidate"], "Kike Hernandez")
+        self.assertIn("matches no DK LAD hitter by first initial", row["note"])
+        self.assertIn('--resolve "X Hernandez=Kike Hernandez"', row["note"])
+        self.assertNotIn("unrosterable", row["note"])
+        # Teoscar is claimed by `T Hernandez` in the same nine, so he is not a second
+        # candidate, which is what makes the surname unambiguous here.
+        (partial,) = report["partial_teams"]
+        self.assertEqual(partial["cause"], "name_form")
+        self.assertNotIn("unrosterable", partial["reason"])
+        self.assertEqual(report["posted_sides_incomplete"],
+                         {"mlb_short": [], "dk_unrostered": [], "name_form": ["LAD"]})
+
+    def test_the_command_the_line_prints_closes_the_loop(self):
+        text = _lad_slot9("X Hernandez")
+        first = resolve_paste_to_feed(text, str(SALARY), resolve_overrides=RESOLVE)
+        printed = re.search(r'--resolve "([^"]+)=([^"]+)"',
+                            first["report"]["unrostered_starters"][0]["note"])
+        self.assertIsNotNone(printed)
+        out = resolve_paste_to_feed(
+            text, str(SALARY), resolve_overrides={**RESOLVE, printed.group(1): printed.group(2)})
+        self.assertEqual(out["report"]["unrostered_starters"], [])
+        self.assertIn("LAD", out["report"]["confirmed_teams"])
+        self.assertEqual(out["report"]["name_form_aliases"][0]["via"], "--resolve")
+
+    def test_two_unclaimed_teammates_with_the_surname_is_a_guess_and_is_not_made(self):
+        """Slots 8 and 9 both restated, so BOTH LAD Hernandezes are unclaimed: neither
+        pasted name has one candidate, and the rows stay the plain not-in-pool kind."""
+        text = _text().replace("[T Hernández]", "[X Hernandez]").replace(
+            "[D Rushing]", "[Y Hernandez]")
+        report = resolve_paste_to_feed(text, str(SALARY), resolve_overrides=RESOLVE)["report"]
+        self.assertEqual(len(report["unrostered_starters"]), 2)
+        for row in report["unrostered_starters"]:
+            self.assertNotIn("name_form_candidate", row)
+            self.assertIn("unrosterable", row["note"])
+        self.assertEqual(report["posted_sides_incomplete"]["name_form"], [])
+        self.assertEqual(report["posted_sides_incomplete"]["dk_unrostered"], ["LAD"])
+
+    def test_a_starter_with_no_same_surname_teammate_is_still_not_in_the_pool(self):
+        report = resolve_paste_to_feed(_lad_slot9("Q Zzzzmann"), str(SALARY),
+                                       resolve_overrides=RESOLVE)["report"]
+        (row,) = report["unrostered_starters"]
+        self.assertNotIn("name_form_candidate", row)
+        self.assertIn("unrosterable", row["note"])
+        self.assertEqual(report["posted_sides_incomplete"]["dk_unrostered"], ["LAD"])
+
+    def test_dks_starting_slot_is_named_as_the_evidence_when_it_has_one(self):
+        for starting, expected in (
+                ("9", "DK's Starting column posts him at slot 9, the slot the paste gives "
+                      "this name"),
+                ("7", "DK's Starting column posts him at slot 7 and the paste has this "
+                      "name at 9")):
+            with self.subTest(starting), tempfile.TemporaryDirectory() as tmp:
+                salary = _salary_copy(tmp, kike_starting=starting)
+                report = resolve_paste_to_feed(_lad_slot9("X Hernandez"), salary,
+                                               resolve_overrides=RESOLVE)["report"]
+                self.assertIn(expected, report["unrostered_starters"][0]["note"])
+
+    def test_the_tool_prints_each_kind_under_its_own_label_and_exits_0(self):
+        done, _ = _tool(_lad_slot9("E Hernandez"))
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn("NAME FORM  LAD slot 9: pasted 'E Hernandez' read as DK "
+                      "'Kike Hernandez' (nickname table)", done.stdout)
+        self.assertNotIn("NOT IN DK POOL", done.stdout)
+        self.assertNotIn("PARTIAL", done.stdout)
+        done, _ = _tool(_lad_slot9("X Hernandez"))
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn("NAME FORM MISMATCH  LAD slot 9: X Hernandez -- ", done.stdout)
+        self.assertNotIn("NOT IN DK POOL", done.stdout)
+        done, _ = _tool(_lad_slot9("Q Zzzzmann"))
+        self.assertIn("NOT IN DK POOL  LAD slot 9: Q Zzzzmann", done.stdout)
+        self.assertNotIn("NAME FORM", done.stdout)
