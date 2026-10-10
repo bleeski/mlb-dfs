@@ -1209,15 +1209,20 @@ def classify_swap_failure(errors, controls, bank_report=None) -> list[str]:
 
 
 def _load_entry_rosters(path: Path) -> dict[str, list[str]]:
-    """Entry ID -> its ten current Player_IDs, read from a DKEntries file."""
-    import csv
+    """Entry ID -> its current Player_IDs, read from a DKEntries file.
 
-    out: dict[str, list[str]] = {}
-    with path.open(encoding="utf-8-sig", newline="") as fh:
-        for row in csv.reader(fh):
-            if len(row) >= 14 and row[0].strip().isdigit():
-                out[row[0].strip()] = [c.strip() for c in row[4:14] if c.strip()]
-    return out
+    R68(a). Through `parse_dk_entry_rows`, which this script already calls on the
+    parent file, so a roster cell has one definition: `normalize_player_id` maps
+    "Jose Ramirez (12345678)" (what `repair_entry.py` writes into a repaired slot,
+    and what a hand-edited or DK-redownloaded file can carry) to its id, and empty
+    cells are dropped. This reader used to keep `row[4:14]` raw, so a repaired
+    entry never compared equal to the engine's bare-id rewrite of it, scored as
+    "not comparable", and could not be refused as a downgrade; the standings read
+    and the consensus-pair guard read the same dict. It needs the DK header, which
+    both callers' files have already passed, and skips a row with no numeric
+    contest id.
+    """
+    return {str(row.entry_id): list(row.roster_ids) for row in parse_dk_entry_rows(path)}
 
 
 def _parse_postures(value: str | None) -> dict[str, str]:
@@ -1763,6 +1768,20 @@ def main() -> int:
             print(f"{exc}. Nothing was read and no swap was attempted.", file=sys.stderr)
             return 4
 
+    # R68(b). `--entry-ids 5001,` used to split to ['5001', ''] and reach the engine
+    # as an Entry ID present in no file: a ValueError traceback at exit 1, after the
+    # pool and the projection frame had been built. Tokens are split, stripped and
+    # emptied here, before anything is read. A flag that names tokens and leaves no
+    # id (`,`) is refused like the other bad flags; `--entry-ids ""` is falsy and
+    # stays the documented default, every reserved entry.
+    authorized = None
+    if args.entry_ids:
+        authorized = [t for t in (e.strip() for e in args.entry_ids.split(",")) if t]
+        if not authorized:
+            print(f"--entry-ids {args.entry_ids!r} names no Entry ID. Nothing was "
+                  f"read and no swap was attempted.", file=sys.stderr)
+            return 4
+
     slate = REPO / "data" / "slates" / args.date
     # R29(4): the salary path was hardcoded to the shared, date-keyed staged
     # name. On 2026-07-29 a concurrent Showdown build for the same date
@@ -2046,7 +2065,6 @@ def main() -> int:
     print(carry_label_text)
     projection_carry = carry_record(carry_info, carry_report, carry_label_text)
 
-    authorized = [e.strip() for e in args.entry_ids.split(",")] if args.entry_ids else None
     requirements = build_entry_requirements(
         args.parent_entries, status["status_by_player_id"], now, contest_shapes,
         mode="reoptimize", authorized_entry_ids=authorized,

@@ -49875,6 +49875,145 @@ class LateSwapRailsTests(unittest.TestCase):
         self.assertIn("bank stack request (R284): sizes [5, 4]", out)
         self.assertEqual([c["stack_min"] for c in calls if not c["pinned"]], [5, 4])
 
+    # -- R68: "Name (ID)" cells and a hostile --entry-ids ------------------------- #
+
+    @staticmethod
+    def _entries_file(path, rows):
+        """A DKEntries file from ``{entry_id: (contest_id, cells)}``; the cells are
+        written exactly as given, so a "Name (ID)" cell stays one."""
+        with Path(path).open("w", newline="", encoding="utf-8") as fh:
+            writer = csv.writer(fh)
+            writer.writerow(HEADER)
+            for entry_id, (contest_id, cells) in rows.items():
+                writer.writerow([entry_id, "Test", contest_id, "$1", *cells, "", ""])
+        return Path(path)
+
+    @staticmethod
+    def _named(roster):
+        return [f"Some Name ({pid})" for pid in roster]
+
+    PAIR = ("30001", "30002")
+    HOLDS = ["30001", "30002", *[f"4000{i}" for i in range(8)]]
+    LOSES = ["30003", "30004", *[f"4000{i}" for i in range(8)]]
+
+    def test_a_name_and_id_cell_reads_as_its_player_id(self):
+        h = self._h()
+        tool = h.ls
+        plain = tool._load_entry_rosters(h.parent_file)
+        with h.parent_file.open(newline="", encoding="utf-8") as fh:
+            rows = list(csv.reader(fh))
+        names = {}
+        with h.salary.open(newline="", encoding="utf-8") as fh:
+            for r in list(csv.reader(fh))[1:]:
+                names[r[3]] = r[2]
+        for r in rows:
+            if r and r[0] == "7001":
+                r[4:14] = [f"{names[c]} ({c})" for c in r[4:14]]
+        repaired_file = h.root / "DKEntries_repaired.csv"
+        with repaired_file.open("w", newline="", encoding="utf-8") as fh:
+            csv.writer(fh).writerows(rows)
+        repaired = tool._load_entry_rosters(repaired_file)
+        self.assertEqual(repaired, plain)
+        frame = epi._assemble_projection_frame(
+            str(h.salary), [{"Player_ID": pid, "AvgPointsPerGame": 10.0} for pid in names],
+            "emergency_proxy", None, None, None)[0]
+        score = tool._score_roster(frame, repaired["7001"], "large_wta")
+        self.assertIsNotNone(score, "a raw 'Name (ID)' roster scored None, so the downgrade "
+                                    "guard could never refuse it")
+        self.assertEqual(score, tool._score_roster(frame, plain["7001"], "large_wta"))
+
+    def test_a_repaired_entry_is_scored_by_a_real_swap_not_skipped_as_not_comparable(self):
+        h = self._h()
+        names = {}
+        with h.salary.open(newline="", encoding="utf-8") as fh:
+            for r in list(csv.reader(fh))[1:]:
+                names[r[3]] = r[2]
+        with h.parent_file.open(newline="", encoding="utf-8") as fh:
+            rows = list(csv.reader(fh))
+        for r in rows:
+            if r and r[0] == "7001":
+                r[4:14] = [f"{names[c]} ({c})" for c in r[4:14]]
+        repaired_file = h.root / "DKEntries_repaired.csv"
+        with repaired_file.open("w", newline="", encoding="utf-8") as fh:
+            csv.writer(fh).writerows(rows)
+        h.parent_file = repaired_file
+        code, out, err = h._run("--allow-parent-mismatch", "--declare-pitcher",
+                                f"{h.pen}=viable_bulk_or_alt_sp")
+        self.assertEqual(code, 0, err[-1500:])
+        self.assertNotIn("not comparable", out)
+        self.assertRegex(out, r"7001 \[\w+\]: [\d.]+ -> [\d.]+ \([+-][\d.]+\)")
+
+    def test_the_pair_guard_sees_a_repaired_pair_holder_the_swap_strips(self):
+        """Before: the repaired cells read as no pair, so a contest that lost its last
+        pair lineup was reported as losing nothing."""
+        tool = LateSwapDeclaredPitcherTests._tool()
+        parent = self._entries_file(self.tmp_path("parent.csv"),
+                                    {"5001": ("900", self._named(self.HOLDS))})
+        after = self._entries_file(self.tmp_path("after.csv"), {"5001": ("900", self.LOSES)})
+        lost = tool.consensus_pair_seats_lost(
+            tool._load_entry_rosters(parent), tool._load_entry_rosters(after),
+            {"5001": "900"}, self.PAIR)
+        self.assertEqual(lost, [{"contest_id": "900", "entries": ["5001"]}])
+
+    def test_the_pair_guard_does_not_refuse_a_swap_that_leaves_a_repaired_holder_in_place(self):
+        """Before: entry B (repaired form) stayed in the contest holding the pair, but
+        read as not holding it, so stripping entry A looked like losing the last one."""
+        tool = LateSwapDeclaredPitcherTests._tool()
+        parent = self._entries_file(self.tmp_path("parent.csv"), {
+            "5001": ("900", self.HOLDS), "5002": ("900", self._named(self.HOLDS[:9] + ["40099"]))})
+        after = self._entries_file(self.tmp_path("after.csv"), {
+            "5001": ("900", self.LOSES), "5002": ("900", self._named(self.HOLDS[:9] + ["40099"]))})
+        lost = tool.consensus_pair_seats_lost(
+            tool._load_entry_rosters(parent), tool._load_entry_rosters(after),
+            {"5001": "900", "5002": "900"}, self.PAIR)
+        self.assertEqual(lost, [])
+
+    def tmp_path(self, name):
+        if not hasattr(self, "_tmp_dir"):
+            self._tmp_dir = tempfile.TemporaryDirectory()
+            self.addCleanup(self._tmp_dir.cleanup)
+        return Path(self._tmp_dir.name) / name
+
+    def _score_block(self, out):
+        block, on = [], False
+        for line in out.splitlines():
+            if line.startswith("entry scores"):
+                on = True
+            elif on and line.startswith("  "):
+                block.append(line)
+            elif on:
+                break
+        return block
+
+    def test_a_trailing_comma_in_entry_ids_is_the_same_swap_as_without_it(self):
+        code, out, err = self._swap_plain("--entry-ids", "7001")
+        self.assertEqual(code, 0, err[-1500:])
+        for flag in ("7001,", " 7001 , ", ",7001"):
+            with self.subTest(flag=flag):
+                code2, out2, err2 = self._swap_plain("--entry-ids", flag)
+                self.assertEqual(code2, 0, err2[-1500:])
+                self.assertEqual(self._score_block(out2), self._score_block(out))
+
+    def _swap_plain(self, *extra):
+        h = self._h()
+        return h._run(*extra)
+
+    def test_a_flag_that_names_no_entry_id_is_refused_at_exit_4_before_anything_is_read(self):
+        for flag in (",", " , ,", " "):
+            with self.subTest(flag=flag):
+                code, out, err = self._swap_plain("--entry-ids", flag)
+                self.assertEqual(code, 4, err[-800:])
+                self.assertIn("names no Entry ID. Nothing was read and no swap was attempted",
+                              err)
+                self.assertNotIn("Traceback", err)
+                self.assertNotIn("salary:", out, "refused before the inputs were resolved")
+
+    def test_an_empty_entry_ids_flag_keeps_meaning_every_reserved_entry(self):
+        code, out, err = self._swap_plain("--entry-ids", "")
+        self.assertEqual(code, 0, err[-1500:])
+        code2, out2, _ = self._swap_plain()
+        self.assertEqual(self._score_block(out), self._score_block(out2))
+
 
 class FixedPairConflictTests(unittest.TestCase):
     """R445 (roadmap Session 29): two untouchable rows against EACH OTHER.
