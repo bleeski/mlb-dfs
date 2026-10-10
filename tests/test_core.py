@@ -49751,3 +49751,126 @@ class PoRefusalTextTests(unittest.TestCase):
         dk_text, _ = self._t4({"T4 Ace": ("PO", 4000)}, feed=self._dk_only())
         self.assertIsNotNone(ab.classify_pool_blocker(feed_text))
         self.assertIsNone(ab.classify_pool_blocker(dk_text))
+
+
+class LateSwapRailsTests(unittest.TestCase):
+    """Roadmap Session 29: the late-swap rails (R284 stack_min half, R68, R141).
+
+    Every test drives the real `late_swap.main()` through the R468 harness
+    (`LateSwapDeclaredPitcherTests`, composed so its own tests do not run twice)
+    or a production function the swap calls, never a string pin on the source.
+    """
+
+    # -- R284: the swap's bank is asked for what its controls ask the allocator -- #
+
+    QUOTA = {"min_five_stack_share_pct": 0.6, "five_stack_min_size": 5}
+    FLOOR = {"primary_stack_min_size": 5}
+
+    def _h(self):
+        h = LateSwapDeclaredPitcherTests(
+            "test_a_parent_with_a_locked_declared_arm_swaps_and_certifies")
+        h.setUp()
+        self.addCleanup(h.doCleanups)
+        h._brief()
+        return h
+
+    def _swap(self, *extra, clock=None):
+        """A real swap with a spy on `extend_bank` (delegating to the real one) and on
+        the two control resolvers. ``clock`` is a dict whose "t" replaces
+        `late_swap.time.monotonic`, advanced 10000s after each pinned call."""
+        h = self._h()
+        calls, events = [], []
+        real_extend = h.ls.extend_bank
+
+        def spy_extend(cache, projections, **kw):
+            events.append("bank")
+            calls.append({"stack_min": kw.get("stack_min", "<default>"),
+                          "pinned": tuple(sorted(kw.get("locked_slot_assignments") or {})),
+                          "budget": float(kw.get("time_budget_s"))})
+            result = real_extend(cache, projections, **kw)
+            if clock is not None and kw.get("locked_slot_assignments"):
+                clock["t"] += 10000.0
+            return result
+
+        h.ls.extend_bank = spy_extend
+        for name in ("inherit_swap_controls", "resolve_swap_controls"):
+            def wrap(*a, _real=getattr(h.ls, name), **kw):
+                events.append("controls")
+                return _real(*a, **kw)
+            setattr(h.ls, name, wrap)
+        if clock is not None:
+            h.ls.time = types.SimpleNamespace(time=time.time, monotonic=lambda: clock["t"])
+        code, out, err = h._run(*extra)
+        return code, calls, events, out, err
+
+    @staticmethod
+    def _override(controls):
+        return ["--controls-override", json.dumps(controls)]
+
+    def test_a_quota_request_reaches_the_general_slice_five_first_then_four(self):
+        code, calls, _, out, err = self._swap(*self._override(self.QUOTA))
+        self.assertEqual(code, 0, err[-1500:])
+        general = [c for c in calls if not c["pinned"]]
+        self.assertEqual([c["stack_min"] for c in general], [5, 4])
+        # --budget 20: the five takes the quota's share (0.6) of what is left, and
+        # the four takes the rest, which is more than it would have had at 0.4.
+        self.assertAlmostEqual(general[0]["budget"], 12.0, delta=0.5)
+        self.assertGreater(general[1]["budget"], general[0]["budget"])
+        self.assertIn("bank stack request (R284): sizes [5, 4]", out)
+
+    def test_a_floor_of_five_asks_for_five_with_the_share_clamped_at_three_quarters(self):
+        code, calls, _, out, err = self._swap(*self._override(self.FLOOR))
+        self.assertEqual(code, 0, err[-1500:])
+        general = [c for c in calls if not c["pinned"]]
+        self.assertEqual([c["stack_min"] for c in general], [5, 4])
+        # target 1.0, clamped to BANK_FIVE_STACK_BUDGET_MAX_SHARE: the four is never starved
+        self.assertAlmostEqual(general[0]["budget"], 20.0 * epi.BANK_FIVE_STACK_BUDGET_MAX_SHARE,
+                               delta=0.5)
+        self.assertGreaterEqual(general[1]["budget"], 20.0 * (1 - epi.BANK_FIVE_STACK_BUDGET_MAX_SHARE) - 0.5)
+
+    def test_pinned_slices_ask_the_four_first_and_then_the_five(self):
+        code, calls, _, _, err = self._swap(*self._override(self.QUOTA))
+        self.assertEqual(code, 0, err[-1500:])
+        by_pin: dict = {}
+        for c in calls:
+            if c["pinned"]:
+                by_pin.setdefault(c["pinned"], []).append(c["stack_min"])
+        self.assertEqual(len(by_pin), 3, "the harness parent has three pinned entries")
+        for pinned, sizes in by_pin.items():
+            self.assertEqual(sizes, [4, 5], pinned)
+
+    def test_a_pinned_five_is_skipped_once_the_slicing_budget_is_gone(self):
+        """`_slice_budget()` floors at one second, so an unconditional second call
+        would add a floor per pinned entry beyond --budget. The four always runs."""
+        clock = {"t": time.monotonic()}
+        code, calls, _, _, err = self._swap(*self._override(self.QUOTA), clock=clock)
+        self.assertEqual(code, 0, err[-1500:])
+        pinned = [c["stack_min"] for c in calls if c["pinned"]]
+        self.assertEqual(pinned, [4, 4, 4])
+
+    def test_without_a_request_every_call_asks_the_default_and_nothing_new_prints(self):
+        code, calls, _, out, err = self._swap()
+        self.assertEqual(code, 0, err[-1500:])
+        self.assertEqual(len(calls), 4, "one general call and one per pinned entry")
+        for c in calls:
+            self.assertIn(c["stack_min"], (4, "<default>"), "four is the default")
+        self.assertNotIn("bank stack request", out)
+        self.assertNotIn("stack 4", "".join(l for l in out.splitlines() if l.startswith("  entry")))
+
+    def test_the_controls_are_resolved_before_the_first_bank_slice(self):
+        _, _, events, _, _ = self._swap(*self._override(self.QUOTA))
+        self.assertIn("bank", events)
+        self.assertEqual(events[0], "controls", events)
+
+    def test_a_merged_general_report_still_says_why_the_bank_stopped(self):
+        """`_merge_bank_slice_reports` pops the last slice's `stop_reason` for
+        `bank_stop_reason`; the printed line must read whichever the report has."""
+        _, _, _, out, _ = self._swap(*self._override(self.QUOTA))
+        line = next(l for l in out.splitlines() if l.startswith("bank after the general slice"))
+        self.assertNotIn("stopped: None", line)
+
+    def test_a_dry_run_names_the_request_too(self):
+        code, calls, _, out, err = self._swap("--dry-run", *self._override(self.QUOTA))
+        self.assertEqual(code, 0, err[-1500:])
+        self.assertIn("bank stack request (R284): sizes [5, 4]", out)
+        self.assertEqual([c["stack_min"] for c in calls if not c["pinned"]], [5, 4])

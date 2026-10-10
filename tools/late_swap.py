@@ -100,6 +100,8 @@ from mlb_engine.pipeline.execution_pipeline import (  # noqa: E402
     CONTROL_ID_MAP_KEYS, parent_realized_controls,
     promote_deferred_run, raise_on_engine_crash, run_late_swap,
     unresolved_contest_blockers,
+    BANK_FIVE_STACK_BUDGET_MAX_SHARE, BANK_FIVE_STACK_BUDGET_MIN_SHARE,
+    resolve_bank_stack_request,
 )
 from mlb_engine.swap.late_swap_manager import build_entry_requirements  # noqa: E402
 
@@ -2051,6 +2053,35 @@ def main() -> int:
         missing_status_policy="treat_as_locked",
     )
 
+    # R284. The controls are resolved BEFORE the bank, because the bank is asked
+    # for what they ask of the allocator: `resolve_bank_stack_request` reads the
+    # merged controls (the parent's recorded ones by default, R268(a)), and a swap
+    # that resolved them after its slices built a bank for four-stacks and then
+    # enforced a five-stack floor over it. Resolution only: every print of them
+    # stays where it was, so `--dry-run` (which returns before those lines) says
+    # what it always said.
+    swap_stripped: dict = {}
+    # R268(a). Inherit what the parent shipped by default. A parent recorded
+    # before R268 carries no controls and is re-derived, and says so.
+    inherited = None
+    if (swap_parent is not None and swap_parent["current_matches_parent_export"]
+            and not args.rederive_controls):
+        inherited = parent_realized_controls(swap_parent["run_dir"])
+    if inherited is not None:
+        controls = inherit_swap_controls(
+            inherited, args.controls_override, args.solver_budget,
+            projections=projections, stripped_out=swap_stripped)
+    else:
+        controls = resolve_swap_controls(
+            postures, args.controls_override, args.solver_budget,
+            requirements=requirements, projections=projections,
+            stripped_out=swap_stripped, never_relax=swap_never_relax)
+    bank_request = resolve_bank_stack_request(controls)
+    bank_sizes = [int(size) for size in bank_request["sizes"]]
+    if bank_request["wants_five"]:
+        print(f"bank stack request (R284): sizes {bank_sizes}, the five first, "
+              f"then the four; {bank_request['reason']}")
+
     cache_path = REPO / "runs" / f"bank_cache_{args.date}_{pool_signature(salary)}.json"
     cache = BankCache(cache_path)
 
@@ -2067,13 +2098,31 @@ def main() -> int:
     # A general bank covers entries with no locked slots. Entries that already hold
     # locked players need candidates built against those exact pins and against the
     # excluded-new-teams rule, or the allocator reports "no compatible candidate".
-    report = extend_bank(cache, projections, time_budget_s=_slice_budget())
+    # R284. One call per size the controls ask the bank for, the five first
+    # (the sliced build door's rule, `build_slate.py`: the five takes the quota's
+    # share of what is left, CLAMPED so the four keeps at least a quarter, and
+    # whatever the five does not spend rolls into the four). With no five
+    # requested `bank_sizes` is [4] and this is the one call this line always was.
+    general_reports = []
+    for idx, size in enumerate(bank_sizes):
+        left = _slice_budget()
+        if idx < len(bank_sizes) - 1:
+            share = min(BANK_FIVE_STACK_BUDGET_MAX_SHARE,
+                        max(BANK_FIVE_STACK_BUDGET_MIN_SHARE,
+                            float(bank_request["five_share_target"])))
+            left = max(1.0, left * share)
+        general = extend_bank(cache, projections, time_budget_s=left, stack_min=size)
+        general["stack_min_requested"] = size
+        general_reports.append(general)
+    report = (general_reports[0] if len(general_reports) == 1
+              else _build_slate_module()._merge_bank_slice_reports(general_reports))
     # R415. Why the slice stopped. Late swap has no candidate cap, so this reads
-    # time_budget (raise --budget; the cache resumes) or the list's end.
+    # time_budget (raise --budget; the cache resumes) or the list's end. A merged
+    # report carries it as `bank_stop_reason` (the merge pops the last slice's).
     print(f"bank after the general slice: {report['total_candidates']} candidates "
           f"(+{report['built_this_slice']} this slice, "
           f"{report['jobs_attempted']}/{report['jobs_total']} jobs, "
-          f"stopped: {report.get('stop_reason')})")
+          f"stopped: {report.get('stop_reason', report.get('bank_stop_reason'))})")
     if report["superseded_jobs_dropped"]:
         # R101: post-split this can only mean the PROJECTIONS moved since the
         # cache was written, or the file predates the conditions index. Either
@@ -2101,14 +2150,24 @@ def main() -> int:
         current |= {str(pid) for pid in lsa.values()}
         excludes = [p for p in all_ids
                     if team_by_id.get(p) in excluded_teams and p not in current]
-        slice_report = extend_bank(
-            cache, projections, time_budget_s=_slice_budget(),
-            locked_slot_assignments=lsa, excludes=excludes,
-        )
-        last_report = slice_report
-        print(f"  entry {requirement['entry_id']}: pinned {sorted(lsa)}, "
-              f"+{slice_report['built_this_slice']} targeted candidates "
-              f"(bank now {slice_report['total_candidates']})")
+        # R284. The four first, exactly the call this loop always made, then the
+        # five only while the slicing budget has not run out: `_slice_budget()`
+        # floors at one second, so an unconditional second call would add a
+        # floor per pinned entry beyond --budget. `extend_bank` relaxes the size
+        # to the entry's free hitter slots itself (a second size that relaxes to
+        # the first's is the same bucket, a no-op).
+        for p_idx, size in enumerate(reversed(bank_sizes)):
+            if p_idx and slice_deadline - time.monotonic() <= 0:
+                break
+            slice_report = extend_bank(
+                cache, projections, time_budget_s=_slice_budget(),
+                locked_slot_assignments=lsa, excludes=excludes, stack_min=size,
+            )
+            last_report = slice_report
+            print(f"  entry {requirement['entry_id']}: pinned {sorted(lsa)}, "
+                  f"+{slice_report['built_this_slice']} targeted candidates "
+                  f"(bank now {slice_report['total_candidates']})"
+                  + (f", stack {size}" if len(bank_sizes) > 1 else ""))
 
     # R101. Before the conditions-signature split this number did not exist:
     # each targeted slice discarded the previous ones, so what the joint solve
@@ -2151,22 +2210,6 @@ def main() -> int:
                           "candidate_scoring": payload_report}, indent=1))
         return 0
 
-    swap_stripped: dict = {}
-    # R268(a). Inherit what the parent shipped by default. A parent recorded
-    # before R268 carries no controls and is re-derived, and says so.
-    inherited = None
-    if (swap_parent is not None and swap_parent["current_matches_parent_export"]
-            and not args.rederive_controls):
-        inherited = parent_realized_controls(swap_parent["run_dir"])
-    if inherited is not None:
-        controls = inherit_swap_controls(
-            inherited, args.controls_override, args.solver_budget,
-            projections=projections, stripped_out=swap_stripped)
-    else:
-        controls = resolve_swap_controls(
-            postures, args.controls_override, args.solver_budget,
-            requirements=requirements, projections=projections,
-            stripped_out=swap_stripped, never_relax=swap_never_relax)
     if swap_stripped:
         print(f"consensus-cluster cap NOT enforced on a late swap (R405): stripped "
               f"{', '.join(f'{k}={v}' for k, v in sorted(swap_stripped.items()))} "
