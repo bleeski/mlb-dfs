@@ -102,6 +102,18 @@ Failure is loud, never quiet, and the failure kinds are kept apart:
     fact: the paste and the salary file are not the same slate. A genuine
     call-up stays non-fatal; a wrong pairing stops.
 
+**R429, 2026-10-10: a third render, and what it reads as when it is not read.** The
+matchup arrives on three lines (``Twins`` / ``@`` / ``Giants``), the hitters carry no
+order number (``B Rice (L) DH``) and an unposted side is a bare ``TBD`` under the two
+lineup headers. All three are read; the order of an unnumbered hitter is his place in
+its block, and a run that is neither one side (at most nine) nor two full ones
+(eighteen) is refused rather than split by guess. What the parser still does not read
+is now loud: a non-empty paste that parses to zero games, and an on-slate game whose
+two headers were read with no hitter attached and at least nine name-shaped lines
+dropped after them, are blockers. Before this the first wrote an empty feed at exit 0,
+and the second (probables read, hitters not) left F4's SP term alive and its platoon
+term dead, with nothing to say so.
+
 Nothing here fetches anything. Nothing here corrects the paste against a
 real-world roster, per the authority rule. A hitter is matched on the team the
 paste puts him on, so one the salary file files under another team resolves to

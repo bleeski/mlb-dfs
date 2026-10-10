@@ -2561,13 +2561,9 @@ replaced.
 - **What.** SKILL.md's "When `statsapi.mlb.com` is proxy-gated" paragraph lists `team_abbrev`, `probable_pitcher`, `lineup_status`, `lineup` and omits `game_date_utc`. A feed built from that list was refused at autobuild attempt 1 with 12 blockers: 4 x "unparseable game_date_utc" and 8 x "no probable or declared starter", the latter a cascade from the missing start time (all 8 probables were in the feed). Adding `game_date_utc` certified the next attempt. Separately the brief read `draftgroup_coverage: 7/8` with all 8 sides upgraded from DK `Starting`; the likely cause is the MLB API's `AZ` against DK's `ARI` (R248's class), not verified.
 - **Fix.** `tools/feed_from_mcp.py`, which takes the two MCP payloads and the salary file, crosswalks `AZ` to `ARI` through `mlb_engine/team_codes.py`, fills `game_date_utc` from the probables payload's `game_time_utc`, and writes the feed `fetch_lineups_feed` would; and `game_date_utc` in the skill's required-field list either way (R346 is the same missing field on a hand-written feed).
 
-### R429. `lineups_from_paste.py` reads a third mlb.com render as zero games, exits 0 and writes an empty feed (P1, S) | new 2026-09-25, from BUILD fragment `2026-09-23_BUILD_paste-render-split-clubs-no-order.md` (1905_10g) | Roadmap: Session 129
+### R429. CLOSED 2026-10-10 -- SHIPPED as roadmap Session 129 (b), entry migrated to CHANGELOG.md
 
-- **What.** Ben pasted https://www.mlb.com/starting-lineups as plain text and the tool printed `0 game(s) parsed` and exited 0 having written an empty feed. The render differs from the two the parser knows: (1) the matchup is three lines, `Twins` / `@` / `Giants`, so `_club_names` never fires; (2) hitter lines carry no order prefix (`B Rice (L) DH`), so `_HITTER` never matches; (3) an unposted side is a bare `TBD` under the two `<TEAM> Lineup` headers, read as a probable's name slot ("found 4 probable pitcher line(s) for the 2 headers", neither attached). The session normalized a copy by hand (joined 14 matchups, numbered each nine-hitter block, rewrote `TBD` as `1. TBD`): 164 names resolved, 135 of 135 numbered orders matched DK's `Starting` column slot for slot. The raw paste is beside it in `data/slates/2026-09-23/`.
-- **Why.** Zero games parsed from a paste that plainly holds 14, at exit 0, is the silent failure class; the feed it wrote would have seeded TBD sides from the platoon reference on a night every side had posted.
-- **The worse sibling, found by the 2026-09-25 review (`review_intake/r1_zero_games.py`, 06-03 salary, synthetic pastes).** Joining the matchup lines but leaving the hitters unnumbered (shape B) parses `2 game(s) ... 0 name(s) resolved`: both sides `tbd` with 0 hitters, no probable attached (the lineup-section `TBD` becomes a third pitcher slot), the 18 hitter lines vanish unnamed, and only `found 3 probable pitcher line(s)` prints. Shape B carries team codes, so it passes `build_slate.py`'s `supplied_feed_rejected` gate (`covered*2 < len(slate_teams)`, about L7739-7748) and is consumed; on a fully DK-covered slate the build then certifies with `batter_hands` 0 and no opposing-probable hand, F4's platoon term 1.0 for every hitter, while the session believes the paste was consumed (07-29 fixture: proper paste `batter_hands=54, 6/6`; the hitter-less feed `batter_hands=0, 0/6, f4_handedness_unavailable` on all six sides, both `blockers=0`). Shape A (three-line matchup) and an off-slate paste are refused at `--lineups` with exit 4, which is loud. The non-zero exit therefore also covers "two headers, 0 hitters AND 0 probables, name-shaped lines between them", counted and printed.
-- **Fix.** Accept all three shapes in `parse_paste`, and make "0 games parsed on a non-empty paste" a non-zero exit. Test data: this paste and the 135/135 DK match.
-
+The third mlb.com render (a three-line matchup, hitters with no order number, a bare `TBD` under the lineup headers) parses to the same feed as the numbered render, and a paste the parser cannot read exits 2 naming the lines: zero games from a non-empty paste, or a game with both headers read, no hitter and nine or more dropped lines. Commit 22fa7af. The register's mechanism for the half-read sibling was corrected in the CHANGELOG entry (the six probables read; the hitters did not). The raw 2026-09-23 acceptance (14 games, 135 of 135 orders) cannot run off Ben's disk and is carried there as one command.
 
 ### R346. A hand-written `lineups_feed.json` without game-level `game_date_utc` silently zeroes the DK batting order in the status map: `confirmed_order_by_player_id` 18 -> 0 on a fully posted slate (P1, S; roadmap CC-15) | new 2026-09-15, merged from BUILD fragment `2026-09-10_BUILD_operator-feed-needs-game-date-utc.md`; premise VERIFIED-read in tree at `live_data_adapters.py:860-900, 943-1040`
 
@@ -2935,85 +2931,9 @@ the code, `reference` claim (ARCHIVE) for any write to
 `data/reference/fangraphs_platoon_lineups.json`. Rollback: `--from-dir` is
 unchanged on every path.
 
-### R319. `lineups_from_paste` has two name-form defects on the ONE input that turns on the F4 platoon factor: a shared normalized name mints a FALSE team-disagreement warning, and a DK first-name alias reports a rostered starter as unrosterable (P2, XS for (a), S for (b)) | new 2026-09-06, merged from BUILD fragments `2026-09-04_BUILD_paste-team-warn-false-positive-on-shared-name.md` and `2026-09-04_BUILD_2210_2g-feed-identity-and-half-inert-f4.md` §(d) and §(e); THREE field sightings across two slates on one date; (a) VERIFIED-read in tree at `paste_lineups.py:803`, (b) field-observed with the workaround that cleared it
+### R319. CLOSED 2026-10-10 -- SHIPPED as roadmap Session 129 (a), entry migrated to CHANGELOG.md
 
-**Why both halves are worth more than their size.** On a DK-covered slate the
-paste's ONLY contribution is `bat_side`, and `bat_side` is the single input
-standing between the zero-fetch path and a live F4 platoon component
-(`f4_platoon_applied: 0` on 54 hitters, 2140_3g). Both defects make that input
-look dangerous or broken, and on 2026-09-04 both were cited in a decision to
-skip the rebuild that would have supplied it. A tool nobody trusts under a clock
-is a tool that is not run.
-
-**(a) The team-disagreement warning is keyed on the NAME, not on the row it
-resolved.** `paste_lineups.py:731` builds `team_of` with
-`setdefault(normalize_name(player.name), team)` -- one team per normalized name,
-last writer wins -- and `:803` then throws away the row it just matched and
-re-derives the team from that dict:
-
-    on_team = team_of.get(normalize_name(matched.name))
-    if on_team and on_team != team.upper():
-
-`_resolve_one(display_name, team, ...)` is TEAM-SCOPED and resolved both
-same-named players correctly, so with two DK rows sharing a normalized name one
-of the two correct matches always reads as a disagreement. Two sightings, same
-name, same date, different slates and different DK ids: 2140_3g (ATH `44030645`
-$2,800 bats R, LAD `44030406` $4,500 bats L) and 2210_2g (LAD `44033030` bats L,
-ATH `44033190` bats R). In both the written feed was correct in every field --
-right id, right team, right handedness on both sides -- and only the warning was
-wrong. **`--resolve` cannot even express a fix, because both DK rows are
-literally the same string.** At T-9 on 2140_3g a session read it as a corrupted
-row on a hitter at 0.53 exposure and cited it as the second reason for declining
-the rebuild; the clock was the first reason and was sufficient on its own, but
-the warning was false. **A warning that cannot be told apart from a true positive
-is a blocker wearing a warning's clothes.** Fix: compare `matched.team`, which is
-already in hand. If the ambiguity is worth surfacing at all, the honest line is
-the one `ownership_pred.py` already emits for the same collision -- `crosswalk 1
-ambiguous name(s), excluded from any grade join: max muncy` -- name the collision
-and say what you did about it.
-
-**(b) A DK first-name alias reads as `NOT IN DK POOL`, which is the REASSURING
-kind of false.** mlb.com renders LAD's #9 as Enrique Hernandez; DK's salary file
-calls him Kike Hernandez (`44033028`, `Starting` = 9). The matcher is
-first-initial + surname + team, so `E Hernandez` misses and the tool prints
-"pasted starter has no row in the DK salary file, so DK did not list him and he
-is unrosterable" -- literally false here. R32 round 2 deliberately made
-`NOT IN DK POOL` non-fatal, so the build proceeded, LAD dropped to `PARTIAL 8/9`,
-and **the slate's best stack routed through the TBD path on a build that had a
-complete confirmed lineup available**: LAD was the highest implied total (4.54)
-facing the weakest starter. Cleared with `--resolve "E Hernandez=Kike Hernandez"`.
-The tool already knows enough to catch it -- surname + team matched exactly one
-DK row and only the first initial disagrees. Fix: a distinct message for that
-case (`NAME FORM MISMATCH: paste 'E Hernandez' vs DK 'Kike Hernandez' (LAD); pass
---resolve to confirm`) so the operator sees a nickname question rather than an
-eligibility fact, plus a small alias table for the canonical cases DK carries.
-**Anything that turns a confirmed side into a projected one deserves a louder
-failure than a line saying the player is unrosterable.**
-
-**R233 enumeration, run 2026-09-06.** The class is "a dict keyed on
-`normalize_name` standing in for an identity the row already carries", and it has
-**thirteen** sites (`grep -rn "\[normalize_name(\|\.get(normalize_name(\|setdefault(normalize_name(" mlb_engine/ tools/ --include=*.py`):
-`field_miner.py:950,954,1256,1283,1288,1885`, `live_data_adapters.py:711,3074`,
-`paste_lineups.py:578,731`, `slate_intake_manager.py:1361`,
-`ownership_pred.py:324`, plus `paste_lineups.py:803`'s read of `:731`. Three are
-collision-SAFE by construction because they append to a list rather than
-overwrite a scalar (`paste_lineups.py:578`, `live_data_adapters.py:3074`,
-`ownership_pred.py:324`); `slate_intake_manager.py:1361` is keyed per team first,
-which narrows but does not close it; the `field_miner` six run over mined
-archive rows where the same collapse is R75's subject. **`paste_lineups.py:731`
-is the only one this item fixes and the enumeration is here so the next reader
-checks the count rather than re-deriving it.** R75 (the DK<->Savant crosswalk
-joining on normalized name only) is the same family at a different site and is
-the entry to take with this one.
-
-**Audit fields.** Acceptance for (a): fixture slate with two DK rows sharing a
-normalized name on different teams -- both resolve, both carry their own
-`dk_player_id` and `bat_side`, and NO team-disagreement warning; and a fixture
-where the paste genuinely puts a matched row on the wrong team still warns,
-unchanged. For (b): fixture where surname+team hits exactly one DK row with a
-different first name emits the NAME FORM MISMATCH line and the side does NOT
-fall to PARTIAL once `--resolve` is passed. Owner: DEV. Rollback: both are
-message and comparison changes; no pool membership moves.
+The team-disagreement warning, which could only fire falsely (it compared the matched row's team with a team looked up by name), is deleted; `E Hernandez` matches DK's `Kike Hernandez` by a one-entry nickname table; any other first-name form is a non-fatal NAME FORM MISMATCH that names the one unclaimed same-surname teammate, DK's Starting slot and the `--resolve` that closes it. Commit 800b3ee. Both of the register's fixes were corrected in the CHANGELOG entry ("compare `matched.team`" is a tautology; "exactly one surname and team row" fails when a teammate shares the surname).
 
 ### R308. A third-party field-ownership estimate is reachable, contradicts our own prior on the half the prior cannot see, and is in no loop (P1, S-M; one precondition only Ben can settle) | new 2026-09-03, from BUILD fragment `2026-09-03_BUILD_external-ownership-pull-is-not-in-the-build-loop.md`; filed as a PROCESS item on Ben's instruction ("Write a fragment so this process gets incorporated into the normal portfolio generation process time permitting")
 
