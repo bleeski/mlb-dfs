@@ -1,0 +1,9 @@
+# 2026-10-10 BUILD (2000_1g_sd, ALDS G5): the Showdown pool has no door for a reliever, and preflight has no role for one
+
+**Observed.** CWS@CLE Game 5, 37 entries. DK's `Starting` column declared only the two starters (Williams, Burke). `melt_showdown_salary_csv` drops every other arm as `confirmed_nonstarter` on a decided side, so no reliever is rosterable, although three of the series' four wins went to relievers and both pens had an off day behind them. The session added ten relievers (Cade Smith, Sabrowski, Gaddis, Herrin, Griffin; Grant Taylor, Hagen Smith, Newcomb, Hicks, Schultz) by wrapping the melt in a scratch driver (`tools/_scratch_g5/g5_build.py`, gitignored) and supplied their Base through `--projections`. The build ran clean (`counted_relaxations.clean: true`), and `preflight_upload.py` then exited 2: `33 rostered player(s) absent from a confirmed posted lineup`, one line per reliever slot.
+
+**Why it is a gap, not a bug.** `--declare-pitcher` reaches the pool on Classic only, its roles are `verified_starter`, `declared_probable_sp` and `viable_bulk_or_alt_sp`, and `gate_classes` says "never manufacture a declaration". A setup man or closer is none of those, so the honest file can only pass preflight through `--force` or `--feed-lenient`, both of which are Ben's. The absence finding on a healthy active-roster reliever is the `missing_confirmation_or_stale_reference` fact (P), not `known_unavailability` (V).
+
+**Candidate item.** A Showdown-only `--include-arm ID[:evidence="..."]` that admits a named healthy arm to the pool with `Participation='operator_included_arm'`, records the evidence in the brief, and has preflight read it back as an acknowledged warning (the R114 path), plus a reliever role in `ALLOWED_PITCHER_ROLES` so the label is true. Effort S. Postseason elimination games are where it binds.
+
+Nothing here is a lift, an edge, an ROI or a win rate.

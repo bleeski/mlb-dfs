@@ -1,0 +1,631 @@
+{
+ "code": {
+  "contest_allocator": "v1.12",
+  "execution_pipeline": "v1.17",
+  "git_dirty": true,
+  "git_sha": "3cf88a8e2e034f27430b26d0b0f92a228d7a159c"
+ },
+ "controls": {
+  "max_cpt_exposure_pct": 0.25,
+  "max_cpt_per_contest": 2,
+  "max_player_exposure_pct": 0.5,
+  "max_shared_players": 4
+ },
+ "date": "2026-10-10",
+ "egress": "egress: statsapi 200, odds 401, savant 200, mlb-lineups 200, fangraphs 200 (curl), open-meteo 429",
+ "egress_source": "session_start 2026-10-10T21:47:22+00:00",
+ "entries": [
+  {
+   "contest_id": "196540460",
+   "contest_name": "MLB Showdown 40x Micro Booster [Top 5 Win $10] (CWS @ CLE)",
+   "entry_fee": 0.25,
+   "entry_id": "5289762503",
+   "filled": true,
+   "roster_ids": [
+    "44447919",
+    "44447820",
+    "44447826",
+    "44447827",
+    "44447828",
+    "44447831"
+   ]
+  },
+  {
+   "contest_id": "196540460",
+   "contest_name": "MLB Showdown 40x Micro Booster [Top 5 Win $10] (CWS @ CLE)",
+   "entry_fee": 0.25,
+   "entry_id": "5289763326",
+   "filled": true,
+   "roster_ids": [
+    "44447908",
+    "44447818",
+    "44447828",
+    "44447831",
+    "44447834",
+    "44447838"
+   ]
+  },
+  {
+   "contest_id": "196540460",
+   "contest_name": "MLB Showdown 40x Micro Booster [Top 5 Win $10] (CWS @ CLE)",
+   "entry_fee": 0.25,
+   "entry_id": "5289763327",
+   "filled": true,
+   "roster_ids": [
+    "44447904",
+    "44447822",
+    "44447828",
+    "44447829",
+    "44447894",
+    "44447901"
+   ]
+  },
+  {
+   "contest_id": "196540460",
+   "contest_name": "MLB Showdown 40x Micro Booster [Top 5 Win $10] (CWS @ CLE)",
+   "entry_fee": 0.25,
+   "entry_id": "5289763328",
+   "filled": true,
+   "roster_ids": [
+    "44447910",
+    "44447820",
+    "44447821",
+    "44447828",
+    "44447829",
+    "44447894"
+   ]
+  },
+  {
+   "contest_id": "196540460",
+   "contest_name": "MLB Showdown 40x Micro Booster [Top 5 Win $10] (CWS @ CLE)",
+   "entry_fee": 0.25,
+   "entry_id": "5289763329",
+   "filled": true,
+   "roster_ids": [
+    "44447909",
+    "44447819",
+    "44447820",
+    "44447829",
+    "44447834",
+    "44447838"
+   ]
+  },
+  {
+   "contest_id": "196540460",
+   "contest_name": "MLB Showdown 40x Micro Booster [Top 5 Win $10] (CWS @ CLE)",
+   "entry_fee": 0.25,
+   "entry_id": "5289763330",
+   "filled": true,
+   "roster_ids": [
+    "44447905",
+    "44447820",
+    "44447823",
+    "44447828",
+    "44447894",
+    "44447901"
+   ]
+  },
+  {
+   "contest_id": "196540460",
+   "contest_name": "MLB Showdown 40x Micro Booster [Top 5 Win $10] (CWS @ CLE)",
+   "entry_fee": 0.25,
+   "entry_id": "5289763331",
+   "filled": true,
+   "roster_ids": [
+    "44447906",
+    "44447822",
+    "44447823",
+    "44447828",
+    "44447831",
+    "44447838"
+   ]
+  },
+  {
+   "contest_id": "196540957",
+   "contest_name": "MLB Showdown $1K Quarter Jukebox [Just $0.25!]  (CWS @ CLE)",
+   "entry_fee": 0.25,
+   "entry_id": "5289762769",
+   "filled": true,
+   "roster_ids": [
+    "44447904",
+    "44447820",
+    "44447828",
+    "44447831",
+    "44447894",
+    "44447901"
+   ]
+  },
+  {
+   "contest_id": "196540957",
+   "contest_name": "MLB Showdown $1K Quarter Jukebox [Just $0.25!]  (CWS @ CLE)",
+   "entry_fee": 0.25,
+   "entry_id": "5289762803",
+   "filled": true,
+   "roster_ids": [
+    "44447909",
+    "44447820",
+    "44447822",
+    "44447828",
+    "44447834",
+    "44447835"
+   ]
+  },
+  {
+   "contest_id": "196540961",
+   "contest_name": "MLB Showdown $500 Daily Dollar [Single Entry] (CWS @ CLE)",
+   "entry_fee": 1.0,
+   "entry_id": "5289757483",
+   "filled": true,
+   "roster_ids": [
+    "44447904",
+    "44447822",
+    "44447827",
+    "44447828",
+    "44447887",
+    "44447901"
+   ]
+  },
+  {
+   "contest_id": "196585537",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (CWS @ CLE)",
+   "entry_fee": 0.1,
+   "entry_id": "5289762336",
+   "filled": true,
+   "roster_ids": [
+    "44447908",
+    "44447818",
+    "44447828",
+    "44447831",
+    "44447899",
+    "44447901"
+   ]
+  },
+  {
+   "contest_id": "196585537",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (CWS @ CLE)",
+   "entry_fee": 0.1,
+   "entry_id": "5289763102",
+   "filled": true,
+   "roster_ids": [
+    "44447908",
+    "44447818",
+    "44447826",
+    "44447831",
+    "44447887",
+    "44447901"
+   ]
+  },
+  {
+   "contest_id": "196585537",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (CWS @ CLE)",
+   "entry_fee": 0.1,
+   "entry_id": "5289763103",
+   "filled": true,
+   "roster_ids": [
+    "44447913",
+    "44447820",
+    "44447822",
+    "44447826",
+    "44447828",
+    "44447901"
+   ]
+  },
+  {
+   "contest_id": "196585537",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (CWS @ CLE)",
+   "entry_fee": 0.1,
+   "entry_id": "5289763104",
+   "filled": true,
+   "roster_ids": [
+    "44447912",
+    "44447822",
+    "44447823",
+    "44447827",
+    "44447828",
+    "44447831"
+   ]
+  },
+  {
+   "contest_id": "196585537",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (CWS @ CLE)",
+   "entry_fee": 0.1,
+   "entry_id": "5289763105",
+   "filled": true,
+   "roster_ids": [
+    "44447920",
+    "44447821",
+    "44447822",
+    "44447826",
+    "44447827",
+    "44447828"
+   ]
+  },
+  {
+   "contest_id": "196585537",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (CWS @ CLE)",
+   "entry_fee": 0.1,
+   "entry_id": "5289763106",
+   "filled": true,
+   "roster_ids": [
+    "44447914",
+    "44447818",
+    "44447822",
+    "44447827",
+    "44447833",
+    "44447838"
+   ]
+  },
+  {
+   "contest_id": "196585537",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (CWS @ CLE)",
+   "entry_fee": 0.1,
+   "entry_id": "5289763107",
+   "filled": true,
+   "roster_ids": [
+    "44447917",
+    "44447818",
+    "44447822",
+    "44447828",
+    "44447833",
+    "44447835"
+   ]
+  },
+  {
+   "contest_id": "196585537",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (CWS @ CLE)",
+   "entry_fee": 0.1,
+   "entry_id": "5289763108",
+   "filled": true,
+   "roster_ids": [
+    "44447913",
+    "44447818",
+    "44447822",
+    "44447831",
+    "44447834",
+    "44447835"
+   ]
+  },
+  {
+   "contest_id": "196585537",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (CWS @ CLE)",
+   "entry_fee": 0.1,
+   "entry_id": "5289763109",
+   "filled": true,
+   "roster_ids": [
+    "44447914",
+    "44447818",
+    "44447820",
+    "44447822",
+    "44447838",
+    "44447901"
+   ]
+  },
+  {
+   "contest_id": "196585537",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (CWS @ CLE)",
+   "entry_fee": 0.1,
+   "entry_id": "5289763110",
+   "filled": true,
+   "roster_ids": [
+    "44447905",
+    "44447820",
+    "44447823",
+    "44447829",
+    "44447894",
+    "44447903"
+   ]
+  },
+  {
+   "contest_id": "196585537",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (CWS @ CLE)",
+   "entry_fee": 0.1,
+   "entry_id": "5289763111",
+   "filled": true,
+   "roster_ids": [
+    "44447905",
+    "44447820",
+    "44447821",
+    "44447830",
+    "44447894",
+    "44447903"
+   ]
+  },
+  {
+   "contest_id": "196585537",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (CWS @ CLE)",
+   "entry_fee": 0.1,
+   "entry_id": "5289763112",
+   "filled": true,
+   "roster_ids": [
+    "44447906",
+    "44447821",
+    "44447823",
+    "44447828",
+    "44447830",
+    "44447894"
+   ]
+  },
+  {
+   "contest_id": "196585537",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (CWS @ CLE)",
+   "entry_fee": 0.1,
+   "entry_id": "5289763113",
+   "filled": true,
+   "roster_ids": [
+    "44447921",
+    "44447820",
+    "44447821",
+    "44447822",
+    "44447823",
+    "44447894"
+   ]
+  },
+  {
+   "contest_id": "196585537",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (CWS @ CLE)",
+   "entry_fee": 0.1,
+   "entry_id": "5289763114",
+   "filled": true,
+   "roster_ids": [
+    "44447907",
+    "44447819",
+    "44447823",
+    "44447829",
+    "44447830",
+    "44447841"
+   ]
+  },
+  {
+   "contest_id": "196585537",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (CWS @ CLE)",
+   "entry_fee": 0.1,
+   "entry_id": "5289763115",
+   "filled": true,
+   "roster_ids": [
+    "44447915",
+    "44447819",
+    "44447821",
+    "44447823",
+    "44447828",
+    "44447838"
+   ]
+  },
+  {
+   "contest_id": "196585537",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (CWS @ CLE)",
+   "entry_fee": 0.1,
+   "entry_id": "5289763116",
+   "filled": true,
+   "roster_ids": [
+    "44447909",
+    "44447819",
+    "44447821",
+    "44447822",
+    "44447894",
+    "44447901"
+   ]
+  },
+  {
+   "contest_id": "196585537",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (CWS @ CLE)",
+   "entry_fee": 0.1,
+   "entry_id": "5289763117",
+   "filled": true,
+   "roster_ids": [
+    "44447909",
+    "44447819",
+    "44447820",
+    "44447827",
+    "44447834",
+    "44447894"
+   ]
+  },
+  {
+   "contest_id": "196585537",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (CWS @ CLE)",
+   "entry_fee": 0.1,
+   "entry_id": "5289763118",
+   "filled": true,
+   "roster_ids": [
+    "44447904",
+    "44447820",
+    "44447829",
+    "44447830",
+    "44447838",
+    "44447894"
+   ]
+  },
+  {
+   "contest_id": "196585537",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (CWS @ CLE)",
+   "entry_fee": 0.1,
+   "entry_id": "5289763119",
+   "filled": true,
+   "roster_ids": [
+    "44447907",
+    "44447820",
+    "44447822",
+    "44447831",
+    "44447834",
+    "44447835"
+   ]
+  },
+  {
+   "contest_id": "196585537",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (CWS @ CLE)",
+   "entry_fee": 0.1,
+   "entry_id": "5289763120",
+   "filled": true,
+   "roster_ids": [
+    "44447904",
+    "44447819",
+    "44447822",
+    "44447894",
+    "44447901",
+    "44447903"
+   ]
+  },
+  {
+   "contest_id": "196590393",
+   "contest_name": "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (CWS @ CLE)",
+   "entry_fee": 0.1,
+   "entry_id": "5289757807",
+   "filled": true,
+   "roster_ids": [
+    "44447926",
+    "44447823",
+    "44447826",
+    "44447827",
+    "44447831",
+    "44447833"
+   ]
+  },
+  {
+   "contest_id": "196590393",
+   "contest_name": "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (CWS @ CLE)",
+   "entry_fee": 0.1,
+   "entry_id": "5289763430",
+   "filled": true,
+   "roster_ids": [
+    "44447912",
+    "44447818",
+    "44447827",
+    "44447829",
+    "44447831",
+    "44447834"
+   ]
+  },
+  {
+   "contest_id": "196590393",
+   "contest_name": "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (CWS @ CLE)",
+   "entry_fee": 0.1,
+   "entry_id": "5289763431",
+   "filled": true,
+   "roster_ids": [
+    "44447904",
+    "44447823",
+    "44447827",
+    "44447831",
+    "44447894",
+    "44447901"
+   ]
+  },
+  {
+   "contest_id": "196590393",
+   "contest_name": "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (CWS @ CLE)",
+   "entry_fee": 0.1,
+   "entry_id": "5289763432",
+   "filled": true,
+   "roster_ids": [
+    "44447916",
+    "44447820",
+    "44447821",
+    "44447824",
+    "44447829",
+    "44447831"
+   ]
+  },
+  {
+   "contest_id": "196590393",
+   "contest_name": "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (CWS @ CLE)",
+   "entry_fee": 0.1,
+   "entry_id": "5289763433",
+   "filled": true,
+   "roster_ids": [
+    "44447906",
+    "44447819",
+    "44447823",
+    "44447829",
+    "44447835",
+    "44447840"
+   ]
+  },
+  {
+   "contest_id": "196590393",
+   "contest_name": "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (CWS @ CLE)",
+   "entry_fee": 0.1,
+   "entry_id": "5289763434",
+   "filled": true,
+   "roster_ids": [
+    "44447904",
+    "44447823",
+    "44447829",
+    "44447830",
+    "44447835",
+    "44447894"
+   ]
+  },
+  {
+   "contest_id": "196590393",
+   "contest_name": "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (CWS @ CLE)",
+   "entry_fee": 0.1,
+   "entry_id": "5289763435",
+   "filled": true,
+   "roster_ids": [
+    "44447905",
+    "44447818",
+    "44447826",
+    "44447831",
+    "44447894",
+    "44447901"
+   ]
+  }
+ ],
+ "entries_binding": {
+  "source": "outputs/2026-10-10/DO_NOT_UPLOAD_DKEntries_showdown_2000_1g_sd.aa1fa0290ac9.csv",
+  "source_sha256": "1af7b7f99eef59c68d63bd3b8dbc36cac96497291dac0810bc138368a9a49fef",
+  "status": "bound"
+ },
+ "host": {
+  "call_budget_s": 630.0,
+  "declared_ceiling_s": 900.0,
+  "host": "claude_code"
+ },
+ "kind": "delivery",
+ "labels": "deterministic review proxies and labeled priors only; never ROI, win rate, cash rate, or probability",
+ "manifest_row": {
+  "certification": "review_grade",
+  "contest_ids": [
+   "196540460",
+   "196540957",
+   "196540961",
+   "196585537",
+   "196590393"
+  ],
+  "contest_names": [
+   "MLB Showdown $100 Dime Time [Just $0.10!] (CWS @ CLE)",
+   "MLB Showdown $1K Quarter Jukebox [Just $0.25!]  (CWS @ CLE)",
+   "MLB Showdown $500 Daily Dollar [Single Entry] (CWS @ CLE)",
+   "MLB Showdown 40x Micro Booster [Top 5 Win $10] (CWS @ CLE)",
+   "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (CWS @ CLE)"
+  ],
+  "contest_type": "showdown",
+  "delivered_file": "outputs/2026-10-10/DKEntries_showdown_2000_1g_sd.csv",
+  "entries": 37,
+  "notes": "Showdown ships review-grade; it does not pass the three certification gates. See CLAUDE.md.",
+  "projection_tier": "unknown",
+  "recorded_utc": "2026-10-10T22:01:34.504401+00:00",
+  "run_id": null,
+  "sha256": "1af7b7f99eef59c68d63bd3b8dbc36cac96497291dac0810bc138368a9a49fef",
+  "slate_tag": "2000_1g_sd",
+  "status": "candidate",
+  "strategy_state": {
+   "counts": {},
+   "state": "unknown"
+  }
+ },
+ "recorded_utc": "2026-10-10T22:01:34.508353+00:00",
+ "relaxations": {
+  "both_relaxed": 0,
+  "captain_cap_relaxed": 0,
+  "captain_contest_cap_relaxed": 0,
+  "captain_lock_relaxed": 0,
+  "contest_cap_relaxed": 0,
+  "cpt_cap_relaxed": 0,
+  "min_per_team_relaxed": 0,
+  "overlap_relaxed": 0,
+  "player_relaxed": 0
+ },
+ "run": {},
+ "schema_version": 1
+}
