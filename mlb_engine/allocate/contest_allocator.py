@@ -1676,6 +1676,63 @@ def _untouchable_cap_conflicts(
                 f"{count} of the {row_count} row(s) this solve cannot change, "
                 f"against a whole-file cap of {cap} at {total} complete rows"
             )
+    # R445. Two untouchable rows against EACH OTHER. Every check above is a count
+    # over the fixed rows; the export validator also grades every PAIR of legal
+    # rosters in the file against `max_shared_players` (identical lineups exempt:
+    # approved cross-contest reuse) and every contest for the same lineup twice
+    # (F-3). The candidate-vs-fixed blocking below this function covers the pairs
+    # the solve forms, so a pair of rows it never touches reached the validator
+    # uncounted: the solve certified, then the file was refused on two rows nobody
+    # asked it to change. `max_shared_players` is a checked control the allocator's
+    # ladders never widen (CHECKED_CONTROLS), and the validator reads the same
+    # `controls`, so this refuses at exactly the value the file will be graded at.
+    # The overlap half is gated by `refuse_fixed_pair_overlap`, which only a late
+    # swap stamps (see `execute_portfolio`): an initial build holding such a pair
+    # ships review-grade today and keeps doing so.
+    fixed_rosters = [tuple(str(p) for p in r) for r in (fixed.get("rosters") or [])]
+    fixed_ids = [str(x) for x in (fixed.get("entry_ids") or [])]
+    if len(fixed_ids) != len(fixed_rosters):
+        fixed_ids = [f"fixed row {i + 1}" for i in range(len(fixed_rosters))]
+    fixed_sigs = [tuple(sorted(r)) for r in fixed_rosters]
+    overlap_cap = controls.get("max_shared_players")
+    if fixed.get("refuse_fixed_pair_overlap") and overlap_cap is not None:
+        cap_n = int(overlap_cap)
+        fixed_sets = [set(r) for r in fixed_rosters]
+        pairs = []
+        for i in range(len(fixed_rosters)):
+            for j in range(i + 1, len(fixed_rosters)):
+                if fixed_sigs[i] == fixed_sigs[j]:
+                    continue  # the validator's exemption: approved reuse of one lineup
+                shared = len(fixed_sets[i] & fixed_sets[j])
+                if shared > cap_n:
+                    pairs.append((-shared, *sorted((fixed_ids[i], fixed_ids[j]))))
+        pairs.sort()
+        for neg_shared, first, second in pairs[:10]:
+            lines.append(
+                f"max_shared_players: entries {first} and {second}, rows this solve "
+                f"cannot change, already share {-neg_shared} players, against a cap "
+                f"of {cap_n}"
+            )
+        if len(pairs) > 10:
+            lines.append(
+                f"max_shared_players: {len(pairs) - 10} more pair(s) of rows this "
+                f"solve cannot change share more than {cap_n}"
+            )
+    duplicate_lines: List[str] = []
+    contest_of = fixed.get("contest_by_entry") or {}
+    for cid, sigs in sorted((fixed.get("signatures_by_contest") or {}).items(),
+                            key=lambda kv: str(kv[0])):
+        counts = Counter(tuple(sorted(str(p) for p in sig)) for sig in sigs)
+        for sig, count in sorted(counts.items()):
+            if count < 2:
+                continue
+            holders = sorted(eid for eid, esig in zip(fixed_ids, fixed_sigs)
+                             if esig == sig and str(contest_of.get(eid)) == str(cid))
+            duplicate_lines.append(
+                f"F-3: contest {cid} already holds the same lineup in {count} "
+                f"row(s) this solve cannot change"
+                + (f" (entries {', '.join(holders)})" if holders else "")
+            )
     if lines:
         lines.append(
             "This is not a solver infeasibility and not a bank problem. In "
@@ -1686,6 +1743,18 @@ def _untouchable_cap_conflicts(
             "the build is the common cause (R29(3)); (3) only a value neither "
             "the parent nor this slate's floors chose is a portfolio strategy "
             "decision, and it concentrates the entered set."
+        )
+        if any(line.startswith("max_shared_players: entries ") for line in lines):
+            lines.append(
+                "For an overlapping pair, authorizing either row of it clears it."
+            )
+    if duplicate_lines:
+        lines.extend(duplicate_lines)
+        lines.append(
+            "F-3 is the operator rule that one lineup never sits in two entries "
+            "of one contest, and it is never relaxed. Change one row of each "
+            "such contest so the solve can replace it: authorize it with "
+            "--entry-ids on a late swap, or blank it on an initial build."
         )
     return lines
 

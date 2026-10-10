@@ -49874,3 +49874,281 @@ class LateSwapRailsTests(unittest.TestCase):
         self.assertEqual(code, 0, err[-1500:])
         self.assertIn("bank stack request (R284): sizes [5, 4]", out)
         self.assertEqual([c["stack_min"] for c in calls if not c["pinned"]], [5, 4])
+
+
+class FixedPairConflictTests(unittest.TestCase):
+    """R445 (roadmap Session 29): two untouchable rows against EACH OTHER.
+
+    `_untouchable_cap_conflicts` counted caps over the rows a solve cannot change
+    and never looked at them pairwise, while the export validator grades every
+    pair of legal rosters against `max_shared_players` (identical lineups exempt)
+    and every contest for the same lineup twice (F-3). So a solve whose frozen rows
+    already breached either between themselves certified, and the file was then
+    refused naming two rows the solve never touched, with a diagnosis that pointed
+    at the cap. Reproduced through the production chain: `fixed_portfolio_exposure`
+    -> `select_and_assign_entries` -> the validator on the same file.
+
+    The overlap half is a late swap's only (`refuse_fixed_pair_overlap`, stamped in
+    `execute_portfolio` from `mode`): on an initial build the same breach fails the
+    validator at S and ships review-grade under R388(d), which a refusal would
+    remove. F-3 is a V failure with no file either way, so it is refused in both.
+    """
+
+    GATES = {g: True for g in (
+        "salary_gate_passed", "entry_grid_gate_passed", "lineup_gate_passed",
+        "pitcher_audit_gate_passed", "weather_gate_passed", "odds_gate_passed",
+        "projection_schema_gate_passed", "optimizer_gate_passed")}
+    OPEN = {"max_player_exposure_pct": 1.0, "max_pitcher_exposure_pct": 1.0,
+            "max_primary_stack_exposure_pct": 1.0, "max_sp_pair_repetition": 3}
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.salary = self.root / "salary.csv"
+        self.ids = write_salary(self.salary)
+        ids = self.ids
+        self.r1, self.r2 = legal_rosters(ids)
+        self.r1_nine = list(self.r1)
+        self.r1_nine[-1] = ids["CCC OF3"]            # shares 9 of 10 with r1
+        self.r3 = [ids["Pitcher A"], ids["Pitcher C"], ids["AAA C"], ids["CCC 1B"],
+                   ids["CCC 2B"], ids["CCC 3B"], ids["CCC SS"], ids["AAA OF1"],
+                   ids["AAA OF2"], ids["CCC OF2"]]   # 7 shared with r1, 6 with r1_nine, 5 with r2
+        self.frame = projection_frame(ids)
+
+    # -- fixtures ------------------------------------------------------------ #
+
+    def _entries(self, rosters, contests, name="DKEntries.csv"):
+        path = self.root / name
+        write_entries(path, rosters, contests)
+        return path
+
+    def _fixed(self, entries, solved=("5003",), swap=True):
+        fixed = fixed_portfolio_exposure(entries, list(solved), salary_csv_path=self.salary)
+        fixed["refuse_fixed_pair_overlap"] = bool(swap)
+        return fixed
+
+    def _allocate(self, fixed, controls, solved=("5003",)):
+        bank = [candidate("X", [f"x{i}" for i in range(10)], 50),
+                candidate("Y", [f"y{i}" for i in range(10)], 49)]
+        reqs = [{"entry_id": e, "contest_id": "900", "contest_shape": "large_wta"}
+                for e in solved]
+        return select_and_assign_entries(bank, reqs, controls, fixed_exposure=fixed)
+
+    def _validate(self, entries, controls):
+        return validate_dk_entries_file(entries, self.salary, portfolio_controls=controls)
+
+    def _swap(self, current, authorized, controls, candidates):
+        statuses = {pid: PlayerLineupStatus(pid, pid, "AAA", "AAA@BBB",
+                                            NOW + timedelta(hours=2), "Confirmed_Starter")
+                    for pid in self.ids.values()}
+        parent = self._parent()
+        return run_late_swap(
+            runs_root=self.root / "runs", current_entries_csv=current,
+            status_by_player_id=statuses, as_of=NOW, salary_csv=self.salary,
+            projections=self.frame, candidates=candidates, workflow_gates=self.GATES,
+            authorized_entry_ids=list(authorized), allow_parent_mismatch=True,
+            portfolio_controls={**self.OPEN, **controls}), parent
+
+    def _reqs(self, *entry_ids):
+        return [{"entry_id": e, "contest_id": "900", "contest_name": "Test WTA",
+                 "contest_shape": "large_wta"} for e in entry_ids]
+
+    def _parent(self):
+        """A promoted run for `allow_parent_mismatch` to resolve: built at the
+        looser `max_shared_players` 9 a deadline-rung parent ships at."""
+        entries = self._entries([None, None, None], ["900"] * 3, "DKEntries_parent.csv")
+        parent = run_initial_build(
+            runs_root=self.root / "runs", salary_csv=self.salary, entries_csv=entries,
+            projections=self.frame,
+            candidates=[candidate("A", self.r1, 100), candidate("B", self.r1_nine, 99),
+                        candidate("C", self.r2, 98, "CCC")],
+            entry_requirements=self._reqs("5001", "5002", "5003"),
+            workflow_gates=self.GATES,
+            portfolio_controls={**self.OPEN, "max_shared_players": 9})
+        self.assertTrue(parent["passed"], parent.get("errors"))
+        return parent
+
+    # -- the pre-check ------------------------------------------------------- #
+
+    def test_a_frozen_pair_over_the_cap_is_refused_naming_both_rows(self):
+        entries = self._entries([self.r1, self.r1_nine, self.r2], ["900"] * 3)
+        controls = {"max_shared_players": 8}
+        result = self._allocate(self._fixed(entries), controls)
+        self.assertFalse(result["passed"])
+        self.assertEqual(result["refusal"], "untouchable_rows_exceed_cap")
+        self.assertFalse(result["allocation_certified"])
+        self.assertEqual(
+            result["errors"][0],
+            "max_shared_players: entries 5001 and 5002, rows this solve cannot "
+            "change, already share 9 players, against a cap of 8")
+        self.assertIn("authorize", " ".join(result["errors"]))
+        self.assertIn("authorizing either row of it clears it", result["errors"][-1])
+        # what the validator says about the same file: the refusal this replaces
+        self.assertIn("entries 5001/5002 share 9>8", self._validate(entries, controls)["errors"])
+
+    def test_the_same_pair_before_the_fix_certified(self):
+        """The defect, kept visible: without the stamp (an initial build, or a hand
+        dict) the allocator certifies this solve, which is what a swap did."""
+        entries = self._entries([self.r1, self.r1_nine, self.r2], ["900"] * 3)
+        result = self._allocate(self._fixed(entries, swap=False), {"max_shared_players": 8})
+        self.assertTrue(result["passed"], result.get("errors"))
+        self.assertTrue(result["allocation_certified"])
+
+    def test_equal_to_the_cap_is_not_a_conflict(self):
+        entries = self._entries([self.r1, self.r1_nine, self.r2], ["900"] * 3)
+        controls = {"max_shared_players": 9}
+        result = self._allocate(self._fixed(entries), controls)
+        self.assertTrue(result["passed"], result.get("errors"))
+        self.assertNotIn("share", " ".join(self._validate(entries, controls)["errors"]))
+
+    def test_identical_lineups_in_two_contests_are_reuse_not_overlap_and_not_F3(self):
+        """The validator exempts an identical roster from the overlap test (approved
+        cross-contest reuse) and F-3 is per contest."""
+        entries = self._entries([self.r1, self.r1, self.r2], ["900", "901", "900"])
+        controls = {"max_shared_players": 8}
+        result = self._allocate(self._fixed(entries), controls)
+        self.assertTrue(result["passed"], result.get("errors"))
+        errors = " ".join(self._validate(entries, controls)["errors"])
+        self.assertNotIn("share", errors)
+        self.assertNotIn("duplicate roster", errors)
+
+    def test_the_overlap_half_needs_the_swap_stamp(self):
+        entries = self._entries([self.r1, self.r1_nine, self.r2], ["900"] * 3)
+        fixed = self._fixed(entries)
+        controls = {"max_shared_players": 8}
+        total = 3
+        self.assertTrue(ca._untouchable_cap_conflicts(fixed, controls, total))
+        for stamp in (False, None):
+            with self.subTest(stamp=stamp):
+                bare = dict(fixed)
+                if stamp is None:
+                    bare.pop("refuse_fixed_pair_overlap")
+                else:
+                    bare["refuse_fixed_pair_overlap"] = stamp
+                self.assertEqual(ca._untouchable_cap_conflicts(bare, controls, total), [])
+        self.assertEqual(ca._untouchable_cap_conflicts(fixed, {}, total), [],
+                         "no max_shared_players, no overlap check")
+
+    def test_two_identical_rows_in_one_contest_are_refused_by_F3_naming_them(self):
+        entries = self._entries([self.r1, self.r1, self.r2], ["900"] * 3)
+        for label, controls, swap in (("swap", {"max_shared_players": 8}, True),
+                                      ("no overlap control", {}, True),
+                                      ("initial build", {"max_shared_players": 8}, False)):
+            with self.subTest(case=label):
+                result = self._allocate(self._fixed(entries, swap=swap), controls)
+                self.assertFalse(result["passed"])
+                self.assertEqual(result["refusal"], "untouchable_rows_exceed_cap")
+                self.assertEqual(
+                    result["errors"][0],
+                    "F-3: contest 900 already holds the same lineup in 2 row(s) this "
+                    "solve cannot change (entries 5001, 5002)")
+                self.assertIn("never relaxed", result["errors"][-1])
+                self.assertIn("blank it on an initial build", result["errors"][-1])
+                self.assertNotIn("restate that value", " ".join(result["errors"]),
+                                 "F-3 never relaxes: the cap-loosening remedies do not apply")
+        self.assertIn("Contest 900: duplicate roster appears 2 times",
+                      self._validate(entries, {})["errors"])
+
+    def test_F3_names_only_the_rows_of_the_contest_that_holds_the_duplicate(self):
+        """The same lineup in contest 901 is legal reuse; it must not be named."""
+        entries = self._entries([self.r1, self.r1, self.r1], ["900", "900", "901"])
+        lines = ca._untouchable_cap_conflicts(
+            self._fixed(entries, solved=()), {}, 3)
+        self.assertEqual(
+            lines[0], "F-3: contest 900 already holds the same lineup in 2 row(s) this "
+                      "solve cannot change (entries 5001, 5002)")
+        self.assertEqual([l for l in lines if l.startswith("F-3: contest")], lines[:1])
+
+    def test_fixed_portfolio_exposure_carries_the_contest_of_every_fixed_row(self):
+        entries = self._entries([self.r1, self.r1_nine, self.r2], ["900", "901", "902"])
+        fixed = fixed_portfolio_exposure(entries, ["5003"], salary_csv_path=self.salary)
+        self.assertEqual(fixed["entry_ids"], ["5001", "5002"])
+        self.assertEqual(fixed["contest_by_entry"], {"5001": "900", "5002": "901"})
+
+    def test_a_hand_built_dict_without_ids_or_contests_still_names_rows(self):
+        def roster(extra):
+            return ["p1", "p2", *[f"h{i}" for i in range(7)], extra]
+        fixed = {"row_count": 2, "refuse_fixed_pair_overlap": True,
+                 "rosters": [roster("a"), roster("b")],
+                 "signatures_by_contest": {"c1": [sorted(roster("a")), sorted(roster("a"))]}}
+        lines = ca._untouchable_cap_conflicts(fixed, {"max_shared_players": 8}, 3)
+        self.assertEqual(lines[0], "max_shared_players: entries fixed row 1 and fixed row 2, "
+                                   "rows this solve cannot change, already share 9 players, "
+                                   "against a cap of 8")
+        f3 = next(l for l in lines if l.startswith("F-3: "))
+        self.assertEqual(f3, "F-3: contest c1 already holds the same lineup in 2 row(s) this "
+                             "solve cannot change", "no contest map, so no ids")
+
+    def test_pairs_are_listed_worst_first_ten_then_a_count(self):
+        def roster(i, shared):
+            core = [f"s{k}" for k in range(shared)]
+            return core + [f"u{i}_{k}" for k in range(10 - shared)]
+        rosters = [roster(i, 9) for i in range(6)]            # 15 pairs at 9 shared
+        fixed = {"row_count": 6, "refuse_fixed_pair_overlap": True,
+                 "entry_ids": [str(7000 + i) for i in range(6)], "rosters": rosters}
+        lines = ca._untouchable_cap_conflicts(fixed, {"max_shared_players": 8}, 8)
+        pair_lines = [l for l in lines if l.startswith("max_shared_players: entries ")]
+        self.assertEqual(len(pair_lines), 10)
+        self.assertEqual(pair_lines, sorted(pair_lines), "a stable order")
+        self.assertIn("max_shared_players: 5 more pair(s) of rows this solve cannot "
+                      "change share more than 8", lines)
+        # row order puts the worst pair LAST: rows 1 and 2 share 9, row 0 shares 1 with each
+        mixed = [["s0"] + [f"u0_{k}" for k in range(9)], roster(1, 9), roster(2, 9)]
+        worst = ca._untouchable_cap_conflicts(
+            {"row_count": 3, "refuse_fixed_pair_overlap": True, "entry_ids": ["1", "2", "3"],
+             "rosters": mixed}, {"max_shared_players": 0}, 3)
+        shared = [int(l.split("share ")[1].split(" ")[0]) for l in worst
+                  if l.startswith("max_shared_players: entries ")]
+        self.assertEqual(shared, sorted(shared, reverse=True), "worst first")
+
+    def test_no_new_line_is_re_steered_by_the_swap_classifier(self):
+        """`classify_swap_failure` annotates any line starting with a mapped error
+        prefix (`entries `, `player `, ...) and would drag the cap-loosening trailer
+        in behind it. The new lines start `max_shared_players:` and `F-3:`."""
+        ls = SwapControlsInheritanceTests._late_swap()
+        entries = self._entries([self.r1, self.r1_nine, self.r1_nine], ["900"] * 3)
+        lines = ca._untouchable_cap_conflicts(
+            self._fixed(entries, solved=()), {"max_shared_players": 8}, 3)
+        self.assertTrue(any(l.startswith("F-3: ") for l in lines), lines)
+        self.assertTrue(any(l.startswith("max_shared_players: entries ") for l in lines))
+        for line in lines:
+            with self.subTest(line=line[:50]):
+                self.assertEqual(
+                    [], [c for p, c in ls._CONTROL_BY_ERROR_PREFIX if line.startswith(p)])
+        self.assertEqual(
+            ls.classify_swap_failure(lines, {"max_shared_players": 8}),
+            [f"  {l}" for l in lines])
+
+    # -- by mode, through the real execute_portfolio -------------------------- #
+
+    def test_a_late_swap_refuses_the_frozen_pair_and_authorizing_one_row_clears_it(self):
+        current = self._entries([self.r1, self.r1_nine, self.r2], ["900"] * 3,
+                                "DKEntries_current.csv")
+        refused, _ = self._swap(current, ["5003"], {"max_shared_players": 8},
+                                [candidate("C", self.r2, 98, "CCC")])
+        self.assertFalse(refused["passed"])
+        self.assertTrue(any(e.startswith("max_shared_players: entries 5001 and 5002")
+                            for e in refused["errors"]), refused["errors"])
+        cleared, _ = self._swap(current, ["5002", "5003"], {"max_shared_players": 8},
+                                [candidate("C", self.r2, 98, "CCC"),
+                                 candidate("D", self.r3, 97, "CCC")])
+        self.assertTrue(cleared["passed"], cleared.get("errors"))
+        self.assertTrue(cleared["selection_certified"])
+        validated = self._validate(Path(cleared["output_path"]), {"max_shared_players": 8})
+        self.assertTrue(validated["passed"], validated["errors"])
+
+    def test_an_initial_build_around_a_held_pair_over_the_cap_still_ships_review_grade(self):
+        """The regression guard (R386, delivery first). The allocator must not refuse
+        here: today the validator fails S and R388(d) hands back a review-grade file."""
+        held = self._entries([self.r1, self.r1_nine, None], ["900"] * 3, "DKEntries_held.csv")
+        result = run_initial_build(
+            runs_root=self.root / "runs_initial", salary_csv=self.salary, entries_csv=held,
+            projections=self.frame,
+            candidates=[candidate("C", self.r2, 98, "CCC"), candidate("D", self.r3, 97, "CCC")],
+            entry_requirements=self._reqs("5003"), workflow_gates=self.GATES,
+            portfolio_controls={**self.OPEN, "max_shared_players": 8})
+        self.assertNotEqual((result.get("allocation") or {}).get("refusal"),
+                            "untouchable_rows_exceed_cap")
+        self.assertEqual(result["errors"], ["entries 5001/5002 share 9>8"])
+        self.assertTrue(result.get("review_grade_export"), sorted(result))
