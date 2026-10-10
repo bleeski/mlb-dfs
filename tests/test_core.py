@@ -50015,6 +50015,140 @@ class LateSwapRailsTests(unittest.TestCase):
         self.assertEqual(self._score_block(out), self._score_block(out2))
 
 
+    # -- R141: the post-lock ownership view, report-only ------------------------- #
+
+    OWN_NOW = datetime(2026, 7, 10, 22, 0, tzinfo=timezone.utc)
+
+    def _ownership_world(self):
+        """Two teams, ten hitters and two pitchers each. Salaries ascend with the index
+        and BBB's sit 50 above AAA's, so the structural High tier is AAA P1, BBB H10,
+        AAA H10 and BBB H9. AAA's game has not started; BBB's has."""
+        rows, status, orders = [], {}, {}
+        for team, game, bump, lock in (("AAA", "AAA@CCC", 0.0, self.OWN_NOW + timedelta(hours=3)),
+                                       ("BBB", "BBB@DDD", 50.0, self.OWN_NOW - timedelta(hours=1))):
+            for i in range(1, 11):
+                pid = str({"AAA": 50000, "BBB": 60000}[team] + i)
+                rows.append({"Player_ID": pid, "Name": f"{team} H{i}", "Team": team,
+                             "Position": ("C", "1B", "2B", "3B", "SS", "OF", "OF", "OF", "OF", "OF")[i - 1],
+                             "Salary": 3000.0 + 100 * i + bump})
+                status[pid] = PlayerLineupStatus(pid, f"{team} H{i}", team, game, lock,
+                                                 "Confirmed_Starter", batting_order=min(i, 9))
+                orders[pid] = min(i, 9)
+            for k in (1, 2):
+                pid = str({"AAA": 70000, "BBB": 80000}[team] + k)
+                rows.append({"Player_ID": pid, "Name": f"{team} P{k}", "Team": team,
+                             "Position": "SP", "Salary": 8000.0 + 100 * k})
+                status[pid] = PlayerLineupStatus(pid, f"{team} P{k}", team, game, lock, "Probable")
+        return (pd.DataFrame(rows),
+                {"status_by_player_id": status, "confirmed_order_by_player_id": orders,
+                 "probable_pitcher_ids": ["70001", "80001"]})
+
+    @staticmethod
+    def _roster(slot7):
+        # P1 P2 C 1B 2B 3B SS OF1 OF2 OF3
+        return ["70001", "80001", "50001", "50002", "50003", "50004", "50005", slot7, "50007", "50008"]
+
+    def _view(self, **kw):
+        tool = LateSwapDeclaredPitcherTests._tool()
+        frame, status = self._ownership_world()
+        parent = {"E1": self._roster("50010"), "E2": self._roster("50010"),
+                  "E3": self._roster("60010")}
+        candidates = [{"roster_slot_ids": self._roster("50006")},
+                      {"roster_slot_ids": self._roster("50006")},
+                      {"roster_slot_ids": self._roster("50008")},
+                      {"roster_slot_ids": self._roster("60006")},     # BBB: another team, never offered
+                      {"roster_slot_ids": self._roster("50010")}]     # the incumbent himself
+        args = dict(projections=frame, status=status, as_of=self.OWN_NOW, parent_rosters=parent,
+                    candidates=candidates, shapes=["large_wta"])
+        args.update(kw)
+        return tool, tool.ownership_view_lines(**args)
+
+    def test_the_ownership_view_lists_unlocked_chalk_the_parent_holds_with_bank_alternatives(self):
+        # BBB H6 is made unlocked on purpose: only the team test, not the lock test,
+        # keeps him out of an AAA player's alternatives.
+        frame, status = self._ownership_world()
+        status["status_by_player_id"]["60006"] = PlayerLineupStatus(
+            "60006", "BBB H6", "BBB", "BBB@DDD", self.OWN_NOW + timedelta(hours=3),
+            "Confirmed_Starter", batting_order=6)
+        _, lines = self._view(status=status)
+        self.assertTrue(lines[0].startswith("ownership view (R141, report-only; UNCALIBRATED "
+                                            "STRUCTURAL PRIOR, a review proxy: never a "
+                                            "probability, edge or ROI)"))
+        self.assertIn("computed over the 24-player swap pool and NOT the salary file", lines[0])
+        self.assertIn("a posted batting order for 20 of 20 hitters", lines[0])
+        self.assertIn("2 probable pitcher(s), implied totals none, base projection none", lines[0])
+        self.assertTrue(lines[1].startswith("  AAA P1 (AAA P): structural own"), lines)
+        self.assertIn("held in 3 of 3 parent entries", lines[1])
+        chalk = [l for l in lines[1:] if l.startswith("  AAA H10")]
+        self.assertEqual(len(chalk), 1, lines)
+        self.assertIn("High tier, held in 2 of 3 parent entries", chalk[0])
+        self.assertIn("same-team same-slot bank alternatives: AAA H6", chalk[0])
+        self.assertIn("in 2 bank lineup(s)", chalk[0])
+        self.assertNotIn("BBB", chalk[0], "another team's player is never an alternative")
+        self.assertNotIn("AAA H10 (", chalk[0].split("alternatives:")[1],
+                         "the incumbent is not offered as his own alternative")
+
+    def test_locked_games_are_filtered_from_the_output_not_the_input(self):
+        """BBB H10 is the field's most owned hitter and the parent holds him, but his game
+        has started, so he is not listed; he is still in the computation, so AAA H10's
+        own% is the full-pool number and not what an AAA-only input gives."""
+        tool, lines = self._view()
+        self.assertFalse([l for l in lines if "BBB H10" in l], lines)
+        frame, status = self._ownership_world()
+        from mlb_engine.field.ownership_prior import predict_ownership
+        rows = [{**r, "Position": "P" if r["Position"] == "SP" else r["Position"]}
+                for r in frame.to_dict("records")]
+        full = predict_ownership(rows, "wta_satellite",
+                                 batting_order_by_player_id=status["confirmed_order_by_player_id"],
+                                 probable_sp_ids=status["probable_pitcher_ids"])
+        listed = next(l for l in lines if l.startswith("  AAA H10"))
+        self.assertIn(f"structural own {full['own_pct_by_player_id']['50010']:.1f}%", listed)
+        filtered = predict_ownership([r for r in rows if r["Team"] == "AAA"], "wta_satellite")
+        self.assertNotAlmostEqual(filtered["own_pct_by_player_id"]["50010"],
+                                  full["own_pct_by_player_id"]["50010"], places=1)
+
+    def test_a_player_with_no_status_is_treated_as_locked(self):
+        frame, status = self._ownership_world()
+        status["status_by_player_id"].pop("50010")
+        _, lines = self._view(status=status)
+        self.assertEqual([l for l in lines if l.startswith("  AAA H10")], [])
+        self.assertTrue(any(l.startswith("  AAA P1") for l in lines))
+        status["status_by_player_id"].pop("70001")
+        _, lines = self._view(status=status)
+        self.assertEqual(lines[-1], "  no unlocked High-tier player is held by the parent file")
+
+    def test_the_listing_is_capped_and_says_how_many_more(self):
+        _, lines = self._view(limit=1)
+        self.assertEqual(len([l for l in lines if l.startswith("  AAA")]), 1, lines)
+        self.assertEqual(lines[-1], "  and 1 more unlocked High-tier player(s) held")
+
+    def test_a_real_swap_prints_the_view_only_with_the_flag_and_changes_nothing_else(self):
+        code, out, err = self._swap_plain("--ownership-report")
+        self.assertEqual(code, 0, err[-1500:])
+        self.assertTrue([l for l in out.splitlines() if l.startswith("ownership view (R141")])
+        code2, out2, err2 = self._swap_plain()
+        self.assertEqual(code2, 0, err2[-1500:])
+        self.assertNotIn("ownership view", out2)
+        self.assertEqual(self._score_block(out), self._score_block(out2))
+
+    def test_the_view_also_prints_under_dry_run(self):
+        code, out, err = self._swap_plain("--ownership-report", "--dry-run")
+        self.assertEqual(code, 0, err[-1500:])
+        self.assertIn("ownership view (R141", out)
+
+    def test_an_exception_in_the_view_never_withholds_the_file(self):
+        h = self._h()
+
+        def boom(*a, **kw):
+            raise RuntimeError("prior exploded")
+
+        h.ls.ownership_view_lines = boom
+        code, out, err = h._run("--ownership-report")
+        self.assertEqual(code, 0, err[-1500:])
+        self.assertIn("OWNERSHIP VIEW FAILED (RuntimeError: prior exploded); the swap continues "
+                      "without it.", err)
+        self.assertIn("gates: workflow_valid=True selection=True allocation=True", out)
+
 class FixedPairConflictTests(unittest.TestCase):
     """R445 (roadmap Session 29): two untouchable rows against EACH OTHER.
 

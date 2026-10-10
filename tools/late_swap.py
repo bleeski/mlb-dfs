@@ -35,7 +35,7 @@ Usage:
         [--salary runs/<run_id>/inputs/DKSalaries.csv] \
         [--budget 30] [--solver-budget 15] [--lineups <fresh feed.json>] \
         [--entry-ids 123,456] [--dry-run] \
-        [--postures <contest_id>=cash,...] [--accept-downgrade]
+        [--postures <contest_id>=cash,...] [--accept-downgrade] [--ownership-report]
         [--declare-pitcher ID[=ROLE[:ip=N][:evidence="..."]] ...]
 
 The money-and-entry wall still applies: this writes a CSV. Nothing here uploads,
@@ -1079,6 +1079,103 @@ def parent_consensus_cluster(runs_root: Path, parent_run_id):
     return ((diag.get("allocation") or {}).get("consensus_cluster")) or None
 
 
+OWNERSHIP_VIEW_LIMIT = 8
+OWNERSHIP_VIEW_LABEL = ("UNCALIBRATED STRUCTURAL PRIOR, a review proxy: never a "
+                        "probability, edge or ROI")
+
+
+def ownership_view_lines(projections, status: dict, as_of, parent_rosters: dict,
+                         candidates, shapes, limit: int = OWNERSHIP_VIEW_LIMIT) -> list[str]:
+    """R141. Report-only: where the field's chalk sits NOW among the unlocked players
+    the parent file holds, and what the bank already offers beside them.
+
+    Recomputes the structural prior (`predict_ownership`, R135) over the swap's own
+    frame with the lineups the swap just read, lists the unlocked players in its
+    High tier by how many parent entries hold them, and names the same-team,
+    same-slot bank candidates in a lower tier. It changes nothing: no rail, no
+    control, no candidate.
+
+    Two things are deliberate. The prior spreads its 800/200 budget over whatever
+    list it is given, so locked games are filtered from the OUTPUT, never the input
+    (one posted team moved a hitter from 30.11 to 58.48 in the probe), and the
+    inputs are named on the first line because this is the swap POOL, not the whole
+    salary file the build's `ownership_pred_<tag>.json` is computed over: the tiers
+    are not comparable with it. A player with no lineup status is treated as
+    locked, the swap's own `missing_status_policy`.
+    """
+    from collections import Counter
+
+    from mlb_engine.field.ownership_prior import (
+        DEFAULT_ARCHETYPE, archetype_for_contest_shape, predict_ownership,
+    )
+
+    rows = []
+    for rec in projections.to_dict("records"):
+        tokens = [t for t in str(rec.get("Position") or "").replace("/", ",").split(",") if t]
+        pitcher = any(t.strip().upper() in ("P", "SP", "RP") for t in tokens)
+        rows.append({"Player_ID": str(rec["Player_ID"]), "Name": str(rec.get("Name") or ""),
+                     "Team": str(rec.get("Team") or ""), "Salary": rec.get("Salary") or 0.0,
+                     "Position": "P" if pitcher else (tokens[0] if tokens else "UTIL")})
+    by_id = {r["Player_ID"]: r for r in rows}
+    orders = {str(k): int(v) for k, v in (status.get("confirmed_order_by_player_id") or {}).items()}
+    probables = [str(x) for x in (status.get("probable_pitcher_ids") or [])]
+    kinds = Counter(a[0] for a in (archetype_for_contest_shape(x) for x in shapes) if a)
+    archetype = kinds.most_common(1)[0][0] if kinds else DEFAULT_ARCHETYPE
+    prior = predict_ownership(rows, archetype, batting_order_by_player_id=orders,
+                              probable_sp_ids=probables)
+    own, tier = prior["own_pct_by_player_id"], prior["tier_by_player_id"]
+    hitters = [r for r in rows if r["Position"] != "P"]
+    posted = sum(1 for r in hitters if r["Player_ID"] in orders)
+    lines = [
+        f"ownership view (R141, report-only; {OWNERSHIP_VIEW_LABEL}), archetype "
+        f"{archetype}, computed over the {len(rows)}-player swap pool and NOT the salary "
+        f"file, so these tiers are not the build's ownership prior and must not be compared "
+        f"with it. Inputs: a posted batting order for {posted} of {len(hitters)} hitters"
+        + ("" if posted == len(hitters) else " (a hitter without one gets the prior's flat "
+                                            "no-order adjustment)")
+        + f", {len(probables)} probable pitcher(s), implied totals none, base projection "
+        f"none. Locked games and players with no status are left out of the listing, not "
+        f"out of the computation."]
+
+    def unlocked(pid):
+        st = (status.get("status_by_player_id") or {}).get(pid)
+        return st is not None and not st.is_locked(as_of)
+
+    rosters = [list(r) for r in (parent_rosters or {}).values()]
+    held = Counter(pid for roster in rosters for pid in roster)
+    chalk = sorted((pid for pid, t in tier.items()
+                    if t == "High" and held.get(pid) and unlocked(pid)),
+                   key=lambda pid: (-held[pid], -own.get(pid, 0.0), by_id[pid]["Name"]))
+    if not chalk:
+        lines.append("  no unlocked High-tier player is held by the parent file")
+        return lines
+    for pid in chalk[:max(1, int(limit))]:
+        slots = Counter(roster.index(pid) for roster in rosters
+                        if pid in roster and len(roster) == 10)
+        alts = Counter()
+        if slots:
+            slot = slots.most_common(1)[0][0]
+            for cand in candidates or []:
+                ids = [str(x) for x in (cand.get("roster_slot_ids") or [])]
+                if len(ids) != 10 or ids[slot] == pid or ids[slot] not in by_id:
+                    continue
+                alt = ids[slot]
+                if (by_id[alt]["Team"] == by_id[pid]["Team"] and tier.get(alt) != "High"
+                        and unlocked(alt)):
+                    alts[alt] += 1
+        shown = ", ".join(f"{by_id[a]['Name']} ({own.get(a, 0.0):.1f}%, in {n} bank lineup(s))"
+                          for a, n in sorted(alts.items(),
+                                             key=lambda kv: (own.get(kv[0], 0.0), kv[0]))[:3])
+        lines.append(
+            f"  {by_id[pid]['Name']} ({by_id[pid]['Team']} {by_id[pid]['Position']}): "
+            f"structural own {own.get(pid, 0.0):.1f}%, High tier, held in {held[pid]} of "
+            f"{len(rosters)} parent entries; same-team same-slot bank alternatives: "
+            + (shown or "none in the bank"))
+    if len(chalk) > limit:
+        lines.append(f"  and {len(chalk) - limit} more unlocked High-tier player(s) held")
+    return lines
+
+
 # Every portfolio-control violation the entries validator can report, mapped to
 # the control that produced it. R29(3): a swap that fails on one of these has a
 # controls problem, and a swap that fails on "no compatible candidate" has a
@@ -1655,6 +1752,16 @@ def main() -> int:
     ap.add_argument("--target-rank", dest="target_rank", type=int, default=None,
                     help="with --standings: the rank whose points define 'live for "
                          "the target' (default 1)")
+    ap.add_argument("--ownership-report", dest="ownership_report", action="store_true",
+                    help="R141. Report-only, off by default: recompute the structural "
+                         "ownership prior over this swap's pool and list the unlocked "
+                         "High-tier players the parent file holds, with the same-team "
+                         "same-slot alternatives already in the bank, before the solve "
+                         "(so it also prints under --dry-run, when the choice of which "
+                         "entries to authorize is still open). Changes no rail, control "
+                         "or candidate; an exception in it prints and never withholds "
+                         "the file. An UNCALIBRATED STRUCTURAL PRIOR, never a "
+                         "probability, edge or ROI.")
     ap.add_argument("--allow-parent-mismatch", action="store_true",
                     help="proceed when --parent-entries matches no run's export "
                          "(R268(b): the parent is found by the file's bytes, so "
@@ -2221,6 +2328,15 @@ def main() -> int:
           f"collapsed across buckets, shapes {payload_report.get('shapes_scored')}")
     for reason, count in sorted((payload_report.get("scoring_failure_reasons") or {}).items()):
         print(f"  scoring failure x{count}: {reason}", file=sys.stderr)
+    if args.ownership_report:
+        try:
+            for line in ownership_view_lines(
+                    projections, status, now, parent_rosters, candidates,
+                    [r.get("contest_shape") for r in requirements]):
+                print(line)
+        except Exception as exc:  # noqa: BLE001 - a report never withholds the file
+            print(f"OWNERSHIP VIEW FAILED ({type(exc).__name__}: {exc}); the swap "
+                  f"continues without it.", file=sys.stderr)
     if args.dry_run:
         print(json.dumps({"entries": len(requirements),
                           "candidates": len(candidates),
