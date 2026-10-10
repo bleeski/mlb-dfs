@@ -123,6 +123,11 @@ _GAMEDAY_ID = re.compile(r"/gameday/(\d+)")
 # "1. [J Peña](url) (R) SS"  and the same line with the link already stripped.
 _HITTER = re.compile(
     r"^(?P<order>\d{1,2})\.\s*(?P<name>.+?)\s*\((?P<bats>[RLS])\)\s*(?P<pos>[A-Z0-9/]{1,4})\s*$")
+# R429. The third mlb.com render drops the order number ("B Rice (L) DH"). It has to start
+# with a letter, so a numbered row never matches here, and it is only read after a
+# `<TEAM> Lineup` header (see `parse_paste`): the order is the row's position in its block.
+_HITTER_UNNUMBERED = re.compile(
+    r"^(?P<name>[^\W\d_].*?)\s*\((?P<bats>[RLS])\)\s*(?P<pos>[A-Z0-9/]{1,4})\s*$")
 _TEAM_HEADER = re.compile(r"^(?P<team>[A-Z]{2,4})\s+Lineup\s*$")
 _HAND = re.compile(r"^(?P<hand>[RL])HP\s*$")
 # R117. The SAME fact with the statline appended on one line:
@@ -215,6 +220,11 @@ class PastedGame:
     away_pitcher: Optional[PastedPitcher] = None
     home_pitcher: Optional[PastedPitcher] = None
     warnings: List[str] = field(default_factory=list)
+    # R429. Name-shaped lines dropped after the first lineup header, so a render the
+    # parser does not read is a list a blocker can name, not a silent absence.
+    unread: List[str] = field(default_factory=list)
+    # R429. True when the hitters carried no order number and the order is their position.
+    positional_orders: bool = False
 
     @property
     def game_id(self) -> str:
@@ -250,6 +260,30 @@ def _club_names(line: str) -> Optional[Tuple[str, str]]:
     if not away or not home or any(ch.isdigit() for ch in away + home):
         return None
     return away, home
+
+
+def _join_split_matchups(lines: Sequence[str]) -> List[str]:
+    """``Twins`` / ``@`` / ``Giants`` on three lines -> ``Twins@Giants`` on one (R429).
+
+    The third mlb.com render splits the matchup, so `_club_names` never fired, no game
+    opened and the whole paste parsed as zero games. The middle line has to be exactly
+    ``@``; blank lines are skipped when looking for the three, and the two lines that
+    were absorbed are blanked, not removed, so the line count and order are unchanged.
+    """
+    out = list(lines)
+    seen = [k for k, text in enumerate(out) if text]
+    at = 0
+    while at + 2 < len(seen):
+        first, middle, last = seen[at], seen[at + 1], seen[at + 2]
+        if (_strip_links(out[middle])[0] == "@" and "@" not in out[first]
+                and "@" not in out[last]
+                and _club_names(f"{out[first]}@{out[last]}") is not None):
+            out[first] = f"{out[first]}@{out[last]}"
+            out[middle] = out[last] = ""
+            at += 3
+        else:
+            at += 1
+    return out
 
 
 def _match_hand(text: str) -> Optional[str]:
@@ -324,28 +358,74 @@ def parse_paste(text: str) -> Tuple[List[PastedGame], List[str]]:
     pitchers: List[Optional[PastedPitcher]] = []
     pending_name: Optional[Tuple[str, Optional[str]]] = None
     seen_clock = False
+    # R429. Consecutive hitter rows that carry no order number, with the line each came
+    # from. They become blocks when the run ends (`_end_run`), because where one side
+    # stops and the next starts is only known once the whole run has been seen.
+    run: List[Tuple[PastedPlayer, str]] = []
 
     def _flush_pending() -> None:
         """The held line was never promoted to a pitcher, so it was the venue."""
         nonlocal pending_name
         if pending_name is None:
             return
-        if current is not None and seen_clock and not current.venue:
+        if current is not None and headers:
+            # R429. After a lineup header a name-shaped line is never the venue (that
+            # sits above the pitchers). It is a line the parser dropped, and the
+            # blocker for an unread render has to be able to name it.
+            current.unread.append(pending_name[0])
+        elif current is not None and seen_clock and not current.venue:
             current.venue = pending_name[0]
         pending_name = None
+
+    def _end_run() -> None:
+        """Turn the open run of unnumbered hitter rows into lineup blocks (R429).
+
+        Order is position in the block. One block when the run is at most nine rows
+        (an unposted side is a `TBD` row, which ends the run on its own); two blocks of
+        nine when it is exactly eighteen, because both sides posted and no separator
+        survived the paste. Any other length cannot say where the first side ends:
+        nothing is attached, the rows go to ``unread`` and the game says so. Guessing
+        would hang a hitter on the wrong team, which is worse than no lineup.
+        """
+        nonlocal run
+        if not run or current is None:
+            run = []
+            return
+        rows, run = run, []
+        if len(rows) == 2 * POSTED_LINEUP_SLOTS:
+            groups = [rows[:POSTED_LINEUP_SLOTS], rows[POSTED_LINEUP_SLOTS:]]
+        elif len(rows) <= POSTED_LINEUP_SLOTS:
+            groups = [rows]
+        else:
+            current.unread.extend(text for _, text in rows)
+            current.warnings.append(
+                f"{len(rows)} hitter rows with no order number ran together under the "
+                f"lineup headers, and a run that is neither one side (at most "
+                f"{POSTED_LINEUP_SLOTS}) nor two full sides ({2 * POSTED_LINEUP_SLOTS}) "
+                f"cannot say where the first side ends; none are attached rather than "
+                f"risk a hitter on the wrong team")
+            return
+        for group in groups:
+            for slot, (player, _) in enumerate(group, start=1):
+                player.order = slot
+            blocks.append([player for player, _ in group])
+        current.positional_orders = True
 
     def _close() -> None:
         nonlocal current, headers, blocks, pitchers, seen_clock
         if current is None:
             return
+        _end_run()
         _flush_pending()
         _assign(current, headers, blocks, pitchers, seen_clock)
         games.append(current)
         current, headers, blocks, pitchers = None, [], [], []
         seen_clock = False
 
-    for raw in str(text or "").splitlines():
-        line = raw.strip()
+    # R429. A blank line is NOT a separator here: the third render's layout between the
+    # two lineup blocks is not known, so the rule that holds under any of them is the
+    # one `_end_run` states (a run of at most nine, or exactly eighteen).
+    for line in _join_split_matchups([raw.strip() for raw in str(text or "").splitlines()]):
         if not line:
             continue
 
@@ -358,6 +438,7 @@ def parse_paste(text: str) -> Tuple[List[PastedGame], List[str]]:
             continue
 
         if "/gameday/" in line:
+            _end_run()
             found = _GAMEDAY_ID.search(line)
             if found:
                 current.gameday_id = found.group(1)
@@ -365,11 +446,19 @@ def parse_paste(text: str) -> Tuple[List[PastedGame], List[str]]:
 
         header = _TEAM_HEADER.match(line)
         if header:
+            _end_run()
             _flush_pending()
             headers.append(header.group("team").upper())
             continue
 
         stripped, ids = _strip_links(line)
+
+        # R429. Only after a header: hitters come after the two headers in every render.
+        unnumbered = _HITTER_UNNUMBERED.match(stripped) if headers else None
+        if unnumbered is not None and unnumbered.group("pos") not in HITTER_POSITIONS:
+            unnumbered = None
+        if unnumbered is None:
+            _end_run()
 
         hitter = _HITTER.match(stripped)
         if hitter and hitter.group("pos") in HITTER_POSITIONS:
@@ -394,6 +483,26 @@ def parse_paste(text: str) -> Tuple[List[PastedGame], List[str]]:
             _flush_pending()
             if int(slot_tbd.group("order")) == 1 or not blocks:
                 blocks.append([])
+            continue
+
+        # R429. The third render marks an unposted side with a bare "TBD" under the
+        # headers, where the second used "1. TBD". Same fact, same empty block. Before
+        # any header the bare form is still a probable's slot (the branch further down),
+        # and it was reading the lineup-section one as a third pitcher.
+        if headers and _BARE_TBD.match(stripped):
+            _flush_pending()
+            blocks.append([])
+            continue
+
+        if unnumbered is not None:
+            _flush_pending()
+            run.append((PastedPlayer(
+                order=0,
+                display_name=unnumbered.group("name").strip(),
+                mlbam_id=ids[0] if ids else None,
+                bat_side=unnumbered.group("bats").upper(),
+                position=unnumbered.group("pos").upper(),
+            ), stripped))
             continue
 
         hand = _match_hand(stripped)
@@ -793,6 +902,16 @@ def resolve_paste_to_feed(
 
     overrides = dict(resolve_overrides or {})
     games, warnings = parse_paste(text)
+    blockers: List[str] = []
+    if not games and str(text or "").strip():
+        # R429. Zero games out of a paste that is not empty is a render the parser does
+        # not read, and it used to exit 0 with an empty feed: the build then took every
+        # side as unposted and the paste's handedness never reached F4.
+        shown = [ln.strip() for ln in str(text).splitlines() if ln.strip()][:3]
+        blockers.append(
+            f"0 games parsed from a paste of {len(str(text).splitlines())} line(s): no "
+            f"matchup line was read. A matchup is 'Club@Club' on one line or 'Club', "
+            f"'@', 'Club' on three. The paste opens {shown}")
     salary_players = list(parse_dk_salary_csv(str(salary_csv)))
     hitter_index = _index_salary(salary_players, pitchers=False)
     pitcher_index = _index_salary(salary_players, pitchers=True)
@@ -803,7 +922,6 @@ def resolve_paste_to_feed(
     salary_game_ids = set(start_by_game)
     dk_starters = _dk_declared_starters(salary_players)
 
-    blockers: List[str] = []
     unrostered: List[Dict[str, str]] = []
     feed_games: List[Dict[str, Any]] = []
     # R58(a): resolved up front, because whether a matchup's legs are separable
@@ -818,6 +936,8 @@ def resolve_paste_to_feed(
     # parser does not read shows as a count and not as DK-backfilled names.
     sides_used = 0
     no_pasted_probable: List[str] = []
+    # R429. Games whose hitters carried no order number, so the order is their position.
+    positional_games: List[str] = []
 
     for game in games:
         if not game.away_team or not game.home_team:
@@ -835,6 +955,22 @@ def resolve_paste_to_feed(
             continue
         if id(game) not in leg_start_by_game:
             # _leg_starts blocked this matchup as inseparable; it already said so.
+            continue
+        if (not game.away_lineup and not game.home_lineup
+                and len(game.unread) >= POSTED_LINEUP_SLOTS):
+            # R429. Both headers read, no hitter attached, and at least a posted side's
+            # worth of name-shaped lines were dropped after them: a lineup render the
+            # parser does not know. The probables may have read fine, which is exactly
+            # why this passed: F4's SP term lived and its platoon term (bat_side) did
+            # not. Nine is the floor so a game both sides have not posted, with one
+            # stray line of page decoration, does not block; a blocker has no bypass.
+            shown = game.unread[:5]
+            blockers.append(
+                f"{game_id}: both '<TEAM> Lineup' headers were read and no hitter was, "
+                f"but {len(game.unread)} name-shaped line(s) follow them and were "
+                f"dropped (first {len(shown)}: {shown}). That is a lineup render this "
+                f"parser does not read, so nothing from this game is used; hitters are "
+                f"read as '<order>. Name (R) POS' or 'Name (R) POS'")
             continue
         start = leg_start_by_game[id(game)]
         # The single-leg cross-check is a wrong-slate detector. On a doubleheader
@@ -976,6 +1112,8 @@ def resolve_paste_to_feed(
                 "source": "operator_paste",
             }
 
+        if game.positional_orders:
+            positional_games.append(game_id)
         feed_games.append({
             "game_pk": int(game.gameday_id) if (game.gameday_id or "").isdigit() else None,
             "game_date_utc": start.astimezone(_utc()).isoformat().replace("+00:00", "Z"),
@@ -1028,6 +1166,9 @@ def resolve_paste_to_feed(
         "dk_declared_probables": dk_probables,
         # R189(3). Per side: a probable the paste named, and the sides it did not
         # (a bare TBD, or a render the parser could not read; the warnings say which).
+        # R429. DK's Starting column still outranks the paste for order (R143); this only
+        # says which games' paste orders were read by position and not printed.
+        "games_with_positional_orders": sorted(positional_games),
         "probables_pasted": sides_used - len(no_pasted_probable),
         "sides_used": sides_used,
         "sides_without_pasted_probable": sorted(no_pasted_probable),

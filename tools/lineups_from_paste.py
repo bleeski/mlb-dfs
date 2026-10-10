@@ -24,11 +24,19 @@ Usage:
 
 Exit 0 clean, 2 on any blocker, 3 on IO. A blocker never writes the feed: a
 half-resolved lineup is the pool reduction CLAUDE.md forbids, and it would
-arrive looking like a posted partial. Three things block. A name that is
+arrive looking like a posted partial. Five things block. A name that is
 AMBIGUOUS or UNMATCHED, always. A side or a slate where too much of the paste is
 ABSENT FROM THE DK POOL, because in bulk that is one wrong-pairing fact rather
 than N call-ups; one absent name on its own is reported and shipped, since DK
-owns eligibility. Nothing else.
+owns eligibility. A non-empty paste that parses to ZERO games (R429). A game on
+the slate whose two lineup headers were read and no hitter was, while a posted
+side's worth of name-shaped lines were dropped after them (R429): a render this
+parser does not know. Nothing else.
+
+Three mlb.com renders are read. Matchup on one line (`Astros@Angels`) or on three
+(`Twins` / `@` / `Giants`); hitters numbered (`1. J Peña (R) SS`) or not
+(`B Rice (L) DH`, where the order is the row's place in its block); an unposted
+side as `1. TBD` or a bare `TBD` under the headers.
 
 Nothing here fetches anything, and nothing here corrects the paste against a
 real-world roster. If the paste and the salary file disagree about a player's
@@ -249,6 +257,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
               f"{report['sides_used']} side(s)"
               + (f"; none for {', '.join(report['sides_without_pasted_probable'])}"
                  if report["sides_without_pasted_probable"] else ""))
+        # R429: the third render prints no order number, so the order is the row's place.
+        if report["games_with_positional_orders"]:
+            print("batting orders read by position, the paste printed no order numbers: "
+                  + ", ".join(report["games_with_positional_orders"])
+                  + " (DK's Starting column outranks them wherever it posts a side)")
         for row in report["partial_teams"]:
             print(f"PARTIAL  {row['team']} {row['hitters_posted']}/9 "
                   f"({row['reason']}) -- projected, not confirmed")
