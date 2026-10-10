@@ -1746,7 +1746,9 @@ def _untouchable_cap_conflicts(
         )
         if any(line.startswith("max_shared_players: entries ") for line in lines):
             lines.append(
-                "For an overlapping pair, authorizing either row of it clears it."
+                "For an overlapping pair, authorizing a row of it that still has an "
+                "unlocked slot clears it; a row whose every game has started cannot "
+                "be changed, and if both are, only the cap value remains."
             )
     if duplicate_lines:
         lines.extend(duplicate_lines)
@@ -1754,7 +1756,8 @@ def _untouchable_cap_conflicts(
             "F-3 is the operator rule that one lineup never sits in two entries "
             "of one contest, and it is never relaxed. Change one row of each "
             "such contest so the solve can replace it: authorize it with "
-            "--entry-ids on a late swap, or blank it on an initial build."
+            "--entry-ids on a late swap (a row whose every game has started "
+            "cannot be changed), or blank it on an initial build."
         )
     return lines
 

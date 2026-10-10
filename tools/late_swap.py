@@ -1141,15 +1141,16 @@ def ownership_view_lines(projections, status: dict, as_of, parent_rosters: dict,
         st = (status.get("status_by_player_id") or {}).get(pid)
         return st is not None and not st.is_locked(as_of)
 
-    rosters = [list(r) for r in (parent_rosters or {}).values()]
+    rosters = [list(r) for r in (parent_rosters or {}).values() if len(r) == 10]
     held = Counter(pid for roster in rosters for pid in roster)
+    limit = max(1, int(limit))
     chalk = sorted((pid for pid, t in tier.items()
                     if t == "High" and held.get(pid) and unlocked(pid)),
                    key=lambda pid: (-held[pid], -own.get(pid, 0.0), by_id[pid]["Name"]))
     if not chalk:
         lines.append("  no unlocked High-tier player is held by the parent file")
         return lines
-    for pid in chalk[:max(1, int(limit))]:
+    for pid in chalk[:limit]:
         slots = Counter(roster.index(pid) for roster in rosters
                         if pid in roster and len(roster) == 10)
         alts = Counter()
@@ -1989,6 +1990,18 @@ def main() -> int:
     # supplied one, so a Double Up and a satellite were refined on the same
     # ceiling-max objective. Resolve identity the way the build does.
     reserved_rows = list(parse_dk_entry_rows(args.parent_entries))
+    # R68(b), found by the landing review. An authorized Entry ID that is in no row of
+    # the parent file (`--entry-ids 9999`, `7001 7002` with a space, `7001;7002`) was
+    # the same ValueError traceback at exit 1 out of `build_entry_requirements`,
+    # after the pool and the projection frame were built. The rows are parsed here,
+    # so it is refused here, in the house style of the other bad flags.
+    if authorized:
+        unknown = sorted(set(authorized) - {str(r.entry_id) for r in reserved_rows})
+        if unknown:
+            print(f"--entry-ids names Entry ID(s) that are in no row of "
+                  f"{args.parent_entries}: {unknown}. Nothing was swapped.",
+                  file=sys.stderr)
+            return 4
     postures = _resolve_contest_postures(
         reserved_rows, _parse_postures(args.postures), None)
     unresolved = unresolved_contest_blockers(postures)
@@ -2276,13 +2289,14 @@ def main() -> int:
         excludes = [p for p in all_ids
                     if team_by_id.get(p) in excluded_teams and p not in current]
         # R284. The four first, exactly the call this loop always made, then the
-        # five only while the slicing budget has not run out: `_slice_budget()`
-        # floors at one second, so an unconditional second call would add a
-        # floor per pinned entry beyond --budget. `extend_bank` relaxes the size
-        # to the entry's free hitter slots itself (a second size that relaxes to
-        # the first's is the same bucket, a no-op).
+        # five only while a full second of the slicing budget is left:
+        # `_slice_budget()` floors at one second, so a second call started with
+        # less would run past --budget (and an unconditional one would add a floor
+        # per pinned entry). `extend_bank` relaxes the size to the entry's free
+        # hitter slots itself (a second size that relaxes to the first's is the
+        # same bucket, a no-op).
         for p_idx, size in enumerate(reversed(bank_sizes)):
-            if p_idx and slice_deadline - time.monotonic() <= 0:
+            if p_idx and slice_deadline - time.monotonic() < 1.0:
                 break
             slice_report = extend_bank(
                 cache, projections, time_budget_s=_slice_budget(),

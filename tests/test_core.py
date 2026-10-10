@@ -49774,22 +49774,28 @@ class LateSwapRailsTests(unittest.TestCase):
         h._brief()
         return h
 
-    def _swap(self, *extra, clock=None):
+    def _swap(self, *extra, clock=None, leave=None):
         """A real swap with a spy on `extend_bank` (delegating to the real one) and on
         the two control resolvers. ``clock`` is a dict whose "t" replaces
-        `late_swap.time.monotonic`, advanced 10000s after each pinned call."""
+        `late_swap.time.monotonic`; after each pinned call it is advanced 10000s, or,
+        with ``leave``, set so that many seconds of the 20s `--budget` remain."""
         h = self._h()
-        calls, events = [], []
+        calls, events, started = [], [], {}
         real_extend = h.ls.extend_bank
 
         def spy_extend(cache, projections, **kw):
             events.append("bank")
+            if clock is not None:
+                started.setdefault("t0", clock["t"])
             calls.append({"stack_min": kw.get("stack_min", "<default>"),
                           "pinned": tuple(sorted(kw.get("locked_slot_assignments") or {})),
                           "budget": float(kw.get("time_budget_s"))})
             result = real_extend(cache, projections, **kw)
             if clock is not None and kw.get("locked_slot_assignments"):
-                clock["t"] += 10000.0
+                if leave is None:
+                    clock["t"] += 10000.0
+                else:
+                    clock["t"] = started["t0"] + 20.0 - leave
             return result
 
         h.ls.extend_bank = spy_extend
@@ -49847,6 +49853,18 @@ class LateSwapRailsTests(unittest.TestCase):
         self.assertEqual(code, 0, err[-1500:])
         pinned = [c["stack_min"] for c in calls if c["pinned"]]
         self.assertEqual(pinned, [4, 4, 4])
+
+    def test_the_pinned_five_needs_a_whole_second_left_not_just_a_clock_that_has_not_passed(self):
+        """`_slice_budget()` floors at one second, so a five started with 0.5s left would
+        run past --budget. With 1.5s left it runs."""
+        clock = {"t": time.monotonic()}
+        code, calls, _, _, err = self._swap(*self._override(self.QUOTA), clock=clock, leave=0.5)
+        self.assertEqual(code, 0, err[-1500:])
+        self.assertEqual([c["stack_min"] for c in calls if c["pinned"]], [4, 4, 4])
+        clock = {"t": time.monotonic()}
+        code, calls, _, _, err = self._swap(*self._override(self.QUOTA), clock=clock, leave=1.5)
+        self.assertEqual(code, 0, err[-1500:])
+        self.assertEqual([c["stack_min"] for c in calls if c["pinned"]], [4, 5, 4, 5, 4, 5])
 
     def test_without_a_request_every_call_asks_the_default_and_nothing_new_prints(self):
         code, calls, _, out, err = self._swap()
@@ -50008,6 +50026,22 @@ class LateSwapRailsTests(unittest.TestCase):
                 self.assertNotIn("Traceback", err)
                 self.assertNotIn("salary:", out, "refused before the inputs were resolved")
 
+    def test_an_entry_id_in_no_row_is_refused_at_exit_4_not_a_traceback(self):
+        """Found by the landing review: `5001,` cleaned to `['5001']` and still raised
+        when 5001 is in no row. Any id the parent file does not hold is exit 4 now,
+        before the pool and the frame are built, under --dry-run too."""
+        for flag, extra in (("9999", ()), ("7001 7002", ()), ("7001;7002", ()),
+                            ("7001,9999", ()), ("9999", ("--dry-run",))):
+            with self.subTest(flag=flag, extra=extra):
+                code, out, err = self._swap_plain("--entry-ids", flag, *extra)
+                self.assertEqual(code, 4, err[-800:])
+                self.assertIn("that are in no row of", err)
+                self.assertIn("Nothing was swapped.", err)
+                self.assertNotIn("Traceback", err)
+                self.assertNotIn("projection frame:", out, "refused before the frame was built")
+        code, out, err = self._swap_plain("--entry-ids", "7001,7002")
+        self.assertEqual(code, 0, err[-1500:])
+
     def test_an_empty_entry_ids_flag_keeps_meaning_every_reserved_entry(self):
         code, out, err = self._swap_plain("--entry-ids", "")
         self.assertEqual(code, 0, err[-1500:])
@@ -50118,9 +50152,17 @@ class LateSwapRailsTests(unittest.TestCase):
         self.assertEqual(lines[-1], "  no unlocked High-tier player is held by the parent file")
 
     def test_the_listing_is_capped_and_says_how_many_more(self):
-        _, lines = self._view(limit=1)
-        self.assertEqual(len([l for l in lines if l.startswith("  AAA")]), 1, lines)
-        self.assertEqual(lines[-1], "  and 1 more unlocked High-tier player(s) held")
+        for limit in (1, 0):
+            with self.subTest(limit=limit):
+                _, lines = self._view(limit=limit)
+                self.assertEqual(len([l for l in lines if l.startswith("  AAA")]), 1, lines)
+                self.assertEqual(lines[-1], "  and 1 more unlocked High-tier player(s) held")
+
+    def test_a_blank_or_partial_parent_row_is_not_an_entry_in_the_denominator(self):
+        parent = {"E1": self._roster("50010"), "E2": [], "E3": self._roster("50010")[:9]}
+        _, lines = self._view(parent_rosters=parent)
+        listed = next(l for l in lines if l.startswith("  AAA H10"))
+        self.assertIn("held in 1 of 1 parent entries", listed)
 
     def test_a_real_swap_prints_the_view_only_with_the_flag_and_changes_nothing_else(self):
         code, out, err = self._swap_plain("--ownership-report")
@@ -50211,9 +50253,11 @@ class FixedPairConflictTests(unittest.TestCase):
     def _validate(self, entries, controls):
         return validate_dk_entries_file(entries, self.salary, portfolio_controls=controls)
 
-    def _swap(self, current, authorized, controls, candidates):
-        statuses = {pid: PlayerLineupStatus(pid, pid, "AAA", "AAA@BBB",
-                                            NOW + timedelta(hours=2), "Confirmed_Starter")
+    def _swap(self, current, authorized, controls, candidates, locked=()):
+        statuses = {pid: PlayerLineupStatus(
+                        pid, pid, "AAA", "AAA@BBB",
+                        NOW - timedelta(hours=1) if pid in locked else NOW + timedelta(hours=2),
+                        "Confirmed_Starter")
                     for pid in self.ids.values()}
         parent = self._parent()
         return run_late_swap(
@@ -50256,7 +50300,8 @@ class FixedPairConflictTests(unittest.TestCase):
             "max_shared_players: entries 5001 and 5002, rows this solve cannot "
             "change, already share 9 players, against a cap of 8")
         self.assertIn("authorize", " ".join(result["errors"]))
-        self.assertIn("authorizing either row of it clears it", result["errors"][-1])
+        self.assertIn("authorizing a row of it that still has an unlocked slot clears it",
+                      result["errors"][-1])
         # what the validator says about the same file: the refusal this replaces
         self.assertIn("entries 5001/5002 share 9>8", self._validate(entries, controls)["errors"])
 
@@ -50410,6 +50455,21 @@ class FixedPairConflictTests(unittest.TestCase):
         self.assertTrue(cleared["selection_certified"])
         validated = self._validate(Path(cleared["output_path"]), {"max_shared_players": 8})
         self.assertTrue(validated["passed"], validated["errors"])
+
+    def test_authorizing_a_fully_locked_row_does_not_clear_the_pair_and_the_message_says_so(self):
+        """`build_entry_requirements` skips a row whose every game has started even when
+        it is authorized, so it stays frozen and the refusal stands. The reviewer's
+        catch: the trailer used to promise that authorizing either row clears it."""
+        current = self._entries([self.r1, self.r1_nine, self.r2], ["900"] * 3,
+                                "DKEntries_current.csv")
+        refused, _ = self._swap(current, ["5002", "5003"], {"max_shared_players": 8},
+                                [candidate("C", self.r2, 98, "CCC"),
+                                 candidate("D", self.r3, 97, "CCC")],
+                                locked=set(self.r1_nine))
+        self.assertFalse(refused["passed"])
+        errors = " ".join(refused["errors"])
+        self.assertIn("max_shared_players: entries 5001 and 5002", errors)
+        self.assertIn("a row whose every game has started cannot be changed", errors)
 
     def test_an_initial_build_around_a_held_pair_over_the_cap_still_ships_review_grade(self):
         """The regression guard (R386, delivery first). The allocator must not refuse

@@ -129,7 +129,7 @@ authorizes every reserved entry in the file.
 The swap builds one general bank, then one targeted slice per pinned entry, each
 passing an `excludes` list computed from that entry's own roster. The general
 bank and every targeted slice survive each other regardless of scope (R101), so
-scoping decides what may move, not how big the bank is. The flag is split on commas and each token stripped, so `7001,` is `7001`; a value that names no id (`,`) is exit 4 before anything is read, and an empty `--entry-ids ""` is the default, every reserved entry (R68).
+scoping decides what may move, not how big the bank is. The flag is split on commas and each token stripped, so `7001,` is `7001`; a value that names no id (`,`) is exit 4 before anything is read, an id that is in no row of the parent file (`9999`, or `7001 7002` with a space) is exit 4 before the pool is built, and an empty `--entry-ids ""` is the default, every reserved entry (R68).
 
 - **Name the entries you actually want to change, for the ordinary reason.**
   A tight `--entry-ids` limits what may move in the file.
@@ -173,7 +173,9 @@ recorded ones by default) before the first slice and asks the bank for what they
 allocator: `resolve_bank_stack_request` gives `[5, 4]` when a five-stack floor or quota is
 in force and `[4]` otherwise. The general slice walks the sizes five first at the build
 door's clamped budget share (the four keeps at least a quarter); each pinned entry gets the
-four as always and then the five only while `--budget` has time left. With no five
+four as always and then the five only while a full second of `--budget` is left (the general
+slice drains a budget on a large grid, so on a big slate the pinned five rarely runs; the pinned
+entries then rest on the general five-stack candidates and the four bucket's own fives). With no five
 requested the calls are the ones this always made, and a line `bank stack request (R284)`
 prints only when a five is asked for. A swap never reuses the build's stored bank (its
 frame's digest differs), so without this a five-stack parent was refined by a bank built
