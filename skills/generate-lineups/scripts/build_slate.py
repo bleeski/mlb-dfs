@@ -5812,6 +5812,24 @@ def resolve_captain_prior(args, slate_tag: str, df) -> tuple[dict, dict]:
                     "optimistic by a large factor and R225 comes first. Read "
                     "this as an ORDERING over a labeled prior and nothing more."),
     }
+    # R495. The six-slot roster market the same file carries, through the same
+    # engine join, for the delivery record's flex prior and nothing else. A
+    # file without it, or with a malformed one, costs that one record field and
+    # never the build, so every failure is caught here (a block of the wrong
+    # type raises AttributeError, not CaptainPriorError) and the brief above is
+    # unchanged. `source` is the file's NAME: the reason lands in a tracked
+    # record, and a host path there differs from machine to machine.
+    try:
+        roster = _st.captain_prior_by_person(
+            df, payload, resolved["archetype"], source=Path(str(path)).name,
+            market="showdown_roster")
+        resolved["roster_own_pct_by_player_key"] = roster["own_pct_by_player_key"]
+        resolved["roster_market"] = {"applied": True,
+                                     "persons_matched": roster["persons_matched"],
+                                     "budget_check": roster["budget_check"]}
+    except Exception as exc:  # noqa: BLE001 - a record field never costs the build
+        resolved["roster_market"] = {"applied": False,
+                                     "reason": f"{type(exc).__name__}: {exc}"}
     return resolved, brief
 
 
@@ -6235,6 +6253,84 @@ def _showdown_entries_in(path: Path) -> int:
     return len(parse_dk_entry_rows(path))
 
 
+def showdown_build_id(date: str, slate_tag: str, salary: Path, entries: Path) -> str:
+    """R495. One identity per Showdown build's INPUTS: ``sd_`` and 12 hex of a
+    sha256 over the date, the slate tag, and the salary and DKEntries template
+    bytes' own sha256.
+
+    Content-keyed like R403's run-less record name, not minted from a clock: the
+    baseline record is keyed on its bytes, so a re-run whose baseline bytes match
+    an earlier run's rewrites that record, and a minted id would leave the
+    earlier ladder record naming a build no baseline carries. Two builds over the
+    same inputs with different flags share the id; their records' sha256 and
+    ``recorded_utc`` tell them apart."""
+    def digest(path: Path) -> str:
+        return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+    key = "|".join([str(date), str(slate_tag), digest(salary), digest(entries)])
+    return "sd_" + hashlib.sha256(key.encode("utf-8")).hexdigest()[:12]
+
+
+def showdown_record_basis(build_id: str, salary: Path, basis: str, sides: list,
+                          captain_prior: dict, captain_prior_brief: dict) -> dict:
+    """R495. What the baseline and ladder records of one Showdown build share:
+    its ``build_id``, the salary file the players map is read from, the pool
+    basis and posted sides, and the two priors' provenance."""
+    roster_market = dict(captain_prior.get("roster_market") or {})
+    applied = bool(captain_prior_brief.get("applied"))
+    source = (Path(str(captain_prior_brief.get("source"))).name
+              if captain_prior_brief.get("source") else None)
+    return {
+        "build_id": build_id,
+        "salary_csv": str(salary),
+        "pool": {"basis": basis,
+                 "posted_sides": sorted({str(s.get("team") or "") for s in sides
+                                         if s.get("decided")})},
+        "priors": {
+            "captain": ({"applied": True, "market": "captain",
+                         "archetype": captain_prior_brief.get("archetype"),
+                         "source": source,
+                         "sha256": captain_prior_brief.get("sha256")}
+                        if applied else
+                        {"applied": False,
+                         "reason": captain_prior_brief.get("reason")}),
+            "flex": ({"applied": bool(roster_market.get("applied")),
+                      "market": "showdown_roster",
+                      "summed_over": "the five UTIL persons",
+                      **({"reason": roster_market["reason"]}
+                         if roster_market.get("reason") else {})}
+                     if applied else
+                     {"applied": False,
+                      "reason": captain_prior_brief.get("reason")}),
+        },
+        "captain_own": captain_prior.get("own_pct_by_player_key") or None,
+        "roster_own": captain_prior.get("roster_own_pct_by_player_key") or None,
+    }
+
+
+def showdown_record_prediction(record_basis, frame, lineups, rows,
+                               theses=None) -> dict:
+    """R495. The payload a Showdown writer hands `record_delivery`: per entry id,
+    what this build predicted for the lineup it put there. Never raises: any
+    failure returns the shared basis with an ``error`` and the record says so,
+    because it is computed beside a delivery that must not depend on it."""
+    basis = record_basis if isinstance(record_basis, dict) else {}
+    out = {key: basis[key] for key in ("build_id", "build_id_error", "salary_csv",
+                                       "pool", "priors") if key in basis}
+    if basis.get("error"):
+        out["error"] = basis["error"]
+        return out
+    try:
+        from mlb_engine.optimize import showdown_theses as _st
+        predicted = _st.record_predictions(
+            frame, lineups, theses, captain_own=basis.get("captain_own"),
+            roster_own=basis.get("roster_own"))
+        out["by_entry"] = {str(row["entry_id"]): pred
+                           for row, pred in zip(rows, predicted) if pred}
+    except Exception as exc:  # noqa: BLE001 - bookkeeping never costs the file
+        out["error"] = f"{type(exc).__name__}: {exc}"
+    return out
+
+
 def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[int, dict]:
     from mlb_engine.optimize import showdown as sd
     from mlb_engine.optimize import showdown_theses as st
@@ -6492,6 +6588,30 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                                  supplied_read=supplied_read,
                                  f1_by_player_key=f1_by_player_key,
                                  f1_report=f1_report)
+    # R495. One identity and one record basis for this build's two writers,
+    # derived before the baseline so both records carry the same. Bookkeeping:
+    # a failure in either step is NAMED in the records and never costs the
+    # build. Two steps, so an id that cannot be derived keeps the priors and
+    # the pool, and a basis that cannot be built reads `unreadable`, never a
+    # `resolved` record whose nulls would read as unscored people.
+    sd_build_id, sd_build_id_error = None, None
+    try:
+        sd_build_id = showdown_build_id(args.date, slate_tag_suffix(salary).lstrip("_"),
+                                        salary, entries)
+    except Exception as exc:  # noqa: BLE001 - bookkeeping never costs the file
+        sd_build_id_error = f"{type(exc).__name__}: {exc}"
+        print(f"showdown build_id not derived ({sd_build_id_error}); the delivery "
+              f"records carry build_id null and say why", file=sys.stderr)
+    try:
+        sd_record_basis = showdown_record_basis(sd_build_id, salary, basis, sides,
+                                                captain_prior, captain_prior_brief)
+        if sd_build_id_error:
+            sd_record_basis["build_id_error"] = sd_build_id_error
+    except Exception as exc:  # noqa: BLE001 - bookkeeping never costs the file
+        sd_record_basis = {"build_id": sd_build_id, "salary_csv": str(salary),
+                           "error": f"record basis: {type(exc).__name__}: {exc}"}
+        print(f"showdown record basis not built ({sd_record_basis['error']}); the "
+              f"delivery records read unreadable", file=sys.stderr)
     # R389(c), roadmap Session 12. Baseline first: a thesis-free points-max
     # file over every incomplete reserved row, checked on its exact bytes,
     # recorded in its own lineage and PRESENTED before the ladder, so a crash
@@ -6506,7 +6626,8 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
             showdown_baseline_deadline(args), share_cap=share_cap, cpt_cap=cpt_cap,
             player_cap_pct=player_cap_pct, cpt_per_contest=cpt_per_contest,
             captain_sleeve=captain_sleeve,
-            before="the thesis ladder" if use_ladder else "the points-max bank")
+            before="the thesis ladder" if use_ladder else "the points-max bank",
+            record_basis=sd_record_basis)
     else:
         _BASELINE.clear()
         _BASELINE.update({
@@ -6704,6 +6825,11 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         print(f"REPLAY: {provisional.name} is a verification file, not a delivery: "
               f"no manifest row, no staged salary, never promoted", file=sys.stderr)
     else:
+        # R495. Before the `try`, and never raising: the record's payload must
+        # not be able to cost this row or the promotion below (R96).
+        sd_prediction = showdown_record_prediction(
+            sd_record_basis, priced if use_ladder else df, bank, rows,
+            theses if use_ladder else None)
         try:
             record_delivery(
                 date=args.date, delivered_file=dest, hash_source=provisional,
@@ -6734,6 +6860,7 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                           "max_cpt_per_contest": cpt_per_contest},
                 relaxations=showdown_relaxation_counts(
                     solve_diag, cpt_diagnostics, ladder_meta),
+                prediction=sd_prediction,
             )
             # R96(4): a Showdown slate with no staged salary can only ever be mined
             # standings_only, which is how the 2026-08-06 SD contests were lost.
@@ -7016,6 +7143,8 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         "delivered_path": str(delivered),
         "delivered_path_repo": manifest_repo_relative(delivered),
         "delivered_sha256": manifest_sha256(delivered),
+        # R495. The id this build's baseline and ladder delivery records share.
+        "build_id": sd_build_id,
         # R96(2). A brief that cited `dest` while the bytes sat under
         # DO_NOT_UPLOAD_ would send the operator to a file that does not exist.
         "manifest_recorded": None if _REPLAY_BARRED else not manifest_error,
@@ -7591,7 +7720,8 @@ def publish_showdown_baseline(args, salary: Path, entries: Path, frame,
                               deadline: float, *, share_cap, cpt_cap,
                               player_cap_pct, cpt_per_contest,
                               captain_sleeve=None,
-                              before: str = "the thesis ladder") -> dict:
+                              before: str = "the thesis ladder",
+                              record_basis=None) -> dict:
     """R389(c), roadmap Session 12. Publish the Showdown baseline before the
     thesis ladder.
 
@@ -7611,13 +7741,18 @@ def publish_showdown_baseline(args, salary: Path, entries: Path, frame,
     errored are named records in `_BASELINE`, and the ladder runs exactly as it
     did before R389(c). Every value in the record is plain JSON, because
     `main()` writes the brief without a ``default``.
+
+    R495. ``record_basis`` is `showdown_record_basis`'s, shared with the ladder,
+    so this record's per-entry prediction (thesis ``points_max``) carries the
+    same ``build_id`` as the ladder's.
     """
     from mlb_engine.optimize import showdown as sd
     from mlb_engine.optimize import showdown_theses as st
 
     _BASELINE.clear()
     block: dict = {"status": "error", "date": args.date, "contest_type": "showdown",
-                   "lineage": "baseline"}
+                   "lineage": "baseline",
+                   "build_id": (record_basis or {}).get("build_id")}
 
     def _done() -> dict:
         _BASELINE.update(block)
@@ -7740,6 +7875,9 @@ def publish_showdown_baseline(args, salary: Path, entries: Path, frame,
             print(f"BASELINE (replay): {provisional.name} is a verification file, not "
                   f"a delivery: no manifest row, never promoted", file=sys.stderr)
         else:
+            # R495. Before the `try`, and never raising (the helper's contract).
+            baseline_prediction = showdown_record_prediction(record_basis, frame,
+                                                             bank, rows)
             try:
                 record_delivery(
                     date=args.date, delivered_file=dest, hash_source=provisional,
@@ -7757,7 +7895,7 @@ def publish_showdown_baseline(args, salary: Path, entries: Path, frame,
                            f"build's controls, published before {before}. "
                            f"Showdown ships review-grade; see CLAUDE.md."),
                     controls=controls, relaxations=block["relaxations"],
-                    lineage=BASELINE_LINEAGE)
+                    lineage=BASELINE_LINEAGE, prediction=baseline_prediction)
                 block["manifest_recorded"] = True
             except Exception as exc:  # noqa: BLE001 - bookkeeping never costs the file
                 block["manifest_recorded"] = False

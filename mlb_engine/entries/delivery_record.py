@@ -40,6 +40,14 @@ roster position, salary, game). Both are copied out of `runs/<run_id>/final/`
 and the run's salary snapshot, which die with the container. Measured at 20
 entries: see `RecordPredictionTests` for the bound.
 
+WHAT A SHOWDOWN RECORD CARRIES (R495). A Showdown build has no run folder, so
+`build_slate.py` hands its payload in through `record_delivery`. Per entry
+`prediction`: the `build_id` its baseline and ladder records share, the thesis
+template or `points_max`, the realized captain and its role, the team split,
+the Base sum with the captain at 1.5x and its rank in the build, and the
+captain-slot and roster priors or null; the record adds the pool basis and the
+same `players` map, read off the build's salary file.
+
 NEVER RAISES. This is bookkeeping running beside a certified build, the same
 contract `stage_salary_for_delivery` already keeps. A record that cannot be
 written must never be the reason a delivery fails; it reports and returns None.
@@ -465,11 +473,22 @@ def _run_final(run_id: str, root: Optional[Path]) -> Optional[Dict[str, Any]]:
     }
 
 
+def _players_from_salary(path: Path) -> Dict[str, list]:
+    """``{id: [name, team, roster_position, salary, game_info]}`` from one DK
+    salary export. R495 reads a Showdown file through it, where `Roster
+    Position` is CPT or UTIL, so both record kinds carry one shape."""
+    from mlb_engine.intake.slate_intake_manager import parse_dk_salary_csv
+    return {sp.player_id: [sp.name, sp.team,
+                           str(sp.raw.get("Roster Position") or "/".join(sp.positions)),
+                           int(sp.salary) if float(sp.salary).is_integer() else sp.salary,
+                           str(sp.raw.get("Game Info") or sp.game_info or "")]
+            for sp in parse_dk_salary_csv(str(path))}
+
+
 def _salary_players(run_id: str, root: Optional[Path]) -> Dict[str, list]:
     """``{id: [name, team, roster_position, salary, game_info]}`` from the run's
     salary snapshot. Snapshots keep their source basename (`DKSalaries_replay.csv`,
     `salary.csv`), so the file is found by its header among the manifest's inputs."""
-    from mlb_engine.intake.slate_intake_manager import parse_dk_salary_csv
     run_dir = _run_dir(run_id, root)
     inputs = _run_manifest(run_id, root).get("inputs") or {}
     for name in sorted(inputs):
@@ -482,11 +501,7 @@ def _salary_players(run_id: str, root: Optional[Path]) -> Dict[str, list]:
             continue
         if "Roster Position" not in header or "TeamAbbrev" not in header:
             continue
-        return {sp.player_id: [sp.name, sp.team,
-                               str(sp.raw.get("Roster Position") or "/".join(sp.positions)),
-                               int(sp.salary) if float(sp.salary).is_integer() else sp.salary,
-                               str(sp.raw.get("Game Info") or sp.game_info or "")]
-                for sp in parse_dk_salary_csv(str(path))}
+        return _players_from_salary(path)
     return {}
 
 
@@ -670,6 +685,104 @@ def classic_prediction(manifest_row: Mapping[str, Any], entries: Sequence[Mappin
             "prediction_source": source}
 
 
+SHOWDOWN_PREDICTION_LABEL = (
+    "what the Showdown build predicted for each lineup it chose, handed to the "
+    "record in process at delivery because a Showdown build has no run folder: "
+    "the thesis template (or points_max for the baseline and the points-max "
+    "bank), the realized captain and whether it is a pitcher or a hitter, the "
+    "team split, the Base sum with the captain at 1.5x and its rank in the "
+    "build, and the labeled captain-slot and six-slot roster priors or null. "
+    "build_id is one per build's inputs (date, slate tag, salary and template "
+    "bytes): the baseline and the ladder of a build share it, and two builds "
+    "over the same inputs share it too, told apart by their sha256 and "
+    "recorded_utc. Deterministic review proxies and labeled priors, never ROI, "
+    "a win rate or a probability")
+
+SHOWDOWN_RANK_BASIS = (
+    "rank_in_build orders this build's own lineups by base_sum descending, ties "
+    "by slot; slot is the lineup's 1-based place in the build (the ladder's "
+    "deal order or the bank's solve order), which is the order of the reserved "
+    "rows it filled")
+
+
+def showdown_prediction(payload: Optional[Mapping[str, Any]],
+                        entries: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
+    """R495. ``{"by_entry", "players", "pool", "prediction_source"}`` for a
+    Showdown record, from the build's in-process payload.
+
+    A filled entry takes the build's prediction for its entry id only when the
+    captain cell and the five UTIL cells (as a set) match the delivered roster,
+    so a prediction never describes a lineup that is not in the file. Two kinds
+    of null are listed apart, because only one is an alarm: a row the build did
+    not fill (a held complete row of the template) is ``held_entry_ids``; a row
+    whose build prediction names another roster is ``unmatched_entry_ids``. No
+    payload is ``not_supplied``; a payload the build could not assemble is
+    ``unreadable`` with its error; an id the build could not derive is null with
+    ``build_id_error``. Never raises; the players map is a separate step whose
+    failure (``players_error``) costs no prediction.
+    """
+    from mlb_engine.optimize.showdown_theses import RECORD_CEILING_BASIS
+    filled = [e for e in entries if e.get("filled")]
+    given = payload if isinstance(payload, Mapping) else None
+    source: Dict[str, Any] = {"build_id": (given or {}).get("build_id"),
+                              "filled": len(filled), "predicted": 0,
+                              "held_entry_ids": [],
+                              "unmatched_entry_ids": [], "players_missing": [],
+                              "priors": (given or {}).get("priors"),
+                              "ceiling_basis": RECORD_CEILING_BASIS,
+                              "rank_basis": SHOWDOWN_RANK_BASIS,
+                              "label": SHOWDOWN_PREDICTION_LABEL}
+    if (given or {}).get("build_id_error"):
+        source["build_id_error"] = str(given["build_id_error"])
+    by_entry: Dict[str, Any] = {str(e.get("entry_id") or ""): None for e in entries}
+    pool = None
+    try:
+        if given is None:
+            source["status"] = "not_supplied"
+        elif given.get("error"):
+            source["status"] = "unreadable"
+            source["error"] = str(given["error"])
+        else:
+            pool = dict(given.get("pool") or {}) or None
+            built = given.get("by_entry") or {}
+            for entry in filled:
+                entry_id = str(entry.get("entry_id") or "")
+                roster = [str(p) for p in entry.get("roster_ids") or []]
+                pred = built.get(entry_id)
+                if not isinstance(pred, Mapping):
+                    source["held_entry_ids"].append(entry_id)
+                    continue
+                built_roster = [str(p) for p in (pred.get("roster_ids") or [])]
+                if (roster and built_roster and built_roster[0] == roster[0]
+                        and sorted(built_roster[1:]) == sorted(roster[1:])):
+                    by_entry[entry_id] = {**{k: v for k, v in pred.items()
+                                             if k != "roster_ids"},
+                                          "build_id": source["build_id"]}
+                else:
+                    source["unmatched_entry_ids"].append(entry_id)
+            source["predicted"] = sum(1 for p in by_entry.values() if p)
+            source["status"] = (
+                "no_filled_entries" if not filled else
+                "unmatched" if not source["predicted"] else
+                "partial" if source["unmatched_entry_ids"] else "resolved")
+    except Exception as exc:  # noqa: BLE001 - bookkeeping never fails a delivery
+        source["status"] = "unreadable"
+        source["error"] = f"{type(exc).__name__}: {exc}"
+        by_entry = {str(e.get("entry_id") or ""): None for e in entries}
+    ids = sorted({str(p) for e in filled for p in e.get("roster_ids") or []})
+    players: Dict[str, list] = {}
+    try:
+        salary = (given or {}).get("salary_csv")
+        if salary:
+            players = {pid: facts for pid, facts in _players_from_salary(Path(salary)).items()
+                       if pid in ids}
+    except Exception as exc:  # noqa: BLE001
+        source["players_error"] = f"{type(exc).__name__}: {exc}"
+    source["players_missing"] = [pid for pid in ids if pid not in players]
+    return {"by_entry": by_entry, "players": dict(sorted(players.items())),
+            "pool": pool, "prediction_source": source}
+
+
 def write_delivery_record(*, date: str, manifest_row: Mapping[str, Any],
                           run_id: Optional[str] = None,
                           controls: Optional[Mapping[str, Any]] = None,
@@ -678,12 +791,16 @@ def write_delivery_record(*, date: str, manifest_row: Mapping[str, Any],
                           root: Optional[Path] = None,
                           extra: Optional[Mapping[str, Any]] = None,
                           entries_source: Optional[str | Path] = None,
+                          prediction: Optional[Mapping[str, Any]] = None,
                           ) -> Optional[Path]:
     """Write one delivery record. Returns its path, or None. Never raises.
 
     ``entries_source`` is the file holding the recorded bytes when that is not
     yet ``delivered_file`` (R387): ``record_delivery`` passes its
     ``hash_source``, the provisional file, on all three delivery paths.
+
+    ``prediction`` is a Showdown build's in-process payload (R495); a Classic
+    record reads its run folder instead (R494) and ignores it.
     """
     try:
         base = deliveries_dir(root) / str(date)
@@ -726,11 +843,18 @@ def write_delivery_record(*, date: str, manifest_row: Mapping[str, Any],
         name = record_name(str(manifest_row.get("slate_tag") or ""),
                            resolved_run, manifest_row.get("sha256"),
                            str(manifest_row.get("lineage") or ""))
-        if str(manifest_row.get("contest_type") or "").lower() == "classic":
-            # R494. Showdown's prediction is R495's, with its own fields.
+        contest_type = str(manifest_row.get("contest_type") or "").lower()
+        if contest_type == "classic":
             predicted = classic_prediction({**manifest_row, "run_id": resolved_run},
                                            entries, date=str(date),
                                            root=root, own_name=name)
+        elif contest_type == "showdown":
+            # R495. No run folder to read back: the build hands its payload in.
+            predicted = showdown_prediction(prediction, entries)
+            record["pool"] = predicted["pool"]
+        else:
+            predicted = None
+        if predicted is not None:
             for entry in entries:
                 entry["prediction"] = predicted["by_entry"].get(str(entry["entry_id"]))
             record["players"] = predicted["players"]

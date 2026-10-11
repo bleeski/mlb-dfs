@@ -5078,13 +5078,18 @@ class RecordPredictionTests(unittest.TestCase):
         self.assertIsInstance(after[-1]["entries"][0]["prediction"], dict)
 
     def test_a_showdown_record_gains_none_of_the_classic_fields(self):
-        """R495 gives Showdown its own prediction; this one leaves it alone."""
+        """R495 gave Showdown its own prediction (`showdown_prediction`, pinned in
+        `test_showdown.ShowdownRecordPredictionTests`). None of this one's
+        Classic fields reach it, and a delivery that hands it no payload records
+        every entry null and says so."""
         ids = self._salary()
         record = self._record(self._deliver([classic_entry("5001", "900", ids[:10])],
                                             contest_type="showdown"))
-        self.assertNotIn("prediction", record["entries"][0])
-        for key in ("players", "prediction_source", "extra"):
-            self.assertNotIn(key, record)
+        self.assertIsNone(record["entries"][0]["prediction"])
+        self.assertEqual(record["prediction_source"]["status"], "not_supplied")
+        for key in ("start_run_id", "runs_read", "hitter_roles_basis"):
+            self.assertNotIn(key, record["prediction_source"])
+        self.assertNotIn("extra", record)
 
     # ---- the size bound ----------------------------------------------------
 

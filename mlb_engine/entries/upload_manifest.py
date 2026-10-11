@@ -345,7 +345,8 @@ def _mirror_to_delivery_record(date: str, record: Mapping[str, Any],
                                entries_source: Optional[Path] = None,
                                market: Optional[Mapping[str, Any]] = None,
                                stack_sleeve: Optional[Mapping[str, Any]] = None,
-                               no_market_reason: str = "") -> None:
+                               no_market_reason: str = "",
+                               prediction: Optional[Mapping[str, Any]] = None) -> None:
     """Project this delivery into the TRACKED record (R369).
 
     Written from here rather than from the three delivery tools because this is
@@ -390,7 +391,7 @@ def _mirror_to_delivery_record(date: str, record: Mapping[str, Any],
                               run_id=record.get("run_id"), controls=controls,
                               relaxations=relaxations, egress=egress,
                               entries_source=entries_source,
-                              extra=extra or None)
+                              extra=extra or None, prediction=prediction)
     except Exception as exc:  # noqa: BLE001
         print(f"delivery_record: mirror skipped ({type(exc).__name__}: {exc})")
 
@@ -421,6 +422,7 @@ def record_delivery(
     market: Optional[Mapping[str, Any]] = None,
     repair_of: Optional[Mapping[str, Any]] = None,
     stack_sleeve: Optional[Mapping[str, Any]] = None,
+    prediction: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Append one delivery record and supersede any prior record for the same slate.
 
@@ -457,6 +459,11 @@ def record_delivery(
     bytes is REFUSED here, before any row is written: the record is keyed
     ``<tag>_<run_id>.json``, so it would replace the earlier run's record
     (1905_10g, 1400_4g). The remedy the error names is to record run-less.
+
+    R495. ``prediction`` is a Showdown build's per-entry payload (it has no run
+    folder for the record writer to read back, which is how a Classic record
+    gets R494's), handed to the tracked record only. It never reaches this
+    manifest's row.
 
     R36 F6m. A manifest that exists and cannot be parsed is QUARANTINED before
     this function writes, and the fresh manifest says where the old bytes went.
@@ -602,7 +609,7 @@ def record_delivery(
             _mirror_to_delivery_record(date, prior, controls, relaxations, egress,
                                        market=market, stack_sleeve=stack_sleeve,
                                        no_market_reason=no_market,
-                                       entries_source=source)
+                                       prediction=prediction, entries_source=source)
             return prior
         prior["status"] = "superseded"
         prior["superseded_by"] = record["delivered_file"]
@@ -613,7 +620,7 @@ def record_delivery(
     _mirror_to_delivery_record(date, record, controls, relaxations, egress,
                                market=market, stack_sleeve=stack_sleeve,
                                no_market_reason=no_market,
-                               entries_source=source)
+                               prediction=prediction, entries_source=source)
     return record
 
 
