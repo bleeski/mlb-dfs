@@ -15,6 +15,14 @@ tracked, survives the container, and carries the delivered sha256 together with
 every Entry ID parsed out of the delivered bytes. That is the join. This tool
 walks it.
 
+R497: an Entry ID is not a delivery. 447 of the 480 entry IDs in the records
+sit in more than one record (baseline, rebuild, repair, late swap), so grading
+every record on a date credited each with the entered one's finishes. Each
+entry is now graded under the record `tools/results_ledger.py resolve` tied it
+to, and only there: another record of the same entry reads `not_entered` (or
+`same_bytes`, for one file recorded twice), and with no resolution an entry is
+`unresolved` and nothing is graded, filed or cleared from the due list.
+
 WHAT IT EMITS, per contest: rank span, points, whether any entry finished in a
 paid position, how many of our own lineups the field duplicated, and planned
 exposures against realized ones. Then one portfolio line: washout, defined as
@@ -41,6 +49,7 @@ bad invocation exits non-zero.
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import os
 import sys
@@ -66,6 +75,16 @@ PAID_PLACES_FILES = (
 
 LABEL = ("observed outcomes read off completed contests, and a deterministic "
          "review proxy for the portfolio; never a graded prediction")
+
+#: R497. Which delivery record each entry was entered from, written by
+#: `tools/results_ledger.py resolve`. Without it nothing is graded: most entry
+#: IDs sit in several records (baseline, rebuild, repair, late swap), and
+#: grading every record on a date credited each with the entered one's finishes.
+RESOLUTION_FILE = "data/reference/dk_entry_resolution.csv"
+#: The review's `entered` value. Only `unresolved` leaves a record due;
+#: `no_entries` is a record that names no filled entry (the R387 records name
+#: none), which says nothing about whether its file was entered.
+ENTERED_STATES = ("resolved", "same_bytes", "not_entered", "unresolved", "no_entries")
 
 
 # ---------------------------------------------------------------------------
@@ -177,6 +196,90 @@ def id_to_name(root: Path, slate_date: str, contest_id: str) -> Tuple[Dict[str, 
         if pid:
             out[pid] = key
     return out, f"joined through {Path(candidates[0]).name}"
+
+
+# ---------------------------------------------------------------------------
+# which record was entered (R497)
+# ---------------------------------------------------------------------------
+
+def _results_ledger():
+    """The sibling tool that owns the resolution file's shape and record keys."""
+    tools_dir = str(Path(__file__).resolve().parent)
+    if tools_dir not in sys.path:
+        sys.path.insert(0, tools_dir)
+    import results_ledger  # noqa: PLC0415 - a sibling tool, loaded where it is read
+    return results_ledger
+
+
+def load_resolution(root: Path, path: Optional[str] = None
+                    ) -> Tuple[Optional[Dict[str, Dict[str, str]]], str]:
+    """``({entry_id: row}, where)``, or ``(None, why)`` when there is no file.
+
+    A file of another shape raises `results_ledger.Refused`; `main` exits 3
+    rather than grade against a table it cannot read.
+    """
+    root = Path(root)
+    target = Path(path) if path else root / RESOLUTION_FILE
+    shown = str(target.relative_to(root)) if target.is_relative_to(root) else str(target)
+    if not target.is_file():
+        return None, (f"no resolution file at {shown}; run `python tools/results_ledger.py "
+                      f"resolve` after ingest")
+    return _results_ledger().read_resolution(target), f"resolution from {shown}"
+
+
+def _delivered_sha(record: Optional[Mapping[str, Any]]) -> str:
+    return str(((record or {}).get("manifest_row") or {}).get("sha256") or "").strip().lower()
+
+
+def _record_at(root: Path, key: Any) -> Optional[Mapping[str, Any]]:
+    try:
+        payload = json.loads((Path(root) / str(key or "")).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return payload if isinstance(payload, Mapping) else None
+
+
+def entry_states(record: Mapping[str, Any],
+                 resolution: Optional[Mapping[str, Mapping[str, str]]],
+                 root: Optional[Path] = None) -> Dict[str, Any]:
+    """A record's filled entries, split by what the resolution says of each.
+
+    graded       resolved to this record
+    same_bytes   resolved to another record of these same bytes (one file
+                 recorded twice), and graded there once; the bytes are
+                 compared, so a twin reads this however the tie was broken
+    not_entered  resolved to another record
+    unresolved   no resolution, or one that is not `resolved` (tied, unmatched,
+                 unscored, no_standings, no_crosswalk), with its status kept
+    A reserved row the delivery never filled holds no lineup of this record:
+    it is counted, never graded.
+    """
+    key = _results_ledger().record_key(record.get("_path") or "")
+    own_sha = _delivered_sha(record)
+    out: Dict[str, Any] = {"graded": [], "same_bytes": [], "not_entered": [],
+                           "unresolved": [], "not_filled": 0}
+    for entry in record.get("entries") or []:
+        eid = str(entry.get("entry_id") or "").strip()
+        if not str(entry.get("contest_id") or "").strip():
+            continue
+        if not entry.get("filled"):
+            out["not_filled"] += 1
+            continue
+        row = (resolution or {}).get(eid)
+        if row is None:
+            out["unresolved"].append({"entry_id": eid, "status": (
+                "no_resolution_file" if resolution is None else "no_resolution_row")})
+        elif row.get("status") != "resolved":
+            out["unresolved"].append({"entry_id": eid, "status": row.get("status") or "",
+                                      "detail": row.get("detail") or ""})
+        elif row.get("record") == key:
+            out["graded"].append(entry)
+        elif (own_sha and key in str(row.get("matched") or "").split("|")
+              and _delivered_sha(_record_at(root or REPO, row.get("record"))) == own_sha):
+            out["same_bytes"].append({"entry_id": eid, "graded_under": row.get("record")})
+        else:
+            out["not_entered"].append({"entry_id": eid, "entered_from": row.get("record")})
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -353,18 +456,61 @@ def portfolio_washout(contests: Sequence[Mapping[str, Any]]) -> Tuple[Any, str]:
                   "finished in a paid position")
 
 
-def review_record(record: Mapping[str, Any], root: Path) -> Dict[str, Any]:
-    """The whole review for one delivery record."""
+def review_record(record: Mapping[str, Any], root: Path,
+                  resolution: Optional[Mapping[str, Mapping[str, str]]] = None,
+                  resolution_note: str = "no resolution supplied") -> Dict[str, Any]:
+    """The whole review for one delivery record: its resolved entries only (R497).
+
+    ``resolution`` is `results_ledger.read_resolution`'s table; None grades
+    nothing, because an entry ID in two records cannot say which was entered.
+    """
     manifest_row = record.get("manifest_row") or {}
     slate_date = str(record.get("date") or "")
+    states = entry_states(record, resolution, root)
     by_contest: Dict[str, List[Mapping[str, Any]]] = defaultdict(list)
-    for entry in record.get("entries") or []:
-        cid = str(entry.get("contest_id") or "").strip()
-        if cid:
-            by_contest[cid].append(entry)
+    for entry in states["graded"]:
+        by_contest[str(entry.get("contest_id")).strip()].append(entry)
     contests = [review_contest(root, slate_date, cid, rows)
                 for cid, rows in sorted(by_contest.items())]
-    washout, reason = portfolio_washout(contests)
+    unresolved = states["unresolved"]
+    if states["graded"]:
+        entered = "resolved"
+    elif unresolved:
+        entered = "unresolved"
+    elif states["same_bytes"]:
+        entered = "same_bytes"
+    elif states["not_entered"]:
+        entered = "not_entered"
+    else:
+        entered = "no_entries"
+    if contests:
+        washout, reason = portfolio_washout(contests)
+        elsewhere = sorted({str(e["entered_from"]) for e in states["not_entered"]}
+                           | {str(e["graded_under"]) for e in states["same_bytes"]})
+        if washout is True and unresolved:
+            # A cash among the unresolved entries is not ruled out.
+            washout, reason = "UNKNOWN", (
+                f"no resolved entry finished in a paid position, but {len(unresolved)} "
+                f"entr{'y is' if len(unresolved) == 1 else 'ies are'} unresolved")
+        elif washout is True and elsewhere:
+            # The slate's other entries were entered from other records and may
+            # have cashed; this record alone cannot say the slate washed out.
+            washout, reason = "UNKNOWN", (
+                "no entry entered from this record finished in a paid position; the "
+                "rest of these entries were entered from " + ", ".join(elsewhere))
+    else:
+        washout = "UNKNOWN"
+        reason = {
+            "unresolved": (f"no entry of this record is resolved as entered: "
+                           f"{len(unresolved)} unresolved ({resolution_note})"),
+            "same_bytes": "this file was recorded twice; its entries are graded under "
+                          + ", ".join(sorted({str(e["graded_under"]) for e in states["same_bytes"]})),
+            "not_entered": ("no entry of this record was entered from it: each was entered from "
+                            + ", ".join(sorted({str(e["entered_from"])
+                                                for e in states["not_entered"]}))),
+            "no_entries": ("this record names no filled entry, so there is nothing to grade; "
+                           "that says nothing about whether its file was entered"),
+        }[entered]
     return {
         "schema_version": SCHEMA_VERSION,
         "kind": "outcome_review",
@@ -381,6 +527,12 @@ def review_record(record: Mapping[str, Any], root: Path) -> Dict[str, Any]:
            if manifest_row.get("lineage") else {}),
         "record_path": str(record.get("_path") or ""),
         "reviewed_utc": datetime.now(timezone.utc).isoformat(),
+        "entered": entered,
+        "resolution": resolution_note,
+        "entries_not_entered": states["not_entered"],
+        "entries_same_bytes": states["same_bytes"],
+        "entries_unresolved": unresolved,
+        "entries_not_filled": states["not_filled"],
         "contests": contests,
         "portfolio_washout": washout,
         "portfolio_washout_reason": reason,
@@ -404,6 +556,18 @@ def render(review: Mapping[str, Any]) -> str:
     out.append(f"run: {review.get('run_id') or 'none'}   "
                f"certification: {review.get('certification') or 'unknown'}")
     out.append(f"record: {review.get('record_path') or 'unknown'}")
+    out.append(f"entered: {review.get('entered')} ({review.get('resolution')})")
+    for label, key, field in (("not entered from this record", "entries_not_entered", "entered_from"),
+                              ("graded under its twin", "entries_same_bytes", "graded_under")):
+        rows = review.get(key) or []
+        if rows:
+            out.append(f"  {label}: {len(rows)} ("
+                       + ", ".join(sorted({str(r.get(field)) for r in rows})) + ")")
+    unresolved = review.get("entries_unresolved") or []
+    if unresolved:
+        counts = Counter(str(r.get("status")) for r in unresolved)
+        out.append(f"  unresolved, not graded: {len(unresolved)} ("
+                   + ", ".join(f"{s} {n}" for s, n in sorted(counts.items())) + ")")
     out.append("")
     washout = review.get("portfolio_washout")
     shown = "UNKNOWN" if washout == "UNKNOWN" else ("YES" if washout else "NO")
@@ -502,6 +666,12 @@ def write_fragment(review: Mapping[str, Any], root: Path) -> Optional[Path]:
     # one slate; one fragment each, so neither review overwrites the other.
     if review.get("lineage"):
         tag = f"{tag}_{review['lineage']}"
+    # R497. Records of one tag now grade different entries (a build and its
+    # repair), so the record's own name keys the fragment: a re-run of one
+    # record replaces its fragment and never another record's.
+    stem = Path(str(review.get("record_path") or "").replace("\\", "/")).stem
+    if stem:
+        tag = stem
     safe = "".join(c if (c.isalnum() or c in "-_") else "_" for c in tag)
     dest = root / "ledger" / "inbox" / f"{review.get('date')}_outcome_{safe}.md"
     try:
@@ -524,7 +694,9 @@ def pending(root: Optional[Path] = None) -> List[Dict[str, str]]:
 
     This is the startup reconciliation line: a delivery nobody graded is the
     state R370 exists to end, and it is invisible unless something counts it.
-    A refusal record is not pending -- there is no portfolio to grade.
+    A refusal record is not pending -- there is no portfolio to grade. R497: a
+    review that graded some entries and left others unresolved is still due,
+    so a later resolution re-grades it.
     """
     base = Path(root) if root is not None else REPO
     try:
@@ -537,8 +709,14 @@ def pending(root: Optional[Path] = None) -> List[Dict[str, str]]:
             if not raw:
                 continue
             path = base / raw
-            if sidecar_path(path).exists():
-                continue
+            side = sidecar_path(path)
+            if side.exists():
+                try:
+                    unresolved = json.loads(side.read_text(encoding="utf-8")).get("entries_unresolved")
+                except (OSError, ValueError, AttributeError):
+                    unresolved = None
+                if not unresolved:
+                    continue
             out.append({"record": raw, "date": str(record.get("date") or ""),
                         "slate_tag": str((record.get("manifest_row") or {}).get("slate_tag") or "")})
         return sorted(out, key=lambda r: (r["date"], r["record"]))
@@ -557,7 +735,7 @@ def pending_line(root: Optional[Path] = None) -> str:
     names = ", ".join(f"{r['date']} {r['slate_tag'] or 'untagged'}" for r in rows[:4])
     more = f" (+{len(rows) - 4} more)" if len(rows) > 4 else ""
     return (f"outcome review due: {len(rows)} ({names}{more}); "
-            f"python tools/outcome_review.py --date <date>")
+            f"python tools/results_ledger.py resolve, then python tools/outcome_review.py --date <date>")
 
 
 # ---------------------------------------------------------------------------
@@ -592,6 +770,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     ap.add_argument("--no-fragment", action="store_true", help="do not write the ledger/inbox fragment")
     ap.add_argument("--pending", action="store_true",
                     help="list delivery records with no review beside them, and exit")
+    ap.add_argument("--resolution", default=None,
+                    help=f"which record each entry was entered from (default {RESOLUTION_FILE}, "
+                         "written by `results_ledger.py resolve`; R497)")
     args = ap.parse_args(list(argv) if argv is not None else None)
     root = Path(args.root).resolve()
 
@@ -615,22 +796,38 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
               f"nothing to grade. A build records itself; see R369.")
         return 0
 
+    try:
+        if args.resolution and not Path(args.resolution).is_file():
+            raise OSError(f"--resolution {args.resolution} is not a file")
+        resolution, resolution_note = load_resolution(root, args.resolution)
+    except (OSError, ValueError, csv.Error, _results_ledger().Refused) as exc:
+        print(f"ERROR  could not read the resolution file: {exc}", file=sys.stderr)
+        return 3
+
     reviews = []
     for record in records:
-        review = review_record(record, root)
+        review = review_record(record, root, resolution, resolution_note)
         reviews.append(review)
         if args.json:
             print(json.dumps(review, indent=1, sort_keys=True, default=str))
         else:
             print(render(review))
             print()
+        if review["entered"] == "unresolved":
+            # Nothing was graded, so nothing is filed and the record stays due
+            # until `results_ledger.py resolve` settles which record was entered.
+            print(f"not filed: {review['record_path']} is unresolved and stays due",
+                  file=sys.stderr)
+            continue
         raw = str(record.get("_path") or "")
         record_path = (root / raw) if raw else None
         if record_path is not None and not args.no_sidecar:
             written = write_sidecar(review, record_path)
             if written:
                 print(f"review written to {written}", file=sys.stderr)
-        if not args.no_fragment:
+        # Only a graded record has a review for ARCHIVE to merge; a record that
+        # was not entered must not replace the entered one's fragment.
+        if not args.no_fragment and review["entered"] == "resolved":
             fragment = write_fragment(review, root)
             if fragment:
                 print(f"ledger fragment for ARCHIVE at {fragment}", file=sys.stderr)

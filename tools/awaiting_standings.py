@@ -50,6 +50,7 @@ Outputs:
 Usage:
     python tools/awaiting_standings.py scan
     python tools/awaiting_standings.py scan --check          # print, write nothing
+    python tools/awaiting_standings.py scan --per-draftgroup # one pull per draftgroup (R497)
     python tools/awaiting_standings.py scan --no-html
     python tools/awaiting_standings.py mark-unrecoverable 192345441 \\
         --reason "zero bytes on second pull, 2026-08-05"
@@ -71,6 +72,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
+# R497. Before `scan_entered` runs, not inside `_today()`: run as a script the
+# tool's own folder is on `sys.path` and the repo is not, so the record scan's
+# `mlb_engine` import failed, was swallowed, and a cloud container (no
+# `outputs/`) listed 0 open contests against 159 with PYTHONPATH set.
+if str(REPO) not in sys.path:
+    sys.path.insert(0, str(REPO))
 
 # Real DraftKings contest IDs are 9 digits. Anything else on a filled entry
 # row is a placeholder (manual/test rows use `0`, `900`, ...) rather than a
@@ -176,8 +183,12 @@ def scan_unrecorded_deliveries(outputs_dir: Path) -> dict[str, list[str]]:
 
 
 def _scan_delivery_records(deliveries_dir: "Path | None",
-                           entered: dict, invalid: dict) -> None:
-    """Contest IDs from the tracked delivery records (R369). Never raises."""
+                           entered: dict, invalid: dict, links: "list | None" = None) -> None:
+    """Contest IDs from the tracked delivery records (R369). Never raises.
+
+    ``links``, when a list, gains each record's set of 9-digit contest IDs: one
+    record is one DKEntries file, so one draftgroup (R497).
+    """
     try:
         from mlb_engine.entries.delivery_record import read_records, DELIVERIES_DIR
         root = None
@@ -194,6 +205,7 @@ def _scan_delivery_records(deliveries_dir: "Path | None",
             if row.get("status") == "superseded":
                 continue
             date = str(record.get("date") or "")
+            group: set = set()
             for entry in record.get("entries") or []:
                 if not entry.get("filled"):
                     continue  # a reserved row was never entered anywhere
@@ -203,12 +215,17 @@ def _scan_delivery_records(deliveries_dir: "Path | None",
                 target = entered if CID_RE.match(cid) else invalid
                 target.setdefault(cid, {"date": date,
                                         "name": entry.get("contest_name") or ""})
+                if CID_RE.match(cid):
+                    group.add(cid)
+            if links is not None and group:
+                links.append(sorted(group))
     except Exception:  # noqa: BLE001 - the outputs/ scan below still runs
         pass
 
 
 def scan_entered(outputs_dir: Path,
-                 deliveries_dir: "Path | None" = None
+                 deliveries_dir: "Path | None" = None,
+                 links: "list | None" = None,
                  ) -> tuple[dict[str, dict], dict[str, dict]]:
     """Every Contest ID on a filled entry row, from the record and from outputs/.
 
@@ -223,10 +240,14 @@ def scan_entered(outputs_dir: Path,
     the pull list, and a contest that is never listed is never pulled, mined or
     graded. Both sources are read because the two hosts that share a disk still
     have the `outputs/` tree, and a contest found twice is the same key.
+
+    R497: ``links``, when a list, gains the 9-digit contest IDs each record and
+    each DKEntries file names, the draftgroup evidence `--per-draftgroup`
+    reads. Collecting them changes neither returned dict.
     """
     entered: dict[str, dict] = {}
     invalid: dict[str, dict] = {}
-    _scan_delivery_records(deliveries_dir, entered, invalid)
+    _scan_delivery_records(deliveries_dir, entered, invalid, links)
     if not outputs_dir.is_dir():
         return entered, invalid
     for date_dir in sorted(outputs_dir.iterdir()):
@@ -254,6 +275,7 @@ def scan_entered(outputs_dir: Path,
                     # at least one roster cell with something in it.
                     roster_i = [i for i, h in enumerate(lowered)
                                 if h in _ROSTER_HEADERS]
+                    group: set = set()
                     for row in reader:
                         if len(row) <= cid_i:
                             continue
@@ -265,6 +287,10 @@ def scan_entered(outputs_dir: Path,
                         name = row[name_i].strip() if name_i is not None and len(row) > name_i else ""
                         target = entered if CID_RE.match(raw) else invalid
                         target.setdefault(raw, {"date": date_dir.name, "name": name})
+                        if CID_RE.match(raw):
+                            group.add(raw)
+                    if links is not None and group:
+                        links.append(sorted(group))
             except OSError:
                 continue
     return entered, invalid
@@ -430,6 +456,109 @@ def compute_unsettled(entered: dict[str, dict], have: set[str], exceptions: dict
     return by_date
 
 
+def draftgroup_components(entered: dict[str, dict], links: list) -> list[list[str]]:
+    """Entered contests grouped by draftgroup (R497), each group sorted.
+
+    No file carries DK's draftgroup ID. A DKEntries file, and so a delivery
+    record, holds one draftgroup, so contests named together in one share it;
+    `links` is the contest set of each file and record `scan_entered` read. A
+    contest no link names is its own group.
+    """
+    parent: dict[str, str] = {cid: cid for cid in entered}
+
+    def find(x: str) -> str:
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    for group in links:
+        members = sorted((c for c in group if c in parent), key=int)
+        for a, b in zip(members, members[1:]):
+            ra, rb = find(a), find(b)
+            if ra != rb:
+                parent[max(ra, rb, key=int)] = min(ra, rb, key=int)
+    comps: dict[str, list[str]] = {}
+    for cid in sorted(entered, key=int):
+        comps.setdefault(find(cid), []).append(cid)
+    return [comps[k] for k in sorted(comps, key=int)]
+
+
+def compute_per_draftgroup(entered: dict[str, dict], links: list, have: set[str],
+                           exceptions: dict, today: str,
+                           field_sizes: dict[str, int]) -> tuple[list[dict], list[dict]]:
+    """One standings pull per draftgroup, newest slate date first (R497).
+
+    Every contest of a draftgroup shares its player points, so one export
+    serves `results_ledger.py resolve` for all of them; a draftgroup with any
+    contest already archived or in the inbox is done. The pick is the largest
+    field the results table records (its player table lists the most players,
+    and its field serves the ownership fit); a draftgroup the table does not
+    cover yet is picked by lowest contest ID and says so. Unrecoverable and
+    placeholder contests are never picked. Newest first: DK's export ages out
+    some days after a contest settles, so the oldest unpulled draftgroups may
+    already be gone and the newest are the ones still served.
+
+    Returns (picks, held back as unsettled), each a dict per draftgroup.
+    """
+    dead = {e["contest_id"] for e in exceptions.get("unrecoverable", [])}
+    dead |= {e["contest_id"] for e in exceptions.get("placeholder", [])}
+    picks: list[dict] = []
+    unsettled: list[dict] = []
+    for group in draftgroup_components(entered, links):
+        if any(cid in have for cid in group):
+            continue
+        live = [cid for cid in group if cid not in dead]
+        if not live:
+            continue
+        date = max(entered[cid]["date"] for cid in group)
+        sized = [cid for cid in live if cid in field_sizes]
+        pick = (max(sized, key=lambda c: (field_sizes[c], -int(c))) if sized
+                else min(live, key=int))
+        row = {"date": date, "contest_id": pick, "name": entered[pick]["name"],
+               "contests": group, "field": field_sizes.get(pick),
+               "basis": "results table" if sized else "field size unknown"}
+        (unsettled if today is not None and date >= today else picks).append(row)
+    for rows in (picks, unsettled):
+        rows.sort(key=lambda r: int(r["contest_id"]))
+        rows.sort(key=lambda r: r["date"], reverse=True)
+    return picks, unsettled
+
+
+def field_sizes_from_results(path: Path, root: "Path | None" = None) -> tuple[dict[str, int], str]:
+    """{Contest_Key: Contest_Entries} from R496's results table, and where from.
+
+    A table that is missing or will not read costs the field sizes, never the
+    list: every pick is then by contest ID, and the note says why. The note is
+    written into a tracked file, so the path is shown relative to ``root``.
+    """
+    shown = path
+    if root is not None:
+        try:
+            shown = Path(path).resolve().relative_to(Path(root).resolve())
+        except ValueError:
+            pass
+    if not path.is_file():
+        return {}, (f"no results table at {shown}; every pick is by contest ID until "
+                    f"`python tools/results_ledger.py ingest` writes one")
+    tools_dir = str(Path(__file__).resolve().parent)
+    if tools_dir not in sys.path:
+        sys.path.insert(0, tools_dir)
+    from results_ledger import Refused, read_results
+    try:
+        rows = read_results(path)
+    except (Refused, ValueError, csv.Error, OSError) as exc:
+        return {}, (f"the results table at {shown} will not read ({type(exc).__name__}); every "
+                    f"pick is by contest ID until `python tools/results_ledger.py ingest` rewrites it")
+    sizes: dict[str, int] = {}
+    for row in rows:
+        try:
+            sizes[str(row["Contest_Key"]).strip()] = int(row["Contest_Entries"])
+        except (KeyError, ValueError):
+            continue
+    return sizes, f"field sizes from {shown}"
+
+
 # --------------------------------------------------------------------------
 # Rendering
 # --------------------------------------------------------------------------
@@ -565,6 +694,65 @@ def render_markdown(by_date: dict, archived_count: int, invalid: dict, exception
     return "\n".join(lines)
 
 
+def render_per_draftgroup(picks: list[dict], unsettled: list[dict], archived_count: int,
+                          today: str, sizes_note: str,
+                          failed_pulls: dict[str, str] | None = None,
+                          unrecorded: dict[str, list[str]] | None = None) -> str:
+    covered = sum(len(p["contests"]) for p in picks)
+    lines = [
+        f"# Standings pulls, one per draftgroup, regenerated {today}",
+        "",
+        "Generated by `python tools/awaiting_standings.py scan --per-draftgroup` (R497); do",
+        "not hand-maintain this list. Every contest of one draftgroup shares its player",
+        "points, so one export per draftgroup lets `python tools/results_ledger.py resolve`",
+        "tie every entry in it to the record it was entered from, and the finishes come",
+        "from the entry-history export, which does not age out. A draftgroup is the set of",
+        "contests one DKEntries file or delivery record names; one with any contest",
+        "already archived or in the inbox is done. The pick is the largest field the",
+        f"results table records ({sizes_note}). `outcome_review.py` still grades a",
+        "contest only from its own export, so the contests not pulled read",
+        "`standings_absent` there.",
+        "",
+        "Pull each while logged in to DraftKings, **check the file size is non-zero**, and",
+        "drop it in `data/standings/inbox/` (flat).",
+        "",
+        f"## Status as of {today}: {_plural(len(picks), 'draftgroup')} to pull, covering "
+        f"{_plural(covered, 'contest')}",
+        "",
+        "Newest first. DK's export ages out some days after a contest settles (ledger,",
+        "2026-07-25), so the oldest draftgroups may already be gone and the newest are the",
+        "ones it still serves.",
+        "",
+    ]
+    for date in sorted({p["date"] for p in picks}, reverse=True):
+        lines.append(f"**{date}**:")
+        lines.append("")
+        for p in (p for p in picks if p["date"] == date):
+            url = f"https://www.draftkings.com/contest/exportfullstandingscsv/{p['contest_id']}"
+            field = (f"field {p['field']}" if p["field"] is not None
+                     else "field size unknown (no results row)")
+            lines.append(f"- [{p['name']}]({url}): `{p['contest_id']}`, {field}, 1 of "
+                         f"{_plural(len(p['contests']), 'contest')} in this draftgroup")
+        lines.append("")
+    if failed_pulls:
+        lines.append(f"## Failed pulls: {_plural(len(failed_pulls), 'zero-byte file')} in the inbox")
+        lines.append("")
+        for cid in sorted(failed_pulls):
+            lines.append(f"- `{failed_pulls[cid]}`: contest `{cid}`")
+        lines.append("")
+    if unsettled:
+        lines.append(f"## Not yet settled: {_plural(len(unsettled), 'draftgroup')}, do not pull yet")
+        lines.append("")
+        for p in unsettled:
+            lines.append(f"- {p['date']}: `{p['contest_id']}` (1 of "
+                         f"{_plural(len(p['contests']), 'contest')})")
+        lines.append("")
+    lines.extend(render_unrecorded_section(unrecorded or {}))
+    lines.append(f"Archived: {_plural(archived_count, 'contest')} already mined into `data/archive/`.")
+    lines.append("")
+    return "\n".join(lines)
+
+
 _HTML_STYLE = """
   :root {
     --bg: #0f1115; --panel: #171a21; --border: #2a2e38;
@@ -636,9 +824,16 @@ _HTML_SCRIPT = """
 """
 
 
-def render_html(by_date: dict, today: str) -> str:
+def render_html(by_date: dict, today: str, newest_first: bool = False) -> str:
     total = sum(len(v) for v in by_date.values())
-    dates_asc = sorted(by_date)  # oldest first, matching the markdown priority order
+    # Oldest first, matching the markdown priority order; `--per-draftgroup`
+    # (R497) lists one contest per draftgroup, newest first.
+    dates_asc = sorted(by_date, reverse=newest_first)
+    order_note = ("Newest date first, one export per draftgroup (R497): DK's export ages "
+                  "out after a few days, so the newest draftgroups are the ones it still serves."
+                  if newest_first else
+                  "Oldest date first — DK's export is known to age out after\n"
+                  "    a few days, so those are the most at risk.")
 
     sections = []
     for date in dates_asc:
@@ -675,8 +870,7 @@ def render_html(by_date: dict, today: str) -> str:
     <b>{_plural(total, 'contest')}</b> across <b>{_plural(len(dates_asc), 'slate date')}</b>, generated {today}.
     Click <b>Open export</b> while logged into DraftKings; it opens the download and checks the row
     off for you. Confirm the download is non-zero bytes, then drop it in
-    <code>data/standings/inbox/</code>. Oldest date first — DK's export is known to age out after
-    a few days, so those are the most at risk.
+    <code>data/standings/inbox/</code>. {order_note}
   </p>
   <div class="progress">
     <span id="progressLabel">0 / {total} pulled</span>
@@ -701,12 +895,18 @@ def cmd_scan(args: argparse.Namespace) -> int:
     outputs_dir = root / args.outputs_dir
     data_dir = root / args.data_dir
 
-    entered, invalid = scan_entered(outputs_dir)
+    # R497: the records under --root, not wherever the default resolves.
+    links: list = []
+    entered, invalid = scan_entered(outputs_dir, deliveries_dir=data_dir / "deliveries",
+                                    links=links)
     pulled, failed_pulls = _scan_inbox(data_dir)
     archived = archived_ids(data_dir)
     have = archived | pulled
     exceptions = load_exceptions(data_dir)
     today = _today(args.date)
+    if args.per_draftgroup:
+        return _scan_per_draftgroup(args, root, entered, links, have, exceptions, today,
+                                    archived, failed_pulls)
     by_date = compute_open(entered, have, exceptions, today)
     unsettled = compute_unsettled(entered, have, exceptions, today)
     total = sum(len(v) for v in by_date.values())
@@ -746,6 +946,41 @@ def cmd_scan(args: argparse.Namespace) -> int:
         html_out.write_text(render_html(by_date, today), encoding="utf-8")
         print(f"wrote {html_out}")
 
+    return 0
+
+
+def _scan_per_draftgroup(args: argparse.Namespace, root: Path, entered: dict, links: list,
+                         have: set[str], exceptions: dict, today: str, archived: set[str],
+                         failed_pulls: dict[str, str]) -> int:
+    """`scan --per-draftgroup` (R497): the same outputs, one pull per draftgroup."""
+    results = root / (args.results or "data/reference/dk_entry_results.csv")
+    sizes, sizes_note = field_sizes_from_results(results, root)
+    picks, unsettled = compute_per_draftgroup(entered, links, have, exceptions, today, sizes)
+    unrecorded = scan_unrecorded_deliveries(root / args.outputs_dir)
+    md = render_per_draftgroup(picks, unsettled, len(archived), today, sizes_note,
+                               failed_pulls=failed_pulls, unrecorded=unrecorded)
+    covered = sum(len(p["contests"]) for p in picks)
+    if args.check:
+        print(md)
+        print(f"\n[check] {_plural(len(picks), 'draftgroup')} to pull, covering "
+              f"{_plural(covered, 'contest')}; {_plural(len(unsettled), 'draftgroup')} held back "
+              f"as unsettled; {sizes_note}; nothing written", file=sys.stderr)
+        return 0
+    md_out = root / args.md_out
+    md_out.parent.mkdir(parents=True, exist_ok=True)
+    md_out.write_text(md, encoding="utf-8")
+    print(f"wrote {md_out} ({_plural(len(picks), 'draftgroup')}, {_plural(covered, 'contest')} "
+          f"covered)")
+    if not args.no_html:
+        by_date: dict = {}
+        for p in picks:
+            field = f"field {p['field']}" if p["field"] is not None else "field size unknown"
+            by_date.setdefault(p["date"], []).append(
+                (p["contest_id"], f"{p['name']} (1 of {_plural(len(p['contests']), 'contest')}; {field})"))
+        html_out = root / (args.html_out or f"data/standings/standings_pulls_{today}.html")
+        html_out.parent.mkdir(parents=True, exist_ok=True)
+        html_out.write_text(render_html(by_date, today, newest_first=True), encoding="utf-8")
+        print(f"wrote {html_out}")
     return 0
 
 
@@ -794,6 +1029,11 @@ def main(argv=None) -> int:
     p.add_argument("--no-html", action="store_true", help="write only the markdown")
     p.add_argument("--date", help="UTC date stamp; defaults to today")
     p.add_argument("--check", action="store_true", help="print the markdown, write nothing")
+    p.add_argument("--per-draftgroup", action="store_true",
+                   help="one standings pull per draftgroup, newest first (R497)")
+    p.add_argument("--results", default=None,
+                   help="R496's results table, for each contest's field size "
+                        "(default data/reference/dk_entry_results.csv)")
 
     p = sub.add_parser("mark-unrecoverable", help="record a contest as a dead pull, excluded from now on")
     p.add_argument("contest_id")
