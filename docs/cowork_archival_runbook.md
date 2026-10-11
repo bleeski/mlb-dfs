@@ -254,6 +254,16 @@ same review lands in `ledger/inbox/` as a fragment for ARCHIVE to merge. Only
 ARCHIVE edits the ledger (CLAUDE.md), and a re-run replaces its own fragment
 rather than appending, so a review run twice is one fragment.
 
+**It grades the entered record only (R497).** Most entry IDs sit in several
+records (baseline, rebuild, repair, late swap), so it reads
+`data/reference/dk_entry_resolution.csv`, which `results_ledger.py resolve`
+writes ("Tie each entry to the record it was entered from (R497)" below), and grades each entry under the record it was
+entered from. Every other record of that entry reads `not_entered`, or
+`same_bytes` when it is the same file recorded twice. With no resolution, or a
+`tied`, `unmatched`, `unscored`, `no_standings` or `no_crosswalk` one, the
+entry is `unresolved`: nothing is graded or filed and the record stays due.
+Run `resolve` first.
+
 The session-start hook prints `outcome review due: <n>` — delivery records with
 no review beside them. A non-zero count is this step, unrun.
 
@@ -297,6 +307,40 @@ that scored 0; `blank_no_lineup` is an empty archived lineup, or a contest
 where every entry of ours scored 0; `zero_unknown` is the rest. The blank table
 is per start block (date, start time, game type), because the export carries no
 draftgroup.
+
+### Tie each entry to the record it was entered from (R497)
+
+The upload is manual and most entry IDs sit in several delivery records, so
+`resolve` scores every candidate record's roster from the player points of any
+standings export of the entry's draftgroup and matches the entry's Points from
+the results table. A draftgroup is the set of contests one DKEntries file or
+delivery record names; every contest in it shares its player points.
+
+```bash
+python tools/awaiting_standings.py scan --per-draftgroup   # one pull per draftgroup, newest first
+python tools/results_ledger.py ingest                      # after a new entry-history export
+python tools/results_ledger.py resolve
+python tools/outcome_review.py --date <date>
+```
+
+`scan --per-draftgroup` writes the same two files as the plain scan, listing
+one contest per draftgroup: the largest field in the results table, newest date
+first, because DK ages exports out and the newest are the ones it still
+serves. The plain per-contest scan stays the default until ARCHIVE switches.
+After the switch, `outcome_review.py` reads `standings_absent` for the contests
+not pulled, because it grades a contest only from its own export.
+
+`resolve` writes `data/reference/dk_entry_resolution.csv` and its `.meta.json`;
+commit both. It prints one line per draftgroup, newest first: the statuses, the
+exports read, the IDs no source names and the players no export lists. A
+roster naming a player no pulled table lists reads `unscored`, so a small
+contest's export can leave a draftgroup short; the line says so, and a second
+pull of a larger contest settles it. The statuses: `resolved` (by points, by
+`same_bytes` for one file recorded twice, or by the preflight sidecar R494
+writes), `tied`, `unmatched` (a hand edit or a swap outside the records),
+`unscored`, `no_standings` and `no_crosswalk`. A record written before R494
+(2026-10-11) carries no player map, so it resolves only where the slate's salary
+file or DKEntries file survives on the machine that runs it.
 
 **These are observed outcomes.** Never ROI, a win rate, a cash rate or a
 probability. Ticket face value is not realized value, and no ratio of net to
@@ -352,6 +396,8 @@ non-consensus source and timestamp, or it does not happen.
 - `archive/<slate_date>/mined_<contest_id>.json` (per contest)
 - `reference/dk_entry_results.csv` and `reference/dk_entry_results.meta.json`
   (after each new entry-history export; R496)
+- `reference/dk_entry_resolution.csv` and `reference/dk_entry_resolution.meta.json`
+  (after each ingest or standings pull; R497)
 - `slate_bundle.json` and the platoon JSON (pre-slate)
 - Raw standings exports and contest JSONs stay in the local archive tree,
   retained untrimmed.
