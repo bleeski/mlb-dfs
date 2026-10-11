@@ -50489,3 +50489,213 @@ class FixedPairConflictTests(unittest.TestCase):
                             "untouchable_rows_exceed_cap")
         self.assertEqual(result["errors"], ["entries 5001/5002 share 9>8"])
         self.assertTrue(result.get("review_grade_export"), sorted(result))
+
+
+class ResultsLedgerTests(unittest.TestCase):
+    """R496 (roadmap Session 162). `tools/results_ledger.py` reads Ben's DraftKings
+    contest entry-history export per entry: finish percentile against each entry's
+    own uniform reference, blank classes from lineup evidence, and cuts with a
+    seeded slate bootstrap. Synthetic fixtures under a temp root; no test reads
+    the committed export.
+    """
+
+    COLUMNS = ["Sport", "Game_Type", "Entry_Key", "Entry", "Contest_Key", "Contest_Date_EST",
+               "Place", "Points", "Winnings_Non_Ticket", "Winnings_Ticket", "Contest_Entries",
+               "Entry_Fee", "Prize_Pool", "Places_Paid"]
+    STANDINGS_HEADER = ["Rank", "EntryId", "EntryName", "TimeRemaining", "Points", "Lineup", "",
+                        "Player", "Roster Position", "%Drafted", "FPTS"]
+    CLASSIC_LINEUP = ("P Ace One P Ace Two C Cat Cee 1B Fir Base 2B Sec Base 3B Thi Base "
+                      "SS Sho Stop OF Out One OF Out Two OF Out Three")
+    TITLE = "MLB $100 Dime Time [Just $0.10!]"
+
+    @staticmethod
+    def _tool():
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "results_ledger_r496", REPO / "tools" / "results_ledger.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.rl = self._tool()
+
+    def _row(self, entry, contest, when, place, points, n, *, fee="$1.00", cash="$0.00",
+             ticket="$0.00", sport="MLB", game_type="Classic", title=None):
+        return {"Sport": sport, "Game_Type": game_type, "Entry_Key": str(entry),
+                "Entry": title or self.TITLE, "Contest_Key": str(contest),
+                "Contest_Date_EST": when, "Place": str(place), "Points": str(points),
+                "Winnings_Non_Ticket": cash, "Winnings_Ticket": ticket,
+                "Contest_Entries": str(n), "Entry_Fee": fee, "Prize_Pool": "$100.00",
+                "Places_Paid": "20"}
+
+    def _export(self, name, rows, columns=None):
+        columns = columns or self.COLUMNS
+        path = self.root / "data" / "reference" / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w", encoding="utf-8", newline="") as fh:
+            writer = csv.writer(fh, quoting=csv.QUOTE_ALL)
+            writer.writerow(columns)
+            for row in rows:
+                writer.writerow([row[c] for c in columns])
+        return path
+
+    def _standings(self, folder, contest, rows):
+        path = self.root / "data" / "archive" / folder / f"contest-standings-{contest}.csv"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w", encoding="utf-8", newline="") as fh:
+            writer = csv.writer(fh)
+            writer.writerow(self.STANDINGS_HEADER)
+            for rank, (entry, points, lineup) in enumerate(rows, start=1):
+                writer.writerow([rank, entry, f"bleeski ({rank}/9)", 0, points, lineup, "", "", "", "", ""])
+        return path
+
+    def _run(self, *argv):
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = self.rl.main(["--root", str(self.root), *argv])
+        return code, out.getvalue(), err.getvalue()
+
+    def _ingest(self, *exports):
+        out = self.root / "scratch" / "dk_entry_results.csv"
+        code, stdout, stderr = self._run("ingest", *[str(p) for p in exports], "--out", str(out))
+        self.assertEqual(code, 0, stderr)
+        with open(out, encoding="utf-8", newline="") as fh:
+            rows = {r["Entry_Key"]: r for r in csv.DictReader(fh)}
+        meta = json.loads(self.rl.sidecar_path(out).read_text(encoding="utf-8"))
+        return rows, meta
+
+    def test_a_missing_column_exits_2_naming_it_and_writes_nothing(self):
+        columns = [c for c in self.COLUMNS if c != "Places_Paid"]
+        path = self._export("draftkings-contest-entry-history_2026-10-01.csv",
+                            [self._row(1, 10, "2026-09-01 19:05:00", 1, 10.0, 20)], columns)
+        out = self.root / "scratch" / "dk_entry_results.csv"
+        code, _, stderr = self._run("ingest", str(path), "--out", str(out))
+        self.assertEqual(code, 2)
+        self.assertIn("missing column(s): Places_Paid", stderr)
+        self.assertFalse(out.exists())
+        self.assertFalse(self.rl.sidecar_path(out).exists())
+
+    def test_identical_rows_across_exports_merge_and_the_sidecar_names_both_sources(self):
+        shared = self._row(5001, 900, "2026-09-01 19:05:00", 3, 88.5, 20)
+        early = self._export("draftkings-contest-entry-history_2026-09-02.csv", [shared])
+        late = self._export("draftkings-contest-entry-history_2026-09-09.csv",
+                            [shared, self._row(5002, 901, "2026-09-08 19:05:00", 1, 120.0, 20)])
+        rows, meta = self._ingest()  # no paths: every committed export, sorted
+        self.assertEqual(sorted(rows), ["5001", "5002"])
+        self.assertEqual(meta["rows_out"], 2)
+        self.assertEqual(meta["identical_rows_merged"], 1)
+        self.assertEqual([s["path"] for s in meta["sources"]],
+                         [early.relative_to(self.root).as_posix(), late.relative_to(self.root).as_posix()])
+        self.assertEqual([s["rows"] for s in meta["sources"]], [1, 2])
+        self.assertEqual(meta["sources"][0]["sha256"], hashlib.sha256(early.read_bytes()).hexdigest())
+
+    def test_a_duplicate_entry_key_that_disagrees_exits_2_naming_the_key_and_column(self):
+        first = self._export("draftkings-contest-entry-history_2026-09-02.csv",
+                             [self._row(5001, 900, "2026-09-01 19:05:00", 3, 88.5, 20)])
+        second = self._export("draftkings-contest-entry-history_2026-09-09.csv",
+                              [self._row(5001, 900, "2026-09-01 19:05:00", 3, 90.0, 20)])
+        out = self.root / "scratch" / "dk_entry_results.csv"
+        code, _, stderr = self._run("ingest", str(first), str(second), "--out", str(out))
+        self.assertEqual(code, 2)
+        self.assertIn("Entry_Key 5001 disagrees", stderr)
+        self.assertIn("Points '88.5' vs '90.0'", stderr)
+        self.assertFalse(out.exists())
+
+    def test_the_uniform_reference_is_each_entrys_own_never_a_flat_ten_percent(self):
+        # N = 10 is the edge where 0.9 N is whole: places 9 and 10 are both bottom decile.
+        cases = {5: (0.0, 0.2), 10: (0.1, 0.2), 25: (0.08, 0.12), 116: (11 / 116, 12 / 116)}
+        for n, (top, bottom) in cases.items():
+            ref = self.rl.uniform_reference(n)
+            self.assertAlmostEqual(ref["top_ref"], top, places=12, msg=n)
+            self.assertAlmostEqual(ref["bottom_ref"], bottom, places=12, msg=n)
+            self.assertAlmostEqual(ref["place_over_n_ref"], (n + 1) / (2 * n), places=12, msg=n)
+        self.assertAlmostEqual(self.rl.uniform_reference(116)["top_ref"], 0.0948, places=4)
+        self.assertAlmostEqual(self.rl.uniform_reference(116)["bottom_ref"], 0.1034, places=4)
+        first, last = self.rl.entry_numbers(1, 116), self.rl.entry_numbers(116, 116)
+        self.assertEqual((first["finish_pctl"], last["finish_pctl"]), (0.0, 1.0))
+        self.assertTrue(first["top_decile"] and not first["bottom_decile"])
+        self.assertTrue(last["bottom_decile"] and not last["top_decile"])
+        # The band edges at N = 116: place 11 is the last top-decile place, 105 the first bottom one.
+        self.assertTrue(self.rl.entry_numbers(11, 116)["top_decile"])
+        self.assertFalse(self.rl.entry_numbers(12, 116)["top_decile"])
+        self.assertTrue(self.rl.entry_numbers(105, 116)["bottom_decile"])
+        self.assertFalse(self.rl.entry_numbers(104, 116)["bottom_decile"])
+        self.assertTrue(self.rl.entry_numbers(9, 10)["bottom_decile"])
+        self.assertFalse(self.rl.entry_numbers(8, 10)["bottom_decile"])
+        self.assertEqual(self.rl.entry_numbers(3, 5)["place_over_n"], 0.6)
+        self.assertIsNone(self.rl.entry_numbers(1, 1)["finish_pctl"])
+
+    def test_three_blank_classes_come_from_lineup_evidence_before_points(self):
+        when = "2026-08-01 19:05:00"
+        rows = [
+            # 901: every entry of ours scored 0, no standings -> blank_no_lineup.
+            self._row(11, 901, when, 40, 0, 40), self._row(12, 901, when, 40, 0, 40),
+            # 902: a complete archived lineup at 0 points -> zero_complete.
+            self._row(21, 902, when, 40, 0, 40), self._row(22, 902, when, 1, 50, 40),
+            # 903: an empty archived lineup beside a scoring sibling, filed under the
+            # next date folder -> blank_no_lineup on its own evidence.
+            self._row(31, 903, when, 40, 0, 40), self._row(32, 903, when, 2, 30, 40),
+            # 904: a zero beside a scoring sibling, no standings -> zero_unknown.
+            self._row(41, 904, when, 40, 0, 40), self._row(42, 904, when, 3, 25, 40),
+            # 905: an all-zero contest, but one archived lineup is complete.
+            self._row(51, 905, when, 39, 0, 40), self._row(52, 905, when, 40, 0, 40),
+            # 906: standings exist and do not hold the entry -> absent, zero_unknown.
+            self._row(61, 906, when, 40, 0, 40), self._row(62, 906, when, 4, 10, 40),
+        ]
+        export = self._export("draftkings-contest-entry-history_2026-08-02.csv", rows)
+        self._standings("2026-08-01", 902, [(22, 50, self.CLASSIC_LINEUP), (21, 0, self.CLASSIC_LINEUP)])
+        self._standings("2026-08-02", 903, [(32, 30, self.CLASSIC_LINEUP), (31, 0, "")])
+        self._standings("2026-08-01", 905, [(51, 0, self.CLASSIC_LINEUP), (52, 0, "")])
+        self._standings("2026-08-01", 906, [(62, 10, self.CLASSIC_LINEUP), (99, 5, self.CLASSIC_LINEUP)])
+        out, meta = self._ingest(export)
+        got = {k: (r["archive_lineup"], r["blank_class"]) for k, r in out.items() if r["zero_points"] == "1"}
+        self.assertEqual(got, {
+            "11": ("no_standings", "blank_no_lineup"), "12": ("no_standings", "blank_no_lineup"),
+            "21": ("complete", "zero_complete"),
+            "31": ("incomplete", "blank_no_lineup"),
+            "41": ("no_standings", "zero_unknown"),
+            "51": ("complete", "zero_complete"), "52": ("incomplete", "blank_no_lineup"),
+            "61": ("absent", "zero_unknown"),
+        })
+        self.assertEqual(out["22"]["blank_class"], "")
+        self.assertEqual(meta["blank_classes"]["MLB"],
+                         {"blank_no_lineup": 4, "zero_complete": 2, "zero_unknown": 2})
+        self.assertEqual(len(meta["standings_read"]), 4)
+
+    def test_field_bands_family_rollup_and_engine_record_presence(self):
+        edges = {25: "<=25", 26: "26-100", 100: "26-100", 101: "101-500", 500: "101-500",
+                 501: "501-2K", 2000: "501-2K", 2001: "2K-10K", 10000: "2K-10K",
+                 10001: "10K-100K", 100000: "10K-100K", 100001: ">100K"}
+        self.assertEqual({n: self.rl.field_band(n) for n in edges}, edges)
+        record = self.root / "data" / "deliveries" / "2026-09-20" / "1905_9g_run.json"
+        record.parent.mkdir(parents=True)
+        record.write_text(json.dumps({"kind": "delivery", "date": "2026-09-20",
+                                      "entries": [{"entry_id": "7001"}]}), encoding="utf-8")
+        refusal = self.root / "data" / "deliveries" / "2026-09-21" / "1905_9g_refusal.json"
+        refusal.parent.mkdir(parents=True)
+        refusal.write_text(json.dumps({"kind": "refusal", "date": "2026-09-21",
+                                       "entries": [{"entry_id": "7002"}]}), encoding="utf-8")
+        when = "2026-09-21 19:05:00"
+        export = self._export("draftkings-contest-entry-history_2026-09-22.csv", [
+            self._row(7001, 950, when, 1, 90, 30, title="MLB Satellite to $2 MLB Pocket Cup MEGA Qualifier"),
+            self._row(7002, 951, when, 2, 80, 30, title="MLB $1 Double Up"),
+            self._row(7003, 952, when, 3, 70, 30, title="MLB $1.5K Solo Shot"),
+            self._row(7004, 953, "2026-09-01 19:05:00", 4, 60, 30, title="MLB $5K Turbo Dime Time"),
+            self._row(7005, 954, when, 5, 50, 30, sport="NHL", title="NHL $100 Dime Time"),
+        ])
+        out, meta = self._ingest(export)
+        self.assertEqual({k: (r["family"], r["single_entry"], r["turbo"]) for k, r in out.items()},
+                         {"7001": ("satellite", "0", "0"), "7002": ("cash", "0", "0"),
+                          "7003": ("gpp", "1", "0"), "7004": ("gpp", "0", "1"),
+                          "7005": ("gpp", "0", "0")})
+        self.assertEqual({k: r["engine_record"] for k, r in out.items()},
+                         {"7001": "present", "7002": "absent", "7003": "absent",
+                          "7004": "pre_records", "7005": ""})
+        self.assertEqual((meta["delivery_records"], meta["earliest_delivery_record"]), (1, "2026-09-20"))
+        self.assertEqual(out["7001"]["net"], "-1.00")
+        self.assertEqual(out["7001"]["slate"], "MLB|2026-09-21|Classic")
+        self.assertEqual(out["7001"]["start_block"], "2026-09-21 19:05|Classic")
