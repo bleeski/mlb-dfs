@@ -9280,6 +9280,7 @@ class ShowdownRecordPredictionTests(_ShowdownExitDoorHarness, unittest.TestCase)
         self.assertEqual(len(entries), len(lineups))
         self.assertEqual(record["prediction_source"]["status"], "resolved")
         self.assertEqual(record["prediction_source"]["unmatched_entry_ids"], [])
+        self.assertEqual(record["prediction_source"]["held_entry_ids"], [])
         sums = []
         for entry in entries:
             pred = entry["prediction"]
@@ -9403,6 +9404,8 @@ class ShowdownRecordPredictionTests(_ShowdownExitDoorHarness, unittest.TestCase)
             {"entry_id": "1", "filled": True, "roster_ids": ["c1", "u1", "u2", "u3", "u4", "u5"]},
             {"entry_id": "2", "filled": True, "roster_ids": ["c2", "u1", "u2", "u3", "u4", "u5"]},
             {"entry_id": "3", "filled": False, "roster_ids": []},
+            # A held complete row: in the file, never built by this build.
+            {"entry_id": "4", "filled": True, "roster_ids": ["c4", "u1", "u2", "u3", "u4", "u6"]},
         ]
         pred = {"thesis": "pitchers_duel", "captain_id": "c1"}
         payload = {"build_id": "sd_000000000000", "pool": {"basis": "x", "posted_sides": []},
@@ -9415,11 +9418,20 @@ class ShowdownRecordPredictionTests(_ShowdownExitDoorHarness, unittest.TestCase)
         self.assertEqual(got["by_entry"]["1"], {**pred, "build_id": "sd_000000000000"})
         self.assertIsNone(got["by_entry"]["2"])
         self.assertIsNone(got["by_entry"]["3"])
+        self.assertIsNone(got["by_entry"]["4"])
         source = got["prediction_source"]
         self.assertEqual((source["status"], source["predicted"], source["filled"]),
-                         ("partial", 1, 2))
+                         ("partial", 1, 3))
+        # Only the mismatch is the alarm; the held row is listed apart.
         self.assertEqual(source["unmatched_entry_ids"], ["2"])
-        self.assertEqual(source["players_missing"], ["c1", "c2", "u1", "u2", "u3", "u4", "u5"])
+        self.assertEqual(source["held_entry_ids"], ["4"])
+        self.assertEqual(source["players_missing"],
+                         ["c1", "c2", "c4", "u1", "u2", "u3", "u4", "u5", "u6"])
+        held_only = showdown_prediction(
+            {**payload, "by_entry": {"1": payload["by_entry"]["1"]}}, [entries[0], entries[3]])
+        self.assertEqual(held_only["prediction_source"]["status"], "resolved",
+                         "a held row is not a mismatch")
+        self.assertEqual(held_only["prediction_source"]["held_entry_ids"], ["4"])
         self.assertEqual(showdown_prediction(None, entries)["prediction_source"]["status"],
                          "not_supplied")
         broken = showdown_prediction({"build_id": "x", "error": "Boom: no"}, entries)
@@ -9446,6 +9458,74 @@ class ShowdownRecordPredictionTests(_ShowdownExitDoorHarness, unittest.TestCase)
             self.assertEqual(source["build_id"], r.brief["build_id"])
             self.assertEqual({e["prediction"] for e in record["entries"]}, {None})
             self.assertTrue(record["players"], "the players map is its own step")
+
+    def test_a_broken_or_missing_roster_market_costs_the_flex_prior_never_the_build(self):
+        """The R495 review's blocker: a roster block of the wrong type raises
+        AttributeError inside the join, which escaped `resolve_captain_prior`
+        and crashed a build `main` ships. A missing block names the FILE, never
+        a host path, because the reason lands in a tracked record."""
+        from tools.ownership_pred import build_prediction
+        for variant in ("wrong_type", "missing"):
+            with self.subTest(variant=variant):
+                root = self._root(variant)
+                payload = build_prediction(SAL, archetypes=["large_field_gpp"])
+                block = payload["archetypes"]["large_field_gpp"]
+                if variant == "wrong_type":
+                    block["showdown_roster"] = "garbage"
+                else:
+                    block.pop("showdown_roster")
+                folder = root / "outputs" / self._DATE
+                folder.mkdir(parents=True)
+                (folder / f"ownership_pred_{self._TAG}.json").write_text(
+                    json.dumps(payload), encoding="utf-8")
+                r = self._build(root, args_extra={"captain_prior": "",
+                                                  "ownership_pred": None})
+                self.assertEqual(r.code, 0, r.err[-3000:])
+                records = self._by_lineage(r)
+                self.assertEqual(set(records), {"baseline", "ladder"})
+                for record in records.values():
+                    priors = record["prediction_source"]["priors"]
+                    self.assertIs(priors["captain"]["applied"], True)
+                    self.assertIs(priors["flex"]["applied"], False)
+                    self.assertNotIn(str(root), priors["flex"]["reason"])
+                    if variant == "missing":
+                        self.assertIn(f"ownership_pred_{self._TAG}.json",
+                                      priors["flex"]["reason"])
+                    for entry in self._filled(record):
+                        self.assertIsNotNone(entry["prediction"]["captain_prior_own"])
+                        self.assertIsNone(entry["prediction"]["flex_prior_own_sum"])
+
+    def test_a_build_id_that_cannot_be_derived_is_named_and_costs_nothing_else(self):
+        """The R495 review: the id and the basis shared one `try`, so a failed id
+        dropped the priors and the pool while the record still read `resolved`."""
+        def boom(*_a, **_k):
+            raise OSError("salary vanished")
+
+        mod = self._module()
+        r = self._build(self._root("noid"), mod=mod,
+                        patches=[(mod, "showdown_build_id", boom)])
+        self.assertEqual(r.code, 0, r.err[-3000:])
+        self.assertIsNone(r.brief["build_id"])
+        records = self._by_lineage(r)
+        self.assertEqual(set(records), {"baseline", "ladder"})
+        for record in records.values():
+            source = record["prediction_source"]
+            self.assertIsNone(source["build_id"])
+            self.assertEqual(source["build_id_error"], "OSError: salary vanished")
+            self.assertEqual(source["status"], "resolved")
+            self.assertIs(source["priors"]["captain"]["applied"], False)
+            self.assertEqual(record["pool"]["basis"], "declared_starters")
+        # A basis that cannot be built reads `unreadable`, never `resolved`.
+        mod = self._module()
+        r = self._build(self._root("nobasis"), mod=mod,
+                        patches=[(mod, "showdown_record_basis", boom)])
+        self.assertEqual(r.code, 0, r.err[-3000:])
+        for record in self._by_lineage(r).values():
+            source = record["prediction_source"]
+            self.assertEqual(source["status"], "unreadable")
+            self.assertIn("record basis: OSError: salary vanished", source["error"])
+            self.assertEqual(source["build_id"], r.brief["build_id"])
+            self.assertEqual({e["prediction"] for e in record["entries"]}, {None})
 
     def test_the_roster_market_reads_through_the_same_join(self):
         from tools.ownership_pred import build_prediction

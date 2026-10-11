@@ -712,22 +712,28 @@ def showdown_prediction(payload: Optional[Mapping[str, Any]],
 
     A filled entry takes the build's prediction for its entry id only when the
     captain cell and the five UTIL cells (as a set) match the delivered roster,
-    so a prediction never describes a lineup that is not in the file; a held
-    complete row the build did not fill, or a mismatch, is null and listed. No
+    so a prediction never describes a lineup that is not in the file. Two kinds
+    of null are listed apart, because only one is an alarm: a row the build did
+    not fill (a held complete row of the template) is ``held_entry_ids``; a row
+    whose build prediction names another roster is ``unmatched_entry_ids``. No
     payload is ``not_supplied``; a payload the build could not assemble is
-    ``unreadable`` with its error. Never raises; the players map is a separate
-    step whose failure (``players_error``) costs no prediction.
+    ``unreadable`` with its error; an id the build could not derive is null with
+    ``build_id_error``. Never raises; the players map is a separate step whose
+    failure (``players_error``) costs no prediction.
     """
     from mlb_engine.optimize.showdown_theses import RECORD_CEILING_BASIS
     filled = [e for e in entries if e.get("filled")]
     given = payload if isinstance(payload, Mapping) else None
     source: Dict[str, Any] = {"build_id": (given or {}).get("build_id"),
                               "filled": len(filled), "predicted": 0,
+                              "held_entry_ids": [],
                               "unmatched_entry_ids": [], "players_missing": [],
                               "priors": (given or {}).get("priors"),
                               "ceiling_basis": RECORD_CEILING_BASIS,
                               "rank_basis": SHOWDOWN_RANK_BASIS,
                               "label": SHOWDOWN_PREDICTION_LABEL}
+    if (given or {}).get("build_id_error"):
+        source["build_id_error"] = str(given["build_id_error"])
     by_entry: Dict[str, Any] = {str(e.get("entry_id") or ""): None for e in entries}
     pool = None
     try:
@@ -743,18 +749,22 @@ def showdown_prediction(payload: Optional[Mapping[str, Any]],
                 entry_id = str(entry.get("entry_id") or "")
                 roster = [str(p) for p in entry.get("roster_ids") or []]
                 pred = built.get(entry_id)
-                held = [str(p) for p in ((pred or {}).get("roster_ids") or [])]
-                if (roster and held and held[0] == roster[0]
-                        and sorted(held[1:]) == sorted(roster[1:])):
+                if not isinstance(pred, Mapping):
+                    source["held_entry_ids"].append(entry_id)
+                    continue
+                built_roster = [str(p) for p in (pred.get("roster_ids") or [])]
+                if (roster and built_roster and built_roster[0] == roster[0]
+                        and sorted(built_roster[1:]) == sorted(roster[1:])):
                     by_entry[entry_id] = {**{k: v for k, v in pred.items()
                                              if k != "roster_ids"},
                                           "build_id": source["build_id"]}
                 else:
                     source["unmatched_entry_ids"].append(entry_id)
             source["predicted"] = sum(1 for p in by_entry.values() if p)
-            source["status"] = ("no_filled_entries" if not filled else
-                                "resolved" if source["predicted"] == len(filled) else
-                                "partial" if source["predicted"] else "unmatched")
+            source["status"] = (
+                "no_filled_entries" if not filled else
+                "unmatched" if not source["predicted"] else
+                "partial" if source["unmatched_entry_ids"] else "resolved")
     except Exception as exc:  # noqa: BLE001 - bookkeeping never fails a delivery
         source["status"] = "unreadable"
         source["error"] = f"{type(exc).__name__}: {exc}"

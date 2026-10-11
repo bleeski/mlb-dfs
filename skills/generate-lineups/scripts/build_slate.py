@@ -5814,18 +5814,22 @@ def resolve_captain_prior(args, slate_tag: str, df) -> tuple[dict, dict]:
     }
     # R495. The six-slot roster market the same file carries, through the same
     # engine join, for the delivery record's flex prior and nothing else. A
-    # file without it costs that one record field, never the build, so its
-    # refusal is caught here and the brief above is unchanged.
+    # file without it, or with a malformed one, costs that one record field and
+    # never the build, so every failure is caught here (a block of the wrong
+    # type raises AttributeError, not CaptainPriorError) and the brief above is
+    # unchanged. `source` is the file's NAME: the reason lands in a tracked
+    # record, and a host path there differs from machine to machine.
     try:
         roster = _st.captain_prior_by_person(
-            df, payload, resolved["archetype"], source=str(path),
+            df, payload, resolved["archetype"], source=Path(str(path)).name,
             market="showdown_roster")
         resolved["roster_own_pct_by_player_key"] = roster["own_pct_by_player_key"]
         resolved["roster_market"] = {"applied": True,
                                      "persons_matched": roster["persons_matched"],
                                      "budget_check": roster["budget_check"]}
-    except _st.CaptainPriorError as exc:
-        resolved["roster_market"] = {"applied": False, "reason": str(exc)}
+    except Exception as exc:  # noqa: BLE001 - a record field never costs the build
+        resolved["roster_market"] = {"applied": False,
+                                     "reason": f"{type(exc).__name__}: {exc}"}
     return resolved, brief
 
 
@@ -6310,7 +6314,11 @@ def showdown_record_prediction(record_basis, frame, lineups, rows,
     failure returns the shared basis with an ``error`` and the record says so,
     because it is computed beside a delivery that must not depend on it."""
     basis = record_basis if isinstance(record_basis, dict) else {}
-    out = {key: basis.get(key) for key in ("build_id", "salary_csv", "pool", "priors")}
+    out = {key: basis[key] for key in ("build_id", "build_id_error", "salary_csv",
+                                       "pool", "priors") if key in basis}
+    if basis.get("error"):
+        out["error"] = basis["error"]
+        return out
     try:
         from mlb_engine.optimize import showdown_theses as _st
         predicted = _st.record_predictions(
@@ -6582,16 +6590,28 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                                  f1_report=f1_report)
     # R495. One identity and one record basis for this build's two writers,
     # derived before the baseline so both records carry the same. Bookkeeping:
-    # a failure here costs the records their prediction, never the build.
+    # a failure in either step is NAMED in the records and never costs the
+    # build. Two steps, so an id that cannot be derived keeps the priors and
+    # the pool, and a basis that cannot be built reads `unreadable`, never a
+    # `resolved` record whose nulls would read as unscored people.
+    sd_build_id, sd_build_id_error = None, None
     try:
         sd_build_id = showdown_build_id(args.date, slate_tag_suffix(salary).lstrip("_"),
                                         salary, entries)
+    except Exception as exc:  # noqa: BLE001 - bookkeeping never costs the file
+        sd_build_id_error = f"{type(exc).__name__}: {exc}"
+        print(f"showdown build_id not derived ({sd_build_id_error}); the delivery "
+              f"records carry build_id null and say why", file=sys.stderr)
+    try:
         sd_record_basis = showdown_record_basis(sd_build_id, salary, basis, sides,
                                                 captain_prior, captain_prior_brief)
+        if sd_build_id_error:
+            sd_record_basis["build_id_error"] = sd_build_id_error
     except Exception as exc:  # noqa: BLE001 - bookkeeping never costs the file
-        sd_build_id, sd_record_basis = None, {"build_id": None, "salary_csv": str(salary)}
-        print(f"showdown build_id not derived ({type(exc).__name__}: {exc}); the "
-              f"delivery records carry no prediction", file=sys.stderr)
+        sd_record_basis = {"build_id": sd_build_id, "salary_csv": str(salary),
+                           "error": f"record basis: {type(exc).__name__}: {exc}"}
+        print(f"showdown record basis not built ({sd_record_basis['error']}); the "
+              f"delivery records read unreadable", file=sys.stderr)
     # R389(c), roadmap Session 12. Baseline first: a thesis-free points-max
     # file over every incomplete reserved row, checked on its exact bytes,
     # recorded in its own lineage and PRESENTED before the ladder, so a crash
