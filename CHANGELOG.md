@@ -2,6 +2,79 @@
 
 What changed in the engine, the tools and the contracts, when, and why.
 
+## 2026-10-11 — R494-R501 filed: Ben's DraftKings results review, recomputed for MLB from his entry-history export, as nine sessions ahead of the queue on his instruction, Showdown's two ahead of the Classic work (roadmap Sessions 160-168)
+
+**Scope.**
+- `docs/backlog.md`: R494 and R499 at the head of Workstream 5, R495 and R501 at the head of Workstream 1, R496 and R497 at the head of Workstream 7, R498 and R500 at the head of Workstream 2. Riders on R30 (its data half discharged for the contests the new export covers; R496 supersedes (d)'s fee fallback there), R13 (R496 produces the GPP leg D-1 lacked), R334 (moved to Session 167) and R263 (its pitcher-captain half split out as R501).
+- `docs/ROADMAP.md`: a section above the exception band, "Ahead of the queue (Ben, 2026-10-11)", holding Sessions 160-168, all Pending, each `Rank 0 (n of 9)` with the band the priority rule would otherwise give it (the Sessions 155-158 precedent; no existing rank moved), in the order 160, 161, 167, 168, 162-166. Session 59 gives R334(b) to Session 167 and keeps R253 and R310's shrink; Session 92 gives up R334(a)'s re-measurement. D-3 rewritten to the one lever left (a pitcher-only captain cap) and moved to the top of the decision table. One sentence added to the queue-order bullet naming the new section. D-9 marked answered. **NEXT** Session 40 -> Session 160. Session 29's SHA backfilled (`3cf88a8`, R410's command). A Progress Ledger row.
+- `data/reference/draftkings-contest-entry-history_2026-10-09.csv`: the export, committed byte-exact in its own `record:` commit at Ben's instruction (sha256 `5752c7f3…`, 10,095 rows).
+- No engine, tool, test, skill or fixture file changed.
+
+**Why.** Ben's instruction (2026-10-11): take the first review of real DraftKings results (`dk-findings-and-engine-requirements.md`, prepared 2026-10-10, every sport, requirements R1 to R6) and put what this engine needs at the top of the backlog. The review did not see this repo, so every MLB claim was checked against the tree (three read-only repo checks) and every figure recomputed from the export Ben attached.
+
+**Recomputed for MLB.** Source: the contest entry-history export (10,095 rows, 2023-10-29 to 2026-10-09, sha256 `5752c7f3a33b0e95c126b47b01e846b374a3c110f45b32ee618c14e056e807a3`). The review's all-sport headline reproduced exactly first: 9,960 paid entries outside Best Ball, fees $2,470.23, net -$640.20, place/N 52.46, top decile 9.66%, bottom decile 13.56%, 106 zero-point entries on nine days.
+- Definitions. Paid outside Best Ball: fee above 0 and `Game_Type` not Best Ball. Net: cash plus ticket face value minus fee. A slate: sport, date and game type. place/N is the review's percentile. Finish percentile: (Place - 1) / (N - 1). Uniform references: (N + 1) / (2N) for place/N, `floor(0.1 N) / N` for the top decile, `(N - ceil(0.9 N) + 1) / N` for the bottom decile. Intervals: 90%, slate bootstrap (whole slates resampled, 2,000 draws, seed 0).
+- Money. 7,598 MLB entries in 242 slates: fees $1,249.05, net -$270.36. The same contests' prize pools return 91.9% of fees to a uniform entrant. Satellites 6,146 entries, fees $519.80, net -$59.23 (cash plus ticket face; the promotional channel is unmeasured, Ben 2026-07-29). Non-satellite GPPs 1,435 entries, fees $708.25, net -$208.13. Fields over 2,000 entries: 639 entries, fees $303.41, net -$199.04.
+- Finish. place/N 52.43 (the review's 52.4) against a uniform reference of 50.39; finish percentile 52.05 [51.1, 53.1].
+- Deciles. Top 10.03% against 9.61%, +0.4 [-0.4, +1.2]. Bottom 13.96% against 10.40%, +3.6 [+2.4, +4.7]; without blanks +2.5 [+1.5, +3.5]. Without blanks the excess sits in the bottom decile (12.89% against 10.36%) and the 80th-90th band (10.81% against 9.98%).
+- Format, without blanks. Classic 51.0 [49.9, 52.2], bottom +2.8 [+1.7, +4.0], top +0.8 [-0.2, +1.8]. Showdown 53.1 [51.5, 54.7], bottom +1.3 [-0.3, +3.0], top at the reference. Showdown minus Classic +2.1 [+0.1, +4.1].
+- Blanks. 94 MLB entries scored 0. One (2026-08-09, entry 5213739389) is a complete 5-1 lineup in the archived standings. The other 93 sit in seven start-time blocks, each starting after a draftgroup filled the same day (R499's table): five whole blocks, two filled contests of five at 2026-08-03 20:05, and three of seven entries in one 2026-04-04 satellite. 0 of 2,094 paid MLB entries since 2026-08-10 scored 0. Turbo with blanks: bottom 17.63%; without: bottom 13.57%, finish 49.4, top 12.27% against 9.59%.
+- Field size, finish percentile without blanks. 25 or fewer 52.7 [49.6, 55.4] (place/N 54.9 against its own reference of 52.3); 26-100 50.9 [48.9, 52.8]; 101-500 50.9 [49.9, 52.0]; 501-2K 52.8 [49.9, 55.5]; 2K-10K 54.3 [50.3, 58.1]; 10K-100K 54.9 (n = 39).
+- Month, Classic without blanks. April 51.2, May 51.0, June 50.6, July 49.6, August 52.4, September 52.8. August-October minus April-July +1.9 [-0.4, +4.3]; inside fields of 2,000 or fewer +2.5 [+0.1, +4.8]. The satellite share of Classic entries fell from 85.7% to 65.0% between the halves.
+- Since 2026-09-19 (95.1% of 466 MLB entries sit in a delivery record). Classic 286 entries in 14 slates, finish 49.8 [44.7, 55.7], bottom against reference [-3.9, +1.6] against [+1.9, +4.2] before. Showdown 180 entries in 12 slates, 54.9 [52.4, 58.0].
+- Attribution prototype (archive, 2026-06 to 2026-08; 791 of our Classic entries in 38 slates joined by Entry ID; ranks agree on 99.4% and points on 100% of the 1,558 MLB entries found there). Bottom-decile excess +4.3 [+1.5, +7.5] overall, +7.7 [+3.0, +13.2] in our entries inside the field's low-chalk third (43.6% of ours, against 33.3% by construction), +1.7 [-1.5, +5.5] in the rest. Our low-chalk entries finish at the field's low-chalk rate (55.3 against 55.6). By stack, +13.3 [+6.8, +19.5] for 4-4, 4-3-1 and 4-2-2, and +0.6 [-5.2, +6.9] for five-stacks (n = 117). Max-four stacks are 74.5% of our entries against 21.7% of the field in the same contests. Dead slots: fewer zero-point hitters per lineup than the field in every month (August 1.60 against 1.79).
+
+**The review's claims this engine corrects.**
+1. "Captain exposure caps are an operations check no tool performs." The solver enforces a per-player captain cap (0.25, `showdown.py:56`), a per-contest captain cap (R239(b)), a roster cap (0.50) and overlap (4 of 6) against the realized set (R153). The missing piece is a per-role pitcher-captain band, shadow-only by design (R263, D-3).
+2. "`e_payout` saturates and ranks lineups backwards in large fields." No payout estimate exists in this engine: the allocator scores ceiling, correlation and field pressure (`contest_allocator.py:21-36`, `optimizer_v3.py:4001-4061`), and the register's "Do not build" forbids a field-ROI engine until R13 and R10.
+3. "Finishing is best in large recreational fields and worst in small fields of regulars." Reversed for MLB: best in fields of 26-500, worst over 2,000. The small-field half is mostly the place/N reference.
+4. "The top tail is at or below random." MLB's top decile sits at or above its own uniform reference; only the bottom is heavy.
+5. "MLB needs a way to replace scratched players after lock." `tools/late_swap.py` and `tools/repair_entry.py` exist for Classic (R267(a), R404, R450, R468); a Showdown game locks at once.
+6. "The build is not finishing before lock." The blanks are later-starting blocks that were never filled. 2026-08-03 traces to three failed scipy installs (R42(a)); none has recurred since 2026-08-10, and baseline-first landed 2026-09-24/25.
+7. R6's mechanism. Builds do not wait for confirmed orders (`MLB_Classic.md`:114-116), and the intake stamps each hitter `Confirmed_Starter` or `Projected_Starter`, but no projection or selection term reads it. The dead-slot mechanism is not visible in the archive through 2026-08-27.
+8. "No Classic ownership model." A labelled prior exists (v0.1, graded Spearman 0.45 to 0.64 with a compressed level; R342 landed). The fit is R10 (Session 44), waiting on an ARCHIVE re-mine; the export carries no ownership.
+
+**Checked against the board (partly done, scoped around).** R369's delivery record exists (R494 and R495 extend it). R370's outcome review exists and has never run (R497(c) fixes its record selection). R118/R384's replay is Classic only (R497(d) counts recoverable Showdown captains before any replay row). R30's (e) stays. Untouched, with the new items citing them as evidence or inputs: R342 and R10 (ownership), R263, R37(2)(c) and R340 (the construction rules R498 grades; Sessions 121, 58, 122), R261 (scenario bank), R255 (projection grade), R422(c) (`tail_winners.py`, field winners), R279 (observed starter state), R41 (Showdown certification, Deferred) and Session 148 (posture routing).
+
+**Research used.** Search-summary level only: WebFetch reached github.com and nothing else, so no figure here is verified against its source, and none moves a row.
+- Opponent models and field generators: Haugh and Singal, Management Science 2021 (Dirichlet-multinomial opponents; generators calibrated to the observed stack rate and salary used).
+- Variance and overlap caps: Hunter, Vielma and Zaman, arXiv 1604.01455 (their baseball code read on GitHub). Newell and Easton on payout-curve stochastic programs.
+- Ownership: SaberSim and Establish The Run on ownership by contest type and field size; Establish The Run and Stokastic on duplication as the product of ownerships.
+- Measuring skill: Getty et al., SIAM Review 2018; Evans et al., Journal of Gambling Studies 2018.
+- Rules: DraftKings help pages on Showdown and late swap.
+
+What the research changed: the per-entry uniform reference and the slate bootstrap (R496), measuring before modelling ownership or a field (R498, R500), and the duplication column (R500).
+
+**Advisor review, before writing.** Raised and adopted:
+- report the red gate truthfully and touch no test;
+- follow the Rank 0 precedent in a section above the exception, with no renumbering and no edit to the priority rule;
+- order by what is unrecoverable, so R494 goes first;
+- fold the Showdown replay into a count (R497(d)) instead of a session;
+- no ROI or probability wording anywhere;
+- treat the attribution finding as composition, which makes it evidence for Sessions 121 and 58 rather than a new construction item;
+- the full cell set and the sizing formula on every row;
+- ask Ben whether the blank draftgroups had files;
+- inline the definitions and figures here, because the scripts die with the container.
+
+No disagreement is recorded. Two things changed after the review: the blanks were re-read per contest (five whole blocks, not seven), and R494 and R495 became one R-number per session, so each row holds one entry.
+
+**Ben's answers (same session, after the first commit).**
+1. Push: the branch is pushed and the PR opened.
+2. Commit the export: done, at R496's path; D-9 reads answered.
+3. Whether the seven blank blocks had DKEntries files: unknown. R499 therefore lands both halves, the tool for the file case and one SKILL.md line (ask for every reserved draftgroup's file by name before the first build of a day) for the case where a draftgroup was never handed over.
+4. Whether the salary files or DKEntries templates since 2026-09-19 survive: unknown. R497 gains a `no_crosswalk` outcome, and the records written before R494 lands may stay unresolved.
+5. Move the Showdown work ahead of the Classic work: yes. Two premises shaped how. R334(b) is still gated on (a)'s 1.77x re-measurement, which sat in Deferred Session 92, so Session 167 carries both, with (b) building only if the residual exceeds what F1's clip carries. The pitcher-captain share already sits at the ceiling the per-player 0.25 cap allows, so the D-3 band could not move it; the lever left is a pitcher-only cap, filed as R501 (Session 168, Needs D-3), with D-3 rewritten to ask for its value. Both rows sit right after the two record rows: blocked rows are skipped by **NEXT**, so they cost the results sessions nothing until they can run.
+
+**Not filed, and why.**
+- A start-probability term for unconfirmed hitters (R6): the archive shows no dead-slot excess, so R498 measures it and files a D-row only if one appears.
+- Field size routed into the production posture: MLB finishes worst in fields over 2,000, but which posture those entries carried is unknown until R498 cuts by it, and Session 148 holds routing.
+- A field simulator or payout estimate in either format: the register's "Do not build" (R13, R10) stands.
+- Showdown certification: R41, Deferred, behind Ben's two decisions.
+- An ownership fit from the export: the export carries no ownership.
+- Slot placement that keeps late-game players swappable: DK MLB Classic has no UTIL slot, so the gain is limited to multi-position hitters.
+
+**Verification.** `python tools/plan_status.py --check`: exit 0, "docs/ROADMAP.md is consistent with docs/backlog.md". Gate at `181e870` before any edit: `FAIL  test suite FAILED in tests.test_core (ran 3623)`. The one failure is `ReplaySlateTests.test_settle_scores_requires_integer_hundredths_so_ties_are_exact`, which asserts that two orderings of one float list sum differently. This container now runs Python 3.13.16, whose `sum()` compensates floating-point error, while the `gate` workflow pins 3.11 and the 2026-09-29 records show 3.11.15. That is a host fact, not a tree defect; no test was touched (planning session). `git diff --stat` shows these three files only.
+
 ## 2026-10-10 — R284 (stack_min half) + R68 + R141 + R445: a late swap asks its bank for the stack sizes its controls ask, reads repaired cells and refuses a hostile flag, checks its frozen rows against each other, and can show the field's chalk (roadmap Session 29, five commits)
 
 Session 29 is four lettered items landed as four commits under this one entry, the breakpoint half first, plus a fifth commit for the landing review's findings: commit 1 is R284(stack_min), commit 2 is R445, commit 3 is R68, commit 4 is R141, commit 5 is the review fixes (below). The registers as filed are `git show 15d986d:docs/backlog.md` under `### R284`, `### R445`, `### R68` and `### R141`. Every line range in the row and the register was stale (`tools/late_swap.py` is 2488 lines, `_untouchable_cap_conflicts` is `contest_allocator.py:1591`, not :1289), so each premise was re-checked against the tree before anything was built (R284 by hand; R68, R141 and R445 by the `dfs-premise` agent, whose commands and outputs were read). One filed premise was false and four were wrong or incomplete in part; they are under each letter.
