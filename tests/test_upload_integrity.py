@@ -5052,6 +5052,128 @@ class RecordPredictionTests(unittest.TestCase):
                         f"a 20-entry Classic record measured {size} bytes")
 
 
+class PreflightSidecarTests(unittest.TestCase):
+    """R494(c), roadmap Session 160. Preflight exit 0 writes a create-only
+    tracked `<record>.preflight.json` beside the delivery record of the bytes it
+    checked, because its verdict otherwise lands only in the gitignored manifest:
+    every tracked record read `candidate`, and 447 of 480 entry ids sat in more
+    than one record with nothing saying which bytes were cleared to upload.
+
+    In a temp root with both `REPO_ROOT`s patched (the `RepairRecordTests`
+    pattern), a certified delivery recorded through the real `deliver`, and the
+    real `preflight_upload.main`.
+    """
+
+    DATE = "2026-07-25"
+    AS_OF = "2026-07-25T16:00:00Z"
+
+    def setUp(self):
+        import preflight_upload
+        from mlb_engine.entries import upload_manifest as um
+        self.pf, self.um = preflight_upload, um
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self._saved = (um.REPO_ROOT, preflight_upload.REPO_ROOT)
+        um.REPO_ROOT = self.root
+        preflight_upload.REPO_ROOT = self.root
+        self.addCleanup(self._restore)
+        self.salary = self.root / "DKSalaries.csv"
+        self.lineup = write_classic_salary(self.salary)
+        self.outputs = self.root / "outputs" / self.DATE
+        self.outputs.mkdir(parents=True)
+        self.records = self.root / "data" / "deliveries" / self.DATE
+
+    def _restore(self):
+        self.um.REPO_ROOT, self.pf.REPO_ROOT = self._saved
+        self.tmp.cleanup()
+
+    def _deliver(self, tag, entry_id="900") -> tuple:
+        out = self.um.deliver(
+            date=self.DATE, dest=self.outputs / f"DKEntries_{tag}.csv",
+            write=lambda p: write_entries(p, CLASSIC_HEADER,
+                                          [classic_entry(entry_id, "5", self.lineup)]),
+            contest_type="classic", slate_tag=tag, contest_ids=["5"], entries=1,
+            run_id=None, status="candidate", certification="certified",
+            projection_tier="proxy", strategy_state={"state": "clean", "counts": {}})
+        self.assertTrue(out["recorded"], out["error"])
+        sha = out["record"]["sha256"]
+        record = self.records / f"{tag}_norun_{sha[:12]}.json"
+        self.assertTrue(record.is_file(), record)
+        return Path(out["path"]), record
+
+    def _preflight(self, entries, *extra) -> tuple:
+        import contextlib
+        import io
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(io.StringIO()):
+            code = self.pf.main(["--entries", str(entries), "--salary", str(self.salary),
+                                 "--as-of", self.AS_OF, "--json", *extra])
+        return code, json.loads(buf.getvalue())
+
+    def _sidecars(self) -> list:
+        return sorted(p.name for p in self.records.glob("*.preflight.json"))
+
+    def test_exit_0_writes_the_sidecar_once_beside_its_record(self):
+        from mlb_engine.entries.delivery_record import read_records
+        entries, record = self._deliver("1905_2g")
+        record_bytes = record.read_bytes()
+        code, report = self._preflight(entries)
+        self.assertEqual(code, 0, report.get("failures"))
+        sidecar = record.with_name(f"{record.stem}.preflight.json")
+        self.assertEqual(self._sidecars(), [sidecar.name])
+        payload = json.loads(sidecar.read_text(encoding="utf-8"))
+        self.assertEqual(
+            {k: payload[k] for k in ("kind", "record", "entries_sha256", "exit_code", "verdict")},
+            {"kind": "preflight", "record": record.name,
+             "entries_sha256": self.um.sha256_file(entries), "exit_code": 0,
+             "verdict": "upload_ready"})
+        self.assertEqual(record.read_bytes(), record_bytes, "the record is never rewritten")
+        first = sidecar.read_bytes()
+        code, report = self._preflight(entries)
+        self.assertEqual(code, 0)
+        self.assertEqual(sidecar.read_bytes(), first, "create-only: the first clearance stands")
+        self.assertEqual(report["info"]["preflight_sidecars"]["written"], [])
+        self.assertEqual([Path(p).name for p in report["info"]["preflight_sidecars"]["already"]],
+                         [sidecar.name])
+        # Every reader of data/deliveries/ filters on kind, so the note is not a delivery.
+        kinds = sorted(r.get("kind") for r in read_records(root=self.root, date=self.DATE))
+        self.assertEqual(kinds, ["delivery", "preflight"])
+
+    def test_a_preflight_of_other_bytes_writes_its_own(self):
+        first_entries, first = self._deliver("1905_2g", "900")
+        second_entries, second = self._deliver("2005_2g", "901")
+        self.assertEqual(self._preflight(first_entries)[0], 0)
+        self.assertEqual(self._sidecars(), [f"{first.stem}.preflight.json"],
+                         "only the record of the checked bytes gets a sidecar")
+        held = (self.records / f"{first.stem}.preflight.json").read_bytes()
+        self.assertEqual(self._preflight(second_entries)[0], 0)
+        self.assertEqual(self._sidecars(), sorted([f"{first.stem}.preflight.json",
+                                                   f"{second.stem}.preflight.json"]))
+        self.assertEqual((self.records / f"{first.stem}.preflight.json").read_bytes(), held)
+
+    def test_a_failing_preflight_writes_none(self):
+        entries, _record = self._deliver("1905_2g")
+        code, _report = self._preflight(entries, "--expect-entries", "2")
+        self.assertEqual(code, 2)
+        self.assertEqual(self._sidecars(), [])
+        code, _report = self._preflight(entries, "--expect-entries", "2", "--force")
+        self.assertEqual(code, 4, "acknowledged is not cleared")
+        self.assertEqual(self._sidecars(), [])
+
+    def test_no_tracked_record_writes_none_and_says_so(self):
+        entries, record = self._deliver("1905_2g")
+        record.unlink()
+        code, report = self._preflight(entries)
+        self.assertEqual(code, 0, "a missing record never changes the verdict")
+        self.assertEqual(self._sidecars(), [])
+        self.assertIn("no tracked delivery record for these bytes",
+                      report["info"]["preflight_sidecars"]["note"])
+        shutil.rmtree(self.records)
+        code, report = self._preflight(entries)
+        self.assertEqual(code, 0)
+        self.assertFalse(self.records.exists(), "the sidecar never creates the folder")
+
+
 class CorruptManifestIsItsOwnStateTests(unittest.TestCase):
     """R36 F6m(1). CORRUPT and ABSENT were the same answer, and the write erased.
 

@@ -1944,6 +1944,69 @@ def committed_manifest_status(manifest_path: Path, entries_sha256: str,
     return str(target.get("status") or "")
 
 
+def write_preflight_sidecars(manifest_path: Path, entries_sha256: str,
+                             verdict: str) -> Dict[str, Any]:
+    """R494(c). A create-only tracked note beside each delivery record of these
+    bytes, so the archive can tell which bytes were cleared to upload.
+
+    ``stamp_manifest_status`` writes the verdict into ``outputs/<date>/
+    upload_manifest.json``, which is gitignored and dies with a cloud container,
+    so every tracked record still reads ``candidate`` and 447 of 480 entry ids
+    sat in more than one record (baseline, rebuild, repair, late swap) with no
+    way to say which one went up. Called only on exit 0.
+
+    The root comes from the manifest's own location, ``<root>/outputs/<date>/
+    upload_manifest.json``, the layout ``upload_manifest.manifest_path`` writes
+    under any artifact root, so a test in a temp root never touches the tracked
+    tree. Nothing happens unless ``<root>/data/deliveries/<date>`` already
+    exists: a manifest under the real ``outputs/_test_r3_*``
+    (`PreflightManifestBindingTests`) derives a folder that does not, and writes
+    nothing. Each ``kind: delivery`` record there whose ``manifest_row.sha256``
+    is these bytes gets ``<record stem>.preflight.json``, opened ``"x"``: never a
+    mkdir, never a second write, never a rewrite of the record. Every reader of
+    ``data/deliveries/`` filters on ``kind``, so ``kind: preflight`` is invisible
+    to them. Never raises; a failure is reported, never an exit code.
+    """
+    out: Dict[str, Any] = {"written": [], "already": [], "note": ""}
+    try:
+        manifest_path = Path(manifest_path)
+        date_dir = manifest_path.parent
+        if date_dir.parent.name != "outputs":
+            out["note"] = "the manifest is not under outputs/<date>/; no record to find"
+            return out
+        records = date_dir.parent.parent / "data" / "deliveries" / date_dir.name
+        if not records.is_dir():
+            out["note"] = f"no tracked delivery records at {records}"
+            return out
+        sha = str(entries_sha256 or "").strip().lower()
+        for path in sorted(records.glob("*.json")):
+            try:
+                record = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            if not isinstance(record, dict) or record.get("kind") != "delivery":
+                continue
+            row = record.get("manifest_row")
+            if not isinstance(row, dict) or str(row.get("sha256") or "").strip().lower() != sha:
+                continue
+            sidecar = path.with_name(f"{path.stem}.preflight.json")
+            payload = {"kind": "preflight", "schema_version": 1, "record": path.name,
+                       "entries_sha256": sha, "exit_code": 0, "verdict": str(verdict),
+                       "preflight_version": VERSION,
+                       "utc": datetime.now(timezone.utc).isoformat()}
+            try:
+                with sidecar.open("x", encoding="utf-8") as handle:
+                    handle.write(json.dumps(payload, indent=1, sort_keys=True) + "\n")
+                out["written"].append(str(sidecar))
+            except FileExistsError:
+                out["already"].append(str(sidecar))
+        if not out["written"] and not out["already"]:
+            out["note"] = f"no tracked delivery record for these bytes in {records}"
+    except Exception as exc:  # noqa: BLE001 - bookkeeping never changes the verdict
+        out["note"] = f"sidecar not written ({type(exc).__name__}: {exc})"
+    return out
+
+
 def stamp_manifest_status(manifest_path: Path, entries_sha256: str,
                           status: str, failures: Sequence[str], rep: Report,
                           entries_name: str = "") -> Dict[str, Any]:
@@ -3426,6 +3489,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 report["verdict"] = verdict
                 code = verdict_exit_code(report["failures"], args.force)
 
+    if manifest_file and code == 0:
+        # R494(c). After the verdict is final, so a stamp that failed to persist
+        # (exit 2 above) writes no note that these bytes were cleared.
+        report["info"]["preflight_sidecars"] = write_preflight_sidecars(
+            Path(manifest_file), report["info"]["entries_sha256"], verdict)
+
     # Persistence can add a hard failure after the initial report was assembled.
     report["passed"] = not report["failures"]
     if args.json:
@@ -3504,6 +3573,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             age_text = (f"{age / 60:.1f}h old" if isinstance(age, (int, float))
                         else "age unknown")
             print(f"  feed: {Path(info['feed_file']).name} ({age_text})")
+        sidecars = info.get("preflight_sidecars")
+        if sidecars:
+            for path in sidecars["written"]:
+                print(f"  record sidecar: {Path(path).name} (written)")
+            for path in sidecars["already"]:
+                print(f"  record sidecar: {Path(path).name} (already held)")
+            if sidecars["note"]:
+                print(f"  record sidecar: none ({sidecars['note']})")
         print()
         for w in report["warnings"]:
             print(f"WARN  {w}")
