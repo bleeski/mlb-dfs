@@ -4677,6 +4677,558 @@ class DeliveryRecordBytesTests(unittest.TestCase):
             self.assertNotIn("env_probe", text, rel)
 
 
+class RecordPredictionTests(unittest.TestCase):
+    """R494(a)+(b), roadmap Session 160. A Classic delivery record keeps what the
+    build predicted for each entry, and whether the build had a market.
+
+    The defect: the record carried `{entry_id, contest_id, contest_name,
+    entry_fee, roster_ids, filled}` and nothing the build predicted, while the
+    prediction sat in `runs/<run_id>/final/assignments.csv` and `projections.csv`,
+    which the cloud deletes with the container (0 of 1,900 entry rows across the
+    151 records to 2026-10-10 carried one). Reproduced at 82c5ad9 through the
+    real `run_slate`: `final/` held both files when the record was written, and
+    the record's entries held none of them.
+
+    One case runs the real `run_slate`; the rest build run folders with the
+    production writers (`create_run`, `snapshot_run_inputs`,
+    `_write_assignments`, `_materialize_projections`) and record through the
+    real `deliver` door.
+    """
+
+    DATE = "2026-07-25"
+    #: Measured 2026-10-11 at 20 entries over 80 players and two contests:
+    #: 32,341 bytes. About 1.25x that; a gross regression guard only.
+    SIZE_BOUND_BYTES = 40_960
+    GAMES = ((GAME_A, ("AAA", "BBB")), (GAME_B, ("CCC", "DDD")),
+             ("EEE@FFF 07/25/2026 07:15PM ET", ("EEE", "FFF")),
+             ("GGG@HHH 07/25/2026 07:20PM ET", ("GGG", "HHH")))
+
+    def setUp(self):
+        from mlb_engine.entries import upload_manifest as um
+        self.um = um
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self._original_root = um.REPO_ROOT
+        um.REPO_ROOT = self.root
+        self.outputs = self.root / "outputs" / self.DATE
+        self.outputs.mkdir(parents=True)
+        self.addCleanup(self._restore)
+
+    def _restore(self):
+        self.um.REPO_ROOT = self._original_root
+        self.tmp.cleanup()
+
+    # ---- fixtures ---------------------------------------------------------
+
+    def _salary(self, games=GAMES) -> list:
+        """Ten players per team in DK's own columns; returns every id in order."""
+        path = self.root / "DKSalaries.csv"
+        rows, ids, pid = [SALARY_HEADER], [], 1000
+        for game, teams in games:
+            for team in teams:
+                for i, (pos, roster) in enumerate(SLOT_SPEC):
+                    pid += 1
+                    ids.append(str(pid))
+                    rows.append(_salary_row(pid, f"{team} {SURNAMES[i]}", team, game,
+                                            pos, roster, 3000 + 100 * i, "",
+                                            "SP" if roster == "P" else str(i)))
+        with path.open("w", newline="", encoding="utf-8") as fh:
+            csv.writer(fh).writerows(rows)
+        self.salary_path = path
+        return ids
+
+    def _frame(self, notes=None, own=True):
+        """A projections frame in the production columns, one row per salary
+        player: Base, Ceiling, the lineup tag in Notes, and the labeled prior."""
+        import pandas as pd
+        notes = notes or {}
+        return pd.DataFrame([{
+            "Player_ID": sp.player_id, "Name": sp.name, "Team": sp.team,
+            "Position": sp.raw["Roster Position"], "Salary": sp.salary,
+            "Game_ID": sp.game_id, "Base": 2.5 + int(sp.player_id) % 7,
+            "Ceiling": 10.0 + int(sp.player_id) % 5,
+            "Notes": notes.get(sp.player_id, ""),
+            **({"Projected_Ownership_Pct": 1.0 + int(sp.player_id) % 3} if own else {}),
+        } for sp in parse_dk_salary_csv(str(self.salary_path))])
+
+    def _make_run(self, assignments, frame, parent=None) -> str:
+        """A run folder written by the production writers, as `execute_portfolio`
+        leaves it: the salary snapshot, `final/projections.csv`, and
+        `final/assignments.csv`. ``assignments`` is ``[(entry_id, contest_id,
+        roster, score)]``."""
+        from mlb_engine.pipeline.build_state_manager import create_run, snapshot_run_inputs
+        from mlb_engine.pipeline.execution_pipeline import (
+            _materialize_projections, _write_assignments)
+        run = create_run(self.root / "runs", "late_swap" if parent else "initial_build",
+                         parent_run_id=parent)
+        snapshot_run_inputs(run["run_dir"], [self.salary_path])
+        final = Path(run["run_dir"]) / "final"
+        _materialize_projections(frame, final / "projections.csv")
+        _write_assignments(final / "assignments.csv", [{
+            "entry_id": eid, "contest_id": cid, "contest_name": f"GPP {cid}",
+            "contest_shape": "large_field_gpp", "candidate_id": f"c{eid}",
+            "lineup_signature": "|".join(sorted(roster)), "contest_fit_score": score,
+            "primary_stack": "AAA", "sp_ids": sorted(roster[:2]), "lineup_ids": roster,
+            "reused_across_contests": False,
+        } for eid, cid, roster, score in assignments])
+        return run["run_id"]
+
+    def _deliver(self, rows, run_id=None, tag="1905_4g", **extra):
+        out = self.um.deliver(
+            date=self.DATE, dest=self.outputs / f"DKEntries_{tag}.csv",
+            write=lambda p: write_entries(p, CLASSIC_HEADER, rows),
+            contest_type=extra.pop("contest_type", "classic"), slate_tag=tag,
+            contest_ids=sorted({r[2] for r in rows}), entries=len(rows),
+            run_id=run_id, status="candidate", certification="review_grade", **extra)
+        self.assertTrue(out["recorded"], out["error"])
+        return out
+
+    def _record(self, out) -> dict:
+        from mlb_engine.entries.delivery_record import read_records
+        hits = [r for r in read_records(root=self.root, date=self.DATE)
+                if (r.get("manifest_row") or {}).get("sha256") == out["record"]["sha256"]]
+        self.assertEqual(len(hits), 1, hits)
+        return hits[0]
+
+    @staticmethod
+    def _by_entry(record) -> dict:
+        return {e["entry_id"]: e for e in record["entries"]}
+
+    def _real_build(self, notes):
+        """The real `run_slate` on a one-entry template, its frame carrying the
+        production `Base` and `Notes` columns, no implied totals."""
+        import contextlib
+        import io
+        import pandas as pd
+        from mlb_engine.pipeline.execution_pipeline import run_slate
+        from tests.test_core import RunSlateFrontDoorTests, candidate
+        salary = self.root / "DKSalaries.csv"
+        lineup = write_classic_salary(salary)
+        self.salary_path = salary
+        entries = self.root / "DKEntries.csv"
+        write_entries(entries, CLASSIC_HEADER,
+                      [blank_classic_entry("5001", "900", name="MLB $1K Quarter Jukebox")])
+        frame = pd.DataFrame([{
+            "Player_ID": sp.player_id, "Name": sp.name, "Team": sp.team,
+            "Opponent": sp.opponent, "Position": sp.raw["Roster Position"],
+            "Salary": sp.salary, "Game_ID": sp.game_id,
+            "Base": 9.0 if "P" in sp.positions else 4.0 + int(sp.player_id) % 3,
+            "Floor": 12.0 if "P" in sp.positions else 5.0,
+            "Ceiling": 25.0 if "P" in sp.positions else 12.0,
+            "Notes": notes.get(sp.team, ""), "Excluded": False, "Locked": False,
+        } for sp in parse_dk_salary_csv(str(salary))])
+        with contextlib.redirect_stdout(io.StringIO()), \
+                contextlib.redirect_stderr(io.StringIO()):
+            result = run_slate(
+                runs_root=self.root / "runs", salary_csv=salary, entries_csv=entries,
+                projections_override=frame,
+                candidates_override=[candidate("A", lineup, 100)],
+                portfolio_controls_override=dict(RunSlateFrontDoorTests.LOOSE),
+                approve=True, assume_gates=list(RunSlateFrontDoorTests.UNEVIDENCED),
+                plan_solve_budget_s=0, sleeve_implied_total_by_team=None)
+        self.assertTrue(result["passed"], result.get("errors"))
+        return result, lineup
+
+    # ---- (a) the prediction ---------------------------------------------
+
+    def test_a_real_classic_build_records_its_prediction_for_every_filled_entry(self):
+        from mlb_engine.entries.delivery_record import read_records
+        result, lineup = self._real_build({
+            "AAA": "confirmed_order: F2 from posted batting order",
+            "CCC": "platoon_order: F2 from projected batting order"})
+        records = read_records(root=self.root, date=None)
+        self.assertEqual(len(records), 1)
+        record = records[0]
+        final = self.root / "runs" / result["run_id"] / "final"
+        with (final / "assignments.csv").open(encoding="utf-8") as fh:
+            row = next(csv.DictReader(fh))
+        with (final / "projections.csv").open(encoding="utf-8") as fh:
+            frame = {r["Player_ID"]: r for r in csv.DictReader(fh)}
+        filled = [e for e in record["entries"] if e["filled"]]
+        self.assertEqual([e["entry_id"] for e in filled], ["5001"])
+        pred = filled[0]["prediction"]
+        self.assertIsInstance(pred, dict, "a filled entry carries its prediction")
+        self.assertEqual(
+            (pred["run_id"], pred["contest_shape"], pred["candidate_id"],
+             pred["lineup_signature"], pred["contest_fit_score"], pred["primary_stack"],
+             pred["sp_ids"]),
+            (result["run_id"], row["contest_shape"], row["candidate_id"],
+             row["lineup_signature"], float(row["contest_fit_score"]),
+             row["primary_stack"], row["sp_ids"].split("/")))
+        roster = filled[0]["roster_ids"]
+        self.assertEqual(sorted(roster), sorted(lineup))
+        self.assertEqual(pred["base_sum"],
+                         round(sum(float(frame[p]["Base"]) for p in roster), 2))
+        self.assertEqual(pred["ceiling_sum"],
+                         round(sum(float(frame[p]["Ceiling"]) for p in roster), 2))
+        self.assertIsNone(pred["prior_own_sum"], "no --leverage build, no prior column")
+        self.assertEqual((pred["fit_rank_in_contest"], pred["fit_rank_of_n"]), (1, 1))
+        teams = {sp.player_id: sp for sp in parse_dk_salary_csv(str(self.salary_path))}
+        self.assertEqual(
+            pred["hitter_roles"],
+            {p: {"AAA": "confirmed_lineup", "CCC": "platoon_projected"}[teams[p].team]
+             for p in roster if p not in pred["sp_ids"]})
+        # The crosswalk the standings join needs, in DK's own words.
+        self.assertEqual(record["players"], {
+            p: [teams[p].name, teams[p].team, teams[p].raw["Roster Position"],
+                int(teams[p].salary), teams[p].raw["Game Info"]]
+            for p in sorted(roster)})
+        self.assertEqual(record["prediction_source"]["status"], "resolved")
+        # (b): the build priced no market, and the record says so.
+        market = record["extra"]["market"]
+        self.assertEqual(market["applied"], False)
+        self.assertIn("slate_market_record returned None", market["reason"])
+
+    def test_the_fit_rank_follows_the_fit_score_within_each_contest(self):
+        ids = self._salary()
+        rosters = {f"500{i}": ids[i * 4:i * 4 + 10] for i in range(1, 7)}
+        # 5003 is written before 5002, so only the entry-id tiebreak orders them.
+        scores = {"5001": ("900", 5.0), "5003": ("900", 7.0), "5002": ("900", 7.0),
+                  "5004": ("900", 1.0), "5005": ("901", 2.0), "5006": ("901", 3.0)}
+        run_id = self._make_run([(e, c, rosters[e], s) for e, (c, s) in scores.items()],
+                                self._frame())
+        # 5003 is removed from the delivered file (F-2): its siblings keep the
+        # build's ranks, because the rank is the run's, not the file's.
+        rows = [classic_entry(e, scores[e][0], rosters[e])
+                for e in ("5001", "5002", "5004", "5005", "5006")]
+        record = self._record(self._deliver(rows, run_id=run_id))
+        got = {eid: (e["prediction"]["fit_rank_in_contest"], e["prediction"]["fit_rank_of_n"])
+               for eid, e in self._by_entry(record).items()}
+        self.assertEqual(got, {"5002": (1, 4), "5001": (3, 4), "5004": (4, 4),
+                               "5006": (1, 2), "5005": (2, 2)},
+                         "descending fit score within each contest; 5002 and 5003 "
+                         "tie at 7.0 and the lower entry id ranks first")
+
+    def test_hitter_roles_and_the_roster_sums_read_the_runs_frame(self):
+        ids = self._salary()
+        roster = ids[:10]
+        notes = {roster[2]: "confirmed_order: F2 from posted batting order; f4_matchup: x",
+                 roster[3]: "platoon_order: F2 from projected batting order",
+                 roster[4]: "appg_blank: Base 0.00"}
+        frame = self._frame(notes)
+        run_id = self._make_run([("5001", "900", roster, 4.0)], frame)
+        record = self._record(self._deliver([classic_entry("5001", "900", roster)],
+                                            run_id=run_id))
+        pred = self._by_entry(record)["5001"]["prediction"]
+        roles = pred["hitter_roles"]
+        self.assertEqual(sorted(roles), sorted(roster[2:]), "the two arms are not hitters")
+        self.assertEqual((roles[roster[2]], roles[roster[3]], roles[roster[4]]),
+                         ("confirmed_lineup", "platoon_projected", "unknown"))
+        by_id = {str(r.Player_ID): r for r in frame.itertuples()}
+        self.assertEqual(pred["base_sum"], round(sum(by_id[p].Base for p in roster), 2))
+        self.assertEqual(pred["prior_own_sum"],
+                         round(sum(by_id[p].Projected_Ownership_Pct for p in roster), 2))
+
+    def test_an_unresolvable_run_writes_prediction_null_and_still_writes(self):
+        ids = self._salary()
+        rows = [classic_entry("5001", "900", ids[:10]), classic_entry("5002", "900", ids[10:20])]
+        gone = self._record(self._deliver(rows, run_id="20260725T000000Z_deadbeef"))
+        self.assertEqual([e["prediction"] for e in gone["entries"]], [None, None])
+        self.assertEqual(gone["prediction_source"]["status"], "run_absent")
+        self.assertEqual(gone["prediction_source"]["unmatched_entry_ids"], ["5001", "5002"])
+        runless = self._record(self._deliver(rows[:1], tag="1905_4g_hand"))
+        self.assertEqual([e["prediction"] for e in runless["entries"]], [None])
+        self.assertEqual(runless["prediction_source"]["status"], "no_run")
+        self.assertIn("run-less", runless["extra"]["market"]["reason"])
+
+    def test_a_late_swaps_frozen_row_takes_its_parents_prediction(self):
+        ids = self._salary()
+        r1, r2, r2_swapped, r3 = ids[:10], ids[10:20], ids[10:19] + [ids[40]], ids[20:30]
+        r4, r4_hand = ids[30:40], ids[30:39] + [ids[50]]
+        parent = self._make_run([("5001", "900", r1, 6.0), ("5002", "900", r2, 5.0),
+                                 ("5004", "900", r4, 3.0)], self._frame())
+        child = self._make_run([("5002", "900", r2_swapped, 4.5)], self._frame(),
+                               parent=parent)
+        # 5004's parent assignment holds r4; the file holds a lineup no run chose.
+        rows = [classic_entry("5001", "900", r1), classic_entry("5002", "900", r2_swapped),
+                classic_entry("5003", "900", r3), classic_entry("5004", "900", r4_hand)]
+        record = self._record(self._deliver(rows, run_id=child, refinement=True))
+        got = self._by_entry(record)
+        self.assertEqual(got["5001"]["prediction"]["run_id"], parent,
+                         "a frozen row was chosen by the run the swap swapped from")
+        self.assertEqual(got["5001"]["prediction"]["source"], f"runs/{parent}/final")
+        self.assertEqual(got["5002"]["prediction"]["run_id"], child)
+        self.assertIsNone(got["5003"]["prediction"],
+                          "an entry no run assigned gets no prediction")
+        self.assertIsNone(got["5004"]["prediction"],
+                          "a prediction never describes a lineup that is not in the file")
+        source = record["prediction_source"]
+        self.assertEqual((source["status"], source["runs_read"], source["unmatched_entry_ids"]),
+                         ("partial", [child, parent], ["5003", "5004"]))
+        self.assertIn("late swap", record["extra"]["market"]["reason"])
+
+    def test_a_run_less_repair_takes_the_parent_records_prediction_once_its_run_is_gone(self):
+        ids = self._salary()
+        r1, r2 = ids[:10], ids[10:20]
+        parent = self._make_run([("5001", "900", r1, 6.0), ("5002", "900", r2, 5.0)],
+                                self._frame())
+        first = self._deliver([classic_entry("5001", "900", r1),
+                               classic_entry("5002", "900", r2)], run_id=parent)
+        parent_record = self._record(first)
+        shutil.rmtree(self.root / "runs" / parent)  # the container that built it is gone
+        repaired = r2[:9] + [ids[45]]
+        out = self._deliver([classic_entry("5001", "900", r1),
+                             classic_entry("5002", "900", repaired)],
+                            repair_of={"run_id": parent, "sha256": first["record"]["sha256"]})
+        record = self._record(out)
+        got = self._by_entry(record)
+        kept = got["5001"]["prediction"]
+        self.assertEqual(kept["run_id"], parent)
+        self.assertEqual(kept["source"], f"tracked_record:{parent_record['_path']}")
+        self.assertEqual(kept["contest_fit_score"],
+                         self._by_entry(parent_record)["5001"]["prediction"]["contest_fit_score"])
+        self.assertIsNone(got["5002"]["prediction"], "the repaired lineup was never predicted")
+        source = record["prediction_source"]
+        self.assertEqual((source["status"], source["start_run_id"], source["runs_read"]),
+                         ("partial", parent, []))
+        self.assertEqual(source["players_missing"], [ids[45]],
+                         "only the replacement is missing from the parent's players map")
+        self.assertIn("hand repair", record["extra"]["market"]["reason"])
+
+    def test_the_repair_fallback_takes_the_repaired_builds_prediction_not_a_rebuilds(self):
+        """The landing review's probe: build A, then a rebuild B holding the same
+        lineup for entry 5001 with its own score, both run folders gone, then a
+        repair of A's file. 5001 is A's lineup, so it carries A's prediction,
+        not the newer record's."""
+        ids = self._salary()
+        r1, r2 = ids[:10], ids[10:20]
+        run_a = self._make_run([("5001", "900", r1, 6.0), ("5002", "900", r2, 5.0)],
+                               self._frame())
+        first = self._deliver([classic_entry("5001", "900", r1),
+                               classic_entry("5002", "900", r2)], run_id=run_a)
+        run_b = self._make_run([("5001", "900", r1, 99.0), ("5002", "900", ids[20:30], 1.0)],
+                               self._frame())
+        self._deliver([classic_entry("5001", "900", r1),
+                       classic_entry("5002", "900", ids[20:30])], run_id=run_b)
+        shutil.rmtree(self.root / "runs" / run_a)
+        shutil.rmtree(self.root / "runs" / run_b)
+        record = self._record(self._deliver(
+            [classic_entry("5001", "900", r1), classic_entry("5002", "900", r2[:9] + [ids[45]])],
+            repair_of={"run_id": run_a, "sha256": first["record"]["sha256"]}))
+        kept = self._by_entry(record)["5001"]["prediction"]
+        self.assertEqual((kept["run_id"], kept["contest_fit_score"]), (run_a, 6.0))
+
+    def test_a_salary_snapshot_that_will_not_parse_keeps_every_prediction(self):
+        """The landing review's probe: the players map is a separate step, so a
+        snapshot the parser refuses costs the crosswalk's salary source and
+        never a prediction that already resolved; the frame fills the map."""
+        ids = self._salary()
+        run_id = self._make_run([("5001", "900", ids[:10], 4.0)], self._frame())
+        snapshot = self.root / "runs" / run_id / "inputs" / self.salary_path.name
+        snapshot.write_text("Roster Position,TeamAbbrev\nP,AAA\n", encoding="utf-8")
+        record = self._record(self._deliver([classic_entry("5001", "900", ids[:10])],
+                                            run_id=run_id))
+        source = record["prediction_source"]
+        self.assertEqual(source["status"], "resolved")
+        self.assertIsInstance(self._by_entry(record)["5001"]["prediction"], dict)
+        self.assertIn("players_error", source)
+        self.assertEqual(sorted(record["players"]), sorted(ids[:10]),
+                         "the frame fills the map when the snapshot will not parse")
+        self.assertTrue(all(isinstance(facts[3], int) for facts in record["players"].values()),
+                        "a whole-dollar salary is an int on both paths")
+
+    def test_an_unreadable_run_writes_the_record_and_names_the_error(self):
+        ids = self._salary()
+        run_id = self._make_run([("5001", "900", ids[:10], 4.0)], self._frame())
+        (self.root / "runs" / run_id / "final" / "assignments.csv").write_bytes(b"\xff\xfe\xfdbad")
+        record = self._record(self._deliver([classic_entry("5001", "900", ids[:10])],
+                                            run_id=run_id))
+        self.assertEqual([e["prediction"] for e in record["entries"]], [None])
+        self.assertEqual(record["prediction_source"]["status"], "unreadable")
+        self.assertTrue(record["prediction_source"]["error"].startswith("UnicodeDecodeError"))
+
+    # ---- (b) the market ----------------------------------------------------
+
+    def test_a_priced_market_is_marked_applied_and_keeps_its_keys(self):
+        ids = self._salary()
+        run_id = self._make_run([("5001", "900", ids[:10], 4.0)], self._frame())
+        market = {"games": 4, "implied_total_by_team": {"AAA": 4.5, "BBB": 3.9}}
+        record = self._record(self._deliver([classic_entry("5001", "900", ids[:10])],
+                                            run_id=run_id, market=market))
+        self.assertEqual(record["extra"]["market"], {**market, "applied": True})
+
+    def test_a_market_that_priced_no_slate_team_is_not_applied(self):
+        """The landing review's probe: `slate_market_record` returns a dict with
+        an empty `implied_total_by_team` when the totals name no slate team, and
+        that market ranked nothing."""
+        ids = self._salary()
+        run_id = self._make_run([("5001", "900", ids[:10], 4.0)], self._frame())
+        market = {"games": 4, "implied_total_by_team": {}, "unpriced_teams": ["AAA"]}
+        record = self._record(self._deliver([classic_entry("5001", "900", ids[:10])],
+                                            run_id=run_id, market=market))
+        got = record["extra"]["market"]
+        self.assertEqual((got["applied"], got["unpriced_teams"]), (False, ["AAA"]))
+        self.assertIn("named no team on this slate", got["reason"])
+
+    def test_a_market_less_record_keeps_applied_false_through_a_re_promotion(self):
+        import contextlib
+        import io
+        from mlb_engine.entries.delivery_record import read_records
+        from tools import promote_run
+        result, _lineup = self._real_build({})
+        before = read_records(root=self.root)[0]["extra"]["market"]
+        args = promote_run.build_parser().parse_args(
+            ["--run-id", result["run_id"], "--repo-root", str(self.root)])
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(promote_run.run(args), 0)
+        after = read_records(root=self.root)
+        self.assertEqual(after[-1]["manifest_row"].get("re_promoted_from"), result["run_id"])
+        self.assertEqual(after[-1]["extra"]["market"], before)
+        self.assertEqual(before["applied"], False)
+        self.assertIsInstance(after[-1]["entries"][0]["prediction"], dict)
+
+    def test_a_showdown_record_gains_none_of_the_classic_fields(self):
+        """R495 gives Showdown its own prediction; this one leaves it alone."""
+        ids = self._salary()
+        record = self._record(self._deliver([classic_entry("5001", "900", ids[:10])],
+                                            contest_type="showdown"))
+        self.assertNotIn("prediction", record["entries"][0])
+        for key in ("players", "prediction_source", "extra"):
+            self.assertNotIn(key, record)
+
+    # ---- the size bound ----------------------------------------------------
+
+    def test_the_record_stays_under_its_size_bound_at_20_entries(self):
+        ids = self._salary()
+        rosters = {str(5001 + i): [ids[(i * 4 + k) % 80] for k in range(10)]
+                   for i in range(20)}
+        contest = {eid: ("900" if int(eid) % 2 else "901") for eid in rosters}
+        tags = {p: ("confirmed_order: F2 from posted batting order" if int(p) % 3
+                    else "platoon_order: F2 from projected batting order") for p in ids}
+        run_id = self._make_run([(e, contest[e], r, 3.0 + int(e) % 7)
+                                 for e, r in rosters.items()], self._frame(tags))
+        out = self._deliver([classic_entry(e, contest[e], r) for e, r in rosters.items()],
+                            run_id=run_id)
+        record = self._record(out)
+        self.assertEqual(len(record["players"]), 80)
+        self.assertEqual(record["prediction_source"]["status"], "resolved")
+        size = Path(self.root / record["_path"]).stat().st_size
+        self.assertLess(size, self.SIZE_BOUND_BYTES,
+                        f"a 20-entry Classic record measured {size} bytes")
+
+
+class PreflightSidecarTests(unittest.TestCase):
+    """R494(c), roadmap Session 160. Preflight exit 0 writes a create-only
+    tracked `<record>.preflight.json` beside the delivery record of the bytes it
+    checked, because its verdict otherwise lands only in the gitignored manifest:
+    every tracked record read `candidate`, and 447 of 480 entry ids sat in more
+    than one record with nothing saying which bytes were cleared to upload.
+
+    In a temp root with both `REPO_ROOT`s patched (the `RepairRecordTests`
+    pattern), a certified delivery recorded through the real `deliver`, and the
+    real `preflight_upload.main`.
+    """
+
+    DATE = "2026-07-25"
+    AS_OF = "2026-07-25T16:00:00Z"
+
+    def setUp(self):
+        import preflight_upload
+        from mlb_engine.entries import upload_manifest as um
+        self.pf, self.um = preflight_upload, um
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self._saved = (um.REPO_ROOT, preflight_upload.REPO_ROOT)
+        um.REPO_ROOT = self.root
+        preflight_upload.REPO_ROOT = self.root
+        self.addCleanup(self._restore)
+        self.salary = self.root / "DKSalaries.csv"
+        self.lineup = write_classic_salary(self.salary)
+        self.outputs = self.root / "outputs" / self.DATE
+        self.outputs.mkdir(parents=True)
+        self.records = self.root / "data" / "deliveries" / self.DATE
+
+    def _restore(self):
+        self.um.REPO_ROOT, self.pf.REPO_ROOT = self._saved
+        self.tmp.cleanup()
+
+    def _deliver(self, tag, entry_id="900") -> tuple:
+        out = self.um.deliver(
+            date=self.DATE, dest=self.outputs / f"DKEntries_{tag}.csv",
+            write=lambda p: write_entries(p, CLASSIC_HEADER,
+                                          [classic_entry(entry_id, "5", self.lineup)]),
+            contest_type="classic", slate_tag=tag, contest_ids=["5"], entries=1,
+            run_id=None, status="candidate", certification="certified",
+            projection_tier="proxy", strategy_state={"state": "clean", "counts": {}})
+        self.assertTrue(out["recorded"], out["error"])
+        sha = out["record"]["sha256"]
+        record = self.records / f"{tag}_norun_{sha[:12]}.json"
+        self.assertTrue(record.is_file(), record)
+        return Path(out["path"]), record
+
+    def _preflight(self, entries, *extra) -> tuple:
+        import contextlib
+        import io
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(io.StringIO()):
+            code = self.pf.main(["--entries", str(entries), "--salary", str(self.salary),
+                                 "--as-of", self.AS_OF, "--json", *extra])
+        return code, json.loads(buf.getvalue())
+
+    def _sidecars(self) -> list:
+        return sorted(p.name for p in self.records.glob("*.preflight.json"))
+
+    def test_exit_0_writes_the_sidecar_once_beside_its_record(self):
+        from mlb_engine.entries.delivery_record import read_records
+        entries, record = self._deliver("1905_2g")
+        record_bytes = record.read_bytes()
+        code, report = self._preflight(entries)
+        self.assertEqual(code, 0, report.get("failures"))
+        sidecar = record.with_name(f"{record.stem}.preflight.json")
+        self.assertEqual(self._sidecars(), [sidecar.name])
+        payload = json.loads(sidecar.read_text(encoding="utf-8"))
+        self.assertEqual(
+            {k: payload[k] for k in ("kind", "record", "entries_sha256", "exit_code", "verdict")},
+            {"kind": "preflight", "record": record.name,
+             "entries_sha256": self.um.sha256_file(entries), "exit_code": 0,
+             "verdict": "upload_ready"})
+        self.assertEqual(record.read_bytes(), record_bytes, "the record is never rewritten")
+        first = sidecar.read_bytes()
+        code, report = self._preflight(entries)
+        self.assertEqual(code, 0)
+        self.assertEqual(sidecar.read_bytes(), first, "create-only: the first clearance stands")
+        self.assertEqual(report["info"]["preflight_sidecars"]["written"], [])
+        self.assertEqual([Path(p).name for p in report["info"]["preflight_sidecars"]["already"]],
+                         [sidecar.name])
+        # Every reader of data/deliveries/ filters on kind, so the note is not a delivery.
+        kinds = sorted(r.get("kind") for r in read_records(root=self.root, date=self.DATE))
+        self.assertEqual(kinds, ["delivery", "preflight"])
+
+    def test_a_preflight_of_other_bytes_writes_its_own(self):
+        first_entries, first = self._deliver("1905_2g", "900")
+        second_entries, second = self._deliver("2005_2g", "901")
+        self.assertEqual(self._preflight(first_entries)[0], 0)
+        self.assertEqual(self._sidecars(), [f"{first.stem}.preflight.json"],
+                         "only the record of the checked bytes gets a sidecar")
+        held = (self.records / f"{first.stem}.preflight.json").read_bytes()
+        self.assertEqual(self._preflight(second_entries)[0], 0)
+        self.assertEqual(self._sidecars(), sorted([f"{first.stem}.preflight.json",
+                                                   f"{second.stem}.preflight.json"]))
+        self.assertEqual((self.records / f"{first.stem}.preflight.json").read_bytes(), held)
+
+    def test_a_failing_preflight_writes_none(self):
+        entries, _record = self._deliver("1905_2g")
+        code, _report = self._preflight(entries, "--expect-entries", "2")
+        self.assertEqual(code, 2)
+        self.assertEqual(self._sidecars(), [])
+        code, _report = self._preflight(entries, "--expect-entries", "2", "--force")
+        self.assertEqual(code, 4, "acknowledged is not cleared")
+        self.assertEqual(self._sidecars(), [])
+
+    def test_no_tracked_record_writes_none_and_says_so(self):
+        entries, record = self._deliver("1905_2g")
+        record.unlink()
+        code, report = self._preflight(entries)
+        self.assertEqual(code, 0, "a missing record never changes the verdict")
+        self.assertEqual(self._sidecars(), [])
+        self.assertIn("no tracked delivery record for these bytes",
+                      report["info"]["preflight_sidecars"]["note"])
+        shutil.rmtree(self.records)
+        code, report = self._preflight(entries)
+        self.assertEqual(code, 0)
+        self.assertFalse(self.records.exists(), "the sidecar never creates the folder")
+
+
 class CorruptManifestIsItsOwnStateTests(unittest.TestCase):
     """R36 F6m(1). CORRUPT and ABSENT were the same answer, and the write erased.
 

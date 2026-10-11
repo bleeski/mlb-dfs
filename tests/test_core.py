@@ -40193,8 +40193,12 @@ class StackSleeveTests(unittest.TestCase):
         self.assertEqual((outcome["status"], outcome["seated"], outcome["fell_back"]),
                          ("applied", {}, ["5001"]))
         self.assertIn("never a prediction", recorded["label"])
-        self.assertNotIn("market", records[0]["extra"], "no odds priced: no market block")
-        # A build with no flag writes no `extra` at all, as before.
+        # R494(b) replaced R422(a)'s "no odds priced: no market block": every
+        # Classic record says whether the build had a market, and why not.
+        self.assertEqual(records[0]["extra"]["market"]["applied"], False)
+        self.assertIn("slate_market_record returned None",
+                      records[0]["extra"]["market"]["reason"])
+        # A build with no flag writes no stack block; its `extra` holds only that.
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             original = um.REPO_ROOT
@@ -40204,7 +40208,7 @@ class StackSleeveTests(unittest.TestCase):
                 none = read_records(root=root)
             finally:
                 um.REPO_ROOT = original
-        self.assertNotIn("extra", none[0])
+        self.assertEqual(sorted(none[0]["extra"]), ["market"])
         self.assertIsNone(epi.stack_sleeve_delivery_record(result))
 
     def test_a_re_promotion_keeps_the_stack_sleeve_record(self):

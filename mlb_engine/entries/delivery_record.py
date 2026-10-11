@@ -29,7 +29,16 @@ holds rather than a new kind.
 WHAT IT IS NOT. Not a second manifest: `outputs/<date>/upload_manifest.json`
 stays the delivery authority for the session that wrote it, and this is its
 durable projection. Not a place for bulky artifacts: no candidate banks, no
-projections, no briefs. Not a secret store -- see `_SECRET_HINTS` below.
+projection frame, no briefs. Not a secret store -- see `_SECRET_HINTS` below.
+
+WHAT A CLASSIC RECORD CARRIES OF THE PREDICTION (R494). The frame stays out,
+but per entry the scalars the build predicted ride along (`prediction`: contest
+shape, fit score and its rank in the contest, stack, arms, and roster sums of
+Base, Ceiling and the labeled ownership prior), with each hitter's lineup basis,
+and the record carries a `players` map for the rostered ids only (name, team,
+roster position, salary, game). Both are copied out of `runs/<run_id>/final/`
+and the run's salary snapshot, which die with the container. Measured at 20
+entries: see `RecordPredictionTests` for the bound.
 
 NEVER RAISES. This is bookkeeping running beside a certified build, the same
 contract `stage_salary_for_delivery` already keeps. A record that cannot be
@@ -37,7 +46,9 @@ written must never be the reason a delivery fails; it reports and returns None.
 """
 from __future__ import annotations
 
+import csv
 import json
+import math
 import os
 import subprocess
 from datetime import datetime, timezone
@@ -358,6 +369,307 @@ def bound_entries(source: Path, expected_sha256: Optional[str]) -> tuple:
     return entry_rows(source), binding
 
 
+#: R494. How far the prediction walk follows `parent_run_id`: a late swap of a
+#: late swap is two hops, and a chain longer than this is not a delivery shape.
+PREDICTION_CHAIN_MAX = 8
+
+PREDICTION_LABEL = (
+    "what the build that chose each lineup predicted for it, copied from "
+    "runs/<run_id>/final/ at delivery: the allocator's contest shape, fit score "
+    "and its rank among that run's entries in the contest, the stack and arms, "
+    "and roster sums of the frame's Base, Ceiling and labeled ownership prior. "
+    "Deterministic review proxies and labeled priors, never ROI, a win rate or "
+    "a probability")
+
+HITTER_ROLES_BASIS = (
+    "the frame's Notes tag per hitter: 'confirmed_order:' (intake, a confirmed "
+    "side's posted slot) is confirmed_lineup, 'platoon_order:' (run_slate, a "
+    "projected slot) is platoon_projected, neither is unknown; R342(c)'s "
+    "role_source vocabulary. The intake's late-swap status map is not in the "
+    "run, so a partial side's posted hitters read platoon_projected or unknown")
+
+
+def _run_dir(run_id: str, root: Optional[Path]) -> Path:
+    return (Path(root) if root is not None else _artifact_root()) / "runs" / str(run_id)
+
+
+def _csv_rows(path: Path) -> list:
+    with path.open(encoding="utf-8-sig", newline="") as handle:
+        return list(csv.DictReader(handle))
+
+
+def _number(value: Any) -> Optional[float]:
+    try:
+        out = float(value)
+    except (TypeError, ValueError):
+        return None
+    return out if math.isfinite(out) else None
+
+
+def _run_manifest(run_id: str, root: Optional[Path]) -> Dict[str, Any]:
+    try:
+        payload = json.loads((_run_dir(run_id, root) / "manifest.json")
+                             .read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _run_chain(start: Optional[str], root: Optional[Path]) -> list:
+    """The run, then its parent, then that one's: a late swap's frozen rows were
+    chosen by the run it swapped from, and `run_late_swap` refuses without that
+    run's folder (`ParentLineageError`), so the parent is on disk when it ran."""
+    chain: list = []
+    run_id = str(start or "").strip() or None
+    while run_id and run_id not in chain and len(chain) < PREDICTION_CHAIN_MAX:
+        chain.append(run_id)
+        run_id = str(_run_manifest(run_id, root).get("parent_run_id") or "").strip() or None
+    return chain
+
+
+def _fit_ranks(rows: Sequence[Mapping[str, Any]]) -> Dict[str, tuple]:
+    """``{entry_id: (rank, of_n)}`` within each contest, over THIS run's
+    assignments: the build's own ordering, so a row removed from the delivered
+    file (F-2) or one that resolves elsewhere never moves a sibling's rank. By
+    `contest_fit_score` descending, ties by entry id; an unscored row is unranked."""
+    by_contest: Dict[str, list] = {}
+    for row in rows:
+        score = _number(row.get("contest_fit_score"))
+        if score is not None:
+            by_contest.setdefault(str(row.get("contest_id") or ""), []).append(
+                (-score, str(row.get("entry_id") or "")))
+    ranks: Dict[str, tuple] = {}
+    for scored in by_contest.values():
+        scored.sort()
+        for i, (_neg, entry_id) in enumerate(scored):
+            ranks[entry_id] = (i + 1, len(scored))
+    return ranks
+
+
+def _run_final(run_id: str, root: Optional[Path]) -> Optional[Dict[str, Any]]:
+    """The run's `final/assignments.csv` and `final/projections.csv`, or None
+    when the run left no assignments (absent folder, a refused build)."""
+    from mlb_engine.entries.dk_entries_manager import normalize_player_id
+    final = _run_dir(run_id, root) / "final"
+    assignments = final / "assignments.csv"
+    if not assignments.is_file():
+        return None
+    rows = _csv_rows(assignments)
+    frame_path = final / "projections.csv"
+    frame_rows = _csv_rows(frame_path) if frame_path.is_file() else []
+    return {
+        "assignments": {str(r.get("entry_id") or "").strip(): r for r in rows},
+        "ranks": _fit_ranks(rows),
+        "frame": {normalize_player_id(r.get("Player_ID")): r for r in frame_rows},
+        "columns": set(frame_rows[0]) if frame_rows else set(),
+    }
+
+
+def _salary_players(run_id: str, root: Optional[Path]) -> Dict[str, list]:
+    """``{id: [name, team, roster_position, salary, game_info]}`` from the run's
+    salary snapshot. Snapshots keep their source basename (`DKSalaries_replay.csv`,
+    `salary.csv`), so the file is found by its header among the manifest's inputs."""
+    from mlb_engine.intake.slate_intake_manager import parse_dk_salary_csv
+    run_dir = _run_dir(run_id, root)
+    inputs = _run_manifest(run_id, root).get("inputs") or {}
+    for name in sorted(inputs):
+        entry = inputs[name] if isinstance(inputs[name], Mapping) else {}
+        path = run_dir / str(entry.get("relative_path") or f"inputs/{name}")
+        try:
+            with path.open(encoding="utf-8-sig") as handle:
+                header = handle.readline()
+        except OSError:
+            continue
+        if "Roster Position" not in header or "TeamAbbrev" not in header:
+            continue
+        return {sp.player_id: [sp.name, sp.team,
+                               str(sp.raw.get("Roster Position") or "/".join(sp.positions)),
+                               int(sp.salary) if float(sp.salary).is_integer() else sp.salary,
+                               str(sp.raw.get("Game Info") or sp.game_info or "")]
+                for sp in parse_dk_salary_csv(str(path))}
+    return {}
+
+
+def _entry_prediction(run_id: str, final: Mapping[str, Any], row: Mapping[str, Any],
+                      entry_id: str, roster: Sequence[str]) -> Dict[str, Any]:
+    from mlb_engine.field.ownership_prior import PROJECTED_OWNERSHIP_COLUMN
+    frame = final["frame"]
+    sp_ids = [s for s in str(row.get("sp_ids") or "").split("/") if s]
+
+    def total(column: str) -> Optional[float]:
+        # A sum missing one rostered player is not that roster's sum: null.
+        if column not in final["columns"]:
+            return None
+        values = [_number((frame.get(pid) or {}).get(column)) for pid in roster]
+        return None if any(v is None for v in values) else round(sum(values), 2)
+
+    roles = {}
+    for pid in roster:
+        if pid in sp_ids:
+            continue
+        notes = str((frame.get(pid) or {}).get("Notes") or "")
+        roles[pid] = ("confirmed_lineup" if "confirmed_order:" in notes
+                      else "platoon_projected" if "platoon_order:" in notes
+                      else "unknown")
+    rank, of_n = final["ranks"].get(entry_id, (None, None))
+    return {
+        "source": f"runs/{run_id}/final",
+        "run_id": run_id,
+        "contest_shape": row.get("contest_shape") or None,
+        "candidate_id": row.get("candidate_id") or None,
+        "lineup_signature": row.get("lineup_signature") or None,
+        "contest_fit_score": _number(row.get("contest_fit_score")),
+        "fit_rank_in_contest": rank,
+        "fit_rank_of_n": of_n,
+        "primary_stack": row.get("primary_stack") or None,
+        "sp_ids": sp_ids,
+        "base_sum": total("Base"),
+        "ceiling_sum": total("Ceiling"),
+        "prior_own_sum": total(PROJECTED_OWNERSHIP_COLUMN),
+        "hitter_roles": roles,
+    }
+
+
+def _tracked_predictions(date: str, root: Optional[Path], own_name: str,
+                         runs: Sequence[str]) -> tuple:
+    """``({(entry_id, roster): prediction}, {id: player})`` from the same date's
+    tracked Classic records OF THIS RECORD'S RUN CHAIN, newest first, this
+    record's own file skipped.
+
+    The cloud case for a run-less hand repair (`tools/repair_entry.py`): a later
+    session repairs a scratched player, the parent's `runs/` died with its
+    container, and the rows the repair left alone are still the parent build's
+    lineups, whose prediction its record already holds. Only that build's
+    records count: a rebuild the same day can hold the same lineup for the same
+    entry with its own score, and taking the newest record would hand the
+    repair the rebuild's prediction (the R494 landing review's probe)."""
+    wanted = {str(r) for r in runs if r}
+    if not wanted:
+        return {}, {}
+    held = [rec for rec in read_records(root=root, date=date)
+            if rec.get("kind") == "delivery"
+            and isinstance(rec.get("manifest_row"), Mapping)
+            and str(rec["manifest_row"].get("contest_type") or "").lower() == "classic"
+            and str(rec["manifest_row"].get("run_id") or "") in wanted
+            and Path(str(rec.get("_path") or "")).name != own_name]
+    held.sort(key=lambda rec: str(rec.get("recorded_utc") or ""), reverse=True)
+    predictions: Dict[tuple, Dict[str, Any]] = {}
+    players: Dict[str, list] = {}
+    for rec in held:
+        for entry in rec.get("entries") or []:
+            pred = entry.get("prediction") if isinstance(entry, Mapping) else None
+            if not isinstance(pred, Mapping):
+                continue
+            key = (str(entry.get("entry_id") or ""),
+                   tuple(sorted(str(p) for p in entry.get("roster_ids") or [])))
+            predictions.setdefault(key, {**dict(pred),
+                                         "source": f"tracked_record:{rec.get('_path')}"})
+        held_players = rec.get("players")
+        for pid, facts in (held_players.items() if isinstance(held_players, Mapping) else ()):
+            players.setdefault(str(pid), facts)
+    return predictions, players
+
+
+def classic_prediction(manifest_row: Mapping[str, Any], entries: Sequence[Mapping[str, Any]],
+                       *, date: str, root: Optional[Path], own_name: str) -> Dict[str, Any]:
+    """R494. ``{"by_entry", "players", "prediction_source"}`` for a Classic record.
+
+    Each filled entry takes the first run in the chain whose assignment for that
+    entry id holds THIS roster (`lineup_signature` against the sorted roster), so
+    a prediction never describes a lineup that is not in the file; then a
+    same-date tracked record of the same run chain holding the same entry and
+    roster; else null. Never raises: a run that cannot be read is ``status:
+    unreadable`` and every entry is null, and the record still writes; the
+    players map is a separate step whose failure (``players_error``) costs no
+    prediction.
+    """
+    filled = [e for e in entries if e.get("filled")]
+    repair = manifest_row.get("repair_of")
+    start = (str(manifest_row.get("run_id") or "").strip()
+             or str((repair.get("run_id") if isinstance(repair, Mapping) else "") or "").strip()
+             or None)
+    source: Dict[str, Any] = {"start_run_id": start, "runs_read": [],
+                              "filled": len(filled), "predicted": 0,
+                              "unmatched_entry_ids": [], "players_missing": [],
+                              "hitter_roles_basis": HITTER_ROLES_BASIS,
+                              "label": PREDICTION_LABEL}
+    try:
+        chain = _run_chain(start, root)
+        loaded = [(rid, final) for rid in chain
+                  for final in [_run_final(rid, root)] if final is not None]
+        source["runs_read"] = [rid for rid, _final in loaded]
+        tracked = None
+        by_entry: Dict[str, Any] = {}
+        for entry in entries:
+            entry_id = str(entry.get("entry_id") or "")
+            if not entry.get("filled"):
+                by_entry[entry_id] = None
+                continue
+            roster = [str(p) for p in entry.get("roster_ids") or []]
+            key = sorted(roster)
+            pred = None
+            for rid, final in loaded:
+                row = final["assignments"].get(entry_id)
+                if row and sorted(str(row.get("lineup_signature") or "").split("|")) == key:
+                    pred = _entry_prediction(rid, final, row, entry_id, roster)
+                    break
+            if pred is None:
+                if tracked is None:
+                    tracked = _tracked_predictions(date, root, own_name, chain)
+                pred = tracked[0].get((entry_id, tuple(key)))
+            if pred is None:
+                source["unmatched_entry_ids"].append(entry_id)
+            by_entry[entry_id] = pred
+        source["predicted"] = sum(1 for p in by_entry.values() if p)
+        if not filled:
+            source["status"] = "no_filled_entries"
+        elif source["predicted"] == len(filled):
+            source["status"] = "resolved"
+        elif source["predicted"]:
+            source["status"] = "partial"
+        else:
+            source["status"] = ("no_run" if not start else
+                                "run_absent" if not loaded else "unmatched")
+    except Exception as exc:  # noqa: BLE001 - bookkeeping never fails a delivery
+        source["status"] = "unreadable"
+        source["error"] = f"{type(exc).__name__}: {exc}"
+        return {"by_entry": {str(e.get("entry_id") or ""): None for e in entries},
+                "players": {}, "prediction_source": source}
+    # The crosswalk is its own step: a salary snapshot that will not parse
+    # costs the players map at most, never a prediction already resolved.
+    ids = sorted({str(p) for e in filled for p in e.get("roster_ids") or []})
+    players: Dict[str, list] = {}
+    try:
+        for rid, _final in loaded:
+            try:
+                salary = _salary_players(rid, root)
+            except Exception as exc:  # noqa: BLE001
+                source["players_error"] = f"{type(exc).__name__}: {exc}"
+                continue
+            for pid, facts in salary.items():
+                if pid in ids:
+                    players.setdefault(pid, facts)
+        for _rid, final in loaded:
+            for pid in ids:
+                row = final["frame"].get(pid)
+                if pid not in players and row:
+                    pay = _number(row.get("Salary"))
+                    players[pid] = [row.get("Name"), row.get("Team"), row.get("Position"),
+                                    int(pay) if pay is not None and pay.is_integer() else pay,
+                                    row.get("Game_ID")]
+        if any(pid not in players for pid in ids):
+            if tracked is None:
+                tracked = _tracked_predictions(date, root, own_name, chain)
+            for pid in ids:
+                if pid not in players and pid in tracked[1]:
+                    players[pid] = tracked[1][pid]
+    except Exception as exc:  # noqa: BLE001
+        source["players_error"] = f"{type(exc).__name__}: {exc}"
+    source["players_missing"] = [pid for pid in ids if pid not in players]
+    return {"by_entry": by_entry, "players": dict(sorted(players.items())),
+            "prediction_source": source}
+
+
 def write_delivery_record(*, date: str, manifest_row: Mapping[str, Any],
                           run_id: Optional[str] = None,
                           controls: Optional[Mapping[str, Any]] = None,
@@ -411,11 +723,19 @@ def write_delivery_record(*, date: str, manifest_row: Mapping[str, Any],
             record["extra"] = dict(extra)
         record["manifest_row"]["delivered_file"] = _posix(
             manifest_row.get("delivered_file") or "")
-        return _write(base,
-                      record_name(str(manifest_row.get("slate_tag") or ""),
-                                  resolved_run, manifest_row.get("sha256"),
-                                  str(manifest_row.get("lineage") or "")),
-                      record)
+        name = record_name(str(manifest_row.get("slate_tag") or ""),
+                           resolved_run, manifest_row.get("sha256"),
+                           str(manifest_row.get("lineage") or ""))
+        if str(manifest_row.get("contest_type") or "").lower() == "classic":
+            # R494. Showdown's prediction is R495's, with its own fields.
+            predicted = classic_prediction({**manifest_row, "run_id": resolved_run},
+                                           entries, date=str(date),
+                                           root=root, own_name=name)
+            for entry in entries:
+                entry["prediction"] = predicted["by_entry"].get(str(entry["entry_id"]))
+            record["players"] = predicted["players"]
+            record["prediction_source"] = predicted["prediction_source"]
+        return _write(base, name, record)
     except Exception as exc:  # noqa: BLE001 - bookkeeping never fails a delivery
         print(f"delivery_record: not written ({type(exc).__name__}: {exc})")
         return None

@@ -307,13 +307,45 @@ def _write(path: Path, payload: Mapping[str, Any]) -> None:
     os.replace(tmp, path)
 
 
+#: R494(b). Why a Classic record holds no market, named from what
+#: `record_delivery` already knows about the delivery.
+NO_MARKET_REASON = ("no implied team totals reached the build: run_slate's "
+                    "slate_market_record returned None (no odds pull, or one whose "
+                    "totals normalized to none)")
+#: A market whose totals reached the build and named no team on this slate:
+#: `slate_market_record` returns a dict with an empty `implied_total_by_team`,
+#: and the tail ranking it feeds ranked nothing.
+NO_SLATE_TEAM_PRICED = ("the market's implied totals named no team on this slate, "
+                        "so it ranked nothing")
+
+
+def market_absent_reason(*, run_id: Optional[str], refinement: bool,
+                         re_promoted_from: Optional[str],
+                         repair_of: Optional[Mapping[str, Any]]) -> str:
+    """R494(b). The reason a Classic delivery's record carries no market."""
+    if refinement:
+        return ("a late swap passes no market: run_late_swap takes no implied "
+                "totals, and the parent build's record holds the market that "
+                "build was ranked by, if it had one")
+    if repair_of:
+        return ("a hand repair (tools/repair_entry.py) passes no market; the "
+                "repaired build's record holds it, if that build had one")
+    if re_promoted_from:
+        return (f"re-promoted from run {re_promoted_from}, whose prior tracked "
+                f"record carried no market block")
+    if not run_id:
+        return "a run-less Classic delivery: no build passed a market"
+    return NO_MARKET_REASON
+
+
 def _mirror_to_delivery_record(date: str, record: Mapping[str, Any],
                                controls: Optional[Mapping[str, Any]],
                                relaxations: Optional[Mapping[str, Any]],
                                egress: str,
                                entries_source: Optional[Path] = None,
                                market: Optional[Mapping[str, Any]] = None,
-                               stack_sleeve: Optional[Mapping[str, Any]] = None) -> None:
+                               stack_sleeve: Optional[Mapping[str, Any]] = None,
+                               no_market_reason: str = "") -> None:
     """Project this delivery into the TRACKED record (R369).
 
     Written from here rather than from the three delivery tools because this is
@@ -337,9 +369,22 @@ def _mirror_to_delivery_record(date: str, record: Mapping[str, Any],
     """
     try:
         from mlb_engine.entries.delivery_record import write_delivery_record
-        # R422(a). Only when the build priced a market, so every other record
-        # keeps exactly its old keys. R434: and only when it named a stack.
-        extra = {**({"market": dict(market)} if market else {}),
+        # R422(a) wrote the market only when the build priced one, so "this
+        # build had no market" and "this record predates the field" read the
+        # same. R494(b): every Classic record carries it, `applied: False` with
+        # the reason when there was none (`setdefault`, so a re-promotion of
+        # that block keeps it). R434: the stack only when one was named.
+        classic = str(record.get("contest_type") or "").lower() == "classic"
+        market_block = dict(market) if market else None
+        if classic and market_block is not None:
+            market_block.setdefault(
+                "applied", bool(market_block.get("implied_total_by_team")))
+            if not market_block["applied"]:
+                market_block.setdefault("reason", NO_SLATE_TEAM_PRICED)
+        elif classic:
+            market_block = {"applied": False,
+                            "reason": no_market_reason or NO_MARKET_REASON}
+        extra = {**({"market": market_block} if market_block else {}),
                  **({"stack_sleeve": dict(stack_sleeve)} if stack_sleeve else {})}
         write_delivery_record(date=date, manifest_row=record,
                               run_id=record.get("run_id"), controls=controls,
@@ -502,6 +547,9 @@ def record_delivery(
         # R389(b). Written only when set, so every other row is unchanged.
         record["lineage"] = lineage
     key = (record["contest_type"], record["slate_tag"], lineage)
+    no_market = market_absent_reason(run_id=run_id, refinement=refinement,
+                                     re_promoted_from=re_promoted_from,
+                                     repair_of=repair_of)
 
     def _key(row: Mapping[str, Any]) -> tuple:
         return (row.get("contest_type"), row.get("slate_tag"), row_lineage(row))
@@ -553,6 +601,7 @@ def record_delivery(
             _write(manifest_path(date), manifest)
             _mirror_to_delivery_record(date, prior, controls, relaxations, egress,
                                        market=market, stack_sleeve=stack_sleeve,
+                                       no_market_reason=no_market,
                                        entries_source=source)
             return prior
         prior["status"] = "superseded"
@@ -563,6 +612,7 @@ def record_delivery(
     _write(manifest_path(date), manifest)
     _mirror_to_delivery_record(date, record, controls, relaxations, egress,
                                market=market, stack_sleeve=stack_sleeve,
+                               no_market_reason=no_market,
                                entries_source=source)
     return record
 
