@@ -37099,11 +37099,33 @@ class OutcomeReviewTests(unittest.TestCase):
         importlib.reload(outcome_review)
         return outcome_review
 
+    def _entered(self, record_path: Path):
+        """R497: these fixtures grade a record that WAS entered, so they say so.
+        Without a resolution `outcome_review` grades nothing, by design."""
+        record = json.loads(record_path.read_text(encoding="utf-8"))
+        key = f"data/deliveries/{record['date']}/{record_path.name}"
+        return {str(e["entry_id"]): {"Entry_Key": str(e["entry_id"]), "status": "resolved",
+                                     "record": key, "by": "points", "matched": key,
+                                     "detail": "fixture: this record was entered"}
+                for e in record["entries"] if e.get("filled")}
+
+    def _resolve_all(self, root: Path, record_path: Path):
+        """The same declaration as the file `results_ledger.py resolve` writes."""
+        target = root / "data" / "reference" / "dk_entry_resolution.csv"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        columns = ["Entry_Key", "Contest_Key", "date", "draftgroup", "status", "record", "by",
+                   "candidates", "rosters", "matched", "points", "standings", "detail"]
+        with open(target, "w", encoding="utf-8", newline="") as fh:
+            writer = csv.DictWriter(fh, fieldnames=columns, restval="")
+            writer.writeheader()
+            for row in self._entered(record_path).values():
+                writer.writerow(row)
+
     def _review(self, root: Path, record_path: Path):
         mod = self._mod()
         record = json.loads(record_path.read_text(encoding="utf-8"))
         record["_path"] = str(record_path.relative_to(root))
-        return mod, mod.review_record(record, root)
+        return mod, mod.review_record(record, root, self._entered(record_path), "fixture")
 
     def test_a_cashed_contest_grades_the_portfolio_as_not_a_washout(self):
         with tempfile.TemporaryDirectory() as raw:
@@ -37261,6 +37283,7 @@ class OutcomeReviewTests(unittest.TestCase):
                             f"contest-standings-{self.CID}.csv", ["E1"])
             self._money(root, {self.CID: {"paid_places": 1}})
             path = self._record(root, ["E1"])
+            self._resolve_all(root, path)
             mod = self._mod()
             self.assertEqual(len(mod.pending(root)), 1)
             self.assertIn("outcome review due: 1", mod.pending_line(root))
@@ -37275,7 +37298,7 @@ class OutcomeReviewTests(unittest.TestCase):
             self._standings(root / "data" / "archive" / self.DATE /
                             f"contest-standings-{self.CID}.csv", ["E1"])
             self._money(root, {self.CID: {"paid_places": 1}})
-            self._record(root, ["E1"])
+            self._resolve_all(root, self._record(root, ["E1"]))
             mod = self._mod()
             for _ in range(2):
                 self.assertEqual(mod.main(["--date", self.DATE, "--root", str(root)]), 0)
@@ -37290,7 +37313,7 @@ class OutcomeReviewTests(unittest.TestCase):
             self._standings(root / "data" / "archive" / self.DATE /
                             f"contest-standings-{self.CID}.csv", ["E1"])
             self._money(root, {self.CID: {"paid_places": 1}})
-            self._record(root, ["E1"])
+            self._resolve_all(root, self._record(root, ["E1"]))
             mod = self._mod()
             self.assertEqual(mod.main(["--date", self.DATE, "--root", str(root)]), 0)
             from mlb_engine.entries.delivery_record import read_records
@@ -51194,3 +51217,182 @@ class ResultsJoinTests(unittest.TestCase):
             code = self.rl.main(["--root", str(self.root), "resolve", "--results", str(missing)])
         self.assertEqual(code, 3)
         self.assertIn("results_ledger.py ingest", err.getvalue())
+
+
+class OutcomeReviewResolvedTests(unittest.TestCase):
+    """R497(c), roadmap Session 163. `outcome_review.py` grades the record an
+    entry was entered from and nothing else. Before it, every record on a date
+    was graded by entry ID, so a baseline and its rebuild, naming the same
+    entries with different rosters, were both credited with one set of
+    finishes (447 of 480 entry IDs sit in more than one record).
+    """
+
+    DATE = OutcomeReviewTests.DATE
+    CID = OutcomeReviewTests.CID
+    NAMES = OutcomeReviewTests.NAMES
+    SLOTS = OutcomeReviewTests.SLOTS
+    _lineup = OutcomeReviewTests._lineup
+    _standings = OutcomeReviewTests._standings
+    _money = OutcomeReviewTests._money
+    _mod = OutcomeReviewTests._mod
+    RESOLUTION_COLUMNS = ["Entry_Key", "Contest_Key", "date", "draftgroup", "status", "record",
+                          "by", "candidates", "rosters", "matched", "points", "standings", "detail"]
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self._standings(self.root / "data" / "archive" / self.DATE /
+                        f"contest-standings-{self.CID}.csv", ["E1"])
+        self._money(self.root, {self.CID: {"paid_places": 1, "entry_fee": 5.0}})
+        self.base = self._record("1910_2g_norun_baseline_aaaa", "a" * 64, lineage="baseline",
+                                 certification="review_grade")
+        self.cert = self._record("1910_2g_run_t", "b" * 64, certification="certified")
+
+    def _record(self, name, sha, lineage=None, certification="certified"):
+        row = {"delivered_file": f"outputs/{self.DATE}/DKEntries_{name}.csv", "sha256": sha,
+               "contest_type": "classic", "slate_tag": "1910_2g", "contest_ids": [self.CID],
+               "run_id": None, "status": "candidate", "certification": certification}
+        if lineage:
+            row["lineage"] = lineage
+        record = {"schema_version": 1, "kind": "delivery", "date": self.DATE, "manifest_row": row,
+                  "entries": [{"entry_id": "E1", "contest_id": self.CID, "contest_name": "Test Cup",
+                               "entry_fee": 5.0, "roster_ids": [str(n) for n in range(10)],
+                               "filled": True}],
+                  "run": {}, "code": {}, "host": {}, "controls": {}, "relaxations": {}, "egress": ""}
+        path = self.root / "data" / "deliveries" / self.DATE / f"{name}.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(record), encoding="utf-8")
+        return path
+
+    def _key(self, path):
+        return f"data/deliveries/{self.DATE}/{path.name}"
+
+    def _resolution(self, status="resolved", record=None, by="points", matched=None):
+        path = self.root / "data" / "reference" / "dk_entry_resolution.csv"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w", encoding="utf-8", newline="") as fh:
+            writer = csv.DictWriter(fh, fieldnames=self.RESOLUTION_COLUMNS)
+            writer.writeheader()
+            writer.writerow({"Entry_Key": "E1", "Contest_Key": self.CID, "date": self.DATE,
+                             "draftgroup": self.CID, "status": status,
+                             "record": record or "", "by": by if status == "resolved" else "",
+                             "candidates": "2", "rosters": "1",
+                             "matched": matched or (record or ""), "points": "199.0",
+                             "standings": "1", "detail": "fixture"})
+
+    def _main(self, mod):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(mod.main(["--date", self.DATE, "--root", str(self.root), "--json"]), 0)
+        return out.getvalue()
+
+    def _sidecar(self, mod, path):
+        side = mod.sidecar_path(path)
+        return json.loads(side.read_text(encoding="utf-8")) if side.exists() else None
+
+    def test_a_baseline_and_a_certified_record_grade_only_the_resolved_one(self):
+        self._resolution(record=self._key(self.cert))
+        mod = self._mod()
+        self._main(mod)
+        cert, base = self._sidecar(mod, self.cert), self._sidecar(mod, self.base)
+        self.assertEqual(cert["entered"], "resolved")
+        self.assertEqual([c["matched"] for c in cert["contests"]], [1])
+        self.assertIs(cert["portfolio_washout"], False)
+        self.assertEqual(base["entered"], "not_entered")
+        self.assertEqual(base["contests"], [])
+        self.assertEqual(base["entries_not_entered"],
+                         [{"entry_id": "E1", "entered_from": self._key(self.cert)}])
+        self.assertEqual(base["portfolio_washout"], "UNKNOWN")
+        # One fragment, the entered record's; the not-entered baseline files none.
+        self.assertEqual([p.name for p in sorted((self.root / "ledger" / "inbox").glob("*.md"))],
+                         [f"{self.DATE}_outcome_1910_2g.md"])
+        self.assertEqual(mod.pending(self.root), [])
+
+    def test_with_no_resolution_nothing_is_graded_and_both_records_stay_due(self):
+        mod = self._mod()
+        self._main(mod)
+        self.assertIsNone(self._sidecar(mod, self.cert))
+        self.assertIsNone(self._sidecar(mod, self.base))
+        self.assertFalse((self.root / "ledger" / "inbox").exists())
+        self.assertEqual(len(mod.pending(self.root)), 2)
+        record = json.loads(self.cert.read_text(encoding="utf-8"))
+        record["_path"] = self._key(self.cert)
+        review = mod.review_record(record, self.root, None, "no resolution file")
+        self.assertEqual(review["entered"], "unresolved")
+        self.assertEqual(review["contests"], [])
+        self.assertEqual(review["entries_unresolved"],
+                         [{"entry_id": "E1", "status": "no_resolution_file"}])
+        self.assertEqual(review["portfolio_washout"], "UNKNOWN")
+        self.assertIn("unresolved", mod.render(review))
+
+    def test_a_tied_entry_is_unresolved_and_its_status_is_named(self):
+        self._resolution(status="tied", matched=f"{self._key(self.base)}|{self._key(self.cert)}")
+        mod = self._mod()
+        resolution, _ = mod.load_resolution(self.root)
+        record = json.loads(self.cert.read_text(encoding="utf-8"))
+        record["_path"] = self._key(self.cert)
+        review = mod.review_record(record, self.root, resolution, "fixture")
+        self.assertEqual(review["entered"], "unresolved")
+        self.assertEqual(review["entries_unresolved"][0]["status"], "tied")
+        self.assertEqual(review["contests"], [])
+        self._main(mod)
+        self.assertIsNone(self._sidecar(mod, self.cert))
+
+    def test_the_twin_of_one_file_recorded_twice_reads_same_bytes_and_leaves_the_due_list(self):
+        self._resolution(record=self._key(self.cert), by="same_bytes",
+                         matched=f"{self._key(self.base)}|{self._key(self.cert)}")
+        mod = self._mod()
+        self._main(mod)
+        base = self._sidecar(mod, self.base)
+        self.assertEqual(base["entered"], "same_bytes")
+        self.assertEqual(base["contests"], [])
+        self.assertEqual(self._sidecar(mod, self.cert)["entered"], "resolved")
+        self.assertEqual([p.name for p in sorted((self.root / "ledger" / "inbox").glob("*.md"))],
+                         [f"{self.DATE}_outcome_1910_2g.md"])
+        self.assertEqual(mod.pending(self.root), [])
+
+    def test_a_resolution_file_of_another_shape_exits_3_and_grades_nothing(self):
+        path = self.root / "data" / "reference" / "dk_entry_resolution.csv"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("Entry_Key,status\nE1,resolved\n", encoding="utf-8")
+        mod = self._mod()
+        err = io.StringIO()
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(err):
+            code = mod.main(["--date", self.DATE, "--root", str(self.root)])
+        self.assertEqual(code, 3)
+        self.assertIn("dk_entry_resolution/1", err.getvalue())
+        self.assertIsNone(self._sidecar(mod, self.cert))
+
+    def test_washout_is_never_yes_while_an_entry_is_unresolved_and_a_reserved_row_is_not_graded(self):
+        self._standings(self.root / "data" / "archive" / self.DATE /
+                        f"contest-standings-{self.CID}.csv", ["E1"], mine_rank=5)
+        record = json.loads(self.cert.read_text(encoding="utf-8"))
+        record["entries"] += [dict(record["entries"][0], entry_id="E2"),
+                              dict(record["entries"][0], entry_id="E3", roster_ids=[], filled=False)]
+        record["_path"] = self._key(self.cert)
+        mod = self._mod()
+        resolution = {"E1": {"Entry_Key": "E1", "status": "resolved", "record": self._key(self.cert),
+                             "by": "points", "matched": self._key(self.cert)}}
+        review = mod.review_record(record, self.root, resolution, "fixture")
+        self.assertEqual(review["entered"], "resolved")
+        self.assertIs(review["contests"][0]["in_the_money"], False)
+        # E1 missed the one paid place; E2 might not have, so no YES.
+        self.assertEqual(review["portfolio_washout"], "UNKNOWN")
+        self.assertIn("1 entry is unresolved", review["portfolio_washout_reason"])
+        self.assertEqual(review["entries_unresolved"], [{"entry_id": "E2", "status": "no_resolution_row"}])
+        self.assertEqual(review["entries_not_filled"], 1)
+        resolution["E2"] = dict(resolution["E1"], Entry_Key="E2")
+        self.assertIs(mod.review_record(record, self.root, resolution, "fixture")["portfolio_washout"], True)
+
+    def test_a_record_naming_no_filled_entry_reads_no_entries_never_not_entered(self):
+        """Five R387-era records carry an empty `entries` list while their manifest
+        rows count 4 to 34 entries; nothing says their files were not entered."""
+        record = json.loads(self.cert.read_text(encoding="utf-8"))
+        record["entries"] = []
+        record["_path"] = self._key(self.cert)
+        review = self._mod().review_record(record, self.root, {}, "fixture")
+        self.assertEqual(review["entered"], "no_entries")
+        self.assertEqual(review["entries_not_entered"], [])
+        self.assertNotIn("not entered", review["portfolio_washout_reason"])
+        self.assertEqual(review["portfolio_washout"], "UNKNOWN")
