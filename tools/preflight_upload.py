@@ -1969,7 +1969,7 @@ def write_preflight_sidecars(manifest_path: Path, entries_sha256: str,
     """
     out: Dict[str, Any] = {"written": [], "already": [], "note": ""}
     try:
-        manifest_path = Path(manifest_path)
+        manifest_path = Path(manifest_path).resolve()
         date_dir = manifest_path.parent
         if date_dir.parent.name != "outputs":
             out["note"] = "the manifest is not under outputs/<date>/; no record to find"

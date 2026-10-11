@@ -4985,6 +4985,48 @@ class RecordPredictionTests(unittest.TestCase):
                          "only the replacement is missing from the parent's players map")
         self.assertIn("hand repair", record["extra"]["market"]["reason"])
 
+    def test_the_repair_fallback_takes_the_repaired_builds_prediction_not_a_rebuilds(self):
+        """The landing review's probe: build A, then a rebuild B holding the same
+        lineup for entry 5001 with its own score, both run folders gone, then a
+        repair of A's file. 5001 is A's lineup, so it carries A's prediction,
+        not the newer record's."""
+        ids = self._salary()
+        r1, r2 = ids[:10], ids[10:20]
+        run_a = self._make_run([("5001", "900", r1, 6.0), ("5002", "900", r2, 5.0)],
+                               self._frame())
+        first = self._deliver([classic_entry("5001", "900", r1),
+                               classic_entry("5002", "900", r2)], run_id=run_a)
+        run_b = self._make_run([("5001", "900", r1, 99.0), ("5002", "900", ids[20:30], 1.0)],
+                               self._frame())
+        self._deliver([classic_entry("5001", "900", r1),
+                       classic_entry("5002", "900", ids[20:30])], run_id=run_b)
+        shutil.rmtree(self.root / "runs" / run_a)
+        shutil.rmtree(self.root / "runs" / run_b)
+        record = self._record(self._deliver(
+            [classic_entry("5001", "900", r1), classic_entry("5002", "900", r2[:9] + [ids[45]])],
+            repair_of={"run_id": run_a, "sha256": first["record"]["sha256"]}))
+        kept = self._by_entry(record)["5001"]["prediction"]
+        self.assertEqual((kept["run_id"], kept["contest_fit_score"]), (run_a, 6.0))
+
+    def test_a_salary_snapshot_that_will_not_parse_keeps_every_prediction(self):
+        """The landing review's probe: the players map is a separate step, so a
+        snapshot the parser refuses costs the crosswalk's salary source and
+        never a prediction that already resolved; the frame fills the map."""
+        ids = self._salary()
+        run_id = self._make_run([("5001", "900", ids[:10], 4.0)], self._frame())
+        snapshot = self.root / "runs" / run_id / "inputs" / self.salary_path.name
+        snapshot.write_text("Roster Position,TeamAbbrev\nP,AAA\n", encoding="utf-8")
+        record = self._record(self._deliver([classic_entry("5001", "900", ids[:10])],
+                                            run_id=run_id))
+        source = record["prediction_source"]
+        self.assertEqual(source["status"], "resolved")
+        self.assertIsInstance(self._by_entry(record)["5001"]["prediction"], dict)
+        self.assertIn("players_error", source)
+        self.assertEqual(sorted(record["players"]), sorted(ids[:10]),
+                         "the frame fills the map when the snapshot will not parse")
+        self.assertTrue(all(isinstance(facts[3], int) for facts in record["players"].values()),
+                        "a whole-dollar salary is an int on both paths")
+
     def test_an_unreadable_run_writes_the_record_and_names_the_error(self):
         ids = self._salary()
         run_id = self._make_run([("5001", "900", ids[:10], 4.0)], self._frame())
@@ -5004,6 +5046,19 @@ class RecordPredictionTests(unittest.TestCase):
         record = self._record(self._deliver([classic_entry("5001", "900", ids[:10])],
                                             run_id=run_id, market=market))
         self.assertEqual(record["extra"]["market"], {**market, "applied": True})
+
+    def test_a_market_that_priced_no_slate_team_is_not_applied(self):
+        """The landing review's probe: `slate_market_record` returns a dict with
+        an empty `implied_total_by_team` when the totals name no slate team, and
+        that market ranked nothing."""
+        ids = self._salary()
+        run_id = self._make_run([("5001", "900", ids[:10], 4.0)], self._frame())
+        market = {"games": 4, "implied_total_by_team": {}, "unpriced_teams": ["AAA"]}
+        record = self._record(self._deliver([classic_entry("5001", "900", ids[:10])],
+                                            run_id=run_id, market=market))
+        got = record["extra"]["market"]
+        self.assertEqual((got["applied"], got["unpriced_teams"]), (False, ["AAA"]))
+        self.assertIn("named no team on this slate", got["reason"])
 
     def test_a_market_less_record_keeps_applied_false_through_a_re_promotion(self):
         import contextlib

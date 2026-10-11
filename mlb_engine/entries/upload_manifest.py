@@ -310,8 +310,13 @@ def _write(path: Path, payload: Mapping[str, Any]) -> None:
 #: R494(b). Why a Classic record holds no market, named from what
 #: `record_delivery` already knows about the delivery.
 NO_MARKET_REASON = ("no implied team totals reached the build: run_slate's "
-                    "slate_market_record returned None (no odds pull, or one that "
-                    "priced no team on this slate)")
+                    "slate_market_record returned None (no odds pull, or one whose "
+                    "totals normalized to none)")
+#: A market whose totals reached the build and named no team on this slate:
+#: `slate_market_record` returns a dict with an empty `implied_total_by_team`,
+#: and the tail ranking it feeds ranked nothing.
+NO_SLATE_TEAM_PRICED = ("the market's implied totals named no team on this slate, "
+                        "so it ranked nothing")
 
 
 def market_absent_reason(*, run_id: Optional[str], refinement: bool,
@@ -372,7 +377,10 @@ def _mirror_to_delivery_record(date: str, record: Mapping[str, Any],
         classic = str(record.get("contest_type") or "").lower() == "classic"
         market_block = dict(market) if market else None
         if classic and market_block is not None:
-            market_block.setdefault("applied", True)
+            market_block.setdefault(
+                "applied", bool(market_block.get("implied_total_by_team")))
+            if not market_block["applied"]:
+                market_block.setdefault("reason", NO_SLATE_TEAM_PRICED)
         elif classic:
             market_block = {"applied": False,
                             "reason": no_market_reason or NO_MARKET_REASON}

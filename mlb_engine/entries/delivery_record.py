@@ -530,31 +530,42 @@ def _entry_prediction(run_id: str, final: Mapping[str, Any], row: Mapping[str, A
     }
 
 
-def _tracked_predictions(date: str, root: Optional[Path], own_name: str) -> tuple:
+def _tracked_predictions(date: str, root: Optional[Path], own_name: str,
+                         runs: Sequence[str]) -> tuple:
     """``({(entry_id, roster): prediction}, {id: player})`` from the same date's
-    tracked Classic records, newest first, this record's own file skipped.
+    tracked Classic records OF THIS RECORD'S RUN CHAIN, newest first, this
+    record's own file skipped.
 
     The cloud case for a run-less hand repair (`tools/repair_entry.py`): a later
     session repairs a scratched player, the parent's `runs/` died with its
     container, and the rows the repair left alone are still the parent build's
-    lineups, whose prediction its record already holds."""
+    lineups, whose prediction its record already holds. Only that build's
+    records count: a rebuild the same day can hold the same lineup for the same
+    entry with its own score, and taking the newest record would hand the
+    repair the rebuild's prediction (the R494 landing review's probe)."""
+    wanted = {str(r) for r in runs if r}
+    if not wanted:
+        return {}, {}
     held = [rec for rec in read_records(root=root, date=date)
             if rec.get("kind") == "delivery"
-            and str((rec.get("manifest_row") or {}).get("contest_type") or "").lower() == "classic"
+            and isinstance(rec.get("manifest_row"), Mapping)
+            and str(rec["manifest_row"].get("contest_type") or "").lower() == "classic"
+            and str(rec["manifest_row"].get("run_id") or "") in wanted
             and Path(str(rec.get("_path") or "")).name != own_name]
     held.sort(key=lambda rec: str(rec.get("recorded_utc") or ""), reverse=True)
     predictions: Dict[tuple, Dict[str, Any]] = {}
     players: Dict[str, list] = {}
     for rec in held:
         for entry in rec.get("entries") or []:
-            pred = entry.get("prediction")
+            pred = entry.get("prediction") if isinstance(entry, Mapping) else None
             if not isinstance(pred, Mapping):
                 continue
             key = (str(entry.get("entry_id") or ""),
                    tuple(sorted(str(p) for p in entry.get("roster_ids") or [])))
             predictions.setdefault(key, {**dict(pred),
                                          "source": f"tracked_record:{rec.get('_path')}"})
-        for pid, facts in (rec.get("players") or {}).items():
+        held_players = rec.get("players")
+        for pid, facts in (held_players.items() if isinstance(held_players, Mapping) else ()):
             players.setdefault(str(pid), facts)
     return predictions, players
 
@@ -566,9 +577,11 @@ def classic_prediction(manifest_row: Mapping[str, Any], entries: Sequence[Mappin
     Each filled entry takes the first run in the chain whose assignment for that
     entry id holds THIS roster (`lineup_signature` against the sorted roster), so
     a prediction never describes a lineup that is not in the file; then a
-    same-date tracked record holding the same entry and roster; else null. Never
-    raises: a run that cannot be read is ``status: unreadable`` and every entry
-    is null, and the record still writes.
+    same-date tracked record of the same run chain holding the same entry and
+    roster; else null. Never raises: a run that cannot be read is ``status:
+    unreadable`` and every entry is null, and the record still writes; the
+    players map is a separate step whose failure (``players_error``) costs no
+    prediction.
     """
     filled = [e for e in entries if e.get("filled")]
     repair = manifest_row.get("repair_of")
@@ -581,7 +594,8 @@ def classic_prediction(manifest_row: Mapping[str, Any], entries: Sequence[Mappin
                               "hitter_roles_basis": HITTER_ROLES_BASIS,
                               "label": PREDICTION_LABEL}
     try:
-        loaded = [(rid, final) for rid in _run_chain(start, root)
+        chain = _run_chain(start, root)
+        loaded = [(rid, final) for rid in chain
                   for final in [_run_final(rid, root)] if final is not None]
         source["runs_read"] = [rid for rid, _final in loaded]
         tracked = None
@@ -601,31 +615,12 @@ def classic_prediction(manifest_row: Mapping[str, Any], entries: Sequence[Mappin
                     break
             if pred is None:
                 if tracked is None:
-                    tracked = _tracked_predictions(date, root, own_name)
+                    tracked = _tracked_predictions(date, root, own_name, chain)
                 pred = tracked[0].get((entry_id, tuple(key)))
             if pred is None:
                 source["unmatched_entry_ids"].append(entry_id)
             by_entry[entry_id] = pred
         source["predicted"] = sum(1 for p in by_entry.values() if p)
-        ids = sorted({str(p) for e in filled for p in e.get("roster_ids") or []})
-        players: Dict[str, list] = {}
-        for rid, final in loaded:
-            for pid, facts in _salary_players(rid, root).items():
-                if pid in ids:
-                    players.setdefault(pid, facts)
-        for rid, final in loaded:
-            for pid in ids:
-                row = final["frame"].get(pid)
-                if pid not in players and row:
-                    players[pid] = [row.get("Name"), row.get("Team"), row.get("Position"),
-                                    _number(row.get("Salary")), row.get("Game_ID")]
-        if any(pid not in players for pid in ids):
-            if tracked is None:
-                tracked = _tracked_predictions(date, root, own_name)
-            for pid in ids:
-                if pid not in players and pid in tracked[1]:
-                    players[pid] = tracked[1][pid]
-        source["players_missing"] = [pid for pid in ids if pid not in players]
         if not filled:
             source["status"] = "no_filled_entries"
         elif source["predicted"] == len(filled):
@@ -635,13 +630,44 @@ def classic_prediction(manifest_row: Mapping[str, Any], entries: Sequence[Mappin
         else:
             source["status"] = ("no_run" if not start else
                                 "run_absent" if not loaded else "unmatched")
-        return {"by_entry": by_entry, "players": dict(sorted(players.items())),
-                "prediction_source": source}
     except Exception as exc:  # noqa: BLE001 - bookkeeping never fails a delivery
         source["status"] = "unreadable"
         source["error"] = f"{type(exc).__name__}: {exc}"
         return {"by_entry": {str(e.get("entry_id") or ""): None for e in entries},
                 "players": {}, "prediction_source": source}
+    # The crosswalk is its own step: a salary snapshot that will not parse
+    # costs the players map at most, never a prediction already resolved.
+    ids = sorted({str(p) for e in filled for p in e.get("roster_ids") or []})
+    players: Dict[str, list] = {}
+    try:
+        for rid, _final in loaded:
+            try:
+                salary = _salary_players(rid, root)
+            except Exception as exc:  # noqa: BLE001
+                source["players_error"] = f"{type(exc).__name__}: {exc}"
+                continue
+            for pid, facts in salary.items():
+                if pid in ids:
+                    players.setdefault(pid, facts)
+        for _rid, final in loaded:
+            for pid in ids:
+                row = final["frame"].get(pid)
+                if pid not in players and row:
+                    pay = _number(row.get("Salary"))
+                    players[pid] = [row.get("Name"), row.get("Team"), row.get("Position"),
+                                    int(pay) if pay is not None and pay.is_integer() else pay,
+                                    row.get("Game_ID")]
+        if any(pid not in players for pid in ids):
+            if tracked is None:
+                tracked = _tracked_predictions(date, root, own_name, chain)
+            for pid in ids:
+                if pid not in players and pid in tracked[1]:
+                    players[pid] = tracked[1][pid]
+    except Exception as exc:  # noqa: BLE001
+        source["players_error"] = f"{type(exc).__name__}: {exc}"
+    source["players_missing"] = [pid for pid in ids if pid not in players]
+    return {"by_entry": by_entry, "players": dict(sorted(players.items())),
+            "prediction_source": source}
 
 
 def write_delivery_record(*, date: str, manifest_row: Mapping[str, Any],
