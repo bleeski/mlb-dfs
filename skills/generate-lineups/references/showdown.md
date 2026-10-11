@@ -107,6 +107,13 @@ With a prior read, the sleeve's selector form works:
   named), more than one archetype with none named, no `captain` block (what a
   CLASSIC salary file emits), a prediction whose ids are strangers to this melt,
   a threshold outside (0, 100], and a threshold that selects nobody.
+- **The delivery record keeps it per entry (R495).** Each entry's `prediction`
+  carries its captain's captain-slot share and the five UTIL players' summed
+  share of the file's six-slot `showdown_roster` market, or `null` without
+  `--captain-prior`, for a person the file never scored, or when the file has
+  no roster market (`prediction_source.priors` says which). It also carries the
+  `build_id` the baseline and ladder records share, the thesis template or
+  `points_max`, and the Base sum with the captain at 1.5x.
 - **The number is an ORDERING and nothing more.** R306 measured person-level
   prior ownership correlating with realized CAPTAIN ownership between 0.33 and
   0.85, and a 60%-rostered player landing at 6% captain; R209 measured this

@@ -9223,3 +9223,247 @@ class PerHitterPlatoonTests(_ShowdownExitDoorHarness, unittest.TestCase):
         self.assertEqual([names[1]], [r["name"] for r in block["split_hitters"]])
         self.assertEqual([names[0]], [r["name"] for r in block["superseded_by_supplied_base"]])
         self.assertEqual(9.0, float(out.loc[out["Name"] == names[0], "Base"].iloc[0]))
+
+
+class ShowdownRecordPredictionTests(_ShowdownExitDoorHarness, unittest.TestCase):
+    """R495, roadmap Session 161. A Showdown delivery record carries, per entry,
+    what the build predicted for the lineup it put there (`prediction`), one
+    `build_id` its baseline and ladder records share, the pool basis and the
+    rostered players, so a finish can be attributed to a captain, a thesis and
+    a prior. Driven through the real exit door on the vendored MIN@CHC slate.
+
+    Three builds are shared across the class: the default ladder build, the
+    same inputs again INTO THE SAME ROOT (so its identical bytes take
+    `record_delivery`'s same-bytes branch and its records are re-mirrored over
+    the first run's), and the blanked-`Starting` points-max build. A test that
+    needs its own inputs builds them itself.
+    """
+
+    _TAG = "1420_1g_sd"
+
+    @classmethod
+    def setUpClass(cls):
+        cls._cls_tmp = tempfile.TemporaryDirectory()
+        base = Path(cls._cls_tmp.name)
+        builder = cls()
+        cls.built = {}
+        for name, folder in (("ladder", "ladder"), ("again", "ladder"),
+                             ("points_max", "points_max")):
+            root = base / folder
+            root.mkdir(exist_ok=True)
+            salary = (cls._points_max_salary(base / "pm_salary.csv")
+                      if name == "points_max" else None)
+            cls.built[name] = builder._build(root, salary_csv=salary)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._cls_tmp.cleanup()
+
+    def _by_lineage(self, r):
+        out = {}
+        for _path, body in self._records(r.root, "delivery"):
+            out[body["manifest_row"].get("lineage") or "ladder"] = body
+        return out
+
+    @staticmethod
+    def _filled(record):
+        return [e for e in record["entries"] if e["filled"]]
+
+    def test_every_ladder_entry_carries_a_prediction_its_captain_the_first_cell(self):
+        r = self.built["ladder"]
+        self.assertEqual(r.code, 0, r.err[-3000:])
+        self.assertEqual(r.brief["construction"]["mode"], "thesis_ladder")
+        record = self._by_lineage(r)["ladder"]
+        salary = self._salary_rows()
+        lineups = r.brief["construction"]["lineups"]
+        entries = self._filled(record)
+        self.assertEqual(len(entries), len(lineups))
+        self.assertEqual(record["prediction_source"]["status"], "resolved")
+        self.assertEqual(record["prediction_source"]["unmatched_entry_ids"], [])
+        sums = []
+        for entry in entries:
+            pred = entry["prediction"]
+            self.assertIsInstance(pred, dict, entry)
+            self.assertEqual(pred["captain_id"], entry["roster_ids"][0])
+            self.assertEqual(salary[pred["captain_id"]]["Roster Position"], "CPT")
+            row = lineups[pred["slot"] - 1]
+            self.assertEqual(pred["thesis"], row["template"])
+            self.assertNotEqual(pred["thesis"], "points_max")
+            self.assertIn(pred["team_split"], {"5-1", "4-2", "3-3"})
+            self.assertEqual(sorted(pred["team_counts"].values(), reverse=True),
+                             [int(c) for c in pred["team_split"].split("-")])
+            self.assertAlmostEqual(pred["base_sum"], row["proxy_points"], delta=0.011)
+            self.assertIn(pred["captain_role"], {"pitcher", "hitter"})
+            position = salary[pred["captain_id"]]["Position"]
+            self.assertEqual(pred["captain_role"] == "pitcher",
+                             position in {"SP", "RP", "P"}, position)
+            self.assertIsNone(pred["ceiling_sum"])
+            self.assertEqual(pred["rank_of_n"], len(entries))
+            sums.append((pred["rank_in_build"], pred["base_sum"]))
+        self.assertEqual(sorted(r for r, _s in sums), list(range(1, len(entries) + 1)))
+        self.assertEqual(min(sums)[1], max(s for _r, s in sums),
+                         "rank 1 holds the build's largest Base sum")
+        self.assertIn("no Ceiling column", record["prediction_source"]["ceiling_basis"])
+        self.assertEqual(record["pool"], {"basis": "declared_starters",
+                                          "posted_sides": ["CHC", "MIN"]})
+        ids = {pid for e in entries for pid in e["roster_ids"]}
+        self.assertEqual(set(record["players"]), ids)
+        for pid in ids:
+            name, team, slot, pay, game = record["players"][pid]
+            self.assertEqual((name, team, slot, pay),
+                             (salary[pid]["Name"], salary[pid]["TeamAbbrev"],
+                              salary[pid]["Roster Position"], int(salary[pid]["Salary"])))
+            self.assertIn("MIN@CHC", game)
+
+    def test_the_baseline_and_ladder_records_share_one_build_id(self):
+        r = self.built["ladder"]
+        records = self._by_lineage(r)
+        self.assertEqual(set(records), {"baseline", "ladder"})
+        build_id = r.brief["build_id"]
+        self.assertRegex(build_id, r"^sd_[0-9a-f]{12}$")
+        self.assertEqual(r.brief["baseline"]["build_id"], build_id)
+        for record in records.values():
+            self.assertEqual(record["prediction_source"]["build_id"], build_id)
+            self.assertEqual({e["prediction"]["build_id"] for e in self._filled(record)},
+                             {build_id})
+        again = self.built["again"]
+        self.assertEqual(again.code, 0, again.err[-3000:])
+        self.assertEqual(again.brief["build_id"], build_id,
+                         "the same inputs are the same build")
+        # The re-run's identical bytes are one delivery per lineage, and the
+        # records the same-bytes branch re-mirrored still carry the prediction.
+        self.assertEqual(len(self._rows(r.root)), 2)
+        self.assertEqual({row["sha256"] for row in self._rows(r.root)},
+                         {r.brief["delivered_sha256"], r.brief["baseline"]["sha256"]})
+        self.assertNotEqual(self.built["points_max"].brief["build_id"], build_id,
+                            "other salary bytes are another build")
+
+    def test_a_build_without_a_captain_prior_records_null_priors(self):
+        r = self.built["ladder"]
+        for record in self._by_lineage(r).values():
+            priors = record["prediction_source"]["priors"]
+            self.assertIs(priors["captain"]["applied"], False)
+            self.assertIs(priors["flex"]["applied"], False)
+            for entry in self._filled(record):
+                self.assertIsNone(entry["prediction"]["captain_prior_own"])
+                self.assertIsNone(entry["prediction"]["flex_prior_own_sum"])
+
+    def test_a_captain_prior_records_the_captains_share_and_the_flex_roster_sum(self):
+        from tools.ownership_pred import build_prediction
+        root = self._root("prior")
+        payload = build_prediction(SAL, archetypes=["large_field_gpp"])
+        folder = root / "outputs" / self._DATE
+        folder.mkdir(parents=True)
+        (folder / f"ownership_pred_{self._TAG}.json").write_text(
+            json.dumps(payload), encoding="utf-8")
+        r = self._build(root, args_extra={"captain_prior": "", "ownership_pred": None})
+        self.assertEqual(r.code, 0, r.err[-3000:])
+        self.assertIs(r.brief["captain_prior"]["applied"], True)
+        block = payload["archetypes"]["large_field_gpp"]
+        captain, roster = (block["captain"]["own_pct_by_player_id"],
+                           block["showdown_roster"]["own_pct_by_player_id"])
+        salary = self._salary_rows()
+        util_of = {(row["Name"], row["TeamAbbrev"]): pid for pid, row in salary.items()
+                   if row["Roster Position"] == "UTIL"}
+        records = self._by_lineage(r)
+        self.assertEqual(set(records), {"baseline", "ladder"})
+        for record in records.values():
+            priors = record["prediction_source"]["priors"]
+            self.assertEqual(priors["captain"]["archetype"], "large_field_gpp")
+            self.assertEqual(priors["captain"]["sha256"], r.brief["captain_prior"]["sha256"])
+            self.assertIs(priors["flex"]["applied"], True)
+            self.assertEqual(priors["flex"]["market"], "showdown_roster")
+            for entry in self._filled(record):
+                pred = entry["prediction"]
+                cpt = salary[entry["roster_ids"][0]]
+                self.assertEqual(pred["captain_prior_own"],
+                                 captain[util_of[(cpt["Name"], cpt["TeamAbbrev"])]])
+                self.assertAlmostEqual(pred["flex_prior_own_sum"],
+                                       sum(roster[pid] for pid in entry["roster_ids"][1:]),
+                                       delta=0.006)
+
+    def test_a_points_max_baseline_and_the_points_max_bank_record_points_max(self):
+        baseline = self._by_lineage(self.built["ladder"])["baseline"]
+        self.assertEqual({e["prediction"]["thesis"] for e in self._filled(baseline)},
+                         {"points_max"})
+        r = self.built["points_max"]
+        self.assertEqual(r.code, 0, r.err[-3000:])
+        self.assertEqual(r.brief["construction"]["mode"], "points_max_bank")
+        records = self._by_lineage(r)
+        self.assertEqual(set(records), {"ladder"}, "no baseline on this path")
+        record = records["ladder"]
+        self.assertEqual(record["prediction_source"]["status"], "resolved")
+        self.assertEqual({e["prediction"]["thesis"] for e in self._filled(record)},
+                         {"points_max"})
+        self.assertEqual(record["pool"], {"basis": "all_healthy", "posted_sides": []})
+
+    def test_a_prediction_never_describes_a_lineup_not_in_the_file(self):
+        from mlb_engine.entries.delivery_record import showdown_prediction
+        entries = [
+            {"entry_id": "1", "filled": True, "roster_ids": ["c1", "u1", "u2", "u3", "u4", "u5"]},
+            {"entry_id": "2", "filled": True, "roster_ids": ["c2", "u1", "u2", "u3", "u4", "u5"]},
+            {"entry_id": "3", "filled": False, "roster_ids": []},
+        ]
+        pred = {"thesis": "pitchers_duel", "captain_id": "c1"}
+        payload = {"build_id": "sd_000000000000", "pool": {"basis": "x", "posted_sides": []},
+                   "by_entry": {
+                       # The five UTIL cells in another order still describe it.
+                       "1": {**pred, "roster_ids": ["c1", "u5", "u4", "u3", "u2", "u1"]},
+                       # The same six people with another captain do not.
+                       "2": {**pred, "roster_ids": ["u1", "c2", "u2", "u3", "u4", "u5"]}}}
+        got = showdown_prediction(payload, entries)
+        self.assertEqual(got["by_entry"]["1"], {**pred, "build_id": "sd_000000000000"})
+        self.assertIsNone(got["by_entry"]["2"])
+        self.assertIsNone(got["by_entry"]["3"])
+        source = got["prediction_source"]
+        self.assertEqual((source["status"], source["predicted"], source["filled"]),
+                         ("partial", 1, 2))
+        self.assertEqual(source["unmatched_entry_ids"], ["2"])
+        self.assertEqual(source["players_missing"], ["c1", "c2", "u1", "u2", "u3", "u4", "u5"])
+        self.assertEqual(showdown_prediction(None, entries)["prediction_source"]["status"],
+                         "not_supplied")
+        broken = showdown_prediction({"build_id": "x", "error": "Boom: no"}, entries)
+        self.assertEqual(broken["prediction_source"]["status"], "unreadable")
+        self.assertEqual(set(broken["by_entry"].values()), {None})
+
+    def test_a_raising_prediction_costs_neither_record_nor_promotion(self):
+        def boom(*_a, **_k):
+            raise RuntimeError("prediction step broke")
+
+        r = self._build(self._root("boom"), patches=[(st, "record_predictions", boom)])
+        self.assertEqual(r.code, 0, r.err[-3000:])
+        self.assertIs(r.brief["manifest_recorded"], True)
+        self.assertFalse(Path(r.brief["delivered_path"]).name.startswith("DO_NOT_UPLOAD_"))
+        self.assertEqual(r.brief["baseline"]["status"], "delivered")
+        self.assertIs(r.brief["baseline"]["promoted"], True)
+        self.assertEqual(len(self._rows(r.root)), 2)
+        records = self._by_lineage(r)
+        self.assertEqual(set(records), {"baseline", "ladder"})
+        for record in records.values():
+            source = record["prediction_source"]
+            self.assertEqual(source["status"], "unreadable")
+            self.assertIn("RuntimeError: prediction step broke", source["error"])
+            self.assertEqual(source["build_id"], r.brief["build_id"])
+            self.assertEqual({e["prediction"] for e in record["entries"]}, {None})
+            self.assertTrue(record["players"], "the players map is its own step")
+
+    def test_the_roster_market_reads_through_the_same_join(self):
+        from tools.ownership_pred import build_prediction
+        df = _sleeve_frame()
+        payload = build_prediction(SAL, archetypes=["large_field_gpp"])
+        block = payload["archetypes"]["large_field_gpp"]
+        util = dict(zip(df["Player_Key"], df["UTIL_ID"].astype(str)))
+        captain = st.captain_prior_by_person(df, payload, "large_field_gpp")
+        roster = st.captain_prior_by_person(df, payload, "large_field_gpp",
+                                            market="showdown_roster")
+        self.assertEqual(captain["market"], "captain")
+        self.assertEqual(captain["budget_check"]["budget_pct"], 100.0)
+        self.assertEqual(roster["market"], "showdown_roster")
+        self.assertEqual(roster["budget_check"]["budget_pct"], 600.0)
+        for key, share in roster["own_pct_by_player_key"].items():
+            self.assertEqual(share, block["showdown_roster"]["own_pct_by_player_id"][util[key]])
+        for key, share in captain["own_pct_by_player_key"].items():
+            self.assertEqual(share, block["captain"]["own_pct_by_player_id"][util[key]])
+        self.assertNotEqual(roster["own_pct_by_player_key"], captain["own_pct_by_player_key"])
+        with self.assertRaises(st.CaptainPriorError):
+            st.captain_prior_by_person(df, payload, "large_field_gpp", market="classic")

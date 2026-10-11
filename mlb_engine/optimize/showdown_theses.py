@@ -53,7 +53,7 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence
 import numpy as np
 import pandas as pd
 
-from mlb_engine.field.ownership_prior import CAPTAIN_BUDGET_PCT
+from mlb_engine.field.ownership_prior import CAPTAIN_BUDGET_PCT, SHOWDOWN_ROSTER_BUDGET_PCT
 from mlb_engine.optimize.showdown import (
     DEFAULT_MAX_CPT_EXPOSURE_PCT,
     DEFAULT_MAX_CPT_PER_CONTEST,
@@ -1142,10 +1142,19 @@ class CaptainPriorError(ValueError):
     """
 
 
+#: R495. The two Showdown markets an emitted prediction carries per archetype
+#: (R306), and the budget each allocates. `captain_prior_by_person` reads the
+#: captain slot by default; the six-slot roster market is read only for the
+#: delivery record's flex prior and steers nothing.
+PRIOR_MARKETS = {"captain": CAPTAIN_BUDGET_PCT,
+                 "showdown_roster": SHOWDOWN_ROSTER_BUDGET_PCT}
+
+
 def captain_prior_by_person(df: pd.DataFrame,
                             payload: Mapping[str, Any],
                             archetype: str = "",
-                            source: str = "") -> Dict[str, Any]:
+                            source: str = "",
+                            market: str = "captain") -> Dict[str, Any]:
     """The emitted CAPTAIN-SLOT prior, re-keyed onto this melt's people.
 
     R382 (CC-5, R307 batch 2). ``tools/ownership_pred.py emit`` has produced
@@ -1201,8 +1210,21 @@ def captain_prior_by_person(df: pd.DataFrame,
     112 graded players) and its LEVEL explicitly not; one slate cannot size a
     coefficient. Nothing here is a lift, an edge, an ROI, a win rate or a
     probability, and no caller may turn it into one.
+
+    **R495. ``market="showdown_roster"``** reads the six-slot ROSTER
+    distribution (600%, R306) the same file carries beside the captain block,
+    through the same UTIL-id join and the same refusals, so the delivery record
+    can carry a flex prior. The default reads the captain block exactly as
+    before, every refusal word for word; nothing on the build path steers on
+    the roster market.
     """
     where = str(source) or "the ownership prediction"
+    if market not in PRIOR_MARKETS:
+        raise CaptainPriorError(
+            f"unknown prior market {market!r}; one of {sorted(PRIOR_MARKETS)}")
+    # The word every refusal below uses for the slot it read, so the default
+    # keeps its messages byte for byte.
+    slot = "captain" if market == "captain" else "roster"
     archetypes = (payload or {}).get("archetypes") or {}
     if not archetypes:
         raise CaptainPriorError(
@@ -1222,7 +1244,11 @@ def captain_prior_by_person(df: pd.DataFrame,
                 f"{sorted(archetypes)}; name one with "
                 "`--captain-prior <archetype>` rather than letting sort order pick")
         name = next(iter(archetypes))
-    block = (archetypes.get(name) or {}).get("captain") or {}
+    block = (archetypes.get(name) or {}).get(market) or {}
+    if not block and market != "captain":
+        raise CaptainPriorError(
+            f"{where} archetype {name!r} carries no `{market}` block; R306 "
+            "emits it beside `captain` only on a Showdown salary file")
     if not block:
         raise CaptainPriorError(
             f"{where} archetype {name!r} carries no `captain` block, which is "
@@ -1234,7 +1260,7 @@ def captain_prior_by_person(df: pd.DataFrame,
     own = block.get("own_pct_by_player_id") or {}
     if not own:
         raise CaptainPriorError(
-            f"{where} archetype {name!r} carries an empty captain "
+            f"{where} archetype {name!r} carries an empty {slot} "
             "`own_pct_by_player_id`; refusing rather than reading every person "
             "as unowned, which passes every threshold a selector can set")
 
@@ -1264,19 +1290,19 @@ def captain_prior_by_person(df: pd.DataFrame,
             continue
         if isinstance(raw, bool) or not isinstance(raw, (int, float)):
             raise CaptainPriorError(
-                f"{where} archetype {name!r} carries a non-numeric captain "
+                f"{where} archetype {name!r} carries a non-numeric {slot} "
                 f"ownership for id {token}: {raw!r}")
         value = float(raw)
         if not math.isfinite(value) or value < 0.0 or value > 100.0:
             raise CaptainPriorError(
-                f"{where} archetype {name!r} carries captain ownership "
+                f"{where} archetype {name!r} carries {slot} ownership "
                 f"{value!r} for id {token}, which is outside [0, 100]. R338 "
                 "refuses the same class before a Classic leverage control "
                 "reads one; a share outside the budget is a broken file, not a "
                 "number to clamp")
         if key in own_by_key:
             raise CaptainPriorError(
-                f"{where} maps two captain-prior ids onto one person ({key}), "
+                f"{where} maps two {slot}-prior ids onto one person ({key}), "
                 f"most recently {token}. The melt drops any person who is not "
                 "exactly one CPT row plus one UTIL row, so this means the "
                 "prediction was emitted against a DIFFERENT salary file than "
@@ -1286,7 +1312,7 @@ def captain_prior_by_person(df: pd.DataFrame,
 
     if not own_by_key:
         raise CaptainPriorError(
-            f"{where} archetype {name!r} carries {len(own)} captain ownership "
+            f"{where} archetype {name!r} carries {len(own)} {slot} ownership "
             "values and NOT ONE of their ids is in this melted pool, so the "
             "prior would read as `nobody is owned` for every person. That is "
             "the CPT/UTIL key-space trap: `ownership_pred` collapses roles "
@@ -1311,7 +1337,7 @@ def captain_prior_by_person(df: pd.DataFrame,
         "ids_not_in_pool": ids_not_in_pool,
         "budget_check": {
             "pct_sum": round(sum(own_by_key.values()), 1),
-            "budget_pct": CAPTAIN_BUDGET_PCT,
+            "budget_pct": PRIOR_MARKETS[market],
             "note": ("the softmax allocates exactly this budget over the people "
                      "the PREDICTION saw. A sum below it here means people in "
                      "the prediction are absent from this melt, which is "
@@ -1319,7 +1345,13 @@ def captain_prior_by_person(df: pd.DataFrame,
                      "rescaled, because rescaling would invent shares R306 did "
                      "not allocate"),
         },
-        "label": ("an UNGRADED, UNCALIBRATED structural prior over the CAPTAIN "
+        "market": market,
+        "label": ("an UNGRADED, UNCALIBRATED structural prior over the six-slot "
+                  "Showdown ROSTER (600%), forwarded unchanged for the delivery "
+                  "record and steering nothing. Never a lift, an edge, an ROI, a "
+                  "win rate or a probability.")
+        if market != "captain" else
+                 ("an UNGRADED, UNCALIBRATED structural prior over the CAPTAIN "
                   "slot, forwarded unchanged. R306 measured person-level prior "
                   "ownership correlating with realized CAPTAIN ownership "
                   "between 0.33 and 0.85, and a 60%-rostered player landing at "
@@ -3617,3 +3649,83 @@ def portfolio_report(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
                        + ". A labeled deterministic prior, not a projection."),
         "label": "review_grade_build",
     }
+
+
+#: R495. Why every Showdown record's `ceiling_sum` is null rather than a number.
+RECORD_CEILING_BASIS = (
+    "null on every Showdown entry: the melted and priced frames carry Base and "
+    "no Ceiling column on either path (the thesis ladder or the points-max "
+    "bank), so there is no ceiling sum to record")
+
+
+def record_predictions(df: pd.DataFrame,
+                       lineups: Sequence[Optional[Mapping[str, Any]]],
+                       theses: Optional[Sequence[Mapping[str, Any]]] = None,
+                       *,
+                       captain_own: Optional[Mapping[str, float]] = None,
+                       roster_own: Optional[Mapping[str, float]] = None,
+                       ) -> List[Optional[Dict[str, Any]]]:
+    """R495. Per lineup, in slot order, what the build predicted for it: the
+    delivery record's Showdown ``prediction`` before it is bound to an entry.
+
+    ``thesis`` is the template id (``favorite_win_big``, ``pitchers_duel``), or
+    ``points_max`` when ``theses`` is None (the baseline and the points-max
+    bank). Never the display name: a repeat's name carries ``(variant N, X
+    captain)`` for the captain the APPORTIONMENT chose, which `solve_ladder` can
+    substitute (R463(3)), so the realized captain is recorded on its own.
+
+    ``base_sum`` is the frame's Base with the captain at the contract's 1.5x,
+    on the frame the build priced and before any thesis multiplier (the number
+    `solve_ladder` writes back to ``proj_points``), rounded to 2 as R494's
+    Classic sums are. ``captain_prior_own`` is the captain-slot share and
+    ``flex_prior_own_sum`` the five UTIL persons' six-slot roster shares, both
+    keyed by person (`captain_prior_by_person`); a person the prediction never
+    scored is null, never 0.0, because unknown is not cold. ``rank_in_build``
+    orders this build's lineups by ``base_sum`` descending, ties by slot.
+    Deterministic review proxies and labeled priors, never a probability.
+    """
+    from mlb_engine.optimize.roster_contracts import SHOWDOWN as _SHOWDOWN
+    from mlb_engine.optimize.showdown import _is_showdown_hitter
+    cpt_multiplier = _SHOWDOWN.multiplier_for(_SHOWDOWN.captain_slot or "CPT")
+    keys = [str(k) for k in df["Player_Key"]]
+    base = {k: float(b) for k, b in zip(keys, df["Base"])}
+    team = dict(zip(keys, df["Team"]))
+    position = dict(zip(keys, df["Position"]))
+    rows: List[Optional[Dict[str, Any]]] = []
+    for slot, lineup in enumerate(lineups):
+        if not lineup:
+            rows.append(None)
+            continue
+        cpt_key = str(lineup["captain"]["player_key"])
+        util_keys = [str(u["player_key"]) for u in lineup["utils"]]
+        counts = Counter(str(team.get(k, "")) for k in [cpt_key] + util_keys)
+        values = [base.get(k) for k in [cpt_key] + util_keys]
+        base_sum = (None if any(v is None for v in values) else
+                    round(cpt_multiplier * values[0] + sum(values[1:]), 2))
+        flex = [roster_own.get(k) for k in util_keys] if roster_own else None
+        thesis = theses[slot] if theses is not None else None
+        rows.append({
+            "slot": slot + 1,
+            "thesis": (str(thesis.get("template") or "unlabelled")
+                       if thesis is not None else "points_max"),
+            "captain_id": str(lineup["roster_ids"][0]),
+            "captain_role": ("hitter" if _is_showdown_hitter(position.get(cpt_key))
+                             else "pitcher"),
+            "team_split": _split_pattern(counts),
+            "team_counts": dict(sorted(counts.items())),
+            "base_sum": base_sum,
+            "ceiling_sum": None,
+            "captain_prior_own": (captain_own.get(cpt_key) if captain_own else None),
+            "flex_prior_own_sum": (None if flex is None or any(v is None for v in flex)
+                                   else round(sum(flex), 2)),
+            "roster_ids": [str(pid) for pid in lineup["roster_ids"]],
+        })
+    ranked = sorted((r for r in rows if r and r["base_sum"] is not None),
+                    key=lambda r: (-r["base_sum"], r["slot"]))
+    for i, row in enumerate(ranked):
+        row["rank_in_build"] = i + 1
+    for row in rows:
+        if row:
+            row.setdefault("rank_in_build", None)
+            row["rank_of_n"] = len(ranked)
+    return rows
