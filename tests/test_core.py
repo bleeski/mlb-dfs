@@ -51396,3 +51396,121 @@ class OutcomeReviewResolvedTests(unittest.TestCase):
         self.assertEqual(review["entries_not_entered"], [])
         self.assertNotIn("not entered", review["portfolio_washout_reason"])
         self.assertEqual(review["portfolio_washout"], "UNKNOWN")
+
+
+class AwaitingPerDraftgroupTests(unittest.TestCase):
+    """R497(b), roadmap Session 163. `awaiting_standings.py scan --per-draftgroup`
+    asks for one standings export per draftgroup, newest first: every contest
+    of a draftgroup shares its player points, so one export serves the resolve
+    join for all of them, and DK ages exports out while one-per-contest pulls
+    wait (159 contests in 30 draftgroups since 2026-09-19). Also the defect it
+    rests on: run as a script the scan could not import `mlb_engine` before
+    `scan_entered` ran and silently read no delivery record (0 open contests in
+    a cloud container against 159 with PYTHONPATH set).
+    """
+
+    TODAY = "2026-10-11"
+    NO_EXC = {"unrecoverable": [], "placeholder": []}
+
+    def _aw(self):
+        sys.path.insert(0, str(REPO / "tools"))
+        import awaiting_standings as aw
+        return aw
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+
+    def _record(self, date, name, contests, status="candidate"):
+        record = {"schema_version": 1, "kind": "delivery", "date": date,
+                  "manifest_row": {"status": status, "contest_ids": list(contests)},
+                  "entries": [{"entry_id": f"7{cid}", "contest_id": cid,
+                               "contest_name": f"Cup {cid}", "roster_ids": ["1"] * 10,
+                               "filled": True} for cid in contests]}
+        path = self.root / "data" / "deliveries" / date / f"{name}.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(record), encoding="utf-8")
+
+    def _three_draftgroups(self):
+        self._record("2026-09-22", "1905_3g_a", ["196000001", "196000002", "196000003"])
+        self._record("2026-09-24", "2000_1g_sd_a", ["196000010", "196000011"])
+        self._record("2026-09-24", "2000_1g_sd_b", ["196000011"])
+        self._record("2026-09-23", "1310_1g_sd_a", ["196000020"])
+
+    def _scan(self, aw, links=None):
+        return aw.scan_entered(self.root / "outputs", deliveries_dir=self.root / "data" / "deliveries",
+                               links=links)
+
+    SIZES = {"196000001": 20, "196000002": 5000, "196000003": 100,
+             "196000010": 50, "196000011": 50}
+
+    def test_one_contest_per_draftgroup_the_largest_field_newest_date_first(self):
+        aw = self._aw()
+        self._three_draftgroups()
+        links: list = []
+        entered, _ = self._scan(aw, links)
+        picks, unsettled = aw.compute_per_draftgroup(entered, links, set(), self.NO_EXC,
+                                                     self.TODAY, self.SIZES)
+        self.assertEqual(unsettled, [])
+        self.assertEqual([(p["date"], p["contest_id"]) for p in picks],
+                         [("2026-09-24", "196000010"), ("2026-09-23", "196000020"),
+                          ("2026-09-22", "196000002")])
+        self.assertEqual(picks[0]["contests"], ["196000010", "196000011"])  # tie: lowest ID
+        self.assertEqual((picks[1]["field"], picks[1]["basis"]), (None, "field size unknown"))
+        self.assertEqual((picks[2]["field"], picks[2]["basis"]), (5000, "results table"))
+        text = aw.render_per_draftgroup(picks, unsettled, 0, self.TODAY, "fixture")
+        self.assertIn("3 draftgroups to pull, covering 6 contests", text)
+        self.assertIn("Newest first", text)
+        self.assertNotIn("Prioritize oldest first", text)
+        self.assertLess(text.index("196000010"), text.index("196000002"))
+        html_text = aw.render_html({p["date"]: [(p["contest_id"], p["name"])] for p in picks},
+                                   self.TODAY, newest_first=True)
+        self.assertLess(html_text.index("196000010"), html_text.index("196000002"))
+        self.assertNotIn("Oldest date first", html_text)
+
+    def test_a_draftgroup_with_an_export_on_hand_is_done_and_a_dead_contest_is_never_picked(self):
+        aw = self._aw()
+        self._three_draftgroups()
+        self._record(self.TODAY, "1905_2g_tonight", ["196000030"])
+        links: list = []
+        entered, _ = self._scan(aw, links)
+        exc = {"unrecoverable": [{"contest_id": "196000010", "reason": "zero bytes twice"}],
+               "placeholder": []}
+        picks, unsettled = aw.compute_per_draftgroup(entered, links, {"196000003"}, exc,
+                                                     self.TODAY, self.SIZES)
+        self.assertEqual([p["contest_id"] for p in picks], ["196000011", "196000020"])
+        self.assertEqual([p["contest_id"] for p in unsettled], ["196000030"])
+
+    def test_the_default_per_contest_scan_is_unchanged_by_collecting_links(self):
+        aw = self._aw()
+        self._three_draftgroups()
+        plain = self._scan(aw)
+        links: list = []
+        linked = self._scan(aw, links)
+        self.assertEqual(plain, linked)
+        self.assertEqual(sorted(sorted(g) for g in links),
+                         [["196000001", "196000002", "196000003"], ["196000010", "196000011"],
+                          ["196000011"], ["196000020"]])
+        self.assertEqual(aw.compute_open(plain[0], set(), self.NO_EXC, self.TODAY),
+                         aw.compute_open(linked[0], set(), self.NO_EXC, self.TODAY))
+        self.assertEqual(sum(len(v) for v in aw.compute_open(plain[0], set(), self.NO_EXC,
+                                                             self.TODAY).values()), 6)
+
+    def test_the_script_reads_the_records_under_its_root_with_no_pythonpath(self):
+        """Run by path from another directory, as a cloud ARCHIVE session does."""
+        self._three_draftgroups()
+        env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
+        env["PYTHONHASHSEED"] = "0"
+        script = str(REPO / "tools" / "awaiting_standings.py")
+        outputs = {}
+        for flag in ([], ["--per-draftgroup"]):
+            proc = subprocess.run([sys.executable, script, "--root", str(self.root), "scan",
+                                   "--check", "--date", self.TODAY, *flag],
+                                  cwd=str(self.root), env=env, capture_output=True, text=True,
+                                  timeout=120)
+            self.assertEqual(proc.returncode, 0, proc.stderr[-2000:])
+            outputs[bool(flag)] = proc.stdout
+        self.assertIn("6 contests open across 3 slate dates", outputs[False])
+        self.assertIn("3 draftgroups to pull, covering 6 contests", outputs[True])
+        self.assertIn("field size unknown", outputs[True])
