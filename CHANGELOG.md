@@ -2,12 +2,13 @@
 
 What changed in the engine, the tools and the contracts, when, and why.
 
-## 2026-10-11 — R494-R500 filed: Ben's DraftKings results review, recomputed for MLB from his entry-history export, as seven sessions ahead of the queue on his instruction (roadmap Sessions 160-166)
+## 2026-10-11 — R494-R501 filed: Ben's DraftKings results review, recomputed for MLB from his entry-history export, as nine sessions ahead of the queue on his instruction, Showdown's two ahead of the Classic work (roadmap Sessions 160-168)
 
 **Scope.**
-- `docs/backlog.md`: R494 and R499 at the head of Workstream 5, R495 at the head of Workstream 1, R496 and R497 at the head of Workstream 7, R498 and R500 at the head of Workstream 2. Riders on R30 (its data half discharged for the contests the new export covers; R496 supersedes (d)'s fee fallback there) and R13 (R496 produces the GPP leg D-1 lacked).
-- `docs/ROADMAP.md`: a section above the exception band, "Ahead of the queue (Ben, 2026-10-11)", holding Sessions 160-166, all Pending, each `Rank 0 (n of 7)` with the band the priority rule would otherwise give it (the Sessions 155-158 precedent; no existing rank moved). One sentence added to the queue-order bullet naming that section. D-9 marked answered by the export once it is committed. **NEXT** Session 40 -> Session 160. Session 29's SHA backfilled (`3cf88a8`, R410's command). A Progress Ledger row.
-- No engine, tool, test, skill, fixture or data file changed. The export itself is not committed; R496 names the path it expects.
+- `docs/backlog.md`: R494 and R499 at the head of Workstream 5, R495 and R501 at the head of Workstream 1, R496 and R497 at the head of Workstream 7, R498 and R500 at the head of Workstream 2. Riders on R30 (its data half discharged for the contests the new export covers; R496 supersedes (d)'s fee fallback there), R13 (R496 produces the GPP leg D-1 lacked), R334 (moved to Session 167) and R263 (its pitcher-captain half split out as R501).
+- `docs/ROADMAP.md`: a section above the exception band, "Ahead of the queue (Ben, 2026-10-11)", holding Sessions 160-168, all Pending, each `Rank 0 (n of 9)` with the band the priority rule would otherwise give it (the Sessions 155-158 precedent; no existing rank moved), in the order 160, 161, 167, 168, 162-166. Session 59 gives R334(b) to Session 167 and keeps R253 and R310's shrink; Session 92 gives up R334(a)'s re-measurement. D-3 rewritten to the one lever left (a pitcher-only captain cap) and moved to the top of the decision table. One sentence added to the queue-order bullet naming the new section. D-9 marked answered. **NEXT** Session 40 -> Session 160. Session 29's SHA backfilled (`3cf88a8`, R410's command). A Progress Ledger row.
+- `data/reference/draftkings-contest-entry-history_2026-10-09.csv`: the export, committed byte-exact in its own `record:` commit at Ben's instruction (sha256 `5752c7f3…`, 10,095 rows).
+- No engine, tool, test, skill or fixture file changed.
 
 **Why.** Ben's instruction (2026-10-11): take the first review of real DraftKings results (`dk-findings-and-engine-requirements.md`, prepared 2026-10-10, every sport, requirements R1 to R6) and put what this engine needs at the top of the backlog. The review did not see this repo, so every MLB claim was checked against the tree (three read-only repo checks) and every figure recomputed from the export Ben attached.
 
@@ -56,6 +57,13 @@ What the research changed: the per-entry uniform reference and the slate bootstr
 - inline the definitions and figures here, because the scripts die with the container.
 
 No disagreement is recorded. Two things changed after the review: the blanks were re-read per contest (five whole blocks, not seven), and R494 and R495 became one R-number per session, so each row holds one entry.
+
+**Ben's answers (same session, after the first commit).**
+1. Push: the branch is pushed and the PR opened.
+2. Commit the export: done, at R496's path; D-9 reads answered.
+3. Whether the seven blank blocks had DKEntries files: unknown. R499 therefore lands both halves, the tool for the file case and one SKILL.md line (ask for every reserved draftgroup's file by name before the first build of a day) for the case where a draftgroup was never handed over.
+4. Whether the salary files or DKEntries templates since 2026-09-19 survive: unknown. R497 gains a `no_crosswalk` outcome, and the records written before R494 lands may stay unresolved.
+5. Move the Showdown work ahead of the Classic work: yes. Two premises shaped how. R334(b) is still gated on (a)'s 1.77x re-measurement, which sat in Deferred Session 92, so Session 167 carries both, with (b) building only if the residual exceeds what F1's clip carries. The pitcher-captain share already sits at the ceiling the per-player 0.25 cap allows, so the D-3 band could not move it; the lever left is a pitcher-only cap, filed as R501 (Session 168, Needs D-3), with D-3 rewritten to ask for its value. Both rows sit right after the two record rows: blocked rows are skipped by **NEXT**, so they cost the results sessions nothing until they can run.
 
 **Not filed, and why.**
 - A start-probability term for unconfirmed hitters (R6): the archive shows no dead-slot excess, so R498 measures it and files a D-row only if one appears.
