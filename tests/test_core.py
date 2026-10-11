@@ -50899,3 +50899,298 @@ class ResultsLedgerTests(unittest.TestCase):
         rows, _ = self._ingest(path)
         self.assertEqual(list(rows), ["6101"])
         self.assertEqual((rows["6101"]["Sport"], rows["6101"]["Entry"]), ("MLB", "MLB Rock\u2019n Dime"))
+
+
+class ResultsJoinTests(unittest.TestCase):
+    """R497 (roadmap Session 163). `results_ledger.py resolve` ties an entry's
+    result to the delivery record it was entered from: every candidate record's
+    roster is scored in integer thousandths from the player points of any
+    standings export of the same draftgroup and matched to the entry's Points.
+    Synthetic records, exports and results under a temp root.
+    """
+
+    DATE = "2026-09-22"
+    C1, C2 = "196000001", "196000002"
+    # Eleven Classic players; distinct points so a one-player swap moves the total.
+    NAMES = ("Ace One", "Ace Two", "Cee Three", "Onebee Four", "Twobee Five", "Threebee Six",
+             "Ess Seven", "Oh Eight", "Oh Nine", "Oh Ten", "Oh Eleven")
+    SLOTS = ("P", "P", "C", "1B", "2B", "3B", "SS", "OF", "OF", "OF", "OF")
+    FPTS = ("12.35", "8.6", "5", "7", "2", "3", "9", "0", "11", "4", "6")
+    IDS = tuple(str(40000101 + i) for i in range(11))
+    ROSTER_A = IDS[:10]                    # scores 61.95
+    ROSTER_B = IDS[:9] + (IDS[10],)        # Oh Ten out, Oh Eleven in: 63.95
+    SALARY_HEADER = ("Position,Name + ID,Name,ID,Roster Position,Salary,Game Info,"
+                     "TeamAbbrev,AvgPointsPerGame")
+    STANDINGS_HEADER = ["Rank", "EntryId", "EntryName", "TimeRemaining", "Points", "Lineup", "",
+                        "Player", "Roster Position", "%Drafted", "FPTS"]
+
+    @staticmethod
+    def _tool():
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "results_ledger_r497", REPO / "tools" / "results_ledger.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.rl = self._tool()
+
+    # -- fixtures ------------------------------------------------------------
+
+    def _results(self, rows):
+        """A results table with the R496 columns; resolve reads four of them."""
+        path = self.root / "scratch" / "dk_entry_results.csv"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w", encoding="utf-8", newline="") as fh:
+            writer = csv.DictWriter(fh, fieldnames=list(self.rl.RESULTS_COLUMNS))
+            writer.writeheader()
+            for entry, contest, points, game_type in rows:
+                writer.writerow({**{c: "" for c in self.rl.RESULTS_COLUMNS},
+                                 "Sport": "MLB", "Game_Type": game_type, "Entry_Key": entry,
+                                 "Contest_Key": contest, "Points": points,
+                                 "Contest_Date_EST": f"{self.DATE} 19:05:00"})
+        return path
+
+    def _players(self, ids=None):
+        ids = ids or self.IDS
+        return {pid: [self.NAMES[self.IDS.index(pid)], "AAA", self.SLOTS[self.IDS.index(pid)],
+                      5000, "AAA@BBB"] for pid in ids}
+
+    def _record(self, name, entries, *, sha, contest_type="classic", players=None,
+                lineage=None, inputs=None):
+        """entries: (entry_id, contest_id, roster) triples, every one filled."""
+        row = {"sha256": sha, "contest_type": contest_type, "slate_tag": "1905_2g",
+               "contest_ids": sorted({c for _, c, _ in entries}), "status": "candidate"}
+        if lineage:
+            row["lineage"] = lineage
+        record = {"schema_version": 1, "kind": "delivery", "date": self.DATE,
+                  "manifest_row": row, "run": {"inputs": dict(inputs or {})},
+                  "entries": [{"entry_id": e, "contest_id": c, "contest_name": "Test Cup",
+                               "entry_fee": 1.0, "roster_ids": list(r), "filled": True}
+                              for e, c, r in entries]}
+        if players is not None:
+            record["players"] = players
+        path = self.root / "data" / "deliveries" / self.DATE / f"{name}.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(record), encoding="utf-8")
+        return path
+
+    def _standings(self, contest, table, folder=None):
+        """table: (player, roster position, FPTS) rows; one filler entry row."""
+        path = (self.root / "data" / "archive" / (folder or self.DATE)
+                / f"contest-standings-{contest}.csv")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w", encoding="utf-8", newline="") as fh:
+            writer = csv.writer(fh)
+            writer.writerow(self.STANDINGS_HEADER)
+            for i, (player, slot, fpts) in enumerate(table):
+                left = ([1, "9000001", "someone", 0, "1.0", ""] if i == 0 else [""] * 6)
+                writer.writerow(left + ["", player, slot, "10.0%", fpts])
+        return path
+
+    def _classic_table(self, skip=(), override=None):
+        override = override or {}
+        return [(n, s, override.get(n, f)) for n, s, f in zip(self.NAMES, self.SLOTS, self.FPTS)
+                if n not in skip]
+
+    def _sidecar(self, record_path, sha):
+        side = record_path.with_name(f"{record_path.stem}.preflight.json")
+        side.write_text(json.dumps({"kind": "preflight", "schema_version": 1,
+                                    "record": record_path.name, "entries_sha256": sha,
+                                    "exit_code": 0}), encoding="utf-8")
+
+    def _resolve(self, results):
+        out = self.root / "scratch" / "dk_entry_resolution.csv"
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            code = self.rl.main(["--root", str(self.root), "resolve", "--results", str(results),
+                                 "--out", str(out)])
+        self.assertEqual(code, 0, stderr.getvalue())
+        with open(out, encoding="utf-8", newline="") as fh:
+            return {r["Entry_Key"]: r for r in csv.DictReader(fh)}, stdout.getvalue()
+
+    def _key(self, path):
+        return f"data/deliveries/{self.DATE}/{path.name}"
+
+    # -- tests ---------------------------------------------------------------
+
+    def test_a_sibling_contests_export_scores_the_entered_roster_and_resolves_it(self):
+        a = self._record("1905_2g_a", [("E1", self.C1, self.ROSTER_A), ("E2", self.C2, self.ROSTER_A)],
+                         sha="a" * 64, players=self._players())
+        b = self._record("1905_2g_b", [("E1", self.C1, self.ROSTER_B)], sha="b" * 64,
+                         players=self._players())
+        # Only C2 was pulled; C1 shares its draftgroup because record a names both.
+        self._standings(self.C2, self._classic_table())
+        rows, stdout = self._resolve(self._results([("E1", self.C1, "63.95", "Classic"),
+                                                    ("E2", self.C2, "61.95", "Classic")]))
+        e1 = rows["E1"]
+        self.assertEqual((e1["status"], e1["by"], e1["record"]), ("resolved", "points", self._key(b)))
+        self.assertEqual((e1["candidates"], e1["rosters"], e1["standings"]), ("2", "2", "1"))
+        self.assertEqual(e1["matched"], self._key(b))
+        self.assertEqual(e1["draftgroup"], self.C1)
+        self.assertEqual((rows["E2"]["status"], rows["E2"]["record"]), ("resolved", self._key(a)))
+        self.assertIn(f"dg {self.C1}", stdout)
+
+    def test_identical_rosters_tie_and_only_a_sidecar_on_its_own_bytes_breaks_it(self):
+        a = self._record("1905_2g_a", [("E1", self.C1, self.ROSTER_B)], sha="a" * 64,
+                         players=self._players())
+        b = self._record("1905_2g_b", [("E1", self.C1, self.ROSTER_B)], sha="b" * 64,
+                         players=self._players())
+        self._standings(self.C1, self._classic_table())
+        results = self._results([("E1", self.C1, "63.95", "Classic")])
+        rows, _ = self._resolve(results)
+        self.assertEqual(rows["E1"]["status"], "tied")
+        self.assertEqual(rows["E1"]["record"], "")
+        self.assertEqual(rows["E1"]["matched"], f"{self._key(a)}|{self._key(b)}")
+        # A sidecar beside a that cleared other bytes says nothing about a.
+        self._sidecar(a, "b" * 64)
+        rows, _ = self._resolve(results)
+        self.assertEqual(rows["E1"]["status"], "tied")
+        self._sidecar(b, "b" * 64)
+        rows, _ = self._resolve(results)
+        self.assertEqual((rows["E1"]["status"], rows["E1"]["by"], rows["E1"]["record"]),
+                         ("resolved", "preflight_sidecar", self._key(b)))
+
+    def test_one_file_recorded_twice_resolves_by_same_bytes_to_the_record_without_lineage(self):
+        base = self._record("1905_2g_baseline", [("E1", self.C1, self.ROSTER_B)], sha="c" * 64,
+                            players=self._players(), lineage="baseline")
+        main = self._record("1905_2g_main", [("E1", self.C1, self.ROSTER_B)], sha="c" * 64,
+                            players=self._players())
+        # The preflight writer stamps every record of the bytes it cleared.
+        self._sidecar(base, "c" * 64)
+        self._sidecar(main, "c" * 64)
+        self._standings(self.C1, self._classic_table())
+        rows, _ = self._resolve(self._results([("E1", self.C1, "63.95", "Classic")]))
+        e1 = rows["E1"]
+        self.assertEqual((e1["status"], e1["by"], e1["record"]),
+                         ("resolved", "same_bytes", self._key(main)))
+        self.assertEqual(e1["matched"], f"{self._key(base)}|{self._key(main)}")
+
+    def test_no_candidate_scoring_the_points_reads_unmatched_with_each_score(self):
+        self._record("1905_2g_a", [("E1", self.C1, self.ROSTER_A)], sha="a" * 64, players=self._players())
+        self._record("1905_2g_b", [("E1", self.C1, self.ROSTER_B)], sha="b" * 64, players=self._players())
+        self._standings(self.C1, self._classic_table())
+        rows, _ = self._resolve(self._results([("E1", self.C1, "70.00", "Classic")]))
+        self.assertEqual(rows["E1"]["status"], "unmatched")
+        self.assertEqual(rows["E1"]["record"], "")
+        self.assertIn("61.950", rows["E1"]["detail"])
+        self.assertIn("63.950", rows["E1"]["detail"])
+
+    def test_no_crosswalk_until_the_salary_file_the_record_hashed_is_found(self):
+        lines = [self.SALARY_HEADER] + [
+            f"{s},{n} ({pid}),{n},{pid},{s},5000,AAA@BBB 09/22/2026 07:05PM ET,AAA,8.0"
+            for n, s, pid in zip(self.NAMES, self.SLOTS, self.IDS)]
+        body = ("\n".join(lines) + "\n").encode("utf-8")
+        digest = hashlib.sha256(body).hexdigest()
+        self._record("1905_2g_a", [("E1", self.C1, self.ROSTER_B)], sha="a" * 64,
+                     inputs={"DKSalaries.csv": {"sha256": digest}})
+        self._standings(self.C1, self._classic_table())
+        results = self._results([("E1", self.C1, "63.95", "Classic")])
+        rows, stdout = self._resolve(results)
+        self.assertEqual(rows["E1"]["status"], "no_crosswalk")
+        self.assertIn(self.IDS[0], rows["E1"]["detail"])
+        self.assertIn("ids no source names 10", stdout)
+        salary = self.root / "data" / "archive" / self.DATE / "DKSalaries_1905_2g.csv"
+        salary.write_bytes(body)
+        rows, _ = self._resolve(results)
+        self.assertEqual((rows["E1"]["status"], rows["E1"]["by"]), ("resolved", "points"))
+
+    def test_a_showdown_captain_scores_one_and_a_half_times_its_util_row_rounded_half_up(self):
+        """46.025 exactly; DK's export reads 46.03. The CPT row's own value (18.52
+        here), a 1.0x captain, truncation and half-even each miss it."""
+        names = ("Ace One", "Bee Two", "Cee Three", "Dee Four", "Eee Five", "Eff Six")
+        util = ("12.35", "8.5", "5", "7", "2", "5")
+        cpt_ids = {n: str(50000001 + i) for i, n in enumerate(names)}
+        util_ids = {n: str(50000101 + i) for i, n in enumerate(names)}
+        players = {**{cpt_ids[n]: [n, "AAA", "CPT", 9000, "AAA@BBB"] for n in names},
+                   **{util_ids[n]: [n, "AAA", "UTIL", 6000, "AAA@BBB"] for n in names}}
+        entered = [cpt_ids["Ace One"]] + [util_ids[n] for n in names[1:]]       # 46.025
+        other = [cpt_ids["Bee Two"]] + [util_ids[n] for n in names if n != "Bee Two"]  # 44.10
+        rec = self._record("2000_1g_sd_a", [("E1", self.C1, entered)], sha="a" * 64,
+                           contest_type="showdown", players=players)
+        self._record("2000_1g_sd_b", [("E1", self.C1, other)], sha="b" * 64,
+                     contest_type="showdown", players=players)
+        # A roster whose first cell is a UTIL id has no captain where DK puts it.
+        util_first = [util_ids[n] for n in names]
+        self._record("2000_1g_sd_c", [("E2", self.C1, util_first)], sha="c" * 64,
+                     contest_type="showdown", players=players)
+        # The CPT row first, as DK orders by %Drafted, carrying a rounded 1.5x.
+        self._standings(self.C1, [("Ace One", "CPT", "18.52")]
+                        + [(n, "UTIL", f) for n, f in zip(names, util)])
+        rows, _ = self._resolve(self._results([("E1", self.C1, "46.03", "Showdown Captain Mode"),
+                                               ("E2", self.C1, "39.85", "Showdown Captain Mode")]))
+        self.assertEqual((rows["E1"]["status"], rows["E1"]["record"]), ("resolved", self._key(rec)))
+        self.assertEqual(rows["E2"]["status"], "unscored")
+        self.assertIn("not CPT", rows["E2"]["detail"])
+        self.assertTrue(self.rl.points_match(46025, "46.03"))
+        self.assertFalse(self.rl.points_match(46025, "46.02"))
+        self.assertTrue(self.rl.points_match(52025, "52.03"))
+
+    def test_a_contest_type_the_export_contradicts_is_not_scored_and_says_why(self):
+        self._record("1905_2g_a", [("E1", self.C1, self.ROSTER_B)], sha="a" * 64, players=self._players())
+        self._standings(self.C1, self._classic_table())
+        rows, _ = self._resolve(self._results([("E1", self.C1, "63.95", "Showdown Captain Mode")]))
+        self.assertEqual(rows["E1"]["status"], "unscored")
+        self.assertIn("contest type", rows["E1"]["detail"])
+
+    def test_no_export_for_any_contest_of_the_draftgroup_reads_no_standings(self):
+        self._record("1905_2g_a", [("E1", self.C1, self.ROSTER_B)], sha="a" * 64, players=self._players())
+        self._standings("196999999", self._classic_table())  # another draftgroup's export
+        results = self._results([("E1", self.C1, "63.95", "Classic")])
+        rows, _ = self._resolve(results)
+        self.assertEqual((rows["E1"]["status"], rows["E1"]["standings"]), ("no_standings", "0"))
+        # An inbox file whose longer digit run contains the ID is not this contest's.
+        inbox = self.root / "data" / "standings" / "inbox"
+        inbox.mkdir(parents=True)
+        decoy = self._standings(self.C1, self._classic_table())
+        decoy.rename(inbox / f"contest-standings-1{self.C1}.csv")
+        rows, _ = self._resolve(results)
+        self.assertEqual(rows["E1"]["status"], "no_standings")
+        # Filed under the next date (a contest after midnight ET), it is found.
+        self._standings(self.C1, self._classic_table(), folder="2026-09-23")
+        rows, _ = self._resolve(results)
+        self.assertEqual((rows["E1"]["status"], rows["E1"]["standings"]), ("resolved", "1"))
+        (self.root / "data" / "archive" / "2026-09-23" / f"contest-standings-{self.C1}.csv").rename(
+            inbox / f"contest-standings-{self.C1}.csv")
+        rows, _ = self._resolve(results)
+        self.assertEqual((rows["E1"]["status"], rows["E1"]["standings"]), ("resolved", "1"))
+
+    def test_a_player_in_no_table_or_scored_two_ways_leaves_the_roster_unscored(self):
+        self._record("1905_2g_a", [("E1", self.C1, self.ROSTER_A), ("E2", self.C2, self.ROSTER_A)],
+                     sha="a" * 64, players=self._players())
+        self._record("1905_2g_b", [("E1", self.C1, self.ROSTER_B)], sha="b" * 64, players=self._players())
+        self._standings(self.C2, self._classic_table(skip=("Oh Eleven",)))
+        results = self._results([("E1", self.C1, "61.95", "Classic")])
+        rows, stdout = self._resolve(results)
+        # Roster A scores 61.95, but B names a player C2's table never lists:
+        # B may be the entered roster, so nothing resolves.
+        self.assertEqual(rows["E1"]["status"], "unscored")
+        self.assertIn("oh eleven", rows["E1"]["detail"])
+        self.assertIn("players in no export 1", stdout)
+        self._standings(self.C1, self._classic_table(override={"Oh Ten": "5"}))
+        rows, _ = self._resolve(results)
+        self.assertEqual(rows["E1"]["status"], "unscored")
+        self.assertIn("scored two ways: oh ten", rows["E1"]["detail"])
+
+    def test_the_resolution_and_its_sidecar_are_byte_identical_on_a_rerun(self):
+        self._record("1905_2g_a", [("E1", self.C1, self.ROSTER_A)], sha="a" * 64, players=self._players())
+        self._standings(self.C1, self._classic_table())
+        results = self._results([("E1", self.C1, "61.95", "Classic")])
+        self._resolve(results)
+        out = self.root / "scratch" / "dk_entry_resolution.csv"
+        first = (out.read_bytes(), self.rl.sidecar_path(out).read_bytes())
+        self._resolve(results)
+        self.assertEqual((out.read_bytes(), self.rl.sidecar_path(out).read_bytes()), first)
+        meta = json.loads(first[1])
+        self.assertEqual(meta["schema"], "dk_entry_resolution/1")
+        self.assertEqual(meta["statuses"]["resolved"], 1)
+        missing = self.root / "scratch" / "absent.csv"
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err), contextlib.redirect_stdout(io.StringIO()):
+            code = self.rl.main(["--root", str(self.root), "resolve", "--results", str(missing)])
+        self.assertEqual(code, 3)
+        self.assertIn("results_ledger.py ingest", err.getvalue())

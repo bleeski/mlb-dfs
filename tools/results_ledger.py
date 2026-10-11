@@ -7,6 +7,8 @@ entered, every sport and contest type) and commits it as
 tool reads those files and nothing on DraftKings.
 
     python tools/results_ledger.py ingest [EXPORT ...] [--out PATH]
+    python tools/results_ledger.py report [--sport MLB] [--results PATH] [--exclude-blanks] [--json]
+    python tools/results_ledger.py resolve [--results PATH] [--out PATH] [--json]
 
 `ingest` validates the 14 export columns by name, dedupes by `Entry_Key` across
 every export it is given (identical rows merge; a row that disagrees refuses),
@@ -36,6 +38,25 @@ Per entry:
   start_block    date, start time and game type: the export's stand-in for a
                  draftgroup, which it does not carry.
 
+`resolve` (R497) answers which delivery record each entry was entered from,
+since most entry IDs sit in several records (baseline, rebuild, repair, late
+swap) and the upload is manual. Every candidate record's roster is scored in
+integer thousandths from the player points of any standings export of the
+entry's draftgroup (a Showdown captain at 1.5x its UTIL row) and matched to the
+entry's Points, rounded half-up to hundredths as DK's export rounds them:
+  resolved      one record's roster scores the Points (`by: points`), or the
+                matching records are one file recorded twice (`same_bytes`),
+                or only one of them cleared preflight (`preflight_sidecar`)
+  tied          matching records nothing above tells apart
+  unmatched     every roster scored and none matches (a hand edit, a swap
+                outside the records)
+  unscored      a roster names a player no export of the draftgroup lists,
+                one scored two ways, or a contest type the export contradicts
+  no_standings  no export of any contest of the draftgroup
+  no_crosswalk  no players map, salary file or DKEntries file names an ID
+It writes `data/reference/dk_entry_resolution.csv` (`--out` for DEV) and a
+`.meta.json`, and `tools/outcome_review.py` grades only resolved records.
+
 Labels: every figure is an observed outcome, never ROI, a win rate, a cash rate
 or a probability; the uniform reference is arithmetic. Family and archetype are
 inferred from the contest title (a labelled prior). Ticket face value is not
@@ -57,7 +78,7 @@ import os
 import re
 import sys
 from collections import defaultdict
-from decimal import Decimal, InvalidOperation
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
@@ -830,6 +851,485 @@ def cmd_report(args: argparse.Namespace) -> int:
 
 
 # ---------------------------------------------------------------------------
+# resolve (R497): which delivery record each entry was entered from
+# ---------------------------------------------------------------------------
+
+RESOLUTION_NAME = "dk_entry_resolution.csv"
+RESOLUTION_SCHEMA = "dk_entry_resolution/1"
+RESOLUTION_COLUMNS: Tuple[str, ...] = (
+    "Entry_Key", "Contest_Key", "date", "draftgroup", "status", "record", "by",
+    "candidates", "rosters", "matched", "points", "standings", "detail",
+)
+RESOLVE_STATUSES = ("resolved", "tied", "unmatched", "unscored", "no_standings", "no_crosswalk")
+DELIVERIES_DIR = Path("data") / "deliveries"
+INBOX_DIR = Path("data") / "standings" / "inbox"
+SHOWDOWN_GAME_TYPE = "Showdown Captain Mode"
+# DK's two rosters: Classic 2P/C/1B/2B/3B/SS/3OF, Showdown 1 CPT + 5 UTIL.
+ROSTER_SIZE = {"classic": 10, "showdown": 6}
+RESOLVE_LABEL = (
+    "Which delivery record an entry was entered from: the record whose roster, scored "
+    "from DK's own player points, equals the entry's Points. A match is arithmetic on "
+    "observed outcomes; it grades nothing.")
+
+
+def record_key(path: Any) -> str:
+    """`data/deliveries/<date>/<file>`: a record's name on every host.
+
+    `read_records` hands back a repo-relative path where it can and an absolute
+    one under any other root, so the last two parts are the identity.
+    """
+    p = Path(str(path).replace("\\", "/"))
+    return f"{DELIVERIES_DIR.as_posix()}/{p.parent.name}/{p.name}"
+
+
+def draftgroups(records: Sequence[Mapping[str, Any]]) -> Dict[str, str]:
+    """{contest id: draftgroup key}. No file in the tree carries DK's draftgroup ID.
+
+    A DKEntries file, and so a delivery record, holds one draftgroup, so
+    contests that share a record share a draftgroup; the key is the group's
+    lowest contest ID. On the records since 2026-09-19 this gives 30 groups for
+    159 contests, the same 30 that (date, slate tag, contest type) gives.
+    """
+    parent: Dict[str, str] = {}
+
+    def find(x: str) -> str:
+        while parent.setdefault(x, x) != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    for record in records:
+        cids = sorted({str(e.get("contest_id") or "").strip() for e in record.get("entries") or []
+                       if e.get("filled") and str(e.get("contest_id") or "").strip()}, key=_cid_order)
+        for cid in cids:
+            find(cid)
+        for a, b in zip(cids, cids[1:]):
+            ra, rb = find(a), find(b)
+            if ra != rb:
+                parent[max(ra, rb, key=_cid_order)] = min(ra, rb, key=_cid_order)
+    return {cid: find(cid) for cid in sorted(parent, key=_cid_order)}
+
+
+def _cid_order(cid: str) -> Tuple[int, int, str]:
+    return (0, int(cid), cid) if str(cid).isdigit() else (1, 0, str(cid))
+
+
+def standings_files(root: Path, contest_ids: Iterable[str]) -> List[Path]:
+    """Every standings export of these contests: the archive under any date (a
+    contest after midnight ET is filed under the next one) and the inbox, the
+    places `outcome_review.standings_candidates` searches. The inbox match is
+    anchored, so a longer digit run never answers for a contest (R74(b))."""
+    root = Path(root)
+    out: List[Path] = []
+    archive = root / ARCHIVE_DIR
+    inbox = root / INBOX_DIR
+    inbox_files = sorted(inbox.glob("*.csv")) if inbox.is_dir() else []
+    for cid in sorted(set(contest_ids), key=_cid_order):
+        if archive.is_dir():
+            out.extend(sorted(archive.glob(f"*/contest-standings-{cid}.csv")))
+        pattern = re.compile(rf"(?<!\d){re.escape(cid)}(?!\d)")
+        out.extend(p for p in inbox_files if pattern.search(p.stem))
+    return sorted(set(out))
+
+
+def player_points(root: Path, paths: Sequence[Path]
+                  ) -> Tuple[Dict[str, int], set, List[str], List[str]]:
+    """Merged realized points in integer hundredths, one draftgroup's exports.
+
+    Player FPTS do not differ across contests of one draftgroup, but each
+    export lists only the players drafted in that contest, so the tables are
+    merged. A name two exports score differently (a pull before a stat
+    correction), or one table scores two ways (two people, one name), is
+    ambiguous and scores nothing. `fpts_cents_by_norm` drops CPT rows: a
+    Showdown captain is scored off its UTIL row, never the rounded CPT value.
+    Returns (points, ambiguous names, files read, files unreadable).
+    """
+    from mlb_engine.field.field_miner import parse_standings_export
+    from tools.replay_slate import ambiguous_norms, fpts_cents_by_norm
+
+    cents: Dict[str, int] = {}
+    ambiguous: set = set()
+    read: List[str] = []
+    unreadable: List[str] = []
+    for path in sorted(paths):
+        try:
+            table = parse_standings_export(str(path))["player_table"]
+        except (ValueError, OSError, csv.Error, UnicodeDecodeError):
+            unreadable.append(_rel(path, root))
+            continue
+        read.append(_rel(path, root))
+        ambiguous |= set(ambiguous_norms(table))
+        for norm, value in fpts_cents_by_norm(table).items():
+            if cents.setdefault(norm, value) != value:
+                ambiguous.add(norm)
+    return cents, ambiguous, read, unreadable
+
+
+def _sha256_file(path: Path) -> Optional[str]:
+    try:
+        return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+    except OSError:
+        return None
+
+
+def crosswalk(root: Path, records: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
+    """One draftgroup's DK player ID -> normalized name, from every source left.
+
+    A record carries IDs and a standings export carries names. The sources, in
+    the order R497 names them: each record's `players` map (R494, R495); the
+    slate's salary file, found by the sha256 the record names
+    (`field_miner.record_salary_candidates`); the DKEntries file the record
+    names, when it is still on disk with the bytes the record hashed (its
+    embedded player pool). DK IDs are per draftgroup, so the union is safe; an
+    ID two sources name differently names nobody. `slots` keeps each ID's
+    roster position where a source says it (CPT or UTIL on Showdown).
+    """
+    from mlb_engine.entries.delivery_record import _players_from_salary
+    from mlb_engine.entries.dk_entries_manager import parse_embedded_player_pool
+    from mlb_engine.field.field_miner import normalize_name, record_salary_candidates
+
+    names: Dict[str, set] = defaultdict(set)
+    slots: Dict[str, str] = {}
+    sources: List[str] = []
+    errors: List[str] = []
+
+    def add(pid: Any, name: Any, slot: Any = "") -> None:
+        pid, norm = str(pid).strip(), normalize_name(str(name or ""))
+        if pid and norm:
+            names[pid].add(norm)
+            if str(slot or "").strip():
+                slots.setdefault(pid, str(slot).strip().upper())
+
+    for record in records:
+        players = record.get("players")
+        if isinstance(players, Mapping) and players:
+            sources.append(f"players map: {record_key(record.get('_path'))}")
+            for pid, row in players.items():
+                if isinstance(row, (list, tuple)) and row:
+                    add(pid, row[0], row[2] if len(row) > 2 else "")
+    salary_files: List[str] = []
+    for record in records:
+        cids = sorted({str(e.get("contest_id") or "") for e in record.get("entries") or []
+                       if e.get("contest_id")}, key=_cid_order)
+        try:
+            found = record_salary_candidates(Path(root), str(record.get("date") or ""),
+                                             cids[0] if cids else "")
+        except Exception as exc:  # noqa: BLE001 - a source that fails is named, never fatal
+            errors.append(f"salary lookup: {type(exc).__name__}: {exc}")
+            found = []
+        salary_files.extend(p for p in found if p not in salary_files)
+    for path in sorted(salary_files):
+        try:
+            for pid, row in _players_from_salary(Path(path)).items():
+                add(pid, row[0], row[2])
+            sources.append(f"salary file: {_rel(Path(path), root)}")
+        except Exception as exc:  # noqa: BLE001
+            errors.append(f"{_rel(Path(path), root)}: {type(exc).__name__}: {exc}")
+    templates: List[Path] = []
+    for record in records:
+        binding = record.get("entries_binding") or {}
+        row = record.get("manifest_row") or {}
+        for rel, sha in ((binding.get("source"), binding.get("source_sha256")),
+                         (row.get("delivered_file"), row.get("sha256"))):
+            if not rel or not sha:
+                continue
+            path = Path(str(rel))
+            path = path if path.is_absolute() else Path(root) / path
+            if path.is_file() and path not in templates and _sha256_file(path) == str(sha).lower():
+                templates.append(path)
+    for path in templates:
+        try:
+            for pid, row in parse_embedded_player_pool(path).items():
+                add(pid, row.get("name"))
+            sources.append(f"DKEntries pool: {_rel(path, root)}")
+        except Exception as exc:  # noqa: BLE001
+            errors.append(f"{_rel(path, root)}: {type(exc).__name__}: {exc}")
+    named = {pid: next(iter(n)) for pid, n in names.items() if len(n) == 1}
+    conflicts = sorted(pid for pid, n in names.items() if len(n) > 1)
+    return {"names": named, "conflicts": conflicts, "slots": slots,
+            "sources": sources, "errors": errors}
+
+
+def points_match(milli: int, points: Any) -> bool:
+    """A roster's score in thousandths against the export's Points.
+
+    The export rounds a Showdown total half-up to hundredths (46.025 reads
+    46.03): of our 742 scorable archived Showdown entries 552 match exactly and
+    190 more only after that rounding, while half-even reaches 661 and
+    truncation 552. A Classic total is whole hundredths, so the rounding is a
+    no-op there (791 of 791).
+    """
+    try:
+        target = Decimal(str(points).strip())
+    except InvalidOperation:
+        return False
+    return (Decimal(int(milli)) / 1000).quantize(Decimal("0.01"), ROUND_HALF_UP) == target
+
+
+def score_roster(roster: Sequence[str], fmt: str, xwalk: Mapping[str, Any],
+                 cents: Mapping[str, int], ambiguous: set) -> Dict[str, Any]:
+    """{milli} or {status, why}: one roster scored in integer thousandths.
+
+    Showdown: the first cell is the captain (DK's CPT-first template order,
+    confirmed on every R495 record) at 15x its UTIL row's hundredths, each UTIL
+    at 10x; Classic: 10x each. Integers only, so two identical rosters always
+    tie (`replay_slate`'s rule).
+    """
+    names = xwalk["names"]
+    conflicted = [pid for pid in roster if pid in xwalk["conflicts"]]
+    unnamed = [pid for pid in roster if pid not in names and pid not in conflicted]
+    if unnamed:
+        return {"status": "no_crosswalk", "ids": unnamed,
+                "why": f"no source names {len(unnamed)} id(s): {', '.join(unnamed[:4])}"}
+    if conflicted:
+        return {"status": "unscored",
+                "why": f"id(s) its sources name two ways: {', '.join(conflicted[:4])}"}
+    if len(roster) != ROSTER_SIZE[fmt]:
+        return {"status": "unscored", "why": f"a {fmt} roster of {len(roster)} cells"}
+    if fmt == "showdown" and xwalk["slots"].get(roster[0], "CPT") != "CPT":
+        return {"status": "unscored",
+                "why": f"captain cell {roster[0]} is a {xwalk['slots'][roster[0]]} id, not CPT"}
+    norms = [names[pid] for pid in roster]
+    absent = [n for n in norms if n not in cents]
+    clash = [n for n in norms if n in ambiguous]
+    if absent or clash:
+        return {"status": "unscored", "absent": absent, "ambiguous": clash,
+                "why": "; ".join(part for part in (
+                    f"in no export's player table: {', '.join(absent)}" if absent else "",
+                    f"scored two ways: {', '.join(clash)}" if clash else "") if part)}
+    weights = [15] + [10] * (len(norms) - 1) if fmt == "showdown" else [10] * len(norms)
+    return {"milli": sum(w * cents[n] for w, n in zip(weights, norms))}
+
+
+def preflight_cleared(root: Path, record: Mapping[str, Any]) -> bool:
+    """R494(c)'s sidecar says preflight exited 0 on this record's own bytes."""
+    key = Path(record_key(record.get("_path")))
+    path = Path(root) / key.parent / f"{key.stem}.preflight.json"
+    try:
+        side = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    sha = str((record.get("manifest_row") or {}).get("sha256") or "").strip().lower()
+    return (isinstance(side, Mapping) and side.get("kind") == "preflight"
+            and side.get("exit_code") == 0 and bool(sha)
+            and str(side.get("entries_sha256") or "").strip().lower() == sha)
+
+
+def _bytes_key(record: Mapping[str, Any]) -> str:
+    sha = str((record.get("manifest_row") or {}).get("sha256") or "").strip().lower()
+    return sha or record_key(record.get("_path"))
+
+
+def _same_bytes_pick(records: Sequence[Mapping[str, Any]]) -> Mapping[str, Any]:
+    """One file recorded twice: the record with no `lineage`, then the lowest path."""
+    return sorted(records, key=lambda r: (bool((r.get("manifest_row") or {}).get("lineage")),
+                                          record_key(r.get("_path"))))[0]
+
+
+def decide(entry_id: str, row: Mapping[str, str], cands: Sequence[Tuple[Mapping[str, Any], Mapping[str, Any]]],
+           xwalk: Mapping[str, Any], points: Mapping[str, Any], root: Path) -> Dict[str, str]:
+    """One entry's resolution. `cands` are (record, entry) pairs, sorted by record."""
+    keys = [record_key(rec.get("_path")) for rec, _ in cands]
+    fmt = "showdown" if row["Game_Type"] == SHOWDOWN_GAME_TYPE else "classic"
+    rosters: Dict[Tuple[str, ...], List[Mapping[str, Any]]] = {}
+    for rec, entry in cands:
+        rosters.setdefault(tuple(str(p).strip() for p in entry.get("roster_ids") or []), []).append(rec)
+    out = {"status": "", "record": "", "by": "", "candidates": str(len(cands)),
+           "rosters": str(len(rosters)), "matched": "", "points": row["Points"],
+           "standings": str(len(points["read"])), "detail": ""}
+
+    said = sorted({str((rec.get("manifest_row") or {}).get("contest_type") or "").lower()
+                   for rec, _ in cands} & set(ROSTER_SIZE))
+    if said and said != [fmt]:
+        return {**out, "status": "unscored",
+                "detail": f"contest type: the record says {'/'.join(said)}, the export's "
+                          f"Game_Type says {row['Game_Type']!r}; not scored"}
+    scored = {roster: score_roster(roster, fmt, xwalk, points["cents"], points["ambiguous"])
+              for roster in rosters}
+    unnamed = sorted({pid for s in scored.values() for pid in s.get("ids", [])})
+    if unnamed:
+        return {**out, "status": "no_crosswalk",
+                "detail": f"no players map, salary file or DKEntries file names {len(unnamed)} "
+                          f"id(s): {', '.join(unnamed[:6])}"}
+    if not points["read"]:
+        return {**out, "status": "no_standings",
+                "detail": "no readable standings export for any contest of draftgroup "
+                          f"{points['draftgroup']}"}
+    bad = [s for s in scored.values() if "milli" not in s]
+    if bad:
+        return {**out, "status": "unscored", "detail": "; ".join(sorted({s["why"] for s in bad}))}
+    hits = [roster for roster, s in scored.items() if points_match(s["milli"], row["Points"])]
+    if not hits:
+        shown = ", ".join(f"{Decimal(s['milli']) / 1000:.3f}" for s in scored.values())
+        return {**out, "status": "unmatched",
+                "detail": f"no candidate scores {row['Points']} (scores {shown}): a hand edit "
+                          "or a swap outside the records"}
+    tie = sorted((rec for roster in hits for rec in rosters[roster]),
+                 key=lambda r: record_key(r.get("_path")))
+    out["matched"] = "|".join(record_key(r.get("_path")) for r in tie)
+    by_bytes: Dict[str, List[Mapping[str, Any]]] = defaultdict(list)
+    for rec in tie:
+        by_bytes[_bytes_key(rec)].append(rec)
+    if len(by_bytes) == 1:
+        group = next(iter(by_bytes.values()))
+        if len(group) == 1:
+            return {**out, "status": "resolved", "record": out["matched"], "by": "points"}
+        return {**out, "status": "resolved", "by": "same_bytes",
+                "record": record_key(_same_bytes_pick(group).get("_path")),
+                "detail": f"{len(group)} records of one file score {row['Points']}"}
+    cleared = [g for g in by_bytes.values() if any(preflight_cleared(root, r) for r in g)]
+    if len(cleared) == 1:
+        return {**out, "status": "resolved", "by": "preflight_sidecar",
+                "record": record_key(_same_bytes_pick(cleared[0]).get("_path")),
+                "detail": f"{len(tie)} records score {row['Points']}; one file cleared preflight"}
+    return {**out, "status": "tied",
+            "detail": f"{len(tie)} records score {row['Points']} ("
+                      + ", ".join(f"{record_key(r.get('_path'))}"
+                                  f"{' preflight-cleared' if preflight_cleared(root, r) else ''}"
+                                  for r in tie) + ")"}
+
+
+def resolve_entries(root: Path, results_rows: Sequence[Mapping[str, str]]) -> Dict[str, Any]:
+    """Every filled entry of every delivery record, resolved to the record entered.
+
+    Driven from the records (record -> entry -> its results row), so a record
+    written after the last ingest is still read and a results row nobody
+    recorded is never asked about.
+    """
+    from mlb_engine.entries.delivery_record import read_records
+
+    root = Path(root)
+    records = sorted((r for r in read_records(root=root) if r.get("kind") == "delivery"),
+                     key=lambda r: record_key(r.get("_path")))
+    group_of = draftgroups(records)
+    results = {str(r["Entry_Key"]).strip(): r for r in results_rows}
+    cands: Dict[str, List[Tuple[Mapping[str, Any], Mapping[str, Any]]]] = defaultdict(list)
+    for record in records:
+        for entry in record.get("entries") or []:
+            eid = str(entry.get("entry_id") or "").strip()
+            if entry.get("filled") and eid and str(entry.get("contest_id") or "").strip():
+                cands[eid].append((record, entry))
+    no_result = sorted((e for e in cands if e not in results), key=_cid_order)
+    members: Dict[str, List[str]] = defaultdict(list)
+    for eid in sorted(cands, key=_cid_order):
+        if eid in results:
+            members[group_of[str(cands[eid][0][1]["contest_id"]).strip()]].append(eid)
+
+    rows: List[Dict[str, str]] = []
+    groups: List[Dict[str, Any]] = []
+    read_all: List[str] = []
+    unreadable_all: List[str] = []
+    for group in sorted(members, key=_cid_order):
+        contests = sorted((c for c, g in group_of.items() if g == group), key=_cid_order)
+        in_group = [r for r in records if any(str(e.get("contest_id") or "").strip() in contests
+                                              for e in r.get("entries") or [] if e.get("filled"))]
+        xwalk = crosswalk(root, in_group)
+        cents, ambiguous, read, unreadable = player_points(root, standings_files(root, contests))
+        points = {"cents": cents, "ambiguous": ambiguous, "read": read, "draftgroup": group}
+        read_all += read
+        unreadable_all += unreadable
+        counts: Dict[str, int] = defaultdict(int)
+        unnamed: set = set()
+        absent: set = set()
+        for eid in members[group]:
+            row = results[eid]
+            decided = decide(eid, row, cands[eid], xwalk, points, root)
+            counts[decided["status"]] += 1
+            for rec, entry in cands[eid]:
+                roster = [str(p).strip() for p in entry.get("roster_ids") or []]
+                unnamed |= {p for p in roster if p not in xwalk["names"]}
+                absent |= {xwalk["names"][p] for p in roster
+                           if p in xwalk["names"] and xwalk["names"][p] not in cents}
+            rows.append({"Entry_Key": eid, "Contest_Key": str(row["Contest_Key"]),
+                         "date": str(cands[eid][0][0].get("date") or ""),
+                         "draftgroup": group, **decided})
+        dates = sorted({str(r.get("date") or "") for r in in_group})
+        groups.append({"draftgroup": group, "date": dates[-1] if dates else "",
+                       "contests": len(contests), "entries": len(members[group]),
+                       "statuses": dict(sorted(counts.items())), "standings_read": len(read),
+                       "standings_unreadable": len(unreadable), "ids_unnamed": len(unnamed),
+                       "players_absent": len(absent), "crosswalk_sources": len(xwalk["sources"]),
+                       "crosswalk_errors": xwalk["errors"]})
+    rows.sort(key=lambda r: (r["date"], _cid_order(r["Contest_Key"]), _cid_order(r["Entry_Key"])))
+    statuses = {s: sum(1 for r in rows if r["status"] == s) for s in RESOLVE_STATUSES}
+    by = {b: sum(1 for r in rows if r["by"] == b) for b in ("points", "same_bytes", "preflight_sidecar")}
+    groups.sort(key=lambda g: (g["date"], _cid_order(g["draftgroup"])), reverse=True)
+    return {"rows": rows, "draftgroups": groups, "statuses": statuses, "resolved_by": by,
+            "records": len(records), "entries_without_result": len(no_result),
+            "standings_read": sorted(set(read_all)), "standings_unreadable": sorted(set(unreadable_all))}
+
+
+def write_resolution(path: Path, rows: Sequence[Mapping[str, str]]) -> None:
+    lines: List[str] = []
+
+    class _Sink:
+        def write(self, s: str) -> None:
+            lines.append(s)
+
+    writer = csv.DictWriter(_Sink(), fieldnames=list(RESOLUTION_COLUMNS), lineterminator="\n")
+    writer.writeheader()
+    for row in rows:
+        writer.writerow({c: row.get(c, "") for c in RESOLUTION_COLUMNS})
+    _atomic_write(Path(path), "".join(lines))
+
+
+def read_resolution(path: Path) -> Dict[str, Dict[str, str]]:
+    """{Entry_Key: row} from a resolution file; refuses a file of another shape."""
+    with open(path, "r", encoding="utf-8", newline="") as fh:
+        reader = csv.DictReader(fh)
+        missing = [c for c in RESOLUTION_COLUMNS if c not in (reader.fieldnames or [])]
+        if missing:
+            raise Refused(f"{path}: not a {RESOLUTION_SCHEMA} file (missing {', '.join(missing)}); "
+                          "re-run `python tools/results_ledger.py resolve`")
+        return {row["Entry_Key"]: row for row in reader}
+
+
+def cmd_resolve(args: argparse.Namespace) -> int:
+    root = Path(args.root)
+    results = Path(args.results) if args.results else root / REFERENCE_DIR / RESULTS_NAME
+    if not results.is_file():
+        print(f"ERROR  no results file at {results}; run `python tools/results_ledger.py ingest` "
+              "first (a DEV session adds --out <scratch path> and passes it here as --results)",
+              file=sys.stderr)
+        return EXIT_IO
+    resolved = resolve_entries(root, read_results(results))
+    out = Path(args.out) if args.out else root / REFERENCE_DIR / RESOLUTION_NAME
+    write_resolution(out, resolved["rows"])
+    meta = {
+        "schema": RESOLUTION_SCHEMA,
+        "tool": "tools/results_ledger.py resolve (R497)",
+        "results": {"path": _rel(results, root), "sha256": _sha256_file(results)},
+        "delivery_records": resolved["records"],
+        "entries": len(resolved["rows"]),
+        "entries_without_result": resolved["entries_without_result"],
+        "statuses": resolved["statuses"],
+        "resolved_by": resolved["resolved_by"],
+        "draftgroups": resolved["draftgroups"],
+        "standings_read": resolved["standings_read"],
+        "standings_unreadable": resolved["standings_unreadable"],
+        "labels": [RESOLVE_LABEL] + list(LABELS[:1]),
+    }
+    _atomic_write(sidecar_path(out), json.dumps(meta, indent=1, sort_keys=True) + "\n")
+    if args.json:
+        print(json.dumps({**meta, "rows": resolved["rows"], "out": str(out)}, indent=1, sort_keys=True))
+        return EXIT_OK
+    print(f"resolve  {len(resolved['rows'])} recorded entries with a result, "
+          f"{resolved['entries_without_result']} without one, from {resolved['records']} "
+          f"delivery records  -> {out}")
+    print("         " + ", ".join(f"{s} {n}" for s, n in resolved["statuses"].items())
+          + "  (resolved by " + ", ".join(f"{b} {n}" for b, n in resolved["resolved_by"].items()) + ")")
+    print("  per draftgroup, newest first (key = lowest contest ID):")
+    for g in resolved["draftgroups"]:
+        print(f"  {g['date']}  dg {g['draftgroup']:<10} {g['contests']} contest(s), "
+              f"{g['entries']} entr{'y' if g['entries'] == 1 else 'ies'}: "
+              + ", ".join(f"{s} {n}" for s, n in g["statuses"].items())
+              + f"  | exports read {g['standings_read']}, ids no source names "
+              f"{g['ids_unnamed']}, players in no export {g['players_absent']}")
+    print(f"  label:   {RESOLVE_LABEL}")
+    return EXIT_OK
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
@@ -851,8 +1351,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                    help="drop blank_no_lineup and zero_unknown entries from every cell")
     p.add_argument("--json", action="store_true", help="print the report as JSON")
 
+    p = sub.add_parser("resolve", help="tie each recorded entry to the delivery record entered (R497)")
+    p.add_argument("--results", default=None, help=f"default data/reference/{RESULTS_NAME}")
+    p.add_argument("--out", default=None,
+                   help=f"default data/reference/{RESOLUTION_NAME} (ARCHIVE's write set)")
+    p.add_argument("--json", action="store_true", help="print every row and the summary as JSON")
+
     args = ap.parse_args(argv)
-    handler = {"ingest": cmd_ingest, "report": cmd_report}[args.cmd]
+    handler = {"ingest": cmd_ingest, "report": cmd_report, "resolve": cmd_resolve}[args.cmd]
     try:
         return handler(args)
     except Refused as exc:
