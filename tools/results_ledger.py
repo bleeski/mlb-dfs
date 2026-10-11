@@ -530,6 +530,282 @@ def cmd_ingest(args: argparse.Namespace) -> int:
 
 
 # ---------------------------------------------------------------------------
+# report
+# ---------------------------------------------------------------------------
+
+# (cut name, results column). Overall comes first; the blank table per start
+# block is printed after the cuts.
+CUTS: Tuple[Tuple[str, str], ...] = (
+    ("format", "Game_Type"), ("family", "family"), ("archetype", "archetype"),
+    ("single_entry", "single_entry"), ("turbo", "turbo"), ("field_band", "field_band"),
+    ("month", "month"), ("engine_record", "engine_record"),
+)
+# What the results review called "without blanks": the zero_complete entry is a
+# lineup that scored 0 and stays.
+BLANKS_EXCLUDED = ("blank_no_lineup", "zero_unknown")
+BOOTSTRAP_DRAWS = 2000
+BOOTSTRAP_SEED = 0
+INTERVAL_PCT = (5.0, 95.0)
+# Per-slate sums the bootstrap resamples, in this column order.
+_SUMS = ("n", "n_fp", "fp", "pon", "pon_ref", "top", "top_ref", "bottom", "bottom_ref", "net")
+CELL_KEYS = (
+    "n", "slates", "fees", "cash", "ticket_face", "net", "net_interval",
+    "place_over_n", "place_over_n_ref", "finish_pctl", "finish_pctl_interval",
+    "top_share", "top_ref", "top_excess", "top_excess_interval",
+    "bottom_share", "bottom_ref", "bottom_excess", "bottom_excess_interval", "blanks",
+)
+
+
+def read_results(path: Path) -> List[Dict[str, str]]:
+    with open(path, "r", encoding="utf-8", newline="") as fh:
+        reader = csv.DictReader(fh)
+        missing = [c for c in RESULTS_COLUMNS if c not in (reader.fieldnames or [])]
+        if missing:
+            raise Refused(f"{path}: not a {SCHEMA} file (missing {', '.join(missing)}); "
+                          "re-run `python tools/results_ledger.py ingest`")
+        return list(reader)
+
+
+def report_population(rows: Iterable[Mapping[str, str]], sport: str, exclude_blanks: bool
+                      ) -> List[Mapping[str, str]]:
+    """Paid entries outside Best Ball for one sport, optionally without the blanks."""
+    out = []
+    for r in rows:
+        if r["Sport"] != sport or r["Game_Type"] == "Best Ball" or Decimal(r["fee"]) <= 0:
+            continue
+        if exclude_blanks and r["blank_class"] in BLANKS_EXCLUDED:
+            continue
+        out.append(r)
+    return out
+
+
+def _interval(values: Any) -> List[float]:
+    import numpy as np
+    lo, hi = np.percentile(values, list(INTERVAL_PCT))
+    return [round(100.0 * float(lo), 4), round(100.0 * float(hi), 4)]
+
+
+def cell_stats(rows: Sequence[Mapping[str, str]], seed: int = BOOTSTRAP_SEED,
+               draws: int = BOOTSTRAP_DRAWS) -> Dict[str, Any]:
+    """One cell's money, finish and decile figures with slate-bootstrap intervals.
+
+    A slate is sport, date and game type. Slates are sorted before sampling and
+    each cell draws from a fresh generator under the seed, so a cell's interval
+    depends on its rows only, never on file order or on the cells before it.
+    One index draw serves every statistic in the cell. A cell with fewer than
+    two slates gets no interval: every draw would be the same slate, and a
+    zero-width interval would read as certainty.
+    """
+    import numpy as np
+
+    sums: Dict[str, List[float]] = {}
+    fees = cash = ticket = net = Decimal(0)
+    blanks: Dict[str, int] = {c: 0 for c in BLANK_CLASSES}
+    for r in rows:
+        nums = entry_numbers(int(r["Place"]), int(r["Contest_Entries"]))
+        fp = nums["finish_pctl"]
+        entry_net = Decimal(r["net"])
+        vec = sums.setdefault(r["slate"], [0.0] * len(_SUMS))
+        for i, v in enumerate((1, fp is not None, fp or 0.0, nums["place_over_n"],
+                               nums["place_over_n_ref"], nums["top_decile"], nums["top_ref"],
+                               nums["bottom_decile"], nums["bottom_ref"], float(entry_net))):
+            vec[i] += float(v)
+        fees += Decimal(r["fee"])
+        cash += Decimal(r["cash"])
+        ticket += Decimal(r["ticket"])
+        net += entry_net
+        if r["blank_class"]:
+            blanks[r["blank_class"]] += 1
+    keys = sorted(sums)
+    col = {name: i for i, name in enumerate(_SUMS)}
+    A = np.array([sums[k] for k in keys], dtype=float).reshape(len(keys), len(_SUMS))
+    t = A.sum(axis=0)
+
+    def pct(num: str, den: str, total: Any = t) -> Optional[float]:
+        return round(100.0 * float(total[col[num]] / total[col[den]]), 4) if total[col[den]] else None
+
+    def excess(share: str, ref: str) -> Optional[float]:
+        return round(100.0 * float((t[col[share]] - t[col[ref]]) / t[col["n"]]), 4) if t[col["n"]] else None
+
+    cell: Dict[str, Any] = {
+        "n": int(t[col["n"]]) if len(keys) else 0, "slates": len(keys),
+        "fees": float(fees), "cash": float(cash), "ticket_face": float(ticket), "net": float(net),
+        "net_interval": None,
+        "place_over_n": pct("pon", "n"), "place_over_n_ref": pct("pon_ref", "n"),
+        "finish_pctl": pct("fp", "n_fp"), "finish_pctl_interval": None,
+        "top_share": pct("top", "n"), "top_ref": pct("top_ref", "n"),
+        "top_excess": excess("top", "top_ref"), "top_excess_interval": None,
+        "bottom_share": pct("bottom", "n"), "bottom_ref": pct("bottom_ref", "n"),
+        "bottom_excess": excess("bottom", "bottom_ref"), "bottom_excess_interval": None,
+        "blanks": blanks,
+    }
+    if len(keys) >= 2:
+        rng = np.random.default_rng(seed)
+        S = A[rng.integers(0, len(keys), size=(draws, len(keys)))].sum(axis=1)
+        n = S[:, col["n"]]
+        if (S[:, col["n_fp"]] > 0).all():
+            cell["finish_pctl_interval"] = _interval(S[:, col["fp"]] / S[:, col["n_fp"]])
+        cell["top_excess_interval"] = _interval((S[:, col["top"]] - S[:, col["top_ref"]]) / n)
+        cell["bottom_excess_interval"] = _interval((S[:, col["bottom"]] - S[:, col["bottom_ref"]]) / n)
+        lo, hi = _interval(S[:, col["net"]] / 100.0)
+        cell["net_interval"] = [round(lo, 2), round(hi, 2)]
+    return cell
+
+
+def _cut_order(cut: str, value: str) -> Tuple[Any, ...]:
+    if cut == "field_band":
+        labels = [label for _, label in FIELD_BANDS] + [FIELD_BAND_OVER]
+        return (labels.index(value) if value in labels else len(labels), value)
+    return (value,)
+
+
+def blank_blocks(rows: Sequence[Mapping[str, str]]) -> List[Dict[str, Any]]:
+    """Zero-point entries per start block (the export's stand-in for a draftgroup)."""
+    by_block: Dict[str, List[Mapping[str, str]]] = defaultdict(list)
+    for r in rows:
+        by_block[r["start_block"]].append(r)
+    out = []
+    for block in sorted(by_block):
+        members = by_block[block]
+        zeros = [r for r in members if r["zero_points"] == "1"]
+        if not zeros:
+            continue
+        contests: Dict[str, List[Mapping[str, str]]] = defaultdict(list)
+        for r in members:
+            contests[r["Contest_Key"]].append(r)
+        out.append({
+            "start_block": block,
+            "entries": len(members),
+            "contests": len(contests),
+            "all_zero_contests": sum(1 for c in contests.values()
+                                     if all(r["zero_points"] == "1" for r in c)),
+            "zero_points": len(zeros),
+            "blanks": {c: sum(1 for r in zeros if r["blank_class"] == c) for c in BLANK_CLASSES},
+        })
+    return out
+
+
+def build_report(rows: Sequence[Mapping[str, str]], sport: str, exclude_blanks: bool,
+                 seed: int = BOOTSTRAP_SEED, draws: int = BOOTSTRAP_DRAWS) -> Dict[str, Any]:
+    population = report_population(rows, sport, exclude_blanks)
+    cuts: Dict[str, Dict[str, Any]] = {}
+    for cut, column in CUTS:
+        groups: Dict[str, List[Mapping[str, str]]] = defaultdict(list)
+        for r in population:
+            groups[r[column]].append(r)
+        cuts[cut] = {value: cell_stats(groups[value], seed, draws)
+                     for value in sorted(groups, key=lambda v: _cut_order(cut, v))}
+    return {
+        "sport": sport,
+        "population": "paid entries (fee above 0) outside Best Ball"
+                      + (", without blank_no_lineup and zero_unknown" if exclude_blanks else ""),
+        "exclude_blanks": exclude_blanks,
+        "bootstrap": {"unit": "slate (sport, date, game type)", "draws": draws, "seed": seed,
+                      "interval_pct": list(INTERVAL_PCT), "order": "slates sorted before sampling"},
+        "labels": list(LABELS) + [
+            "Engine-record presence: a delivery record names the Entry ID; which record was "
+            "entered is R497's to resolve."],
+        "overall": cell_stats(population, seed, draws),
+        "cuts": cuts,
+        "blank_blocks": blank_blocks(population),
+    }
+
+
+def _money(value: float) -> str:
+    return f"-${abs(value):,.2f}" if value < 0 else f"${value:,.2f}"
+
+
+def _span(interval: Optional[Sequence[float]], signed: bool = False, money: bool = False) -> str:
+    if not interval:
+        return "[no interval: under 2 slates]"
+    if money:
+        return f"[{_money(interval[0])}, {_money(interval[1])}]"
+    fmt = "{:+.1f}" if signed else "{:.1f}"
+    return f"[{fmt.format(interval[0])}, {fmt.format(interval[1])}]"
+
+
+def _num(value: Optional[float], fmt: str = "{:.2f}") -> str:
+    return "n/a" if value is None else fmt.format(value)
+
+
+def render_cell(label: str, cell: Mapping[str, Any]) -> List[str]:
+    blanks = cell["blanks"]
+    return [
+        f"  {label:<24} n {cell['n']}  slates {cell['slates']}  fees {_money(cell['fees'])}  "
+        f"cash {_money(cell['cash'])}  ticket face {_money(cell['ticket_face'])}  "
+        f"net {_money(cell['net'])} {_span(cell['net_interval'], money=True)}",
+        f"  {'':<24} place/N {_num(cell['place_over_n'])} (ref {_num(cell['place_over_n_ref'])})  "
+        f"finish {_num(cell['finish_pctl'])} {_span(cell['finish_pctl_interval'])}  "
+        f"top {_num(cell['top_share'])} vs {_num(cell['top_ref'])} "
+        f"({_num(cell['top_excess'], '{:+.2f}')} {_span(cell['top_excess_interval'], signed=True)})  "
+        f"bottom {_num(cell['bottom_share'])} vs {_num(cell['bottom_ref'])} "
+        f"({_num(cell['bottom_excess'], '{:+.2f}')} {_span(cell['bottom_excess_interval'], signed=True)})  "
+        f"blanks " + ", ".join(f"{c} {blanks.get(c, 0)}" for c in BLANK_CLASSES),
+    ]
+
+
+def render_report(report: Mapping[str, Any], results: Path, meta: Optional[Mapping[str, Any]]) -> str:
+    boot = report["bootstrap"]
+    lines = [f"results_ledger report  {report['sport']}  ({report['population']})",
+             f"  results: {results}"]
+    if meta:
+        for src in meta.get("sources", []):
+            lines.append(f"  source:  {src['path']}  sha256 {src['sha256'][:12]}  {src['rows']} rows")
+    else:
+        lines.append("  source:  sidecar missing; re-run ingest to record the exports read")
+    lines.append(f"  intervals: 90%, {boot['unit']} bootstrap, {boot['draws']} draws, seed "
+                 f"{boot['seed']}, {boot['order']}")
+    lines.append("  finish = (Place - 1) / (N - 1), uniform reference 50; top and bottom are "
+                 "decile shares against each entry's own uniform reference, in percent")
+    for label in report["labels"]:
+        lines.append(f"  label:   {label}")
+    lines.append("")
+    lines.extend(render_cell("overall", report["overall"]))
+    for cut, cells in report["cuts"].items():
+        lines.append("")
+        lines.append(f"== {cut} ==")
+        for value, cell in cells.items():
+            shown = {"1": "yes", "0": "no"}.get(value, value) if cut in ("single_entry", "turbo") else value
+            lines.extend(render_cell(shown or "(none)", cell))
+    lines.append("")
+    lines.append("== zero-point entries by start block (date, start, game type; the export carries no draftgroup) ==")
+    if not report["blank_blocks"]:
+        lines.append("  none")
+    for block in report["blank_blocks"]:
+        lines.append(
+            f"  {block['start_block']:<40} {block['zero_points']} of {block['entries']} entries, "
+            f"{block['all_zero_contests']} of {block['contests']} contests all zero: "
+            + ", ".join(f"{c} {block['blanks'][c]}" for c in BLANK_CLASSES))
+    return "\n".join(lines) + "\n"
+
+
+def cmd_report(args: argparse.Namespace) -> int:
+    root = Path(args.root)
+    results = Path(args.results) if args.results else root / REFERENCE_DIR / RESULTS_NAME
+    if not results.is_file():
+        print(f"ERROR  no results file at {results}; run `python tools/results_ledger.py ingest` "
+              "first (a DEV session adds --out <scratch path> and passes it here as --results)",
+              file=sys.stderr)
+        return EXIT_IO
+    rows = read_results(results)
+    meta = None
+    side = sidecar_path(results)
+    if side.is_file():
+        meta = json.loads(side.read_text(encoding="utf-8"))
+    report = build_report(rows, args.sport, args.exclude_blanks)
+    if not report["overall"]["n"]:
+        print(f"no paid {args.sport} entries outside Best Ball in {results}")
+        return EXIT_OK
+    if args.json:
+        payload = {**report, "results": str(results),
+                   "sources": (meta or {}).get("sources", [])}
+        print(json.dumps(payload, indent=1, sort_keys=True))
+    else:
+        sys.stdout.write(render_report(report, results, meta))
+    return EXIT_OK
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
@@ -544,8 +820,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     p.add_argument("--out", default=None,
                    help=f"default data/reference/{RESULTS_NAME} (ARCHIVE's write set)")
 
+    p = sub.add_parser("report", help="money, finish, deciles and blanks by cut, with intervals")
+    p.add_argument("--sport", default="MLB", help="Sport column value (default MLB)")
+    p.add_argument("--results", default=None, help=f"default data/reference/{RESULTS_NAME}")
+    p.add_argument("--exclude-blanks", action="store_true",
+                   help="drop blank_no_lineup and zero_unknown entries from every cell")
+    p.add_argument("--json", action="store_true", help="print the report as JSON")
+
     args = ap.parse_args(argv)
-    handler = {"ingest": cmd_ingest}[args.cmd]
+    handler = {"ingest": cmd_ingest, "report": cmd_report}[args.cmd]
     try:
         return handler(args)
     except Refused as exc:

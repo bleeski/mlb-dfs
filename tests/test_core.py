@@ -50665,6 +50665,16 @@ class ResultsLedgerTests(unittest.TestCase):
         self.assertEqual(meta["blank_classes"]["MLB"],
                          {"blank_no_lineup": 4, "zero_complete": 2, "zero_unknown": 2})
         self.assertEqual(len(meta["standings_read"]), 4)
+        # "Without blanks" drops blank_no_lineup and zero_unknown and keeps the lineup that scored 0.
+        rows_back = self.rl.read_results(self.root / "scratch" / "dk_entry_results.csv")
+        kept = {r["Entry_Key"] for r in self.rl.report_population(rows_back, "MLB", True)}
+        self.assertEqual(kept, {"21", "22", "32", "42", "51", "62"})
+        blocks = self.rl.build_report(rows_back, "MLB", False)["blank_blocks"]
+        self.assertEqual([(b["start_block"], b["entries"], b["contests"], b["all_zero_contests"],
+                           b["zero_points"]) for b in blocks],
+                         [("2026-08-01 19:05|Classic", 12, 6, 2, 8)])
+        self.assertEqual(blocks[0]["blanks"],
+                         {"blank_no_lineup": 4, "zero_unknown": 2, "zero_complete": 2})
 
     def test_field_bands_family_rollup_and_engine_record_presence(self):
         edges = {25: "<=25", 26: "26-100", 100: "26-100", 101: "101-500", 500: "101-500",
@@ -50699,3 +50709,84 @@ class ResultsLedgerTests(unittest.TestCase):
         self.assertEqual(out["7001"]["net"], "-1.00")
         self.assertEqual(out["7001"]["slate"], "MLB|2026-09-21|Classic")
         self.assertEqual(out["7001"]["start_block"], "2026-09-21 19:05|Classic")
+
+    def _report_fixture(self):
+        """Twelve slates of five entries each, with finishes that vary by slate."""
+        rows = []
+        for s in range(12):
+            when = f"2026-07-{s + 1:02d} 19:05:00"
+            for e in range(5):
+                place = 1 + ((s * 7 + e * 11) % 40)
+                rows.append(self._row(80000 + s * 10 + e, 960 + s, when, place, 100 - place, 40,
+                                      cash="$2.00" if place <= 4 else "$0.00",
+                                      game_type="Classic" if s % 3 else "Showdown Captain Mode"))
+        return self._ingest(self._export("draftkings-contest-entry-history_2026-07-13.csv", rows))
+
+    def _report(self, results, *extra):
+        code, stdout, stderr = self._run("report", "--results", str(results), "--json", *extra)
+        self.assertEqual(code, 0, stderr)
+        return json.loads(stdout)
+
+    def test_the_bootstrap_is_identical_under_its_seed_and_blind_to_row_order(self):
+        self._report_fixture()
+        results = self.root / "scratch" / "dk_entry_results.csv"
+        first, second = self._report(results), self._report(results)
+        self.assertEqual(first, second)
+        overall = first["overall"]
+        self.assertEqual((overall["n"], overall["slates"]), (60, 12))
+        lo, hi = overall["finish_pctl_interval"]
+        self.assertLess(lo, overall["finish_pctl"])
+        self.assertGreater(hi, overall["finish_pctl"])
+        # The same rows written in reverse order: slates are sorted before sampling.
+        lines = results.read_text(encoding="utf-8").splitlines()
+        reversed_results = self.root / "scratch" / "reversed.csv"
+        reversed_results.write_text("\n".join([lines[0]] + lines[1:][::-1]) + "\n", encoding="utf-8")
+        flipped = self._report(reversed_results)
+        self.assertEqual(flipped["overall"], first["overall"])
+        self.assertEqual(flipped["cuts"], first["cuts"])
+        # The seed is what pins it: another seed moves the interval.
+        rows = self.rl.read_results(results)
+        population = self.rl.report_population(rows, "MLB", False)
+        self.assertEqual(self.rl.cell_stats(population)["finish_pctl_interval"], [lo, hi])
+        self.assertNotEqual(self.rl.cell_stats(population, seed=1)["finish_pctl_interval"], [lo, hi])
+
+    def test_the_report_carries_its_labels_and_no_ratio_of_net_to_fees(self):
+        self._report_fixture()
+        results = self.root / "scratch" / "dk_entry_results.csv"
+        report = self._report(results)
+        self.assertEqual(sorted(report["overall"]), sorted(self.rl.CELL_KEYS))
+        for cells in report["cuts"].values():
+            for cell in cells.values():
+                self.assertEqual(sorted(cell), sorted(self.rl.CELL_KEYS))
+        self.assertEqual(sorted(report["cuts"]), sorted(c for c, _ in self.rl.CUTS))
+        code, text, _ = self._run("report", "--results", str(results))
+        self.assertEqual(code, 0)
+        for fragment in ("ticket face is not realized value", "arithmetic, not a forecast",
+                         "inferred from the contest title", "seed 0", "2000 draws"):
+            self.assertIn(fragment, text)
+        headings = [line[3:-3] for line in text.splitlines() if line.startswith("== ")]
+        self.assertEqual(headings[:-1], [c for c, _ in self.rl.CUTS])
+        lowered = text.lower()
+        for banned in ("roi", "win rate", "cash rate", "probability", "return on", "net/fee"):
+            self.assertNotIn(banned, lowered)
+
+    def test_report_without_an_ingested_file_exits_3_naming_ingest(self):
+        code, _, stderr = self._run("report")
+        self.assertEqual(code, 3)
+        self.assertIn("results_ledger.py ingest", stderr)
+        self.assertIn(str(self.root / "data" / "reference" / "dk_entry_results.csv"), stderr)
+
+    def test_a_cell_under_two_slates_prints_no_interval(self):
+        self._report_fixture()
+        results = self.root / "scratch" / "dk_entry_results.csv"
+        rows = self.rl.read_results(results)
+        one_slate = [r for r in self.rl.report_population(rows, "MLB", False)
+                     if r["slate"] == "MLB|2026-07-02|Classic"]
+        self.assertEqual(len(one_slate), 5)
+        cell = self.rl.cell_stats(one_slate)
+        self.assertEqual(cell["slates"], 1)
+        for key in ("finish_pctl_interval", "top_excess_interval", "bottom_excess_interval",
+                    "net_interval"):
+            self.assertIsNone(cell[key], key)
+        self.assertIsNotNone(cell["finish_pctl"])
+        self.assertIn("[no interval: under 2 slates]", "\n".join(self.rl.render_cell("x", cell)))
