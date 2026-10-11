@@ -49,6 +49,7 @@ bad invocation exits non-zero.
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import os
 import sys
@@ -226,13 +227,27 @@ def load_resolution(root: Path, path: Optional[str] = None
     return _results_ledger().read_resolution(target), f"resolution from {shown}"
 
 
+def _delivered_sha(record: Optional[Mapping[str, Any]]) -> str:
+    return str(((record or {}).get("manifest_row") or {}).get("sha256") or "").strip().lower()
+
+
+def _record_at(root: Path, key: Any) -> Optional[Mapping[str, Any]]:
+    try:
+        payload = json.loads((Path(root) / str(key or "")).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return payload if isinstance(payload, Mapping) else None
+
+
 def entry_states(record: Mapping[str, Any],
-                 resolution: Optional[Mapping[str, Mapping[str, str]]]) -> Dict[str, Any]:
+                 resolution: Optional[Mapping[str, Mapping[str, str]]],
+                 root: Optional[Path] = None) -> Dict[str, Any]:
     """A record's filled entries, split by what the resolution says of each.
 
     graded       resolved to this record
     same_bytes   resolved to another record of these same bytes (one file
-                 recorded twice), and graded there once
+                 recorded twice), and graded there once; the bytes are
+                 compared, so a twin reads this however the tie was broken
     not_entered  resolved to another record
     unresolved   no resolution, or one that is not `resolved` (tied, unmatched,
                  unscored, no_standings, no_crosswalk), with its status kept
@@ -240,6 +255,7 @@ def entry_states(record: Mapping[str, Any],
     it is counted, never graded.
     """
     key = _results_ledger().record_key(record.get("_path") or "")
+    own_sha = _delivered_sha(record)
     out: Dict[str, Any] = {"graded": [], "same_bytes": [], "not_entered": [],
                            "unresolved": [], "not_filled": 0}
     for entry in record.get("entries") or []:
@@ -258,7 +274,8 @@ def entry_states(record: Mapping[str, Any],
                                       "detail": row.get("detail") or ""})
         elif row.get("record") == key:
             out["graded"].append(entry)
-        elif row.get("by") == "same_bytes" and key in str(row.get("matched") or "").split("|"):
+        elif (own_sha and key in str(row.get("matched") or "").split("|")
+              and _delivered_sha(_record_at(root or REPO, row.get("record"))) == own_sha):
             out["same_bytes"].append({"entry_id": eid, "graded_under": row.get("record")})
         else:
             out["not_entered"].append({"entry_id": eid, "entered_from": row.get("record")})
@@ -449,7 +466,7 @@ def review_record(record: Mapping[str, Any], root: Path,
     """
     manifest_row = record.get("manifest_row") or {}
     slate_date = str(record.get("date") or "")
-    states = entry_states(record, resolution)
+    states = entry_states(record, resolution, root)
     by_contest: Dict[str, List[Mapping[str, Any]]] = defaultdict(list)
     for entry in states["graded"]:
         by_contest[str(entry.get("contest_id")).strip()].append(entry)
@@ -468,11 +485,19 @@ def review_record(record: Mapping[str, Any], root: Path,
         entered = "no_entries"
     if contests:
         washout, reason = portfolio_washout(contests)
+        elsewhere = sorted({str(e["entered_from"]) for e in states["not_entered"]}
+                           | {str(e["graded_under"]) for e in states["same_bytes"]})
         if washout is True and unresolved:
             # A cash among the unresolved entries is not ruled out.
             washout, reason = "UNKNOWN", (
                 f"no resolved entry finished in a paid position, but {len(unresolved)} "
                 f"entr{'y is' if len(unresolved) == 1 else 'ies are'} unresolved")
+        elif washout is True and elsewhere:
+            # The slate's other entries were entered from other records and may
+            # have cashed; this record alone cannot say the slate washed out.
+            washout, reason = "UNKNOWN", (
+                "no entry entered from this record finished in a paid position; the "
+                "rest of these entries were entered from " + ", ".join(elsewhere))
     else:
         washout = "UNKNOWN"
         reason = {
@@ -641,6 +666,12 @@ def write_fragment(review: Mapping[str, Any], root: Path) -> Optional[Path]:
     # one slate; one fragment each, so neither review overwrites the other.
     if review.get("lineage"):
         tag = f"{tag}_{review['lineage']}"
+    # R497. Records of one tag now grade different entries (a build and its
+    # repair), so the record's own name keys the fragment: a re-run of one
+    # record replaces its fragment and never another record's.
+    stem = Path(str(review.get("record_path") or "").replace("\\", "/")).stem
+    if stem:
+        tag = stem
     safe = "".join(c if (c.isalnum() or c in "-_") else "_" for c in tag)
     dest = root / "ledger" / "inbox" / f"{review.get('date')}_outcome_{safe}.md"
     try:
@@ -663,7 +694,9 @@ def pending(root: Optional[Path] = None) -> List[Dict[str, str]]:
 
     This is the startup reconciliation line: a delivery nobody graded is the
     state R370 exists to end, and it is invisible unless something counts it.
-    A refusal record is not pending -- there is no portfolio to grade.
+    A refusal record is not pending -- there is no portfolio to grade. R497: a
+    review that graded some entries and left others unresolved is still due,
+    so a later resolution re-grades it.
     """
     base = Path(root) if root is not None else REPO
     try:
@@ -676,8 +709,14 @@ def pending(root: Optional[Path] = None) -> List[Dict[str, str]]:
             if not raw:
                 continue
             path = base / raw
-            if sidecar_path(path).exists():
-                continue
+            side = sidecar_path(path)
+            if side.exists():
+                try:
+                    unresolved = json.loads(side.read_text(encoding="utf-8")).get("entries_unresolved")
+                except (OSError, ValueError, AttributeError):
+                    unresolved = None
+                if not unresolved:
+                    continue
             out.append({"record": raw, "date": str(record.get("date") or ""),
                         "slate_tag": str((record.get("manifest_row") or {}).get("slate_tag") or "")})
         return sorted(out, key=lambda r: (r["date"], r["record"]))
@@ -696,7 +735,7 @@ def pending_line(root: Optional[Path] = None) -> str:
     names = ", ".join(f"{r['date']} {r['slate_tag'] or 'untagged'}" for r in rows[:4])
     more = f" (+{len(rows) - 4} more)" if len(rows) > 4 else ""
     return (f"outcome review due: {len(rows)} ({names}{more}); "
-            f"python tools/outcome_review.py --date <date>")
+            f"python tools/results_ledger.py resolve, then python tools/outcome_review.py --date <date>")
 
 
 # ---------------------------------------------------------------------------
@@ -758,8 +797,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return 0
 
     try:
+        if args.resolution and not Path(args.resolution).is_file():
+            raise OSError(f"--resolution {args.resolution} is not a file")
         resolution, resolution_note = load_resolution(root, args.resolution)
-    except (OSError, ValueError, _results_ledger().Refused) as exc:
+    except (OSError, ValueError, csv.Error, _results_ledger().Refused) as exc:
         print(f"ERROR  could not read the resolution file: {exc}", file=sys.stderr)
         return 3
 

@@ -1110,8 +1110,9 @@ def preflight_cleared(root: Path, record: Mapping[str, Any]) -> bool:
     except (OSError, ValueError):
         return False
     sha = str((record.get("manifest_row") or {}).get("sha256") or "").strip().lower()
+    code = side.get("exit_code") if isinstance(side, Mapping) else None
     return (isinstance(side, Mapping) and side.get("kind") == "preflight"
-            and side.get("exit_code") == 0 and bool(sha)
+            and type(code) is int and code == 0 and bool(sha)
             and str(side.get("entries_sha256") or "").strip().lower() == sha)
 
 
@@ -1138,6 +1139,13 @@ def decide(entry_id: str, row: Mapping[str, str], cands: Sequence[Tuple[Mapping[
            "rosters": str(len(rosters)), "matched": "", "points": row["Points"],
            "standings": str(len(points["read"])), "detail": ""}
 
+    named = sorted({str(entry.get("contest_id") or "").strip() for _, entry in cands}, key=_cid_order)
+    if named != [str(row["Contest_Key"]).strip()]:
+        # One Entry ID is one contest: a results row or a record naming another
+        # would score a roster against the wrong draftgroup's points.
+        return {**out, "status": "unscored",
+                "detail": f"contest: the results row says {row['Contest_Key']}, the records say "
+                          f"{', '.join(named)}; not scored"}
     said = sorted({str((rec.get("manifest_row") or {}).get("contest_type") or "").lower()
                    for rec, _ in cands} & set(ROSTER_SIZE))
     if said and said != [fmt]:
@@ -1363,6 +1371,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return handler(args)
     except Refused as exc:
         print(f"REFUSED  {exc}", file=sys.stderr)
+        return EXIT_REFUSED
+    except UnicodeDecodeError as exc:
+        print(f"REFUSED  not UTF-8 at byte {exc.start}; re-run ingest rather than re-saving the file",
+              file=sys.stderr)
         return EXIT_REFUSED
     except OSError as exc:
         print(f"ERROR  {exc}", file=sys.stderr)

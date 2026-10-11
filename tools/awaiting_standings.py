@@ -525,22 +525,38 @@ def compute_per_draftgroup(entered: dict[str, dict], links: list, have: set[str]
     return picks, unsettled
 
 
-def field_sizes_from_results(path: Path) -> tuple[dict[str, int], str]:
-    """{Contest_Key: Contest_Entries} from R496's results table, and where from."""
+def field_sizes_from_results(path: Path, root: "Path | None" = None) -> tuple[dict[str, int], str]:
+    """{Contest_Key: Contest_Entries} from R496's results table, and where from.
+
+    A table that is missing or will not read costs the field sizes, never the
+    list: every pick is then by contest ID, and the note says why. The note is
+    written into a tracked file, so the path is shown relative to ``root``.
+    """
+    shown = path
+    if root is not None:
+        try:
+            shown = Path(path).resolve().relative_to(Path(root).resolve())
+        except ValueError:
+            pass
     if not path.is_file():
-        return {}, (f"no results table at {path}; every pick is by contest ID until "
+        return {}, (f"no results table at {shown}; every pick is by contest ID until "
                     f"`python tools/results_ledger.py ingest` writes one")
     tools_dir = str(Path(__file__).resolve().parent)
     if tools_dir not in sys.path:
         sys.path.insert(0, tools_dir)
-    from results_ledger import read_results
+    from results_ledger import Refused, read_results
+    try:
+        rows = read_results(path)
+    except (Refused, ValueError, csv.Error, OSError) as exc:
+        return {}, (f"the results table at {shown} will not read ({type(exc).__name__}); every "
+                    f"pick is by contest ID until `python tools/results_ledger.py ingest` rewrites it")
     sizes: dict[str, int] = {}
-    for row in read_results(path):
+    for row in rows:
         try:
             sizes[str(row["Contest_Key"]).strip()] = int(row["Contest_Entries"])
         except (KeyError, ValueError):
             continue
-    return sizes, f"field sizes from {path}"
+    return sizes, f"field sizes from {shown}"
 
 
 # --------------------------------------------------------------------------
@@ -938,7 +954,7 @@ def _scan_per_draftgroup(args: argparse.Namespace, root: Path, entered: dict, li
                          failed_pulls: dict[str, str]) -> int:
     """`scan --per-draftgroup` (R497): the same outputs, one pull per draftgroup."""
     results = root / (args.results or "data/reference/dk_entry_results.csv")
-    sizes, sizes_note = field_sizes_from_results(results)
+    sizes, sizes_note = field_sizes_from_results(results, root)
     picks, unsettled = compute_per_draftgroup(entered, links, have, exceptions, today, sizes)
     unrecorded = scan_unrecorded_deliveries(root / args.outputs_dir)
     md = render_per_draftgroup(picks, unsettled, len(archived), today, sizes_note,
