@@ -50592,6 +50592,12 @@ class ResultsLedgerTests(unittest.TestCase):
                          [early.relative_to(self.root).as_posix(), late.relative_to(self.root).as_posix()])
         self.assertEqual([s["rows"] for s in meta["sources"]], [1, 2])
         self.assertEqual(meta["sources"][0]["sha256"], hashlib.sha256(early.read_bytes()).hexdigest())
+        sidecar = self.rl.sidecar_path(self.root / "scratch" / "dk_entry_results.csv")
+        first_bytes = sidecar.read_bytes()
+        # Named in reverse, and one of them twice: the same sidecar, byte for byte.
+        _, again = self._ingest(late, early, late)
+        self.assertEqual(sidecar.read_bytes(), first_bytes)
+        self.assertEqual(again["identical_rows_merged"], 1)
 
     def test_a_duplicate_entry_key_that_disagrees_exits_2_naming_the_key_and_column(self):
         first = self._export("draftkings-contest-entry-history_2026-09-02.csv",
@@ -50602,6 +50608,7 @@ class ResultsLedgerTests(unittest.TestCase):
         code, _, stderr = self._run("ingest", str(first), str(second), "--out", str(out))
         self.assertEqual(code, 2)
         self.assertIn("Entry_Key 5001 disagrees", stderr)
+        self.assertIn(f"{first}:2 and {second}:2", stderr)
         self.assertIn("Points '88.5' vs '90.0'", stderr)
         self.assertFalse(out.exists())
 
@@ -50696,15 +50703,16 @@ class ResultsLedgerTests(unittest.TestCase):
             self._row(7003, 952, when, 3, 70, 30, title="MLB $1.5K Solo Shot"),
             self._row(7004, 953, "2026-09-01 19:05:00", 4, 60, 30, title="MLB $5K Turbo Dime Time"),
             self._row(7005, 954, when, 5, 50, 30, sport="NHL", title="NHL $100 Dime Time"),
+            self._row(7006, 955, "2026-09-20 19:05:00", 6, 40, 30),
         ])
         out, meta = self._ingest(export)
         self.assertEqual({k: (r["family"], r["single_entry"], r["turbo"]) for k, r in out.items()},
                          {"7001": ("satellite", "0", "0"), "7002": ("cash", "0", "0"),
                           "7003": ("gpp", "1", "0"), "7004": ("gpp", "0", "1"),
-                          "7005": ("gpp", "0", "0")})
+                          "7005": ("gpp", "0", "0"), "7006": ("gpp", "0", "0")})
         self.assertEqual({k: r["engine_record"] for k, r in out.items()},
                          {"7001": "present", "7002": "absent", "7003": "absent",
-                          "7004": "pre_records", "7005": ""})
+                          "7004": "pre_records", "7005": "", "7006": "absent"})
         self.assertEqual((meta["delivery_records"], meta["earliest_delivery_record"]), (1, "2026-09-20"))
         self.assertEqual(out["7001"]["net"], "-1.00")
         self.assertEqual(out["7001"]["slate"], "MLB|2026-09-21|Classic")
@@ -50720,7 +50728,38 @@ class ResultsLedgerTests(unittest.TestCase):
                 rows.append(self._row(80000 + s * 10 + e, 960 + s, when, place, 100 - place, 40,
                                       cash="$2.00" if place <= 4 else "$0.00",
                                       game_type="Classic" if s % 3 else "Showdown Captain Mode"))
+        rows += [
+            # Dropped by the population: a free entry and a Best Ball entry.
+            self._row(89001, 960, "2026-07-01 19:05:00", 1, 99, 40, fee="$0.00",
+                      game_type="Showdown Captain Mode"),
+            self._row(89002, 990, "2026-07-02 19:05:00", 1, 99, 40, game_type="Best Ball"),
+            # Kept: a field of one counts in n and the deciles, never in the finish percentile.
+            self._row(89003, 991, "2026-07-03 19:05:00", 1, 50, 1),
+        ]
         return self._ingest(self._export("draftkings-contest-entry-history_2026-07-13.csv", rows))
+
+    @staticmethod
+    def _oracle(population):
+        """The 90% slate-bootstrap intervals, recomputed from Place, N and money alone."""
+        import numpy as np
+        by_slate = defaultdict(lambda: [0.0] * 6)
+        for r in population:
+            place, n = int(r["Place"]), int(r["Contest_Entries"])
+            vec = by_slate[(r["Sport"], r["Contest_Date_EST"][:10], r["Game_Type"])]
+            vec[0] += 1
+            if n >= 2:
+                vec[1] += 1
+                vec[2] += (place - 1) / (n - 1)
+            vec[3] += (place <= math.floor(0.1 * n)) - math.floor(0.1 * n) / n
+            money = [float(r[c].replace("$", "").replace(",", ""))
+                     for c in ("Winnings_Non_Ticket", "Winnings_Ticket", "Entry_Fee")]
+            vec[4] += money[0] + money[1] - money[2]
+        a = np.array([by_slate[k] for k in sorted(by_slate)])
+        s = a[np.random.default_rng(0).integers(0, len(a), size=(2000, len(a)))].sum(axis=1)
+        pct = lambda v: list(np.percentile(v, [5, 95]))
+        return {"finish": [100 * x for x in pct(s[:, 2] / s[:, 1])],
+                "top_excess": [100 * x for x in pct(s[:, 3] / s[:, 0])],
+                "net": pct(s[:, 4])}
 
     def _report(self, results, *extra):
         code, stdout, stderr = self._run("report", "--results", str(results), "--json", *extra)
@@ -50733,10 +50772,20 @@ class ResultsLedgerTests(unittest.TestCase):
         first, second = self._report(results), self._report(results)
         self.assertEqual(first, second)
         overall = first["overall"]
-        self.assertEqual((overall["n"], overall["slates"]), (60, 12))
+        self.assertEqual((overall["n"], overall["slates"]), (61, 12))
         lo, hi = overall["finish_pctl_interval"]
         self.assertLess(lo, overall["finish_pctl"])
         self.assertGreater(hi, overall["finish_pctl"])
+        self.assertLessEqual(overall["net_interval"][0], overall["net"])
+        self.assertGreaterEqual(overall["net_interval"][1], overall["net"])
+        rows_back = self.rl.read_results(results)
+        oracle = self._oracle([r for r in rows_back if r["Game_Type"] != "Best Ball"
+                               and r["Entry_Fee"] != "$0.00"])
+        for key, got in (("finish", overall["finish_pctl_interval"]),
+                         ("top_excess", overall["top_excess_interval"]),
+                         ("net", overall["net_interval"])):
+            for want, have in zip(oracle[key], got):
+                self.assertAlmostEqual(have, want, places=2, msg=key)
         # The same rows written in reverse order: slates are sorted before sampling.
         lines = results.read_text(encoding="utf-8").splitlines()
         reversed_results = self.root / "scratch" / "reversed.csv"
@@ -50790,3 +50839,63 @@ class ResultsLedgerTests(unittest.TestCase):
             self.assertIsNone(cell[key], key)
         self.assertIsNotNone(cell["finish_pctl"])
         self.assertIn("[no interval: under 2 slates]", "\n".join(self.rl.render_cell("x", cell)))
+        two = [r for r in self.rl.report_population(rows, "MLB", False)
+               if r["slate"] in ("MLB|2026-07-02|Classic", "MLB|2026-07-03|Classic")]
+        two_cell = self.rl.cell_stats(two)
+        self.assertEqual(two_cell["slates"], 2)
+        self.assertIsNotNone(two_cell["finish_pctl_interval"])
+        empty = self._report(results, "--sport", "XFL")
+        self.assertEqual((empty["overall"]["n"], empty["overall"]["slates"]), (0, 0))
+
+    def test_a_cell_that_is_no_finish_or_no_dollar_amount_exits_2_and_writes_nothing(self):
+        when = "2026-09-01 19:05:00"
+        cases = [
+            (dict(place=25, n=20), "Place 25 is not a finish in a field of Contest_Entries 20"),
+            (dict(place=0, n=20), "Place 0 is not a finish"),
+            (dict(place=1, n=0), "Place 1 is not a finish in a field of Contest_Entries 0"),
+            (dict(points="nan"), "Points is not a number"),
+            (dict(cash="1,2,3"), "Winnings_Non_Ticket is not a dollar amount"),
+            (dict(cash="--5.00"), "Winnings_Non_Ticket is not a dollar amount"),
+            (dict(fee="-$-5.00"), "Entry_Fee is not a dollar amount"),
+            (dict(ticket="$1,234.567"), "Winnings_Ticket is not a dollar amount"),
+        ]
+        out = self.root / "scratch" / "dk_entry_results.csv"
+        for i, (bad, message) in enumerate(cases):
+            args = {"place": 3, "n": 20, "points": 50.0}
+            args.update({k: bad[k] for k in ("place", "n", "points") if k in bad})
+            money = {k: bad[k] for k in ("cash", "ticket", "fee") if k in bad}
+            path = self._export(f"draftkings-contest-entry-history_2026-09-{i + 10:02d}.csv",
+                                [self._row(6001, 970, when, args["place"], args["points"], args["n"], **money)])
+            code, _, stderr = self._run("ingest", str(path), "--out", str(out))
+            self.assertEqual(code, 2, (bad, stderr))
+            self.assertIn(message, stderr, bad)
+            self.assertFalse(out.exists(), bad)
+        self.assertEqual(self.rl.parse_money("$1,234.56"), self.rl.Decimal("1234.56"))
+        self.assertEqual(self.rl.parse_money("-$0.25"), self.rl.Decimal("-0.25"))
+        self.assertEqual(self.rl.parse_money("5"), self.rl.Decimal("5"))
+
+    def test_a_non_utf8_or_empty_export_refuses_and_a_padded_header_reads(self):
+        out = self.root / "scratch" / "dk_entry_results.csv"
+        row = self._row(6101, 971, "2026-09-01 19:05:00", 2, 60.0, 20, title="MLB Rock\u2019n Dime")
+        path = self._export("draftkings-contest-entry-history_2026-09-02.csv", [row])
+        # What a spreadsheet re-save on Windows writes: cp1252, not UTF-8.
+        path.write_bytes(path.read_text(encoding="utf-8").encode("cp1252"))
+        code, _, stderr = self._run("ingest", str(path), "--out", str(out))
+        self.assertEqual(code, 2, stderr)
+        self.assertIn("not UTF-8 at byte", stderr)
+        self.assertFalse(out.exists())
+        empty = self._export("draftkings-contest-entry-history_2026-09-03.csv", [])
+        code, _, stderr = self._run("ingest", str(empty), "--out", str(out))
+        self.assertEqual(code, 2, stderr)
+        self.assertIn("a header and no entry rows", stderr)
+        self.assertFalse(out.exists())
+        padded = [" Entry_Key" if c == "Entry_Key" else "Sport " if c == "Sport" else c
+                  for c in self.COLUMNS]
+        path = self.root / "data" / "reference" / "draftkings-contest-entry-history_2026-09-04.csv"
+        with open(path, "w", encoding="utf-8", newline="") as fh:
+            writer = csv.writer(fh, quoting=csv.QUOTE_ALL)
+            writer.writerow(padded)
+            writer.writerow([row[c] for c in self.COLUMNS])
+        rows, _ = self._ingest(path)
+        self.assertEqual(list(rows), ["6101"])
+        self.assertEqual((rows["6101"]["Sport"], rows["6101"]["Entry"]), ("MLB", "MLB Rock\u2019n Dime"))

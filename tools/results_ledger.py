@@ -52,6 +52,7 @@ import csv
 import hashlib
 import io
 import json
+import math
 import os
 import re
 import sys
@@ -100,7 +101,9 @@ BLANK_CLASSES = ("blank_no_lineup", "zero_unknown", "zero_complete")
 # (0 partial cells in the 610 archived files on 2026-10-11).
 ARCHIVE_LINEUP_VALUES = ("complete", "incomplete", "absent", "no_standings", "unreadable")
 TURBO_RE = re.compile(r"\bturbo\b", re.IGNORECASE)
-MONEY_RE = re.compile(r"^-?\$?-?[\d,]*\.?\d+$")
+# One optional leading minus, an optional dollar sign, digits with well-placed
+# thousands commas, at most two decimals: `$1,234.56`, `-$0.25`, `5`.
+MONEY_RE = re.compile(r"^-?\$?(\d{1,3}(,\d{3})+|\d+)(\.\d{1,2})?$")
 
 DERIVED_COLUMNS: Tuple[str, ...] = (
     "fee", "cash", "ticket", "net", "slate", "start_block", "month", "field_band",
@@ -135,12 +138,11 @@ def parse_money(cell: str) -> Decimal:
     text = str(cell).strip()
     if not MONEY_RE.match(text):
         raise ValueError(text)
-    negative = text.count("-") % 2 == 1
     try:
         value = Decimal(text.replace("$", "").replace(",", "").replace("-", ""))
     except InvalidOperation as exc:
         raise ValueError(text) from exc
-    return -value if negative else value
+    return -value if text.startswith("-") else value
 
 
 def _validate_row(row: Mapping[str, str], where: str) -> None:
@@ -154,9 +156,15 @@ def _validate_row(row: Mapping[str, str], where: str) -> None:
         except ValueError:
             raise Refused(f"{where}: Entry_Key {key}: {col} is not a dollar amount: {row[col]!r}") from None
     try:
-        float(str(row["Points"]).strip())
+        points = float(str(row["Points"]).strip())
     except ValueError:
-        raise Refused(f"{where}: Entry_Key {key}: Points is not a number: {row['Points']!r}") from None
+        points = math.nan
+    if not math.isfinite(points):
+        raise Refused(f"{where}: Entry_Key {key}: Points is not a number: {row['Points']!r}")
+    place, n = int(row["Place"]), int(row["Contest_Entries"])
+    if n < 1 or not 1 <= place <= n:
+        raise Refused(f"{where}: Entry_Key {key}: Place {place} is not a finish in a field of "
+                      f"Contest_Entries {n}")
     if not re.match(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}", str(row["Contest_Date_EST"]).strip()):
         raise Refused(f"{where}: Entry_Key {key}: Contest_Date_EST is not 'YYYY-MM-DD HH:MM': "
                       f"{row['Contest_Date_EST']!r}")
@@ -170,25 +178,35 @@ def read_export(path: Path) -> Dict[str, Any]:
     and named, because a new DK column is news, not an error.
     """
     raw = Path(path).read_bytes()
-    text = raw.decode("utf-8-sig")
+    try:
+        text = raw.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise Refused(f"{path}: not UTF-8 at byte {exc.start} ({raw[exc.start:exc.start + 1]!r}); "
+                      "re-download the export rather than re-saving it") from None
     reader = csv.DictReader(io.StringIO(text, newline=""))
     header = [str(h).strip() for h in (reader.fieldnames or [])]
     if not header:
         raise Refused(f"{path}: empty file, no header")
+    # Read by the stripped names too, so a padded header cell is the column it names.
+    reader.fieldnames = header
     missing = [c for c in EXPORT_COLUMNS if c not in header]
     if missing:
         raise Refused(f"{path}: missing column(s): {', '.join(missing)} "
                       f"(the entry-history export has {len(EXPORT_COLUMNS)}: {', '.join(EXPORT_COLUMNS)})")
     extras = sorted(h for h in header if h not in EXPORT_COLUMNS)
     rows: List[Dict[str, str]] = []
+    lines: List[int] = []
     for n, rec in enumerate(reader, start=2):
         row = {c: str(rec.get(c) if rec.get(c) is not None else "").strip() for c in EXPORT_COLUMNS}
         if not any(row.values()):
             continue
         _validate_row(row, f"{path}:{n}")
         rows.append(row)
+        lines.append(n)
+    if not rows:
+        raise Refused(f"{path}: a header and no entry rows; refusing to write an empty ledger")
     return {"path": Path(path), "sha256": hashlib.sha256(raw).hexdigest(),
-            "rows": rows, "extras": extras}
+            "rows": rows, "lines": lines, "extras": extras}
 
 
 def merge_exports(exports: Sequence[Mapping[str, Any]]) -> Tuple[Dict[str, Dict[str, str]], int]:
@@ -203,18 +221,20 @@ def merge_exports(exports: Sequence[Mapping[str, Any]]) -> Tuple[Dict[str, Dict[
     origin: Dict[str, str] = {}
     identical = 0
     for export in exports:
-        for row in export["rows"]:
+        for row, line in zip(export["rows"], export.get("lines") or [None] * len(export["rows"])):
             key = row["Entry_Key"]
+            where = f"{export['path']}:{line}" if line else str(export["path"])
             prior = merged.get(key)
             if prior is None:
                 merged[key] = row
-                origin[key] = str(export["path"])
+                origin[key] = where
                 continue
+            # Cell text, not parsed values: a formatting change DK makes is a
+            # disagreement a person reads, never one this tool decides.
             differs = [c for c in EXPORT_COLUMNS if prior[c] != row[c]]
             if differs:
                 detail = "; ".join(f"{c} {prior[c]!r} vs {row[c]!r}" for c in differs)
-                raise Refused(f"Entry_Key {key} disagrees between {origin[key]} and "
-                              f"{export['path']}: {detail}")
+                raise Refused(f"Entry_Key {key} disagrees between {origin[key]} and {where}: {detail}")
             identical += 1
     return merged, identical
 
@@ -480,7 +500,8 @@ def sidecar_path(results: Path) -> Path:
 def cmd_ingest(args: argparse.Namespace) -> int:
     root = Path(args.root)
     if args.exports:
-        paths = [Path(p) for p in args.exports]
+        # The same file named twice is one source.
+        paths = list(dict.fromkeys(Path(p).resolve() for p in args.exports))
     else:
         paths = sorted((root / REFERENCE_DIR).glob(EXPORT_GLOB))
         if not paths:
@@ -523,7 +544,8 @@ def cmd_ingest(args: argparse.Namespace) -> int:
     for sport, counts in sorted(blanks.items()):
         print(f"        {sport} zero-point entries: "
               + ", ".join(f"{c} {counts.get(c, 0)}" for c in BLANK_CLASSES))
-    print(f"        standings read for zero-point contests: {len(derived['standings_read'])}; "
+    print(f"        standings read for zero-point contests: {len(derived['standings_read'])}"
+          f" ({len(derived['standings_unreadable'])} unreadable); "
           f"delivery records: {derived['delivery_records']} (earliest "
           f"{derived['earliest_delivery_record'] or 'none'})")
     return EXIT_OK
@@ -791,15 +813,17 @@ def cmd_report(args: argparse.Namespace) -> int:
     meta = None
     side = sidecar_path(results)
     if side.is_file():
-        meta = json.loads(side.read_text(encoding="utf-8"))
+        try:
+            meta = json.loads(side.read_text(encoding="utf-8"))
+        except ValueError:
+            print(f"note   {side} is not JSON; the sources it names are not shown", file=sys.stderr)
     report = build_report(rows, args.sport, args.exclude_blanks)
-    if not report["overall"]["n"]:
-        print(f"no paid {args.sport} entries outside Best Ball in {results}")
-        return EXIT_OK
     if args.json:
         payload = {**report, "results": str(results),
                    "sources": (meta or {}).get("sources", [])}
         print(json.dumps(payload, indent=1, sort_keys=True))
+    elif not report["overall"]["n"]:
+        print(f"no paid {args.sport} entries outside Best Ball in {results}")
     else:
         sys.stdout.write(render_report(report, results, meta))
     return EXIT_OK
