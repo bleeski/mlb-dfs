@@ -257,6 +257,51 @@ rather than appending, so a review run twice is one fragment.
 The session-start hook prints `outcome review due: <n>` — delivery records with
 no review beside them. A non-zero count is this step, unrun.
 
+### Read every entry's finish from the entry-history export (R496)
+
+The standings above give one contest at a time and only the ones someone
+pulled. DraftKings' contest entry-history export gives the finish, points and
+money of every entry Ben ever entered, every sport and contest type, in one
+download. Ben downloads it by hand from his DraftKings contest history (no
+scripted DK access, CLAUDE.md) and commits it as
+`data/reference/draftkings-contest-entry-history_<last contest date>.csv`,
+named by its last contest because the download date is not in the file. Then:
+
+```bash
+python tools/results_ledger.py ingest
+python tools/results_ledger.py report --sport MLB
+python tools/results_ledger.py report --sport MLB --exclude-blanks
+```
+
+`ingest` reads every committed export, dedupes by `Entry_Key` (identical rows
+merge; a row that disagrees exits 2 naming it, and that needs Ben, not a
+tiebreak) and writes `data/reference/dk_entry_results.csv` and its
+`.meta.json` sidecar (each source's sha256 and row count). Commit both. Run it
+again whenever a new export lands or the archive gains standings for a
+zero-point contest, because a zero-point entry's blank class reads the raw
+standings first.
+
+`report` prints money in dollars, finish percentile and decile shares, each
+against the entry's own uniform reference, and blank classes, overall and by
+format, family, archetype, single-entry, Turbo, field-size band, month and
+engine-record presence, with a seeded slate-bootstrap 90% interval on every
+cell. Three things to know before reading it.
+
+**The reference is per entry, never a flat 10%.** A uniform finisher lands in
+the top decile `floor(0.1 N) / N` of the time and the bottom `(N - ceil(0.9 N)
++ 1) / N`; place/N averages `(N + 1) / (2N)`, 52.3 in a field of 25. The
+finish percentile `(Place - 1) / (N - 1)` averages 50 at every N.
+
+**A zero is not always a blank.** `zero_complete` is a complete archived lineup
+that scored 0; `blank_no_lineup` is an empty archived lineup, or a contest
+where every entry of ours scored 0; `zero_unknown` is the rest. The blank table
+is per start block (date, start time, game type), because the export carries no
+draftgroup.
+
+**These are observed outcomes.** Never ROI, a win rate, a cash rate or a
+probability. Ticket face value is not realized value, and no ratio of net to
+fees is printed.
+
 After all contests on the slate: return the updated ledger, the updated
 registry, and the mined JSON files to the claude.ai project session.
 
@@ -305,6 +350,8 @@ non-consensus source and timestamp, or it does not happen.
 - `MLB_Classic_Calibration_Ledger.md` (updated, archive appended)
 - `field_opponent_registry.json` (updated)
 - `archive/<slate_date>/mined_<contest_id>.json` (per contest)
+- `reference/dk_entry_results.csv` and `reference/dk_entry_results.meta.json`
+  (after each new entry-history export; R496)
 - `slate_bundle.json` and the platoon JSON (pre-slate)
 - Raw standings exports and contest JSONs stay in the local archive tree,
   retained untrimmed.
