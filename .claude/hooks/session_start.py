@@ -158,6 +158,38 @@ def outcome_reviews_due() -> str:
         return f"outcome review due: not measured ({type(exc).__name__})"
 
 
+def build_claim_held() -> bool:
+    """A held BUILD claim in this tree (released claims do not count)."""
+    for owner in sorted((ROOT / "claims").glob("*/owner.json")):
+        try:
+            data = json.loads(owner.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if not isinstance(data, dict):
+            continue
+        if data.get("role") == "BUILD" and not data.get("released_utc"):
+            return True
+    return False
+
+
+def day_plan_line() -> str | None:
+    """Today's draftgroups in deadline order, or None when there is nothing to say (R499).
+
+    93 MLB entries locked blank in seven start-time blocks, each after a
+    draftgroup filled the same day, and nothing listed a day's draftgroups.
+    Printed when a BUILD claim is held OR a DKEntries file for today is staged
+    or attached: a cloud container starts with no claim (claims are
+    container-local), so the files are what a build session has at startup. A
+    DEV session with neither sees no line. Never raises.
+    """
+    try:
+        sys.path.insert(0, str(ROOT / "tools"))
+        import day_plan  # noqa: PLC0415 - deliberately lazy, like outcome_review
+        return day_plan.hook_line(ROOT, build_claim=build_claim_held())
+    except Exception as exc:  # noqa: BLE001
+        return f"day plan: not measured ({type(exc).__name__})"
+
+
 def egress() -> str:
     """What this host can reach right now, measured rather than asserted.
 
@@ -213,6 +245,7 @@ def full() -> str:
     lock_state = locks()  # read before any git call of our own can leave one
     head = git("log", "-1", "--format=%h %<(72,trunc)%s")
     branch = git("rev-parse", "--abbrev-ref", "HEAD")
+    plan = day_plan_line()
     parts = [
         f"== mlb-dfs session start ({stamp}, hook) ==",
         f"HEAD {head}  [{branch}]  {ahead_behind()}",
@@ -224,6 +257,7 @@ def full() -> str:
         "roadmap: " + next_pointer(),
         "inbox (fragments awaiting their owning role): " + pending_fragments(),
         outcome_reviews_due(),
+        *([plan] if plan else []),
         "git locks: " + lock_state,
         egress(),
         "next: take your role's claim (python tools/claim.py take engine --role DEV --scope \"...\"), "

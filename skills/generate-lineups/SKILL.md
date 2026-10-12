@@ -1101,6 +1101,8 @@ moved before; if the tool reports a location you did not expect, say so rather
 than assuming it found the right slate. If it finds nothing, ask Ben to re-attach
 rather than building from a stale copy already sitting in `data/slates/`.
 
+**Before the first build of a day, plan the day (R499).** Run `python tools/day_plan.py --date <date>`, ask Ben to name every draftgroup he holds reserved entries in and for each one with no DKEntries file by name, and baseline every draftgroup with open rows in deadline order before enhancing any; it exits 1 while one inside T-30 has open rows.
+
 Never correct the DKSalaries CSV against real-world rosters. It is authoritative
 for player IDs, salaries, teams, and eligibility, whatever it says.
 
