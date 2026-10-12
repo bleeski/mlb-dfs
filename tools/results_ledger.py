@@ -10,6 +10,7 @@ tool reads those files and nothing on DraftKings.
     python tools/results_ledger.py report [--sport MLB] [--results PATH] [--exclude-blanks] [--json]
     python tools/results_ledger.py resolve [--results PATH] [--out PATH] [--json]
     python tools/results_ledger.py attribute [--results PATH] [--resolution PATH] [--json]
+                                             [--rank | --showdown]
 
 `ingest` validates the 14 export columns by name, dedupes by `Entry_Key` across
 every export it is given (identical rows merge; a row that disagrees refuses),
@@ -72,6 +73,18 @@ holds our finish and decile excess against the uniform reference, the field's
 in the same cell of the same contests on one paired slate draw, and our share
 of entries against the field's share of lineups; a finding line prints only
 when an interval excludes 0. It writes nothing.
+
+`attribute --rank` (R500(a)) asks whether the lineup the engine put higher
+finished higher: per contest's resolved entries from one build, the Spearman
+correlation (midranks) between the engine's own order (Classic
+`contest_fit_score`, Showdown `rank_in_build`) and DK's Place, signed so
+agreement reads +1, with its median and spread across units; a unit of one
+entry or no spread is skipped and counted. `attribute --showdown` (R500(b)) is
+the same cells over our paid Showdown entries: the captain's role (the
+resolved record's, else the vendored season tables, a labelled prior), the
+captain's CPT% and flex% in the field (the entry block, not DK's table), the
+team split, duplication (captain-aware), posture, field band, month and, per
+resolved entry, the thesis.
 
 Labels: every figure is an observed outcome, never ROI, a win rate, a cash rate
 or a probability; the uniform reference is arithmetic. Family and archetype are
@@ -1495,7 +1508,8 @@ def _band(value: float, bands: Sequence[Tuple[float, str]], over: str) -> str:
     return over
 
 
-def mined_stacks(root: Path, contest_id: str) -> Dict[str, Tuple[str, int]]:
+def mined_stacks(root: Path, contest_id: str, contest_type: str = "classic",
+                 size: int = CLASSIC_HITTERS) -> Dict[str, Tuple[str, int]]:
     """{entry: (stack_pattern, max_stack)} from the contest's mined standings.
 
     A contest mined twice (2026-07-18 and 07-19 hold 192464820) reads its typed
@@ -1504,6 +1518,8 @@ def mined_stacks(root: Path, contest_id: str) -> Dict[str, Tuple[str, int]]:
     carry no pattern and are left out, and so is a pattern whose counts do not
     sum to the eight hitters: the miner writes one even when a hitter failed to
     join (none on disk on 2026-10-12; this is the only check the file allows).
+    A Showdown contest (R500) reads its typed `showdown` file and the pattern
+    over all six players, which is the team split.
     """
     files = sorted((Path(root) / ARCHIVE_DIR).glob(f"*/mined_{contest_id}.json"))
     loaded = []
@@ -1512,7 +1528,7 @@ def mined_stacks(root: Path, contest_id: str) -> Dict[str, Tuple[str, int]]:
             loaded.append((path, json.loads(path.read_text(encoding="utf-8"))))
         except (OSError, ValueError):
             continue
-    loaded.sort(key=lambda pd: (str(pd[1].get("contest_type") or "").lower() != "classic", str(pd[0])))
+    loaded.sort(key=lambda pd: (str(pd[1].get("contest_type") or "").lower() != contest_type, str(pd[0])))
     if not loaded:
         return {}
     out: Dict[str, Tuple[str, int]] = {}
@@ -1520,7 +1536,7 @@ def mined_stacks(root: Path, contest_id: str) -> Dict[str, Tuple[str, int]]:
         pattern = str(entry.get("stack_pattern") or "")
         counts = pattern.split("-")
         if (entry.get("max_stack") is not None and all(c.isdigit() for c in counts)
-                and sum(int(c) for c in counts) == CLASSIC_HITTERS):
+                and sum(int(c) for c in counts) == size):
             out[str(entry.get("entry_id"))] = (pattern, int(entry["max_stack"]))
     return out
 
@@ -1999,6 +2015,10 @@ def _attribute_order(axis: str, value: str, counts: Mapping[str, int]) -> Tuple[
         "implied_total": [label for _, label in IMPLIED_BANDS] + [IMPLIED_OVER],
         "field_band": [label for _, label in FIELD_BANDS] + [FIELD_BAND_OVER],
         "market": ["applied", "not_applied"],
+        "captain_role": [ROLE_PITCHER, ROLE_HITTER], "team_split": list(TEAM_SPLITS),
+        "captain_cpt_share": [label for _, label in CPT_SHARE_BANDS] + [CPT_SHARE_OVER],
+        "captain_flex_share": [label for _, label in FLEX_SHARE_BANDS] + [FLEX_SHARE_OVER],
+        "duplication": list(DUPLICATION_LABELS),
     }.get(axis)
     if fixed is not None:
         return (tail, fixed.index(value) if value in fixed else len(fixed), value)
@@ -2010,16 +2030,18 @@ def _attribute_order(axis: str, value: str, counts: Mapping[str, int]) -> Tuple[
 
 
 def attribute_cells(lineups: Sequence[Mapping[str, Any]], seed: int = BOOTSTRAP_SEED,
-                    draws: int = BOOTSTRAP_DRAWS) -> Dict[str, Any]:
+                    draws: int = BOOTSTRAP_DRAWS,
+                    axes: Sequence[Tuple[str, str]] = ATTRIBUTE_AXES) -> Dict[str, Any]:
     """Every axis's cells: ours against the uniform reference, against the field in
     the same cell of the same contests, and (lineup axes) our share of entries
     against the field's share of lineups over every contest we entered, each
-    share over the lineups whose value is known."""
+    share over the lineups whose value is known. The chalk and dead-slot means
+    are Classic's (R498); a Showdown lineup (R500) carries neither."""
     ours_all = [lu for lu in lineups if lu["ours"]]
     field_all = [lu for lu in lineups if not lu["ours"]]
     pop_slates = sorted({lu["slate"] for lu in ours_all})
     axes_out: Dict[str, Any] = {}
-    for axis, level in ATTRIBUTE_AXES:
+    for axis, level in axes:
         ours_by: Dict[str, List[Mapping[str, Any]]] = defaultdict(list)
         field_by: Dict[str, List[Mapping[str, Any]]] = defaultdict(list)
         for lu in ours_all:
@@ -2042,8 +2064,9 @@ def attribute_cells(lineups: Sequence[Mapping[str, Any]], seed: int = BOOTSTRAP_
                      [lu for lu in field_by.get(value, []) if lu["contest"] in contests
                       and lu["numbers"] is not None])
             cell = paired_cell(ours, field, seed, draws)
-            cell["chalk_pctl_mean"] = round(sum(lu["chalk_pctl"] for lu in ours) / len(ours), 4)
-            cell["dead_mean"] = round(sum(lu["dead"] for lu in ours) / len(ours), 4)
+            if "chalk_pctl" in ours[0]:
+                cell["chalk_pctl_mean"] = round(sum(lu["chalk_pctl"] for lu in ours) / len(ours), 4)
+                cell["dead_mean"] = round(sum(lu["dead"] for lu in ours) / len(ours), 4)
             cell["share"] = None
             if level == "lineup" and value not in (UNKNOWN, UNRECORDED):
                 vec = {s: [0.0, known[s][0], 0.0, known[s][1]] for s in pop_slates}
@@ -2191,9 +2214,10 @@ def render_attribution(report: Mapping[str, Any], results: Path) -> str:
 
 def render_attribution_cell(value: str, cell: Mapping[str, Any]) -> List[str]:
     lines: List[str] = []
+    means = (f"chalk {cell['chalk_pctl_mean']:.3f}  dead {cell['dead_mean']:.2f}  "
+             if "chalk_pctl_mean" in cell else "")
     lines.append(
-        f"  {value:<22} n {cell['n']}  slates {cell['slates']}  chalk {cell['chalk_pctl_mean']:.3f}  "
-        f"dead {cell['dead_mean']:.2f}  finish {_num(cell['finish_pctl'])} "
+        f"  {value:<22} n {cell['n']}  slates {cell['slates']}  {means}finish {_num(cell['finish_pctl'])} "
         f"{_span(cell['finish_pctl_interval'])}  top {_num(cell['top_share'])} vs "
         f"{_num(cell['top_ref'])} ({_num(cell['top_excess'], '{:+.2f}')} "
         f"{_span(cell['top_excess_interval'], signed=True)})  bottom {_num(cell['bottom_share'])} vs "
@@ -2265,6 +2289,25 @@ def cmd_attribute(args: argparse.Namespace) -> int:
     else:
         default = root / REFERENCE_DIR / RESOLUTION_NAME
         resolution = default if default.is_file() else None
+    if args.rank:
+        builds = resolved_builds(root, resolution)
+        ranked = {"rank": rank_report(read_results(results), builds["builds"]),
+                  "builds": {k: v for k, v in builds.items() if k != "builds"},
+                  "labels": list(RANK_LABELS)}
+        if args.json:
+            print(json.dumps({**ranked, "results": str(results)}, indent=1, sort_keys=True))
+        else:
+            sys.stdout.write(render_rank(ranked, results))
+        return EXIT_OK
+    if args.showdown:
+        report = build_showdown_attribution(root, read_results(results), resolution)
+        if args.json:
+            print(json.dumps({**report, "results": str(results)}, indent=1, sort_keys=True))
+        elif not report["coverage"]["with_lineup"]:
+            print(f"no paid MLB Showdown entry in {results} has a complete lineup in a standings export")
+        else:
+            sys.stdout.write(render_showdown_attribution(report, results))
+        return EXIT_OK
     report = build_attribution(root, read_results(results), resolution)
     if args.json:
         print(json.dumps({**report, "results": str(results)}, indent=1, sort_keys=True))
@@ -2273,6 +2316,404 @@ def cmd_attribute(args: argparse.Namespace) -> int:
     else:
         sys.stdout.write(render_attribution(report, results))
     return EXIT_OK
+
+
+# ---------------------------------------------------------------------------
+# attribute --rank (R500(a)): the engine's own order against finish order
+# ---------------------------------------------------------------------------
+
+#: Per format, the prediction key a resolved entry carries and the sign that
+#: makes "the engine put it higher" read high: R494's allocator score (higher
+#: is better) and R495's rank in the build (1 is the build's best Base).
+RANK_KEYS: Dict[str, Tuple[str, int]] = {"classic": ("contest_fit_score", 1),
+                                         "showdown": ("rank_in_build", -1)}
+RANK_GAME_TYPES = {CLASSIC_GAME_TYPE: "classic", SHOWDOWN_GAME_TYPE: "showdown"}
+RANK_LABELS: Tuple[str, ...] = (
+    "Spearman over midranks, per unit: +1 when the engine's own order of our entries equals "
+    "their finish order (DK's Place, ties shared), -1 when it is reversed. A review proxy of "
+    "the engine's ordering, never a probability, a win rate or an edge.",
+    "Classic orders by R494's contest_fit_score (the allocator's score); Showdown by R495's "
+    "rank_in_build (the build's Base with the captain at 1.5x, descending, ties by slot).",
+    "A unit is one contest's entries from one build: a score orders only its own build's "
+    "lineups, so a contest whose entries came from two builds (a rebuild, a late swap, the "
+    "Showdown baseline beside its ladder) is cut into one unit per build. Classic keys the "
+    "build by the prediction's run, Showdown by the record R497 resolved the entry to.",
+    "Only entries R497 resolved to a delivery record whose entry carries the key. A unit needs "
+    "two of them, and one with no spread on either side has no correlation; both are counted.",
+)
+
+
+def midranks(values: Sequence[float]) -> List[float]:
+    """1-based ranks with ties sharing their average rank."""
+    order = sorted(range(len(values)), key=lambda i: values[i])
+    ranks = [0.0] * len(values)
+    i = 0
+    while i < len(order):
+        j = i
+        while j + 1 < len(order) and values[order[j + 1]] == values[order[i]]:
+            j += 1
+        for k in range(i, j + 1):
+            ranks[order[k]] = (i + j) / 2 + 1
+        i = j + 1
+    return ranks
+
+
+def spearman(xs: Sequence[float], ys: Sequence[float]) -> Optional[float]:
+    """Spearman's rho as Pearson's correlation of the midranks; None under two
+    pairs or when either side has no spread (every value tied)."""
+    n = len(xs)
+    if n != len(ys) or n < 2:
+        return None
+    rx, ry = midranks(xs), midranks(ys)
+    mx, my = sum(rx) / n, sum(ry) / n
+    sxy = sum((a - mx) * (b - my) for a, b in zip(rx, ry))
+    sxx = sum((a - mx) ** 2 for a in rx)
+    syy = sum((b - my) ** 2 for b in ry)
+    if not sxx or not syy:
+        return None
+    return sxy / math.sqrt(sxx * syy)
+
+
+def rank_report(results_rows: Sequence[Mapping[str, str]], builds: Mapping[str, Any]) -> Dict[str, Any]:
+    """Per format, per unit (a contest's resolved entries from one build), the
+    Spearman correlation between the engine's own order and the finish order,
+    and its median and spread across units; skipped units counted."""
+    import numpy as np
+
+    units: Dict[str, Dict[Tuple[str, str], List[Tuple[float, int]]]] = {f: defaultdict(list) for f in RANK_KEYS}
+    without_key = {f: 0 for f in RANK_KEYS}
+    for row in results_rows:
+        fmt = RANK_GAME_TYPES.get(row["Game_Type"]) if row["Sport"] == "MLB" else None
+        build = builds.get(str(row["Entry_Key"]).strip())
+        if fmt is None or build is None:
+            continue
+        key, sign = RANK_KEYS[fmt]
+        pred = build.get("prediction") or {}
+        value = pred.get(key)
+        if not isinstance(value, (int, float)) or not math.isfinite(value):
+            without_key[fmt] += 1
+            continue
+        scale = str(pred.get("run_id") or "") if fmt == "classic" else ""
+        units[fmt][(str(row["Contest_Key"]).strip(), scale or str(build.get("record") or ""))].append(
+            (sign * float(value), int(row["Place"])))
+    out: Dict[str, Any] = {}
+    for fmt, by_unit in units.items():
+        measured: List[Dict[str, Any]] = []
+        one = one_entries = flat = 0
+        for (cid, scale) in sorted(by_unit, key=lambda u: (_cid_order(u[0]), u[1])):
+            pairs = by_unit[(cid, scale)]
+            if len(pairs) < 2:
+                one += 1
+                one_entries += len(pairs)
+                continue
+            rho = spearman([p[0] for p in pairs], [-p[1] for p in pairs])
+            if rho is None:
+                flat += 1
+                continue
+            measured.append({"contest": cid, "build": scale, "n": len(pairs), "rho": round(rho, 6)})
+        rhos = [u["rho"] for u in measured]
+        cut = ([round(float(v), 6) for v in np.percentile(rhos, [25, 50, 75])] if rhos else [None] * 3)
+        contests = defaultdict(set)
+        for cid, scale in by_unit:
+            contests[cid].add(scale)
+        out[fmt] = {
+            "key": RANK_KEYS[fmt][0], "units": len(measured), "entries": sum(u["n"] for u in measured),
+            "contests": len({u["contest"] for u in measured}),
+            "median": cut[1], "p25": cut[0], "p75": cut[2],
+            "min": min(rhos) if rhos else None, "max": max(rhos) if rhos else None,
+            "skipped_one_entry": {"units": one, "entries": one_entries}, "skipped_no_spread": flat,
+            "contests_split_across_builds": sum(1 for s in contests.values() if len(s) > 1),
+            "entries_without_key": without_key[fmt], "per_unit": measured,
+        }
+    return out
+
+
+def render_rank(ranked: Mapping[str, Any], results: Path) -> str:
+    lines = ["results_ledger attribute --rank  (the engine's own order of our entries against "
+             "their finish order)", f"  results: {results}",
+             f"  build-time source: {ranked['builds']['note']}"]
+    lines += [f"  label:   {label}" for label in ranked["labels"]]
+    for fmt, r in ranked["rank"].items():
+        lines.append("")
+        head = f"  {fmt:<9} {r['key']}: {r['units']} unit(s) in {r['contests']} contest(s), {r['entries']} entries"
+        if r["units"]:
+            lines.append(f"{head}: median {r['median']:+.3f}, p25 {r['p25']:+.3f}, p75 {r['p75']:+.3f}, "
+                         f"range [{r['min']:+.3f}, {r['max']:+.3f}]")
+        else:
+            lines.append(f"{head}: not measurable (n 0)")
+        lines.append(f"  {'':<9} skipped: {r['skipped_one_entry']['units']} unit(s) with one entry "
+                     f"({r['skipped_one_entry']['entries']} entries), {r['skipped_no_spread']} with no "
+                     f"spread; {r['contests_split_across_builds']} contest(s) split across builds; "
+                     f"{r['entries_without_key']} resolved entries carry no {r['key']}")
+    return "\n".join(lines) + "\n"
+
+
+# ---------------------------------------------------------------------------
+# attribute --showdown (R500(b)): the Showdown axis
+# ---------------------------------------------------------------------------
+
+SHOWDOWN_SIZE = 6
+ROLE_PITCHER, ROLE_HITTER = "pitcher", "hitter"
+TEAM_SPLITS = ("5-1", "4-2", "3-3")
+# The captain's share of the field's complete lineups at CPT and at UTIL, upper
+# bounds exclusive. Our 757 archived Showdown entries' captains sit at quartiles
+# 3.2, 9.3 and 20.4% at CPT and 19.9, 26.9 and 34.6% at UTIL (2026-10-12).
+CPT_SHARE_BANDS, CPT_SHARE_OVER = TEAM_SHARE_BANDS, TEAM_SHARE_OVER
+FLEX_SHARE_BANDS: Tuple[Tuple[float, str], ...] = ((0.20, "<20%"), (0.30, "20-30%"), (0.40, "30-40%"))
+FLEX_SHARE_OVER = "40%+"
+DUPLICATION_LABELS = ("0", "1", "2+")
+SEASON_PITCHING = REFERENCE_DIR / "statsapi_season_pitching.csv"
+SEASON_BATTING = REFERENCE_DIR / "expected_stats_batting.csv"
+SHOWDOWN_AXES: Tuple[Tuple[str, str], ...] = (
+    ("captain_role", "lineup"), ("captain_cpt_share", "lineup"), ("captain_flex_share", "lineup"),
+    ("team_split", "lineup"), ("duplication", "lineup"), ("posture", "contest"),
+    ("field_band", "contest"), ("month", "contest"), ("thesis", "build"),
+)
+SHOWDOWN_LABELS: Tuple[str, ...] = (
+    "Observed outcomes and review proxies: which Showdown constructions sat under our finishes, "
+    "never why, never ROI, a win rate or a probability; nothing reads this back into a control.",
+    ATTRIBUTE_LABELS[1],
+    "Captain role: DK's position from the delivery record R497 resolved our entry to; otherwise, "
+    "and for every field lineup, a labelled prior from the vendored season tables: pitcher when "
+    "the name is only in statsapi_season_pitching.csv, hitter when only in "
+    "expected_stats_batting.csv, unknown when in both (a two-way player, or two people sharing a "
+    "name) or neither. It moves when ARCHIVE refreshes those tables.",
+    "Captain CPT% and flex%: the captain's share of the field's complete lineups (ours never "
+    "among them) at CPT and at UTIL, counted from the entry block, because DK's %Drafted table "
+    "drops one of two equal slot rows (R341); a field lineup is measured without itself.",
+    "Team split: players per team over all six (5-1, 4-2, 3-3), from the mined standings, else "
+    "the resolved record's split.",
+    "Duplication: the other complete lineups in the contest with the same captain and the same "
+    "five, whoever entered them (field_miner.lineup_identity_groups, captain-aware).",
+    "Thesis: the template the build dealt the entry (R495), only from a resolved delivery record.",
+    ATTRIBUTE_LABELS[5],
+    "The bootstrap's slate is R496's (sport, date, game type), so every single-game Showdown "
+    "contest of one day is one slate.",
+    ATTRIBUTE_LABELS[7],
+    ATTRIBUTE_LABELS[9],
+)
+
+
+def season_roles(root: Path) -> Dict[str, Any]:
+    """{name: pitcher|hitter} from the two vendored season tables, by normalized name.
+
+    A name in both tables (a two-way player, or two people sharing a name) or in
+    neither is absent, so it reads unknown. Both tables are needed: with one,
+    every name of the other kind would read unknown and the pitcher share of
+    the known roles would be wrong, so a missing table classifies nobody.
+    """
+    from mlb_engine.field.field_miner import normalize_name
+
+    names: Dict[str, set] = {}
+    missing: List[str] = []
+    for kind, rel, column in ((ROLE_PITCHER, SEASON_PITCHING, "Name"),
+                              (ROLE_HITTER, SEASON_BATTING, "last_name, first_name")):
+        found: set = set()
+        try:
+            with open(Path(root) / rel, "r", encoding="utf-8-sig", newline="") as fh:
+                for row in csv.DictReader(fh):
+                    name = str(row.get(column) or "")
+                    if "," in name:
+                        last, first = name.split(",", 1)
+                        name = f"{first.strip()} {last.strip()}"
+                    if normalize_name(name):
+                        found.add(normalize_name(name))
+        except (OSError, csv.Error, UnicodeDecodeError):
+            missing.append(rel.as_posix())
+        names[kind] = found
+    if missing:
+        return {"roles": {}, "both": 0, "note": f"no captain role from the tables: {', '.join(missing)} unreadable"}
+    pitch, bat = names[ROLE_PITCHER], names[ROLE_HITTER]
+    roles = {n: ROLE_PITCHER for n in pitch - bat}
+    roles.update({n: ROLE_HITTER for n in bat - pitch})
+    return {"roles": roles, "both": len(pitch & bat),
+            "note": f"{len(pitch - bat)} pitchers and {len(bat - pitch)} hitters from "
+                    f"{SEASON_PITCHING.name} and {SEASON_BATTING.name}; {len(pitch & bat)} names in both"}
+
+
+def showdown_lineups(root: Path, results_rows: Sequence[Mapping[str, str]],
+                     builds: Mapping[str, Any]) -> Dict[str, Any]:
+    """Every lineup of every contest holding one of our Showdown entries, ours and the field's.
+
+    `attribute_lineups`' population and field rules on Showdown: ours are the
+    paid MLB Showdown entries whose standings export has a complete lineup for
+    the Entry ID; every other Entry_Key in the results file is ours too and
+    never joins the field; a field lineup takes its slate from our row.
+    """
+    from mlb_engine.field.field_miner import lineup_identity_groups, normalize_name, parse_standings_export
+
+    root = Path(root)
+    ours_ids = {str(r["Entry_Key"]).strip() for r in results_rows}
+    population = [r for r in results_rows if r["Sport"] == "MLB" and r["Game_Type"] == SHOWDOWN_GAME_TYPE
+                  and Decimal(r["fee"]) > 0]
+    by_contest: Dict[str, List[Mapping[str, str]]] = defaultdict(list)
+    for r in population:
+        by_contest[str(r["Contest_Key"]).strip()].append(r)
+    postures = title_postures((r["Entry"], Decimal(r["fee"])) for r in population)
+    roles = season_roles(root)
+    coverage: Dict[str, int] = {"population": len(population), "with_lineup": 0, "no_standings": 0,
+                                "incomplete_lineup": 0, "absent_from_standings": 0,
+                                "field_rank_unusable": 0}
+    role_check = {"recorded": 0, "recorded_and_table": 0, "disagree": 0}
+    unreadable: List[str] = []
+    not_showdown: List[str] = []
+    lineups: List[Dict[str, Any]] = []
+    inferred_n = fell_through_n = 0
+    for cid in sorted(by_contest, key=_cid_order):
+        rows_c = sorted(by_contest[cid], key=lambda r: _cid_order(str(r["Entry_Key"])))
+        parsed = None
+        for path in standings_files(root, [cid]):
+            try:
+                candidate = parse_standings_export(str(path))
+            except (ValueError, OSError, csv.Error, UnicodeDecodeError):
+                unreadable.append(_rel(path, root))
+                continue
+            if candidate.get("contest_type") == "showdown":
+                parsed = candidate
+                break
+            not_showdown.append(_rel(path, root))
+        if parsed is None:
+            coverage["no_standings"] += len(rows_c)
+            continue
+        anchor = rows_c[0]
+        slate, month, n_field = anchor["slate"], anchor["month"], int(anchor["Contest_Entries"])
+        posture, by_title = postures[(anchor["Entry"], Decimal(anchor["fee"]))]
+        contest_axes = {"posture": posture, "field_band": anchor["field_band"], "month": month}
+        mine = {str(r["Entry_Key"]).strip(): r for r in rows_c}
+        everyone = [e for e in parsed["entries"] if e["lineup_complete"]]
+        by_entry = {e["entry_id"]: e for e in parsed["entries"]}
+        for eid in sorted(mine, key=_cid_order):
+            if eid not in by_entry:
+                coverage["absent_from_standings"] += 1
+            elif not by_entry[eid]["lineup_complete"]:
+                coverage["incomplete_lineup"] += 1
+        if not any(e["entry_id"] in mine for e in everyone):
+            continue
+        # Duplication counts every complete lineup in the contest, whoever entered it.
+        groups, _ = lineup_identity_groups(everyone, "showdown", strict=False)
+        copies = {eid: len(ids) for ids in groups.values() for eid in ids}
+        complete = [e for e in everyone if e["entry_id"] in mine or e["entry_id"] not in ours_ids]
+        field = [e for e in complete if e["entry_id"] not in mine]
+        cpt_counts: Dict[str, int] = defaultdict(int)
+        util_counts: Dict[str, int] = defaultdict(int)
+        for e in field:
+            cpt_counts[str(e["captain_norm"])] += 1
+            for name in {normalize_name(n) for slot, n in e["lineup"] if slot == "UTIL"}:
+                util_counts[name] += 1
+        mined = mined_stacks(root, cid, "showdown", SHOWDOWN_SIZE)
+        for e in complete:
+            eid = e["entry_id"]
+            ours = eid in mine
+            build = builds.get(eid) if ours else None
+            pred = ((build or {}).get("prediction") or {}) if ours else {}
+            captain = str(e["captain_norm"])
+            others = len(field) - (0 if ours else 1)
+            if others <= 0:
+                cpt_share = flex_share = UNKNOWN
+            else:
+                # A field lineup leaves itself out; its own UTIL never holds its captain.
+                cpt_share = _band((cpt_counts[captain] - (0 if ours else 1)) / others,
+                                  CPT_SHARE_BANDS, CPT_SHARE_OVER)
+                flex_share = _band(util_counts[captain] / others, FLEX_SHARE_BANDS, FLEX_SHARE_OVER)
+            recorded = pred.get("captain_role") if pred.get("captain_role") in (ROLE_PITCHER, ROLE_HITTER) else None
+            table = roles["roles"].get(captain, UNKNOWN)
+            if recorded:
+                role_check["recorded"] += 1
+                if table != UNKNOWN:
+                    role_check["recorded_and_table"] += 1
+                    role_check["disagree"] += int(recorded != table)
+            split = mined.get(eid, (None, None))[0]
+            if split is None and pred.get("team_split") in TEAM_SPLITS:
+                split = pred["team_split"]
+            dup = copies[eid] - 1
+            if ours:
+                nums = entry_numbers(int(mine[eid]["Place"]), int(mine[eid]["Contest_Entries"]))
+            else:
+                rank = str(e.get("rank") or "").strip()
+                nums = (entry_numbers(int(rank), n_field)
+                        if rank.isdigit() and 1 <= int(rank) <= n_field else None)
+                if nums is None:
+                    coverage["field_rank_unusable"] += 1
+            axes = {
+                "captain_role": recorded or table,
+                "captain_cpt_share": cpt_share, "captain_flex_share": flex_share,
+                "team_split": split or UNKNOWN,
+                "duplication": str(dup) if dup < 2 else "2+",
+                **contest_axes,
+                **({"thesis": str(pred.get("thesis") or UNRECORDED) if build else UNRECORDED} if ours else {}),
+            }
+            lineups.append({"entry": eid, "contest": cid, "slate": slate, "month": month, "ours": ours,
+                            "numbers": nums, "axes": axes})
+        ours_here = sum(1 for e in complete if e["entry_id"] in mine)
+        coverage["with_lineup"] += ours_here
+        inferred_n += ours_here if by_title else 0
+        fell_through_n += 0 if by_title else ours_here
+    return {"lineups": lineups, "coverage": coverage, "standings_unreadable": sorted(set(unreadable)),
+            "standings_not_showdown": sorted(set(not_showdown)), "roles_note": roles["note"],
+            "role_check": role_check,
+            "postures_inferred": {"name_inference": inferred_n, "unresolved": fell_through_n}}
+
+
+def build_showdown_attribution(root: Path, results_rows: Sequence[Mapping[str, str]],
+                               resolution: Optional[Path], seed: int = BOOTSTRAP_SEED,
+                               draws: int = BOOTSTRAP_DRAWS) -> Dict[str, Any]:
+    builds = resolved_builds(root, resolution)
+    joined = showdown_lineups(root, results_rows, builds["builds"])
+    lineups = joined["lineups"]
+    ours = [lu for lu in lineups if lu["ours"]]
+    overall = (paired_cell(ours, [lu for lu in lineups if not lu["ours"] and lu["numbers"] is not None],
+                           seed, draws) if ours else None)
+    if overall is not None:
+        overall["share"] = None
+        overall["findings"] = finding_lines(overall)
+    unknown = {side: sum(1 for lu in lineups if lu["ours"] == (side == "ours")
+                         and lu["axes"]["captain_role"] == UNKNOWN) for side in ("ours", "field")}
+    return {
+        "population": "paid MLB Showdown entries (fee above 0) with a complete lineup in a standings export",
+        "coverage": {**joined["coverage"], "field_lineups": len(lineups) - len(ours),
+                     "contests": len({lu["contest"] for lu in ours}),
+                     "slates": len({lu["slate"] for lu in ours}),
+                     "standings_unreadable": joined["standings_unreadable"],
+                     "standings_not_showdown": joined["standings_not_showdown"]},
+        "postures_inferred": joined["postures_inferred"],
+        "builds": {k: v for k, v in builds.items() if k != "builds"},
+        "captain_role": {"tables": joined["roles_note"], "unknown": unknown, **joined["role_check"]},
+        "bootstrap": {"unit": "slate (sport, date, game type)", "draws": draws, "seed": seed,
+                      "interval_pct": list(INTERVAL_PCT), "order": "slates sorted before sampling"},
+        "labels": list(SHOWDOWN_LABELS),
+        "overall": overall,
+        "axes": attribute_cells(lineups, seed, draws, axes=SHOWDOWN_AXES),
+    }
+
+
+def render_showdown_attribution(report: Mapping[str, Any], results: Path) -> str:
+    cov = report["coverage"]
+    boot = report["bootstrap"]
+    role = report["captain_role"]
+    lines = [f"results_ledger attribute --showdown  ({report['population']})", f"  results: {results}",
+             f"  coverage: {cov['with_lineup']} of {cov['population']} entries with a lineup in "
+             f"{cov['contests']} contests, {cov['slates']} slates; {cov['no_standings']} without a "
+             f"standings export, {cov['absent_from_standings']} absent from theirs, "
+             f"{cov['incomplete_lineup']} incomplete; field {cov['field_lineups']} lineups "
+             f"({cov['field_rank_unusable']} without a usable rank)",
+             f"  captain role: {role['tables']}; unknown on {role['unknown']['ours']} of ours and "
+             f"{role['unknown']['field']} field lineups; {role['recorded']} of ours from a record, "
+             f"{role['disagree']} of the {role['recorded_and_table']} the tables also name disagree",
+             f"  posture: {report['postures_inferred']['name_inference']} of our entries by "
+             f"name_inference, {report['postures_inferred']['unresolved']} unresolved (the entry cap "
+             "or the large_gpp default)",
+             f"  build-time axes: {report['builds']['note']}",
+             f"  intervals: 90%, {boot['unit']} bootstrap, {boot['draws']} draws, seed {boot['seed']}, "
+             f"{boot['order']}; ours and the field paired on one draw per cell"]
+    lines += [f"  label:   {label}" for label in report["labels"]]
+    lines.append("")
+    lines.extend(render_attribution_cell("overall", report["overall"]))
+    for axis, block in report["axes"].items():
+        lines.append("")
+        lines.append(f"== {axis} ({block['level']}) ==")
+        for value, cell in block["cells"].items():
+            lines.extend(render_attribution_cell(value, cell))
+    return "\n".join(lines) + "\n"
 
 
 # ---------------------------------------------------------------------------
@@ -2308,6 +2749,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     p.add_argument("--resolution", default=None,
                    help=f"default data/reference/{RESOLUTION_NAME} when present (R497's resolve)")
     p.add_argument("--json", action="store_true", help="print every cell and summary as JSON")
+    which = p.add_mutually_exclusive_group()
+    which.add_argument("--rank", action="store_true",
+                       help="only the engine's own order against finish order, per contest (R500(a))")
+    which.add_argument("--showdown", action="store_true",
+                       help="our Showdown finishes by captain, split, duplication and thesis (R500(b))")
 
     args = ap.parse_args(argv)
     handler = {"ingest": cmd_ingest, "report": cmd_report, "resolve": cmd_resolve,
