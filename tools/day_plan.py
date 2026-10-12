@@ -50,6 +50,7 @@ import argparse
 import csv
 import hashlib
 import json
+import math
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -129,15 +130,18 @@ def read_template(path: Path) -> Optional[Dict[str, Any]]:
         for row in rows[head + 1:]:
             info = row[gi_col].strip() if gi_col < len(row) else ""
             pid = row[id_col].strip() if id_col < len(row) else ""
-            when = parse_game_info_datetime(info)
-            if when is None:
-                continue
-            locks.append(when)
-            token = info.split(" ", 1)[0].upper()
-            if "@" in token:
-                games.add(token)
+            # `slate_signature`'s game rule, row for row: AWAY@HOME off the
+            # first token, else the token itself, so a 'Postponed' cell counts
+            # there and here alike and the two tags stay equal.
+            token = info.split(" ", 1)[0]
+            gid = token.upper() if "@" in token else token
+            if gid:
+                games.add(gid)
             if pid:
                 pool_ids.add(pid)
+            when = parse_game_info_datetime(info)
+            if when is not None:
+                locks.append(when)
     first_lock = min(locks) if locks else None
     # The tag `build_slate.slate_signature` and EP `_slate_tag` compute from a
     # salary file, computed here from the template's own pool so a delivery or
@@ -165,14 +169,13 @@ def _candidates(root: Path, date: str, attachment_roots: Optional[Iterable[str]]
                 named: Sequence[str]) -> List[Tuple[Path, str]]:
     import stage_slate
 
-    found: List[Tuple[Path, str]] = []
+    found: List[Tuple[Path, str]] = [(Path(p), "named") for p in named]
     staged = root / "data" / "slates" / date
     if staged.is_dir():
         found += [(p, "staged") for p in sorted(staged.glob("*.csv")) if p.is_file()]
     roots = stage_slate.ATTACHMENT_ROOTS if attachment_roots is None else tuple(attachment_roots)
     for _root, paths in stage_slate.attachment_candidates(roots):
         found += [(p, "attached") for p in paths]
-    found += [(Path(p), "named") for p in named]
     return found
 
 
@@ -185,14 +188,16 @@ def templates_for(root: Path, date: str, *, attachment_roots: Optional[Iterable[
     named on the command line, since nothing else ties it to the day.
     """
     seen: Dict[str, Dict[str, Any]] = {}
+    reached: set = set()
     notes: List[str] = []
     for path, origin in _candidates(root, date, attachment_roots, named):
         try:
-            digest = _sha256(path)
-            if digest in seen:
-                seen[digest]["sources"].append(f"{origin} {path.name}")
+            real = path.resolve()
+            if real in reached:  # the attachment roots nest: one file, one source
                 continue
+            reached.add(real)
             template = read_template(path)
+            digest = _sha256(path) if template is not None else ""
         except (OSError, ValueError, csv.Error, UnicodeDecodeError) as exc:
             if origin == "named":
                 notes.append(f"{path}: unreadable as a DKEntries file ({exc})")
@@ -201,8 +206,14 @@ def templates_for(root: Path, date: str, *, attachment_roots: Optional[Iterable[
             if origin == "named":
                 notes.append(f"{path}: not a DKEntries file (header)")
             continue
+        if digest in seen:
+            seen[digest]["sources"].append(f"{origin} {path.name}")
+            continue
         lock = template["first_lock"]
         if lock is not None and lock.date().isoformat() != date:
+            if origin == "named":
+                notes.append(f"{path}: first lock {lock:%Y-%m-%d %H:%M} ET is not on "
+                             f"{date}; left out")
             continue
         if lock is None and origin == "attached":
             continue
@@ -252,7 +263,8 @@ def build_plan(root: Path, date: str, now: Optional[datetime] = None, *,
     groups = _merge(templates)
     records = read_records(root, date)
     deliveries = [r for r in records if r.get("kind") == "delivery"]
-    refused_tags = {str(r.get("slate_tag") or "") for r in records if r.get("kind") == "refusal"}
+    refused_tags = {str(r.get("slate_tag") or "") for r in records
+                    if r.get("kind") == "refusal"} - {""}
     matched: set = set()
 
     out = []
@@ -260,7 +272,8 @@ def build_plan(root: Path, date: str, now: Optional[datetime] = None, *,
         ids = set(g["rows"])
         states, filled = {"none"}, set()
         for i, rec in enumerate(deliveries):
-            rows = [e for e in rec.get("entries") or [] if str(e.get("entry_id")) in ids]
+            rows = [e for e in rec.get("entries") or []
+                    if isinstance(e, dict) and str(e.get("entry_id")) in ids]
             if not rows:
                 continue
             matched.add(i)
@@ -277,8 +290,12 @@ def build_plan(root: Path, date: str, now: Optional[datetime] = None, *,
         open_ids = sorted(e for e, n in g["rows"].items() if n != g["slots"] and e not in filled)
         lock = g["first_lock"]
         deadline = lock - timedelta(minutes=DELIVERY_BUFFER_MINUTES) if lock else None
-        to_deadline = (deadline - now).total_seconds() / 60.0 if deadline else None
-        locked = bool(lock and now >= lock)
+        # In UTC: two datetimes sharing one zone object subtract and compare as
+        # wall clocks, which is an hour off across the DST change.
+        utc_now = now.astimezone(timezone.utc)
+        to_deadline = ((deadline.astimezone(timezone.utc) - utc_now).total_seconds() / 60.0
+                       if deadline else None)
+        locked = bool(lock and utc_now >= lock.astimezone(timezone.utc))
         inside = bool(lock and not locked and to_deadline < T30_MINUTES)
         if lock is None:
             clock = "lock unknown"
@@ -287,7 +304,7 @@ def build_plan(root: Path, date: str, now: Optional[datetime] = None, *,
         elif to_deadline >= 0:
             clock = f"T-{int(to_deadline)} to deadline"
         else:
-            clock = f"T+{int(-to_deadline) + 1} past deadline"
+            clock = f"T+{math.ceil(-to_deadline)} past deadline"
         contests = sorted(g["contests"])
         out.append({
             "tag": g["tag"], "format": g["contract"].title(), "key": g["key"],
@@ -316,9 +333,19 @@ def build_plan(root: Path, date: str, now: Optional[datetime] = None, *,
         next_action = f"baseline into {text}, in deadline order, before enhancing any"
         short_next = "baseline " + ", then ".join(r["tag"] for r in ahead)
     elif out:
-        next_action = ("every draftgroup on hand has a lineup for every reserved row; "
-                       "enhance in deadline order")
-        short_next = "enhance in deadline order"
+        unlocked = [r for r in out if not r["locked"]]
+        locked_open = [r for r in out if r["open"] and r["locked"]]
+        parts = []
+        if unlocked:
+            parts.append("every draftgroup on hand that has not locked has a lineup for "
+                         "every reserved row; enhance in deadline order")
+        if locked_open:
+            parts.append("nothing left to act on in " + ", ".join(
+                f"{r['tag']} ({r['open']} rows locked without a lineup)" for r in locked_open))
+        elif not unlocked:
+            parts.append("every draftgroup on hand has locked")
+        next_action = "; ".join(parts)
+        short_next = "enhance in deadline order" if unlocked else "nothing left to act on"
     else:
         next_action = (f"no DKEntries file staged or attached for {date}; ask Ben for "
                        f"every reserved draftgroup's file by name")
@@ -329,11 +356,13 @@ def build_plan(root: Path, date: str, now: Optional[datetime] = None, *,
         if i not in matched:
             tag = str((rec.get("manifest_row") or {}).get("slate_tag") or "untagged")
             elsewhere.setdefault(tag, set()).add(record_state(rec))
+    for tag in sorted(refused_tags - {r["tag"] for r in out}):
+        elsewhere.setdefault(tag, set()).add("refused")
     return {
         "date": date, "now_et": now.strftime("%Y-%m-%d %H:%M"),
         "draftgroups": out, "next": next_action, "short_next": short_next,
         "act_now": [r for r in out if r["act_now"]],
-        "delivered_without_template": {
+        "recorded_without_template": {
             t: max(s, key=STATE_ORDER.index) for t, s in sorted(elsewhere.items())},
         "notes": notes,
         "labels": "bookkeeping over the files handed over and the delivery records; "
@@ -365,9 +394,9 @@ def render(plan: Mapping[str, Any]) -> str:
             f"blank {r['blank']:>3}  complete {r['complete']:>3}  {r['fill']:<9} "
             f"state {r['state']:<12} {first}" + (f" (+{more} contests)" if more > 0 else ""))
     lines.append(f"next: {plan['next']}")
-    if plan["delivered_without_template"]:
-        lines.append("delivered on this date with no DKEntries file on hand: " + ", ".join(
-            f"{t} ({s})" for t, s in plan["delivered_without_template"].items()))
+    if plan["recorded_without_template"]:
+        lines.append("recorded on this date with no DKEntries file on hand: " + ", ".join(
+            f"{t} ({s})" for t, s in plan["recorded_without_template"].items()))
     lines += [f"note: {n}" for n in plan["notes"]]
     lines.append(f"this plan {SEES_ONLY}")
     return "\n".join(lines)

@@ -52172,7 +52172,7 @@ class DayPlanTests(unittest.TestCase):
         return datetime(y, m, d, int(hhmm[:2]), int(hhmm[3:]), tzinfo=self.ET)
 
     def _template(self, name, *, starts, entries, base, showdown=False, filled=0,
-                  where=None, date=None, contest="MLB $5K Cup"):
+                  where=None, date=None, contest="MLB $5K Cup", at=2):
         """A DKEntries file in DK's layout: the entry rows, then the embedded
         pool under a `Position` header row that sits on an entry row, in the
         column `Instructions` occupies (col 15 Classic, col 11 Showdown)."""
@@ -52181,9 +52181,12 @@ class DayPlanTests(unittest.TestCase):
         y, m, d = date.split("-")
         pool = []
         for g, hhmm in enumerate(starts):
-            hour, minute = int(hhmm[:2]), hhmm[3:]
-            clock = f"{(hour - 1) % 12 + 1:02d}:{minute}{'PM' if hour >= 12 else 'AM'}"
-            info = f"A{g}@H{g} {m}/{d}/{y} {clock} ET"
+            if hhmm is None:
+                info = f"A{g}@H{g} Postponed"
+            else:
+                hour, minute = int(hhmm[:2]), hhmm[3:]
+                clock = f"{(hour - 1) % 12 + 1:02d}:{minute}{'PM' if hour >= 12 else 'AM'}"
+                info = f"A{g}@H{g} {m}/{d}/{y} {clock} ET"
             for k in range(len(slots)):
                 pid = str(base + g * 100 + k)
                 pool.append(("SS", f"Player {pid} ({pid})", f"Player {pid}", pid,
@@ -52196,7 +52199,8 @@ class DayPlanTests(unittest.TestCase):
             cells = [p[3] for p in pool[:len(slots)]] if i < filled else [""] * len(slots)
             rows.append([str(base * 10 + i), contest, str(base + 7), "$1.00", *cells, ""]
                         + [""] * len(self.POOL_HEADER))
-        at = 2  # the pool's header lands on the third entry row, as DK writes it
+        # DK puts the pool's header on an entry row (`at=2`, the third) or on the
+        # file's own header row (`at=-1`); both are read.
         while len(rows) < at + 1 + len(pool) + 1:
             rows.append([""] * width)
         rows[at + 1][col:col + len(self.POOL_HEADER)] = self.POOL_HEADER
@@ -52289,8 +52293,20 @@ class DayPlanTests(unittest.TestCase):
         self.assertEqual(self._main("19:30")[0], 0)  # exactly 30: not inside
         self.assertEqual(self._main("19:28")[0], 0)
         self.assertEqual(self._main("20:03")[0], 1)  # past the deadline, before lock
-        self.assertIn("T+4 past deadline", self._main("20:03")[1])
-        self.assertEqual(self._main("20:05")[0], 0)  # locked: nothing left to act on
+        self.assertIn("T+3 past deadline", self._main("20:03")[1])
+        code, text = self._main("20:05")
+        self.assertEqual(code, 0)  # locked: nothing left to act on
+        self.assertIn("next: nothing left to act on in 2005_4g (17 rows locked without a "
+                      "lineup)", text)
+        self.assertNotIn("has a lineup for every reserved row", text)
+        # Across the DST change the clock is elapsed time, not wall time:
+        # 00:30 EDT to 19:00 EST on 2026-11-01 is 1170 minutes, not 1110.
+        self._template("DKEntries_dst.csv", base=4470, entries=2, starts=["19:05"],
+                       date="2026-11-01", where=self.root / "data" / "slates" / "2026-11-01")
+        plan = self._dp().build_plan(self.root, "2026-11-01",
+                                     datetime(2026, 11, 1, 0, 30, tzinfo=self.ET),
+                                     attachment_roots=())
+        self.assertEqual(plan["draftgroups"][0]["minutes_to_deadline"], 1170.0)
 
     def test_a_baseline_record_clears_the_turbo(self):
         main, turbo, _ = self._three()
@@ -52317,7 +52333,8 @@ class DayPlanTests(unittest.TestCase):
                           for r in rows],
                          [("2005_4g", "complete", "none", 17, 0),
                           ("2010_1g_sd", "complete", "none", 6, 0)])
-        self.assertIn("next: every draftgroup on hand has a lineup for every reserved row", text)
+        self.assertIn("next: every draftgroup on hand that has not locked has a lineup for "
+                      "every reserved row; enhance in deadline order", text)
         # A blank copy of the same draftgroup (an older download) changes nothing:
         # one draftgroup, and a row's best copy wins.
         self._template("DKEntries_turbo_old.csv", base=4420, entries=17, where=self.uploads,
@@ -52330,6 +52347,18 @@ class DayPlanTests(unittest.TestCase):
     def test_a_partial_file_leaves_the_rest_open_and_a_refusal_is_not_a_delivery(self):
         _, turbo = self._template("DKEntries_turbo.csv", base=4420, entries=17,
                                   starts=["20:05", "20:10", "21:05", "22:10"])
+        self._template("DKEntries_sd.csv", base=4430, entries=4, starts=["21:40"],
+                       showdown=True)
+        folder = self.root / "data" / "deliveries" / self.DATE
+        folder.mkdir(parents=True)
+        for name, tag in (("untagged", ""), ("other", "1905_10g")):
+            (folder / f"refusal_{name}.json").write_text(json.dumps(
+                {"schema_version": 1, "kind": "refusal", "date": self.DATE,
+                 "slate_tag": tag, "exit_code": 3}), encoding="utf-8")
+        (folder / "malformed.json").write_text(json.dumps(
+            {"schema_version": 1, "kind": "delivery", "date": self.DATE,
+             "manifest_row": {"certification": "certified"}, "entries": ["x", None]}),
+            encoding="utf-8")
         # Ten rows delivered, one of them holding nine ids: nine entries filled.
         self._record("2005_4g_partial", turbo[:10], cert="review_grade", lineage=None,
                      short=(turbo[3],), tag="2005_4g")
@@ -52341,7 +52370,11 @@ class DayPlanTests(unittest.TestCase):
         row = plan["draftgroups"][0]
         self.assertEqual((row["state"], row["open"]), ("review-grade", 8))  # best state
         self.assertIn(turbo[3], row["open_entry_ids"])
-        self.assertEqual(self._main("19:40")[0], 1)
+        self.assertEqual(plan["draftgroups"][1]["state"], "none")  # not another tag's refusal
+        code, text = self._main("19:40")
+        self.assertEqual(code, 1)
+        self.assertIn("\nrecorded on this date with no DKEntries file on hand: "
+                      "1905_10g (refused), untagged (certified)\n", text)
         # The refusal alone: named, still open, still exit 1.
         (self.root / "data" / "deliveries" / self.DATE / "2005_4g_partial.json").unlink()
         row = self._plan("19:40")["draftgroups"][0]
@@ -52360,27 +52393,33 @@ class DayPlanTests(unittest.TestCase):
         self.assertIn("next: baseline into 2140_1g_sd (deadline 21:35 ET, 20 open), in "
                       "deadline order, before enhancing any", text)
         self.assertNotIn("1905_10g (deadline", text)
-        self.assertIn("\ndelivered on this date with no DKEntries file on hand: "
+        self.assertIn("\nrecorded on this date with no DKEntries file on hand: "
                       "1310_3g (certified)\n", text)  # the matched baseline is not in it
 
     def test_discovery_reads_headers_dedupes_copies_and_keeps_to_the_date(self):
         staged, _ = self._template("DKEntries_turbo.csv", base=4420, entries=17,
-                                   starts=["20:05", "20:10", "21:05", "22:10"])
+                                   starts=["20:05", "20:10", "21:05", "22:10"], at=-1)
         (self.uploads / "DKEntries (1).csv").write_bytes(staged.read_bytes())
-        self._template("DKEntries_tomorrow.csv", base=4440, entries=5, starts=["19:05"],
-                       where=self.uploads, date="2026-10-13")
+        tomorrow, _ = self._template("DKEntries_tomorrow.csv", base=4440, entries=5,
+                                     starts=["19:05"], where=self.uploads, date="2026-10-13")
         (staged.parent / "DKSalaries.csv").write_text(
             "Position,Name + ID,Name,ID,Roster Position,Salary,Game Info,TeamAbbrev,"
             "AvgPointsPerGame\nSS,A (1),A,1,SS/UTIL,4000,A0@H0 10/12/2026 08:05PM ET,A0,7\n",
             encoding="utf-8")
         # No readable lock: kept when staged under the date, dropped when attached.
-        self._template("DKEntries_nolock.csv", base=4450, entries=3, starts=[])
-        self._template("DKEntries_nolock_att.csv", base=4460, entries=3, starts=[],
-                       where=self.uploads)
+        nolock, _ = self._template("DKEntries_nolock.csv", base=4450, entries=3, starts=[None])
+        # One cell reads a bare 'Postponed': `slate_signature` counts its first token
+        # as a game too, so the tag does.
+        nolock.write_text(nolock.read_text(encoding="utf-8").replace(
+            "A0@H0 Postponed", "Postponed", 1), encoding="utf-8")
+        nolock_att, _ = self._template("DKEntries_nolock_att.csv", base=4460, entries=3,
+                                       starts=[None], where=self.uploads)
+        # The roots nest (the tree reaches uploads/ one level down): one file, one source.
         plan = self._dp().build_plan(self.root, self.DATE, self._at("19:40"),
-                                     attachment_roots=[str(self.uploads)])
+                                     attachment_roots=[str(self.uploads), str(self.root)])
+        # A Postponed game counts toward the tag, as `slate_signature` counts it.
         self.assertEqual([(r["tag"], r["clock"], r["reserved"]) for r in plan["draftgroups"]],
-                         [("2005_4g", "T-20 to deadline", 17), ("0g", "lock unknown", 3)])
+                         [("2005_4g", "T-20 to deadline", 17), ("2g", "lock unknown", 3)])
         self.assertEqual(sorted(plan["draftgroups"][0]["sources"]),
                          ["attached DKEntries (1).csv", "staged DKEntries_turbo.csv"])
         # Run by path from another directory with no PYTHONPATH, as a session does.
@@ -52393,6 +52432,16 @@ class DayPlanTests(unittest.TestCase):
             cwd=str(self.root), env=env, capture_output=True, text=True, timeout=120)
         self.assertEqual(proc.returncode, 1, proc.stderr[-2000:])
         self.assertIn("ACT NOW: 2005_4g 17 open", proc.stdout)
+        # Named, the lockless attached file is the session's pick and is kept.
+        plan = self._dp().build_plan(self.root, self.DATE, self._at("19:40"),
+                                     attachment_roots=[str(self.uploads)],
+                                     named=[str(nolock_att)])
+        self.assertEqual(sorted(r["sources"][0] for r in plan["draftgroups"]
+                                if r["clock"] == "lock unknown"),
+                         ["named DKEntries_nolock_att.csv", "staged DKEntries_nolock.csv"])
+        code, text = self._main("19:40", "--entries", str(tomorrow))
+        self.assertIn(f"note: {tomorrow}: first lock 2026-10-13 19:05 ET is not on "
+                      f"2026-10-12; left out", text)
         self.assertNotIn("1905_1g", proc.stdout)  # tomorrow's template
 
     def test_the_session_start_hook_prints_the_line_only_when_it_has_something(self):
@@ -52418,6 +52467,10 @@ class DayPlanTests(unittest.TestCase):
             # Nothing on hand and no BUILD claim: a DEV session sees no new line.
             self.assertIsNone(hook().day_plan_line())
             self.assertNotIn("day plan", hook().full())
+            junk = self.root / "claims" / "junk" / "owner.json"
+            junk.parent.mkdir(parents=True)
+            junk.write_text("[]", encoding="utf-8")
+            self.assertIsNone(hook().day_plan_line())
             # A held DEV claim is not a build session.
             dev = self.root / "claims" / "engine_2026-10-12" / "owner.json"
             dev.parent.mkdir(parents=True)
@@ -52442,6 +52495,12 @@ class DayPlanTests(unittest.TestCase):
                                    "to deadline; next: baseline 2005_4g; "
                                    "python tools/day_plan.py --date 2026-10-12")
             self.assertIn(line, hook().full())
+            # 20:30 ET is 00:30Z the next day: the plan stays on the ET date.
+            with unittest.mock.patch.object(dp, "_utcnow", return_value=self._at("20:30")):
+                self.assertEqual(hook().day_plan_line(),
+                                 "day plan 2026-10-12: 2005_4g open 17 none LOCKED; next: "
+                                 "nothing left to act on; python tools/day_plan.py --date "
+                                 "2026-10-12")
             # A file that will not read costs nothing; a plan that raises says so.
             (self.root / "data" / "slates" / self.DATE / "DKEntries_bad.csv").write_bytes(
                 b"Entry ID,Contest Name,Contest ID,Entry Fee,X\n\xff\xfe\n")

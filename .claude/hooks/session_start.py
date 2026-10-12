@@ -165,6 +165,8 @@ def build_claim_held() -> bool:
             data = json.loads(owner.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             continue
+        if not isinstance(data, dict):
+            continue
         if data.get("role") == "BUILD" and not data.get("released_utc"):
             return True
     return False
