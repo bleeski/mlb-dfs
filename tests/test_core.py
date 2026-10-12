@@ -51785,19 +51785,22 @@ class ResultsRankTests(unittest.TestCase):
             code = self.rl.main(["--root", str(self.root), *argv])
         return code, out.getvalue(), err.getvalue()
 
-    def test_spearman_reads_one_in_order_minus_one_reversed_and_ties_share_a_midrank(self):
-        self.assertEqual(self.rl.spearman([3, 2, 1], [3, 2, 1]), 1.0)
-        self.assertEqual(self.rl.spearman([1, 2, 3, 4], [4, 3, 2, 1]), -1.0)
+    def test_the_correlation_reads_one_in_order_minus_one_reversed_and_ties_share_a_midrank(self):
+        # `rank_report` reads `replay_slate.spearman` (R384's grade), pinned here
+        # for the cases the rank depends on.
+        from tools.replay_slate import average_ranks, spearman
+        self.assertEqual(spearman([3, 2, 1], [3, 2, 1]), 1.0)
+        self.assertEqual(spearman([1, 2, 3, 4], [4, 3, 2, 1]), -1.0)
         # d = (-1, 1, -1, 1, 0): 1 - 6 * 4 / (5 * 24) = 0.8, so a sign alone fails.
-        self.assertAlmostEqual(self.rl.spearman([1, 2, 3, 4, 5], [2, 1, 4, 3, 5]), 0.8, places=12)
-        self.assertEqual(self.rl.midranks([10, 20, 20, 30]), [1.0, 2.5, 2.5, 4.0])
-        # Ties at midranks, Pearson on the ranks: 4.5 / sqrt(4.5 * 5).
-        self.assertAlmostEqual(self.rl.spearman([1, 2, 2, 3], [1, 2, 3, 4]), 4.5 / math.sqrt(22.5), places=12)
-        self.assertIsNone(self.rl.spearman([1], [1]))
-        self.assertIsNone(self.rl.spearman([], []))
-        self.assertIsNone(self.rl.spearman([1, 2], [1]))
-        self.assertIsNone(self.rl.spearman([5, 5, 5], [1, 2, 3]))      # no spread on one side
-        self.assertIsNone(self.rl.spearman([1, 2, 3], [7, 7, 7]))
+        self.assertEqual(spearman([1, 2, 3, 4, 5], [2, 1, 4, 3, 5]), 0.8)
+        self.assertEqual(average_ranks([10, 20, 20, 30]), [1.0, 2.5, 2.5, 4.0])
+        # Ties at midranks, Pearson on the ranks: 4.5 / sqrt(4.5 * 5), to 4 places.
+        self.assertEqual(spearman([1, 2, 2, 3], [1, 2, 3, 4]), round(4.5 / math.sqrt(22.5), 4))
+        self.assertIsNone(spearman([1], [1]))
+        self.assertIsNone(spearman([], []))
+        self.assertIsNone(spearman([1, 2], [1]))
+        self.assertIsNone(spearman([5, 5, 5], [1, 2, 3]))      # no spread on one side
+        self.assertIsNone(spearman([1, 2, 3], [7, 7, 7]))
 
     def test_each_contest_reads_its_own_rho_and_every_skip_is_counted(self):
         spec = [("a1", "101", 1), ("a2", "101", 2), ("a3", "101", 3),           # in order: +1

@@ -2343,42 +2343,15 @@ RANK_LABELS: Tuple[str, ...] = (
 )
 
 
-def midranks(values: Sequence[float]) -> List[float]:
-    """1-based ranks with ties sharing their average rank."""
-    order = sorted(range(len(values)), key=lambda i: values[i])
-    ranks = [0.0] * len(values)
-    i = 0
-    while i < len(order):
-        j = i
-        while j + 1 < len(order) and values[order[j + 1]] == values[order[i]]:
-            j += 1
-        for k in range(i, j + 1):
-            ranks[order[k]] = (i + j) / 2 + 1
-        i = j + 1
-    return ranks
-
-
-def spearman(xs: Sequence[float], ys: Sequence[float]) -> Optional[float]:
-    """Spearman's rho as Pearson's correlation of the midranks; None under two
-    pairs or when either side has no spread (every value tied)."""
-    n = len(xs)
-    if n != len(ys) or n < 2:
-        return None
-    rx, ry = midranks(xs), midranks(ys)
-    mx, my = sum(rx) / n, sum(ry) / n
-    sxy = sum((a - mx) * (b - my) for a, b in zip(rx, ry))
-    sxx = sum((a - mx) ** 2 for a in rx)
-    syy = sum((b - my) ** 2 for b in ry)
-    if not sxx or not syy:
-        return None
-    return sxy / math.sqrt(sxx * syy)
-
-
 def rank_report(results_rows: Sequence[Mapping[str, str]], builds: Mapping[str, Any]) -> Dict[str, Any]:
     """Per format, per unit (a contest's resolved entries from one build), the
     Spearman correlation between the engine's own order and the finish order,
-    and its median and spread across units; skipped units counted."""
+    and its median and spread across units; skipped units counted. The
+    correlation is `replay_slate.spearman` (tie-averaged ranks, None under two
+    pairs or with no spread on a side, 4 decimals), R384's projection grade's."""
     import numpy as np
+
+    from tools.replay_slate import spearman
 
     units: Dict[str, Dict[Tuple[str, str], List[Tuple[float, int]]]] = {f: defaultdict(list) for f in RANK_KEYS}
     without_key = {f: 0 for f in RANK_KEYS}
@@ -2410,7 +2383,7 @@ def rank_report(results_rows: Sequence[Mapping[str, str]], builds: Mapping[str, 
             if rho is None:
                 flat += 1
                 continue
-            measured.append({"contest": cid, "build": scale, "n": len(pairs), "rho": round(rho, 6)})
+            measured.append({"contest": cid, "build": scale, "n": len(pairs), "rho": rho})
         rhos = [u["rho"] for u in measured]
         cut = ([round(float(v), 6) for v in np.percentile(rhos, [25, 50, 75])] if rhos else [None] * 3)
         contests = defaultdict(set)
