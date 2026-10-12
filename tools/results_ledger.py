@@ -64,7 +64,7 @@ export (archive under any date, then the inbox) holds a complete lineup, and
 every other complete lineup of the same contest as the field. Per lineup: the
 field-relative ownership percentile (summed %Drafted, midrank / N) and its
 third; the hitter stack (mined, else a team map) and its group; the primary
-team and its share of the field's primary stacks; dead slots (hitters at
+team and the share of the field's team-mapped lineups stacking it; dead slots (hitters at
 exactly 0 FPTS). Per contest: posture (the build's default inference from the
 title and fee), field-size band, month. Per resolved entry only (R497): hitter
 roles, market, the primary team's implied total, contest shape. Every cell
@@ -1358,10 +1358,12 @@ def cmd_resolve(args: argparse.Namespace) -> int:
 # ---------------------------------------------------------------------------
 
 CLASSIC_GAME_TYPE = "Classic"
+CLASSIC_HITTERS = 8
 UNKNOWN, UNRECORDED, NONE_LABEL = "unknown", "unrecorded", "none"
 LARGE_SECONDARY = ("4-4", "4-3-1", "4-2-2")
 STACK_GROUPS = ("5", "4-4|4-3-1|4-2-2", "4-other", "3-or-less")
-# A team's share of the field's primary stacks, upper bounds exclusive.
+# The share of the field's team-mapped lineups whose primary stack is the
+# team (a lineup with no primary in the denominator), upper bounds exclusive.
 TEAM_SHARE_BANDS: Tuple[Tuple[float, str], ...] = ((0.05, "<5%"), (0.10, "5-10%"), (0.20, "10-20%"))
 TEAM_SHARE_OVER = "20%+"
 IMPLIED_BANDS: Tuple[Tuple[float, str], ...] = ((4.0, "<4.0"), (5.0, "4.0-4.99"))
@@ -1405,6 +1407,8 @@ ATTRIBUTE_LABELS: Tuple[str, ...] = (
     "entries prints none about that band (its bootstrap has no spread).",
     "Dead slots are an outcome, not a choice: the axis is here for the R6 question, and its "
     "cells sort finishes by construction.",
+    "The field is weighted by its lineups: a contest of 10,000 weighs 400 times one of 25 on the "
+    "field side, whatever number of ours it holds; the pairing is by slate, not by weight.",
 )
 
 
@@ -1497,7 +1501,9 @@ def mined_stacks(root: Path, contest_id: str) -> Dict[str, Tuple[str, int]]:
     A contest mined twice (2026-07-18 and 07-19 hold 192464820) reads its typed
     `classic` file first, then the first by path: the 07-19 copy is one of four
     untyped files an older miner wrote. Entries mined without a salary file
-    carry no pattern and are left out.
+    carry no pattern and are left out, and so is a pattern whose counts do not
+    sum to the eight hitters: the miner writes one even when a hitter failed to
+    join (none on disk on 2026-10-12; this is the only check the file allows).
     """
     files = sorted((Path(root) / ARCHIVE_DIR).glob(f"*/mined_{contest_id}.json"))
     loaded = []
@@ -1511,8 +1517,11 @@ def mined_stacks(root: Path, contest_id: str) -> Dict[str, Tuple[str, int]]:
         return {}
     out: Dict[str, Tuple[str, int]] = {}
     for entry in loaded[0][1].get("entries") or []:
-        if entry.get("stack_pattern") and entry.get("max_stack") is not None:
-            out[str(entry.get("entry_id"))] = (str(entry["stack_pattern"]), int(entry["max_stack"]))
+        pattern = str(entry.get("stack_pattern") or "")
+        counts = pattern.split("-")
+        if (entry.get("max_stack") is not None and all(c.isdigit() for c in counts)
+                and sum(int(c) for c in counts) == CLASSIC_HITTERS):
+            out[str(entry.get("entry_id"))] = (pattern, int(entry["max_stack"]))
     return out
 
 
@@ -1529,7 +1538,9 @@ def salary_teams(path: Path) -> Dict[str, str]:
 class _TeamMaps:
     """One salary file per contest, found the way the archive and the records allow:
     the R497-resolved record's salary sha (`record_salary_candidates`), else the
-    file `replay_slate.slate_groups` resolves for the contest's archive folder."""
+    file `replay_slate.slate_groups` resolves for a folder holding the contest's
+    typed classic mined file. `slate_groups` walks those files only, so a
+    contest with no mined file gets no map from the archive."""
 
     def __init__(self, root: Path) -> None:
         self.root = Path(root)
@@ -1551,16 +1562,13 @@ class _TeamMaps:
             self._groups[key] = found
         return self._groups[key]
 
-    def for_contest(self, contest_id: str, standings: Path, record_dates: Sequence[str]
-                    ) -> Tuple[Dict[str, str], str]:
+    def for_contest(self, contest_id: str, record_dates: Sequence[str]) -> Tuple[Dict[str, str], str]:
         from mlb_engine.field.field_miner import record_salary_candidates
 
         for date in sorted(set(record_dates)):
             for path in record_salary_candidates(self.root, date, contest_id):
                 return salary_teams(Path(path)), f"salary file via record: {_rel(Path(path), self.root)}"
-        folders = sorted({p.parent for p in (self.root / ARCHIVE_DIR).glob(f"*/mined_{contest_id}.json")}
-                         | ({Path(standings).parent} if (self.root / ARCHIVE_DIR) in Path(standings).parents
-                            else set()))
+        folders = sorted({p.parent for p in (self.root / ARCHIVE_DIR).glob(f"*/mined_{contest_id}.json")})
         for folder in folders:
             path = self._archive_lookup(folder).get(str(contest_id))
             if path:
@@ -1635,7 +1643,9 @@ def _build_axes(build: Optional[Mapping[str, Any]], primary: str) -> Dict[str, s
         hitter_roles = UNRECORDED
     else:
         projected = sum(1 for v in roles.values() if v == ROLE_PROJECTED)
-        hitter_roles = "0" if projected == 0 else "1-2" if projected <= 2 else "3+"
+        known = sum(1 for v in roles.values() if v in (ROLE_PROJECTED, ROLE_CONFIRMED))
+        hitter_roles = ("no_known_role" if not known else "0" if projected == 0
+                        else "1-2" if projected <= 2 else "3+")
     market = build.get("market")
     if market is None:
         applied: Optional[bool] = None
@@ -1643,8 +1653,10 @@ def _build_axes(build: Optional[Mapping[str, Any]], primary: str) -> Dict[str, s
         # R494(b) writes `applied`; a record before it reads the writer's own rule.
         applied = bool(market["applied"]) if "applied" in market else bool(market.get("implied_total_by_team"))
     totals = (market or {}).get("implied_total_by_team") or {}
-    if not applied:
+    if applied is None:
         implied = UNRECORDED
+    elif not applied:
+        implied = "not_applied"
     elif primary in (NONE_LABEL, UNKNOWN):
         implied = primary
     elif primary in totals:
@@ -1712,6 +1724,7 @@ def attribute_lineups(root: Path, results_rows: Sequence[Mapping[str, str]],
                                 "incomplete_lineup": 0, "absent_from_standings": 0,
                                 "field_rank_unusable": 0}
     unreadable: List[str] = []
+    not_classic: List[str] = []
     team_sources: Dict[str, str] = {}
     lineups: List[Dict[str, Any]] = []
     inferred_n = fell_through_n = 0
@@ -1727,7 +1740,7 @@ def attribute_lineups(root: Path, results_rows: Sequence[Mapping[str, str]],
             if candidate.get("contest_type") == "classic":
                 parsed, used = candidate, path
                 break
-            unreadable.append(_rel(path, root))
+            not_classic.append(_rel(path, root))
         if parsed is None:
             coverage["no_standings"] += len(rows_c)
             continue
@@ -1750,18 +1763,28 @@ def attribute_lineups(root: Path, results_rows: Sequence[Mapping[str, str]],
         norms = {e["entry_id"]: [(slot, normalize_name(name)) for slot, name in e["lineup"]]
                  for e in complete}
         # The percentile ranks every complete lineup, as the field saw them.
-        chalk = chalk_percentiles({eid: sum(own.get(n, 0.0) for _, n in lu) for eid, lu in norms.items()})
+        # DK's shares carry two decimals, so a sum rounded to two is exact and
+        # equal lineups tie (unrounded, 112.98 and 112.97999999999999 ranked apart).
+        chalk = chalk_percentiles({eid: round(sum(own.get(n, 0.0) for _, n in lu), 2)
+                                   for eid, lu in norms.items()})
         # Ours outside the population (a free entry) are neither ours here nor field.
         complete = [e for e in complete if e["entry_id"] in mine or e["entry_id"] not in ours_ids]
         mined = mined_stacks(root, cid)
         record_dates = [builds[e]["date"] for e in mine if e in builds]
-        team_map, source = teams.for_contest(cid, used, record_dates)
+        team_map, source = teams.for_contest(cid, record_dates)
         if source:
             team_sources[cid] = source
         stacks = {e["entry_id"]: stack_from_teams(norms[e["entry_id"]], team_map) if team_map else None
                   for e in complete}
+        # The share of the field's team-mapped lineups whose primary stack is a
+        # team (a lineup with no primary counts in the denominator). A field
+        # lineup is measured without itself, as ours are, so the two sides sit
+        # on one basis.
         field_primary = [stacks[e["entry_id"]]["primary_team"] for e in complete
                          if e["entry_id"] not in mine and stacks[e["entry_id"]] is not None]
+        primary_counts: Dict[str, int] = defaultdict(int)
+        for team in field_primary:
+            primary_counts[team] += 1
         for e in complete:
             eid = e["entry_id"]
             ours = eid in mine
@@ -1772,11 +1795,14 @@ def attribute_lineups(root: Path, results_rows: Sequence[Mapping[str, str]],
             if pattern is None and stack is not None:
                 pattern, max_stack = stack["pattern"], stack["max_stack"]
             primary = stack["primary_team"] if stack is not None else UNKNOWN
-            if primary in (UNKNOWN, NONE_LABEL) or not field_primary:
-                share = primary if primary in (UNKNOWN, NONE_LABEL) else UNKNOWN
+            own_one = 0 if ours or stacks[eid] is None else 1
+            others = len(field_primary) - own_one
+            if primary in (UNKNOWN, NONE_LABEL):
+                share = primary
+            elif others <= 0:
+                share = UNKNOWN
             else:
-                share = _band(sum(1 for t in field_primary if t == primary) / len(field_primary),
-                              TEAM_SHARE_BANDS, TEAM_SHARE_OVER)
+                share = _band((primary_counts[primary] - own_one) / others, TEAM_SHARE_BANDS, TEAM_SHARE_OVER)
             dead = dead_slots(norms[eid], fpts)
             if ours:
                 nums = entry_numbers(int(mine[eid]["Place"]), int(mine[eid]["Contest_Entries"]))
@@ -1804,6 +1830,7 @@ def attribute_lineups(root: Path, results_rows: Sequence[Mapping[str, str]],
         inferred_n += ours_here if by_title else 0
         fell_through_n += 0 if by_title else ours_here
     return {"lineups": lineups, "coverage": coverage, "standings_unreadable": sorted(set(unreadable)),
+            "standings_not_classic": sorted(set(not_classic)),
             "team_sources": team_sources,
             "postures_inferred": {"name_inference": inferred_n, "unresolved": fell_through_n}}
 
@@ -2052,7 +2079,12 @@ def dead_slot_summary(lineups: Sequence[Mapping[str, Any]], seed: int = BOOTSTRA
 def r6_summary(lineups: Sequence[Mapping[str, Any]], seed: int = BOOTSTRAP_SEED,
                draws: int = BOOTSTRAP_DRAWS) -> Dict[str, Any]:
     """Dead-slot rate of platoon_projected hitters minus confirmed_lineup hitters, in
-    the contests where our resolved entries hold both (the results review's R6)."""
+    the contests where our resolved entries hold both (the results review's R6).
+
+    `reading` is `finding` only for the D-row's question (projected above
+    confirmed, the interval excluding 0, at FINDING_MIN_SLATES slates or more);
+    an interval wholly below 0 reads `below`, never inside the reference.
+    """
     by_contest: Dict[str, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
     slate_of: Dict[str, str] = {}
     for lu in lineups:
@@ -2072,11 +2104,19 @@ def r6_summary(lineups: Sequence[Mapping[str, Any]], seed: int = BOOTSTRAP_SEED,
         row[1] += v[f"{ROLE_PROJECTED}_n"]
         row[2] += v[f"{ROLE_CONFIRMED}_dead"]
         row[3] += v[f"{ROLE_CONFIRMED}_n"]
-    out = _ratio_diff(vec, slates, seed, draws) if slates else {
+    got = _ratio_diff(vec, slates, seed, draws) if slates else {
         "ours": None, "field": None, "ours_den": 0, "field_den": 0, "diff": None, "interval": None}
-    out["contests"] = len(both)
-    out["slates"] = len(slates)
-    out["finding"] = _excludes_zero(out["interval"]) and out["diff"] is not None and out["diff"] > 0
+    out = {"projected": got["ours"], "confirmed": got["field"], "projected_n": got["ours_den"],
+           "confirmed_n": got["field_den"], "diff": got["diff"], "interval": got["interval"],
+           "contests": len(both), "slates": len(slates)}
+    if not both:
+        out["reading"] = "not_measurable"
+    elif len(slates) < FINDING_MIN_SLATES:
+        out["reading"] = "under_floor"
+    elif _excludes_zero(got["interval"]):
+        out["reading"] = "finding" if got["interval"][0] > 0 else "below"
+    else:
+        out["reading"] = "inside"
     return out
 
 
@@ -2101,7 +2141,8 @@ def build_attribution(root: Path, results_rows: Sequence[Mapping[str, str]],
                      "slates": len({lu["slate"] for lu in ours}),
                      "team_mapped_contests": len(joined["team_sources"]),
                      "team_mapped_entries": sum(1 for lu in ours if lu["contest"] in joined["team_sources"]),
-                     "standings_unreadable": joined["standings_unreadable"]},
+                     "standings_unreadable": joined["standings_unreadable"],
+                     "standings_not_classic": joined["standings_not_classic"]},
         "postures_inferred": joined["postures_inferred"],
         "builds": {k: v for k, v in builds.items() if k != "builds"},
         "bootstrap": {"unit": "slate (sport, date, game type)", "draws": draws, "seed": seed,
@@ -2175,7 +2216,7 @@ def render_attribution_cell(value: str, cell: Mapping[str, Any]) -> List[str]:
     if cell["findings"]:
         lines.extend(f"  {'':<22} finding: {text}" for text in cell["findings"])
     if cell["slates"] < 2:
-        lines.append(f"  {'':<22} no interval: under 2 slates")
+        lines.append(f"  {'':<22} no interval on its finishes: under 2 slates")
     elif cell["n"] < FINDING_MIN_N or cell["slates"] < FINDING_MIN_SLATES:
         lines.append(f"  {'':<22} under the finding floor ({FINDING_MIN_N} entries, "
                      f"{FINDING_MIN_SLATES} slates)")
@@ -2193,14 +2234,17 @@ def _render_summaries(report: Mapping[str, Any], lines: List[str]) -> str:
     r6 = report["r6"]
     lines.append("")
     lines.append("== R6: dead-slot rate, platoon_projected hitters minus confirmed_lineup hitters ==")
-    if not r6["contests"]:
+    if r6["reading"] == "not_measurable":
         lines.append("  not measurable: n 0 (no resolved entry carries hitter roles in a contest holding both)")
     else:
-        lines.append(f"  projected {_num(r6['ours'], '{:.3f}')} of {r6['ours_den']}  confirmed "
-                     f"{_num(r6['field'], '{:.3f}')} of {r6['field_den']}  difference "
+        verdict = {"finding": "finding: projected above confirmed (the R6 D-row's question)",
+                   "below": "the interval excludes 0 below it: projected under confirmed",
+                   "under_floor": f"under the finding floor ({FINDING_MIN_SLATES} slates)",
+                   "inside": "inside the reference"}[r6["reading"]]
+        lines.append(f"  projected {_num(r6['projected'], '{:.3f}')} of {r6['projected_n']}  confirmed "
+                     f"{_num(r6['confirmed'], '{:.3f}')} of {r6['confirmed_n']}  difference "
                      f"{_num(r6['diff'], '{:+.3f}')} {_pct_span(r6['interval'])}  ({r6['contests']} contests, "
-                     f"{r6['slates']} slates)" + ("  finding: projected above confirmed" if r6["finding"]
-                                                  else "  inside the reference"))
+                     f"{r6['slates']} slates)  {verdict}")
     return "\n".join(lines) + "\n"
 
 
