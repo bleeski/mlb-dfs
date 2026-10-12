@@ -2977,6 +2977,12 @@ def build_sleeve_jobs(
                               "teams_short": short,
                               "built": rep.get("built_this_slice"),
                               "job_list_exhausted": rep.get("job_list_exhausted"),
+                              # R454. Solved here versus answered by the
+                              # ordinary bucket's identical job, so 0 built
+                              # reads as depth the grid did not have.
+                              "jobs_attempted_this_slice": rep.get("attempted_this_slice"),
+                              "answered_by_ordinary_bucket": rep.get(
+                                  "answered_by_ordinary_bucket"),
                               "conditions_signature": rep.get("conditions_signature")}
             continue
         if sleeve == cs.SLEEVE_NAMED_STACK:
@@ -3054,7 +3060,12 @@ def build_sleeve_jobs(
                           "built": rep.get("built_this_slice"),
                           "job_list_exhausted": rep.get("job_list_exhausted"),
                           "conditions_signature": rep.get("conditions_signature"),
-                          **({"transform": rep["transform"]} if "transform" in rep else {})}
+                          **({"transform": rep["transform"]} if "transform" in rep else {}),
+                          # R454. The environment slice is a depth slice, as
+                          # the tail's is; the others have no ordinary twin.
+                          **({"jobs_attempted_this_slice": rep.get("attempted_this_slice"),
+                              "answered_by_ordinary_bucket": rep["answered_by_ordinary_bucket"]}
+                             if rep.get("answered_by_ordinary_bucket") is not None else {})}
     return {"attempted": True, "sleeves": report,
             "elapsed_s": round(_t.monotonic() - started, 3)}
 

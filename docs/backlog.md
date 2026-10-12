@@ -3758,11 +3758,7 @@ On `verify_failed` the brief's `delivered_*` are null, the failed file is under 
 
 A crash inside a governor-rung or R407 re-solve stranded solve 1's mirrored UNCERTIFIED file at exit 1. `_solve` now holds a clean-re-reading review-grade export in `_LAST_USABLE` (lineage `review_grade`, never over the baseline or a certified file), so the crash exits 7 naming it. Open remainder, not in the row: the crash-with-nothing-usable path still writes no refusal record (the rider).
 
-### R454. The environment and tail depth slices re-solve (pair, team) jobs the ordinary bucket already answered; on an exhausted grid they spend the sleeve budget and append nothing (P2, XS-S) | new 2026-09-25, found by the 2026-09-25 code review (optimizer area; `review_optimizer/sleeve_waste.py`); the direct door's empty throwaway cache is R417's rider, this is the sliced door | Roadmap: Session 40
-
-- **What.** `execution_pipeline.py:2793-2800` (tail: `stack_teams=short, max_candidates=len(cache) + need`) and `:2827-2834` (environment, guarded only by `held >= need`); the restricted grid is a new conditions bucket via the `teams:` suffix (`bank_cache.py:845`, `:932-934`), so the `key in cache.attempted` skip at `:962` never matches the ordinary bucket's identical job. A depth job differs from the ordinary job only by the signature suffix, so the MILP is identical, returns the identical roster, `cache.add` dedupes it, `len(cache)` never grows, and the walk runs to the end of the grid. `classic_sleeves.py:360-366` predicts exactly this. Measured on 06-03: ordinary slice 64 jobs, 27 built, exhausted; depth slice `[PHI, SD]` 32 jobs, 32 solves, 0 built, 32 of 32 already answered, 0.633s re-spent; through `build_sleeve_jobs`: `tail: need 1, already_held {'SD': 1}, built 0, job_list_exhausted True` (16 solves for nothing).
-- **Why.** Bounded clock waste inside `BANK_SLEEVE_BUDGET_SHARE` (30% of the slice budget) on exactly the builds where the sleeve then falls back to `projection` (counted). Not a legality risk.
-- **Fix.** Skip a depth job when the ordinary bucket's key for the same (pair, team, lock_sig) is already in `cache.attempted`, or count `held` off the union before sizing.
+### R454. CLOSED 2026-10-12 (Session 40). A `stack_teams` depth slice (the tail and environment sleeves) treats a job its ordinary twin answered (the same facts with no restriction: the same MILP, and `add` dedupes the roster) as answered, in the walk and in `jobs_attempted` through one `_answered` closure; `answered_by_ordinary_bucket` counts them and `build_sleeve_jobs` carries it. Measured on the 2026-06-03 golden pool after an exhausted ordinary slice: 32 solves and 0 built before, 0 solves after, exhausted. Full text, the mutations and the gate line: `CHANGELOG.md` 2026-10-12, "R164 + R454 + R115 + R138".
 
 ### R445. A refused late swap whose own failures are all S or P gets no review-grade file: the early-errors verdict runs on `mode == "initial_build"` only (P2, S) | new 2026-09-25; the pairwise pre-check half SHIPPED 2026-10-10 (Session 29), this is the rider filed 2026-09-27 at Session 101 | Roadmap: Session 90
 
@@ -4431,78 +4427,14 @@ Session 15 gave every Classic build one frozen `Deadline(end, reserve)` (`mlb_en
 - **What remains.** F18's other readers still receive a NEW limit each: the Showdown solves (`optimize/showdown.py`, the `showdown_theses.py` ladder; the Showdown baseline already reads the Deadline's end), the allocator's joint MILP (`contest_allocator.py`'s `time_limit`, 30s, from no deadline; R462 measured it binding at 150 entries), and autobuild's child timeout (`per_build_seconds + 90`, reset per attempt, and `--stop-after-minutes` clamped to the lock only with `--deliver-by`).
 - **Fix.** Each takes `Deadline.slice()`, and no attempt resets it (roadmap Session 16). Done when an injected slow stage in each cannot consume the reserve.
 
-### R115. SP-pair coverage: the bank freezes at `requested_n`, the resume path cannot engage, and no control can floor arm diversity (P1, M) | new 2026-08-14, merged from BUILD fragment `2026-08-13_BUILD_bank-cache-freezes-at-first-slice.md` + ledger fragments 2026-08-13 (1507_3g); mechanisms verified in tree by the audit
+### R115. SP-pair coverage, the allocator half: no control can floor pair or arm diversity, and `cross_game_only` is not a stated control (P2, M) | new 2026-08-14, merged from BUILD fragment `2026-08-13_BUILD_bank-cache-freezes-at-first-slice.md` + ledger fragments 2026-08-13 (1507_3g); the sliced half CLOSED 2026-10-12 (Session 40, `CHANGELOG.md` "R164 + R454 + R115 + R138") | Roadmap: Session 170
 
-> **Rider 2026-10-02 (Session 144, Phase 3, the board rebuild).** from the 2026-08-22 ed6 critique §2.1, never filed: seeded SP-pair lineups bypass the SP-exposure-cap excludes on BOTH coverage paths (`optimizer_v3.py:2847-2848`) and only `hard_all_pairs` writes a coverage note. Verify at HEAD before building; XS; band 2 (a seeded pair over the cap is a shared failure point the cap was meant to bound).
+> **Rider 2026-10-12 (Session 40): rewritten to its open remainder.** Closed, with the evidence in the CHANGELOG entry: (a) is superseded at HEAD (the direct door's target is `resolve_candidate_bank_size(n)` and its Phase 1 forces every viable pair first; the sliced door's growth bound is the host cap R415 names; the exit-10 gate is R351's pair term with R415 and R390), and its mechanism is now pinned end to end on the vendored 2026-06-03 slate (`test_core.BankCoverageTests`); the filed 1310_6g replay stays unverifiable from a cloud clone because those inputs are not in the repository. Mechanism (3)'s round-0 gap is R164's, and the per-pair rotation that would close it was measured and declined (it moved the production golden's portfolio). The 2026-10-02 rider (seeded pairs bypass the SP cap) is unreachable: no production caller passes `sp_pair_coverage_plan` or `max_sp_exposure`, and `bank_constraint_scope='selection'` nulls the bank's SP cap. (c)'s naming half exists (`contest_allocator._diagnose_binding_constraints`). Repriced P1 -> P2: the lost-window shape is now the baseline-first contract's (no file is no longer the failure), and what remains is a strategy control.
 
-- **What, three verified mechanisms behind the 08-13 1310_6g lost window (11
-  blocked runs, `runs/20260813T162034Z_40da1d56` onward):** (1)
-  `build_diverse_candidate_bank`'s growth target collapses to `requested_n`
-  (`optimizer_v3.py:3863`: `coverage_target or candidate_bank_size_requested
-  or requested_n`), so a bank already holding >= requested_n candidates never
-  grows — the cache file's size and mtime sat unchanged across runs 2-7 at
-  `--max-seconds 30` while the job list read 75/720. (2) `build_slate.py:1534`
-  gates exit-10 on `len(candidates) < n_entries*2`; at 66 candidates against
-  13 entries the documented resume path is unreachable however unexhausted
-  the jobs. (3) jobs are ceiling-ordered (`bank_cache.py:744-750`) and
-  budget-truncated, so a truncated slice concentrates in the top pairs by
-  combined pitcher ceiling — 4 distinct starters on a 6-game slate. The
-  fragment's "jobs vary stacks, not arms" diagnosis is CORRECTED: pairs are
-  the primary job axis (`bank_cache.py:752-756`); truncation is the cause.
-  Downstream the joint MILP reports slice properties as slate properties
-  (R112's family), and on 1507_3g the operator monkey-patched the engine
-  mid-slate (`cross_game_only` forced off in `enumerate_sp_pairs` and
-  `bank_cache`, plus a synthesized per-pair LOWER bound no engine control
-  expresses).
-- **The patch's floor, kept here 2026-08-18 because the file it lived in was
-  swept and this entry was its only other reader.** The mechanism is three
-  lines and the diagnosis in it is the part worth having: EVERY pair control in
-  `contest_allocator` is a CEILING, `pair_cap` adding one row per distinct pair
-  as `add({x_idx(e, k): 1.0 ...}, -np.inf, headroom(...))`, so "each pair at
-  least twice" is not expressible by relaxing anything that exists. The floor
-  is the mirrored row on the same index set — `add({x_idx(e, k): 1.0 for e in
-  range(E) for k in range(K) if sp_pairs[k] == pair}, float(minimum), np.inf)`,
-  one per pair, immediately after the `pair_cap` block. Two consequences to
-  design around rather than discover: a floor of `m` over `d` distinct pairs is
-  infeasible on its face when `d * m > entries`, which is the closed-form check
-  the sibling fragment already asks the refusal to name; and a floor cannot
-  relax the way a ceiling does, so it needs its own place on the relaxation
-  ladder or it converts a delivery into a refusal — which is R132's failure
-  arriving through the control meant to prevent R115's. The bank-side half is
-  separate and cheaper: `bank_cache` filters `if ga != gb` on `usable_pairs`
-  and `enumerate_sp_pairs` defaults `cross_game_only=True`, which on a 2-game
-  slate leaves 4 of 6 combinations before the allocator sees anything.
-  Body archived at `_to_delete/tools_residue_20260818/` (gitignored) with a
-  WHY.md; the two ledger fragments carry the slate's own record.
-- **Why P1:** one whole slate window lost (the fragment's own cost line), and
-  a run-scoped engine patch is the operator routing around a missing control
-  — both silent-quality shapes, on the surface R98 and R112 already name.
-- **Fix, ordered:** (a) bank growth honors an explicit coverage target above
-  `requested_n` while the job list is unexhausted, or the exit-10 gate reads
-  `job_list_exhausted` rather than the 2x heuristic — one of the two, so
-  "grow the bank, re-run, it resumes" is true again. (b) a distinct-SP-pair
-  coverage floor as a real control (the ledger fragment's
-  `min_sp_pair_representation` ask), and `cross_game_only` exposed as a
-  stated control carrying its anti-correlation warning, retiring the
-  monkey-patch. (c) per-pair bank candidate counts in the brief beside
-  `feasibility.checks` (rides the false-signal batch with R112), and — the
-  sp_pair_floor ledger fragment's closed-form ask — when
-  `job_list_exhausted` is true and `distinct_sp_pairs x
-  max_sp_pair_repetition < entries`, the refusal NAMES that inequality: it
-  is decidable arithmetic available before the MILP runs, and three
-  relaxation rounds went to bisecting it under a T-20 clock while realized
-  exposure sat exactly at the untouched default cap. Absorb
-  R98(3)'s budget derivation where the two meet; they are halves of one
-  failure. Done when: replaying the 1310_6g inputs either reaches
-  `n_entries` distinct SP pairs in the bank or refuses in words that name
-  the bank, and exit-10 engages on an unexhausted job list.
-- **Audit fields.** Moves: portfolio quality, robustness, speed. Evidence:
-  V2 (blocked-run manifests; fragment; the three mechanism lines read in
-  tree). Falsifier: if a 30s budget genuinely cannot push that pool past 66
-  candidates, (a)'s premise fails and the remedy is R98(3)'s budget work
-  alone. FOSS basis: existing vendored scipy/numpy, stdlib; $0. Owner
-  action: none. Rollback: new control defaults off; gate change is one
-  conditional.
+- **What remains.** (b) EVERY pair control in `contest_allocator` is a CEILING (`pair_cap`, one row per distinct pair, `add({x_idx(e, k): 1.0 ...}, -np.inf, headroom(...))`), so "each pair at least m times" or "at least N distinct arms" is not expressible by relaxing anything that exists; on 1507_3g the operator monkey-patched a per-pair LOWER bound mid-slate. And `cross_game_only` is not a control: `bank_cache.extend_bank` filters same-game pairs and `enumerate_sp_pairs` defaults `cross_game_only=True`, which on a 2-game slate leaves 4 of 6 combinations before the allocator sees anything; the same operator forced it off in both. (c) Per-pair bank candidate counts are in no brief (`distinct_sp_pairs` is a total).
+- **The floor's design, kept from the swept patch.** The mirrored row on the same index set: `add({x_idx(e, k): 1.0 for e in range(E) for k in range(K) if sp_pairs[k] == pair}, float(minimum), np.inf)`, one per pair, immediately after the `pair_cap` block. Two consequences to design around rather than discover: a floor of `m` over `d` distinct pairs is infeasible on its face when `d * m > entries` (the closed-form check the sibling fragment asks the refusal to name), and a floor cannot relax the way a ceiling does, so it needs its own rung: under R386 it is an S control that relaxes inside T-30 and is counted, or it converts a delivery into a refusal (R132's failure arriving through the control meant to prevent R115's).
+- **Fix.** (b) `min_sp_pair_representation` (or a distinct-arm floor; decide which the 1507_3g record supports) as a real allocator control with its rung and its `feasibility.checks` arithmetic; `cross_game_only` exposed as a stated control through `build_slate.py`, the merged controls, `extend_bank` and `enumerate_sp_pairs`, carrying its anti-correlation warning, retiring the monkey-patch. (c) per-pair bank counts in the brief beside `feasibility.checks` (rides the false-signal batch with R112). Done when: the 1507_3g shape (a 3-game slate wanting every cross-game pair at least twice) builds through the control with no patch, and a floor that cannot be met relaxes counted instead of refusing.
+- **Audit fields.** Moves: portfolio robustness. Evidence: V2 (the 1507_3g ledger fragments; the swept patch's diagnosis kept above). FOSS basis: vendored scipy; $0. Owner action: none. Rollback: the control defaults off.
 
 ### R125. Autonomy defaults: bullpen-day auto-declaration, posture fallback, and a counted Classic relaxation ladder (P2, S-M; (b) and (c) decided 2026-09-22 by R386) | new 2026-08-14, merged from the delivery-guarantee fragment's autonomy section
 
@@ -4760,31 +4692,7 @@ objectives and solve counts identical at n=4/6/9 on the accepted-relaxed path.
 `du_relaxed_lineups: 0` can no longer coexist with a non-negative high-water, and
 the single assignment site is pinned by source inspection.
 
-### R164. The bank job grid wastes solves two ways, hardest on the pinned late-swap path (P1, S) | new 2026-08-22, from the greenfield sixth edition; (a) VERIFIED-repro, (b)(c) VERIFIED-read (`bank_cache.py` unchanged since the review)
-
-**Rider 2026-09-25 (the code review, optimizer area; `review_optimizer/sleeve_waste.py`): the (b) `extend_bank` half, measured.** `bank_cache.py:932-934` fans every pair over every team with no `_teams_of_pair` skip (the direct door has it at `optimizer_v3.py:4531` since R293): on 06-03 at k=0, 32 of 64 ordinary jobs are (pair, opponent-of-an-arm) and provably infeasible, `proven_infeasible solves 32`, mean 0.014s against 0.030s feasible, 0.449s total, so the waste is 2/T of jobs and about 1/T of the ordinary slice's clock on a T-team slate.
-
-
-**Rider 2026-09-02 (ed10, GF10-S1 and GF10-S5): (b)'s premise is REVERSED in the sibling grid, and the class has a third member.** The diverse bank's `_teams_of_pair` (`optimizer_v3.py:4163-4174`) returns the arms' OWN teams and skips those, so it attempts the opponent stacks the anti-correlation rows bar and never attempts the legal own-team stack (repro: 6 of 13 augmentation attempts infeasible, 0 own-team). Re-scope (b) to BOTH grids with the direction stated: skip `team ∈ {Opponent(a), Opponent(b)}` when the effective `max_opposing_hitters_per_sp < stack_min`. The R293 entry carries the optimizer-side fix; this item keeps the `extend_bank` side. Third member: `extend_bank` (:731-737) read `excl` but never the `Excluded` column, so an all-excluded team or a shelved arm cost a full `proven_infeasible` solve per job (R291(d)).
-
-**The optimizer half SHIPPED under R293, 2026-09-03, and (b)'s own bullet below is now CORRECT ONLY AS RE-SCOPED — read this paragraph before it.** `_teams_of_pair` returns `Opponent` and the skip is CONDITIONAL on the allowance, which is what the bullet's "provably infeasible before the solve" needs in order to stay true after R288 made `k` a control: at `k >= stack_min` an opponent stack is feasible and skipping it would be a wall, not an optimization. Measured on the diverse fixture: 4 infeasible opponent attempts and 0 appended candidates before, 0 opponent attempts and 4 appended after. So two sentences in the bullet below are now FALSE about HEAD and are left in place only as the record of what was believed: "`build_diverse_candidate_bank` already skips these via `_teams_of_pair`, so the two subsystems disagree" described a skip pointing the other way, and the R165 mutation notes repeat the same reversed reading. **What REMAINS on this item is (a), (c), and the `extend_bank` half of (b) — with the direction and the condition taken from R293's `_teams_of_pair`, never re-derived**, and per the R291 landing note above it belongs beside the `eligible` frame rather than in a second place. A session that re-derives the direction here will re-introduce R293(a) one file over, which is the specific thing this paragraph exists to prevent.
-
-**The `Excluded` third SHIPPED under R291, 2026-09-02.** `extend_bank` applies `_drop_excluded_rows` before the pitcher and team enumeration and reports `excluded_column_dropped: {rows, arms, stack_teams}`. Measured on the R289 fixture with one team excluded, against the exact counterfactual (same frame, the drop patched out): 16 jobs -> 6, same 2 candidates. What REMAINS on this item is (a), (c) and the opponent-direction half of (b) -- and note the interaction the R291 landing makes concrete: the two are the same shape (a job the solve can never answer) reached from two different facts, so (b)'s fix belongs beside the `eligible` frame this landing added rather than in a second place.
-
-- **What:** (a) when pins relax `stack_min` below 2 the stack constraint is
-  nulled but the job grid still fans out one job per team, so the IDENTICAL
-  pins+pair MILP is solved `len(teams)` times per SP pair — measured 15 jobs,
-  15 solver calls, 3 distinct candidates on a 7-pinned-slot entry; on a
-  12-game slate ~96% of that entry's slice budget is duplicate re-solves,
-  exactly at T-minus. (b) the grid pairs every SP pair with stack teams that
-  OPPOSE one of the pair's arms — provably infeasible before the solve;
-  `build_diverse_candidate_bank` already skips these via `_teams_of_pair`, so
-  the two subsystems disagree (~528 wasted solves of 6,336 jobs on 12 games,
-  in the FIRST slices). (c) exact `Position == "P"` instead of the
-  `_parse_positions` treatment.
-- **Fix:** (a) collapse the team axis when `stack_min < 2`. (b) skip
-  `(pair, team)` when `team` opposes either arm. (c) parse positions. Sits
-  beside R115 (same file, same session).
+### R164. CLOSED 2026-10-12 (Session 40). `extend_bank`'s grid filters the (pair, opponent-of-an-arm) jobs the anti-correlation row proves infeasible below the stack floor (32 of 64 on the 2026-06-03 golden pool at k=0; 9.1% on 06-28) through one rule, `optimizer_v3.opponent_stack_barred_teams`, that R293's `_teams_of_pair` now reads too, as a filter over the old job order (the production golden moved only `jobs_total` 64 -> 32); collapses the team axis to one job per pair below a two-stack (a 9-slot pinned entry: 4 solves -> 1); reads positions through `_parse_positions`; and counts `jobs_attempted` over the current job list, so a cache written before the skip still reads exhausted. Full text, the R233 class and the gate line: `CHANGELOG.md` 2026-10-12, "R164 + R454 + R115 + R138".
 
 ### R165. CLOSED 2026-09-01 -- SHIPPED, entry migrated to CHANGELOG.md
 
@@ -6556,20 +6464,7 @@ together.
 - **(d) SKILL.md should carry the dual objective** so R126's apex/washout definition survives outside a chat prompt. Sequence it after R126 lands, not before, or the skill documents a metric the pipeline does not emit. **Unblocked 2026-08-17: R126 has landed**, so the definitions to document are `portfolio_frontier`'s own keys, in the brief's exposure block, plus the `frontier:` review line. Two things the landing means this half must say rather than paraphrase: the retained percent is NOT comparable across slates and the intact count is, and the histogram is what separates two builds the gates and the retained percent cannot.
 - **(e) Derive the slate tag BEFORE lighting the beacon, so claims and artifacts agree.** Arrived 2026-08-18 as R117's rider and filed here rather than landing with it: R117 was a paste parser and a brief key, and this is a claims-naming fact that shares no surface with either. The ask (BUILD fragment 2026-08-13, ask 7) is that the tag in `claims/slate_<date>_<tag>` and the tag in `outputs/<date>/` come from one derivation, because a session that lights the beacon first and names the artifacts afterwards produces two names for one slate and nothing reconciles them. Note the mutex is nominal (CLAUDE.md), so a mismatched beacon name blocks nobody and the cost is archaeology later, which is why this is XS and P2 rather than a contract change.
 
-### R138. Bank scenario coverage: one stack family per game, stated as standing practice (P2, XS) | new 2026-08-16, from the leverage ideation fragment
-
-- **What:** section 7 seeds scenario families from totals/park/wind, and the
-  field concentrates on the top totals — the same feature every structural
-  prior weights highest. When caps bind, the allocator can only choose
-  mid-total coverage if the bank contains it, and today nothing states that
-  as practice.
-- **Fix:** one SKILL.md standing-practice line: the bank always contains at
-  least one stack family per GAME, not per top-ranked game. Bank growth is
-  already the always-permitted remedy under the autonomy contract; this aims
-  it. R126's game-split histogram is the check that it happened; R140's
-  per-family profiles sharpen the target where they exist.
-- **Rides:** any session already touching SKILL.md — R131(c)(d) is the named
-  carrier. Never instead of a tier item.
+### R138. CLOSED 2026-10-12 (Session 40). Stated in `MLB_Classic.md` §7 rather than SKILL.md (1,655 lines against its 150-line target): the bank holds a stack family per GAME; the ordinary grid stacks every legal team over its full walk, pinned by `test_core.BankCoverageTests`; a clock-truncated walk may not, and bank growth is the remedy. Full text: `CHANGELOG.md` 2026-10-12, "R164 + R454 + R115 + R138".
 
 ### R42(b). Genuine-miss install path still has no headroom check or reclaim (P2, M) | new 2026-08-01, (a) shipped 2026-08-04 — see CHANGELOG for the four incidents and full detail
 

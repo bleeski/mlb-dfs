@@ -1514,7 +1514,8 @@ def _merge_bank_slice_reports(reports: list) -> dict:
     if len(reports) > 1:
         summed = ("built_this_slice", "jobs_attempted", "jobs_total",
                   "jobs_timed_out", "time_limited_accepted", "jobs_raised",
-                  "jobs_unanswered", "superseded_jobs_dropped")
+                  "jobs_unanswered", "superseded_jobs_dropped",
+                  "opponent_stack_jobs_skipped")  # R164
         for key in summed:
             values = [r.get(key) for r in reports if isinstance(r.get(key), int)]
             if values:

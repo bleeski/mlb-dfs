@@ -60,10 +60,15 @@ from mlb_engine.allocate.contest_allocator import ENTRY_ROSTER_SLOTS
 from mlb_engine.optimize.optimizer_v3 import (
     ANTI_CORRELATION_DEFAULT_MAX, ANTI_CORRELATION_STATUS_KEY,
     anti_correlation_report, build_single_lineup, _new_solver_status,
-    _drop_excluded_rows, resolve_solver_time_limit,
+    _drop_excluded_rows, _parse_positions, opponent_stack_barred_teams,
+    resolve_solver_time_limit, sp_opponent_map,
 )
 
 VERSION = "v1.3"
+
+#: R164(a). The team field of a job key when the stack demand is below two,
+#: which builds no stack constraint, so one job per pair is the whole question.
+UNSTACKED_JOB_TEAM = "*"
 
 
 def pool_signature(salary_csv: str | Path, length: int = 10) -> str:
@@ -1069,12 +1074,19 @@ def extend_bank(
     # `optimizer_v3._drop_excluded_rows`.
     eligible = _drop_excluded_rows(projections_df)
     excluded_dropped = int(len(projections_df) - len(eligible))
-    pitchers = eligible[eligible["Position"] == "P"]
+
+    # R164(c). An arm is a row whose PARSED positions include P, the reading
+    # the solver's own `_pos_set` makes; an exact `== "P"` called a `P/OF`
+    # listing a bat here and an arm in every solve.
+    def _is_arm(frame):
+        return frame["Position"].map(lambda pos: "P" in _parse_positions(pos)).astype(bool)
+
+    pitchers = eligible[_is_arm(eligible)]
     if "Ceiling" in pitchers.columns:
         pitchers = pitchers.sort_values("Ceiling", ascending=False)
     sp_ids = [str(p) for p in pitchers["Player_ID"] if str(p) not in set(excl)]
     game_of = {str(r.Player_ID): str(r.Game_ID) for r in eligible.itertuples()}
-    hitters = eligible[eligible["Position"] != "P"]
+    hitters = eligible[~_is_arm(eligible)]
     teams = sorted({str(t) for t in hitters["Team"]})
     legal_teams = list(teams)
     if stack_teams is not None:
@@ -1095,9 +1107,9 @@ def extend_bank(
         if legal_named < secondary[1]:
             teams = []
             secondary_report["status"] = "team_has_fewer_than_min_legal_hitters"
-    all_pitchers = projections_df[projections_df["Position"] == "P"]
+    all_pitchers = projections_df[_is_arm(projections_df)]
     excluded_arms_dropped = int(len(all_pitchers) - len(pitchers))
-    all_hitters = projections_df[projections_df["Position"] != "P"]
+    all_hitters = projections_df[~_is_arm(projections_df)]
     excluded_teams_dropped = sorted(
         {str(t) for t in all_hitters["Team"]} - set(legal_teams))
 
@@ -1179,10 +1191,49 @@ def extend_bank(
 
     usable_pairs.sort(key=_pair_order)
     jobs: List[Tuple[Tuple[str, str], str]] = []
-    if teams:
+    # R164(a). Below a two-stack the solve gets no stack constraint, so every
+    # team in the grid was the IDENTICAL MILP (a 9-slot pinned entry on the
+    # 2026-06-03 golden pool: 4 jobs, 4 solves, 1 roster). One job per pair.
+    team_axis_collapsed = bool(teams) and stack_min < 2
+    # R164(b). A pair never stacks its arms' opponents while the allowance is
+    # below the floor: proven infeasible before the solve (32 of 64 ordinary
+    # jobs on that pool at k=0). The rule is optimizer_v3's, the one R293's
+    # `_teams_of_pair` reads, and it is applied as a FILTER over the order
+    # below: every job that remains, and every lineup in every prefix of the
+    # walk, is the one it was; the walk only reaches later jobs sooner. A
+    # per-pair re-rotation that gave each pair a solvable round-0 job was
+    # measured and declined (it moved the production golden's portfolio).
+    opponent_jobs_skipped = 0
+    if team_axis_collapsed:
+        jobs = [(pair, UNSTACKED_JOB_TEAM) for pair in usable_pairs]
+    elif teams:
+        opponent_of = sp_opponent_map(projections_df)
+        barred = [opponent_stack_barred_teams(
+            opponent_of, pair, max_opposing_hitters_per_sp=max_opposing_hitters_per_sp,
+            stack_min=stack_min) for pair in usable_pairs]
         for round_idx in range(len(teams)):
             for pair_idx, pair in enumerate(usable_pairs):
-                jobs.append((pair, teams[(pair_idx + round_idx) % len(teams)]))
+                team = teams[(pair_idx + round_idx) % len(teams)]
+                if team in barred[pair_idx]:
+                    opponent_jobs_skipped += 1
+                    continue
+                jobs.append((pair, team))
+
+    # R454. A depth slice (`stack_teams`) is its own bucket, so its keys never
+    # matched the ordinary bucket's IDENTICAL job: the same facts less the
+    # restriction is the same MILP, and `add` dedupes the roster it returns.
+    # Measured on the 2026-06-03 golden pool after an exhausted ordinary
+    # slice: 32 jobs, 32 solves, 0 built. The twin's key answers the job.
+    twin_sig = (signature_from_facts(projections_df, {**facts, "stack_teams": None})
+                if stack_teams is not None else None)
+
+    def _answered(pair: Tuple[str, str], team: str) -> bool:
+        """The ONE reading of "this job is answered", for the walk's skip and
+        for `jobs_attempted`, so the two cannot disagree (R164, R454)."""
+        if _job_key(pair, team, lock_sig, conditions_sig) in cache.attempted:
+            return True
+        return (twin_sig is not None
+                and _job_key(pair, team, lock_sig, twin_sig) in cache.attempted)
 
     built = 0
     attempted_now = 0
@@ -1217,7 +1268,7 @@ def extend_bank(
         # skipped first, so a fully answered list re-run at its cap still reads
         # exhausted rather than capped (R415 review).
         key = _job_key(pair, team, lock_sig, conditions_sig)
-        if key in cache.attempted:
+        if _answered(pair, team):
             continue
         if max_candidates is not None and _cap_counted() >= max_candidates:
             exhausted = False
@@ -1330,11 +1381,17 @@ def extend_bank(
             built += 1
 
     cache.save()
-    # Count only jobs for this lock signature AND these conditions. Both are
-    # suffixes of the key; a global count reads as more jobs done than the
-    # current list contains.
-    suffix = f"|{lock_sig}|{conditions_sig}"
-    done_here = sum(1 for key in cache.attempted if key.endswith(suffix))
+    # Count the CURRENT job list's answered jobs (R164). The count was every
+    # attempted key with this lock and conditions suffix, which equalled the
+    # list only while the grid never shrank: a cache file written before the
+    # opponent skip holds answered keys that are no longer jobs, and counted by
+    # suffix it would read unexhausted forever. `_answered` is the walk's own
+    # reading, so a depth job its ordinary twin answered counts here too (R454).
+    done_here = sum(1 for pair, team in jobs if _answered(pair, team))
+    answered_by_twin = (None if twin_sig is None else sum(
+        1 for pair, team in jobs
+        if _job_key(pair, team, lock_sig, conditions_sig) not in cache.attempted
+        and _answered(pair, team)))
     live_buckets = cache.live_buckets()
     this_bucket = sum(1 for c in cache.candidates
                       if _key_conditions(c.get("job")) == conditions_sig)
@@ -1359,6 +1416,16 @@ def extend_bank(
         "jobs_total": len(jobs),
         "jobs_attempted": done_here,
         "job_list_exhausted": job_list_exhausted,
+        # R164. What the grid left out as provably unanswerable, so a job list
+        # half the size of an older brief's reads as the rule it is: (pair,
+        # opponent-of-an-arm) jobs at an allowance below the stack floor, and
+        # the team axis folded to one job per pair below a two-stack.
+        "opponent_stack_jobs_skipped": opponent_jobs_skipped,
+        "team_axis_collapsed": team_axis_collapsed,
+        # R454. On a `stack_teams` slice, the jobs its ordinary twin already
+        # answered (counted in `jobs_attempted`, never solved again); None on
+        # any other slice, which has no twin.
+        "answered_by_ordinary_bucket": answered_by_twin,
         # R415. `candidate_cap` or `time_budget` when one of them broke the
         # walk; `job_list_exhausted` when every job is answered; and
         # `jobs_retryable` when the walk reached the end of the list but some

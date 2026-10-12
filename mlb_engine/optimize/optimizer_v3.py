@@ -1986,6 +1986,58 @@ def enumerate_sp_pairs(sp_ids, projections_df=None, cross_game_only=True,
     return pairs
 
 
+def sp_opponent_map(projections_df):
+    """Each row's ``Opponent``, keyed by the normalized ``Player_ID``.
+
+    R164. The input :func:`opponent_stack_barred_teams` reads, built once per
+    bank instead of one frame scan per pair. The first row for an id wins, which
+    is the row ``_teams_of_pair`` read with ``.iloc[0]``; a frame with no
+    ``Opponent`` column maps every id to ``'None'``, the string that lookup
+    produced, so neither ever names a real team.
+    """
+    if not hasattr(projections_df, 'columns') or 'Player_ID' not in projections_df.columns:
+        return {}
+    ids = normalize_id_series(projections_df['Player_ID'])
+    opponents = (projections_df['Opponent'] if 'Opponent' in projections_df.columns
+                 else [None] * len(projections_df))
+    out = {}
+    for pid, opponent in zip(ids, opponents):
+        out.setdefault(pid, str(opponent))
+    return out
+
+
+def opponent_stack_barred_teams(opponent_of, pair, *, max_opposing_hitters_per_sp,
+                                stack_min):
+    """The stack teams an SP pair can never answer: its arms' OPPONENTS.
+
+    R164(b), the rule R293 fixed in ``build_diverse_candidate_bank``'s
+    ``_teams_of_pair`` and the one the sliced bank's job grid
+    (``bank_cache.extend_bank``) now reads too, so the direction is stated once.
+    A forced stack of ``stack_min`` hitters facing a rostered SP breaks the
+    anti-correlation row whenever the allowance ``k`` is below the floor, so the
+    job is proven infeasible before it is solved: 32 of the 64 ordinary jobs on
+    the 2026-06-03 golden pool at k=0. The arms' OWN offenses are legal and
+    positively correlated, and are never returned (R293(a) is what returning
+    them cost).
+
+    Empty when ``k >= stack_min``, because R288 made ``k`` a control and the
+    opponent stack is then reachable. A waste rule, never a legality gate: it
+    removes no player from any pool. A caller whose job carries no stack
+    constraint at all (``extend_bank`` below a two-stack) has no stack team to
+    bar and does not ask. ``opponent_of`` is :func:`sp_opponent_map`'s output.
+    """
+    allowance = (ANTI_CORRELATION_DEFAULT_MAX if max_opposing_hitters_per_sp is None
+                 else int(max_opposing_hitters_per_sp))
+    if allowance >= int(stack_min):
+        return set()
+    barred = set()
+    for pid in pair:
+        key = normalize_id(pid)
+        if key in opponent_of:
+            barred.add(opponent_of[key])
+    return barred
+
+
 def _sp_pair_from_lineup(lineup_df):
     ids = _get_ordered_sp_ids(lineup_df)
     if len(ids) != 2:
@@ -4606,10 +4658,11 @@ def build_diverse_candidate_bank(
     # skip as targeting the OPPOSING teams and it targeted the arms' own. The
     # direction is fixed below and the correction is repeated here because this
     # comment is where a session normalizing ids next will be reading.
-    _bank_pid_col = (
-        normalize_id_series(projections_df['Player_ID'])
-        if 'Player_ID' in getattr(projections_df, 'columns', []) else None
-    )
+    #
+    # R164, 2026-10-12: the map and the rule now live in `sp_opponent_map` and
+    # `opponent_stack_barred_teams`, which `bank_cache.extend_bank` reads too,
+    # so the two bank builders cannot disagree about the direction again.
+    _bank_opponent_of = sp_opponent_map(projections_df)
 
     def _teams_of_pair(pair):
         """The stack teams this pair cannot legally reach: the arms' OPPONENTS.
@@ -4633,12 +4686,9 @@ def build_diverse_candidate_bank(
         key = tuple(pair)
         if key in team_of_cache:
             return team_of_cache[key]
-        teams = set()
-        if _bank_pid_col is not None and _aug_max_opposing < int(bank_stack_min_size):
-            for pid in pair:
-                row = projections_df[_bank_pid_col == normalize_id(pid)]
-                if len(row):
-                    teams.add(str(row.iloc[0].get('Opponent')))
+        teams = opponent_stack_barred_teams(
+            _bank_opponent_of, pair, max_opposing_hitters_per_sp=_aug_max_opposing,
+            stack_min=bank_stack_min_size)
         team_of_cache[key] = teams
         return teams
 

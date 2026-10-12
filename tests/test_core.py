@@ -1539,6 +1539,367 @@ class BankCoverageTests(unittest.TestCase):
             empty = opt.bank_coverage_report(frame, [])
             self.assertIsNone(empty["passed"])
 
+    # ------------------------------------------------------------------ #
+    # Session 40 (R164, R454, R115, R138). The sliced bank's job grid.
+    # ------------------------------------------------------------------ #
+
+    @staticmethod
+    def _spied_extend(cache, frame, **kwargs):
+        """`extend_bank` with every solve recorded as (sorted pair, stack
+        team, proven_infeasible, built)."""
+        solves = []
+        real = bank_cache.build_single_lineup
+
+        def spy(df, **k):
+            status = k.get("status_out")
+            out = real(df, **k)
+            solves.append((tuple(sorted(str(p) for p in k.get("locks") or [])),
+                           (k.get("stack_constraints") or {}).get("team"),
+                           bool(status and status.get("proven_infeasible")),
+                           out[0] is not None))
+            return out
+
+        with unittest.mock.patch.object(bank_cache, "build_single_lineup", spy):
+            report = bank_cache.extend_bank(cache, frame, **kwargs)
+        return report, solves
+
+    @staticmethod
+    def _grid(frame):
+        """The full (cross-game pair, hitter team) grid of a frame, and each
+        arm's Opponent, read the way the solver reads them."""
+        import itertools
+        arms = frame[frame["Position"].map(lambda p: "P" in opt._parse_positions(p))]
+        game = dict(zip(arms["Player_ID"].astype(str), arms["Game_ID"].astype(str)))
+        pairs = [tuple(sorted(p)) for p in itertools.combinations(sorted(game), 2)
+                 if game[p[0]] != game[p[1]]]
+        teams = sorted({str(t) for t in frame.loc[
+            ~frame["Position"].map(lambda p: "P" in opt._parse_positions(p)), "Team"]})
+        opponent = dict(zip(arms["Player_ID"].astype(str), arms["Opponent"].astype(str)))
+        return pairs, teams, opponent
+
+    @staticmethod
+    def _fake_clock(step):
+        """A clock that advances `step` units per read, bound to `bank_cache`
+        only, so a budgeted walk stops after a fixed number of solves while
+        every real solve keeps scipy's own wall clock (its limit is the fake
+        `remaining`, held far above a solve's cost by the step size)."""
+        import types
+        state = {"t": 0.0}
+
+        def monotonic():
+            state["t"] += step
+            return state["t"]
+        return types.SimpleNamespace(monotonic=monotonic)
+
+    @staticmethod
+    def _vendored_0603_frame():
+        """The golden replay's pool on the vendored 2026-06-03 slate (8 arms,
+        4 teams, 16 cross-game pairs), unenriched."""
+        from mlb_engine.pipeline import baseline as bl
+        frame, _ = bl.unenriched_frame(BaselineCoreTests._SALARY, BaselineCoreTests._rows(2))
+        return frame
+
+    def test_r164_the_grid_skips_exactly_the_opponent_stacks_the_solver_proves_infeasible(self):
+        """R164(b). At k=0 a stack of an arm's OPPONENT puts `stack_min`
+        hitters facing a rostered SP, which the anti-correlation row bars, so
+        the job is proven infeasible before it is solved. Measured at 4a2daff
+        on the golden pool: 64 jobs, 32 of them opponent stacks, all 32 proven
+        infeasible. The direction is R293's (`_teams_of_pair`), from the one
+        shared rule: the arms' OWN offenses stay, and they are the only legal
+        stacks on a two-game slate."""
+        frame = diverse_projection_frame()
+        pairs, teams, opponent = self._grid(frame)
+        team_of = dict(zip(frame["Player_ID"].astype(str), frame["Team"].astype(str)))
+        barred = {(p, t) for p in pairs for t in teams if t in {opponent[p[0]], opponent[p[1]]}}
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = bank_cache.BankCache(Path(tmp) / "b.json")
+            report, solves = self._spied_extend(cache, frame, time_budget_s=60, stack_min=4)
+        self.assertEqual(len(pairs) * len(teams), 16)
+        self.assertEqual(len(barred), 8)
+        self.assertEqual(report["jobs_total"], 16 - len(barred))
+        self.assertEqual(report["opponent_stack_jobs_skipped"], len(barred))
+        self.assertTrue(report["job_list_exhausted"], report)
+        solved = {(p, t) for p, t, _pi, _ok in solves}
+        self.assertFalse(solved & barred, "a barred job reached the solver")
+        self.assertFalse(any(pi for _p, _t, pi, _ok in solves), "a kept job was infeasible")
+        for p in pairs:  # the arms' own offenses: the legal stacks, never skipped
+            self.assertLessEqual({(p, team_of[p[0]]), (p, team_of[p[1]])}, solved)
+        # Every skipped job IS proven infeasible when handed to the solver.
+        for p, t in sorted(barred):
+            status = opt._new_solver_status()
+            lineup, _ = opt.build_single_lineup(
+                frame, target="ceiling", locks=list(p), status_out=status,
+                stack_constraints={"team": t, "min_size": 4, "max_size": 5})
+            self.assertIsNone(lineup, (p, t))
+            self.assertTrue(status.get("proven_infeasible"), (p, t))
+
+    def test_r164_the_skip_is_conditional_on_the_allowance(self):
+        """R164(b) keeps R288's control a control: an opponent stack is legal
+        the moment k covers the stack floor, so nothing is skipped at k >=
+        stack_min, and everything barred is skipped one below it. Budget 0
+        answers no job, so the grid is measured without a solve."""
+        frame = diverse_projection_frame()
+        with tempfile.TemporaryDirectory() as tmp:
+            sizes = {}
+            for k in (None, 3, 4, 5):
+                cache = bank_cache.BankCache(Path(tmp) / f"k{k}.json")
+                rep = bank_cache.extend_bank(cache, frame, time_budget_s=0.0, stack_min=4,
+                                             max_opposing_hitters_per_sp=k)
+                sizes[k] = (rep["jobs_total"], rep["opponent_stack_jobs_skipped"])
+        self.assertEqual(sizes, {None: (8, 8), 3: (8, 8), 4: (16, 0), 5: (16, 0)})
+
+    def test_r164_a_cache_holding_the_old_opponent_keys_still_reads_exhausted(self):
+        """R164(b). A cache file written before the skip recorded every
+        opponent stack as answered (proven infeasible). Those keys are no
+        longer jobs, so `jobs_attempted` counts the CURRENT job list, not every
+        key with this bucket's suffix: counted by suffix, 16 answered keys
+        against 8 jobs would read unexhausted forever."""
+        frame = diverse_projection_frame()
+        pairs, teams, opponent = self._grid(frame)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "b.json"
+            cache = bank_cache.BankCache(path)
+            first = bank_cache.extend_bank(cache, frame, time_budget_s=60, stack_min=4)
+            self.assertTrue(first["job_list_exhausted"], first)
+            sig = first["conditions_signature"]
+            old = {bank_cache._job_key(p, t, "", sig) for p in pairs for t in teams
+                   if t in {opponent[p[0]], opponent[p[1]]}}
+            cache.attempted |= old
+            cache.save()
+            again, solves = self._spied_extend(
+                bank_cache.BankCache(path), frame, time_budget_s=60, stack_min=4)
+        self.assertEqual(solves, [])
+        self.assertEqual(again["jobs_attempted"], again["jobs_total"])
+        self.assertTrue(again["job_list_exhausted"], again)
+        self.assertEqual(again["stop_reason"], "job_list_exhausted")
+
+    def test_r164_a_pinned_entry_below_a_two_stack_solves_each_pair_once(self):
+        """R164(a). Pins that leave fewer than two free hitter slots relax
+        `stack_min` below 2, which drops the stack constraint, so every team
+        in the grid was the identical MILP: measured at 4a2daff on the golden
+        pool, 4 jobs, 4 solves, 1 roster. The team axis collapses to one job
+        per pair (team field `*`), and no opponent skip applies to a job that
+        stacks nobody."""
+        frame = diverse_projection_frame()
+        with tempfile.TemporaryDirectory() as tmp:
+            seed = bank_cache.BankCache(Path(tmp) / "seed.json")
+            bank_cache.extend_bank(seed, frame, time_budget_s=60, stack_min=4)
+            roster = seed.candidates[0]["roster"]
+            slots = bank_cache.ENTRY_ROSTER_SLOTS
+            pins = {slots[i]: roster[i] for i in range(9)}  # both arms and 7 bats
+            cache = bank_cache.BankCache(Path(tmp) / "pinned.json")
+            report, solves = self._spied_extend(
+                cache, frame, time_budget_s=60, stack_min=4, locked_slot_assignments=pins)
+        self.assertEqual(report["stack_min_relaxed_to"], 1)
+        self.assertTrue(report["team_axis_collapsed"])
+        self.assertEqual(report["jobs_total"], 1)
+        self.assertEqual(report["opponent_stack_jobs_skipped"], 0)
+        self.assertEqual(len(solves), 1)
+        self.assertIsNone(solves[0][1], "a collapsed job carries no stack")
+        self.assertTrue(report["job_list_exhausted"], report)
+        self.assertEqual({k.split("|")[1] for k in cache.attempted}, {bank_cache.UNSTACKED_JOB_TEAM})
+
+    def test_r164_a_two_way_position_string_is_read_the_way_the_solver_reads_it(self):
+        """R164(c). The grid split arms from bats on `Position == "P"`; the
+        solver reads `"P" in _parse_positions(...)`. A `P/OF` arm is an arm to
+        the solver, so it is one to the grid: the pair space and the team list
+        match the plain `P` frame's."""
+        frame = diverse_projection_frame()
+        two_way = frame.copy()
+        first_arm = two_way.index[two_way["Position"] == "P"][0]
+        two_way.loc[first_arm, "Position"] = "P/OF"
+        with tempfile.TemporaryDirectory() as tmp:
+            plain = bank_cache.extend_bank(bank_cache.BankCache(Path(tmp) / "a.json"),
+                                           frame, time_budget_s=0.0, stack_min=4)
+            parsed = bank_cache.extend_bank(bank_cache.BankCache(Path(tmp) / "b.json"),
+                                            two_way, time_budget_s=0.0, stack_min=4)
+        self.assertEqual(parsed["jobs_total"], plain["jobs_total"])
+        self.assertEqual(parsed["opponent_stack_jobs_skipped"],
+                         plain["opponent_stack_jobs_skipped"])
+        self.assertEqual(parsed["excluded_column_dropped"]["arms"], 0)
+
+    def test_r454_a_depth_slice_skips_the_jobs_the_ordinary_bucket_answered(self):
+        """R454. A `stack_teams` slice is its own conditions bucket (`teams:`),
+        so its keys never matched the ordinary bucket's identical (pair, team)
+        job: measured at 4a2daff on the golden pool, 32 jobs, 32 solves, 0
+        built after an exhausted ordinary slice. The twin's key (the same facts
+        with no restriction) now answers it, in the walk AND in the count, so
+        the slice solves nothing and still reads exhausted."""
+        frame = diverse_projection_frame()
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = bank_cache.BankCache(Path(tmp) / "b.json")
+            ordinary = bank_cache.extend_bank(cache, frame, time_budget_s=60, stack_min=4)
+            self.assertTrue(ordinary["job_list_exhausted"], ordinary)
+            self.assertIsNone(ordinary["answered_by_ordinary_bucket"])
+            held = len(cache)
+            depth, solves = self._spied_extend(
+                cache, frame, time_budget_s=60, stack_min=4, stack_teams=["T1", "T3"],
+                max_candidates=len(cache) + 2, job_class="sleeve_environment")
+        self.assertNotEqual(depth["conditions_signature"], ordinary["conditions_signature"])
+        self.assertGreater(depth["jobs_total"], 0)
+        self.assertEqual(solves, [])
+        self.assertEqual(depth["attempted_this_slice"], 0)
+        self.assertEqual(depth["answered_by_ordinary_bucket"], depth["jobs_total"])
+        self.assertEqual(depth["jobs_attempted"], depth["jobs_total"])
+        self.assertTrue(depth["job_list_exhausted"], depth)
+        self.assertEqual(depth["built_this_slice"], 0)
+        self.assertEqual(depth["total_candidates"], held)
+
+    def test_r454_after_a_truncated_ordinary_slice_the_depth_slice_solves_only_the_rest(self):
+        """R454, the other side: depth is real when the ordinary walk stopped
+        early. A fake clock stops the ordinary slice after a few solves; the
+        depth slice over every team (the same grid, its own bucket) then
+        solves exactly the jobs the ordinary bucket left unanswered."""
+        frame = diverse_projection_frame()
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = bank_cache.BankCache(Path(tmp) / "b.json")
+            with unittest.mock.patch.object(bank_cache, "time", self._fake_clock(10.0)):
+                ordinary, first = self._spied_extend(cache, frame, time_budget_s=100.0,
+                                                     stack_min=4)
+            self.assertEqual(ordinary["stop_reason"], "time_budget", ordinary)
+            self.assertGreater(len(first), 0)
+            self.assertLess(len(first), ordinary["jobs_total"])
+            depth, second = self._spied_extend(
+                cache, frame, time_budget_s=60, stack_min=4,
+                stack_teams=["T1", "T2", "T3", "T4"])
+        done = {(p, t) for p, t, _pi, _ok in first}
+        redone = {(p, t) for p, t, _pi, _ok in second}
+        self.assertFalse(done & redone, "a depth job re-solved an answered twin")
+        self.assertEqual(len(redone), depth["jobs_total"] - len(done))
+        self.assertEqual(depth["answered_by_ordinary_bucket"], len(done))
+        self.assertTrue(depth["job_list_exhausted"], depth)
+
+    def test_r454_the_tail_and_environment_sleeves_report_what_the_ordinary_bucket_answered(self):
+        """R454 on the record: a sleeve that builds nothing says why, through
+        `build_sleeve_jobs`, the helper every bank door calls."""
+        frame = diverse_projection_frame()
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = bank_cache.BankCache(Path(tmp) / "b.json")
+            bank_cache.extend_bank(cache, frame, time_budget_s=60, stack_min=4)
+            request = {"active": True, "environment": {"teams": ["T1", "T3"]},
+                       "sleeves": {"environment": {"min_candidates": 99},
+                                   "tail": {"teams": ["T2", "T4"],
+                                            "min_candidates_per_team": 99}}}
+            jobs = epi.build_sleeve_jobs(cache, frame, request, consensus_members=[],
+                                         time_budget_s=60, stack_min=4)
+        for name in ("environment", "tail"):
+            entry = jobs["sleeves"][name]
+            self.assertTrue(entry["attempted"], entry)
+            self.assertEqual(entry["jobs_attempted_this_slice"], 0, entry)
+            self.assertGreater(entry["answered_by_ordinary_bucket"], 0, entry)
+            self.assertEqual(entry["built"], 0, entry)
+            self.assertTrue(entry["job_list_exhausted"], entry)
+
+    def test_r115_a_thin_sliced_bank_resumes_until_its_job_list_is_exhausted(self):
+        """R115(a), the mechanism R351 left unverified end to end, on the
+        vendored 2026-06-03 slate (the filed 1310_6g inputs are not in the
+        repository). A fake clock stops each slice after a few solves. While
+        the bank is thin by SP-pair coverage and its job list is unfinished,
+        the exit-10 gate asks for a re-run; each re-run of the same call adds
+        jobs no earlier slice answered, so coverage grows and never freezes;
+        and the loop ends when coverage is met or the list is exhausted."""
+        import importlib.util
+        path = (Path(__file__).resolve().parents[1] / "skills" / "generate-lineups"
+                / "scripts" / "build_slate.py")
+        spec = importlib.util.spec_from_file_location("build_slate_r115", path)
+        bs = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(bs)
+        frame = self._vendored_0603_frame()
+        need = bs.sp_pairs_needed(18, 2)  # the golden template's 18 entries at cap 2
+        self.assertEqual(need, 9)
+        seen_jobs, coverage, verdicts = set(), [], []
+        with tempfile.TemporaryDirectory() as tmp:
+            path_ = Path(tmp) / "bank.json"
+            for _run in range(40):
+                cache = bank_cache.BankCache(path_)  # a fresh process reads the file
+                with unittest.mock.patch.object(bank_cache, "time", self._fake_clock(10.0)):
+                    rep, solves = self._spied_extend(cache, frame, time_budget_s=100.0,
+                                                     stack_min=4)
+                jobs = {(p, t) for p, t, _pi, _ok in solves}
+                self.assertFalse(jobs & seen_jobs, "a re-run solved an answered job")
+                seen_jobs |= jobs
+                report = bs._merge_bank_slice_reports([rep])  # sets bank_stop_reason
+                pairs = bs.distinct_sp_pairs(cache.as_candidates(None))
+                coverage.append(pairs)
+                thin = pairs < need
+                verdicts.append(bs.bank_resume_warranted(report, thin))
+                if not verdicts[-1]:
+                    break
+        self.assertTrue(verdicts[0], "a thin, unfinished first slice must ask for a re-run")
+        self.assertFalse(verdicts[-1])
+        self.assertGreater(len(coverage), 1)
+        self.assertEqual(coverage, sorted(coverage), "coverage fell across re-runs")
+        self.assertGreater(coverage[-1], coverage[0])
+        self.assertGreaterEqual(coverage[-1], need)
+        # The other terminator: at cap 1 the 18 entries need 18 pairs and the
+        # pool has 16, so coverage is never met and `job_list_exhausted` is
+        # what ends the loop (R351's "a slate with genuinely few pairs still
+        # stops"); the allocator's refusal then names 16 x 1 < 18.
+        need_all = bs.sp_pairs_needed(18, 1)
+        self.assertEqual(need_all, 18)
+        with tempfile.TemporaryDirectory() as tmp:
+            path_ = Path(tmp) / "bank.json"
+            for _run in range(40):
+                cache = bank_cache.BankCache(path_)
+                with unittest.mock.patch.object(bank_cache, "time", self._fake_clock(10.0)):
+                    rep = bank_cache.extend_bank(cache, frame, time_budget_s=100.0, stack_min=4)
+                report = bs._merge_bank_slice_reports([rep])
+                pairs = bs.distinct_sp_pairs(cache.as_candidates(None))
+                if not bs.bank_resume_warranted(report, pairs < need_all):
+                    break
+            else:
+                self.fail("the resume loop never ended on an exhaustible job list")
+        self.assertTrue(report["job_list_exhausted"], report)
+        self.assertEqual(pairs, 16)
+
+    def test_r138_the_ordinary_grid_stacks_every_legal_team_over_its_full_walk(self):
+        """R138. The standing practice MLB_Classic.md §7 states: the ordinary
+        grid holds a stack family for every game once its walk is complete.
+        The R164 skip removes only provably infeasible jobs, so every legal
+        hitter team still anchors a built lineup, on the fixture and on the
+        vendored 2026-06-03 golden pool. (Round 0 alone does not promise this:
+        on a one-arm-per-team pool a team's only round-0 job can be an
+        opponent stack.)"""
+        for frame in (diverse_projection_frame(), self._vendored_0603_frame()):
+            hitters = frame[~frame["Position"].map(lambda p: "P" in opt._parse_positions(p))]
+            team_of = dict(zip(hitters["Player_ID"].astype(str), hitters["Team"].astype(str)))
+            legal = sorted(set(team_of.values()))
+            with tempfile.TemporaryDirectory() as tmp:
+                cache = bank_cache.BankCache(Path(tmp) / "b.json")
+                rep = bank_cache.extend_bank(cache, frame, time_budget_s=120, stack_min=4)
+            self.assertTrue(rep["job_list_exhausted"], rep)
+            stacked = set()
+            for cand in cache.candidates:
+                counts = Counter(team_of.get(str(p)) for p in cand["roster"][2:])
+                stacked |= {t for t, n in counts.items() if t and n >= 4}
+            self.assertEqual(sorted(stacked), legal)
+
+    def test_r164_one_opponent_rule_for_both_bank_builders(self):
+        """R164's rider: the direction is R293's and is never re-derived. The
+        rule returns the arms' OPPONENTS, only while the allowance is below the
+        stack floor (one opposing bat already breaks k=0), and reads ids the
+        way the frame stores them. `extend_bank` never asks it below a
+        two-stack: those jobs carry no stack constraint at all."""
+        frame = diverse_projection_frame()
+        opponent_of = opt.sp_opponent_map(frame)
+        arms = frame[frame["Position"] == "P"]
+        a = arms[arms["Team"] == "T1"]["Player_ID"].iloc[0]
+        b = arms[arms["Team"] == "T3"]["Player_ID"].iloc[0]
+        rule = opt.opponent_stack_barred_teams
+        self.assertEqual(rule(opponent_of, (a, b), max_opposing_hitters_per_sp=None,
+                              stack_min=4), {"T2", "T4"})
+        self.assertEqual(rule(opponent_of, (int(a), int(b)), max_opposing_hitters_per_sp=0,
+                              stack_min=4), {"T2", "T4"})
+        self.assertEqual(rule(opponent_of, (a, b), max_opposing_hitters_per_sp=3,
+                              stack_min=4), {"T2", "T4"})
+        self.assertEqual(rule(opponent_of, (a, b), max_opposing_hitters_per_sp=4,
+                              stack_min=4), set())
+        self.assertEqual(rule(opponent_of, (a, b), max_opposing_hitters_per_sp=0,
+                              stack_min=1), {"T2", "T4"})
+        self.assertEqual(rule(opponent_of, (a, b), max_opposing_hitters_per_sp=0,
+                              stack_min=0), set())
+        self.assertEqual(rule({}, (a, b), max_opposing_hitters_per_sp=0, stack_min=4), set())
+
 
 def _shaped_candidate(cid, roster, by_shape, primary="AAA"):
     """A candidate whose score is pinned per contest shape.
