@@ -52134,3 +52134,319 @@ class AwaitingPerDraftgroupTests(unittest.TestCase):
             self.assertNotIn(str(self.root), note)  # the note lands in a tracked file
         sizes, note = aw.field_sizes_from_results(self.root / "absent.csv", self.root)
         self.assertEqual((sizes, note.split(";")[0]), ({}, "no results table at absent.csv"))
+
+
+class DayPlanTests(unittest.TestCase):
+    """R499, roadmap Session 165. `tools/day_plan.py --date d`: every DKEntries
+    file for the date as one row per draftgroup, in deadline order, with a
+    baseline-first next action and exit 1 while one inside T-30 has open rows.
+    93 MLB entries locked blank in seven start-time blocks, each after a
+    draftgroup filled the same day, and nothing listed a day's draftgroups.
+
+    No test here reads a host attachment location (R155): every call passes
+    `attachment_roots` or `--attachment-root`, and the hook test patches the
+    default the hook cannot pass.
+    """
+
+    DATE = "2026-10-12"
+    ET = ZoneInfo("America/New_York")
+    CLASSIC = ("P", "P", "C", "1B", "2B", "3B", "SS", "OF", "OF", "OF")
+    SHOWDOWN = ("CPT", "UTIL", "UTIL", "UTIL", "UTIL", "UTIL")
+    POOL_HEADER = ("Position", "Name + ID", "Name", "ID", "Roster Position", "Salary",
+                   "Game Info", "TeamAbbrev", "AvgPointsPerGame")
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.uploads = self.root / "uploads"
+        self.uploads.mkdir()
+
+    def _dp(self):
+        sys.path.insert(0, str(REPO / "tools"))
+        import day_plan
+        return day_plan
+
+    def _at(self, hhmm, date=None):
+        y, m, d = (int(x) for x in (date or self.DATE).split("-"))
+        return datetime(y, m, d, int(hhmm[:2]), int(hhmm[3:]), tzinfo=self.ET)
+
+    def _template(self, name, *, starts, entries, base, showdown=False, filled=0,
+                  where=None, date=None, contest="MLB $5K Cup"):
+        """A DKEntries file in DK's layout: the entry rows, then the embedded
+        pool under a `Position` header row that sits on an entry row, in the
+        column `Instructions` occupies (col 15 Classic, col 11 Showdown)."""
+        slots = self.SHOWDOWN if showdown else self.CLASSIC
+        date = date or self.DATE
+        y, m, d = date.split("-")
+        pool = []
+        for g, hhmm in enumerate(starts):
+            hour, minute = int(hhmm[:2]), hhmm[3:]
+            clock = f"{(hour - 1) % 12 + 1:02d}:{minute}{'PM' if hour >= 12 else 'AM'}"
+            info = f"A{g}@H{g} {m}/{d}/{y} {clock} ET"
+            for k in range(len(slots)):
+                pid = str(base + g * 100 + k)
+                pool.append(("SS", f"Player {pid} ({pid})", f"Player {pid}", pid,
+                             "SS/UTIL", "4000", info, f"A{g}", "7.1"))
+        width = 4 + len(slots) + 1 + len(self.POOL_HEADER)
+        col = 4 + len(slots) + 1
+        rows = [["Entry ID", "Contest Name", "Contest ID", "Entry Fee", *slots, "",
+                 "Instructions"] + [""] * (width - col - 1)]
+        for i in range(entries):
+            cells = [p[3] for p in pool[:len(slots)]] if i < filled else [""] * len(slots)
+            rows.append([str(base * 10 + i), contest, str(base + 7), "$1.00", *cells, ""]
+                        + [""] * len(self.POOL_HEADER))
+        at = 2  # the pool's header lands on the third entry row, as DK writes it
+        while len(rows) < at + 1 + len(pool) + 1:
+            rows.append([""] * width)
+        rows[at + 1][col:col + len(self.POOL_HEADER)] = self.POOL_HEADER
+        for j, p in enumerate(pool):
+            rows[at + 2 + j][col:col + len(self.POOL_HEADER)] = p
+        folder = where or self.root / "data" / "slates" / self.DATE
+        folder.mkdir(parents=True, exist_ok=True)
+        path = folder / name
+        with path.open("w", newline="", encoding="utf-8") as handle:
+            csv.writer(handle).writerows(rows)
+        return path, [str(base * 10 + i) for i in range(entries)]
+
+    def _three(self):
+        """19:05 Classic main, 20:05 Turbo, 21:40 Showdown; filenames out of lock order."""
+        _, main = self._template("DKEntries_zz_main.csv", base=4410, entries=20,
+                                 starts=["19:05"] + ["19:10"] * 4 + ["20:10"] * 5)
+        _, turbo = self._template("DKEntries_aa_turbo.csv", base=4420, entries=17,
+                                  starts=["20:05", "20:10", "21:05", "22:10"],
+                                  contest="MLB $3K Turbo [Single Entry]")
+        _, sd = self._template("DKEntries_mm_sd.csv", base=4430, entries=20,
+                               starts=["21:40"], showdown=True,
+                               contest="MLB Showdown $5K (A0 @ H0)")
+        return main, turbo, sd
+
+    def _record(self, name, entry_ids, *, cert="review_grade_baseline", lineage="baseline",
+                slots=10, short=(), tag="untagged"):
+        rows = [{"entry_id": e, "contest_id": "1", "filled": True,
+                 "roster_ids": [str(9000 + i) for i in range(slots - (1 if e in short else 0))]}
+                for e in entry_ids]
+        record = {"schema_version": 1, "kind": "delivery", "date": self.DATE,
+                  "manifest_row": {"certification": cert, "lineage": lineage,
+                                   "slate_tag": tag},
+                  "entries": rows}
+        path = self.root / "data" / "deliveries" / self.DATE / f"{name}.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(record), encoding="utf-8")
+
+    def _plan(self, hhmm, **kw):
+        dp = self._dp()
+        return dp.build_plan(self.root, self.DATE, self._at(hhmm), attachment_roots=(), **kw)
+
+    def _main(self, hhmm, *extra):
+        dp = self._dp()
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = dp.main(["--root", str(self.root), "--date", self.DATE,
+                            "--attachment-root", str(self.uploads),
+                            "--now", self._at(hhmm).isoformat(), *extra])
+        return code, out.getvalue()
+
+    def test_three_templates_print_in_deadline_order(self):
+        self._three()
+        plan = self._plan("17:00")
+        rows = plan["draftgroups"]
+        self.assertEqual([(r["tag"], r["format"], r["lock_et"], r["deadline_et"]) for r in rows],
+                         [("1905_10g", "Classic", "19:05", "19:00"),
+                          ("2005_4g", "Classic", "20:05", "20:00"),
+                          ("2140_1g_sd", "Showdown", "21:40", "21:35")])
+        self.assertEqual([(r["reserved"], r["blank"], r["complete"], r["open"]) for r in rows],
+                         [(20, 20, 0, 20), (17, 17, 0, 17), (20, 20, 0, 20)])
+        self.assertEqual([r["clock"] for r in rows],
+                         ["T-120 to deadline", "T-180 to deadline", "T-275 to deadline"])
+        code, text = self._main("17:00")
+        self.assertEqual(code, 0)
+        self.assertLess(text.index("1905_10g"), text.index("2005_4g"))
+        self.assertLess(text.index("2005_4g"), text.index("2140_1g_sd"))
+        self.assertIn("next: baseline into 1905_10g (deadline 19:00 ET, 20 open), then "
+                      "2005_4g (deadline 20:00 ET, 17 open), then 2140_1g_sd (deadline "
+                      "21:35 ET, 20 open), in deadline order, before enhancing any", text)
+        self.assertIn("ask Ben to name every draftgroup he holds reserved entries in", text)
+
+    def test_the_unfilled_turbo_inside_t30_is_named_and_exits_1(self):
+        main, _, _ = self._three()
+        self._record("1905_10g_cert", main, cert="certified", lineage=None, tag="1905_10g")
+        code, text = self._main("19:40")
+        self.assertEqual(code, 1)
+        act = [l for l in text.splitlines() if l.startswith("ACT NOW")]
+        self.assertEqual(act, ["ACT NOW: 2005_4g 17 open, deadline 20:00 ET (T-20 to deadline)"])
+        plan = self._plan("19:40")
+        self.assertEqual([r["tag"] for r in plan["act_now"]], ["2005_4g"])
+        sd = plan["draftgroups"][2]
+        self.assertEqual((sd["tag"], sd["open"], sd["inside_t30"]), ("2140_1g_sd", 20, False))
+
+    def test_t30_counts_to_the_deadline_not_the_lock(self):
+        """`build_slate.py`'s `deadline_t30`: minutes to the deadline under 30.
+        19:32 is 28 to the 20:00 deadline and 33 to the 20:05 lock."""
+        self._template("DKEntries_turbo.csv", base=4420, entries=17,
+                       starts=["20:05", "20:10", "21:05", "22:10"])
+        self.assertEqual(self._main("19:32")[0], 1)
+        self.assertEqual(self._main("19:30")[0], 0)  # exactly 30: not inside
+        self.assertEqual(self._main("19:28")[0], 0)
+        self.assertEqual(self._main("20:03")[0], 1)  # past the deadline, before lock
+        self.assertIn("T+4 past deadline", self._main("20:03")[1])
+        self.assertEqual(self._main("20:05")[0], 0)  # locked: nothing left to act on
+
+    def test_a_baseline_record_clears_the_turbo(self):
+        main, turbo, _ = self._three()
+        self._record("1905_10g_cert", main, cert="certified", lineage=None, tag="1905_10g")
+        self._record("2005_4g_BASELINE", turbo, tag="2005_4g")
+        code, text = self._main("19:40")
+        self.assertEqual(code, 0)
+        self.assertNotIn("ACT NOW", text)
+        rows = {r["tag"]: r for r in self._plan("19:40")["draftgroups"]}
+        self.assertEqual((rows["2005_4g"]["state"], rows["2005_4g"]["fill"],
+                          rows["2005_4g"]["open"]), ("baseline", "complete", 0))
+        self.assertEqual(rows["1905_10g"]["state"], "certified")
+        self.assertIn("next: baseline into 2140_1g_sd (deadline 21:35 ET, 20 open)", text)
+
+    def test_a_template_of_complete_rows_reads_complete(self):
+        self._template("DKEntries_turbo.csv", base=4420, entries=17, filled=17,
+                       starts=["20:05", "20:10", "21:05", "22:10"])
+        self._template("DKEntries_sd.csv", base=4430, entries=6, filled=6,
+                       starts=["20:10"], showdown=True)
+        code, text = self._main("19:40")
+        self.assertEqual(code, 0)
+        rows = self._plan("19:40")["draftgroups"]
+        self.assertEqual([(r["tag"], r["fill"], r["state"], r["complete"], r["open"])
+                          for r in rows],
+                         [("2005_4g", "complete", "none", 17, 0),
+                          ("2010_1g_sd", "complete", "none", 6, 0)])
+        self.assertIn("next: every draftgroup on hand has a lineup for every reserved row", text)
+        # A blank copy of the same draftgroup (an older download) changes nothing:
+        # one draftgroup, and a row's best copy wins.
+        self._template("DKEntries_turbo_old.csv", base=4420, entries=17, where=self.uploads,
+                       starts=["20:05", "20:10", "21:05", "22:10"])
+        plan = self._dp().build_plan(self.root, self.DATE, self._at("19:40"),
+                                     attachment_roots=[str(self.uploads)])
+        self.assertEqual([(r["tag"], r["fill"], len(r["sources"])) for r in plan["draftgroups"]],
+                         [("2005_4g", "complete", 2), ("2010_1g_sd", "complete", 1)])
+
+    def test_a_partial_file_leaves_the_rest_open_and_a_refusal_is_not_a_delivery(self):
+        _, turbo = self._template("DKEntries_turbo.csv", base=4420, entries=17,
+                                  starts=["20:05", "20:10", "21:05", "22:10"])
+        # Ten rows delivered, one of them holding nine ids: nine entries filled.
+        self._record("2005_4g_partial", turbo[:10], cert="review_grade", lineage=None,
+                     short=(turbo[3],), tag="2005_4g")
+        path = self.root / "data" / "deliveries" / self.DATE / "2005_4g_refusal.json"
+        path.write_text(json.dumps({"schema_version": 1, "kind": "refusal",
+                                    "date": self.DATE, "slate_tag": "2005_4g",
+                                    "exit_code": 3}), encoding="utf-8")
+        plan = self._plan("19:40")
+        row = plan["draftgroups"][0]
+        self.assertEqual((row["state"], row["open"]), ("review-grade", 8))  # best state
+        self.assertIn(turbo[3], row["open_entry_ids"])
+        self.assertEqual(self._main("19:40")[0], 1)
+        # The refusal alone: named, still open, still exit 1.
+        (self.root / "data" / "deliveries" / self.DATE / "2005_4g_partial.json").unlink()
+        row = self._plan("19:40")["draftgroups"][0]
+        self.assertEqual((row["state"], row["open"]), ("refused", 17))
+        self.assertEqual(self._main("19:40")[0], 1)
+
+    def test_a_locked_draftgroup_and_a_record_only_one_never_move_the_exit(self):
+        _, turbo, _ = self._three()
+        self._record("2005_4g_BASELINE", turbo, tag="2005_4g")
+        self._record("1310_3g_early", ["5550001", "5550002"], cert="certified",
+                     lineage=None, tag="1310_3g")
+        code, text = self._main("19:40")
+        self.assertEqual(code, 0)
+        rows = {r["tag"]: r for r in self._plan("19:40")["draftgroups"]}
+        self.assertEqual((rows["1905_10g"]["clock"], rows["1905_10g"]["open"]), ("LOCKED", 20))
+        self.assertIn("next: baseline into 2140_1g_sd (deadline 21:35 ET, 20 open), in "
+                      "deadline order, before enhancing any", text)
+        self.assertNotIn("1905_10g (deadline", text)
+        self.assertIn("\ndelivered on this date with no DKEntries file on hand: "
+                      "1310_3g (certified)\n", text)  # the matched baseline is not in it
+
+    def test_discovery_reads_headers_dedupes_copies_and_keeps_to_the_date(self):
+        staged, _ = self._template("DKEntries_turbo.csv", base=4420, entries=17,
+                                   starts=["20:05", "20:10", "21:05", "22:10"])
+        (self.uploads / "DKEntries (1).csv").write_bytes(staged.read_bytes())
+        self._template("DKEntries_tomorrow.csv", base=4440, entries=5, starts=["19:05"],
+                       where=self.uploads, date="2026-10-13")
+        (staged.parent / "DKSalaries.csv").write_text(
+            "Position,Name + ID,Name,ID,Roster Position,Salary,Game Info,TeamAbbrev,"
+            "AvgPointsPerGame\nSS,A (1),A,1,SS/UTIL,4000,A0@H0 10/12/2026 08:05PM ET,A0,7\n",
+            encoding="utf-8")
+        # No readable lock: kept when staged under the date, dropped when attached.
+        self._template("DKEntries_nolock.csv", base=4450, entries=3, starts=[])
+        self._template("DKEntries_nolock_att.csv", base=4460, entries=3, starts=[],
+                       where=self.uploads)
+        plan = self._dp().build_plan(self.root, self.DATE, self._at("19:40"),
+                                     attachment_roots=[str(self.uploads)])
+        self.assertEqual([(r["tag"], r["clock"], r["reserved"]) for r in plan["draftgroups"]],
+                         [("2005_4g", "T-20 to deadline", 17), ("0g", "lock unknown", 3)])
+        self.assertEqual(sorted(plan["draftgroups"][0]["sources"]),
+                         ["attached DKEntries (1).csv", "staged DKEntries_turbo.csv"])
+        # Run by path from another directory with no PYTHONPATH, as a session does.
+        env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
+        env["PYTHONHASHSEED"] = "0"
+        proc = subprocess.run(
+            [sys.executable, str(REPO / "tools" / "day_plan.py"), "--root", str(self.root),
+             "--date", self.DATE, "--attachment-root", str(self.uploads),
+             "--now", self._at("19:40").isoformat()],
+            cwd=str(self.root), env=env, capture_output=True, text=True, timeout=120)
+        self.assertEqual(proc.returncode, 1, proc.stderr[-2000:])
+        self.assertIn("ACT NOW: 2005_4g 17 open", proc.stdout)
+        self.assertNotIn("1905_1g", proc.stdout)  # tomorrow's template
+
+    def test_the_session_start_hook_prints_the_line_only_when_it_has_something(self):
+        import importlib.util
+        dp = self._dp()
+        import stage_slate
+        src = REPO / ".claude" / "hooks" / "session_start.py"
+
+        def hook():
+            with unittest.mock.patch.dict(os.environ, {"CLAUDE_PROJECT_DIR": str(self.root)}):
+                spec = importlib.util.spec_from_file_location(
+                    f"_sshook_dp_{abs(hash(str(self.root)))}", src)
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+            for name, value in (("git", lambda *a, **k: ""), ("held_claims", lambda: ["none"]),
+                                ("dirt", lambda: ["clean"]), ("egress", lambda: "egress: x"),
+                                ("outcome_reviews_due", lambda: "outcome review due: 0")):
+                setattr(module, name, value)
+            return module
+
+        with unittest.mock.patch.object(stage_slate, "ATTACHMENT_ROOTS", ()), \
+                unittest.mock.patch.object(dp, "_utcnow", return_value=self._at("19:40")):
+            # Nothing on hand and no BUILD claim: a DEV session sees no new line.
+            self.assertIsNone(hook().day_plan_line())
+            self.assertNotIn("day plan", hook().full())
+            # A held DEV claim is not a build session.
+            dev = self.root / "claims" / "engine_2026-10-12" / "owner.json"
+            dev.parent.mkdir(parents=True)
+            dev.write_text(json.dumps({"role": "DEV", "taken_utc": "2026-10-12T22:00Z"}),
+                           encoding="utf-8")
+            self.assertIsNone(hook().day_plan_line())
+            # A BUILD claim with no file: the ask, by name.
+            owner = self.root / "claims" / "slate_2026-10-12_2005" / "owner.json"
+            owner.parent.mkdir(parents=True)
+            owner.write_text(json.dumps({"role": "BUILD", "taken_utc": "2026-10-12T23:00Z"}),
+                             encoding="utf-8")
+            self.assertIn("no DKEntries file staged or attached", hook().day_plan_line())
+            owner.write_text(json.dumps({"role": "BUILD", "released_utc": "x"}),
+                             encoding="utf-8")
+            self.assertIsNone(hook().day_plan_line())
+            # Today's template, no claim: the plan in one line, in the briefing.
+            self._template("DKEntries_turbo.csv", base=4420, entries=17,
+                           starts=["20:05", "20:10", "21:05", "22:10"])
+            line = hook().day_plan_line()
+            self.assertEqual(line, "day plan 2026-10-12: ACT NOW: 2005_4g 17 open, deadline "
+                                   "20:00 ET (T-20 to deadline); 2005_4g open 17 none T-20 "
+                                   "to deadline; next: baseline 2005_4g; "
+                                   "python tools/day_plan.py --date 2026-10-12")
+            self.assertIn(line, hook().full())
+            # A file that will not read costs nothing; a plan that raises says so.
+            (self.root / "data" / "slates" / self.DATE / "DKEntries_bad.csv").write_bytes(
+                b"Entry ID,Contest Name,Contest ID,Entry Fee,X\n\xff\xfe\n")
+            self.assertEqual(hook().day_plan_line(), line)
+            with unittest.mock.patch.object(dp, "build_plan", side_effect=RuntimeError("x")):
+                self.assertEqual(hook().day_plan_line(), "day plan: not measured (RuntimeError)")
+            with unittest.mock.patch.object(dp, "hook_line", side_effect=KeyError("x")):
+                self.assertEqual(hook().day_plan_line(), "day plan: not measured (KeyError)")
