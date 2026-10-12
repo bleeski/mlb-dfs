@@ -365,6 +365,28 @@ or 5 slates. The R6 line at the end compares dead slots of `platoon_projected`
 against `confirmed_lineup` hitters; while it reads `not measurable`, no resolved
 entry carries hitter roles yet.
 
+### Our order against finish order, and the Showdown axis (R500)
+
+```bash
+python tools/results_ledger.py attribute --rank       # the engine's order against finish order
+python tools/results_ledger.py attribute --showdown   # our Showdown finishes, R498's cells
+```
+
+`--rank` reads only entries `resolve` tied to a record that carries the build's
+own order: Classic `contest_fit_score` (R494), Showdown `rank_in_build` (R495).
+Per contest's entries from one build it prints the Spearman correlation against
+DK's Place (+1 when the engine's order matched the finish order), then the
+median and spread across contests; a contest with one such entry, or no spread,
+is skipped and counted. It reads `not measurable` until a recorded build's
+contests have their standings pulled and `resolve` run.
+
+`--showdown` prints R498's cells over our paid Showdown entries: the captain's
+role, the captain's CPT% and flex% in the field, the team split, duplication,
+posture, field band and month, and the thesis for resolved entries. The
+captain's role comes from the resolved record, else from
+`statsapi_season_pitching.csv` and `expected_stats_batting.csv` (a name in both
+reads unknown), so refreshing those tables can move it.
+
 **These are observed outcomes.** Never ROI, a win rate, a cash rate or a
 probability. Ticket face value is not realized value, and no ratio of net to
 fees is printed.

@@ -6341,6 +6341,339 @@ class CaptainSleeveBriefTruthTests(unittest.TestCase):
                       "win-rate claim", label)
 
 
+class ShowdownAttributionTests(unittest.TestCase):
+    """R500(b) (roadmap Session 166). `results_ledger.py attribute --showdown`
+    cuts our Showdown finishes by the captain's role, the captain's CPT% and
+    flex% in the field, the team split, duplication and the thesis, against the
+    uniform reference and the field in the same cell (R498's cells). Synthetic
+    exports, standings, mined files, season tables and a record under a temp
+    root. No 1.5x is pinned here: the attribution scores no lineup (DK's Place
+    and rank are the finish); R497's ResultsJoinTests pins the captain's 1.5x.
+    """
+
+    S1, S2 = "198000001", "198000002"
+    DATE, DATE2 = "2026-08-20", "2026-08-21"
+    TITLE = "MLB Showdown $3 Satellite [20 Entry Max]"
+    SD = "Showdown Captain Mode"
+    RECORD = "data/deliveries/2026-08-20/2005_1g_sd_run.json"
+    STANDINGS_HEADER = ["Rank", "EntryId", "EntryName", "TimeRemaining", "Points", "Lineup", "",
+                        "Player", "Roster Position", "%Drafted", "FPTS"]
+    COLUMNS = ["Sport", "Game_Type", "Entry_Key", "Entry", "Contest_Key", "Contest_Date_EST",
+               "Place", "Points", "Winnings_Non_Ticket", "Winnings_Ticket", "Contest_Entries",
+               "Entry_Fee", "Prize_Pool", "Places_Paid"]
+    F4 = ("Fill One", "Fill Two", "Fill Three", "Fill Four")
+    F5 = ("Fill One", "Fill Two", "Fill Three", "Fill Five")
+    # S1 in finish order: (entry, captain, the five UTIL). 8001, 8002 and 8009 (a
+    # free entry) are ours; 8002 repeats 9002 and 9006, 8001 repeats 9005, and
+    # 8009 repeats 9007, so duplication counts them all.
+    S1_LINEUPS = (
+        ("8001", "Ace Pitcher", ("Bat Hitter",) + F4),
+        ("9001", "Ace Pitcher", ("Big Slugger",) + F4),
+        ("9002", "Bat Hitter", ("Ace Pitcher",) + F4),
+        ("9003", "Big Slugger", ("Ace Pitcher",) + F5),
+        ("9004", "Two Way", ("Bat Hitter",) + F5),
+        ("8002", "Bat Hitter", ("Ace Pitcher",) + F4),
+        ("9005", "Ace Pitcher", ("Bat Hitter",) + F4),
+        ("9006", "Bat Hitter", ("Ace Pitcher",) + F4),
+        ("9007", "Pen Arm", ("Big Slugger",) + F5),
+        ("8009", "Pen Arm", ("Big Slugger",) + F5),
+    )
+    S2_LINEUPS = (
+        ("8003", "Ace Pitcher", ("Bat Hitter",) + F4),
+        ("9011", "Big Slugger", ("Ace Pitcher",) + F4),
+        ("9012", "Pen Arm", ("Big Slugger",) + F5),
+    )
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        spec = importlib.util.spec_from_file_location("results_ledger_r500", REPO / "tools" / "results_ledger.py")
+        self.rl = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.rl)
+
+    # -- fixtures ------------------------------------------------------------
+
+    def _tables(self, pitching=True, batting=True):
+        ref = self.root / "data" / "reference"
+        ref.mkdir(parents=True, exist_ok=True)
+        if pitching:
+            (ref / "statsapi_season_pitching.csv").write_text(
+                "Name,MLBAM_ID,Team,G,GS,IP,TBF,SO,K/9\nAce Pitcher,1,X,30,30,180,700,200,10\n"
+                "Two Way,2,X,10,10,50,200,60,10\nPen Arm,3,X,60,0,60,250,70,10\n", encoding="utf-8")
+        if batting:
+            (ref / "expected_stats_batting.csv").write_text(
+                '"last_name, first_name","player_id","year","pa"\n"Hitter, Bat","4","2026","600"\n'
+                '"Way, Two","2","2026","500"\n"Slugger, Big","5","2026","550"\n', encoding="utf-8")
+
+    def _standings(self, contest, lineups, folder, table=()):
+        path = self.root / "data" / "archive" / folder / f"contest-standings-{contest}.csv"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w", encoding="utf-8", newline="") as fh:
+            writer = csv.writer(fh)
+            writer.writerow(self.STANDINGS_HEADER)
+            for i in range(max(len(lineups), len(table))):
+                left = ([i + 1, lineups[i][0], f"user{i} (1/20)", 0, "40.0",
+                         " ".join([f"CPT {lineups[i][1]}"] + [f"UTIL {u}" for u in lineups[i][2]])]
+                        if i < len(lineups) else [""] * 6)
+                right = ["", *table[i]] if i < len(table) else [""] * 5
+                writer.writerow(left + right)
+
+    def _mined(self, contest, folder, patterns, contest_type="showdown"):
+        doc = {"contest_id": contest, "contest_type": contest_type,
+               "entries": [{"entry_id": e, "stack_pattern": p, "max_stack": int(p.split("-")[0])}
+                           for e, p in patterns.items()]}
+        path = self.root / "data" / "archive" / folder / f"mined_{contest}.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(doc), encoding="utf-8")
+
+    def _results(self):
+        export = self.root / "data" / "reference" / "draftkings-contest-entry-history_2026-10-01.csv"
+        export.parent.mkdir(parents=True, exist_ok=True)
+        rows = [("8001", self.S1, 1, 10, self.DATE, "$3.00"), ("8002", self.S1, 6, 10, self.DATE, "$3.00"),
+                ("8009", self.S1, 10, 10, self.DATE, "$0.00"), ("8003", self.S2, 1, 3, self.DATE2, "$3.00")]
+        with open(export, "w", encoding="utf-8", newline="") as fh:
+            writer = csv.writer(fh, quoting=csv.QUOTE_ALL)
+            writer.writerow(self.COLUMNS)
+            for entry, contest, place, n, date, fee in rows:
+                writer.writerow(["MLB", self.SD, entry, self.TITLE, contest, f"{date} 19:05:00", place,
+                                 "40.0", "$0.00", "$0.00", n, fee, "$30.00", "1"])
+            # A paid Classic entry: never in the Showdown population.
+            writer.writerow(["MLB", "Classic", "8100", "MLB $5 Satellite [10 Entry Max]", "198000100",
+                             f"{self.DATE} 19:05:00", 2, "90.0", "$0.00", "$0.00", 9, "$5.00", "$40.00", "1"])
+        out = self.root / "scratch" / "dk_entry_results.csv"
+        code, _, err = self._run("ingest", str(export), "--out", str(out))
+        self.assertEqual(code, 0, err)
+        return out
+
+    def _record(self):
+        """8001 and 8002 resolved to one ladder record. 8002's record calls its
+        captain a pitcher where the tables say hitter: the record wins for ours."""
+        record = {"schema_version": 1, "kind": "delivery", "date": self.DATE,
+                  "manifest_row": {"sha256": "ef" * 32, "contest_type": "showdown"},
+                  "entries": [{"entry_id": e, "contest_id": self.S1, "roster_ids": ["1", "2", "3", "4", "5", "6"],
+                               "filled": True, "prediction": p}
+                              for e, p in (("8001", {"captain_role": "pitcher", "team_split": "5-1",
+                                                     "thesis": "favorite_win_big", "rank_in_build": 1}),
+                                           ("8002", {"captain_role": "pitcher", "team_split": "4-2",
+                                                     "thesis": "pitchers_duel", "rank_in_build": 2}))]}
+        path = self.root / self.RECORD
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(record), encoding="utf-8")
+        resolution = self.root / "scratch" / "dk_entry_resolution.csv"
+        resolution.parent.mkdir(parents=True, exist_ok=True)
+        with open(resolution, "w", encoding="utf-8", newline="") as fh:
+            writer = csv.DictWriter(fh, fieldnames=list(self.rl.RESOLUTION_COLUMNS))
+            writer.writeheader()
+            for eid in ("8001", "8002"):
+                writer.writerow({**{c: "" for c in self.rl.RESOLUTION_COLUMNS}, "Entry_Key": eid,
+                                 "Contest_Key": self.S1, "status": "resolved", "record": self.RECORD})
+        return resolution
+
+    def _world(self):
+        self._tables()
+        # DK's table halves a player used at two slots equally often (R341); the
+        # shares never read it, so a nonsense 90% CPT row changes nothing.
+        self._standings(self.S1, self.S1_LINEUPS, self.DATE,
+                        table=[("Ace Pitcher", "CPT", "90.00%", 30.0), ("Bat Hitter", "UTIL", "1.00%", 8.0)])
+        self._standings(self.S2, self.S2_LINEUPS, self.DATE2)
+        # 9004's pattern sums to eight (a Classic shape) and is refused; a
+        # classic-typed file elsewhere naming 9005 is never read for Showdown.
+        self._mined(self.S1, self.DATE, {"8001": "3-3", "9001": "5-1", "9002": "4-2", "9003": "3-3",
+                                         "9004": "5-3"})
+        self._mined(self.S1, "2026-08-19", {"9005": "4-2"}, contest_type="classic")
+        results = self._results()
+        resolution = self._record()
+        return results, resolution
+
+    def _run(self, *argv):
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = self.rl.main(["--root", str(self.root), *argv])
+        return code, out.getvalue(), err.getvalue()
+
+    def _lineups(self):
+        results, resolution = self._world()
+        builds = self.rl.resolved_builds(self.root, resolution)["builds"]
+        joined = self.rl.showdown_lineups(self.root, self.rl.read_results(results), builds)
+        return {lu["entry"]: lu for lu in joined["lineups"]}, joined
+
+    # -- tests ---------------------------------------------------------------
+
+    def test_the_captain_is_the_cpt_slot_and_its_cpt_and_flex_shares_count_the_field_s_slots(self):
+        by, joined = self._lineups()
+        axes = lambda e: (by[e]["axes"]["captain_cpt_share"], by[e]["axes"]["captain_flex_share"])
+        # The field is 9001-9007 (our free 8009 is ours, never field). Ace: CPT in
+        # 9001 and 9005 (2 of 7), UTIL in 9002, 9003 and 9006 (3 of 7).
+        self.assertEqual(axes("8001"), ("20%+", "40%+"))
+        # Bat: CPT 2 of 7, UTIL in 9004 and 9005, 2 of 7 = 28.6%.
+        self.assertEqual(axes("8002"), ("20%+", "20-30%"))
+        # A field lineup leaves itself out: 9001's Ace is CPT in 1 of the other 6.
+        self.assertEqual(axes("9001"), ("10-20%", "40%+"))
+        # Big: CPT only in 9003 itself (0 of 6), UTIL in 9001 and 9007 (2 of 6).
+        self.assertEqual(axes("9003"), ("<5%", "30-40%"))
+        self.assertNotIn("8009", by)
+        self.assertEqual(sorted(e for e, lu in by.items() if lu["ours"]), ["8001", "8002", "8003"])
+        self.assertEqual((joined["coverage"]["population"], joined["coverage"]["with_lineup"]), (3, 3))
+
+    def test_captain_role_reads_the_record_first_then_the_tables_and_a_name_in_both_is_unknown(self):
+        by, joined = self._lineups()
+        roles = {e: lu["axes"]["captain_role"] for e, lu in by.items()}
+        self.assertEqual({e: roles[e] for e in ("8001", "8002", "8003", "9001", "9003", "9004", "9007")},
+                         {"8001": "pitcher", "8002": "pitcher", "8003": "pitcher", "9001": "pitcher",
+                          "9003": "hitter", "9004": "unknown", "9007": "pitcher"})
+        self.assertEqual(joined["role_check"], {"recorded": 2, "recorded_and_table": 2, "disagree": 1})
+        got = self.rl.season_roles(self.root)
+        self.assertEqual(got["roles"], {"ace pitcher": "pitcher", "pen arm": "pitcher",
+                                        "bat hitter": "hitter", "big slugger": "hitter"})
+        self.assertEqual(got["both"], 1)
+        (self.root / "data" / "reference" / "expected_stats_batting.csv").unlink()
+        got = self.rl.season_roles(self.root)
+        self.assertEqual(got["roles"], {})
+        self.assertIn("expected_stats_batting.csv unreadable", got["note"])
+
+    def test_the_team_split_reads_the_mined_file_then_the_record(self):
+        by, _ = self._lineups()
+        splits = {e: lu["axes"]["team_split"] for e, lu in by.items()}
+        self.assertEqual(splits, {"8001": "3-3", "8002": "4-2", "8003": "unknown", "9001": "5-1",
+                                  "9002": "4-2", "9003": "3-3", "9004": "unknown", "9005": "unknown",
+                                  "9006": "unknown", "9007": "unknown", "9011": "unknown",
+                                  "9012": "unknown"})
+
+    def test_duplication_is_captain_aware_and_counts_every_complete_lineup(self):
+        by, _ = self._lineups()
+        dup = {e: lu["axes"]["duplication"] for e, lu in by.items()}
+        # 8001 and 9005 share captain and five; 9002, 8002 and 9006 hold the same
+        # six people under another captain, which is another lineup; 9007 and
+        # our free 8009 are one lineup, so 9007 counts a copy.
+        self.assertEqual({e: dup[e] for e in ("8001", "9005", "8002", "9002", "9006", "9001", "9007")},
+                         {"8001": "1", "9005": "1", "8002": "2+", "9002": "2+", "9006": "2+", "9001": "0",
+                          "9007": "1"})
+
+    def test_thesis_is_a_build_axis_and_the_cells_pair_ours_with_the_field(self):
+        by, _ = self._lineups()
+        self.assertEqual({e: by[e]["axes"]["thesis"] for e in ("8001", "8002", "8003")},
+                         {"8001": "favorite_win_big", "8002": "pitchers_duel", "8003": "unrecorded"})
+        self.assertNotIn("thesis", by["9001"]["axes"])
+        self.assertEqual({by[e]["axes"]["field_band"] for e in by}, {"<=25"})
+        cells = self.rl.attribute_cells(list(by.values()), axes=self.rl.SHOWDOWN_AXES)
+        self.assertEqual([a for a, _ in self.rl.SHOWDOWN_AXES], list(cells))
+        self.assertIsNone(cells["thesis"]["cells"]["favorite_win_big"]["field"])
+        pitcher = cells["captain_role"]["cells"]["pitcher"]
+        # Ours 8001, 8002, 8003; the field's pitcher captains in those contests:
+        # 9001, 9005, 9007 and 9012.
+        self.assertEqual((pitcher["n"], pitcher["slates"], pitcher["field"]["n"]), (3, 2, 4))
+        self.assertNotIn("chalk_pctl_mean", pitcher)
+        # Shares over known roles: ours 3 of 3; the field 4 of its 8 known (9004 unknown).
+        share = pitcher["share"]
+        self.assertEqual((share["ours"], share["ours_den"], share["field"], share["field_den"]), (1.0, 3, 0.5, 8))
+        self.assertEqual(list(cells["captain_role"]["cells"]), ["pitcher"])
+        # Ours read 1 (8001), 2+ (8002) and 0 (8003, alone in S2), in the fixed order.
+        self.assertEqual(list(cells["duplication"]["cells"]), ["0", "1", "2+"])
+
+    def test_the_edges_are_counted_and_none_of_them_breaks_the_join(self):
+        """A contest with no other complete lineup, field rows DK ranked blank or
+        past N, a Classic-shaped export under a Showdown contest, our incomplete
+        and absent entries, and a record whose role and split DK never writes."""
+        self._tables()
+        s3, s4, s5, date = "198000003", "198000004", "198000005", "2026-08-22"
+        utils = " ".join(f"UTIL {u}" for u in ("Bat Hitter",) + self.F4)
+        path = self.root / "data" / "archive" / date
+        path.mkdir(parents=True, exist_ok=True)
+
+        def write(contest, rows):
+            with open(path / f"contest-standings-{contest}.csv", "w", encoding="utf-8", newline="") as fh:
+                writer = csv.writer(fh)
+                writer.writerow(self.STANDINGS_HEADER)
+                for rank, eid, lineup in rows:
+                    writer.writerow([rank, eid, "user (1/20)", 0, "40.0", lineup])
+
+        # S3: ours 8004 is the only complete lineup (8005 ours and 9021 empty).
+        write(s3, [(1, "8004", f"CPT Ace Pitcher {utils}"), (2, "8005", ""), (3, "9021", "")])
+        # S4: a Classic export filed under a Showdown contest.
+        write(s4, [(1, "8007", "P Ace Pitcher P Pen Arm C Fill One 1B Fill Two 2B Fill Three 3B Fill Four "
+                               "SS Fill Five OF Bat Hitter OF Big Slugger OF Two Way")])
+        # S5: two field rows whose rank is blank or past N.
+        write(s5, [(1, "8008", f"CPT Ace Pitcher {utils}"), ("", "9031", f"CPT Big Slugger {utils}"),
+                   (99, "9032", f"CPT Pen Arm {utils}")])
+        export = self.root / "data" / "reference" / "draftkings-contest-entry-history_2026-10-01.csv"
+        with open(export, "w", encoding="utf-8", newline="") as fh:
+            writer = csv.writer(fh, quoting=csv.QUOTE_ALL)
+            writer.writerow(self.COLUMNS)
+            for entry, contest, place, n in (("8004", s3, 1, 3), ("8005", s3, 2, 3), ("8006", s3, 3, 3),
+                                             ("8007", s4, 1, 5), ("8008", s5, 1, 3)):
+                writer.writerow(["MLB", self.SD, entry, self.TITLE, contest, f"{date} 19:05:00", place,
+                                 "40.0", "$0.00", "$0.00", n, "$3.00", "$30.00", "1"])
+        results = self.root / "scratch" / "dk_entry_results.csv"
+        code, _, err = self._run("ingest", str(export), "--out", str(results))
+        self.assertEqual(code, 0, err)
+        record = {"schema_version": 1, "kind": "delivery", "date": date,
+                  "manifest_row": {"sha256": "aa" * 32, "contest_type": "showdown"},
+                  "entries": [{"entry_id": "8004", "contest_id": s3, "roster_ids": ["1", "2", "3", "4", "5", "6"],
+                               "filled": True, "prediction": {"captain_role": "DH", "team_split": "6-0"}}]}
+        rec = self.root / "data" / "deliveries" / date / "2005_1g_sd_run.json"
+        rec.parent.mkdir(parents=True, exist_ok=True)
+        rec.write_text(json.dumps(record), encoding="utf-8")
+        resolution = self.root / "scratch" / "dk_entry_resolution.csv"
+        with open(resolution, "w", encoding="utf-8", newline="") as fh:
+            writer = csv.DictWriter(fh, fieldnames=list(self.rl.RESOLUTION_COLUMNS))
+            writer.writeheader()
+            writer.writerow({**{c: "" for c in self.rl.RESOLUTION_COLUMNS}, "Entry_Key": "8004",
+                             "Contest_Key": s3, "status": "resolved",
+                             "record": f"data/deliveries/{date}/2005_1g_sd_run.json"})
+        builds = self.rl.resolved_builds(self.root, resolution)["builds"]
+        joined = self.rl.showdown_lineups(self.root, self.rl.read_results(results), builds)
+        by = {lu["entry"]: lu for lu in joined["lineups"]}
+        self.assertEqual(joined["coverage"], {"population": 5, "with_lineup": 2, "no_standings": 1,
+                                              "incomplete_lineup": 1, "absent_from_standings": 1,
+                                              "field_rank_unusable": 2})
+        self.assertEqual(joined["standings_not_showdown"], [f"data/archive/{date}/contest-standings-{s4}.csv"])
+        # No other complete lineup: neither share has a denominator.
+        self.assertEqual((by["8004"]["axes"]["captain_cpt_share"], by["8004"]["axes"]["captain_flex_share"]),
+                         ("unknown", "unknown"))
+        # A role or split DK never writes is not a record's answer: the tables, then unknown.
+        self.assertEqual((by["8004"]["axes"]["captain_role"], by["8004"]["axes"]["team_split"]),
+                         ("pitcher", "unknown"))
+        self.assertEqual(joined["role_check"]["recorded"], 0)
+        self.assertIsNone(by["9031"]["numbers"])
+        self.assertIsNone(by["9032"]["numbers"])
+        cells = self.rl.attribute_cells(list(by.values()), axes=self.rl.SHOWDOWN_AXES)
+        lineup_axes = ("captain_role", "captain_cpt_share", "captain_flex_share", "team_split", "duplication")
+        self.assertEqual({axis: block["level"] for axis, block in cells.items()},
+                         {**{a: "lineup" for a in lineup_axes}, "posture": "contest", "field_band": "contest",
+                          "month": "contest", "thesis": "build"})
+        # A contest axis has no share line: the field shares the contest's value.
+        self.assertTrue(all(c["share"] is None for c in cells["posture"]["cells"].values()))
+        # The unranked field rows join the share, never a finish cell.
+        self.assertEqual(cells["captain_role"]["cells"]["pitcher"]["field"]["n"], 0)
+
+    def test_the_cli_runs_the_showdown_axis_and_classic_never_reads_it(self):
+        results, resolution = self._world()
+        code, out, err = self._run("attribute", "--showdown", "--results", str(results),
+                                   "--resolution", str(resolution))
+        self.assertEqual(code, 0, err)
+        self.assertIn("results_ledger attribute --showdown", out)
+        self.assertIn("2 of ours from a record, 1 of the 2 the tables also name disagree", out)
+        self.assertIn("== captain_role (lineup) ==", out)
+        self.assertIn("== thesis (build) ==", out)
+        self.assertIn("field: n/a (a build-time axis)", out)
+        self.assertNotIn("chalk ", out.split("== captain_role")[1])
+        code, out, err = self._run("attribute", "--showdown", "--json", "--results", str(results),
+                                   "--resolution", str(resolution))
+        self.assertEqual(code, 0, err)
+        payload = json.loads(out)
+        self.assertEqual(payload["captain_role"]["unknown"], {"ours": 0, "field": 1})
+        self.assertEqual(payload["coverage"]["field_lineups"], 9)
+        # Showdown entries never enter the Classic population, and the two
+        # flags exclude each other.
+        code, out, err = self._run("attribute", "--results", str(results))
+        self.assertEqual(code, 0, err)
+        self.assertIn("no paid MLB Classic entry", out)
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            self.rl.main(["--root", str(self.root), "attribute", "--rank", "--showdown",
+                          "--results", str(results)])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
 

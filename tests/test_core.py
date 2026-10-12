@@ -51757,6 +51757,150 @@ class ResultsAttributionTests(unittest.TestCase):
         self.assertEqual(payload["r6"]["contests"], 0)
 
 
+class ResultsRankTests(unittest.TestCase):
+    """R500(a) (roadmap Session 166). `results_ledger.py attribute --rank`: per
+    contest's resolved entries from one build, the Spearman correlation between
+    the engine's own order (Classic `contest_fit_score`, Showdown
+    `rank_in_build`) and the finish order (DK's Place), signed so agreement
+    reads +1, with its median and spread across units and every skip counted.
+    """
+
+    DATE = "2026-10-11"
+    COLUMNS = ResultsAttributionTests.COLUMNS
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.rl = ResultsAttributionTests._tool()
+
+    def _rows(self, spec, game_type="Classic", sport="MLB"):
+        """spec: (entry, contest, place) -> results rows as `read_results` gives them."""
+        return [{"Sport": sport, "Game_Type": game_type, "Entry_Key": e, "Contest_Key": c, "Place": str(p)}
+                for e, c, p in spec]
+
+    def _run(self, *argv):
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = self.rl.main(["--root", str(self.root), *argv])
+        return code, out.getvalue(), err.getvalue()
+
+    def test_the_correlation_reads_one_in_order_minus_one_reversed_and_ties_share_a_midrank(self):
+        # `rank_report` reads `replay_slate.spearman` (R384's grade), pinned here
+        # for the cases the rank depends on.
+        from tools.replay_slate import average_ranks, spearman
+        self.assertEqual(spearman([3, 2, 1], [3, 2, 1]), 1.0)
+        self.assertEqual(spearman([1, 2, 3, 4], [4, 3, 2, 1]), -1.0)
+        # d = (-1, 1, -1, 1, 0): 1 - 6 * 4 / (5 * 24) = 0.8, so a sign alone fails.
+        self.assertEqual(spearman([1, 2, 3, 4, 5], [2, 1, 4, 3, 5]), 0.8)
+        self.assertEqual(average_ranks([10, 20, 20, 30]), [1.0, 2.5, 2.5, 4.0])
+        # Ties at midranks, Pearson on the ranks: 4.5 / sqrt(4.5 * 5), to 4 places.
+        self.assertEqual(spearman([1, 2, 2, 3], [1, 2, 3, 4]), round(4.5 / math.sqrt(22.5), 4))
+        self.assertIsNone(spearman([1], [1]))
+        self.assertIsNone(spearman([], []))
+        self.assertIsNone(spearman([1, 2], [1]))
+        self.assertIsNone(spearman([5, 5, 5], [1, 2, 3]))      # no spread on one side
+        self.assertIsNone(spearman([1, 2, 3], [7, 7, 7]))
+
+    def test_each_contest_reads_its_own_rho_and_every_skip_is_counted(self):
+        spec = [("a1", "101", 1), ("a2", "101", 2), ("a3", "101", 3),           # in order: +1
+                ("b1", "102", 3), ("b2", "102", 2), ("b3", "102", 1),           # reversed: -1
+                ("c1", "103", 2), ("c2", "103", 1), ("c3", "103", 4), ("c4", "103", 3), ("c5", "103", 5),
+                ("d1", "104", 7),                                                # one entry
+                ("e1", "105", 1), ("e2", "105", 2),                              # fit scores tie
+                ("f1", "101", 4),                                                # no fit score
+                ("f2", "101", 8),                                                # NaN fit score
+                ("g1", "101", 5)]                                                # not resolved
+        fit = {"a1": 9, "a2": 8, "a3": 7, "b1": 9, "b2": 8, "b3": 7, "c1": 5, "c2": 4, "c3": 3, "c4": 2,
+               "c5": 1, "d1": 3.5, "e1": 5.0, "e2": 5.0, "f1": None, "f2": float("nan")}
+        builds = {e: {"record": "data/deliveries/2026-10-11/r.json",
+                      "prediction": {"contest_fit_score": v, "run_id": "run_a"}} for e, v in fit.items()}
+        rows = self._rows(spec) + self._rows([("h1", "101", 6)], sport="NFL")
+        builds["h1"] = builds["a1"]
+        got = self.rl.rank_report(rows, builds)["classic"]
+        self.assertEqual({u["contest"]: u["rho"] for u in got["per_unit"]}, {"101": 1.0, "102": -1.0, "103": 0.8})
+        self.assertEqual((got["units"], got["contests"], got["entries"]), (3, 3, 11))
+        # numpy's linear percentiles over (-1, 0.8, 1).
+        self.assertEqual((got["median"], got["p25"], got["p75"], got["min"], got["max"]),
+                         (0.8, -0.1, 0.9, -1.0, 1.0))
+        self.assertEqual(got["skipped_one_entry"], {"units": 1, "entries": 1})
+        self.assertEqual((got["skipped_no_spread"], got["entries_without_key"]), (1, 2))
+        self.assertEqual(self.rl.rank_report(rows, builds)["showdown"]["units"], 0)
+
+    def test_a_contest_split_across_builds_is_one_unit_per_build(self):
+        # Pooled, these four read 0.4; each build's own pair is in order.
+        rows = self._rows([("r1", "201", 1), ("r2", "201", 4), ("s1", "201", 2), ("s2", "201", 3)])
+        builds = {"r1": {"record": "x.json", "prediction": {"contest_fit_score": 100.0, "run_id": "run_r"}},
+                  "r2": {"record": "x.json", "prediction": {"contest_fit_score": 90.0, "run_id": "run_r"}},
+                  "s1": {"record": "x.json", "prediction": {"contest_fit_score": 2.0, "run_id": "run_s"}},
+                  "s2": {"record": "x.json", "prediction": {"contest_fit_score": 1.0, "run_id": "run_s"}}}
+        got = self.rl.rank_report(rows, builds)["classic"]
+        self.assertEqual([(u["build"], u["rho"]) for u in got["per_unit"]], [("run_r", 1.0), ("run_s", 1.0)])
+        self.assertEqual((got["units"], got["contests"], got["contests_split_across_builds"]), (2, 1, 1))
+
+    def test_showdown_reads_rank_in_build_with_one_as_the_build_s_best(self):
+        sd = "Showdown Captain Mode"
+        rows = self._rows([("p1", "301", 1), ("p2", "301", 2), ("p3", "301", 3),
+                           ("q1", "301", 4), ("q2", "301", 5)], game_type=sd)
+        rank = {"p1": 1, "p2": 2, "p3": 3, "q1": 2, "q2": 1}
+        builds = {e: {"record": "data/deliveries/2026-10-11/" + ("lad.json" if e[0] == "p" else "base.json"),
+                      "prediction": {"rank_in_build": r, "base_sum": 50.0 - r}} for e, r in rank.items()}
+        got = self.rl.rank_report(rows, builds)["showdown"]
+        # The ladder's three in order (+1); the baseline's two reversed (-1): one
+        # unit per record, never one ranking across two builds' ranks.
+        self.assertEqual({u["build"].rsplit("/", 1)[-1]: u["rho"] for u in got["per_unit"]},
+                         {"lad.json": 1.0, "base.json": -1.0})
+        self.assertEqual((got["key"], got["contests_split_across_builds"]), ("rank_in_build", 1))
+        self.assertEqual(self.rl.rank_report(rows, builds)["classic"]["units"], 0)
+
+    def test_the_cli_reads_resolved_records_and_says_not_measurable_without_them(self):
+        export = self.root / "data" / "reference" / "draftkings-contest-entry-history_2026-10-12.csv"
+        export.parent.mkdir(parents=True, exist_ok=True)
+        with open(export, "w", encoding="utf-8", newline="") as fh:
+            writer = csv.writer(fh, quoting=csv.QUOTE_ALL)
+            writer.writerow(self.COLUMNS)
+            for entry, place in (("8001", 3), ("8002", 1), ("8003", 2)):
+                writer.writerow(["MLB", "Classic", entry, "MLB $5 Satellite [10 Entry Max]", "401",
+                                 f"{self.DATE} 19:05:00", place, "50.0", "$0.00", "$0.00", "9", "$5.00",
+                                 "$100.00", "2"])
+        results = self.root / "scratch" / "dk_entry_results.csv"
+        code, _, err = self._run("ingest", str(export), "--out", str(results))
+        self.assertEqual(code, 0, err)
+        code, out, err = self._run("attribute", "--rank", "--results", str(results))
+        self.assertEqual(code, 0, err)
+        self.assertIn("contest_fit_score: 0 unit(s) in 0 contest(s), 0 entries: not measurable (n 0)", out)
+        self.assertIn("rank_in_build: 0 unit(s) in 0 contest(s), 0 entries: not measurable (n 0)", out)
+        self.assertIn("no resolution file", out)
+        record = {"schema_version": 1, "kind": "delivery", "date": self.DATE,
+                  "manifest_row": {"sha256": "cd" * 32, "contest_type": "classic"},
+                  "entries": [{"entry_id": e, "contest_id": "401", "roster_ids": [], "filled": True,
+                               "prediction": {"contest_fit_score": s, "run_id": "run_1"}}
+                              for e, s in (("8001", 1.0), ("8002", 3.0), ("8003", 2.0))]}
+        path = self.root / "data" / "deliveries" / self.DATE / "1905_9g_run.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(record), encoding="utf-8")
+        resolution = self.root / "scratch" / "dk_entry_resolution.csv"
+        with open(resolution, "w", encoding="utf-8", newline="") as fh:
+            writer = csv.DictWriter(fh, fieldnames=list(self.rl.RESOLUTION_COLUMNS))
+            writer.writeheader()
+            for eid in ("8001", "8002", "8003"):
+                writer.writerow({**{c: "" for c in self.rl.RESOLUTION_COLUMNS}, "Entry_Key": eid,
+                                 "Contest_Key": "401", "status": "resolved",
+                                 "record": f"data/deliveries/{self.DATE}/1905_9g_run.json"})
+        code, out, err = self._run("attribute", "--rank", "--results", str(results),
+                                   "--resolution", str(resolution))
+        self.assertEqual(code, 0, err)
+        self.assertIn("contest_fit_score: 1 unit(s) in 1 contest(s), 3 entries: median +1.000", out)
+        self.assertIn("Spearman over midranks", out)
+        code, out, err = self._run("attribute", "--rank", "--json", "--results", str(results),
+                                   "--resolution", str(resolution))
+        self.assertEqual(code, 0, err)
+        payload = json.loads(out)
+        self.assertEqual(payload["rank"]["classic"]["per_unit"],
+                         [{"contest": "401", "build": "run_1", "n": 3, "rho": 1.0}])
+        self.assertEqual(payload["builds"]["resolved"], 3)
+
+
 class OutcomeReviewResolvedTests(unittest.TestCase):
     """R497(c), roadmap Session 163. `outcome_review.py` grades the record an
     entry was entered from and nothing else. Before it, every record on a date
