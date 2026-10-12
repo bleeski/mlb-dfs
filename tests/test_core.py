@@ -51249,6 +51249,514 @@ class ResultsJoinTests(unittest.TestCase):
         self.assertIn("not UTF-8", err.getvalue())
 
 
+class ResultsAttributionTests(unittest.TestCase):
+    """R498 (roadmap Session 164). `results_ledger.py attribute` cuts our Classic
+    finishes by construction against the uniform reference and against the field
+    in the same cell of the same contests: the field-relative ownership
+    percentile, the stack, dead slots, posture, and the build-time axes a
+    resolved delivery record carries. Synthetic exports, standings, mined files
+    and records under a temp root.
+    """
+
+    DATE = "2026-08-20"
+    C1, C2 = "197000001", "197000002"
+    SATELLITE = "MLB $5 Satellite [10 Entry Max]"
+    STANDINGS_HEADER = ["Rank", "EntryId", "EntryName", "TimeRemaining", "Points", "Lineup", "",
+                        "Player", "Roster Position", "%Drafted", "FPTS"]
+    COLUMNS = ["Sport", "Game_Type", "Entry_Key", "Entry", "Contest_Key", "Contest_Date_EST",
+               "Place", "Points", "Winnings_Non_Ticket", "Winnings_Ticket", "Contest_Entries",
+               "Entry_Fee", "Prize_Pool", "Places_Paid"]
+    # Eight hitters every lineup shares but the last OF; the variable OF sets the chalk.
+    BASE = (("P", "Pa Ace"), ("P", "Pb Ace"), ("C", "Cee Base"), ("1B", "Onebee Base"),
+            ("2B", "Twobee Base"), ("3B", "Threebee Base"), ("SS", "Ess Base"),
+            ("OF", "Of One"), ("OF", "Of Two"))
+
+    @staticmethod
+    def _tool():
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "results_ledger_r498", REPO / "tools" / "results_ledger.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.rl = self._tool()
+
+    # -- fixtures ------------------------------------------------------------
+
+    def _lineup(self, last_of, base=None):
+        return " ".join(f"{slot} {name}" for slot, name in tuple(base or self.BASE) + (("OF", last_of),))
+
+    def _table(self, variable, fpts=None, extra=()):
+        """The shared players carry no %Drafted (so they add nothing to the chalk
+        sum) and score 5; `variable` is {name: %Drafted}."""
+        fpts = fpts or {}
+        rows = [(name, slot, None, fpts.get(name, 5.0)) for slot, name in self.BASE]
+        rows += [(name, "OF", pct, fpts.get(name, 5.0)) for name, pct in variable.items()]
+        return rows + list(extra)
+
+    def _standings(self, contest, entries, table, folder=None):
+        """entries: (rank, entry_id, lineup string); table: (player, pos, pct, fpts)."""
+        path = (self.root / "data" / "archive" / (folder or self.DATE)
+                / f"contest-standings-{contest}.csv")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w", encoding="utf-8", newline="") as fh:
+            writer = csv.writer(fh)
+            writer.writerow(self.STANDINGS_HEADER)
+            for i in range(max(len(entries), len(table))):
+                left = ([entries[i][0], entries[i][1], f"user{i} ({i + 1}/9)", 0, "50.0", entries[i][2]]
+                        if i < len(entries) else [""] * 6)
+                right = (["", table[i][0], table[i][1],
+                          "" if table[i][2] is None else f"{table[i][2]}%", table[i][3]]
+                         if i < len(table) else [""] * 5)
+                writer.writerow(left + right)
+        return path
+
+    def _mined(self, contest, folder, stacks, typed=True):
+        doc = {"contest_id": contest,
+               "entries": [{"entry_id": e, "stack_pattern": p, "max_stack": m}
+                           for e, (p, m) in stacks.items()]}
+        if typed:
+            doc["contest_type"] = "classic"
+        path = self.root / "data" / "archive" / folder / f"mined_{contest}.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(doc), encoding="utf-8")
+
+    def _results(self, rows):
+        """rows: (entry, contest, place, n[, date, title, fee]); ingested to a scratch path."""
+        export = self.root / "data" / "reference" / "draftkings-contest-entry-history_2026-10-01.csv"
+        export.parent.mkdir(parents=True, exist_ok=True)
+        with open(export, "w", encoding="utf-8", newline="") as fh:
+            writer = csv.writer(fh, quoting=csv.QUOTE_ALL)
+            writer.writerow(self.COLUMNS)
+            for row in rows:
+                entry, contest, place, n = row[:4]
+                date = row[4] if len(row) > 4 else self.DATE
+                title = row[5] if len(row) > 5 else self.SATELLITE
+                fee = row[6] if len(row) > 6 else "$5.00"
+                writer.writerow(["MLB", "Classic", entry, title, contest, f"{date} 19:05:00", place,
+                                 "50.0", "$0.00", "$0.00", n, fee, "$100.00", "2"])
+        out = self.root / "scratch" / "dk_entry_results.csv"
+        code, _, err = self._run("ingest", str(export), "--out", str(out))
+        self.assertEqual(code, 0, err)
+        return out
+
+    def _run(self, *argv):
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = self.rl.main(["--root", str(self.root), *argv])
+        return code, out.getvalue(), err.getvalue()
+
+    def _lineups(self, results, builds=None):
+        joined = self.rl.attribute_lineups(self.root, self.rl.read_results(results), builds or {})
+        return {lu["entry"]: lu for lu in joined["lineups"]}, joined
+
+    # -- tests ---------------------------------------------------------------
+
+    def test_chalk_percentile_is_midrank_over_complete_lineups_and_sums_a_two_row_player(self):
+        pct = self.rl.chalk_percentiles({"a": 10.0, "b": 20.0, "c": 20.0, "d": 30.0})
+        self.assertEqual(pct, {"a": (0.25, "low"), "b": (0.625, "mid"), "c": (0.625, "mid"),
+                               "d": (1.0, "high")})
+        # Exactly 1/3 is not low and exactly 2/3 is high, decided in integers.
+        self.assertEqual(self.rl.chalk_percentiles({"x": 1.0, "y": 2.0, "z": 3.0}),
+                         {"x": (1 / 3, "mid"), "y": (2 / 3, "high"), "z": (1.0, "high")})
+        # On a standings file: Oh Two is drafted at OF and 1B, so DK lists two rows
+        # (5% and 7%) that sum to his 12%; the empty lineup is outside N.
+        table = self._table({"Oh One": 10.0, "Oh Three": 12.0, "Oh Four": 30.0},
+                            extra=[("Oh Two", "OF", 5.0, 5.0), ("Oh Two", "1B", 7.0, 5.0)])
+        self._standings(self.C1, [(1, "8001", self._lineup("Oh Two")), (2, "9001", self._lineup("Oh One")),
+                                  (3, "9002", self._lineup("Oh Three")), (4, "9003", self._lineup("Oh Four")),
+                                  (5, "9004", "")], table)
+        results = self._results([("8001", self.C1, 1, 5)])
+        by, joined = self._lineups(results)
+        self.assertEqual(by["8001"]["chalk_pctl"], 0.625)
+        self.assertEqual(by["8001"]["axes"]["chalk_third"], "mid")
+        self.assertEqual((by["9001"]["axes"]["chalk_third"], by["9003"]["axes"]["chalk_third"]),
+                         ("low", "high"))
+        self.assertNotIn("9004", by)
+        self.assertEqual(joined["coverage"]["with_lineup"], 1)
+        # 0.2 + 0.1 and 0.3 are one share at DK's two decimals, so they tie.
+        tie_base = tuple((s, n) for s, n in self.BASE if n != "Of Two") + (("OF", "Pt Two"),)
+        table = self._table({"Pt One": 0.1, "Pt Three": 0.3, "Pt Nine": 9.0}, extra=[("Pt Two", "OF", 0.2, 5.0)])
+        self._standings(self.C2, [(1, "8002", self._lineup("Pt One", tie_base)),
+                                  (2, "9011", self._lineup("Pt Three")), (3, "9012", self._lineup("Pt Nine"))],
+                        table)
+        results = self._results([("8001", self.C1, 1, 5), ("8002", self.C2, 1, 3)])
+        by, _ = self._lineups(results)
+        self.assertEqual((by["8002"]["chalk_pctl"], by["9011"]["chalk_pctl"]), (0.5, 0.5))
+
+    def test_the_field_is_every_other_lineup_in_the_same_contests_and_never_ours(self):
+        picks = {"Lo Pick": 1.0, "Lo Two": 2.0, "Pick Ten": 10.0, "Pick Twenty": 20.0,
+                 "Pick Quarter": 25.0, "Pick Thirty": 30.0, "Pick Thirtyfive": 35.0, "Hi Pick": 40.0}
+        table = self._table(picks)
+        # C1, seven lineups: ours 8001 lowest (low), field 9001 second (2/7, low);
+        # our free entry 8009 (fee 0) is ours, so it never joins the field.
+        c1 = [("8001", "Lo Pick"), ("9001", "Lo Two"), ("9002", "Pick Ten"), ("9003", "Pick Twenty"),
+              ("8009", "Pick Quarter"), ("9004", "Pick Thirty"), ("9005", "Hi Pick")]
+        self._standings(self.C1, [(i + 1, e, self._lineup(n)) for i, (e, n) in enumerate(c1)], table)
+        # C2, another slate: ours high only; its two low field lineups must not
+        # enter C1's low cell.
+        c2 = [("9011", "Lo Pick"), ("9012", "Lo Two"), ("9013", "Pick Ten"), ("9014", "Pick Twenty"),
+              ("9015", "Pick Thirty"), ("9016", "Pick Thirtyfive"), ("8002", "Hi Pick")]
+        self._standings(self.C2, [(i + 1, e, self._lineup(n)) for i, (e, n) in enumerate(c2)], table,
+                        folder="2026-08-21")
+        results = self._results([("8001", self.C1, 1, 7),
+                                 ("8009", self.C1, 5, 7, self.DATE, self.SATELLITE, "$0.00"),
+                                 ("8002", self.C2, 7, 7, "2026-08-21")])
+        by, _ = self._lineups(results)
+        self.assertNotIn("8009", by)
+        self.assertEqual(sorted(e for e, lu in by.items() if not lu["ours"]),
+                         ["9001", "9002", "9003", "9004", "9005", "9011", "9012", "9013", "9014", "9015",
+                          "9016"])
+        self.assertEqual({e: by[e]["axes"]["chalk_third"] for e in ("8001", "9001", "8002", "9011", "9012")},
+                         {"8001": "low", "9001": "low", "8002": "high", "9011": "low", "9012": "low"})
+        cells = self.rl.attribute_cells(list(by.values()))["chalk_third"]["cells"]
+        low = cells["low"]
+        self.assertEqual((low["n"], low["field"]["n"]), (1, 1))     # 9001 only, not 9011/9012
+        # 9001 finished 2nd of 7: (2-1)/(7-1); ours 1st.
+        self.assertEqual(low["field"]["finish_pctl"], round(100 / 6, 4))
+        self.assertEqual(low["finish_pctl"], 0.0)
+        self.assertEqual(low["field"]["finish_diff"], -round(100 / 6, 4))
+        # Composition over both contests: 1 of our 2 is low; 3 of the field's 11.
+        self.assertEqual((low["share"]["ours"], low["share"]["field"]), (0.5, 3 / 11))
+        self.assertEqual((low["share"]["ours_den"], low["share"]["field_den"]), (2, 11))
+
+    def test_a_dead_slot_is_a_hitter_at_exactly_zero_and_the_field_mean_excludes_ours(self):
+        fpts = self.rl.fpts_by_norm([{"player_norm": "a", "fpts": 0.0}, {"player_norm": "b", "fpts": 0.0},
+                                     {"player_norm": "b", "fpts": 3.0}, {"player_norm": "c", "fpts": 0.5}])
+        self.assertEqual(fpts, {"a": 0.0, "c": 0.5})            # b is scored two ways
+        lineup = [("P", "a"), ("C", "a"), ("OF", "c"), ("OF", "b"), ("SS", "missing")]
+        self.assertEqual(self.rl.dead_slots(lineup, {**fpts, "p0": 0.0}), 1)
+        # Of Two scores 0: ours carry it, the field's swap it out except one.
+        zero_two = tuple((s, n) for s, n in self.BASE if n != "Of Two") + (("OF", "Zed Two"),)
+        table = self._table({"Lo Pick": 1.0}, fpts={"Of Two": 0.0, "Pa Ace": 0.0},
+                            extra=[("Zed Two", "OF", 3.0, 4.0)])
+        self._standings(self.C1, [(1, "8001", self._lineup("Lo Pick")), (2, "9001", self._lineup("Lo Pick")),
+                                  (3, "9002", self._lineup("Lo Pick", zero_two)),
+                                  (4, "9003", self._lineup("Lo Pick", zero_two))], table)
+        results = self._results([("8001", self.C1, 1, 4)])
+        by, _ = self._lineups(results)
+        # Pa Ace (a pitcher) at 0 is not a dead slot; Of Two is.
+        self.assertEqual({e: lu["dead"] for e, lu in by.items()}, {"8001": 1, "9001": 1, "9002": 0, "9003": 0})
+        summary = self.rl.dead_slot_summary(list(by.values()))["overall"]
+        self.assertEqual((summary["ours"], summary["field"], summary["field_den"]), (1.0, 1 / 3, 3))
+
+    def test_a_finding_prints_only_when_its_interval_excludes_zero_above_the_floor(self):
+        def cell(**over):
+            base = {"n": 40, "slates": 8, "bottom_share": 20.0, "bottom_ref": 10.0, "bottom_excess": 10.0,
+                    "bottom_excess_interval": [2.0, 18.0], "top_share": 10.0, "top_ref": 10.0,
+                    "top_excess": 0.0, "top_excess_interval": [-3.0, 3.0], "finish_pctl": 55.0,
+                    "field": None, "share": None}
+            base.update(over)
+            return base
+        lines = self.rl.finding_lines(cell())
+        self.assertEqual(len(lines), 1)
+        self.assertTrue(lines[0].startswith("bottom-decile share 20.00 against its uniform reference 10.00"))
+        self.assertEqual(self.rl.finding_lines(cell(bottom_excess_interval=[-1.0, 18.0])), [])
+        self.assertEqual(self.rl.finding_lines(cell(bottom_excess_interval=[0.0, 18.0])), [])
+        self.assertEqual(self.rl.finding_lines(cell(bottom_excess_interval=[-18.0, -2.0], bottom_excess=-10.0,
+                                                    bottom_share=0.0)), [])        # no spread
+        self.assertEqual(self.rl.finding_lines(cell(bottom_share=100.0)), [])          # all in band
+        self.assertEqual(self.rl.finding_lines(cell(n=19)), [])
+        self.assertEqual(self.rl.finding_lines(cell(slates=4)), [])
+        self.assertEqual(self.rl.finding_lines(cell(bottom_excess_interval=None)), [])
+        share = {"ours": 0.6, "field": 0.2, "ours_den": 50, "field_den": 900, "diff": 0.4,
+                 "interval": [0.3, 0.5]}
+        # The share is over the population: it takes no cell floor.
+        lines = self.rl.finding_lines(cell(n=3, slates=2, share=share, bottom_excess_interval=[-1.0, 18.0]))
+        self.assertEqual(lines, ["60.0% of our 50 entries against 20.0% of the field's 900 lineups: "
+                                 "+40.0 [+30.0, +50.0]"])
+        self.assertEqual(self.rl.finding_lines(cell(share={**share, "interval": [-0.1, 0.5]},
+                                                    bottom_excess_interval=[-1.0, 18.0])), [])
+        field = {"n": 500, "finish_pctl": 50.0, "top_excess": 0.0, "bottom_excess": 0.0, "finish_diff": 5.0,
+                 "top_diff": 0.0, "bottom_diff": 10.0, "finish_diff_interval": [-1.0, 9.0],
+                 "top_diff_interval": [-2.0, 2.0], "bottom_diff_interval": [1.0, 19.0]}
+        lines = self.rl.finding_lines(cell(field=field))
+        self.assertEqual(len(lines), 2)
+        self.assertIn("against the field's +0.00 in this cell, same contests: +10.00 [+1.0, +19.0]", lines[1])
+
+    def test_the_paired_draw_gives_our_side_exactly_cell_stats_and_pairs_the_field(self):
+        rows, ours = [], []
+        # Uneven slates (sizes and fields differ), so a draw over the slates in
+        # any order but sorted gives other intervals.
+        for s in range(7):
+            slate = f"MLB|2026-08-{10 + s:02d}|Classic"
+            for k in range(2 + 3 * s):
+                place, n = 1 + (13 * s * s + 7 * k) % (30 + 10 * s), 30 + 10 * s
+                rows.append({"slate": slate, "Place": str(place), "Contest_Entries": str(n), "net": "0.00",
+                             "fee": "1.00", "cash": "0.00", "ticket": "0.00", "blank_class": ""})
+                ours.append({"slate": slate, "numbers": self.rl.entry_numbers(place, n)})
+        stats = self.rl.cell_stats(rows)
+        cell = self.rl.paired_cell(ours, [dict(lu) for lu in ours])
+        for key in ("finish_pctl", "finish_pctl_interval", "top_excess", "top_excess_interval",
+                    "bottom_excess", "bottom_excess_interval"):
+            self.assertEqual(cell[key], stats[key], key)
+        # The field is a copy of ours, so a paired draw differs by exactly 0 in
+        # every draw; an unpaired one would spread.
+        self.assertEqual(cell["field"]["bottom_diff_interval"], [0.0, 0.0])
+        self.assertEqual(cell["field"]["finish_diff_interval"], [0.0, 0.0])
+        # A field with no lineup in some drawn slate gets no difference interval.
+        lonely = self.rl.paired_cell(ours, [dict(ours[0])])
+        self.assertIsNone(lonely["field"]["bottom_diff_interval"])
+        self.assertIsNotNone(lonely["bottom_excess_interval"])
+
+    def test_posture_is_the_builds_default_inference_and_the_field_shares_the_contests(self):
+        from decimal import Decimal
+        got = self.rl.title_postures([(self.SATELLITE, Decimal("5")),
+                                      ("MLB $3 Single Entry [Single Entry]", Decimal("3")),
+                                      ("MLB $10 Moonshot [20 Entry Max]", Decimal("10")),
+                                      ("Zzz Mystery Cup", Decimal("1"))])
+        self.assertEqual(got[(self.SATELLITE, Decimal("5"))], ("wta_satellite", True))
+        self.assertEqual(got[("MLB $3 Single Entry [Single Entry]", Decimal("3"))], ("single_entry", True))
+        self.assertEqual(got[("MLB $10 Moonshot [20 Entry Max]", Decimal("10"))], ("small_gpp", False))
+        self.assertEqual(got[("Zzz Mystery Cup", Decimal("1"))], ("large_gpp", False))
+        table = self._table({"Lo Pick": 1.0})
+        self._standings(self.C1, [(1, "8001", self._lineup("Lo Pick")), (2, "9001", self._lineup("Lo Pick"))],
+                        table)
+        results = self._results([("8001", self.C1, 1, 2, self.DATE, "MLB $3 Single Entry [Single Entry]",
+                                  "$3.00")])
+        by, joined = self._lineups(results)
+        self.assertEqual((by["8001"]["axes"]["posture"], by["9001"]["axes"]["posture"]),
+                         ("single_entry", "single_entry"))
+        self.assertEqual(joined["postures_inferred"], {"name_inference": 1, "unresolved": 0})
+
+    def test_the_stack_reads_the_typed_mined_file_first_then_a_team_map(self):
+        # stack_from_teams: the primary team is the unique largest stack of 3 or more.
+        lu = [("P", "p1"), ("C", "a1"), ("1B", "a2"), ("2B", "a3"), ("3B", "a4"), ("SS", "b1"),
+              ("OF", "b2"), ("OF", "b3"), ("OF", "c1")]
+        teams = {"a1": "AAA", "a2": "AAA", "a3": "AAA", "a4": "AAA", "b1": "BBB", "b2": "BBB",
+                 "b3": "BBB", "c1": "CCC"}
+        self.assertEqual(self.rl.stack_from_teams(lu, teams),
+                         {"pattern": "4-3-1", "max_stack": 4, "primary_team": "AAA"})
+        tie = {**teams, "c1": "BBB"}
+        self.assertEqual(self.rl.stack_from_teams(lu, tie)["primary_team"], "none")       # 4-4
+        spread = {n: t for n, t in zip(teams, ("AAA", "AAA", "BBB", "CCC", "DDD", "EEE", "FFF", "GGG"))}
+        self.assertEqual(self.rl.stack_from_teams(lu, spread),                              # unique, under 3
+                         {"pattern": "2-1-1-1-1-1-1", "max_stack": 2, "primary_team": "none"})
+        self.assertIsNone(self.rl.stack_from_teams(lu, {k: v for k, v in teams.items() if k != "c1"}))
+        self.assertEqual([self.rl.stack_group(p, m) for p, m in (("5-3", 5), ("4-4", 4), ("4-2-1-1", 4),
+                                                                   ("3-3-2", 3), (None, None))],
+                         ["5", "4-4|4-3-1|4-2-2", "4-other", "3-or-less", "unknown"])
+        # A contest mined twice: the typed classic file wins over the earlier path.
+        self._mined(self.C1, "2026-08-19", {"8001": ("4-4", 4)}, typed=False)
+        self._mined(self.C1, "2026-08-20", {"8001": ("5-3", 5), "9001": ("4-3", 4)})
+        self._standings(self.C1, [(1, "8001", self._lineup("Lo Pick")), (2, "9001", self._lineup("Lo Pick"))],
+                        self._table({"Lo Pick": 1.0}))
+        results = self._results([("8001", self.C1, 1, 2)])
+        by, _ = self._lineups(results)
+        self.assertEqual((by["8001"]["axes"]["stack_pattern"], by["8001"]["axes"]["max_stack"]), ("5-3", "5"))
+        # A mined pattern short of eight hitters (a failed join) is no pattern;
+        # with no team map either, unknown.
+        self.assertEqual((by["9001"]["axes"]["stack_group"], by["9001"]["axes"]["primary_team"]),
+                         ("unknown", "unknown"))
+
+    def test_r6_reads_a_finding_only_above_confirmed_from_the_slate_floor(self):
+        def lineups(slates, projected_dead, confirmed_dead):
+            out = []
+            for s in range(slates):
+                out.append({"ours": True, "contest": f"c{s}", "slate": f"MLB|2026-09-{10 + s:02d}|Classic",
+                            "r6": [("platoon_projected", projected_dead[s % 2]),
+                                   ("platoon_projected", 0), ("confirmed_lineup", confirmed_dead[s % 2]),
+                                   ("confirmed_lineup", 0)]})
+            return out
+        above = self.rl.r6_summary(lineups(6, (1, 1), (0, 0)))
+        self.assertEqual((above["diff"], above["interval"], above["reading"]), (0.5, [0.5, 0.5], "finding"))
+        below = self.rl.r6_summary(lineups(6, (0, 0), (1, 1)))
+        self.assertEqual((below["diff"], below["reading"]), (-0.5, "below"))
+        self.assertEqual(self.rl.r6_summary(lineups(4, (1, 1), (0, 0)))["reading"], "under_floor")
+        mixed = self.rl.r6_summary(lineups(6, (1, 0), (0, 1)))
+        self.assertEqual(mixed["reading"], "inside")
+        none = self.rl.r6_summary([{"ours": True, "contest": "c", "slate": "s", "r6": []}])
+        self.assertEqual((none["reading"], none["contests"]), ("not_measurable", 0))
+        report = {"r6": below, "dead_slots": {}}
+        text = self.rl._render_summaries(report, [])
+        self.assertIn("the interval excludes 0 below it: projected under confirmed", text)
+        self.assertNotIn("inside the reference", text)
+
+    def test_the_first_readable_export_wins_and_a_rank_past_n_leaves_the_cells(self):
+        table = self._table({"Lo Pick": 1.0, "Hi Pick": 40.0})
+        broken = self.root / "data" / "archive" / "2026-08-19" / f"contest-standings-{self.C1}.csv"
+        broken.parent.mkdir(parents=True, exist_ok=True)
+        broken.write_text("not,a,standings,export\n", encoding="utf-8")
+        # C1: our row says N = 3, but the export lists a fourth entry ranked 4.
+        self._standings(self.C1, [(1, "8001", self._lineup("Lo Pick")), (2, "9001", self._lineup("Lo Pick")),
+                                  (3, "9002", self._lineup("Hi Pick")), (4, "9003", self._lineup("Lo Pick"))],
+                        table)
+        # C2 exported twice: the first by path is the one read.
+        self._standings(self.C2, [(1, "8002", self._lineup("Lo Pick")), (2, "9011", self._lineup("Hi Pick"))],
+                        table, folder="2026-08-21")
+        self._standings(self.C2, [(1, "8002", self._lineup("Lo Pick")), (2, "9099", self._lineup("Hi Pick"))],
+                        table, folder="2026-08-22")
+        results = self._results([("8001", self.C1, 1, 3), ("8002", self.C2, 1, 2, "2026-08-21")])
+        by, joined = self._lineups(results)
+        self.assertIn("9011", by)
+        self.assertNotIn("9099", by)
+        self.assertEqual(joined["standings_unreadable"], [f"data/archive/2026-08-19/contest-standings-{self.C1}.csv"])
+        self.assertIsNone(by["9003"]["numbers"])
+        self.assertEqual(joined["coverage"]["field_rank_unusable"], 1)
+        self.assertEqual((by["8001"]["axes"]["month"], by["8002"]["axes"]["month"]), ("2026-08", "2026-08"))
+        overall = self.rl.paired_cell([lu for lu in by.values() if lu["ours"]],
+                                      [lu for lu in by.values() if not lu["ours"] and lu["numbers"] is not None])
+        self.assertEqual(overall["field"]["n"], 3)                          # 9001, 9002, 9011
+        cells = self.rl.attribute_cells(list(by.values()))
+        self.assertEqual(cells["month"]["cells"]["2026-08"]["field"]["n"], 3)
+
+    def _salary(self, folder, rows):
+        """rows: (name, roster position, team, salary)."""
+        path = self.root / "data" / "archive" / folder / f"DKSalaries_{folder}.csv"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w", encoding="utf-8", newline="") as fh:
+            writer = csv.writer(fh)
+            writer.writerow(["Position", "Name + ID", "Name", "ID", "Roster Position", "Salary", "Game Info",
+                             "TeamAbbrev", "AvgPointsPerGame"])
+            for i, (name, slot, team, salary) in enumerate(rows):
+                pid = str(60000101 + i)
+                writer.writerow([slot.split("/")[0], f"{name} ({pid})", name, pid, slot, salary,
+                                 "AAA@BBB 08/20/2026 07:05PM ET", team, "8.0"])
+        return path
+
+    def test_a_salary_file_maps_teams_for_the_field_and_the_record_map_comes_first(self):
+        teams = {"Pa Ace": "XXX", "Pb Ace": "YYY", "Cee Base": "AAA", "Onebee Base": "AAA",
+                 "Twobee Base": "AAA", "Threebee Base": "BBB", "Ess Base": "BBB", "Of One": "BBB",
+                 "Of Two": "BBB", "Bb Pick": "BBB", "Aa Pick": "AAA"}
+        slots = dict((n, s) for s, n in self.BASE)
+        rows = [(n, "P" if slots.get(n) == "P" else "OF" if n in ("Bb Pick", "Aa Pick") else slots[n], t, 5000)
+                for n, t in teams.items()]
+        # Two players share a name: the map names neither, so a lineup holding one is unknown.
+        rows += [("Twin Name", "OF", "DDD", 3000), ("Twin Name", "OF", "EEE", 3500)]
+        self._salary(self.DATE, rows)
+        # Ours: Bb Pick, so BBB 5 - AAA 3 (primary BBB). Field: one more BBB
+        # primary (9001), eighteen 4-4 lineups with no primary, one Twin Name.
+        entries = [(1, "8001", self._lineup("Bb Pick")), (2, "9001", self._lineup("Bb Pick"))]
+        entries += [(3 + i, str(9100 + i), self._lineup("Aa Pick")) for i in range(18)]
+        entries += [(21, "9200", self._lineup("Twin Name"))]
+        table = self._table({"Bb Pick": 10.0, "Aa Pick": 50.0}, extra=[("Twin Name", "OF", 5.0, 5.0)])
+        self._standings(self.C1, entries, table)
+        self._mined(self.C1, self.DATE, {})                 # typed, mined without salary
+        results = self._results([("8001", self.C1, 1, 21)])
+        by, joined = self._lineups(results)
+        self.assertEqual(joined["team_sources"],
+                         {self.C1: f"salary file via slate_groups: data/archive/{self.DATE}/DKSalaries_{self.DATE}.csv"})
+        self.assertEqual((by["8001"]["axes"]["stack_pattern"], by["8001"]["axes"]["primary_team"]), ("5-3", "BBB"))
+        self.assertEqual((by["9100"]["axes"]["stack_pattern"], by["9100"]["axes"]["primary_team"]), ("4-4", "none"))
+        self.assertEqual(by["9200"]["axes"]["primary_team"], "unknown")
+        # Ours against 1 BBB of the field's 19 mapped lineups: 5.3%. 9001 without
+        # itself: 0 of 18.
+        self.assertEqual((by["8001"]["axes"]["team_field_share"], by["9001"]["axes"]["team_field_share"]),
+                         ("5-10%", "<5%"))
+        # A resolved record's players map comes before the salary file for ours.
+        names = [n for _, n in self.BASE] + ["Bb Pick"]
+        build = {"date": self.DATE, "roster_ids": [str(i) for i in range(10)], "prediction": None, "market": None,
+                 "players": {str(i): [n, "AAA" if n in ("Threebee Base", "Ess Base") else teams[n], "OF", 1, ""]
+                             for i, n in enumerate(names)}}
+        by, _ = self._lineups(results, {"8001": build})
+        self.assertEqual((by["8001"]["axes"]["stack_pattern"], by["8001"]["axes"]["primary_team"]), ("5-3", "AAA"))
+
+    def _build_record(self, market):
+        names = [n for _, n in self.BASE] + ["Lo Pick"]
+        ids = [str(50000101 + i) for i in range(len(names))]
+        slots = [s for s, _ in self.BASE] + ["OF"]
+        team = ["XXX", "YYY"] + ["AAA"] * 3 + ["BBB"] * 5
+        players = {pid: [name, t, slot, 5000, "AAA@BBB"] for pid, name, t, slot in zip(ids, names, team, slots)}
+        roles = {pid: ("platoon_projected" if name in ("Of Two", "Lo Pick")
+                       else "unknown" if name == "Ess Base" else "confirmed_lineup")
+                 for pid, name in zip(ids[2:], names[2:])}
+        confirmed = {pid: "confirmed_lineup" for pid in roles}
+        record = {"schema_version": 1, "kind": "delivery", "date": self.DATE,
+                  "manifest_row": {"sha256": "ab" * 32, "contest_type": "classic", "status": "candidate"},
+                  "players": players,
+                  "entries": [{"entry_id": e, "contest_id": c, "roster_ids": ids, "filled": True,
+                               "prediction": {"contest_shape": "satellite", "hitter_roles": r}}
+                              for e, c, r in (("8001", self.C1, roles), ("8002", self.C1, roles),
+                                              ("8003", self.C2, confirmed))]
+                  + [{"entry_id": "8004", "contest_id": self.C1, "roster_ids": [], "filled": False}],
+                  "extra": {"market": market}}
+        path = self.root / "data" / "deliveries" / self.DATE / "1905_9g_run.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(record), encoding="utf-8")
+        resolution = self.root / "scratch" / "dk_entry_resolution.csv"
+        resolution.parent.mkdir(parents=True, exist_ok=True)
+        with open(resolution, "w", encoding="utf-8", newline="") as fh:
+            writer = csv.DictWriter(fh, fieldnames=list(self.rl.RESOLUTION_COLUMNS))
+            writer.writeheader()
+            # The tied row names the record too: the status decides, not the cell.
+            for eid, contest, status in (("8001", self.C1, "resolved"), ("8002", self.C1, "tied"),
+                                         ("8003", self.C2, "resolved"), ("8004", self.C1, "resolved")):
+                writer.writerow({**{c: "" for c in self.rl.RESOLUTION_COLUMNS}, "Entry_Key": eid,
+                                 "Contest_Key": contest, "status": status,
+                                 "record": f"data/deliveries/{self.DATE}/1905_9g_run.json"})
+        return resolution
+
+    def test_a_resolved_record_fills_the_build_time_axes_and_the_r6_line(self):
+        resolution = self._build_record({"implied_total_by_team": {"AAA": 5.2, "BBB": 4.6}, "applied": True})
+        table = self._table({"Lo Pick": 1.0}, fpts={"Of Two": 0.0})
+        self._standings(self.C1, [(1, "8001", self._lineup("Lo Pick")), (2, "8002", self._lineup("Lo Pick")),
+                                  (3, "9001", self._lineup("Lo Pick"))], table)
+        # C2 holds 8003, whose hitters all read confirmed: R6 compares inside
+        # contests holding both roles, so it stays out of the R6 line.
+        self._standings(self.C2, [(1, "8003", self._lineup("Lo Pick")), (2, "9011", self._lineup("Lo Pick"))],
+                        table)
+        results = self._results([("8001", self.C1, 1, 3), ("8002", self.C1, 2, 3), ("8003", self.C2, 1, 2)])
+        builds = self.rl.resolved_builds(self.root, resolution)
+        # A tied row is not enriched, nor an unfilled entry of the record.
+        self.assertEqual(sorted(builds["builds"]), ["8001", "8003"])
+        by, _ = self._lineups(results, builds["builds"])
+        self.assertEqual({k: by["8001"]["axes"][k] for k in ("hitter_roles", "market", "implied_total",
+                                                              "contest_shape", "primary_team")},
+                         {"hitter_roles": "1-2", "market": "applied", "implied_total": "4.0-4.99",
+                          "contest_shape": "satellite", "primary_team": "BBB"})
+        self.assertEqual({k: by["8002"]["axes"][k] for k in ("hitter_roles", "market", "contest_shape")},
+                         {"hitter_roles": "unrecorded", "market": "unrecorded", "contest_shape": "unrecorded"})
+        self.assertNotIn("hitter_roles", by["9001"]["axes"])
+        r6 = self.rl.r6_summary(list(by.values()))
+        # Projected: Of Two (0) and Lo Pick (5) -> 1 of 2; confirmed: 5 at 5 -> 0 of 5
+        # (Ess Base reads unknown and joins neither).
+        self.assertEqual((r6["projected"], r6["confirmed"], r6["diff"], r6["contests"]), (0.5, 0.0, 0.5, 1))
+        self.assertEqual((r6["projected_n"], r6["confirmed_n"], r6["reading"]), (2, 5, "under_floor"))
+        self.assertIsNone(r6["interval"])                                   # one slate
+        # A record before R494(b): no `applied` key, the writer's own rule.
+        axes = self.rl._build_axes({"prediction": None, "market": {"implied_total_by_team": {}}}, "AAA")
+        self.assertEqual((axes["market"], axes["implied_total"], axes["hitter_roles"]),
+                         ("not_applied", "not_applied", "unrecorded"))
+        axes = self.rl._build_axes({"prediction": {"hitter_roles": {"1": "unknown"}},
+                                    "market": {"implied_total_by_team": {"AAA": 3.9}}}, "AAA")
+        self.assertEqual((axes["market"], axes["implied_total"], axes["hitter_roles"]),
+                         ("applied", "<4.0", "no_known_role"))
+        axes = self.rl._build_axes({"prediction": None, "market": {"implied_total_by_team": {"AAA": 3.9},
+                                                                   "applied": True}}, "none")
+        self.assertEqual(axes["implied_total"], "none")
+        code, out, err = self._run("attribute", "--results", str(results), "--resolution", str(resolution))
+        self.assertEqual(code, 0, err)
+        self.assertIn("== hitter_roles (build) ==", out)
+        self.assertIn("field: n/a (a build-time axis)", out)
+        self.assertIn("projected 0.500 of 2  confirmed 0.000 of 5", out)
+        self.assertIn("under the finding floor (5 slates)", out)
+
+    def test_inputs_it_cannot_read_exit_with_the_modules_codes(self):
+        missing = self.root / "scratch" / "nope.csv"
+        code, _, err = self._run("attribute", "--results", str(missing))
+        self.assertEqual(code, 3)
+        self.assertIn("no results file at", err)
+        self._standings(self.C1, [(1, "8001", self._lineup("Lo Pick"))], self._table({"Lo Pick": 1.0}))
+        results = self._results([("8001", self.C1, 1, 1)])
+        code, _, err = self._run("attribute", "--results", str(results), "--resolution", str(missing))
+        self.assertEqual(code, 3)
+        self.assertIn("no resolution file", err)
+        other = self.root / "scratch" / "other.csv"
+        other.write_text("a,b\n1,2\n", encoding="utf-8")
+        self.assertEqual(self._run("attribute", "--results", str(results), "--resolution", str(other))[0], 2)
+        code, out, err = self._run("attribute", "--results", str(results), "--json")
+        self.assertEqual(code, 0, err)
+        payload = json.loads(out)
+        self.assertEqual(payload["builds"]["note"], "no resolution file; every build-time axis reads unrecorded")
+        self.assertEqual(payload["coverage"]["with_lineup"], 1)
+        self.assertEqual(payload["r6"]["contests"], 0)
+
+
 class OutcomeReviewResolvedTests(unittest.TestCase):
     """R497(c), roadmap Session 163. `outcome_review.py` grades the record an
     entry was entered from and nothing else. Before it, every record on a date

@@ -342,6 +342,29 @@ writes), `tied`, `unmatched` (a hand edit or a swap outside the records),
 (2026-10-11) carries no player map, so it resolves only where the slate's salary
 file or DKEntries file survives on the machine that runs it.
 
+### Which of our choices sit under our finishes (R498)
+
+`attribute` reads our paid Classic entries whose standings export holds a
+complete lineup, and every other complete lineup of the same contest as the
+field. It writes nothing; run it after `resolve` when a pull or an ingest adds
+contests.
+
+```bash
+python tools/results_ledger.py attribute            # text; --json for every cell
+```
+
+Each axis prints one cell per value: our finish and decile excess against the
+uniform reference, the field's in the same cell of the same contests (one
+paired draw), and our share of entries against the field's share of lineups.
+The axes: chalk third, stack and stack group, primary team and its share of the
+field's primary stacks, dead slots, posture (the build's default inference from
+the title), field band and month; and, only for entries `resolve` tied to a
+record, hitter roles, market, implied total and contest shape. A finding line
+prints only when an interval excludes 0, and never for a cell under 20 entries
+or 5 slates. The R6 line at the end compares dead slots of `platoon_projected`
+against `confirmed_lineup` hitters; while it reads `not measurable`, no resolved
+entry carries hitter roles yet.
+
 **These are observed outcomes.** Never ROI, a win rate, a cash rate or a
 probability. Ticket face value is not realized value, and no ratio of net to
 fees is printed.
