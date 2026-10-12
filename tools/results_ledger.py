@@ -2338,8 +2338,9 @@ RANK_LABELS: Tuple[str, ...] = (
     "lineups, so a contest whose entries came from two builds (a rebuild, a late swap, the "
     "Showdown baseline beside its ladder) is cut into one unit per build. Classic keys the "
     "build by the prediction's run, Showdown by the record R497 resolved the entry to.",
-    "Only entries R497 resolved to a delivery record whose entry carries the key. A unit needs "
-    "two of them, and one with no spread on either side has no correlation; both are counted.",
+    "Only entries R497 resolved to a delivery record whose entry carries the key, free entries "
+    "included (the order is the engine's whatever the fee). A unit needs two of them, and one "
+    "with no spread on either side has no correlation; both are counted.",
 )
 
 
@@ -2449,8 +2450,10 @@ SHOWDOWN_LABELS: Tuple[str, ...] = (
     "Captain role: DK's position from the delivery record R497 resolved our entry to; otherwise, "
     "and for every field lineup, a labelled prior from the vendored season tables: pitcher when "
     "the name is only in statsapi_season_pitching.csv, hitter when only in "
-    "expected_stats_batting.csv, unknown when in both (a two-way player, or two people sharing a "
-    "name) or neither. It moves when ARCHIVE refreshes those tables.",
+    "expected_stats_batting.csv, unknown when in both (mostly a position player with a mop-up "
+    "inning or a pitcher with a plate appearance; also a two-way player, or two people sharing a "
+    "name) or in neither (a name the tables spell another way). It moves when ARCHIVE refreshes "
+    "those tables.",
     "Captain CPT% and flex%: the captain's share of the field's complete lineups (ours never "
     "among them) at CPT and at UTIL, counted from the entry block, because DK's %Drafted table "
     "drops one of two equal slot rows (R341); a field lineup is measured without itself.",
@@ -2470,8 +2473,9 @@ SHOWDOWN_LABELS: Tuple[str, ...] = (
 def season_roles(root: Path) -> Dict[str, Any]:
     """{name: pitcher|hitter} from the two vendored season tables, by normalized name.
 
-    A name in both tables (a two-way player, or two people sharing a name) or in
-    neither is absent, so it reads unknown. Both tables are needed: with one,
+    A name in both tables (mostly a position player with a mop-up inning or a
+    pitcher with a plate appearance; also a two-way player, or two people
+    sharing a name) or in neither is absent, so it reads unknown. Both tables are needed: with one,
     every name of the other kind would read unknown and the pitcher share of
     the known roles would be wrong, so a missing table classifies nobody.
     """
@@ -2717,7 +2721,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                    help=f"default data/reference/{RESOLUTION_NAME} (ARCHIVE's write set)")
     p.add_argument("--json", action="store_true", help="print every row and the summary as JSON")
 
-    p = sub.add_parser("attribute", help="our Classic finishes by construction, against the field (R498)")
+    p = sub.add_parser("attribute", help="our finishes by construction against the field (R498, Classic; "
+                                         "--showdown and --rank, R500)")
     p.add_argument("--results", default=None, help=f"default data/reference/{RESULTS_NAME}")
     p.add_argument("--resolution", default=None,
                    help=f"default data/reference/{RESOLUTION_NAME} when present (R497's resolve)")
