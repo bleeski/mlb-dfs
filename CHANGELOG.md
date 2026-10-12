@@ -2,6 +2,110 @@
 
 What changed in the engine, the tools and the contracts, when, and why.
 
+## 2026-10-12 — R164 + R454 + R115 + R138: the sliced bank's job grid stops solving jobs it can never answer, the depth slices stop re-solving answered ones, and SP-pair coverage's sliced half closes (roadmap Session 40)
+
+**Scope.**
+- `mlb_engine/optimize/optimizer_v3.py`: `sp_opponent_map` and `opponent_stack_barred_teams`, new; `build_diverse_candidate_bank`'s `_teams_of_pair` reads them (no behavior change; its per-pair frame scan and `_bank_pid_col` are gone).
+- `mlb_engine/optimize/bank_cache.py`: `UNSTACKED_JOB_TEAM`; `extend_bank`'s arm/bat split (`_is_arm`), its job grid (the axis collapse and the opponent filter), one `_answered` closure for the walk and `jobs_attempted`, the depth slice's ordinary twin, and three report keys (`opponent_stack_jobs_skipped`, `team_axis_collapsed`, `answered_by_ordinary_bucket`).
+- `mlb_engine/pipeline/execution_pipeline.py`: `build_sleeve_jobs`'s tail and environment entries carry `jobs_attempted_this_slice` and `answered_by_ordinary_bucket`.
+- `skills/generate-lineups/scripts/build_slate.py`: `_merge_bank_slice_reports` sums `opponent_stack_jobs_skipped` (one key).
+- `tests/test_core.py`: `BankCoverageTests` +11 (1 -> 12).
+- `tests/golden/golden_replay_production_2026-06-03.json`: re-frozen, one value (below); `tests/test_golden_replay.py`: the production replay's docstring (32 jobs, and the re-freeze recorded).
+- `tools/audit.py`: `test_core` pin 2464 -> 2475.
+- `MLB_Classic.md` §7: R138's standing-practice paragraph.
+- `docs/backlog.md`: R164, R454 and R138 collapsed to CLOSED stubs (their text is below); R115 rewritten to its open remainder.
+- `docs/ROADMAP.md`: Session 40 Complete; **NEXT** Session 152; Session 170, new, holds R115's remainder; a Progress Ledger row; Session 166's SHA backfilled (`4a2daff`).
+- `data/agent_runs/2026-10-12/`: the session's agent runs, in their own `record:` commits.
+- Not touched: the allocator, certification, `tools/late_swap.py` (its pinned slices go through `extend_bank` unchanged at the call), `tools/solver_probe.py`.
+
+**What was wrong, reproduced at 4a2daff before any edit** (the golden pool: the vendored 2026-06-03 slate under the golden replay's rule, 8 arms, 4 teams, 16 cross-game pairs).
+- **R164(b).** `extend_bank` fanned every pair over every team. At k=0 the ordinary slice ran 64 jobs; 32 were (pair, opponent of an arm), all 32 proven infeasible, 0 other infeasible, 27 built. The same grid on 06-28 (one SP per team): 440 of 4,840 jobs (9.1%); 07-24 main: 360 of 3,600 (10.0%). The direct door already skipped these (R293).
+- **R164(a).** A 9-slot pinned entry relaxes `stack_min` to 1, the stack constraint is None, and the grid still solved the identical MILP once per team: 4 jobs, 4 solves, 1 roster.
+- **R164(c).** The grid split arms from bats on `Position == "P"`; the solver reads `"P" in _parse_positions(...)`. No vendored row differs: consistency, not a live miss.
+- **R454.** After that exhausted ordinary slice, `extend_bank(stack_teams=[BAL, BOS])` ran 32 jobs, 32 solves, 0 built: the `teams:` suffix makes its own bucket, so its keys never matched the ordinary bucket's identical job.
+- **R115.** Most of it is superseded at HEAD, and its seeded-pair rider is unreachable: see Declined and closed below.
+- **R138.** Nothing stated "a stack family per game", and nothing measured it on the bank (R126's histogram is the entered portfolio's).
+
+**What shipped.**
+- **One opponent rule for both bank builders (R164's rider: "never re-derived").** `opponent_stack_barred_teams` returns a pair's arms' `Opponent` teams when the effective allowance is below the stack floor, else nothing; `sp_opponent_map` is its input, built once per bank. `_teams_of_pair` (the direct door, R293) and `extend_bank` (the sliced door) both call it. A caller whose job carries no stack constraint has nothing to bar and does not ask.
+- **R164(b), a filter over the old order.** `extend_bank` drops the barred (pair, team) jobs and keeps every other job where it was, so every remaining job, and every lineup in every prefix of the walk, is the one it was; the walk only reaches later jobs sooner. Skipped jobs are counted (`opponent_stack_jobs_skipped`). At k >= `stack_min` nothing is skipped (R288's control stays a control).
+- **R164(a).** Below a two-stack the team axis collapses to one job per pair, team field `*` (`team_axis_collapsed`). A late-swap cache holding the old per-team pinned keys re-solves each pair once on first contact.
+- **R164(c).** `_is_arm` reads the parsed position set, for the pair space, the team list and the excluded counts.
+- **`jobs_attempted` counts the current job list.** It counted every attempted key with the bucket's suffix, which equalled the list only while the grid never shrank; a cache written before the skip holds 32 answered keys that are no longer jobs and would have read unexhausted forever.
+- **R454.** On a `stack_teams` slice a job is answered when its own key or its ordinary twin's key (the same facts with no restriction: the same MILP, and `add` dedupes the roster) is in `attempted`. One `_answered` closure is the walk's skip and the `jobs_attempted` count, so the two cannot disagree (the advisor's point at plan time: two expressions would read a depth slice that solved nothing as retryable). `answered_by_ordinary_bucket` counts them; `build_sleeve_jobs` carries it, and the jobs solved, on the tail and environment entries.
+- **R138.** `MLB_Classic.md` §7, beside the scenario-family paragraph: the bank holds a stack family per GAME; the ordinary grid stacks every legal team over its full walk (pinned); a clock-truncated walk may not, and bank growth is the remedy. The entry asked for a SKILL.md line. SKILL.md is 1,655 lines against its 150-line target (`.claude/rules/skills.md`) and §7 is where scenario families are defined, so the line went there. The test pins the FULL walk, not round 0: on a one-arm-per-team pool a team's only round-0 jobs can be opponent stacks (PHI on 06-03, SEA on 07-19's four-game slate), and at HEAD those round-0 jobs were proven infeasible anyway.
+
+**After, on the same setup.** Ordinary slice: 32 jobs, 32 skipped, 32 solves, 0 infeasible, 27 built, 16 distinct pairs, exhausted. Depth slice `[BAL, BOS]`: 16 jobs, 0 solves, 16 answered by the ordinary bucket, exhausted. The 9-slot pinned entry: 1 job, 1 solve. R115's resume loop (a fake clock, 3 solves per slice, 18 entries at cap 2): distinct pairs 3, 6, 9 over three re-runs, `bank_resume_warranted` True, True, False.
+
+**The one design call, measured before building.** A per-pair rotation that gives every pair a solvable round-0 job (round 0 at HEAD leaves 4 of 16 pairs without a lineup on 06-03 and 12 of 220 on 06-28) was patched in memory and run against the production golden beside the filter. Filter: one frozen value moves (`.aggregates.bank.jobs_total` 64 -> 32), assignments and roster multiset byte-identical. Rotation: 40 aggregate values move and the delivered roster multiset changes, because the need-bounded sleeve and cluster-limited slices walk a different order. Its gain is at most 2/T of pairs inside a narrow budget window. **Declined**; the filter shipped.
+
+**Declined and closed.**
+- **R115(a), superseded at HEAD, the mechanism now pinned.** "The bank freezes at `requested_n`": the direct door's target is `resolve_candidate_bank_size(n)` (v3.18: `ceil(2n)` capped at 150 for 10+), and its Phase 1 forces every viable pair before the target applies; the sliced door's growth bound is the host cap R415 names with its lever. The exit-10 gate is R351's pair-coverage term with R415's cap stop and R390's thin delivery. R351 recorded the end-to-end resume as never verified; `test_r115_a_thin_sliced_bank_resumes_until_its_job_list_is_exhausted` now drives the real `extend_bank` and the real `build_slate` gate functions on the vendored slate: coverage grows on every re-run and never re-solves an answered job, the loop stops when coverage is met, and at cap 1 (18 pairs needed, 16 exist) it stops on `job_list_exhausted`. It is a mechanism test, not the filed "done when": the 1310_6g inputs are not in the repository, so that replay stays unverifiable from a cloud clone.
+- **R115 mechanism (3), truncation concentration.** Measured: the first 13 pairs in job order hold 14 of 22 arms on 06-28 and 9 of 20 on 07-24, not the filed "4 distinct starters" (the 08-13 run's artifacts are not here, and at 75 of 720 jobs breadth-first ordering had already covered every pair once). The round-0 gap is R164's and is the rotation above.
+- **R115's rider, unreachable.** "Seeded SP-pair lineups bypass the SP-exposure-cap excludes on both coverage paths (`optimizer_v3.py:2847-2848`)": the code is at :2884-2885 of `build_multi_lineup`, and no production caller passes `sp_pair_coverage_plan` or `max_sp_exposure`, and the default `bank_constraint_scope='selection'` nulls the bank's SP cap; the allocator's own pitcher cap bounds the delivered set. Nothing built.
+- **R115(c)'s naming half** is already there: the allocator's `_diagnose_binding_constraints` prints `N distinct SP pairs x cap = M < entries` from the bank's own pairs.
+- **What stays open, as R115 (Session 170):** the allocator pair (or arm) floor with its own relaxation rung under R386, `cross_game_only` as a stated control, and per-pair bank counts in the brief.
+
+**The class (R233): every site that fans SP pairs over forced stack teams.** `grep -n "Opponent\|stack_constraints" mlb_engine/optimize/bank_cache.py mlb_engine/optimize/optimizer_v3.py mlb_engine/pipeline/execution_pipeline.py tools/*.py skills/generate-lineups/scripts/*.py`:
+- `bank_cache.extend_bank`'s grid: fixed here. Its production callers all go through it: `build_slate.py` (the ordinary slices), `late_swap.py` (the general and pinned slices), `execution_pipeline.py` (the plan leg, the cluster-limited bucket, the consensus pair, and the tail, named-stack, chalk-fails, environment and salary-only sleeves), `baseline.py`, `benchmark_engine.py`.
+- `build_diverse_candidate_bank`'s Phases 1-3 (`_try_accept`, `optimizer_v3.py`): R293's skip, now through the shared rule.
+- Outside the class, read and left: `build_single_lineup`'s anti-correlation row (the rule's source: `sp_row['Opponent']`); `build_multi_lineup`'s scenario families (the solver chooses the arms); `tools/stack_shape_probe.py` and the pipeline's variant specs (no fixed pair).
+
+**Verification.**
+- `UT test_core.BankCoverageTests`: 12 OK (1 existing, 11 new). The neighbouring bank and late-swap classes (`R293BankOnEveryRungTests`, `R291ExcludedColumnReachesTheOptimizerTests`, `BankConsolidationTests`, `SolverTimeoutSemanticsTests`, `SolverIdDtypeBoundaryTests`, `BankCacheAnsweredJobTests`, `BankCacheBucketingTests`, `FalseSignalBatchTests`, `BankCapGrowthTests`, `BankCapPerBucketTests`, `ServedBucketFactsTests`, `LeveragePassthroughTests`, `ConsensusClusterCapTests`, `ClassicSleeveTests`, `ClassicTailSeatTests`, `StackSleeveTests`, `LateSwapRailsTests`, `BankStackRequestReachesBothDoorsTests`, `ThinBankRecoveryTests`): 258 OK.
+- **Mutations, 15 killed, each by hand against the live module:** the rule's direction reversed to the arms' own team (3 red), the skip unconditional (2), `>=` to `>` at the boundary (2), no skip in the grid (2), `jobs_attempted` by suffix (2), no axis collapse (1), `Position == "P"` (1), the twin dropped from the walk only (3), from the count only (2), no twin at all (3), the walk re-solving answered jobs (1), an over-broad bar (1), the tail entry losing its count (1), `bank_resume_warranted` never resuming (1), and ignoring exhaustion (the loop's 40-run cap fails the test).
+- **GOLD.** `GoldenReplayTests` unmoved. `GoldenProductionReplayTests` re-frozen deliberately, measured with every unit in place: exactly one value, `aggregates.bank.jobs_total` 64 -> 32; the assignments and the roster multiset byte-identical before and after; 9 tests OK.
+- **PROBE.** `solver_probe.py --date 2026-06-03 --salary data/archive/2026-06-03/DKSalaries_2026-06-03.csv`: projected 8s against 630s, FITS.
+- **Gate.** Pending at this commit: the landed tree's local line and the PR's 3.11 `gate` line land in the follow-up landing commit. The session-start gate at 4a2daff read `FAIL  test suite FAILED in tests.test_core (ran 3721)`, the one known 3.13 failure (`ReplaySlateTests.test_settle_scores_requires_integer_hundredths_so_ties_are_exact`: 3.12+ `sum()` is compensated, so its two float sums come out equal), confirmed by running that class alone.
+
+**The register entries, as filed** (R164, R454 and R138 migrate whole; R115's remainder stays in `docs/backlog.md`).
+
+**R164. The bank job grid wastes solves two ways, hardest on the pinned late-swap path (P1, S) | new 2026-08-22, from the greenfield sixth edition; (a) VERIFIED-repro, (b)(c) VERIFIED-read (`bank_cache.py` unchanged since the review)**
+**Rider 2026-09-25 (the code review, optimizer area; `review_optimizer/sleeve_waste.py`): the (b) `extend_bank` half, measured.** `bank_cache.py:932-934` fans every pair over every team with no `_teams_of_pair` skip (the direct door has it at `optimizer_v3.py:4531` since R293): on 06-03 at k=0, 32 of 64 ordinary jobs are (pair, opponent-of-an-arm) and provably infeasible, `proven_infeasible solves 32`, mean 0.014s against 0.030s feasible, 0.449s total, so the waste is 2/T of jobs and about 1/T of the ordinary slice's clock on a T-team slate.
+
+
+**Rider 2026-09-02 (ed10, GF10-S1 and GF10-S5): (b)'s premise is REVERSED in the sibling grid, and the class has a third member.** The diverse bank's `_teams_of_pair` (`optimizer_v3.py:4163-4174`) returns the arms' OWN teams and skips those, so it attempts the opponent stacks the anti-correlation rows bar and never attempts the legal own-team stack (repro: 6 of 13 augmentation attempts infeasible, 0 own-team). Re-scope (b) to BOTH grids with the direction stated: skip `team ∈ {Opponent(a), Opponent(b)}` when the effective `max_opposing_hitters_per_sp < stack_min`. The R293 entry carries the optimizer-side fix; this item keeps the `extend_bank` side. Third member: `extend_bank` (:731-737) read `excl` but never the `Excluded` column, so an all-excluded team or a shelved arm cost a full `proven_infeasible` solve per job (R291(d)).
+
+**The optimizer half SHIPPED under R293, 2026-09-03, and (b)'s own bullet below is now CORRECT ONLY AS RE-SCOPED — read this paragraph before it.** `_teams_of_pair` returns `Opponent` and the skip is CONDITIONAL on the allowance, which is what the bullet's "provably infeasible before the solve" needs in order to stay true after R288 made `k` a control: at `k >= stack_min` an opponent stack is feasible and skipping it would be a wall, not an optimization. Measured on the diverse fixture: 4 infeasible opponent attempts and 0 appended candidates before, 0 opponent attempts and 4 appended after. So two sentences in the bullet below are now FALSE about HEAD and are left in place only as the record of what was believed: "`build_diverse_candidate_bank` already skips these via `_teams_of_pair`, so the two subsystems disagree" described a skip pointing the other way, and the R165 mutation notes repeat the same reversed reading. **What REMAINS on this item is (a), (c), and the `extend_bank` half of (b) — with the direction and the condition taken from R293's `_teams_of_pair`, never re-derived**, and per the R291 landing note above it belongs beside the `eligible` frame rather than in a second place. A session that re-derives the direction here will re-introduce R293(a) one file over, which is the specific thing this paragraph exists to prevent.
+
+**The `Excluded` third SHIPPED under R291, 2026-09-02.** `extend_bank` applies `_drop_excluded_rows` before the pitcher and team enumeration and reports `excluded_column_dropped: {rows, arms, stack_teams}`. Measured on the R289 fixture with one team excluded, against the exact counterfactual (same frame, the drop patched out): 16 jobs -> 6, same 2 candidates. What REMAINS on this item is (a), (c) and the opponent-direction half of (b) -- and note the interaction the R291 landing makes concrete: the two are the same shape (a job the solve can never answer) reached from two different facts, so (b)'s fix belongs beside the `eligible` frame this landing added rather than in a second place.
+
+- **What:** (a) when pins relax `stack_min` below 2 the stack constraint is
+  nulled but the job grid still fans out one job per team, so the IDENTICAL
+  pins+pair MILP is solved `len(teams)` times per SP pair — measured 15 jobs,
+  15 solver calls, 3 distinct candidates on a 7-pinned-slot entry; on a
+  12-game slate ~96% of that entry's slice budget is duplicate re-solves,
+  exactly at T-minus. (b) the grid pairs every SP pair with stack teams that
+  OPPOSE one of the pair's arms — provably infeasible before the solve;
+  `build_diverse_candidate_bank` already skips these via `_teams_of_pair`, so
+  the two subsystems disagree (~528 wasted solves of 6,336 jobs on 12 games,
+  in the FIRST slices). (c) exact `Position == "P"` instead of the
+  `_parse_positions` treatment.
+- **Fix:** (a) collapse the team axis when `stack_min < 2`. (b) skip
+  `(pair, team)` when `team` opposes either arm. (c) parse positions. Sits
+  beside R115 (same file, same session).
+
+**R454. The environment and tail depth slices re-solve (pair, team) jobs the ordinary bucket already answered; on an exhausted grid they spend the sleeve budget and append nothing (P2, XS-S) | new 2026-09-25, found by the 2026-09-25 code review (optimizer area; `review_optimizer/sleeve_waste.py`); the direct door's empty throwaway cache is R417's rider, this is the sliced door | Roadmap: Session 40**
+- **What.** `execution_pipeline.py:2793-2800` (tail: `stack_teams=short, max_candidates=len(cache) + need`) and `:2827-2834` (environment, guarded only by `held >= need`); the restricted grid is a new conditions bucket via the `teams:` suffix (`bank_cache.py:845`, `:932-934`), so the `key in cache.attempted` skip at `:962` never matches the ordinary bucket's identical job. A depth job differs from the ordinary job only by the signature suffix, so the MILP is identical, returns the identical roster, `cache.add` dedupes it, `len(cache)` never grows, and the walk runs to the end of the grid. `classic_sleeves.py:360-366` predicts exactly this. Measured on 06-03: ordinary slice 64 jobs, 27 built, exhausted; depth slice `[PHI, SD]` 32 jobs, 32 solves, 0 built, 32 of 32 already answered, 0.633s re-spent; through `build_sleeve_jobs`: `tail: need 1, already_held {'SD': 1}, built 0, job_list_exhausted True` (16 solves for nothing).
+- **Why.** Bounded clock waste inside `BANK_SLEEVE_BUDGET_SHARE` (30% of the slice budget) on exactly the builds where the sleeve then falls back to `projection` (counted). Not a legality risk.
+- **Fix.** Skip a depth job when the ordinary bucket's key for the same (pair, team, lock_sig) is already in `cache.attempted`, or count `held` off the union before sizing.
+
+**R138. Bank scenario coverage: one stack family per game, stated as standing practice (P2, XS) | new 2026-08-16, from the leverage ideation fragment**
+- **What:** section 7 seeds scenario families from totals/park/wind, and the
+  field concentrates on the top totals — the same feature every structural
+  prior weights highest. When caps bind, the allocator can only choose
+  mid-total coverage if the bank contains it, and today nothing states that
+  as practice.
+- **Fix:** one SKILL.md standing-practice line: the bank always contains at
+  least one stack family per GAME, not per top-ranked game. Bank growth is
+  already the always-permitted remedy under the autonomy contract; this aims
+  it. R126's game-split histogram is the check that it happened; R140's
+  per-family profiles sharpen the target where they exist.
+- **Rides:** any session already touching SKILL.md — R131(c)(d) is the named
+  carrier. Never instead of a tier item.
+
+---
+
 ## 2026-10-12 — R500: the engine's own order against finish order (`attribute --rank`) and the Showdown axis (`attribute --showdown`) (roadmap Session 166)
 
 **Scope.**

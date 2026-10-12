@@ -438,11 +438,18 @@ class GoldenProductionReplayTests(unittest.TestCase):
     sessions and a golden gate may not read moving inputs.
 
     The bank is built in-test through the sliced production path
-    (bank_cache.extend_bank), which exhausts this pool's 64 (SP pair, stack
+    (bank_cache.extend_bank), which exhausts this pool's 32 (SP pair, stack
     team) jobs in about a second where the joint auto-bank path needs
     minutes. job_list_exhausted is asserted, so a slow box fails loudly
     rather than silently freezing a partial bank; solver determinism across
     machines is backed by requirements.lock pinning scipy (R7).
+
+    Re-frozen once, 2026-10-12, R164(b): the grid stopped enumerating the 32
+    (pair, opponent-of-an-arm) jobs the anti-correlation row proves
+    infeasible at k=0, so `aggregates.bank.jobs_total` moved 64 -> 32 and
+    nothing else did. The skip is a filter over the old job order, so every
+    remaining job and every lineup came back identical: the same
+    assignments and the same roster multiset, byte for byte.
 
     Total cost is a few seconds, which is what lets this run inside the
     session-start audit macro's one-call budget.

@@ -275,6 +275,8 @@ Use a compact bank based on unique lineup demand, not raw reserved entries.
 
 Scenario families should represent baseball outcomes—different SP pairs, offenses, and game environments—not repeated arbitrary exclusions. Game totals, park factors, and wind from §5 are the preferred seeds for scenario families.
 
+Standing practice (R138): the bank holds at least one stack family per GAME, not only per top-ranked game. The field concentrates on the top totals, so when caps bind the allocator can choose mid-total coverage only if the bank already holds it. The ordinary sliced grid stacks every legal team over its full walk (`test_core.BankCoverageTests` pins this). A walk the clock cut short may not, and growing the bank (exit 10, a re-run that resumes) is the remedy.
+
 Candidate score may use:
 
 1. Projection appropriate to contest shape.
