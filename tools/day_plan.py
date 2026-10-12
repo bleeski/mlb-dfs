@@ -414,7 +414,8 @@ def hook_line(root: Optional[Path] = None, *, now: Optional[datetime] = None,
     Never raises."""
     try:
         root = Path(root) if root is not None else REPO_ROOT
-        date = _now_et(now).date().isoformat()
+        now = _now_et(now)  # one clock reading for the date and the plan
+        date = now.date().isoformat()
         plan = build_plan(root, date, now, attachment_roots=attachment_roots)
         if not plan["draftgroups"] and not build_claim:
             return None
