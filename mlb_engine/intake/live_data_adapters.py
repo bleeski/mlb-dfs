@@ -1049,6 +1049,84 @@ def merge_dk_starting_into_feed(
     return out_feed, report
 
 
+#: R208. The confirmed-lineup crosswalk bar, named once. A confirmed side that
+#: matches fewer salary hitters than this is a name or team join failure rather
+#: than thin data (R133), and CLAUDE.md lists it as Ben's at any clock. The
+#: Classic pool's confirmed-side check and the Showdown melt's feed lift both
+#: read it, so the two doors cannot disagree about where the wall is.
+FEED_CROSSWALK_MIN_MATCHED = 5
+
+
+def showdown_feed_sides(feed: Optional[Mapping[str, Any]],
+                        salary_csv: str | Path) -> Dict[str, Any]:
+    """R208. What a lineups feed says about each side of a SHOWDOWN slate,
+    crosswalked to DK's UTIL ids. Crosswalk only: which source a side's pool
+    takes is the melt's decision, not this function's.
+
+    The melt read batting order from DK's ``Starting`` column alone, so a
+    confirmed paste or API pull never reached a side DK left blank (1335_1g_sd).
+    This is the Classic front door's own two calls, ``merge_dk_starting_into_feed``
+    then ``build_status_map_from_lineups_feed`` (``build_slate_pool``), on the
+    file's UTIL rows. UTIL only, because a Showdown file lists every person
+    twice: on both rows every name matches two ids and the name crosswalk calls
+    the whole side ambiguous. The UTIL row is the person's base identity and
+    the one a resolved paste carries (``paste_lineups._dedupe_by_dk_identity``).
+    Reusing the pair brings R143's precedence and its named disagreements, R325's
+    explicit-id team check and date check, R151's accent folding and the
+    doubleheader leg selection, rather than a second copy of any of them.
+
+    Returns ``{"teams": {team: record}, "disagreements": [...]}`` for the
+    salary file's teams only; a whole-day feed's other games are not this
+    draftgroup's business. Each record carries ``feed_status`` (the side's
+    ``lineup_status``, ``absent`` when the feed has nothing for it), ``source``,
+    ``rows``, ``order_by_util_id`` (confirmed sides only), ``unmatched`` and
+    ``date_ignored`` (the feed's date for the game is not the salary file's).
+    """
+    from mlb_engine.intake.slate_intake_manager import parse_dk_salary_csv
+
+    util = {p.player_id: p for p in parse_dk_salary_csv(str(salary_csv))
+            if str((p.raw or {}).get("Roster Position") or "").strip().upper()
+            == "UTIL"}
+    merged, merge_report = merge_dk_starting_into_feed(feed, util)
+    status = build_status_map_from_lineups_feed(merged, util)
+    team_of = {pid: to_dk_abbrev(_record_get(p, "team")) for pid, p in util.items()}
+    teams: Dict[str, Dict[str, Any]] = {
+        team: {"team": team, "game_id": None, "feed_status": "absent",
+               "source": None, "rows": 0, "order_by_util_id": {},
+               "unmatched": [], "date_ignored": False}
+        for team in sorted(set(team_of.values()) - {""})}
+    ignored = {r["game_id"] for r in status.get("feed_dates_ignored") or []}
+    kept, _dropped = _select_slate_legs(list(merged.get("games") or []),
+                                        _salary_game_times(util))
+    for game in kept:
+        away = to_dk_abbrev((game.get("away") or {}).get("team_abbrev"))
+        home = to_dk_abbrev((game.get("home") or {}).get("team_abbrev"))
+        for key, team in (("away", away), ("home", home)):
+            if team not in teams:
+                continue
+            side = game.get(key) or {}
+            rows = side.get("lineup") or []
+            teams[team].update({
+                "game_id": f"{away}@{home}",
+                "feed_status": (str(side.get("lineup_status") or "").strip().lower()
+                                or "absent"),
+                "source": (side.get("lineup_source") or side.get("source")
+                           or game.get("source") or (feed or {}).get("source")
+                           or "lineups_feed"),
+                "rows": len(rows),
+                "date_ignored": f"{away}@{home}" in ignored,
+            })
+    for pid, order in sorted(status["confirmed_order_by_player_id"].items()):
+        if team_of.get(pid) in teams:
+            teams[team_of[pid]]["order_by_util_id"][str(pid)] = int(order)
+    for miss in status.get("unmatched_feed_players") or []:
+        if miss.get("team") in teams:
+            teams[miss["team"]]["unmatched"].append(dict(miss))
+    return {"teams": teams,
+            "disagreements": [d for d in merge_report.get("disagreements") or []
+                              if d.get("team") in teams]}
+
+
 # ---------------------------------------------------------------------------
 # MLB Stats API lineups feed -> late-swap and confirmation contracts
 # ---------------------------------------------------------------------------
@@ -2244,7 +2322,7 @@ def build_slate_pool(
         if n == 9:
             continue
         detail = f"{team}: confirmed lineup matched {n}/9 salary hitters"
-        if n < 5:
+        if n < FEED_CROSSWALK_MIN_MATCHED:
             # A posted lineup that crosswalks to almost nothing is a name/team
             # join failure, not thin data. Building anyway silently substitutes a
             # projected or APPG order while real information sits unused.
@@ -2568,7 +2646,7 @@ def build_slate_pool(
         if team in excluded_teams or dk_slots < 9:
             continue
         matched = sum(1 for r in keep.values() if r["Team"] == team)
-        if matched < 5:
+        if matched < FEED_CROSSWALK_MIN_MATCHED:
             blockers.append(
                 f"{team}: DK marks 9 confirmed batting slots in the salary file "
                 f"but the pool holds {matched}; crosswalk failure, the "

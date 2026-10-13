@@ -4242,7 +4242,14 @@ class R291ShowdownExcludedColumnTests(unittest.TestCase):
                              "a one-team legal pool produced a lineup")
             args = types.SimpleNamespace(date="2026-07-18", entries=None,
                                          controls_override=None, projections=None)
-            with contextlib.redirect_stdout(io.StringIO()) as out:
+
+            def no_feed(*_a, **_k):
+                raise OSError("no egress in a test")
+
+            # R208: the lineups feed is read before the melt now, so this
+            # refusal is reached after a feed read; it stays network-free.
+            with unittest.mock.patch.object(mod, "fetch_lineups", no_feed), \
+                    contextlib.redirect_stdout(io.StringIO()) as out:
                 code, brief = mod.run_showdown(
                     args, Path(tmp), path, Path(tmp) / "no_such_entries.csv")
             printed = json.loads(out.getvalue())
@@ -7908,6 +7915,265 @@ class UseLadderGateTests(_ShowdownExitDoorHarness, unittest.TestCase):
             "pool basis is 'all_healthy' with 0 posted hitters; the thesis "
             "ladder needs both posted batting orders to condition on, so it "
             "was not used")
+
+
+class ShowdownLineupMergeTests(_ShowdownExitDoorHarness, unittest.TestCase):
+    """R208. A confirmed 1-9 in the lineups feed reaches the Showdown POOL when
+    DK leaves a side's `Starting` blank.
+
+    The melt read batting order from DK's column alone, and `--lineups` reached
+    Showdown only through `showdown_handedness`, after the pool was built. On
+    1335_1g_sd DK flagged both probables and left all eighteen hitters blank,
+    Ben's paste resolved cleanly, and the pool was the whole healthy roster.
+    Reproduced at b988c61 on MIN@CHC reshaped the same way (hitters blank, DK's
+    SP tokens kept on Taj Bradley and Matthew Boyd, a pasted confirmed nine per
+    side via `--lineups`): pool 70, `all_healthy`, posted 0, and 14 of 14
+    lineups carried someone outside the confirmed twenty (54 of 84 slots).
+
+    The lift is narrow on purpose. A side takes the feed's order only when DK
+    posted NO slot on it, DK declares an arm on it (otherwise the lift drops
+    every pitcher on the side), the feed calls it confirmed for this date, and
+    all nine rows crosswalk to nine pool persons on slots 1-9. Everything else
+    is the pool it always was, with the reason named.
+    """
+
+    _ARMS = {"MIN": "Taj Bradley", "CHC": "Matthew Boyd"}
+
+    @staticmethod
+    def _posted():
+        """MIN_CHC's own posted nines off the vendored file's UTIL rows:
+        team -> slot -> (name, UTIL id)."""
+        out: dict = collections.defaultdict(dict)
+        with SAL.open(newline="", encoding="utf-8-sig") as fh:
+            for row in csv.DictReader(fh):
+                token = (row.get("Starting") or "").strip()
+                if token.isdigit() and row["Roster Position"] == "UTIL":
+                    out[row["TeamAbbrev"]][int(token)] = (row["Name"], row["ID"])
+        return out
+
+    def _salary(self, name="DKSalaries_blank.csv", keep_slots=None,
+                drop_arm=None, clash=None):
+        """1335_1g_sd's shape: every hitter's `Starting` blank, DK's arm
+        tokens kept. `keep_slots` leaves {team: n} of DK's slots posted;
+        `drop_arm` blanks one team's SP token too; `clash` gives one person's
+        CPT row a Position his UTIL row does not carry."""
+        keep_slots = keep_slots or {}
+        with SAL.open(newline="", encoding="utf-8-sig") as fh:
+            rows = list(csv.reader(fh))
+        head = rows[0]
+        col, team_col = head.index("Starting"), head.index("TeamAbbrev")
+        name_col, role_col = head.index("Name"), head.index("Roster Position")
+        pos_col = head.index("Position")
+        for row in rows[1:]:
+            if clash and row[name_col] == clash and row[role_col] == "CPT":
+                row[pos_col] = "ZZ"
+            token = row[col].strip()
+            if token.isdigit() and int(token) > keep_slots.get(row[team_col], 0):
+                row[col] = ""
+            if drop_arm and row[team_col] == drop_arm and token == "SP":
+                row[col] = ""
+        dest = self.base / name
+        with dest.open("w", newline="", encoding="utf-8") as fh:
+            csv.writer(fh).writerows(rows)
+        return dest
+
+    def _feed(self, *, with_ids=True, source="operator_paste",
+              date="2026-07-18T18:20:00Z", statuses=None, rename=None,
+              extra_game=False):
+        """A lineups feed carrying MIN_CHC's posted nines. `rename` maps
+        (team, slot) to a name no DK row carries; `statuses` overrides a
+        side's `lineup_status`."""
+        posted, statuses, rename = self._posted(), statuses or {}, rename or {}
+        game = {"game_pk": 1, "status": "Pre-Game", "game_date_utc": date}
+        for side, team in (("away", "MIN"), ("home", "CHC")):
+            lineup = []
+            for slot, (name, util_id) in sorted(posted[team].items()):
+                row = {"order": slot, "name": rename.get((team, slot), name),
+                       "bat_side": "R"}
+                if with_ids and (team, slot) not in rename:
+                    row["dk_id"] = util_id
+                lineup.append(row)
+            block = {"team_abbrev": team, "lineup": lineup,
+                     "lineup_status": statuses.get(team, "confirmed"),
+                     "probable_pitcher": {"name": self._ARMS[team], "hand": "R"}}
+            if source:
+                block["source"] = source
+            game[side] = block
+        games = [game]
+        if extra_game:
+            # A whole-day API feed names games this draftgroup does not carry.
+            games.append({"game_pk": 2, "status": "Pre-Game", "game_date_utc": date,
+                          **{side: {"team_abbrev": team, "lineup_status": "confirmed",
+                                    "lineup": [{"order": i, "name": f"{team} Bat{i}"}
+                                               for i in range(1, 10)]}
+                             for side, team in (("away", "NYY"), ("home", "BOS"))}})
+        return {"date": "2026-07-18", "games": games}
+
+    def _melt(self, salary, feed):
+        return sd.melt_showdown_salary_csv(str(salary), lineups_feed=feed)
+
+    @staticmethod
+    def _orders(df):
+        return {s["team"]: s for s in df.attrs["participation_report"]["sides"]}
+
+    def _confirmed_twenty(self):
+        return ({n for team in self._posted().values() for n, _i in team.values()}
+                | set(self._ARMS.values()))
+
+    # -- the row's verification, through the real exit door -- #
+
+    def test_a_pasted_order_on_a_blank_side_builds_on_the_confirmed_twenty(self):
+        feed_path = self.base / "lineups_feed.json"
+        feed_path.write_text(json.dumps(self._feed()), encoding="utf-8")
+        r = self._build(self._root(), salary_csv=self._salary(),
+                        args_extra={"lineups": str(feed_path)})
+        self.assertEqual(r.code, 0, r.err[-3000:])
+        pool = r.brief.get("pool") or {}
+        self.assertEqual(pool.get("players"), 20, pool)
+        self.assertEqual(pool.get("basis"), "declared_starters")
+        self.assertEqual(pool.get("posted_hitters"), 18)
+        self.assertEqual((r.brief.get("construction") or {}).get("mode"),
+                         "thesis_ladder")
+        participation = pool["participation"]
+        self.assertEqual(participation["feed_orders"]["lifted"], ["CHC", "MIN"])
+        self.assertEqual({s["team"]: s["order_source"] for s in participation["sides"]},
+                         {"CHC": "operator_paste", "MIN": "operator_paste"})
+        names = {row["ID"]: row["Name"] for row in self._salary_rows().values()}
+        files = self._file_lines(r.err)
+        self.assertTrue(files, r.err[-2000:])
+        allowed = self._confirmed_twenty()
+        for line in files:
+            for entry in self._entry_rows(self._path_of(line)):
+                players = {names[pid] for pid in entry["cells"] if pid}
+                self.assertLessEqual(players, allowed, (line, players - allowed))
+
+    # -- the melt: which sides lift, and the reason for every side that does not -- #
+
+    def test_a_fetched_api_feed_lifts_a_blank_side_too(self):
+        """R143's third rank. An API pull carries names and MLBAM ids, no DK
+        id and no source label, and covers the whole day: the crosswalk is
+        the Classic one on the UTIL rows, and the other game's hitters are
+        not this draftgroup's business."""
+        df = self._melt(self._salary(),
+                        self._feed(with_ids=False, source=None, extra_game=True))
+        report = df.attrs["participation_report"]
+        self.assertEqual(report["slate_basis"], "declared_starters")
+        self.assertEqual(len(df), 20)
+        self.assertEqual(report["feed_orders"]["lifted"], ["CHC", "MIN"])
+        self.assertEqual(report["feed_orders"]["unmatched"], [])
+        self.assertEqual({t: s["order_source"] for t, s in self._orders(df).items()},
+                         {"CHC": "lineups_feed", "MIN": "lineups_feed"})
+        for team, nine in self._posted().items():
+            got = {r.Name: r.Batting_Order for r in df.itertuples()
+                   if r.Team == team and r.Batting_Order == r.Batting_Order
+                   and r.Batting_Order is not None}
+            self.assertEqual(got, {name: slot for slot, (name, _i) in nine.items()})
+        self.assertEqual(set(df["Name"]), self._confirmed_twenty())
+
+    def test_a_posted_dk_side_outranks_a_contradicting_feed(self):
+        """DK's complete nine is the first source and the feed never rewrites
+        it. The contradiction is named, never resolved silently."""
+        bench = "Matt Wallner"
+        feed = self._feed(rename={("MIN", 9): bench})
+        plain = sd.melt_showdown_salary_csv(str(SAL))
+        df = self._melt(SAL, feed)
+        self.assertEqual(sorted(df["Player_Key"]), sorted(plain["Player_Key"]))
+        self.assertEqual(df["Batting_Order"].fillna(0).tolist(),
+                         plain["Batting_Order"].fillna(0).tolist())
+        orders = df.attrs["participation_report"]["feed_orders"]
+        self.assertEqual(orders["lifted"], [])
+        self.assertEqual(orders["not_lifted"], [],
+                         "a side DK posted is DK's, not a side the feed declined")
+        self.assertEqual([d["team"] for d in orders["disagreements"]], ["MIN"])
+        self.assertEqual(orders["disagreements"][0]["in_feed_not_dk"], [bench])
+        self.assertEqual({t: s["order_source"] for t, s in self._orders(df).items()},
+                         {"CHC": "dk_starting", "MIN": "dk_starting"})
+
+    def test_a_dk_partial_side_is_not_lifted_and_says_why(self):
+        df = self._melt(self._salary(keep_slots={"MIN": 4}), self._feed())
+        report = df.attrs["participation_report"]
+        orders = report["feed_orders"]
+        self.assertEqual(orders["lifted"], ["CHC"])
+        self.assertEqual([n["team"] for n in orders["not_lifted"]], ["MIN"])
+        self.assertIn("posted 4 of 9", orders["not_lifted"][0]["reason"])
+        self.assertEqual(report["slate_basis"], "mixed_declared_and_projected")
+        self.assertIsNone(self._orders(df)["MIN"]["order_source"])
+        self.assertGreater(int((df["Team"] == "MIN").sum()), 10)
+
+    def test_a_side_with_no_dk_arm_is_not_lifted(self):
+        """Lifting decides the side, and on a decided side every arm DK does
+        not declare is a confirmed nonstarter: with no DK arm at all, the lift
+        would empty MIN's pitching. The feed's probable is not read as a
+        declaration here."""
+        df = self._melt(self._salary(drop_arm="MIN"), self._feed())
+        orders = df.attrs["participation_report"]["feed_orders"]
+        self.assertEqual(orders["lifted"], ["CHC"])
+        self.assertIn("no arm", orders["not_lifted"][0]["reason"])
+        self.assertLessEqual({"Joe Ryan", "Taj Bradley"}, set(df["Name"]))
+
+    def test_a_malformed_dk_side_is_not_lifted(self):
+        """A person whose CPT and UTIL rows disagree makes his side malformed
+        with no slot posted at all. Lifting it would seat the feed's nine on a
+        side the shared predicate still calls undecided."""
+        df = self._melt(self._salary(clash="Matt Wallner"), self._feed())
+        orders = df.attrs["participation_report"]["feed_orders"]
+        self.assertEqual(orders["lifted"], ["CHC"])
+        self.assertIn("malformed", orders["not_lifted"][0]["reason"])
+        self.assertTrue(df.loc[df["Team"] == "MIN", "Batting_Order"].isna().all())
+
+    def test_seven_of_nine_crosswalked_is_not_lifted_and_does_not_refuse(self):
+        df = self._melt(self._salary(), self._feed(
+            rename={("MIN", 3): "Nobody Atall", ("MIN", 7): "Someone Else"}))
+        orders = df.attrs["participation_report"]["feed_orders"]
+        self.assertEqual(orders["lifted"], ["CHC"])
+        self.assertIn("7 of 9", orders["not_lifted"][0]["reason"])
+        self.assertEqual(orders["crosswalk_failures"], [])
+        self.assertEqual(sorted(u["name"] for u in orders["unmatched"]),
+                         ["Nobody Atall", "Someone Else"])
+
+    def test_a_feed_dated_another_day_is_not_lifted(self):
+        """Yesterday's game in a series is the same matchup with a different
+        nine. R325's date check names it; the lift trusts nothing from it."""
+        df = self._melt(self._salary(), self._feed(date="2026-07-17T18:20:00Z"))
+        orders = df.attrs["participation_report"]["feed_orders"]
+        self.assertEqual(orders["lifted"], [])
+        self.assertEqual(len(orders["not_lifted"]), 2)
+        for rec in orders["not_lifted"]:
+            self.assertIn("date", rec["reason"])
+        self.assertEqual(df.attrs["participation_report"]["slate_basis"], "all_healthy")
+
+    def test_a_partial_feed_side_is_not_lifted_and_is_not_a_crosswalk_failure(self):
+        df = self._melt(self._salary(), self._feed(statuses={"CHC": "partial"}))
+        orders = df.attrs["participation_report"]["feed_orders"]
+        self.assertEqual(orders["lifted"], ["MIN"])
+        self.assertIn("'partial'", orders["not_lifted"][0]["reason"])
+        self.assertEqual(orders["crosswalk_failures"], [])
+        self.assertEqual(df.attrs["participation_report"]["slate_basis"],
+                         "mixed_declared_and_projected")
+
+    def test_no_feed_and_an_empty_feed_leave_the_pool_alone(self):
+        plain = sd.melt_showdown_salary_csv(str(SAL))
+        self.assertIs(plain.attrs["participation_report"]["feed_orders"]["applied"], False)
+        empty = self._melt(SAL, {"date": "2026-07-18", "games": []})
+        self.assertIs(empty.attrs["participation_report"]["feed_orders"]["applied"], True)
+        pd.testing.assert_frame_equal(empty, plain)
+
+    # -- the refusal: a confirmed lineup in hand that crosswalks to almost nothing -- #
+
+    def test_a_crosswalk_failure_refuses_through_the_exit_door(self):
+        rename = {("MIN", n): f"Not A Player {n}" for n in range(1, 7)}
+        feed_path = self.base / "lineups_feed.json"
+        feed_path.write_text(json.dumps(self._feed(rename=rename)), encoding="utf-8")
+        r = self._build(self._root(), salary_csv=self._salary(),
+                        args_extra={"lineups": str(feed_path)})
+        self.assertEqual(r.code, 3, r.err[-2000:])
+        payload = json.loads(r.out[r.out.find("{"):])
+        self.assertEqual(payload["status"], "pool_blocked")
+        self.assertEqual(payload["refusal"], "showdown_pool_blocked_crosswalk")
+        self.assertEqual(payload["refusal_authority"], "claude_md_wall")
+        self.assertEqual(payload["feed_orders"]["crosswalk_failures"],
+                         [{"team": "MIN", "matched": 3, "of": 9}])
+        self.assertEqual(self._file_lines(r.err), [])
 
 
 class ShowdownManifestCountTests(_ShowdownExitDoorHarness, unittest.TestCase):

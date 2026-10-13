@@ -31680,7 +31680,8 @@ class RefusalClassificationTests(unittest.TestCase):
         self.assertEqual(len(set(stamped)), len(stamped),
                          "a refusal key is stamped LITERALLY at two different "
                          "sites, so one payload's class describes another site")
-        self.assertEqual(len(mod.REFUSAL_SITES), 11)
+        # R208, 2026-10-13: 11 -> 12, `showdown_pool_blocked_crosswalk`.
+        self.assertEqual(len(mod.REFUSAL_SITES), 12)
         for key in stamped:
             self.assertIn(key, table_keys, f"{key} is stamped with no row")
 
@@ -31713,12 +31714,13 @@ class RefusalClassificationTests(unittest.TestCase):
             "a function returns a refusal exit code and stamps no class; an "
             "unclassified refusal exit is the N+1 this table prevents")
 
-        # C. The shape pin. Ten `return` statements yield 3 or 10 today, over
-        # eleven semantic sites, because the Showdown loop shares one. A NEW
+        # C. The shape pin. Eleven `return` statements yield 3 or 10 today, over
+        # twelve semantic sites, because the Showdown loop shares one (R208,
+        # 2026-10-13: 10 -> 11, the Showdown crosswalk refusal). A NEW
         # return statement of 3 or 10 fails here and forces its author to
         # classify it; a deliberate merge or split updates this number and says
         # so in the CHANGELOG entry, which is where R233 puts an enumeration.
-        self.assertEqual(len(sites), 10,
+        self.assertEqual(len(sites), 11,
                          f"the count of refusal return statements moved: "
                          f"{sites}")
 

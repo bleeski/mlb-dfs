@@ -9,6 +9,23 @@ all of it.
 `declared_starters` with both orders posted. `build_showdown_bank`, documented
 below, is the fallback for an unposted slate.
 
+**A side's order comes from DK's `Starting` column first and the lineups feed
+second (R208).** When DK posts no slot on a side, the pool takes that side's
+nine from the feed `run_showdown` reads once (`--lineups`, else the slate
+folder's `lineups_feed.json`, else a fetch). It does so only if all of these
+hold:
+- DK declares an arm on the side.
+- The feed calls the side confirmed, for the salary file's date.
+- All nine rows match pool persons on slots 1-9, through Classic's name+team
+  crosswalk on the UTIL rows.
+
+`brief.pool.participation` shows the result. Each side carries its
+`order_source`, and `feed_orders` names the sides lifted, every side not lifted
+with its reason, unmatched names, and any disagreement with a side DK posted
+(DK wins). A confirmed feed side that matches under five pool persons refuses
+as `showdown_pool_blocked_crosswalk` (exit 3, Ben's at any clock). A DK partial
+side and a side with no DK arm keep DK's pool (R503).
+
 **Three portfolio controls are enforced in the solver on both paths (R153, Ben
 2026-08-19).** The defaults live in `mlb_engine/optimize/showdown.py` and are
 the citation:

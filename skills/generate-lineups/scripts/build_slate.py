@@ -261,6 +261,21 @@ REFUSAL_SITES = (
                "being substituted for it.",
     },
     {
+        "key": "showdown_pool_blocked_crosswalk",
+        "exit_code": 3,
+        "prints_status": "pool_blocked",
+        "klass": REFUSAL_ILLEGAL,
+        "authority": "claude_md_wall",
+        "override": None,
+        "why": "R208. The Showdown twin of `pool_blocked_crosswalk`, on the "
+               "door that has no pool report: a lineups feed confirms a side "
+               "DK left blank and its nine match fewer than five pool persons. "
+               "The real posted lineup is in hand and the pool would build on "
+               "the whole healthy roster instead. Its own row because a key is "
+               "stamped at one site only; the authority, class and remedy are "
+               "the Classic row's.",
+    },
+    {
         "key": "bank_thin_partial",
         "exit_code": 10,
         "prints_status": "partial",
@@ -5494,7 +5509,40 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
 # --------------------------------------------------------------------------- #
 # Showdown
 # --------------------------------------------------------------------------- #
-def showdown_handedness(args, slate_dir: Path, df) -> tuple[dict, dict, dict]:
+def showdown_lineups_feed(args, slate_dir: Path) -> tuple[dict | None, dict]:
+    """(feed or None, note): the one read of the lineups feed a Showdown build
+    makes. R208.
+
+    The named ``--lineups`` file, else the slate folder's ``lineups_feed.json``,
+    else a fetch; a failure at each step is a warning, never a refusal, so a
+    feed that cannot be had leaves the build where it always was. Lifted out of
+    ``showdown_handedness`` unchanged because the POOL now reads the same feed
+    (``melt_showdown_salary_csv(lineups_feed=)``) and does so first: one read,
+    so the pool and the platoon prior cannot be looking at two different feeds,
+    and a fetch happens at most once.
+    """
+    note: dict = {}
+    named = getattr(args, "lineups", None)
+    feed_path = Path(named) if named else slate_dir / "lineups_feed.json"
+    feed = None
+    if feed_path.exists():
+        try:
+            feed = json.loads(feed_path.read_text(encoding="utf-8"))
+            note["source"] = str(feed_path)
+            note["age_minutes"] = feed_age_minutes(feed)
+        except Exception as exc:
+            note["warning"] = f"unreadable lineups feed: {exc}"
+    if feed is None:
+        try:
+            feed = fetch_lineups(args.date, slate_dir / "lineups_feed.json")
+            note["source"] = "fetched"
+        except Exception as exc:
+            note["warning"] = f"lineups feed unavailable ({exc}); platoon stays flat"
+    return feed, note
+
+
+def showdown_handedness(args, slate_dir: Path, df,
+                        loaded: tuple | None = None) -> tuple[dict, dict, dict]:
     """Return (bat_side, pitcher_hand_by_team, note) for a Showdown pool.
 
     The platoon component of the Base prior needs a hitter's side and the
@@ -5527,6 +5575,10 @@ def showdown_handedness(args, slate_dir: Path, df) -> tuple[dict, dict, dict]:
     never a guess; every pool hitter left without a side is named in
     ``note["hitters_without_side"]`` and on one stderr line. A warning, never a
     refusal.
+
+    R208. ``loaded`` is ``showdown_lineups_feed``'s ``(feed, note)``, which
+    ``run_showdown`` reads once for the pool and hands here; without it this
+    reads the feed itself, the same way.
     """
     from mlb_engine.intake.live_data_adapters import to_dk_abbrev
     from mlb_engine.optimize import showdown_theses as _st
@@ -5565,23 +5617,12 @@ def showdown_handedness(args, slate_dir: Path, df) -> tuple[dict, dict, dict]:
             print(f"showdown handedness: {len(without)} of {with_side + len(without)} "
                   f"hitters have no bat side and take the flat 1.00 platoon factor: "
                   f"{names}{f' (+{more} more)' if more > 0 else ''}", file=sys.stderr)
-    feed_path = Path(args.lineups) if args.lineups else slate_dir / "lineups_feed.json"
-    feed = None
-    if feed_path.exists():
-        try:
-            feed = json.loads(feed_path.read_text(encoding="utf-8"))
-            note["source"] = str(feed_path)
-            note["age_minutes"] = feed_age_minutes(feed)
-        except Exception as exc:
-            note["warning"] = f"unreadable lineups feed: {exc}"
+    feed, load_note = (loaded if loaded is not None
+                       else showdown_lineups_feed(args, slate_dir))
+    note.update(load_note)
     if feed is None:
-        try:
-            feed = fetch_lineups(args.date, slate_dir / "lineups_feed.json")
-            note["source"] = "fetched"
-        except Exception as exc:
-            note["warning"] = f"lineups feed unavailable ({exc}); platoon stays flat"
-            _tally({})
-            return {}, {}, note
+        _tally({})
+        return {}, {}, note
 
     teams = set(df["Team"].unique()) if len(df) else set()
     seen_sides: dict = {}
@@ -6362,7 +6403,38 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
 
     from mlb_engine.intake.slate_intake_manager import parse_dk_salary_csv, slate_clock
 
-    df = sd.melt_showdown_salary_csv(str(salary))
+    # R208. The lineups feed is read ONCE, here, before the melt: the pool takes
+    # a confirmed nine from it for a side DK left blank, and the platoon prior
+    # below reuses the same read rather than fetching a second time.
+    feed, feed_load_note = showdown_lineups_feed(args, slate_dir)
+    df = sd.melt_showdown_salary_csv(str(salary), lineups_feed=feed)
+    # R208. A confirmed lineup for a side DK left blank that matches almost
+    # nobody in the pool is a crosswalk failure, and CLAUDE.md lists it as
+    # Ben's at any clock: the real lineup is in hand and the pool would build on
+    # the whole healthy roster instead. Refused here, by name, for the reason
+    # Classic's front door refuses it (R133(4)).
+    feed_orders = (df.attrs.get("participation_report") or {}).get(
+        "feed_orders") or {}
+    if feed_orders.get("crosswalk_failures"):
+        print(json.dumps({
+            "status": "pool_blocked",
+            **refusal_stamp("showdown_pool_blocked_crosswalk"),
+            "date": args.date,
+            "blockers": [f"{f['team']}: the lineups feed's confirmed lineup "
+                         f"matched {f['matched']} of {f['of']} to the Showdown "
+                         f"pool; crosswalk failure, real lineup went unused"
+                         for f in feed_orders["crosswalk_failures"]],
+            "feed_orders": feed_orders,
+            "lineups_feed": feed_load_note,
+            "note": "a name-crosswalk failure is not overridable: fix the "
+                    "names or team codes in the feed against the salary file "
+                    "(`tools/lineups_from_paste.py --resolve` for a paste), or "
+                    "drop the side from the feed so DK's column alone decides.",
+        }, indent=1))
+        return 3, {}
+    for rec in feed_orders.get("not_lifted") or []:
+        print(f"lineups feed: {rec['team']} takes no batting order from the "
+              f"feed: {rec['reason']}", file=sys.stderr)
     # R291(c). Read before anything is built, so a restriction that leaves no
     # legal lineup refuses HERE with the reason, rather than surfacing as an
     # empty bank three hundred lines later. The melt's own single-team refusal
@@ -6425,7 +6497,8 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
     # points-max bank, so gather them before deciding the path. Both are
     # best-effort: a Showdown build must not fail because an odds endpoint is
     # down, it must say the input was missing and build anyway.
-    bat_side, pitcher_hand, feed_note = showdown_handedness(args, slate_dir, df)
+    bat_side, pitcher_hand, feed_note = showdown_handedness(
+        args, slate_dir, df, loaded=(feed, feed_load_note))
     moneyline, odds_note, odds_packet = showdown_moneyline(args, df,
                                                            salary_csv=salary)
     if odds_note.get("named_file_missing"):
