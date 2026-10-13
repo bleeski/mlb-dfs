@@ -3392,7 +3392,7 @@ def parse_the_odds_api_totals(
     raw: Sequence[Mapping[str, Any]],
     fetched_at: Optional[str] = None,
     slate_game_times: Optional[Mapping[str, datetime]] = None,
-    tolerance_minutes: int = 10,
+    tolerance_minutes: int = LEG_START_TOLERANCE_MINUTES,
 ) -> Dict[str, Any]:
     """Parse a v4 odds response (markets=totals) into odds-gate packet entries.
 

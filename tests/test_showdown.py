@@ -8049,6 +8049,42 @@ class ShowdownLineupMergeTests(_ShowdownExitDoorHarness, unittest.TestCase):
 
     # -- the melt: which sides lift, and the reason for every side that does not -- #
 
+    def test_the_paste_tools_own_feed_lifts_both_sides(self):
+        """Every other case here hands the melt a synthetic feed. This one
+        runs an mlb.com-style paste through `resolve_paste_to_feed`, the
+        engine half of `tools/lineups_from_paste.py`, against the reshaped
+        Showdown file: its UTIL ids, `fetched_at` and salary-derived start
+        are what the lift reads, so a shape drift there cannot leave the
+        feature inert while the synthetic cases stay green."""
+        from mlb_engine.intake.paste_lineups import resolve_paste_to_feed
+        salary = self._salary()
+        positions = {}
+        with SAL.open(newline="", encoding="utf-8-sig") as fh:
+            for row in csv.DictReader(fh):
+                positions[row["Name"]] = row["Position"].split("/")[0]
+        lines = ["[Twins](https://www.mlb.com/twins)@[Cubs](https://www.mlb.com/cubs)",
+                 "(50-50)", "2:20 PM", "Wrigley Field", "(50-50)",
+                 "[Taj Bradley](https://www.mlb.com/player/taj-bradley-1)", "RHP",
+                 "0-0, 4.00 ERA, 1 SO",
+                 "[Matthew Boyd](https://www.mlb.com/player/matthew-boyd-1)", "LHP",
+                 "0-0, 4.00 ERA, 1 SO", "MIN Lineup", "CHC Lineup", ""]
+        for team in ("MIN", "CHC"):
+            for slot, (name, _util) in sorted(self._posted()[team].items()):
+                first, last = name.split(" ", 1)
+                lines.append(f"{slot}. [{first[0]} {last}](https://www.mlb.com/"
+                             f"player/x-1) (R) {positions[name]}")
+            lines.append("")
+        result = resolve_paste_to_feed("\n".join(lines) + "\n", str(salary))
+        self.assertEqual(result["report"].get("blockers") or [], [], result["report"])
+        df = self._melt(salary, result["feed"])
+        report = df.attrs["participation_report"]
+        self.assertEqual(report["feed_orders"]["lifted"], ["CHC", "MIN"],
+                         report["feed_orders"])
+        self.assertEqual(len(df), 20)
+        self.assertEqual({s["order_source"] for s in report["sides"]},
+                         {"operator_paste"})
+
+
     def test_a_fetched_api_feed_lifts_a_blank_side_too(self):
         """R143's third rank. An API pull carries names and MLBAM ids, no DK
         id and no source label, and covers the whole day: the crosswalk is

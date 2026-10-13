@@ -8,7 +8,7 @@ What changed in the engine, the tools and the contracts, when, and why.
 - `mlb_engine/intake/live_data_adapters.py`:
   - `showdown_feed_sides`, new. It runs Classic's own two front-door calls (`merge_dk_starting_into_feed`, then `build_status_map_from_lineups_feed`) on the Showdown file's UTIL rows and returns, per slate team, the feed status, source label, rows, `order_by_util_id`, unmatched names and whether R325's date check ignored the game, plus the merge's disagreements.
   - `FEED_CROSSWALK_MIN_MATCHED = 5`, new. The confirmed-side check and the DK-posted backstop in `build_slate_pool` read it in place of two `5` literals, unchanged in value.
-  - `LEG_START_TOLERANCE_MINUTES = 10`, new: the default both doubleheader leg selectors already had, named and now read by the Showdown start check.
+  - `LEG_START_TOLERANCE_MINUTES = 10`, new: the default the two doubleheader leg selectors and the odds-packet leg match already had, named and now read by the Showdown start check.
 - `mlb_engine/optimize/showdown.py`:
   - `melt_showdown_salary_csv(..., lineups_feed=None)`.
   - `_feed_orders_for_blank_sides` and `SHOWDOWN_FEED_ORDERS_NOTE`, new.
@@ -23,10 +23,10 @@ What changed in the engine, the tools and the contracts, when, and why.
   - `REFUSAL_SITES` gains `showdown_pool_blocked_crosswalk`.
 - `mlb_engine/entries/gate_classes.py`: `REFUSAL_SITE_VALIDITY` gains the new key, classed as the Classic crosswalk row is.
 - `tests/test_showdown.py`:
-  - `ShowdownLineupMergeTests`, new (+15).
+  - `ShowdownLineupMergeTests`, new (+16).
   - `R291ShowdownExcludedColumnTests.test_an_exclusion_that_leaves_one_team_refuses_with_the_reason` stubs `fetch_lineups`. Its refusal is now reached after a feed read, and it stays network-free.
 - `tests/test_core.py`: the refusal-table pins move, `len(REFUSAL_SITES)` 11 -> 12 and refusal return statements 10 -> 11, each with a comment.
-- `tools/audit.py`: `test_showdown` pin 465 -> 480.
+- `tools/audit.py`: `test_showdown` pin 465 -> 481.
 - `skills/generate-lineups/references/showdown.md`: one paragraph on the feed lift, `order_source`, `feed_orders` and the refusal.
 - `skills/generate-lineups/SKILL.md`: the refusal-exit count, eleven -> twelve (nine literal `return 3`, nine that print JSON only).
 - `docs/backlog.md`: R208 collapsed to a CLOSED stub; R503 filed under Workstream 1.
@@ -92,6 +92,8 @@ The filed shape was 71, 19 of 19 and 68 of 114 on the real slate, which is not o
 - `grep -rn "n < 5\b\|matched < 5\|FEED_CROSSWALK_MIN_MATCHED"`:
   - the constant, its two Classic uses (`build_slate_pool`'s confirmed-side check and its DK-posted backstop) and the Showdown lift.
   - Kept: `tools/autobuild.py:227` (`matched >= 5`). It parses a pool blocker's text and returns None, meaning a human decides, below the same bar, so it reads the pool's decision rather than drawing the line.
+- `grep -rn "LEG_START_TOLERANCE_MINUTES\|tolerance_minutes: int = "`: the constant, its three defaults (`select_one_leg_per_matchup`, `_select_slate_legs`, `parse_the_odds_api_totals`; each was a literal 10) and the Showdown start check. No other copy.
+- `grep -rn "FEED_MAX_AGE_MINUTES\|feed_max_age_minutes"`: the constant, the argparse default, Classic's staged-feed leg (`args.feed_max_age_minutes`, unchanged) and `run_showdown`'s read. No tool restates it.
 - `grep -n "showdown_lineups_feed(\|fetch_lineups(" build_slate.py`: on the Showdown path the feed is read at one place, `run_showdown`, and handed to `showdown_handedness`, whose own read survives only for direct callers. The other two `fetch_lineups` calls are Classic's.
 
 **The before-done review (an independent agent on f591e70), four findings, all fixed in the second commit.**
@@ -106,7 +108,7 @@ The review's notes, kept as they are:
 - A feed that does not carry the matchup prints one stderr line per DK-blank side.
 
 **Tests and mutations.**
-- `ShowdownLineupMergeTests` has 15 tests:
+- `ShowdownLineupMergeTests` has 16 tests:
   - The row's verification through the exit door: a pasted confirmed 1-9 on blank-`Starting` sides gives a 20-person pool, `declared_starters`, 18 posted, the ladder, and every delivered lineup (ladder and baseline) inside the confirmed eighteen plus the two DK arms.
   - An API-shaped feed lifts both sides, and a whole-day feed's other game adds nothing.
   - DK's complete nine outranks a contradicting feed and the contradiction is named.
@@ -114,7 +116,8 @@ The review's notes, kept as they are:
   - Under five refuses through the exit door with no file.
   - An empty feed leaves the frame equal.
   - The review's four: no start time and a three-row side are not crosswalk failures; a leg 240 minutes off is not lifted; a no-arm side never refuses on its names; a six-hour-old cached feed is refetched (and reused with a warning when the refetch fails).
-- 20 hand mutations were run with `python -B`, `PYTHONDONTWRITEBYTECODE=1` and pycache cleared, and all 20 were killed:
+  - The paste tool's own output: an mlb.com-style paste through `resolve_paste_to_feed` against the reshaped Showdown file lifts both sides. Run end to end through the CLI too, `lineups_from_paste.py` wrote a dated feed with the salary file's start and 20 names resolved, and `run_showdown` built pool 20 and the ladder on it, both as a named `--lineups` and as a fresh cached file.
+- 21 hand mutations were run with `python -B`, `PYTHONDONTWRITEBYTECODE=1` and pycache cleared, and all 21 were killed:
   - Seven conditions in the lift dropped one at a time: no-digit, arm, 1-9, date, DK-complete precedence, malformed, feed status.
   - The crosswalk floor and the refusal dropped.
   - `Batting_Order` back on `Starting`.
@@ -123,6 +126,7 @@ The review's notes, kept as they are:
   - The crosswalk on both roles.
   - The date flag never set.
   - The review's five: the age gate, the no-start-time skip, the off-leg skip and its flag, and the short-side guard.
+  - The lift dropped, against the paste-resolver test.
 
 **Gate.**
 - Local (Python 3.13), on f591e70: `FAIL  test suite FAILED in tests.test_core (ran 3749); do not build`. That is the host's known `ReplaySlateTests::test_settle_scores_requires_integer_hundredths_so_ties_are_exact` (`155.6 == 155.6`, the 3.13 float sum), and nothing else: a full `test_core` run read 2476 passed, 4 skipped, 1 failed, identical to the b988c61 baseline. The suites the local gate never reaches, run directly: `test_showdown` 480 OK (1 skipped), `test_upload_integrity` + `test_paste_lineups` 643 OK, `test_greenfield_regressions` + `test_production` 140 passed.
