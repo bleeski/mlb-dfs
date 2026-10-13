@@ -130,7 +130,7 @@ The review's notes, kept as they are:
 
 **Gate.**
 - Local (Python 3.13), on f591e70: `FAIL  test suite FAILED in tests.test_core (ran 3749); do not build`. That is the host's known `ReplaySlateTests::test_settle_scores_requires_integer_hundredths_so_ties_are_exact` (`155.6 == 155.6`, the 3.13 float sum), and nothing else: a full `test_core` run read 2476 passed, 4 skipped, 1 failed, identical to the b988c61 baseline. The suites the local gate never reaches, run directly: `test_showdown` 480 OK (1 skipped), `test_upload_integrity` + `test_paste_lineups` 643 OK, `test_greenfield_regressions` + `test_production` 140 passed.
-- PR gate (3.11, the merge authority), PR #151 on f591e70: `PASS  v2.26.0  45 modules  3749 tests  5 skipped  {test_core 2481/2481 (4 skipped) skipped_in_place; test_showdown 476/476 (1 skipped) skipped_in_place}`, the same five documented skips as PR #150's base. The review-fix head's line: GATE_LINE_PR_FINAL.
+- PR gate (3.11, the merge authority), PR #151 on f591e70: `PASS  v2.26.0  45 modules  3749 tests  5 skipped  {test_core 2481/2481 (4 skipped) skipped_in_place; test_showdown 476/476 (1 skipped) skipped_in_place}`, the same five documented skips as PR #150's base. On the code-final head 9d77d65: `PASS  v2.26.0  45 modules  3754 tests  5 skipped  {test_core 2481/2481 (4 skipped) skipped_in_place; test_showdown 481/481 (1 skipped) skipped_in_place}`, all 16 new tests run (3738 + 16) and the same five documented skips. The commit after it records this line and changes no code.
 - `GOLD` unmoved: `test_golden_replay` 9 OK, no re-freeze.
 - `python tools/plan_status.py --check` exits 0.
 - The register entry as filed is `git show b988c61:docs/backlog.md` under `### R208`.
