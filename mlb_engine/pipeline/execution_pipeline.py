@@ -2537,14 +2537,13 @@ def shape_band_application(
         if allocation is not None:
             if band == "floor_5":
                 blk = dict(allocation.get("primary_stack_floor") or {})
-                entry["realized"] = ({
+                entry["realized"] = (None if not blk else {
                     cid: {"status": row.get("status"),
                           "assigned_below_requested": row.get("assigned_below_requested")}
                     for cid, row in dict(blk.get("by_contest") or {}).items()}
                     if entry["scope"] == "contests" else
                     {k: blk.get(k) for k in ("status", "applied",
-                                             "assigned_below_requested", "relaxations")}
-                    if blk else None)
+                                             "assigned_below_requested", "relaxations")})
             else:
                 blk = dict(allocation.get("five_stack_quota") or {})
                 entry["realized"] = ({k: blk.get(k) for k in (

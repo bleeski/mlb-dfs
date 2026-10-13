@@ -19,6 +19,11 @@ What changed in the engine, the tools and the contracts, when, and why.
 - `mlb_engine/pipeline/deadline_governor.py`: `NEVER_RELAX_NOT_HONOURED` gains both map keys with the reason.
 - `tests/test_core.py`: `ShapeBandsMixedSetTests`, new (+6). Two `ShapeBandRoutingTests` are renamed with their assertions unchanged (`test_the_portfolio_floor_5_binds_only_when_every_contest_is_narrow`, `test_the_portfolio_quota_retires_when_any_contest_is_outside_the_mid_band`).
 - `tools/audit.py`: `test_core` pin 2475 -> 2481.
+- `skills/generate-lineups/scripts/build_slate.py`: `shape_bands_brief`, new (never raises; a failure is named in the block), and one key, `shape_bands`, in `run_classic`'s brief.
+- `skills/generate-lineups/references/shape_bands.md`, new: the rule, the escape with its three `--controls-override` lines, relaxation order, where to read it. `skills/generate-lineups/SKILL.md`: one pointer line beside the stack sleeve's (the body is at 1,656 lines against its 150-line target, so nothing else).
+- `ledger/inbox/2026-10-13_DEV_shape-bands-per-contest.md`, create-only: the Quick Card's R37(2)(a) sentence ("one broad-payout contest retires the floor for the whole portfolio") is stale; ARCHIVE reconciles it.
+- `docs/backlog.md`: R483 collapsed to a CLOSED stub (its filed text is below). `docs/ROADMAP.md`: Session 152 Complete; **NEXT** Session 53; a Progress Ledger row; Session 40's SHA backfilled (`9c5d165`).
+- Landed as two commits on one PR: the engine, tests and pin, then the brief key, the docs and the board.
 - Not touched: the optimizer, the bank builders, certification, the export validator (it checks no floor or quota), `tools/late_swap.py` (its merge and bank request pick both maps up unchanged at the call), `mlb_engine/production/` (stage 0 reads its own `ProductionControls`, not the merge).
 
 **What was wrong, reproduced at b29468e before any edit.**
@@ -49,7 +54,7 @@ What changed in the engine, the tools and the contracts, when, and why.
   - `not_carried`, with the reason (the typed-override escape, or a slate floor at 0);
   - with an allocation, `realized`.
   
-  `run_slate` writes it to `checkpoint["shape_bands"]["application"]`, which the approve=False review reads. `shape_bands_brief_block(result)` composes the brief's block from a run result.
+  `run_slate` writes it to `checkpoint["shape_bands"]["application"]`, which the approve=False review reads. `shape_bands_brief_block(result)` composes the brief's block from a run result, and `build_slate.py`'s Classic brief carries it as `shape_bands` (the checkpoint's rows plus the application realized against the allocation; null when the result carries no bands). Before this, no build brief carried a band, floor or quota key, which is the gap the fragment found.
 
 **The R233 class: every reader of the two scalars that decides where a band applies.** `grep -rn 'get("primary_stack_min_size"\|get("min_five_stack_share_pct"\|\["primary_stack_min_size"\]\|\["min_five_stack_share_pct"\]\|controls.primary_stack_min_size' --include=*.py mlb_engine tools skills`, 19 hits:
 - **EP:2625, 2629** `resolve_bank_stack_request`: reads the maps too (above).
@@ -75,7 +80,7 @@ What changed in the engine, the tools and the contracts, when, and why.
   - Every golden solve passes `candidates_override`, so the bank request flipping to `wants_five` reaches no bank.
 
 **Tests.** `ShapeBandsMixedSetTests` +6:
-- a satellite and a large GPP each carry their own band through the real merge and allocator (the GPP's quota scoped to its 16 entries and met, the satellite's entries all five-plus, and `shape_band_application` naming both);
+- a satellite and a large GPP each carry their own band through the real merge and allocator (the GPP's quota scoped to its 16 entries and met, the satellite's entries all five-plus, `shape_band_application` naming both, and `shape_bands_brief_block` composing the brief's block from the same allocation);
 - a unanimous all-mid set and an all-narrow set add no key, and the quota scope is the portfolio;
 - a cash contest sits in neither map, its entries take fours, and the satellite's fives are not counted toward the GPP's quota;
 - the escape works and a typed map is refused;
@@ -92,6 +97,15 @@ The fixture bank holds 20 fours over 10 fives because F-3 seats a signature once
 - **Loose:** 18 entries, 7 distinct; primary stack BAL 3, BOS 10, PHI 5; SP pairs {01+02: 5, 01+6001: 5, 01+6009: 8}.
 - **Production:** 18 entries, 18 distinct; BAL 6, BOS 6, PHI 2, SD 4; 12 SP pairs.
 - `UT test_golden_replay`: 9 OK, golden files untouched.
+
+**The register entry, as filed 2026-10-02 (migrated verbatim).**
+
+R483. The five-stack floor and quota bands both retire on a MIXED entered set, because the merge needs unanimity across the entered contests, so a seven-contest file with one satellite among GPPs builds with neither band (P1, S; S) | new 2026-10-02, from the BUILD fragment `2026-09-15_BUILD_shape-bands-inert-on-mixed-entered-set.md` that exists only on the branch `ben/reference-refresh-2026-09-22` (2006c74, never merged), via the 2026-10-02 board rebuild (Session 144) | Roadmap: Session 152
+
+- **What.** R340 made R37(2)'s floor-5 and quota bands live from every door, but the portfolio merge at `execution_pipeline.py:2408-2411` applies a band only when every entered contest agrees on it; the fragment measured both bands inert on the 2026-09-15 1310_4g set (mixed shapes), with the brief silent about it. The fragment's (b), a `shape_bands` brief block, may be stale: `checkpoint['shape_bands']` is now written at `execution_pipeline.py:6745`; verify before building and fold what is missing (per-contest rows, `floor_5_binds_portfolio`, `quota_binds_portfolio`) into (a).
+- **Why.** Band 1: stack shape is the strongest Classic construction signal in the archive (5-2-1 at +13 to +17pp on 3g+ slates, both halves; our mix 0.4% against a field at 25.7%), and the bands exist to move it; a rule that stands down whenever the entered set is mixed, which the 2026-09-24 file (seven contests, four shapes) and most postseason files are, moves nothing. DEV arbitrates the merge rule: apply each band to the contests whose shape asked for it, with the SKILL.md override escape documented.
+- **Fix.** Replace unanimity with per-contest application at the merge (`EP:2408-2411`): a band binds on the entries of the contests whose posture requests it, and the brief's `shape_bands` block names which contests carried which band and which did not. SKILL.md documents the override escape. `qa_portfolio`'s stack-shape axis is R276's rider, not this entry.
+- **Acceptance.** `UT test_core.ShapeBandsMixedSetTests` (new): a two-contest set (one satellite, one large GPP) applies the five-stack quota to the GPP entries alone and the brief says so; a unanimous set is unchanged; the band never applies to a contest whose posture did not ask (+3 core). `GOLD` unmoved (golden sets are unanimous; verify); `PROBE`, `LINT`, `GATE`.
 
 **Gate.**
 - `PROBE`: FITS (projected 4s against 630s).

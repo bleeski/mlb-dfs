@@ -28986,6 +28986,13 @@ class ShapeBandsMixedSetTests(unittest.TestCase):
         self.assertEqual((applied["quota"]["scope"], applied["quota"]["carried_by"]),
                          ("contests", ["GPP"]))
         self.assertEqual(applied["quota"]["realized"]["need_met"], True)
+        # The brief's block is the same function over a run result's keys.
+        brief = epi.shape_bands_brief_block(
+            {"checkpoint_plan": {"shape_bands": bands}, "merged_controls": m, **result})
+        self.assertEqual(brief["contests"], bands["contests"])
+        self.assertEqual(brief["application"]["floor_5"]["realized"]["SAT"]["status"],
+                         "applied")
+        self.assertIsNone(epi.shape_bands_brief_block({}))
 
     def test_a_unanimous_set_is_unchanged(self):
         for cids, games, key, value in (

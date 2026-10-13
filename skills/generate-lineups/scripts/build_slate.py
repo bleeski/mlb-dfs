@@ -634,6 +634,19 @@ def has_deliverable(result: Mapping[str, Any]) -> bool:
     return bool(result.get("passed")) or bool(result.get("last_usable_artifact"))
 
 
+def shape_bands_brief(result: Mapping[str, Any]) -> Any:
+    """R483. The Classic brief's `shape_bands` block: the checkpoint's
+    per-contest bands, which contests carried each after the merge and any
+    override, and what the delivered set holds against it
+    (`execution_pipeline.shape_bands_brief_block`). A failure is named in the
+    block and never raised: the file already exists (R393(b))."""
+    try:
+        from mlb_engine.pipeline.execution_pipeline import shape_bands_brief_block
+        return shape_bands_brief_block(result)
+    except Exception as exc:  # noqa: BLE001 - a report field never costs the brief
+        return {"error": f"{type(exc).__name__}: {exc}"}
+
+
 def later_failures(result: Mapping[str, Any]) -> list:
     """Every stage that failed AFTER the delivered export existed (R393(b))."""
     out = []
@@ -5320,6 +5333,9 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         # name, because the weights are the thing that actually ranked the
         # candidates and the table they come from is versioned code.
         "contests": _contest_objective_block(result.get("posture_by_contest")),
+        # R483. Which contests declared and carried each R37(2) shape band, and
+        # what the delivered set holds; null when the result carries no bands.
+        "shape_bands": shape_bands_brief(result),
         "gates": {
             "workflow_valid": gate_source.get("workflow_valid"),
             "selection_certified": gate_source.get("selection_certified"),
