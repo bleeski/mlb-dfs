@@ -47650,10 +47650,13 @@ class DeclaredPitcherEvidenceTests(unittest.TestCase):
     def test_every_brief_site_that_records_the_roles_records_the_notes(self):
         """Five sites record `declared_pitchers` (the baseline brief, Classic's
         refusal and delivered briefs, Showdown's refusal and delivered
-        briefs); each records `declared_pitcher_evidence` beside it."""
+        briefs); each records `declared_pitcher_evidence` beside it. R484:
+        the three Showdown sites and the baseline brief record through
+        `brief_declared_pitchers`, which adds the kept arms to the same
+        parse, so either call counts as a site."""
         import re as _re
         src = (REPO / "skills" / "generate-lineups" / "scripts" / "build_slate.py").read_text(encoding="utf-8")
-        roles = _re.findall(r'"declared_pitchers"\]?\s*[:=]\s*parse_declared_pitchers\(', src)
+        roles = _re.findall(r'"declared_pitchers"\]?\s*[:=]\s*(?:parse|brief)_declared_pitchers\(', src)
         notes = _re.findall(r'"declared_pitcher_evidence"\]?\s*[:=]\s*declared_pitcher_evidence\(', src)
         self.assertEqual(len(roles), 5)
         self.assertEqual(len(notes), len(roles))

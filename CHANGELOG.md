@@ -23,6 +23,7 @@ What changed in the engine, the tools and the contracts, when, and why.
   - `declared_pitchers` on the Showdown brief, the Showdown refusal payload and `_write_baseline_brief` (shared with Classic, where no kept arm is ever set) reads through `brief_declared_pitchers`. The R304(d) comment above the key is rewritten to say the key now carries this one pool fact.
   - `main` refuses either flag on Classic at exit 4 (`keep_arms_not_supported_on_classic`). The exit-4 prose moves TWENTY-TWO -> TWENTY-THREE (main 15 -> 16).
 - `tests/test_showdown.py`: `KeepArmsPoolTests` (11, new). `R382CaptainPriorWiringTests.test_the_exit_4_site_count_in_the_prose_matches_the_TREE` moves 22 -> 23 on purpose (no test added).
+- `tests/test_core.py`: `DeclaredPitcherEvidenceTests.test_every_brief_site_that_records_the_roles_records_the_notes` counts a site recording `declared_pitchers` through `parse_declared_pitchers(` or `brief_declared_pitchers(`. It still pins five sites, each with `declared_pitcher_evidence` beside it. The PR's 3.11 gate caught the old pin reading 2 of 5 on 4c31b01. This host's `test_core` was already red for its known host test, so the local FAIL line hid the second failure until `test_core` was run whole and its failures listed.
 - `tools/audit.py`: `test_showdown` pin 481 -> 492, in two comment lines.
 - `skills/generate-lineups/references/showdown.md`: `## Keeping the bullpen (--keep-arms, R484)`, new: when to use it, the named form, the pricing table, Rea's residual, what the ladder does with a kept arm, and the record and preflight.
 - Board:
