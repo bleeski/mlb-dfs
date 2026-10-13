@@ -2,6 +2,94 @@
 
 What changed in the engine, the tools and the contracts, when, and why.
 
+## 2026-10-13 — R503: the Showdown feed lift takes a DK partial side beside a complete confirmed feed, and a side DK declares no arm on takes the feed's probable as its arm, DK's arm winning where both name one (roadmap Session 171)
+
+**Scope.**
+- `mlb_engine/optimize/showdown.py`:
+  - `_feed_orders_for_blank_sides` returns `{Player_Key: order token}` (a string) instead of `{Player_Key: slot}`, and keeps its name. The tokens are a feed slot `"1"`-`"9"`, `"SP"` for the feed's probable on a side with no DK arm, and `""` for a DK partial slot the feed's nine overrode. They are committed only where the old `slots_out.update` ran, after the row count, the crosswalk count and the 1-9 check have all passed.
+  - Its `posted` skip ("a feed does not outrank a DK partial", R503) is removed.
+  - Its arm check reads DK's declaration first, then the feed's crosswalked probable. Each failed check gets its own reason: no probable, no arm on this side, or OUT.
+  - `feed_orders` gains `dk_slots_overridden`, `arms_from_feed` and `arm_disagreements`. The arm disagreement is computed before the `complete` skip, so it is named on a DK-posted side too, and only on a side the feed dates to this game.
+  - The melt's `feed_order` and `_token` take the string token as is.
+  - The `--keep-arm` not-kept reason for a person whose declaration came from the feed says so, rather than "DK names him (Starting=)".
+  - `SHOWDOWN_FEED_ORDERS_NOTE`, the function's docstring and the melt's R208 paragraph are rewritten to the new rule.
+- `mlb_engine/intake/live_data_adapters.py`: `showdown_feed_sides`' per-team record gains `probable`, `{"name", "util_id"}` or `None`. It is the merged side's probable, and `util_id` is the one id the status map's own `probable_pitcher_ids` holds for the team, or `None` when it holds none or more than one.
+- `skills/generate-lineups/scripts/build_slate.py`: `run_showdown` prints one stderr line per overridden DK slot, per arm read from the feed, and per arm disagreement, beside the existing `not_lifted` lines. No new refusal row.
+- `tests/test_showdown.py`, `ShowdownLineupMergeTests` 16 -> 20 and `KeepArmsPoolTests` 11 -> 11:
+  - Rewritten to the new fact on purpose, count unchanged:
+    - `test_a_dk_partial_side_is_not_lifted_and_says_why` is now `test_a_dk_partial_side_takes_a_complete_feed_and_names_each_overridden_slot`;
+    - `test_a_side_with_no_dk_arm_is_not_lifted` is now `test_a_side_with_no_dk_arm_takes_the_feeds_probable_as_its_arm`;
+    - `test_a_side_that_cannot_lift_never_refuses_on_its_names`, whose feed now names no MIN probable, with a subTest that the same names WITH the probable reach the crosswalk count;
+    - `KeepArmsPoolTests.test_a_feed_lifted_side_keeps_its_relievers_and_the_lift_rule_holds`, whose no-arm half now lifts CHC on Boyd and whose lift-rule half runs on a feed with no CHC probable.
+  - New: `test_a_dk_partial_side_lifts_through_the_exit_door_and_names_the_overrides`, `test_a_dk_arm_the_feeds_probable_contradicts_is_named_and_dk_wins`, `test_a_feed_probable_dk_marks_out_does_not_lift_the_side`, and `test_a_file_downloaded_before_dk_flagged_probables_builds_on_the_feeds_twenty`.
+  - `test_a_feed_dated_another_day_is_not_lifted` gains one assertion: yesterday's probable is no arm disagreement.
+  - The helpers gain `_salary(status=)` and a set-valued `drop_arm`, and `_feed(probables=)`.
+- `tools/audit.py`: the `test_showdown` pin goes 492 -> 496, in two commented steps.
+- `skills/generate-lineups/references/showdown.md`: the R208 paragraph states the new rule.
+- `docs/backlog.md`: R503 is collapsed to a CLOSED stub.
+- `docs/ROADMAP.md`:
+  - Session 171 is Complete.
+  - **NEXT** is Session 59. It skips Sessions 118 and 136, which need D-2 and D-10.
+  - There is a Progress Ledger row, and Session 153's SHA is backfilled (`fa89c20`).
+- `docs/backlog_inbox/2026-10-13_DEV_classic-feed-probable-silently-outranks-dk-sp.md`, new: a fragment, see "Found and filed".
+- Not touched:
+  - `merge_dk_starting_into_feed` and `build_status_map_from_lineups_feed`, and with them Classic's precedence.
+  - `showdown_theses.py`: `describe_slate` already takes the only non-opener, non-kept arm with no order as a side's starter.
+  - Preflight.
+  - The solver, the bank and the export.
+
+**What was wrong, reproduced at fa89c20 before any edit.** The vendored MIN@CHC Showdown file was reshaped with R208's own test helpers, and the feed was MIN_CHC's posted nines with both probables, `confirmed`:
+
+| shape | HEAD | now |
+|---|---|---|
+| R208 control: hitters blank, DK's SP tokens kept | pool 20, lifted CHC MIN | unchanged |
+| (a) DK posts MIN 1-4 | pool 46 (`mixed`, MIN 36, 4 ordered), MIN "DK posted 4 of 9" | pool 20 (`declared_starters`), MIN `confirmed` from `operator_paste` |
+| (a) the same, the feed swapping DK's 1-2 and Wallner at 3 over Bell | not lifted | lifted, slots 1, 2 and 3 named, Bell out of the pool |
+| (b) MIN's SP token blank | pool 46, MIN 36 with no declared arm, "DK declares no arm" | pool 20, Bradley MIN's declared arm (`arms_from_feed`) |
+| (b) both SP tokens blank | pool 70 (`all_healthy`) | pool 20, Bradley and Boyd declared |
+| DK flags Bradley, the feed names Joe Ryan | lifted silently, Ryan out | lifted, named in `arm_disagreements`, DK's Bradley kept |
+
+**Premises checked.**
+- (a) holds. `merge_dk_starting_into_feed` seeds only DK `confirmed` and `degraded` sides. A DK `partial` side is left to the feed, so `showdown_feed_sides` already returned the feed's nine for it (MIN `confirmed`, 9 rows, 9 UTIL orders). The melt's `posted` skip was the one blocker.
+- (b) holds. Classic's pool takes `status["probable_pitcher_ids"]` as its pitchers. `showdown_feed_sides` returned no probable. The status map already crosswalks the probable on the UTIL rows, so the UTIL id the entry asked for is that list filtered to the team, not a second crosswalk.
+- Nothing downstream needed changing. `describe_slate` picks the highest-Base arm with no order that is not an opener or a kept arm, so it names the feed's probable on a lifted side. `Is_Declared_Starter` reads the melt's token, which feeds the brief's `declared_starters`, `apply_kept_arm_prior`'s reference and the Savant duel. Preflight counts a feed side's `probable_pitcher` name as posted.
+- Preflight's evidence on both new shapes is the feed beside the salary file. `resolve_feed_source` uses DK's own orders only when every side is covered, so the exit-door tests assert `info.feed_autoresolve` names `lineups_feed.json`.
+
+**What shipped.**
+- (a) A DK partial side runs the same checks as a blank one: confirmed, dated, on this leg, an arm, nine crosswalked on 1-9.
+  - On a lift, each DK slot whose occupant the feed's nine replaces is named as `{team, slot, dk, feed}`, and a slot that agrees is not.
+  - A DK-posted person outside the feed's nine takes `""`. Without that, DK's `3` and the feed's `3` are two claims on one slot, and the side reads malformed. A mutation proves it.
+  - DK's complete nine always wins, and a malformed DK side is still not papered over.
+- (b) With no DK arm, the feed's probable must be a person on this side of the file, not a hitter by position, and not `Status_Out` (Classic's `dk_declared_probables` skips a shelved arm too). Such a probable takes `SP` and is named in `arms_from_feed`, and the frame's `Starting` stays DK's own blank.
+  - Each refusal names its cause: the feed names no probable, his name matches no arm on this side, or DK marks him OUT.
+  - Where DK declares an arm (SP, P, PLR or PO), a different crosswalked feed probable is named as `{team, dk_arms, feed_probable, resolved_to: "dk_starting"}` on every side the feed dates to this game. DK's arm stays the declaration, and on a lifted side the feed's man is a confirmed nonstarter.
+- A side with no DK arm but a crosswalked feed probable now reaches the crosswalk count. Under five matched therefore refuses as `showdown_pool_blocked_crosswalk`, because the lineup could be used, which is the refusal's own premise. With no probable either, the side still never refuses on its names.
+- Left as it is, on purpose: a DK nine posted with a shelved player reads `complete` from the shared predicate, so it stays DK's on Showdown. Classic's merge lets a complete feed outrank those eight (`merge_dk_starting_into_feed`'s degraded loop). R503 does not name it, and no slate has shown it.
+
+**One definition (R233).**
+- `grep -n '"Starting"' mlb_engine/optimize/showdown.py`:
+  - :534-573 is the parse that collects DK's raw value, kept: it is the source fact.
+  - :287 is the lift's DK-arm read, which reads DK's raw value on purpose, because the question is what DK declared. The feed's probable is the fallback beside it, never a rewrite of it.
+  - :625 is `_token`'s DK fallback.
+  - :760 is the `--keep-arm` reason, which now compares `_token` against `Starting` to say whose declaration it was. It was the one reader that stated "DK names him" from the participation value alone.
+- `grep -rn "showdown_feed_sides("`: one caller, the lift.
+- `grep -rn "feed_orders" mlb_engine tools skills`: the melt and `run_showdown`, whose refusal reads `crosswalk_failures` and whose stderr loops read the three new lists and `not_lifted`.
+- `grep -rn "probable_pitcher_ids"`: the status map, Classic's pool, `tools/late_swap.py`, `tools/ownership_pred.py`, `tools/repair_entry.py` and the new read. All read the same list. None is a Showdown reader, and none changed.
+
+**Tests and mutations.**
+- `ShowdownLineupMergeTests` (20) and `KeepArmsPoolTests` (11): 31 green.
+- 16 hand mutations, each against the tests it should redden, all 16 red, with the bytes restored each time:
+  - (a): the `posted` skip restored; the `""` clearing dropped; the override record dropped; agreeing slots named too; the door's override line dropped.
+  - (b): the `SP` token dropped; `SP` committed before the crosswalk checks (the phantom-declaration assertion); the OUT guard dropped; the hitter guard dropped; the disagreement record dropped; the this-game gate on disagreements dropped; DK-wins inverted; the door's two arm lines dropped one at a time; the `--keep-arm` reason reverted; `util_id` never set in LDA.
+
+**Found and filed.** On Classic, a feed probable silently outranks the arm DK's `Starting` column flags SP. `_attach_probable` adds DK's arm only to a side the feed left without a probable, so the status map and `build_slate_pool` take the feed's. The vendored 2026-06-03 file, given `SP` on BAL's Shane Baz with a feed naming Dean Kremer, pools Kremer alone, and the pool report never names Baz. The build contract says disagreements are named, never silently resolved, and the Showdown melt now resolves the same pair the other way. Filed as `docs/backlog_inbox/2026-10-13_DEV_classic-feed-probable-silently-outranks-dk-sp.md`: which source wins on a Classic probable is Ben's call.
+
+**Gate.**
+- Local (Python 3.13): pending at this commit; the PR gate (3.11) is the merge authority.
+- `GOLD` unmoved.
+- `python tools/plan_status.py --check` exits 0.
+- The register entry as filed is `git show fa89c20:docs/backlog.md` under `### R503`.
+
 ## 2026-10-13 — R484: the Showdown door keeps the bullpen on request (`--keep-arms`, and `--keep-arm ID` for a postseason roster), priced on a tiered labeled prior and recorded so preflight acknowledges a kept arm (roadmap Session 153)
 
 **Scope.**
