@@ -6571,6 +6571,16 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         print(f"lineups feed: {rec['team']} slot {rec['slot']}: DK posted "
               f"{rec['dk']}, the feed's confirmed nine has {rec['feed']}; the "
               f"feed's nine is used", file=sys.stderr)
+    # R503(b). The arm, both ways: the feed's probable declared where DK names
+    # none, and DK's arm kept where the feed's probable is someone else.
+    for rec in feed_orders.get("arms_from_feed") or []:
+        print(f"lineups feed: {rec['team']} takes the feed's probable "
+              f"{rec['name']} as its arm; DK declares none on the side",
+              file=sys.stderr)
+    for rec in feed_orders.get("arm_disagreements") or []:
+        print(f"lineups feed: {rec['team']}: DK declares "
+              f"{', '.join(rec['dk_arms'])}, the feed's probable is "
+              f"{rec['feed_probable']}; DK's arm is used", file=sys.stderr)
     # R484. Priced here, off the melt and before anything reads a Base, so the
     # baseline, the ladder, every report and a supplied Base (which still
     # replaces it) all see the same kept-arm prior.

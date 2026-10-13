@@ -189,7 +189,10 @@ SHOWDOWN_FEED_ORDERS_NOTE = (
     "on slots 1-9. DK's own complete nine always wins and a feed that "
     "contradicts it is named in `disagreements`; a DK partial side yields to "
     "the feed's nine and every DK slot the feed replaced is named in "
-    "`dk_slots_overridden`. Every other side keeps the pool it had, with the "
+    "`dk_slots_overridden`. A side DK declares no arm on takes the feed's "
+    "crosswalked probable as its arm (`arms_from_feed`); where DK declares "
+    "one, DK's arm wins and a different feed probable is named in "
+    "`arm_disagreements`. Every other side keeps the pool it had, with the "
     "reason.")
 
 #: R484. The participation an arm takes when `--keep-arms` keeps him on a
@@ -235,15 +238,22 @@ def _feed_orders_for_blank_sides(path: str | Path, rows: Sequence[Mapping[str, A
     * Nine rows must crosswalk to nine pool persons on slots 1-9. Fewer than
       ``FEED_CROSSWALK_MIN_MATCHED`` is a crosswalk failure, which
       ``run_showdown`` refuses because CLAUDE.md lists it as Ben's.
-    * DK must declare an arm on the side. Lifting DECIDES the side, and on a
-      decided side every arm DK does not declare is a confirmed nonstarter, so
-      a side with no DK arm would lose its whole staff. Reading the feed's
-      probable as a declaration is the other half of R503.
+    * The side must have an arm. Lifting DECIDES the side, and on a decided
+      side every arm not declared is a confirmed nonstarter, so a side with no
+      arm would lose its whole staff. R503(b): DK's own declaration first;
+      with none, the feed's probable, crosswalked to a non-OUT arm on this
+      side, takes ``SP`` (Classic's pool takes him as the starter) and is
+      named in ``arms_from_feed``. On every side the feed dates to this game,
+      a feed probable who is not one of DK's declared arms is named in
+      ``arm_disagreements`` and DK's arm stays the declaration.
+    * Nothing is committed until every check has passed, so a side that is
+      not lifted keeps DK's tokens and carries no declaration from the feed.
     """
     report: Dict[str, Any] = {
         "applied": False, "reason": "no lineups feed reached the melt",
         "lifted": [], "not_lifted": [], "unmatched": [], "disagreements": [],
-        "dk_slots_overridden": [], "crosswalk_failures": [],
+        "dk_slots_overridden": [], "arms_from_feed": [],
+        "arm_disagreements": [], "crosswalk_failures": [],
         "note": SHOWDOWN_FEED_ORDERS_NOTE}
     if lineups_feed is None:
         return {}, {}, report
@@ -267,12 +277,37 @@ def _feed_orders_for_blank_sides(path: str | Path, rows: Sequence[Mapping[str, A
         persons.setdefault(side_key(rec), []).append(rec)
     slots_out: Dict[str, str] = {}
     sources: Dict[tuple, str] = {}
+    arm_tokens = DK_STARTING_DECLARED_TOKENS | DK_STARTING_OPENER_TOKENS
     for key in sorted(dk_sides):
         reading = dk_sides[key]
-        if reading.get("complete"):
-            continue
         team = key[1]
         side = (read.get("teams") or {}).get(team) or {}
+        dk_arms = sorted(
+            (p for p in persons.get(key, [])
+             if str(p.get("Starting") or "").strip().upper() in arm_tokens),
+            key=lambda p: str(p.get("Player_Key")))
+        # R503(b). The feed's probable as a person on THIS side of the file,
+        # and an arm: the status map's name match is the crosswalk, and a
+        # match to a hitter or to the other side is no arm for this side.
+        probable = side.get("probable") or {}
+        feed_arm = by_util.get(str(probable.get("util_id")))
+        if feed_arm is not None and (
+                side_key(feed_arm) != key
+                or _is_showdown_hitter(feed_arm.get("Position"))):
+            feed_arm = None
+        # DK wins on the arm, and the difference is named, on every side whose
+        # feed game is this game: a DK-posted side included, so this runs
+        # before the `complete` skip below.
+        if (feed_arm is not None and dk_arms and not side.get("date_ignored")
+                and side.get("start_off_minutes") is None
+                and str(feed_arm["Player_Key"]) not in
+                {str(p.get("Player_Key")) for p in dk_arms}):
+            report["arm_disagreements"].append({
+                "team": team, "dk_arms": [str(p.get("Name")) for p in dk_arms],
+                "feed_probable": str(feed_arm.get("Name")),
+                "resolved_to": "dk_starting"})
+        if reading.get("complete"):
+            continue
 
         def _skip(reason: str) -> None:
             report["not_lifted"].append({"team": team, "reason": reason})
@@ -301,16 +336,23 @@ def _feed_orders_for_blank_sides(path: str | Path, rows: Sequence[Mapping[str, A
                   f"file's, so it is another leg of a doubleheader or a "
                   f"rescheduled game, not this one")
             continue
-        arm_tokens = DK_STARTING_DECLARED_TOKENS | DK_STARTING_OPENER_TOKENS
-        if not any(str(p.get("Starting") or "").strip().upper() in arm_tokens
-                   for p in persons.get(key, [])):
-            # Before the crosswalk count on purpose: a side that cannot be
-            # lifted whatever its names match is not a lineup going unused
-            # for a crosswalk reason, so it never reaches the refusal.
-            _skip("DK declares no arm on this side, and lifting it would make "
-                  "every arm on it a confirmed nonstarter; the feed's probable "
-                  "is not read as a declaration (R503)")
-            continue
+        # Before the crosswalk count on purpose: a side that cannot be lifted
+        # whatever its names match is not a lineup going unused for a
+        # crosswalk reason, so it never reaches the refusal.
+        if not dk_arms:
+            head = ("DK declares no arm on this side, and lifting it with none "
+                    "would make every arm on it a confirmed nonstarter")
+            if not (probable.get("name") or probable.get("util_id")):
+                _skip(f"{head}; the feed names no probable for it")
+                continue
+            if feed_arm is None:
+                _skip(f"{head}; the feed's probable {probable.get('name')!r} "
+                      f"matches no arm on this side of the salary file")
+                continue
+            if feed_arm.get("Status_Out"):
+                _skip(f"{head}; DK marks the feed's probable "
+                      f"{feed_arm.get('Name')} Status {feed_arm.get('Status')}")
+                continue
         report["unmatched"].extend(side.get("unmatched") or [])
         slots = {}
         for util_id, slot in sorted((side.get("order_by_util_id") or {}).items()):
@@ -349,11 +391,22 @@ def _feed_orders_for_blank_sides(path: str | Path, rows: Sequence[Mapping[str, A
             if dk_pk not in slots:
                 slots_out[dk_pk] = ""
         slots_out.update({pk: str(slot) for pk, slot in slots.items()})
+        if not dk_arms:
+            # R503(b). The feed's probable is the side's declared arm, through
+            # the token a DK `SP` is; the frame's `Starting` stays DK's.
+            slots_out[str(feed_arm["Player_Key"])] = "SP"
+            report["arms_from_feed"].append({
+                "team": team, "name": str(feed_arm.get("Name")),
+                "util_id": str(feed_arm.get("UTIL_ID"))})
         sources[key] = str(side.get("source") or "lineups_feed")
         report["lifted"].append(team)
     report["lifted"] = sorted(report["lifted"])
     report["dk_slots_overridden"] = sorted(
         report["dk_slots_overridden"], key=lambda o: (o["team"], o["slot"]))
+    report["arms_from_feed"] = sorted(report["arms_from_feed"],
+                                      key=lambda a: a["team"])
+    report["arm_disagreements"] = sorted(report["arm_disagreements"],
+                                         key=lambda a: a["team"])
     report["unmatched"] = sorted(report["unmatched"],
                                  key=lambda u: (u.get("team", ""), u.get("name", "")))
     return slots_out, sources, report
@@ -425,7 +478,8 @@ def melt_showdown_salary_csv(path: str | Path, exclude_out: bool = True,
     slate is reporting one side's answer for both.
 
     R208. ``lineups_feed`` is the second source, after DK's column, for a side
-    DK left BLANK, and since R503(a) for a side DK posted only PART of. Until now the order came from ``Starting`` alone and a
+    DK left BLANK, and since R503 for a side DK posted only PART of (a) or
+    declared no arm on (b: the feed's crosswalked probable is the arm). Until now the order came from ``Starting`` alone and a
     confirmed paste reached Showdown only through the platoon prior, so on
     1335_1g_sd (both arms flagged, all eighteen hitters blank) the pool was the
     whole healthy roster. ``_feed_orders_for_blank_sides`` decides which sides
@@ -699,8 +753,13 @@ def melt_showdown_salary_csv(path: str | Path, exclude_out: bool = True,
         elif person.get("Status_Out"):
             why = f"Status {person.get('Status')}: the health filter drops him"
         elif person["Participation"] in ("confirmed_starter", "declared_opener"):
+            # R503(b). His declaration may be the feed's probable on a side DK
+            # named no arm on, where DK's `Starting` is blank.
             why = (f"DK names him (Starting={person.get('Starting')}), so he is "
-                   f"in the pool without the flag")
+                   f"in the pool without the flag"
+                   if _token(person) == str(person.get("Starting") or "").strip().upper()
+                   else "the lineups feed names him the side's probable, so he "
+                        "is in the pool without the flag")
         else:
             why = ("his side is not decided (its 1-9 is not completely posted, "
                    "or DK's column is malformed or ambiguous there), so he is in "
