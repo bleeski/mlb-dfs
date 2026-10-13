@@ -14,9 +14,9 @@ second (R208, R503).** When DK has not posted a complete nine on a side, the
 pool takes that side's nine from the feed `run_showdown` reads once
 (`--lineups`, else the slate folder's `lineups_feed.json`, else a fetch). It
 does so only if all of these hold:
-- The side has an arm: one DK declares, or, when DK declares none, the feed's
-  probable crosswalked to a non-OUT arm on the side, who becomes its declared
-  starter (`arms_from_feed`).
+- The side has an arm: one DK declares and does not mark OUT, or, when DK
+  declares none, the feed's probable crosswalked to a non-OUT arm on the side,
+  who becomes its declared starter (`arms_from_feed`).
 - The feed calls the side confirmed, for the salary file's date, with a start
   within `LEG_START_TOLERANCE_MINUTES` (10) of the salary file's.
 - All nine rows match pool persons on slots 1-9, through Classic's name+team

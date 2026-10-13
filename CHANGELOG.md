@@ -84,13 +84,25 @@ What changed in the engine, the tools and the contracts, when, and why.
 
 **The before-done review (an independent agent on 964cb6a): one blocking finding, fixed.**
 1. An OUT arm counted as DK's declaration. `dk_arms` read the raw `Starting` token, so a DK SP marked Status O decided the side. The feed's probable was never tried, the health filter then dropped the SP, and the side had no arm in the pool, while `arm_disagreements` and the door said "DK's arm is used". Probe: DK posts MIN 1-4 with Bradley SP and O, and the feed names Joe Ryan; MIN lifted with no arm, pool 19. At fa89c20 that partial side was not lifted, so (a) had made it a regression; a DK-blank side had the same zero-arm lift since R208. Fixed: `dk_arms` skips a `Status_Out` person, as `dk_declared_probables` does on Classic and as (b)'s own guard on the feed's probable already did. The side now lifts on Ryan (`arms_from_feed`), and nothing disagrees. The new test is red without the fix.
+  - One R208 shape changes with it, deliberately: a DK-blank side whose only DK arm is an OUT SP, with no feed probable, is no longer lifted to a side with zero arms. It keeps its `all_healthy` pool and names the cause.
 - Taken: the skip reason for a feed probable whose `util_id` is `None` now also names the ambiguous case. The status map's list held more than one id for the team, which a doubleheader feed can do. It was read off the code, not reproduced.
 - Noted for Ben, not changed: a side whose only DK arm is a `PO` opener is DK's on the arm. This was already true of a blank side under R208. When the feed's probable is the bulk arm, he is a confirmed nonstarter on the lifted side and is named in `arm_disagreements`. R488's opener-plus-bulk admission is Classic's, and whether Showdown should admit the feed's bulk arm beside DK's opener is a strategy call.
 
 **Found and filed.** On Classic, a feed probable silently outranks the arm DK's `Starting` column flags SP. `_attach_probable` adds DK's arm only to a side the feed left without a probable, so the status map and `build_slate_pool` take the feed's. The vendored 2026-06-03 file, given `SP` on BAL's Shane Baz with a feed naming Dean Kremer, pools Kremer alone, and the pool report never names Baz. The build contract says disagreements are named, never silently resolved, and the Showdown melt now resolves the same pair the other way. Filed as `docs/backlog_inbox/2026-10-13_DEV_classic-feed-probable-silently-outranks-dk-sp.md`: which source wins on a Classic probable is Ben's call.
 
 **Gate.**
-- Local (Python 3.13): pending at this commit; the PR gate (3.11) is the merge authority.
+- PR #153 (3.11, the merge authority) at 964cb6a: `PASS  v2.26.0  45 modules  3769 tests  5 skipped  {test_core 2481/2481 (4 skipped) skipped_in_place; test_showdown 496/496 (1 skipped) skipped_in_place}`, the five documented skips. Ben merged it (merge 1bc392f) before the review fix was pushed, so `main` carried the OUT-arm shape between the two merges.
+- PR #154 (3.11) on the code-final head 5366b96: `PASS  v2.26.0  45 modules  3770 tests  5 skipped  {test_core 2481/2481 (4 skipped) skipped_in_place; test_showdown 497/497 (1 skipped) skipped_in_place}`.
+- Local (Python 3.13), on the main tree at 964cb6a: `FAIL  test suite FAILED in tests.test_core, tests.test_greenfield_regressions, tests.test_showdown, tests.test_upload_integrity (ran 3759); do not build`. Every failure is a host fact, by name:
+  - `test_showdown` run whole in the main tree, 486 tests: five failures, none in a class this change touches.
+    - The two `ShowdownBaselineFirstTests` rerun errors and `ShowdownRecordPredictionTests` setUpClass, all three from the read-only fixture copy.
+    - Two `GateBudgetIsHostResolvedTests`, because this host resolves a 540 s ceiling.
+  - `test_core` and `test_upload_integrity` in a fresh worktree at 5366b96, 2970 tests: 17 failures. The same 17 names fail identically at fa89c20 (run by name in a second worktree and diffed).
+    - The R477 re-promotion family (6).
+    - Host-profile, budget and claim-host tests (8).
+    - `ReplaySlateTests`, the 3.13 float sum (1).
+    - `AwaitingPerDraftgroupTests` and `MinerMoneyHonestyTests` (1 each).
+  - `test_greenfield_regressions`: not run by name. It imports nothing this change touches, and CLAUDE.local.md records its `.pylibs` `pydantic_core` failures on this host.
 - `GOLD` unmoved.
 - `python tools/plan_status.py --check` exits 0.
 - The register entry as filed is `git show fa89c20:docs/backlog.md` under `### R503`.
