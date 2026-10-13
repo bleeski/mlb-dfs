@@ -2,6 +2,116 @@
 
 What changed in the engine, the tools and the contracts, when, and why.
 
+## 2026-10-13 — R484: the Showdown door keeps the bullpen on request (`--keep-arms`, and `--keep-arm ID` for a postseason roster), priced on a tiered labeled prior and recorded so preflight acknowledges a kept arm (roadmap Session 153)
+
+**Scope.**
+- `mlb_engine/optimize/showdown.py`:
+  - `KEPT_ARM_PARTICIPATION = "operator_kept_arm"` and `KEPT_ARM_EXPECTED_IP = 1.0`, new.
+  - `melt_showdown_salary_csv(..., keep_arms=False, keep_arm_ids=None)`. On a decided side, `_participation` gives an arm DK did not name `operator_kept_arm` instead of `confirmed_nonstarter`. With `keep_arm_ids` only the named persons qualify, and the ids imply the widening.
+  - `participation_report` gains `arms_kept` (read off the final rows), `keep_arm_ids`, and `keep_arm_ids_not_kept` (each id that kept nobody, with the reason).
+  - `apply_kept_arm_prior`, new, with `attrs["kept_arm_prior_report"]`.
+  - The melt docstring gains an R484 paragraph.
+- `mlb_engine/optimize/showdown_theses.py`: `describe_slate` drops `operator_kept_arm` rows before it picks a side's starter, beside R347's opener guard. The constant joins the module's existing import from `showdown`.
+- `skills/generate-lineups/scripts/build_slate.py`:
+  - `--keep-arms` (store_true) and `--keep-arm ID` (append), new. `--declare-pitcher`'s help gains one clause.
+  - `showdown_keep_arms` and `brief_declared_pitchers`, new.
+  - `run_showdown` passes both flags to the melt and prices the kept arms right after the feed lines, before any reader of Base.
+  - `pool.operator_widening` on the Showdown brief.
+  - `declared_pitchers` on the Showdown brief, the Showdown refusal payload and `_write_baseline_brief` (shared with Classic, where no kept arm is ever set) reads through `brief_declared_pitchers`. The R304(d) comment above the key is rewritten to say the key now carries this one pool fact.
+  - `main` refuses either flag on Classic at exit 4 (`keep_arms_not_supported_on_classic`). The exit-4 prose moves TWENTY-TWO -> TWENTY-THREE (main 15 -> 16).
+- `tests/test_showdown.py`: `KeepArmsPoolTests` (11, new). `R382CaptainPriorWiringTests.test_the_exit_4_site_count_in_the_prose_matches_the_TREE` moves 22 -> 23 on purpose (no test added).
+- `tools/audit.py`: `test_showdown` pin 481 -> 492, in two comment lines.
+- `skills/generate-lineups/references/showdown.md`: `## Keeping the bullpen (--keep-arms, R484)`, new (when to use it, the named form, the pricing table, what the ladder does with a kept arm, the record and preflight).
+- Board:
+  - `docs/backlog.md`: R484 collapsed to a CLOSED stub.
+  - `docs/ROADMAP.md`: Session 153 Complete; **NEXT** -> Session 171 (R503); a Progress Ledger row; Session 53's SHA backfilled (`3290a28`).
+  - `docs/backlog_inbox/2026-10-10_BUILD_showdown-pool-cannot-carry-relievers.md` and `docs/backlog_inbox/2026-10-03_BUILD_showdown-handedness-drops-accented-names.md` consumed (`git rm --cached`, moved to `_to_delete/`).
+- Not touched: `tools/preflight_upload.py`, `tools/verify_export.py`, `dk_entries_manager.ALLOWED_PITCHER_ROLES`, the solver and bank builders, the thesis templates, `certify_showdown`, the export writer, and the Classic pool.
+
+**What was wrong, reproduced at 3290a28 before any edit.**
+- *The pool.* On a side whose 1-9 is posted, `_participation` makes every arm DK did not tag SP, P, PLR or PO `confirmed_nonstarter`, and `starters_only` drops him. On the vendored MIN_CHC file (both sides posted) the pool is 20 people of a 94-person universe. Of the 74 dropped, 35 are arms (37 arms with `starters_only=False`), and 3 of those have no APPG. In an elimination game the bullpen decides the result and the field rosters relievers. 2000_1g_sd on 2026-10-01 was widened by hand. ALDS G5 on 2026-10-10 added ten relievers through a scratch driver, then `preflight_upload.py` exited 2 on 33 reliever slots.
+- *Preflight, the second half of the 10-10 fragment.* In memory, `check_feed` on the DK-Starting feed with Colin Rea (CHC RP) rostered gave FAIL `absent from a confirmed posted lineup`. With `declared_pitchers={rea: "operator_kept_arm"}` it gave R114's acknowledged WARN naming the role.
+
+**Premise corrections.**
+- *The fragment's preflight remedy is unneeded.* It proposed a reliever role in `ALLOWED_PITCHER_ROLES` and treated `--force` or `--feed-lenient` as the only ways past preflight. `resolve_declared_pitchers` reads the brief's `declared_pitchers`, matched by `delivered_sha256`, and never validates the role vocabulary. The Showdown brief has written that key since R304(d). `ALLOWED_PITCHER_ROLES` is Classic's pitcher-audit gate and never runs on Showdown. No preflight change.
+- *The register's "Base from the declared prior or APPG" leaves a Base-less arm undefined.* R470's prior is a factor on a Base, and 0 x anything is 0.
+- *The widening, as filed, would have caused two defects the entry did not name. Both were reproduced on the widened MIN_CHC pool.*
+  - `describe_slate` takes the highest-Base arm with no batting order as a side's starter. It named Shota Imanaga (15.6, not starting) over Matthew Boyd (14.9, DK SP), and `pitchers_duel` hard-locks whoever it names. This is why `showdown_theses.py`, not in the row's file list, moved.
+  - At raw APPG a 10-entry points-max bank put kept arms in 28 of 60 slots. Four rotation starters who were not starting (Ryan, Imanaga, Matthews, Ober) were in 5 of 10 entries each. This is R489's class: an arm priced as a starter with nothing said.
+- *The approved plan declined the fragment's named-arm door, and the landing reinstates it.* The 2026-10-03 fragment's second observation, left to this item by R208, is that on that ALDS G1 file 24 of DK's 47 arms were off the series rosters, 17 with a blank Status. Bare `--keep-arms` would keep all 17 on exactly the slates it exists for, and preflight would then wave each one through as `operator_kept_arm`.
+
+**What shipped.**
+- *The widening.*
+  - Every non-OUT arm of a decided side stays as `operator_kept_arm`: not `confirmed_starter` (DK did not name him) and not `unknown` (the side is decided). `Projected_Candidate` stays False, `Pool_Basis` is the side's own, and `decided`, the slate basis, `use_ladder` and the declared-starter count do not move.
+  - Hitters are never touched: the nine stay and the bench stays out.
+  - An unposted side was already all healthy players and is not relabelled.
+  - The branch runs after R208's lift, so a lifted side keeps its arms like a posted one, and a kept arm never counts as the DK declaration the lift requires (a side with no DK arm is still not lifted).
+  - Without the flag the frame is byte-identical. Every frame's report carries `arms_kept: []`, `keep_arm_ids: null` and `keep_arm_ids_not_kept: []`.
+- *The named form.*
+  - `--keep-arm ID`, repeatable, takes either of a person's two DK ids. It implies the widening and keeps only those arms.
+  - An id that keeps nobody is named with its reason in `pool.operator_widening.named_not_kept` and on stderr: not on the file, a hitter, already DK-named (so in the pool anyway), OUT, or on an unposted side (so in the pool as `unknown`). It is never refused (`--declare-pitcher`'s precedent), so a typo costs that arm and not the file. No new exit site.
+- *The prior* (Ben, 2026-10-13, at plan approval). The constant is `KEPT_ARM_EXPECTED_IP = 1.0`, and the factor is R470's `declared_arm_workload`, so its cap at 1.0 applies unchanged.
+
+  | kept arm | Base | `base_source` |
+  |---|---|---|
+  | DK `RP`/`P` with APPG, no typed ip | his APPG, already a relief appearance | `appg_relief` |
+  | DK `SP` who is not starting | his APPG x ip/5.5 | `starter_appg_workload_prior` |
+  | no APPG, or a reliever with typed ip | the DK-declared starters' mean APPG x ip/5.5 | `declared_prior` |
+
+  - `ip` is typed with `--declare-pitcher ID=ROLE:ip=N` (either id). A typed ip for an arm the flag did not keep is named in `ip_not_applied` and changes nothing.
+  - With no declared starter there is no reference: a Base-less arm keeps 0 and is named `no_reference`.
+  - The report carries the reference (11.0 on the test file, 17.05 on MIN_CHC) and the median APPG of the kept relievers as a cross-check (2.90 on MIN_CHC against the 3.10 prior).
+  - A supplied Base (`--projections`, R249) still replaces any of these.
+  - Priced in `run_showdown` right after the melt, so the baseline, the ladder and every report see one Base.
+- *The ladder.* `describe_slate` never takes a kept arm for a side's starter, and a side whose only DK arm is an opener stays a bullpen game. No template captains a kept arm. He is UTIL fill on the ladder, and the points-max bank can captain him.
+- *The record.*
+  - `pool.operator_widening` is on every Showdown brief, `applied: false` with the reason without a flag. It holds the flag used, the count and the per-team count, each kept arm (ids, position, APPG, Base, `base_source`, ip, `ip_source`, factor), the reference and the arms it came from, the reliever median, `named` and `named_not_kept`, `ip_not_applied`, `no_reference`, and a line naming the preflight consequence.
+  - One stderr line per side names the arms priced on the workload prior, and one per id that kept nobody.
+- *`declared_pitchers`* on the three Showdown surfaces holds the typed declarations plus each kept arm's UTIL id as `operator_kept_arm`. A role the operator typed wins. A typed id with no role (`ID` or `ID=:ip=1`), which the parser defaults to `declared_probable_sp`, reads as kept instead: the raw value is read the way `plr_declarations_without_role` reads it, so a reliever is never recorded as a probable starter. The key's meaning moves accordingly: it was the typed flag values verbatim on Showdown, and it now also carries the arms the operator's widening kept. The R304(d) comment says so.
+- *Classic* refuses `--keep-arms` and `--keep-arm` at exit 4 before anything is staged. A Classic pool admits an arm through the probables or `--declare-pitcher`, so nothing would apply either flag.
+
+**Measured on MIN_CHC through the real door (baseline, then ladder, 14 entries each).**
+- Without the flag: pool 20, kept 0. Both delivered files are byte-identical at 3290a28 and at this landing: the baseline's sha256 begins `eda2a14e9d05620b`, the ladder's `32fab88182ff1711`.
+- With `--keep-arms`: pool 55, kept 35. The baseline has kept arms in 15 of 84 slots (Anderson 7, Rea 7, Morris 1; captains Anderson 1, Rea 1). The ladder has them in 26 of 84 slots (Rea 7, Anderson 7, Morris 6, Rolison 4, Rojas 1, Webb 1), with no kept captain.
+- No rotation starter who was not starting is in either file.
+- Every kept arm used sits at DK's $4,000 floor except Rea and Rojas. Rea is DK-tagged RP with a starter's 10.5 APPG at $10,000, the residual of the tiered rule; `--projections` or `:ip=N` is the remedy.
+- Ben approved the tiers on the 10-of-60 points-max figure. On the delivered ladder the same rule spends 26 of 84 slots, with Anderson and Rea at the 0.50 player cap. On a regular-season file that is cheap filler, which is why the reference says to leave the flag off there.
+- A delivered file rostering a kept reliever passes preflight's posted-lineup check as an acknowledged WARN (both files), and the same file against a brief without the kept arms exits 2 with `absent from a confirmed posted lineup`.
+
+**Declined, with reasons.**
+- *A captain template for a kept arm* (the register's "the ladder's captain templates may name a kept arm"). It is a strategy change with no graded Showdown slate holding relievers in the field's top cohort (the entry's own Why), and R347 left the same question open for openers.
+- *A reliever role in `ALLOWED_PITCHER_ROLES`* (the 10-10 fragment). Unneeded; see the corrections.
+
+**R233 enumeration.**
+- The arm-set readers, every row with no `Batting_Order`: `grep -n 'Batting_Order"\]\.isna' mlb_engine/optimize/showdown*.py skills/generate-lineups/scripts/build_slate.py` finds three.
+  - `showdown_theses.describe_slate`: guarded here.
+  - `showdown.opposing_arm_report`: also reads `Is_Declared_Starter`, which a kept arm never sets, so it is unaffected.
+  - `build_slate.build_showdown_f1`: pins every arm, kept arms included, to `F1_PITCHER_NEUTRAL`. That is correct for an arm.
+- `apply_base_prior` keeps a pitcher's Base (`APPG_Raw`), which for a kept arm is now the prior. A supplied-Base ratio on a kept arm (`supplied_base.ratio_*`) therefore reads against the prior, not his APPG.
+- `portfolio_report` counts a kept captain's role from `Position`, as a pitcher, which is truthful.
+- The readers of `Participation`, `grep -n '\["Participation"\]\|confirmed_nonstarter"' mlb_engine/optimize/showdown*.py skills/generate-lineups/scripts/build_slate.py`: all inside `showdown.py` (`Projected_Candidate`, the `starters_only` filter, the report, the named-id reasons) plus the new `describe_slate` guard.
+- Writers of `declared_pitchers`, `grep -n '"declared_pitchers"' skills/generate-lineups/scripts/build_slate.py`: five. The three Showdown surfaces, plus the baseline brief shared with Classic, read through `brief_declared_pitchers`. The two Classic-only sites (`run_classic`'s refusal payload and certified brief) keep `parse_declared_pitchers`.
+- `late_swap.py` refuses a Showdown file, so a kept arm never becomes an inherited declaration.
+
+**Tests.**
+- 11 new, through production functions and the real exit door:
+  - A posted side keeps its relievers and all nine hitters and no bench bat.
+  - Without the flag the frame equals the default, and the flag only adds arms.
+  - An OUT arm is never kept, and an unposted side is untouched.
+  - The three tiers, typed ip on either id, the cap, and `ip_not_applied`.
+  - `describe_slate` never takes a kept arm, and a bullpen side stays one.
+  - A feed-lifted side keeps its arms, and a no-arm side is still not lifted.
+  - The brief's block and `declared_pitchers` (a typed role wins, `ID=:ip=2` stays kept), with no off-day starter in either delivered file.
+  - Preflight acknowledges a rostered kept arm through the brief and fails it without.
+  - Classic refuses both spellings at exit 4.
+  - The named form keeps only the named arms, and the ids alone imply the widening.
+  - Every id that keeps nobody is named with its reason, and the build still delivers.
+- 22 hand mutations, all killed, run with `python -B` and `PYTHONDONTWRITEBYTECODE=1` after clearing pycache. M13, the door computing the prior and then solving on the unpriced frame, first survived. The door test gained the off-day-starter assertion, which kills it.
+
+**Code review.** An independent review of `git diff 3290a28..HEAD` runs before the merge; its findings and what was done with each land in the review commit that follows this one.
+
+**Gate.** The PR's 3.11 `gate` check is the merge authority; its line lands in the landing commit. This container (Python 3.13) fails only the known host test in `test_core` (`ReplaySlateTests.test_settle_scores_requires_integer_hundredths_so_ties_are_exact`, 155.6 == 155.6), as at the session start on 3290a28 (`FAIL  test suite FAILED in tests.test_core (ran 3754)`); `test_showdown` alone: 492 tests OK, 1 skipped.
+
 ## 2026-10-13 — R208: a confirmed lineups feed reaches the Showdown pool for a side DK left blank, and a confirmed side that crosswalks to almost nobody refuses by name (roadmap Session 53)
 
 **Scope.**
