@@ -1327,7 +1327,8 @@ EXPECTED_SUITE_COUNTS = {
     # R484 named form, 2026-10-13: 490 -> 492, the two that pin --keep-arm ID (only the named arms are kept, on either id, the ids alone imply the widening and everyone else is the default pool; every id that keeps nobody is named with its reason (not on the file, a hitter, DK-declared, OUT, an unposted side) and a typo'd id through the door costs only its own line); the Classic refusal test now runs both spellings; 6 more hand mutations killed, and 3 more for the review's fixes (a distinct second starter APPG pins the reference mean, the shadow's declared-arm count, a typed role carried across a person's two ids): 25 in all.
     # R503(a), 2026-10-13: 492 -> 493, the one that pins a DK partial side lifting through the exit door (the feed's confirmed nine over DK's MIN 1-4, each overridden slot on stderr, preflight cleared on the feed beside the salary file); R208's not-lifted partial test is rewritten to the new fact, not added.
     # R503(b), 2026-10-13: 493 -> 496, the three that pin the arm (DK's arm wins over a different feed probable and it is named on a lifted side, a DK-posted side and stderr; an OUT feed probable never lifts a side with no DK arm; a file with every Starting cell blank builds on the feed's twenty with both feed probables declared, preflight cleared on the feed beside the salary file); R208's no-arm and cannot-lift tests and R484's lifted-side test are rewritten to the new fact, not added.
-    "tests.test_showdown": 496,
+    # R503 review, 2026-10-13: 496 -> 497, the one that pins an OUT DK arm as no declaration (DK posts MIN 1-4 with its SP Status O and the feed names Joe Ryan: the side lifts on Ryan, and nothing disagrees).
+    "tests.test_showdown": 497,
     # R96, 2026-08-11: 141 -> 162, the twenty-one tests that pin the delivery
     # path. A `grew` verdict is the one case where moving a pin is correct.
     # R46 round 2, 2026-08-12: 162 -> 168, the six that pin the PARTIAL side.
