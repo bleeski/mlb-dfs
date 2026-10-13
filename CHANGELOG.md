@@ -132,7 +132,11 @@ What changed in the engine, the tools and the contracts, when, and why.
   - OUT arms move between the two drop counters under the flag; the new counts are correct.
   - The OUT-arm test passing on the existing health filter is the behavior it pins.
 
-**Gate.** The PR's 3.11 `gate` check is the merge authority; its line lands in the landing commit. This container (Python 3.13) fails only the known host test in `test_core` (`ReplaySlateTests.test_settle_scores_requires_integer_hundredths_so_ties_are_exact`, 155.6 == 155.6), as at the session start on 3290a28 (`FAIL  test suite FAILED in tests.test_core (ran 3754)`); `test_showdown` alone: 492 tests OK, 1 skipped.
+**Gate.**
+- PR #152's `gate` (Python 3.11.17, the merge authority) on the code-final head 776dc16: `PASS  v2.26.0  45 modules  3765 tests  5 skipped  {test_core 2481/2481 (4 skipped) skipped_in_place; test_showdown 492/492 (1 skipped) skipped_in_place}  [tests.test_core ran its pinned 2481 but 4 were SKIPPED, so the count proves nothing about coverage.; tests.test_showdown ran its pinned 492 but 1 were SKIPPED, so the count proves nothing about coverage.]`. That is 3754 + 11 new, with the same five documented skips (absent optional files, on every host) and no sixth. The commit after it records this line and changes no code.
+- On 4c31b01 the same gate failed `DeclaredPitcherEvidenceTests` (2 != 5), the source pin the Scope names; 776dc16 moved it.
+- This container (Python 3.13), `test_core` run whole: 2481 ran, 4 skipped, and the one failure is the known host test (`ReplaySlateTests.test_settle_scores_requires_integer_hundredths_so_ties_are_exact`, 155.6 == 155.6), as at the session start on 3290a28. `test_showdown`: 492 OK, 1 skipped.
+- `test_golden_replay`: 9 tests OK, so the goldens are unmoved.
 
 ## 2026-10-13 — R208: a confirmed lineups feed reaches the Showdown pool for a side DK left blank, and a confirmed side that crosswalks to almost nobody refuses by name (roadmap Session 53)
 
