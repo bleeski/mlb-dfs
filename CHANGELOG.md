@@ -17,14 +17,15 @@ What changed in the engine, the tools and the contracts, when, and why.
   - In `select_and_assign_entries`: the contest-floor mask after the portfolio floor's; the quota's scope; the floor slot's re-entry, one guarded call site for the contest step and the portfolio rungs; the delivered and refused floor and quota blocks; the contest-floor warning.
   - `LADDER_RELAXED_CONTROLS` gains both map keys.
 - `mlb_engine/pipeline/deadline_governor.py`: `NEVER_RELAX_NOT_HONOURED` gains both map keys with the reason.
+- `tools/late_swap.py`: both control doors (`inherit_swap_controls`, `resolve_swap_controls`) call `apply_shape_band_override` after their override lands, and the zero-cost gate refuses a typed map at exit 4.
 - `tests/test_core.py`: `ShapeBandsMixedSetTests`, new (+6). Two `ShapeBandRoutingTests` are renamed with their assertions unchanged (`test_the_portfolio_floor_5_binds_only_when_every_contest_is_narrow`, `test_the_portfolio_quota_retires_when_any_contest_is_outside_the_mid_band`).
 - `tools/audit.py`: `test_core` pin 2475 -> 2481.
-- `skills/generate-lineups/scripts/build_slate.py`: `shape_bands_brief`, new (never raises; a failure is named in the block), and one key, `shape_bands`, in `run_classic`'s brief.
+- `skills/generate-lineups/scripts/build_slate.py`: `shape_bands_brief`, new (never raises; a failure is named in the block), and one key, `shape_bands`, in `run_classic`'s brief; `SHAPE_BAND_MAP_KEYS`, new, and the R167 units gate refuses a typed map by name at exit 4 (one problem row per map; `FRACTION_CONTROL_DICT_KEYS` and its pin unchanged).
 - `skills/generate-lineups/references/shape_bands.md`, new: the rule, the escape with its three `--controls-override` lines, relaxation order, where to read it. `skills/generate-lineups/SKILL.md`: one pointer line beside the stack sleeve's (the body is at 1,656 lines against its 150-line target, so nothing else).
 - `ledger/inbox/2026-10-13_DEV_shape-bands-per-contest.md`, create-only: the Quick Card's R37(2)(a) sentence ("one broad-payout contest retires the floor for the whole portfolio") is stale; ARCHIVE reconciles it.
 - `docs/backlog.md`: R483 collapsed to a CLOSED stub (its filed text is below). `docs/ROADMAP.md`: Session 152 Complete; **NEXT** Session 53; a Progress Ledger row; Session 40's SHA backfilled (`9c5d165`).
-- Landed as two commits on one PR: the engine, tests and pin, then the brief key, the docs and the board.
-- Not touched: the optimizer, the bank builders, certification, the export validator (it checks no floor or quota), `tools/late_swap.py` (its merge and bank request pick both maps up unchanged at the call), `mlb_engine/production/` (stage 0 reads its own `ProductionControls`, not the merge).
+- Landed as three commits on one PR: the engine, tests and pin; the brief key, the docs and the board; then the override escape on the late-swap doors and the two front-door gates, which the before-done review found (below).
+- Not touched: the optimizer, the bank builders, certification, the export validator (it checks no floor or quota), `mlb_engine/production/` (stage 0 reads its own `ProductionControls`, not the merge). The swap's merge and bank request pick both maps up unchanged at the call; `recorded_controls` keeps a map as a map, so a swap inheriting a mixed-set parent inherits its bands.
 
 **What was wrong, reproduced at b29468e before any edit.**
 - **The setup.** A `wta_satellite` contest on `wta_ticket_satellite` (narrow, 0.002) plus a `large_gpp` contest on `large_field_gpp` (mid, 0.12), 4 games.
@@ -48,7 +49,12 @@ What changed in the engine, the tools and the contracts, when, and why.
   - `five_stack_quota` gains `scope` (`portfolio` or `contests`), `contests`, `share_by_contest`, `scope_entries` and `assigned_qualifying_by_contest`.
   - `assigned_qualifying` and `need_met` count only the scoped rows, so a satellite's fives never read as a GPP's quota met.
 - **The bank.** `resolve_bank_stack_request` asks for `[5, 4]` off either map: target 1.0 for a floor map (the portfolio floor's ask), and the enforced share for a quota map. All four doors (sliced, direct, plan leg, late swap) read it with no caller edit.
-- **The escape.** A typed `min_five_stack_share_pct` or `primary_stack_min_size` is the operator's answer for every entry and retires its map; 0 turns the band off. A typed `_by_contest` map is refused by name: the maps are derived, so the zero-cost units gate in `build_slate.py` and its pinned key tuple do not move. `--never-relax` on either map is refused with the ladder reason, where before it read "not a control this engine knows".
+- **The escape, on every door.** A typed `min_five_stack_share_pct` or `primary_stack_min_size` is the operator's answer for every entry and retires its map; 0 turns the band off. A typed `_by_contest` map is refused by name. One helper, `apply_shape_band_override`, holds both rules, and four call sites use it:
+  - the merge;
+  - `late_swap.py`'s two control doors, because the swap applies `--controls-override` with `controls.update` on top of a merge it called with no override, or on top of the parent's recorded controls, so the merge's own rules never saw it;
+  - `late_swap.py`'s zero-cost gate, at exit 4 with nothing read.
+  
+  `build_slate.py`'s R167 units gate refuses a typed map in the same second, through its own `SHAPE_BAND_MAP_KEYS` table (no engine import there), which a test pins to the merge's. Before this, a typed map passed that gate and raised at the merge after the bank had spent. `--never-relax` on either map is refused with the ladder reason, where before it read "not a control this engine knows".
 - **The report.** `shape_band_application(shape_bands, controls, allocation=None, provenance=None)` is pure. For each band it gives:
   - `scope` (`portfolio`, `contests` or `none`), `value`, `declared_by` and `carried_by`;
   - `not_carried`, with the reason (the typed-override escape, or a slate floor at 0);
@@ -70,6 +76,7 @@ What changed in the engine, the tools and the contracts, when, and why.
 - **The sleeves run first.** The sleeve mask runs before both floors, so a narrow entry seated in a sleeve whose candidates hold no five relaxes its contest's floor (counted, named in the warning). The unanimous scalar floor has had this failure mode since R406; this change localizes it to one contest.
 - **The bank request is coarse.** The controls carry no entry counts. A floor map on 2 of 20 entries asks for target 1.0, which the doors clamp to 0.75. A quota map whose need floors to 0 still asks at the 0.25 clamp. Both are search effort, never legality.
 - **A late swap inherits R61's class.** The contest-scoped quota counts over the entries in the solve (E), not `total`, so a swap ignores untouched rows that already carry fives. The portfolio quota has the same asymmetry today.
+- **The baseline brief carries no `shape_bands`.** The fragment said "either brief". `_write_baseline_brief` is the pre-research quick file's record and carries none; the main Classic brief does.
 
 **Corrections to the filed premise.**
 - **The incident slate.** The fragment (only on `ben/reference-refresh-2026-09-22`, 2006c74) measured 1840_5g on 2026-09-15 (5 contests, 8 entries, 3 narrow and 2 mid), not 1310_4g.
@@ -83,11 +90,11 @@ What changed in the engine, the tools and the contracts, when, and why.
 - a satellite and a large GPP each carry their own band through the real merge and allocator (the GPP's quota scoped to its 16 entries and met, the satellite's entries all five-plus, `shape_band_application` naming both, and `shape_bands_brief_block` composing the brief's block from the same allocation);
 - a unanimous all-mid set and an all-narrow set add no key, and the quota scope is the portfolio;
 - a cash contest sits in neither map, its entries take fours, and the satellite's fives are not counted toward the GPP's quota;
-- the escape works and a typed map is refused;
+- the escape works and a typed map is refused, at the merge, at both late-swap doors and at both front doors (the two gates run as subprocesses with the salary file as `--entries`, as the R167 gate test does, so a door that skipped its gate fails fast instead of building);
 - the bank is asked for fives off either map;
 - a contest floor relaxes and counts on a starved bank, and on a proven infeasibility (one five, two satellite entries, F-3) with the portfolio floor unmoved.
 
-Ten hand mutations, all killed: no maps, the quota always portfolio, no contest mask, no contest re-entry, a typed scalar keeping its map, a typed map accepted, the bank request blind to either map (two mutants), maps on a unanimous set (`>=`), and the quota counted over every row.
+Fourteen hand mutations, all killed: no maps, the quota always portfolio, no contest mask, no contest re-entry, a typed scalar keeping its map, a typed map accepted, the bank request blind to either map (two mutants), maps on a unanimous set (`>=`), the quota counted over every row, each late-swap door skipping the helper (two mutants), and each front-door gate skipping the refusal (two mutants). No mutant wrote to `outputs/`, `runs/` or `data/slates/`, checked before and after.
 
 A false survivor from the first pass, recorded because it will recur: mutating `if asked:` to `if False:` keeps the file size, and the restore landed in the same second, so Python reused the mutant's `.pyc` for the next three mutants. The rerun used `python -B` with `PYTHONDONTWRITEBYTECODE=1` after clearing `__pycache__`.
 
@@ -97,6 +104,10 @@ The fixture bank holds 20 fours over 10 fives because F-3 seats a signature once
 - **Loose:** 18 entries, 7 distinct; primary stack BAL 3, BOS 10, PHI 5; SP pairs {01+02: 5, 01+6001: 5, 01+6009: 8}.
 - **Production:** 18 entries, 18 distinct; BAL 6, BOS 6, PHI 2, SD 4; 12 SP pairs.
 - `UT test_golden_replay`: 9 OK, golden files untouched.
+
+**Found at the before-done review, fixed before the merge.** `late_swap.py` called the merge with no override and applied `--controls-override` afterwards (`controls.update`). The escape the reference doc documents would not have worked on the swap: a typed `primary_stack_min_size=4` would have sat beside the parent's `primary_stack_min_size_by_contest`, and the contest floor would still have masked. The build's gate also let a typed map through to raise at the merge after the bank had spent. Both are fixed above, each pinned and mutation-checked. Two further checks came back clean:
+- The refusal path's own walks over controls (`_interaction_probe`, `compose_infeasibility_errors`, `_infeasibility_remedies`, `_diagnose_binding_constraints`) read fixed key lists, so a dict-valued map never reaches a coercion there.
+- `recorded_controls` keeps mappings as mappings.
 
 **The register entry, as filed 2026-10-02 (migrated verbatim).**
 

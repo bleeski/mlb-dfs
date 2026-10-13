@@ -39,8 +39,9 @@ python skills/generate-lineups/scripts/build_slate.py ...     --controls-overrid
 ```
 
 The `_by_contest` maps are derived, not typed: an override naming one is refused by
-name at the merge. `--never-relax` refuses the bands too, because the allocator's
-ladder relaxes them.
+name at exit 4 before anything is staged, by `build_slate.py` and `late_swap.py`
+alike. A late swap applies the same escape on top of the parent's recorded controls.
+`--never-relax` refuses the bands too, because the allocator's ladder relaxes them.
 
 ## Relaxation (never a refusal: an S control never costs the file)
 

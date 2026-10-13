@@ -29043,6 +29043,62 @@ class ShapeBandsMixedSetTests(unittest.TestCase):
             with self.assertRaises(ValueError) as ctx:
                 self._merged(pbc, override={key: {"GPP": 0.2}})
             self.assertIn(key.replace("_by_contest", ""), str(ctx.exception))
+        # The swap applies its override on top of the merge (or the parent's
+        # recorded controls), so the same two rules run there too.
+        import importlib
+        import importlib.util
+        ls = importlib.import_module("tools.late_swap")
+        parent = {"primary_stack_min_size": 4,
+                  "primary_stack_min_size_by_contest": {"SAT": 5}}
+        self.assertNotIn("primary_stack_min_size_by_contest", ls.inherit_swap_controls(
+            parent, {"primary_stack_min_size": 4}, None))
+        self.assertEqual(ls.inherit_swap_controls(parent, None, None)[
+            "primary_stack_min_size_by_contest"], {"SAT": 5})
+        with self.assertRaises(ValueError):
+            ls.inherit_swap_controls(
+                parent, {"primary_stack_min_size_by_contest": {"SAT": 4}}, None)
+        # The re-derive door: the bands resolve from the swap's own frame.
+        frame = pd.DataFrame({"Player_ID": [str(i) for i in range(8)],
+                              "Team": list("ABCDEFGH"),
+                              "Game_ID": ["g1", "g1", "g2", "g2", "g3", "g3", "g4", "g4"]})
+        self.assertEqual(ls.resolve_swap_controls(pbc, None, None, projections=frame)[
+            "primary_stack_min_size_by_contest"], {"SAT": 5})
+        self.assertNotIn("primary_stack_min_size_by_contest", ls.resolve_swap_controls(
+            pbc, {"primary_stack_min_size": 4}, None, projections=frame))
+        # And both front doors refuse a typed map before anything is read.
+        archive = REPO / "data" / "archive" / "2026-06-03"
+        salary = archive / "DKSalaries_2026-06-03.csv"
+        typed = '{"min_five_stack_share_pct_by_contest": {"GPP": 0.2}}'
+        build = subprocess.run(
+            [sys.executable, str(REPO / "skills" / "generate-lineups" / "scripts"
+                                 / "build_slate.py"),
+             # The salary file as --entries, as the R167 gate test does: a door
+             # that skipped its gate fails fast instead of building.
+             "--salary", str(salary), "--entries", str(salary),
+             "--controls-override", typed],
+            capture_output=True, text=True, cwd=str(REPO))
+        self.assertEqual(build.returncode, 4, build.stderr[-400:])
+        payload = json.loads(build.stdout)
+        self.assertEqual(payload["controls"][0]["control"],
+                         "min_five_stack_share_pct_by_contest")
+        self.assertIn("type min_five_stack_share_pct", payload["controls"][0]["problem"])
+        swap = subprocess.run(
+            [sys.executable, str(REPO / "tools" / "late_swap.py"),
+             "--date", "2026-06-03", "--salary", str(salary),
+             "--parent-entries", str(salary),
+             "--controls-override", typed],
+            capture_output=True, text=True, cwd=str(REPO))
+        self.assertEqual(swap.returncode, 4, swap.stderr[-400:])
+        self.assertIn("type min_five_stack_share_pct", swap.stderr)
+        self.assertNotIn("Traceback", swap.stderr)
+        bs = importlib.util.spec_from_file_location(
+            "build_slate_r483", REPO / "skills" / "generate-lineups" / "scripts"
+            / "build_slate.py")
+        mod = importlib.util.module_from_spec(bs)
+        bs.loader.exec_module(mod)
+        self.assertEqual(mod.SHAPE_BAND_MAP_KEYS,
+                         {m: k for k, m in epi.SHAPE_BAND_CONTEST_MAPS},
+                         "the build's gate names the merge's map keys")
 
     def test_the_bank_is_asked_for_fives_when_only_a_contest_band_wants_them(self):
         _, m = self._merged(self._pbc("SAT", "GPP"))

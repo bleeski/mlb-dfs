@@ -1387,6 +1387,14 @@ FRACTION_CONTROL_DICT_KEYS = (
     "max_game_exposure_pct_by_game",
 )
 
+# R483. The shape bands' per-contest maps, each with the scalar that is its
+# escape. Derived by the merge and refused in --controls-override; named here
+# rather than imported so the gate stays free of the engine import.
+SHAPE_BAND_MAP_KEYS = {
+    "primary_stack_min_size_by_contest": "primary_stack_min_size",
+    "min_five_stack_share_pct_by_contest": "min_five_stack_share_pct",
+}
+
 
 def fraction_or_problem(value: Any) -> tuple:
     """``(coerced float, None)`` or ``(None, why it is not a fraction)``.
@@ -9469,6 +9477,17 @@ def main() -> int:
                               "problem": f"{problem}; a COUNT control"})
         else:
             override[key] = coerced
+    # R483. The shape bands' per-contest maps are derived by the engine's merge
+    # and never typed (`execution_pipeline.SHAPE_BAND_CONTEST_MAPS`, which a test
+    # pins this table to). Refused here, in the same second, rather than at the
+    # merge after the bank has spent; the escape is the scalar.
+    for map_key, scalar_key in SHAPE_BAND_MAP_KEYS.items():
+        if map_key in override:
+            bad_units.append({
+                "control": map_key, "value": override[map_key],
+                "problem": (f"derived from the contests' shape bands, not an "
+                            f"override; type {scalar_key} to set it for every "
+                            f"entry, or 0 to turn the band off (R483)")})
     if bad_units:
         print(json.dumps({
             "status": "controls_override_bad_units",

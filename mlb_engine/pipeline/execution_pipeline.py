@@ -2171,6 +2171,34 @@ SHAPE_BAND_CONTEST_MAPS = (
     ("min_five_stack_share_pct", "min_five_stack_share_pct_by_contest"),
 )
 
+
+def apply_shape_band_override(controls: MutableMapping[str, Any],
+                              override: Optional[Mapping[str, Any]]) -> List[str]:
+    """R483. The escape's two rules, for every door that applies an override.
+
+    A typed `_by_contest` map is refused by name: the maps are derived from the
+    contests' shape bands, never typed. A typed scalar is the operator's answer
+    for EVERY entry, so it retires the map it would otherwise sit beside.
+    `_merged_controls_for_build` calls this after its override lands, and
+    `late_swap.py`, which applies its override on top of a merge (or of the
+    parent's recorded controls), calls it at both of its doors: one
+    implementation, because two would diverge (R29(3)). Returns the map keys it
+    retired, so a caller keeping provenance can drop theirs.
+    """
+    typed = dict(override or {})
+    for scalar_key, map_key in SHAPE_BAND_CONTEST_MAPS:
+        if map_key in typed:
+            raise ValueError(
+                f"{map_key} is derived from the contests' shape bands and is "
+                f"not an override; type {scalar_key} to set it for every "
+                f"entry, or set it to 0 to turn the band off (R483)")
+    retired: List[str] = []
+    for scalar_key, map_key in SHAPE_BAND_CONTEST_MAPS:
+        if scalar_key in typed and map_key in controls:
+            controls.pop(map_key, None)
+            retired.append(map_key)
+    return retired
+
 # How the quota reads the field. `MID_BREADTH_QUOTA_SHARE_RATIO` is the fraction
 # of the shape's CURRENT field share we ask for, clamped into the band above.
 #
@@ -4948,17 +4976,9 @@ def _merged_controls_for_build(
                                          "max_game_exposure_pct")
     _fraction_control_dict_keys = ("max_game_exposure_pct_by_game",)
     coerced_override: Dict[str, Any] = dict(override or {})
+    # R483. A typed `_by_contest` map is refused before anything is coerced.
+    apply_shape_band_override({}, coerced_override)
     for key, value in list(coerced_override.items()):
-        # R483. The per-contest band maps are DERIVED here from the postures and
-        # the bands, never typed: the escape is the scalar, which applies to
-        # every entry and retires the map. Refused by name, so a typed map is
-        # never half-honoured.
-        for scalar_key, map_key in SHAPE_BAND_CONTEST_MAPS:
-            if key == map_key:
-                raise ValueError(
-                    f"{map_key} is derived from the contests' shape bands and is "
-                    f"not an override; type {scalar_key} to set it for every "
-                    f"entry, or set it to 0 to turn the band off (R483)")
         if value is None:
             continue
         if key == CONSENSUS_PAIR_SEAT_CONTROL:
@@ -5137,10 +5157,8 @@ def _merged_controls_for_build(
         prov[key] = (override_provenance or {}).get(key) or _gc.PROV_OPERATOR_RELAXABLE
     # R483. The escape: a typed scalar is the operator's answer for EVERY
     # entry, so the per-contest map it would otherwise sit beside is retired.
-    for scalar_key, map_key in SHAPE_BAND_CONTEST_MAPS:
-        if scalar_key in coerced_override:
-            merged.pop(map_key, None)
-            prov.pop(map_key, None)
+    for map_key in apply_shape_band_override(merged, coerced_override):
+        prov.pop(map_key, None)
     # Never-relax reaches the game scalar before the per-game expansion reads
     # its provenance, so every game the held scalar sets reads held too.
     if "max_game_exposure_pct" in holding and "max_game_exposure_pct" in merged:
