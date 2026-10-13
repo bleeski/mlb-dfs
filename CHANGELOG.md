@@ -11,7 +11,10 @@ What changed in the engine, the tools and the contracts, when, and why.
   - `participation_report` gains `arms_kept` (read off the final rows), `keep_arm_ids`, and `keep_arm_ids_not_kept` (each id that kept nobody, with the reason).
   - `apply_kept_arm_prior`, new, with `attrs["kept_arm_prior_report"]`.
   - The melt docstring gains an R484 paragraph.
-- `mlb_engine/optimize/showdown_theses.py`: `describe_slate` drops `operator_kept_arm` rows before it picks a side's starter, beside R347's opener guard. The constant joins the module's existing import from `showdown`.
+- `mlb_engine/optimize/showdown_theses.py`:
+  - `describe_slate` drops `operator_kept_arm` rows before it picks a side's starter, beside R347's opener guard.
+  - `construction_shadow` counts only declared arms in `declared_arms` and the pitcher-captain ceiling. A kept arm a relaxed lock did put on the armband still counts as a pitcher captain.
+  - The constant joins the module's existing import from `showdown`.
 - `skills/generate-lineups/scripts/build_slate.py`:
   - `--keep-arms` (store_true) and `--keep-arm ID` (append), new. `--declare-pitcher`'s help gains one clause.
   - `showdown_keep_arms` and `brief_declared_pitchers`, new.
@@ -21,9 +24,9 @@ What changed in the engine, the tools and the contracts, when, and why.
   - `main` refuses either flag on Classic at exit 4 (`keep_arms_not_supported_on_classic`). The exit-4 prose moves TWENTY-TWO -> TWENTY-THREE (main 15 -> 16).
 - `tests/test_showdown.py`: `KeepArmsPoolTests` (11, new). `R382CaptainPriorWiringTests.test_the_exit_4_site_count_in_the_prose_matches_the_TREE` moves 22 -> 23 on purpose (no test added).
 - `tools/audit.py`: `test_showdown` pin 481 -> 492, in two comment lines.
-- `skills/generate-lineups/references/showdown.md`: `## Keeping the bullpen (--keep-arms, R484)`, new (when to use it, the named form, the pricing table, what the ladder does with a kept arm, the record and preflight).
+- `skills/generate-lineups/references/showdown.md`: `## Keeping the bullpen (--keep-arms, R484)`, new: when to use it, the named form, the pricing table, Rea's residual, what the ladder does with a kept arm, and the record and preflight.
 - Board:
-  - `docs/backlog.md`: R484 collapsed to a CLOSED stub.
+  - `docs/backlog.md`: R484 collapsed to a CLOSED stub; a rider on R463 (the review's label finding).
   - `docs/ROADMAP.md`: Session 153 Complete; **NEXT** -> Session 171 (R503); a Progress Ledger row; Session 53's SHA backfilled (`3290a28`).
   - `docs/backlog_inbox/2026-10-10_BUILD_showdown-pool-cannot-carry-relievers.md` and `docs/backlog_inbox/2026-10-03_BUILD_showdown-handedness-drops-accented-names.md` consumed (`git rm --cached`, moved to `_to_delete/`).
 - Not touched: `tools/preflight_upload.py`, `tools/verify_export.py`, `dk_entries_manager.ALLOWED_PITCHER_ROLES`, the solver and bank builders, the thesis templates, `certify_showdown`, the export writer, and the Classic pool.
@@ -83,7 +86,7 @@ What changed in the engine, the tools and the contracts, when, and why.
 - *A reliever role in `ALLOWED_PITCHER_ROLES`* (the 10-10 fragment). Unneeded; see the corrections.
 
 **R233 enumeration.**
-- The arm-set readers, every row with no `Batting_Order`: `grep -n 'Batting_Order"\]\.isna' mlb_engine/optimize/showdown*.py skills/generate-lineups/scripts/build_slate.py` finds three.
+- The arm-set readers, every row with no `Batting_Order`: `grep -n 'Batting_Order"\]\.isna' mlb_engine/optimize/showdown*.py skills/generate-lineups/scripts/build_slate.py` finds three, and the review found a fourth that the grep misses because it tests `pd.isna(bo)` in a comprehension (`showdown_theses.construction_shadow`, guarded here; `grep -n "pd.isna(bo)" mlb_engine/optimize/showdown_theses.py` lists it beside its apportioned-captain twin, which needs nothing because no template names a kept arm).
   - `showdown_theses.describe_slate`: guarded here.
   - `showdown.opposing_arm_report`: also reads `Is_Declared_Starter`, which a kept arm never sets, so it is unaffected.
   - `build_slate.build_showdown_f1`: pins every arm, kept arms included, to `F1_PITCHER_NEUTRAL`. That is correct for an arm.
@@ -106,9 +109,27 @@ What changed in the engine, the tools and the contracts, when, and why.
   - Classic refuses both spellings at exit 4.
   - The named form keeps only the named arms, and the ids alone imply the widening.
   - Every id that keeps nobody is named with its reason, and the build still delivers.
-- 22 hand mutations, all killed, run with `python -B` and `PYTHONDONTWRITEBYTECODE=1` after clearing pycache. M13, the door computing the prior and then solving on the unpriced frame, first survived. The door test gained the off-day-starter assertion, which kills it.
+- 25 hand mutations, all killed, run with `python -B` and `PYTHONDONTWRITEBYTECODE=1` after clearing pycache.
+  - M13, the door computing the prior and then solving on the unpriced frame, first survived. The door test gained the off-day-starter assertion, which kills it.
+  - The review showed the reference mean survived `.max()` and own-side mutants, because both test starters had APPG 11. BBB's starter is now 15, and that mutant dies.
 
-**Code review.** An independent review of `git diff 3290a28..HEAD` runs before the merge; its findings and what was done with each land in the review commit that follows this one.
+**Code review.** An independent general-purpose review agent read `git diff 3290a28..99e919c` (the Skill tool refuses `/code-review` on this host). It ran its own probes and an in-memory mutation of the reference, and found nothing blocking.
+- *Fixed:*
+  - (1) The reference formula was unpinned (both test starters had APPG 11): the test pool now has two different starter APPGs.
+  - (3) `construction_shadow` read 37 "declared" arms and a 100% ceiling with the flag on MIN_CHC: the count and the ceiling now exclude kept arms, pinned at the door (2).
+  - (4) A role typed on a person's CPT id lost to a bare declaration on his UTIL id (`{'1020': 'declared_probable_sp', '1021': 'viable_bulk_or_alt_sp'}`): the typed role now carries to both.
+  - The cleanup reason for a named arm on a malformed or ambiguous side read "has not posted"; it now says the side is not decided.
+  - Two doc overstatements were corrected: the ladder's 26 slots are not all $4,000 relievers (Rea and Rojas are $10,000 arms), and a kept arm can reach the armband through a relaxed lock or a `--captain-sleeve`.
+- *Kept, with reasons:*
+  - (2) Rea, DK-tagged RP at $10,000 with a starter's 10.5 APPG, keeps his APPG under the tier rule Ben approved. The rule keys on DK's position, the reference now says how to read the outlier off `relief_median_appg`, and the remedy is `:ip=N` or `--projections`. This is the decision to revisit if a graded slate shows it.
+  - (5) A role typed without `:ip=` does not move the price. That is the approved spec; the reference now says so.
+  - (6) `SP/RP` reads as SP-tagged. No tracked DK salary file (10 checked) carries a combined arm position.
+  - (7) A PLR arm enters the reference mean because DK declares him. That is the declared-starter set every other Showdown reader uses.
+  - An empty `keep_arm_ids=[]` through the API keeps nobody. The CLI cannot pass one, and an empty restriction meaning "nobody" is the literal reading.
+  - `operator_widening.arms[].base` shows the prior even where `--projections` replaced it. The reference says so, and `supplied_base` records the replacement.
+  - The template wording ("Both arms off" with kept relievers rostered) is R463's class and rides there as a rider.
+  - OUT arms move between the two drop counters under the flag; the new counts are correct.
+  - The OUT-arm test passing on the existing health filter is the behavior it pins.
 
 **Gate.** The PR's 3.11 `gate` check is the merge authority; its line lands in the landing commit. This container (Python 3.13) fails only the known host test in `test_core` (`ReplaySlateTests.test_settle_scores_requires_integer_hundredths_so_ties_are_exact`, 155.6 == 155.6), as at the session start on 3290a28 (`FAIL  test suite FAILED in tests.test_core (ran 3754)`); `test_showdown` alone: 492 tests OK, 1 skipped.
 

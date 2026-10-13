@@ -6505,7 +6505,14 @@ def brief_declared_pitchers(args) -> dict:
             typed_role.add(pid.strip())
     for cpt_id, util_id in kept:
         ids = [i for i in (cpt_id, util_id) if i]
-        if any(i in typed_role for i in ids):
+        typed_on = [i for i in ids if i in typed_role]
+        if typed_on:
+            # A role typed on either of his ids is his role on both: a bare
+            # declaration on the other id must not leave the parser's
+            # `declared_probable_sp` beside it.
+            for pid in ids:
+                if pid in declared and pid not in typed_role:
+                    declared[pid] = declared[typed_on[0]]
             continue
         for pid in ids:
             if pid in declared:

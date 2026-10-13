@@ -678,8 +678,9 @@ def melt_showdown_salary_csv(path: str | Path, exclude_out: bool = True,
             why = (f"DK names him (Starting={person.get('Starting')}), so he is "
                    f"in the pool without the flag")
         else:
-            why = ("his side has not posted its 1-9, so he is in the pool as "
-                   "`unknown` without the flag")
+            why = ("his side is not decided (its 1-9 is not completely posted, "
+                   "or DK's column is malformed or ambiguous there), so he is in "
+                   "the pool as `unknown` without the flag")
         named_not_kept.append({
             "id": pid, "reason": why,
             "name": None if person is None else str(person.get("Name")),

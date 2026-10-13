@@ -3368,14 +3368,23 @@ def construction_shadow(
             if pd.isna(bo)}
     except Exception:
         pitcher_names = set()
-    out["declared_arms"] = len(pitcher_names)
+    # R484. An arm `--keep-arms` kept is no declared arm and no template names
+    # him captain, so he is out of the count and the ceiling (MIN_CHC with the
+    # flag read 37 "declared" arms and a 100% ceiling). A kept arm a relaxed
+    # captain lock did put on the armband still counts as a pitcher captain
+    # below, because he is one.
+    declared_names = set(pitcher_names)
+    if "Participation" in df.columns:
+        declared_names -= {str(nm) for nm, p in zip(df["Name"], df["Participation"])
+                           if p == KEPT_ARM_PARTICIPATION}
+    out["declared_arms"] = len(declared_names)
     cpt_is_p = [1 if str(r.get("captain")) in pitcher_names else 0 for r in rows]
     out["pitcher_cpt_entries"] = sum(cpt_is_p)
     out["pitcher_cpt_share_pct"] = round(100.0 * sum(cpt_is_p) / n, 1)
-    if pitcher_names and max_cpt_exposure_pct:
+    if declared_names and max_cpt_exposure_pct:
         per_player = exposure_cap_count(max_cpt_exposure_pct, n)
         if per_player is not None:
-            ceiling = min(n, len(pitcher_names) * int(per_player))
+            ceiling = min(n, len(declared_names) * int(per_player))
             out["pitcher_cpt_ceiling_portfolio_pct"] = round(100.0 * ceiling / n, 1)
             out["pitcher_cpt_ceiling_basis"] = "portfolio captain cap"
             if contest_of_entry is not None and max_cpt_per_contest:
@@ -3393,7 +3402,7 @@ def construction_shadow(
                         "not computed)")
                 if per_contest_n and sum(per_contest_n.values()) == n:
                     by_contest = sum(
-                        min(nj, len(pitcher_names) * per_contest_cap_count(
+                        min(nj, len(declared_names) * per_contest_cap_count(
                             nj, int(max_cpt_per_contest)))
                         for nj in per_contest_n.values())
                     out["pitcher_cpt_ceiling_per_contest_pct"] = round(

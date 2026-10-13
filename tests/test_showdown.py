@@ -10299,7 +10299,8 @@ class KeepArmsPoolTests(_ShowdownExitDoorHarness, unittest.TestCase):
 
     def _rows(self, post=(), arm=(), opener=()):
         """Per team: nine bats (posted on `post`), four bench bats, the arm DK
-        tags SP on `arm` (APPG 11), a reliever (3.0), a closer (5.0), a
+        tags SP on `arm` (APPG 11 on AAA, 15 on BBB, so the reference is a
+        mean of two different numbers), a reliever (3.0), a closer (5.0), a
         rotation starter not starting today whose APPG (16.0) tops the real
         starter's, a call-up with no APPG, and an IL arm."""
         rows = [self.HEADER]
@@ -10309,7 +10310,7 @@ class KeepArmsPoolTests(_ShowdownExitDoorHarness, unittest.TestCase):
                        str(i + 1) if team in post else "") for i in range(9)]
             people += [(f"{team} Bench{i + 1}", "OF", 3000, "5.0", "", "")
                        for i in range(4)]
-            people += [(f"{team} Arm", "SP", 9000, "11.0", "",
+            people += [(f"{team} Arm", "SP", 9000, "11.0" if team == "AAA" else "15.0", "",
                         "SP" if team in arm else ""),
                        (f"{team} Reliever", "RP", 2000, "3.0", "", ""),
                        (f"{team} Closer", "RP", 2400, "5.0", "", ""),
@@ -10408,13 +10409,15 @@ class KeepArmsPoolTests(_ShowdownExitDoorHarness, unittest.TestCase):
         base = dict(zip(out["Name"], out["Base"]))
         rep = out.attrs["kept_arm_prior_report"]
         src = {a["name"]: a["base_source"] for a in rep["arms"]}
-        self.assertEqual(rep["reference_base"], 11.0,
-                         "the mean APPG of DK's two declared starters")
+        self.assertEqual(rep["reference_base"], 13.0,
+                         "the mean APPG of DK's two declared starters (11, 15)")
         self.assertAlmostEqual(base["AAA Reliever"], 3.0)      # a relief appearance
         self.assertEqual(src["AAA Reliever"], "appg_relief")
         self.assertAlmostEqual(base["AAA Swingman"], 16.0 / ref)
         self.assertEqual(src["AAA Swingman"], "starter_appg_workload_prior")
-        self.assertAlmostEqual(base["AAA Rookie"], 11.0 / ref)
+        self.assertAlmostEqual(base["AAA Rookie"], 13.0 / ref)
+        self.assertAlmostEqual(base["BBB Rookie"], 13.0 / ref,
+                               msg="one slate reference, not his own side's arm")
         self.assertEqual(src["AAA Rookie"], "declared_prior")
         self.assertEqual(rep["relief_median_appg"], 4.0,
                          "the cross-check: median APPG of the kept relievers")
@@ -10428,9 +10431,9 @@ class KeepArmsPoolTests(_ShowdownExitDoorHarness, unittest.TestCase):
         base = dict(zip(out["Name"], out["Base"]))
         rep = out.attrs["kept_arm_prior_report"]
         self.assertAlmostEqual(base["AAA Swingman"], 16.0 * 3.0 / ref)
-        self.assertAlmostEqual(base["AAA Reliever"], 11.0 * 2.0 / ref,
+        self.assertAlmostEqual(base["AAA Reliever"], 13.0 * 2.0 / ref,
                                msg="typed innings price him off the reference")
-        self.assertAlmostEqual(base["AAA Closer"], 11.0,
+        self.assertAlmostEqual(base["AAA Closer"], 13.0,
                                msg="the factor is capped at 1.0 (R470)")
         self.assertAlmostEqual(base["AAA Arm"], 11.0)
         self.assertEqual(rep["ip_not_applied"], [ids["AAA Arm"][1]],
@@ -10503,6 +10506,16 @@ class KeepArmsPoolTests(_ShowdownExitDoorHarness, unittest.TestCase):
         self.assertEqual(declared[by_name["Joe Ryan"]["UTIL"]], self.KEPT)
         self.assertNotIn(by_name["Taj Bradley"]["UTIL"], declared)
         self.assertIn("keep-arms:", r.err)
+        # A kept arm is no declared arm: the shadow's count and ceiling read
+        # DK's two (the widened pool read 37 and a 100% ceiling).
+        self.assertEqual(r.brief["construction_shadow"]["declared_arms"], 2)
+        # A role typed on one of a person's ids is his role on the other too.
+        cross = types.SimpleNamespace(
+            declare_pitcher=[f"{rea['CPT']}=viable_bulk_or_alt_sp", rea["UTIL"]],
+            _kept_arms=[(rea["CPT"], rea["UTIL"])])
+        self.assertEqual(r.mod.brief_declared_pitchers(cross),
+                         {rea["CPT"]: "viable_bulk_or_alt_sp",
+                          rea["UTIL"]: "viable_bulk_or_alt_sp"})
         # The priced frame is the one the solver used: at raw APPG the four
         # rotation starters who were not starting rode 5 of 10 points-max
         # entries each (Session 153's measurement); on the prior none is in
@@ -10634,7 +10647,7 @@ class KeepArmsPoolTests(_ShowdownExitDoorHarness, unittest.TestCase):
         self.assertIn("a hitter", why[ids["BBB Bat1"]])
         self.assertIn("DK names him (Starting=SP)", why[ids["BBB Arm"]])
         self.assertIn("Status IL", why[every["BBB Hurt"]])
-        self.assertIn("has not posted", why[ids["AAA Reliever"]])
+        self.assertIn("is not decided", why[ids["AAA Reliever"]])
         self.assertEqual(df.attrs["participation_report"]["arms_kept"],
                          ["BBB BBB Rookie"])
         # Through the door: a typo'd id costs nothing but its own line.

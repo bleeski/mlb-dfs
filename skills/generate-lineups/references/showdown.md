@@ -97,17 +97,26 @@ stderr. It is never refused, so a typo costs that arm and not the file.
 | no APPG | the declared starters' mean APPG x ip/5.5 |
 
 `ip` is 1.0 (`KEPT_ARM_EXPECTED_IP`) unless `--declare-pitcher ID=ROLE:ip=N`
-types it. Typed innings on a reliever price him off the declared starters'
-mean. `--projections` replaces any of these. Without the tiers, raw APPG put
-four rotation starters who were not starting in 5 of 10 MIN_CHC entries each.
-With them, the MIN_CHC ladder fills 26 of 84 slots with $4,000 relievers and
-rosters none of those starters. Use `:ip=3` for a known bulk arm, and
-`--projections` for an arm you expect to close.
+types it. Only the typed `ip` moves the price: a typed role alone (even
+`viable_bulk_or_alt_sp`) changes the role recorded in `declared_pitchers`, not
+the Base. Typed innings on a reliever price him off the declared starters'
+mean. `--projections` replaces any of these, and `operator_widening` still
+shows the prior it replaced. Without the tiers, raw APPG put four rotation
+starters who were not starting in 5 of 10 MIN_CHC entries each. With them, the
+MIN_CHC ladder puts kept arms in 26 of 84 slots and rosters none of those
+starters. Most are $4,000 relievers. The exception is Colin Rea, whom DK tags
+RP at $10,000 with a starter's 10.5 APPG: the tier keys on DK's position, so he
+keeps that APPG and sits at the 0.50 player cap. Read
+`operator_widening.arms` for a kept reliever whose APPG is far above
+`relief_median_appg`, and give him `:ip=N` or `--projections`. Use `:ip=3` for
+a known bulk arm, and `--projections` for an arm you expect to close.
 
 **What the ladder does with them.** A kept arm is UTIL fill on the thesis
-ladder. No template captains him, and `describe_slate` never takes him for a
-side's starter, so `pitchers_duel` locks only DK's arms. The points-max bank
-can captain him.
+ladder. No template names him captain, and `describe_slate` never takes him for
+a side's starter, so `pitchers_duel` locks only DK's arms. He can still reach
+the armband: a relaxed captain lock, a `--captain-sleeve` (a `prior_own_below`
+sleeve picks the coldest captains first), or the points-max bank. The
+`construction_shadow` counts only DK's arms as declared.
 
 **The record and preflight.** `pool.operator_widening` lists each kept arm
 (APPG, Base, `base_source`, ip, factor), the reference and the reliever median
