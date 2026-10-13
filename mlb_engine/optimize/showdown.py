@@ -282,9 +282,14 @@ def _feed_orders_for_blank_sides(path: str | Path, rows: Sequence[Mapping[str, A
         reading = dk_sides[key]
         team = key[1]
         side = (read.get("teams") or {}).get(team) or {}
+        # A shelved arm is no declaration, whatever his `Starting` token says
+        # (`dk_declared_probables` skips him on Classic): counting him would
+        # decide the side on an arm the health filter then drops, leaving it
+        # with none, and would hide the feed's probable behind him.
         dk_arms = sorted(
             (p for p in persons.get(key, [])
-             if str(p.get("Starting") or "").strip().upper() in arm_tokens),
+             if str(p.get("Starting") or "").strip().upper() in arm_tokens
+             and not p.get("Status_Out")),
             key=lambda p: str(p.get("Player_Key")))
         # R503(b). The feed's probable as a person on THIS side of the file,
         # and an arm: the status map's name match is the crosswalk, and a
@@ -340,14 +345,16 @@ def _feed_orders_for_blank_sides(path: str | Path, rows: Sequence[Mapping[str, A
         # whatever its names match is not a lineup going unused for a
         # crosswalk reason, so it never reaches the refusal.
         if not dk_arms:
-            head = ("DK declares no arm on this side, and lifting it with none "
-                    "would make every arm on it a confirmed nonstarter")
+            head = ("DK declares no arm on this side that is not OUT, and "
+                    "lifting it with none would make every arm on it a "
+                    "confirmed nonstarter")
             if not (probable.get("name") or probable.get("util_id")):
                 _skip(f"{head}; the feed names no probable for it")
                 continue
             if feed_arm is None:
                 _skip(f"{head}; the feed's probable {probable.get('name')!r} "
-                      f"matches no arm on this side of the salary file")
+                      f"matches no arm on this side of the salary file, or "
+                      f"matches more than one person")
                 continue
             if feed_arm.get("Status_Out"):
                 _skip(f"{head}; DK marks the feed's probable "

@@ -8309,6 +8309,27 @@ class ShowdownLineupMergeTests(_ShowdownExitDoorHarness, unittest.TestCase):
         self.assertIn("Joe Ryan", set(mins["Name"]))
         self.assertTrue(mins["Batting_Order"].isna().all())
 
+    def test_an_out_dk_arm_is_no_declaration_and_the_feeds_probable_takes_the_side(self):
+        """Review of R503. DK posts MIN 1-4 and flags Bradley SP with Status
+        O, and the feed names Joe Ryan. Counting the OUT SP as DK's arm lifted
+        the side on him, the health filter then dropped him, and MIN had no
+        arm in the pool while `arm_disagreements` said DK's arm was used. A
+        shelved arm is no declaration (Classic's `dk_declared_probables`
+        skips him too), so Ryan is the side's arm and nothing disagrees."""
+        df = self._melt(self._salary(keep_slots={"MIN": 4},
+                                     status={"Taj Bradley": "O"}),
+                        self._feed(probables={"MIN": "Joe Ryan"}))
+        orders = df.attrs["participation_report"]["feed_orders"]
+        self.assertEqual(orders["lifted"], ["CHC", "MIN"], orders)
+        self.assertEqual(orders["arm_disagreements"], [])
+        self.assertEqual([(a["team"], a["name"]) for a in orders["arms_from_feed"]],
+                         [("MIN", "Joe Ryan")])
+        mins = df[df["Team"] == "MIN"]
+        self.assertEqual(sorted(mins.loc[mins["Is_Declared_Starter"], "Name"]),
+                         ["Joe Ryan"])
+        self.assertNotIn("Taj Bradley", set(mins["Name"]))
+        self.assertEqual(st.describe_slate(df)["starters"]["MIN"], "Joe Ryan|MIN")
+
     def test_a_file_downloaded_before_dk_flagged_probables_builds_on_the_feeds_twenty(self):
         """R503(b) end to end: every `Starting` cell blank, both SP tokens
         included, and a confirmed feed naming both probables. The pool is the
