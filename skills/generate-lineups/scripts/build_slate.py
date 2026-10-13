@@ -634,6 +634,19 @@ def has_deliverable(result: Mapping[str, Any]) -> bool:
     return bool(result.get("passed")) or bool(result.get("last_usable_artifact"))
 
 
+def shape_bands_brief(result: Mapping[str, Any]) -> Any:
+    """R483. The Classic brief's `shape_bands` block: the checkpoint's
+    per-contest bands, which contests carried each after the merge and any
+    override, and what the delivered set holds against it
+    (`execution_pipeline.shape_bands_brief_block`). A failure is named in the
+    block and never raised: the file already exists (R393(b))."""
+    try:
+        from mlb_engine.pipeline.execution_pipeline import shape_bands_brief_block
+        return shape_bands_brief_block(result)
+    except Exception as exc:  # noqa: BLE001 - a report field never costs the brief
+        return {"error": f"{type(exc).__name__}: {exc}"}
+
+
 def later_failures(result: Mapping[str, Any]) -> list:
     """Every stage that failed AFTER the delivered export existed (R393(b))."""
     out = []
@@ -1373,6 +1386,14 @@ FRACTION_CONTROL_KEYS = (
 FRACTION_CONTROL_DICT_KEYS = (
     "max_game_exposure_pct_by_game",
 )
+
+# R483. The shape bands' per-contest maps, each with the scalar that is its
+# escape. Derived by the merge and refused in --controls-override; named here
+# rather than imported so the gate stays free of the engine import.
+SHAPE_BAND_MAP_KEYS = {
+    "primary_stack_min_size_by_contest": "primary_stack_min_size",
+    "min_five_stack_share_pct_by_contest": "min_five_stack_share_pct",
+}
 
 
 def fraction_or_problem(value: Any) -> tuple:
@@ -5320,6 +5341,9 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
         # name, because the weights are the thing that actually ranked the
         # candidates and the table they come from is versioned code.
         "contests": _contest_objective_block(result.get("posture_by_contest")),
+        # R483. Which contests declared and carried each R37(2) shape band, and
+        # what the delivered set holds; null when the result carries no bands.
+        "shape_bands": shape_bands_brief(result),
         "gates": {
             "workflow_valid": gate_source.get("workflow_valid"),
             "selection_certified": gate_source.get("selection_certified"),
@@ -9453,6 +9477,17 @@ def main() -> int:
                               "problem": f"{problem}; a COUNT control"})
         else:
             override[key] = coerced
+    # R483. The shape bands' per-contest maps are derived by the engine's merge
+    # and never typed (`execution_pipeline.SHAPE_BAND_CONTEST_MAPS`, which a test
+    # pins this table to). Refused here, in the same second, rather than at the
+    # merge after the bank has spent; the escape is the scalar.
+    for map_key, scalar_key in SHAPE_BAND_MAP_KEYS.items():
+        if map_key in override:
+            bad_units.append({
+                "control": map_key, "value": override[map_key],
+                "problem": (f"derived from the contests' shape bands, not an "
+                            f"override; type {scalar_key} to set it for every "
+                            f"entry, or 0 to turn the band off (R483)")})
     if bad_units:
         print(json.dumps({
             "status": "controls_override_bad_units",

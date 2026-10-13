@@ -96,6 +96,7 @@ from mlb_engine.pipeline.execution_pipeline import (  # noqa: E402
     _assemble_projection_frame, _merged_controls_for_build, _slate_feasibility,
     controls_for_report, derive_roster_id_maps,
     resolve_shape_bands, slate_game_count,
+    apply_shape_band_override,
     _resolve_contest_postures, _slate_tag, feasibility_floors_from,
     CONTROL_ID_MAP_KEYS, parent_realized_controls,
     promote_deferred_run, raise_on_engine_crash, run_late_swap,
@@ -929,6 +930,9 @@ def inherit_swap_controls(parent_controls, override, solver_budget,
     if solver_budget is not None:
         controls["time_limit"] = float(solver_budget)
     controls.update(override or {})
+    # R483. The escape's rules, as the merge applies them: a typed scalar
+    # retires the parent's per-contest band map, a typed map is refused.
+    apply_shape_band_override(controls, override)
     for key in SWAP_UNENFORCED_CONTROLS:
         if key in controls:
             value = controls.pop(key)
@@ -1033,6 +1037,9 @@ def resolve_swap_controls(postures, override, solver_budget,
     if solver_budget is not None:
         controls["time_limit"] = float(solver_budget)
     controls.update(override or {})
+    # R483. The override lands after the merge here, so the merge's escape
+    # rules are applied again on top of it: one helper for both.
+    apply_shape_band_override(controls, override)
     # R405. The consensus-cluster cap is derived like every other control and
     # then STRIPPED, the item's one declined door. Enforced here it would bind
     # against a swap bank that holds no cluster-limited jobs and against
@@ -1817,6 +1824,14 @@ def main() -> int:
               f"{type(args.controls_override).__name__} "
               f"({json.dumps(args.controls_override)[:120]}). Nothing was read "
               f"and no swap was attempted.", file=sys.stderr)
+        return 4
+    # R483. The shape bands' per-contest maps are derived, never typed: refused
+    # here, before anything is read, rather than after the bank has spent.
+    try:
+        apply_shape_band_override({}, args.controls_override)
+    except ValueError as exc:
+        print(f"{exc}. Nothing was read and no swap was attempted.",
+              file=sys.stderr)
         return 4
     # R388(b). The same resolver the build's flag uses, so the two accept the
     # same names; plus the one control the swap derives and then strips.

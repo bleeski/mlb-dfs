@@ -28609,10 +28609,12 @@ class ShapeBandRoutingTests(unittest.TestCase):
                        if b <= epi.NARROW_BREADTH_MAX}
         self.assertEqual(named, at_or_under)
 
-    def test_floor_5_binds_only_when_every_contest_is_narrow(self):
+    def test_the_portfolio_floor_5_binds_only_when_every_contest_is_narrow(self):
         """R34's floor merge takes the LEAST demanding declared value, because one
-        portfolio serves every contest. A mixed set must fall back to the stage-1
-        floor of 4 rather than force a narrow contest's floor onto a broad one."""
+        portfolio serves every contest. A mixed set's PORTFOLIO floor falls back
+        to the stage-1 floor of 4 rather than force a narrow contest's floor onto
+        a broad one. Since R483 the narrow contest still carries its own floor
+        in `primary_stack_min_size_by_contest` (ShapeBandsMixedSetTests)."""
         allnarrow = self._pbc(("wta_satellite", "winner_take_all"),
                               ("mme", "mme_gpp"))
         _, m = self._merged(allnarrow, 6)
@@ -28724,9 +28726,11 @@ class ShapeBandRoutingTests(unittest.TestCase):
         self.assertLessEqual(m["min_five_stack_share_pct"], hi)
         self.assertEqual(m["five_stack_min_size"], 5)
 
-    def test_quota_retires_when_any_contest_is_outside_the_mid_band(self):
+    def test_the_portfolio_quota_retires_when_any_contest_is_outside_the_mid_band(self):
         """Same unanimity rule as the floor, same reason: a contest that never
-        asked for a quota must not inherit one."""
+        asked for a quota must not inherit one. Since R483 the PORTFOLIO scalar
+        retires and the mid contests carry the quota on their own entries in
+        `min_five_stack_share_pct_by_contest` (ShapeBandsMixedSetTests)."""
         pbc = self._pbc(("large_gpp", "large_field_gpp"),
                         ("wta_satellite", "winner_take_all"))
         bands, m = self._merged(pbc, 6)
@@ -28891,6 +28895,250 @@ class FiveStackQuotaLadderTests(unittest.TestCase):
             for state in ("_floor_state", "_reuse_state", "_quota_state", "_seat_state"):
                 self.assertIn(state, passed,
                               f"re-entry at line {call.lineno} drops {state}")
+
+
+class ShapeBandsMixedSetTests(unittest.TestCase):
+    """R483, 2026-10-13. R37(2)'s two bands bind on the entries of the contests
+    that declared them. R34's unanimity merge still decides the PORTFOLIO
+    scalars, so a unanimous set is unchanged; what it dropped on a mixed set
+    (one satellite among GPPs, the ordinary night: 1840_5g on 2026-09-15 had
+    three narrow and two mid contests and built with neither band) now rides
+    the `_by_contest` maps to the allocator, which applies each to its own
+    contests' entries. Deterministic construction controls over labeled
+    priors; never a win-rate or probability claim."""
+
+    BAND_KEYS = ("primary_stack_min_size", "min_five_stack_share_pct",
+                 "five_stack_min_size", "primary_stack_min_size_by_contest",
+                 "min_five_stack_share_pct_by_contest")
+    SHAPES = {"SAT": ("wta_satellite", "wta_ticket_satellite"),
+              "GPP": ("large_gpp", "large_field_gpp"),
+              "GPP2": ("small_gpp", "portfolio_gpp"),
+              "MME": ("mme", "mme_gpp"),
+              "CASH": ("cash", "cash")}
+
+    def _pbc(self, *cids):
+        return {cid: {"posture": self.SHAPES[cid][0],
+                      "contest_shape": self.SHAPES[cid][1], "contest_name": cid,
+                      "inferred": {"payout_shape_default": self.SHAPES[cid][1]}}
+                for cid in cids}
+
+    def _merged(self, pbc, games=8, override=None):
+        bands = epi.resolve_shape_bands(pbc, game_count=games)
+        return bands, epi._merged_controls_for_build(pbc, override, shape_bands=bands)
+
+    @staticmethod
+    def _entries(counts):
+        return [{"entry_id": f"{cid}{i}", "contest_id": cid,
+                 "contest_shape": ShapeBandsMixedSetTests.SHAPES[cid][1]}
+                for cid, n in counts for i in range(n)]
+
+    @staticmethod
+    def _bank(fours=20, fives=10):
+        """Four-stacks outscore five-stacks, and there are enough of them for
+        every entry to take a distinct one (F-3 seats a signature once per
+        contest), so a band that is not enforced delivers no five: the test
+        measures the constraint, not the objective or the reuse cap."""
+        out = []
+        for i in range(fours + fives):
+            size = 4 if i < fours else 5
+            roster = [f"P{i}a", f"P{i}b"] + [f"H{i}_{j}" for j in range(8)]
+            c = candidate(f"c{i}", roster, 200 - i, f"T{i}")
+            c["primary_stack_size"] = size
+            out.append(c)
+        return out
+
+    def _solve(self, merged, entries, bank, **extra):
+        controls = {k: merged[k] for k in self.BAND_KEYS if k in merged}
+        controls.update(extra)
+        result = select_and_assign_entries(bank, entries, controls)
+        self.assertTrue(result["passed"], result.get("errors"))
+        size_of = {c["candidate_id"]: c["primary_stack_size"] for c in bank}
+        by = defaultdict(list)
+        for a in result["assignments"]:
+            by[a["contest_id"]].append(size_of[a["candidate_id"]])
+        return result, by
+
+    def test_a_satellite_and_a_large_gpp_each_carry_their_own_band_and_say_so(self):
+        bands, m = self._merged(self._pbc("SAT", "GPP"))
+        # The portfolio scalars are what R34 always produced on a mixed set.
+        self.assertEqual(m["primary_stack_min_size"], 4)
+        self.assertEqual(m["min_five_stack_share_pct"], 0.0)
+        q = bands["quota_share_resolved"]
+        self.assertEqual(m["primary_stack_min_size_by_contest"], {"SAT": 5})
+        self.assertEqual(m["min_five_stack_share_pct_by_contest"], {"GPP": q})
+        entries = self._entries((("SAT", 2), ("GPP", 16)))
+        result, by = self._solve(m, entries, self._bank())
+        self.assertTrue(all(s >= 5 for s in by["SAT"]), by["SAT"])
+        need = math.floor(16 * q + 1e-9)
+        self.assertGreaterEqual(need, 2, "fixture is wrong: the quota must bind")
+        self.assertGreaterEqual(sum(1 for s in by["GPP"] if s >= 5), need)
+        quota = result["five_stack_quota"]
+        self.assertEqual((quota["scope"], quota["contests"], quota["scope_entries"]),
+                         ("contests", ["GPP"], 16))
+        self.assertEqual(quota["applied_need"], need)
+        self.assertTrue(quota["need_met"])
+        floor = result["primary_stack_floor"]
+        self.assertEqual(floor["by_contest"]["SAT"]["status"], "applied")
+        self.assertEqual(floor["by_contest"]["SAT"]["assigned_below_requested"], 0)
+        applied = epi.shape_band_application(bands, m, allocation=result)
+        self.assertEqual((applied["floor_5"]["scope"], applied["floor_5"]["carried_by"]),
+                         ("contests", ["SAT"]))
+        self.assertEqual((applied["quota"]["scope"], applied["quota"]["carried_by"]),
+                         ("contests", ["GPP"]))
+        self.assertEqual(applied["quota"]["realized"]["need_met"], True)
+        # The brief's block is the same function over a run result's keys.
+        brief = epi.shape_bands_brief_block(
+            {"checkpoint_plan": {"shape_bands": bands}, "merged_controls": m, **result})
+        self.assertEqual(brief["contests"], bands["contests"])
+        self.assertEqual(brief["application"]["floor_5"]["realized"]["SAT"]["status"],
+                         "applied")
+        self.assertIsNone(epi.shape_bands_brief_block({}))
+
+    def test_a_unanimous_set_is_unchanged(self):
+        for cids, games, key, value in (
+                (("GPP", "GPP2"), 8, "min_five_stack_share_pct", None),
+                (("SAT", "MME"), 8, "primary_stack_min_size", 5)):
+            bands, m = self._merged(self._pbc(*cids), games)
+            self.assertNotIn("primary_stack_min_size_by_contest", m)
+            self.assertNotIn("min_five_stack_share_pct_by_contest", m)
+            expected = bands["quota_share_resolved"] if value is None else value
+            self.assertEqual(m[key], expected)
+        bands, m = self._merged(self._pbc("GPP", "GPP2"))
+        entries = self._entries((("GPP", 8), ("GPP2", 8)))
+        result, _ = self._solve(m, entries, self._bank())
+        quota = result["five_stack_quota"]
+        self.assertEqual((quota["scope"], quota["scope_entries"]), ("portfolio", 16))
+        self.assertNotIn("contests", quota)
+        self.assertEqual(epi.shape_band_application(bands, m)["quota"]["scope"],
+                         "portfolio")
+
+    def test_the_band_never_applies_to_a_contest_whose_posture_did_not_ask(self):
+        bands, m = self._merged(self._pbc("SAT", "GPP", "CASH"))
+        self.assertNotIn("CASH", m["primary_stack_min_size_by_contest"])
+        self.assertNotIn("CASH", m["min_five_stack_share_pct_by_contest"])
+        self.assertNotIn("SAT", m["min_five_stack_share_pct_by_contest"])
+        entries = self._entries((("SAT", 2), ("GPP", 16), ("CASH", 2)))
+        result, by = self._solve(m, entries, self._bank())
+        # The cash entries take the best-scoring four-stacks; nothing masked them.
+        self.assertEqual(by["CASH"], [4, 4])
+        # The satellite's fives are not the GPP's quota: the scope counts GPP only.
+        quota = result["five_stack_quota"]
+        self.assertEqual(quota["scope_entries"], 16)
+        self.assertEqual(quota["assigned_qualifying"],
+                         sum(1 for s in by["GPP"] if s >= 5))
+        self.assertNotIn("CASH", result["primary_stack_floor"]["by_contest"])
+
+    def test_a_typed_scalar_is_the_escape_and_a_typed_map_is_refused(self):
+        pbc = self._pbc("SAT", "GPP")
+        _, off = self._merged(pbc, override={"min_five_stack_share_pct": 0.0})
+        self.assertNotIn("min_five_stack_share_pct_by_contest", off)
+        self.assertEqual(off["primary_stack_min_size_by_contest"], {"SAT": 5})
+        _, wide = self._merged(pbc, override={"min_five_stack_share_pct": 0.5})
+        self.assertEqual(wide["min_five_stack_share_pct"], 0.5)
+        self.assertNotIn("min_five_stack_share_pct_by_contest", wide)
+        _, four = self._merged(pbc, override={"primary_stack_min_size": 4})
+        self.assertNotIn("primary_stack_min_size_by_contest", four)
+        for key in ("min_five_stack_share_pct_by_contest",
+                    "primary_stack_min_size_by_contest"):
+            with self.assertRaises(ValueError) as ctx:
+                self._merged(pbc, override={key: {"GPP": 0.2}})
+            self.assertIn(key.replace("_by_contest", ""), str(ctx.exception))
+        # The swap applies its override on top of the merge (or the parent's
+        # recorded controls), so the same two rules run there too.
+        import importlib
+        import importlib.util
+        ls = importlib.import_module("tools.late_swap")
+        parent = {"primary_stack_min_size": 4,
+                  "primary_stack_min_size_by_contest": {"SAT": 5}}
+        self.assertNotIn("primary_stack_min_size_by_contest", ls.inherit_swap_controls(
+            parent, {"primary_stack_min_size": 4}, None))
+        self.assertEqual(ls.inherit_swap_controls(parent, None, None)[
+            "primary_stack_min_size_by_contest"], {"SAT": 5})
+        with self.assertRaises(ValueError):
+            ls.inherit_swap_controls(
+                parent, {"primary_stack_min_size_by_contest": {"SAT": 4}}, None)
+        # The re-derive door: the bands resolve from the swap's own frame.
+        frame = pd.DataFrame({"Player_ID": [str(i) for i in range(8)],
+                              "Team": list("ABCDEFGH"),
+                              "Game_ID": ["g1", "g1", "g2", "g2", "g3", "g3", "g4", "g4"]})
+        self.assertEqual(ls.resolve_swap_controls(pbc, None, None, projections=frame)[
+            "primary_stack_min_size_by_contest"], {"SAT": 5})
+        self.assertNotIn("primary_stack_min_size_by_contest", ls.resolve_swap_controls(
+            pbc, {"primary_stack_min_size": 4}, None, projections=frame))
+        # And both front doors refuse a typed map before anything is read.
+        archive = REPO / "data" / "archive" / "2026-06-03"
+        salary = archive / "DKSalaries_2026-06-03.csv"
+        typed = '{"min_five_stack_share_pct_by_contest": {"GPP": 0.2}}'
+        build = subprocess.run(
+            [sys.executable, str(REPO / "skills" / "generate-lineups" / "scripts"
+                                 / "build_slate.py"),
+             # The salary file as --entries, as the R167 gate test does: a door
+             # that skipped its gate fails fast instead of building.
+             "--salary", str(salary), "--entries", str(salary),
+             "--controls-override", typed],
+            capture_output=True, text=True, cwd=str(REPO))
+        self.assertEqual(build.returncode, 4, build.stderr[-400:])
+        payload = json.loads(build.stdout)
+        self.assertEqual(payload["controls"][0]["control"],
+                         "min_five_stack_share_pct_by_contest")
+        self.assertIn("type min_five_stack_share_pct", payload["controls"][0]["problem"])
+        swap = subprocess.run(
+            [sys.executable, str(REPO / "tools" / "late_swap.py"),
+             "--date", "2026-06-03", "--salary", str(salary),
+             "--parent-entries", str(salary),
+             "--controls-override", typed],
+            capture_output=True, text=True, cwd=str(REPO))
+        self.assertEqual(swap.returncode, 4, swap.stderr[-400:])
+        self.assertIn("type min_five_stack_share_pct", swap.stderr)
+        self.assertNotIn("Traceback", swap.stderr)
+        bs = importlib.util.spec_from_file_location(
+            "build_slate_r483", REPO / "skills" / "generate-lineups" / "scripts"
+            / "build_slate.py")
+        mod = importlib.util.module_from_spec(bs)
+        bs.loader.exec_module(mod)
+        self.assertEqual(mod.SHAPE_BAND_MAP_KEYS,
+                         {m: k for k, m in epi.SHAPE_BAND_CONTEST_MAPS},
+                         "the build's gate names the merge's map keys")
+
+    def test_the_bank_is_asked_for_fives_when_only_a_contest_band_wants_them(self):
+        _, m = self._merged(self._pbc("SAT", "GPP"))
+        request = epi.resolve_bank_stack_request(m)
+        self.assertTrue(request["wants_five"])
+        self.assertEqual(request["sizes"], [5, 4])
+        # The satellite's floor asks as the portfolio floor does: every entry it
+        # holds needs a five, and the doors' clamp keeps the fours unstarved.
+        self.assertEqual(request["five_share_target"], 1.0)
+        self.assertIn("primary_stack_min_size_by_contest: SAT", request["reason"])
+        _, quota_only = self._merged(self._pbc("SAT", "GPP"), games=2)
+        self.assertNotIn("primary_stack_min_size_by_contest", quota_only)
+        request = epi.resolve_bank_stack_request(quota_only)
+        self.assertTrue(request["wants_five"])
+        self.assertIn("min_five_stack_share_pct_by_contest", request["reason"])
+        self.assertEqual(request["five_share_target"],
+                         min(quota_only["min_five_stack_share_pct_by_contest"].values()))
+
+    def test_a_contest_floor_the_bank_cannot_carry_relaxes_and_counts(self):
+        _, m = self._merged(self._pbc("SAT", "GPP"))
+        entries = self._entries((("SAT", 2), ("GPP", 4)))
+        # Pre-solve: no five in the bank, so the satellite's entries starve.
+        result, by = self._solve(m, entries, self._bank(fours=10, fives=0))
+        row = result["primary_stack_floor"]["by_contest"]["SAT"]
+        self.assertEqual(row["status"], "relaxed_off")
+        self.assertEqual(result["primary_stack_floor"]["relaxation_steps"][-1]["trigger"],
+                         "entry_starved_before_solve")
+        self.assertGreaterEqual(result["primary_stack_floor"]["relaxations"], 1)
+        # Proven infeasible: ONE five, two satellite entries, and F-3 seats a
+        # signature at most once per contest. Each entry has a compatible five,
+        # so only the joint solve can say no, and the contest floor steps off.
+        result, by = self._solve(m, entries, self._bank(fours=10, fives=1),
+                                 max_candidate_reuse=20)
+        floor = result["primary_stack_floor"]
+        self.assertEqual(floor["by_contest"]["SAT"]["status"], "relaxed_off")
+        self.assertIn("proven_infeasible_with_contest_floor",
+                      [s["trigger"] for s in floor["relaxation_steps"]])
+        self.assertEqual(floor["applied"], 4, "the portfolio floor did not move")
+        self.assertTrue(any("SAT" in w for w in result.get("warnings", [])),
+                        result.get("warnings"))
 
 
 class ObservedStarterTierTests(unittest.TestCase):

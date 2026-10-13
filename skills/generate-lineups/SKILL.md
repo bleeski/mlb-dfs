@@ -772,6 +772,7 @@ MILP and every cap still bind across the whole entered set.
   Constructions over labeled priors; a sleeve that does well in a replay is
   "supported in the shapes replayed", never a probability or an edge.
 - **A named secondary stack for one entry** (R434, `--stack-sleeve`): `references/stack_sleeve.md`.
+- **The five-stack bands on a mixed file** (R483): each binds only the contests that declared it; the brief's `shape_bands` block names which carried it, and a typed scalar is the escape. `references/shape_bands.md`.
 
 ### Caps that scale with input confidence (R407, Classic only)
 

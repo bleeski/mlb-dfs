@@ -230,6 +230,15 @@ NEVER_RELAX_NOT_HONOURED: Dict[str, str] = {
                                 "five-stack quota (LADDER_RELAXED_CONTROLS)",
     "five_stack_min_size": "the allocator's re-entry ladder relaxes the "
                            "five-stack quota (LADDER_RELAXED_CONTROLS)",
+    # R483, 2026-10-13. The shape bands' per-contest maps, on their scalars'
+    # ladders. Derived by the merge, never typed, and never held.
+    "primary_stack_min_size_by_contest": "the allocator relaxes a contest's "
+                                         "floor before the solve when the bank "
+                                         "starves it and on the floor's ladder "
+                                         "(LADDER_RELAXED_CONTROLS)",
+    "min_five_stack_share_pct_by_contest": "the allocator's re-entry ladder "
+                                           "relaxes the contest-scoped quota "
+                                           "(LADDER_RELAXED_CONTROLS)",
     # R469, 2026-09-30. The chalk-core seat relaxes on the same ladder and when
     # the bank holds no pair lineup, counted either way.
     "min_consensus_pair_entries_per_contest": "the allocator relaxes the seat "
