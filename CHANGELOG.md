@@ -123,7 +123,7 @@ R483. The five-stack floor and quota bands both retire on a MIXED entered set, b
 - `LINT`: exit 0.
 - Local `GATE` on Python 3.13.16: `FAIL  test suite FAILED in tests.test_core (ran 3738)`. The baseline at b29468e was the same line at 3732. The one failure, before and after, is `ReplaySlateTests.test_settle_scores_requires_integer_hundredths_so_ties_are_exact`: 3.13's `sum()` is compensated, so `155.6 == 155.6`. That is the host carry-over.
 - `test_core` alone: 2481 run, that one failure. The other audited suites: 1117 OK and 140 passed.
-- The PR's 3.11 `gate` check is the merge authority.
+- The PR's 3.11 `gate` check is the merge authority. PR #150 on f92e4d1 (Python 3.11.17): `PASS  v2.26.0  45 modules  3738 tests  5 skipped  {test_core 2481/2481 (4 skipped) skipped_in_place; test_showdown 465/465 (1 skipped) skipped_in_place}`, the five documented skips (absent optional files, on every host).
 
 ## 2026-10-12 — R164 + R454 + R115 + R138: the sliced bank's job grid stops solving jobs it can never answer, the depth slices stop re-solving answered ones, and SP-pair coverage's sliced half closes (roadmap Session 40)
 
