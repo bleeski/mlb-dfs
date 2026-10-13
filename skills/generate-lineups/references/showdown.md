@@ -10,15 +10,23 @@ all of it.
 below, is the fallback for an unposted slate.
 
 **A side's order comes from DK's `Starting` column first and the lineups feed
-second (R208).** When DK posts no slot on a side, the pool takes that side's
-nine from the feed `run_showdown` reads once (`--lineups`, else the slate
-folder's `lineups_feed.json`, else a fetch). It does so only if all of these
-hold:
-- DK declares an arm on the side.
+second (R208, R503).** When DK has not posted a complete nine on a side, the
+pool takes that side's nine from the feed `run_showdown` reads once
+(`--lineups`, else the slate folder's `lineups_feed.json`, else a fetch). It
+does so only if all of these hold:
+- The side has an arm: one DK declares, or, when DK declares none, the feed's
+  probable crosswalked to a non-OUT arm on the side, who becomes its declared
+  starter (`arms_from_feed`).
 - The feed calls the side confirmed, for the salary file's date, with a start
   within `LEG_START_TOLERANCE_MINUTES` (10) of the salary file's.
 - All nine rows match pool persons on slots 1-9, through Classic's name+team
   crosswalk on the UTIL rows.
+
+A DK partial side (some slots posted) takes the feed's nine, as Classic's
+merge does, and every DK slot the feed's nine gives someone else is named in
+`dk_slots_overridden` and on stderr. Where DK declares an arm and the feed's
+probable is someone else, DK's arm wins and the feed's is named in
+`arm_disagreements`.
 
 A cached `lineups_feed.json` older than `--feed-max-age-minutes` is refetched
 first, the same rule Classic applies; a named `--lineups` file is never aged.
@@ -26,8 +34,8 @@ first, the same rule Classic applies; a named `--lineups` file is never aged.
 `order_source`, and `feed_orders` names the sides lifted, every side not lifted
 with its reason, unmatched names, and any disagreement with a side DK posted
 (DK wins). A confirmed feed side that matches under five pool persons refuses
-as `showdown_pool_blocked_crosswalk` (exit 3, Ben's at any clock). A DK partial
-side and a side with no DK arm keep DK's pool (R503).
+as `showdown_pool_blocked_crosswalk` (exit 3, Ben's at any clock). A DK nine
+posted with a shelved player in it is complete, so it stays DK's.
 
 **Three portfolio controls are enforced in the solver on both paths (R153, Ben
 2026-08-19).** The defaults live in `mlb_engine/optimize/showdown.py` and are

@@ -1093,6 +1093,14 @@ def showdown_feed_sides(feed: Optional[Mapping[str, Any]],
     ``LEG_START_TOLERANCE_MINUTES``: a lone leg is kept by the leg selector
     whatever its time, so on a doubleheader day a feed carrying only game 1
     would otherwise read as game 2's lineup).
+
+    R503(b). ``probable`` is the side's probable pitcher after the merge,
+    ``{"name", "util_id"}`` or ``None``: the feed's own when it names one (the
+    merge attaches DK's declared arm only to a side the feed left without),
+    crosswalked by the status map's own probable match, so ``util_id`` is the
+    one id ``probable_pitcher_ids`` holds for the team, or ``None`` when it
+    holds none or more than one. Classic's pool takes this arm as the side's
+    starter; whether Showdown does is the melt's decision.
     """
     from mlb_engine.intake.slate_intake_manager import parse_dk_salary_csv
 
@@ -1106,7 +1114,8 @@ def showdown_feed_sides(feed: Optional[Mapping[str, Any]],
         team: {"team": team, "game_id": None, "feed_status": "absent",
                "source": None, "rows": 0, "order_by_util_id": {},
                "unmatched": [], "date_ignored": False,
-               "lock_time_missing": False, "start_off_minutes": None}
+               "lock_time_missing": False, "start_off_minutes": None,
+               "probable": None}
         for team in sorted(set(team_of.values()) - {""})}
     ignored = {r["game_id"] for r in status.get("feed_dates_ignored") or []}
     no_lock = {r["game_id"] for r in status.get("games_without_lock_time") or []}
@@ -1143,6 +1152,13 @@ def showdown_feed_sides(feed: Optional[Mapping[str, Any]],
                 "lock_time_missing": gid in no_lock,
                 "start_off_minutes": off,
             })
+            probable = side.get("probable_pitcher") or {}
+            if probable.get("name") or probable.get("dk_id"):
+                ids = sorted(str(pid) for pid in status.get("probable_pitcher_ids") or []
+                             if team_of.get(pid) == team)
+                teams[team]["probable"] = {
+                    "name": str(probable.get("name") or ""),
+                    "util_id": ids[0] if len(ids) == 1 else None}
     for pid, order in sorted(status["confirmed_order_by_player_id"].items()):
         if team_of.get(pid) in teams:
             teams[team_of[pid]]["order_by_util_id"][str(pid)] = int(order)
