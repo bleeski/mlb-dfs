@@ -341,6 +341,7 @@ def melt_showdown_salary_csv(path: str | Path, exclude_out: bool = True,
                              starters_only: bool = True,
                              lineups_feed: Optional[Mapping[str, Any]] = None,
                              keep_arms: bool = False,
+                             keep_arm_ids: Optional[Sequence[str]] = None,
                              ) -> pd.DataFrame:
     """Melt a DK Showdown salary export (two rows per player, CPT and UTIL) to one
     row per player carrying CPT_ID/CPT_Salary, UTIL_ID/UTIL_Salary, team, opponent,
@@ -420,7 +421,12 @@ def melt_showdown_salary_csv(path: str | Path, exclude_out: bool = True,
     side keeps its arms like a posted one, and a kept arm never counts as the
     DK declaration the lift requires. ``participation_report["arms_kept"]``
     names each one; ``apply_kept_arm_prior`` prices them. ``False`` is the
-    pool it always was.
+    pool it always was. ``keep_arm_ids`` (the door's ``--keep-arm ID``,
+    either of a person's two ids) restricts the widening to the named arms: on
+    a postseason slate DK lists arms the series roster does not carry, with a
+    blank Status (2026-10-03 ALDS G1: 24 of 47 arms off the active rosters, 17
+    of them blank). An id that keeps nobody is named with the reason in
+    ``participation_report["keep_arm_ids_not_kept"]``, never refused.
     """
     by_key: Dict[tuple, Dict[str, Any]] = {}
     # R291(c). Whether the FILE carried the column is a different fact from
@@ -607,6 +613,12 @@ def melt_showdown_salary_csv(path: str | Path, exclude_out: bool = True,
     decided = {key for key, reading in per_side.items() if reading["complete"]}
     decided_teams = {team for _event, team in decided}
 
+    # R484. `None` keeps every undeclared arm of a decided side; a set keeps
+    # only the named persons.
+    named = (None if keep_arm_ids is None
+             else {str(i).strip() for i in keep_arm_ids if str(i).strip()})
+    keep_arms = keep_arms or named is not None
+
     def _participation(rec: Mapping[str, Any]) -> str:
         value = _token(rec)
         if value.isdigit() or _is_declared(rec):
@@ -628,7 +640,9 @@ def melt_showdown_salary_csv(path: str | Path, exclude_out: bool = True,
         # him) and not `unknown` (the side is decided): his own value, which
         # `starters_only` keeps and `describe_slate` never takes for a starter.
         if (keep_arms and _side_key(rec) in decided
-                and not _is_showdown_hitter(rec.get("Position"))):
+                and not _is_showdown_hitter(rec.get("Position"))
+                and (named is None or {str(rec.get("CPT_ID")),
+                                       str(rec.get("UTIL_ID"))} & named)):
             return KEPT_ARM_PARTICIPATION
         return "confirmed_nonstarter" if _side_key(rec) in decided else "unknown"
 
@@ -644,6 +658,32 @@ def melt_showdown_salary_csv(path: str | Path, exclude_out: bool = True,
         # frame can see WHY he is not a declared starter rather than inferring it
         # from a False. Rosterable, not declared.
         rec["Is_Declared_Opener"] = value in DK_STARTING_OPENER_TOKENS
+
+    # R484. Every named id that kept nobody, with the reason, read off the
+    # complete persons before any filter so an OUT arm is named as one.
+    named_not_kept: List[Dict[str, Any]] = []
+    for pid in sorted(named or ()):
+        person = next((r for r in rows if pid in (str(r.get("CPT_ID")),
+                                                  str(r.get("UTIL_ID")))), None)
+        if person is not None and person["Participation"] == KEPT_ARM_PARTICIPATION \
+                and not person.get("Status_Out"):
+            continue
+        if person is None:
+            why = "no CPT and UTIL pair on the salary file carries this id"
+        elif _is_showdown_hitter(person.get("Position")):
+            why = "a hitter; the flag keeps arms only"
+        elif person.get("Status_Out"):
+            why = f"Status {person.get('Status')}: the health filter drops him"
+        elif person["Participation"] in ("confirmed_starter", "declared_opener"):
+            why = (f"DK names him (Starting={person.get('Starting')}), so he is "
+                   f"in the pool without the flag")
+        else:
+            why = ("his side has not posted its 1-9, so he is in the pool as "
+                   "`unknown` without the flag")
+        named_not_kept.append({
+            "id": pid, "reason": why,
+            "name": None if person is None else str(person.get("Name")),
+            "team": None if person is None else str(person.get("Team"))})
 
     universe = len(rows)
     if starters_only:
@@ -697,6 +737,8 @@ def melt_showdown_salary_csv(path: str | Path, exclude_out: bool = True,
         "arms_kept": sorted(
             f"{r.get('Team')} {r.get('Name')}"
             for r in rows if r.get("Participation") == KEPT_ARM_PARTICIPATION),
+        "keep_arm_ids": None if named is None else sorted(named),
+        "keep_arm_ids_not_kept": named_not_kept,
         "role_disagreements": sorted(
             f"{r['Player_Key']}: {r['Role_Disagreement']}"
             for r in rows if r.get("Role_Disagreement")),

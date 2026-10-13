@@ -77,6 +77,16 @@ shape: every win in the series went to an arm who did not start the game.
 session's S call, like a posture, and the brief records it. Leave it off on a
 regular-season slate, where it only adds cheap relievers as filler.
 
+**Name the active roster's arms on a postseason slate.** `--keep-arm ID`
+(repeatable, the DK id from either row) keeps only the named arms, and it
+implies the widening. DK lists arms a series roster does not carry, with a
+blank Status. On 2026-10-03 (ALDS G1) 24 of the file's 47 arms were off the
+active rosters, 17 of them blank, and bare `--keep-arms` would keep all 17.
+Use bare `--keep-arms` only when the whole staff can pitch. An id that keeps
+nobody (not on the file, a hitter, already DK-declared, OUT, or on an unposted
+side) is named with the reason in `pool.operator_widening.named_not_kept` and on
+stderr. It is never refused, so a typo costs that arm and not the file.
+
 **How a kept arm is priced** (a labeled prior; Ben chose the tiers on
 2026-10-13):
 

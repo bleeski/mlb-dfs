@@ -6438,7 +6438,8 @@ def showdown_keep_arms(args, df) -> tuple:
     """
     from mlb_engine.optimize import showdown as sd
     args._kept_arms = []
-    if not getattr(args, "keep_arms", False):
+    named = getattr(args, "keep_arm", None) or None
+    if not (getattr(args, "keep_arms", False) or named):
         return df, {"applied": False, "flag": None, "kept": 0, "arms": [],
                     "reason": "--keep-arms was not passed: a side whose nine "
                               "is posted keeps only the arms DK names"}
@@ -6446,7 +6447,12 @@ def showdown_keep_arms(args, df) -> tuple:
         df, declared_pitcher_workload(getattr(args, "declare_pitcher", None)))
     report = dict(priced.attrs.get("kept_arm_prior_report") or {})
     args._kept_arms = [(a["cpt_id"], a["util_id"]) for a in report.get("arms") or []]
-    block = {**report, "flag": "--keep-arms",
+    participation = df.attrs.get("participation_report") or {}
+    block = {**report, "flag": "--keep-arm" if named else "--keep-arms",
+             # R484. The named form's ids and every one that kept nobody, with
+             # the reason; never a refusal (`--declare-pitcher`'s precedent).
+             "named": participation.get("keep_arm_ids"),
+             "named_not_kept": list(participation.get("keep_arm_ids_not_kept") or []),
              "preflight": ("each kept arm is in declared_pitchers as "
                            f"{sd.KEPT_ARM_PARTICIPATION} (a role typed with "
                            "--declare-pitcher wins), so preflight_upload and "
@@ -6467,6 +6473,10 @@ def showdown_keep_arms(args, df) -> tuple:
     for pid in report.get("ip_not_applied") or []:
         print(f"keep-arms: --declare-pitcher ip= for {pid}, which is not a kept "
               f"arm; no workload prior applied", file=sys.stderr)
+    for miss in block["named_not_kept"]:
+        who = f"{miss['team']} {miss['name']}" if miss.get("name") else "nobody"
+        print(f"keep-arms: --keep-arm {miss['id']} ({who}) kept no arm: "
+              f"{miss['reason']}", file=sys.stderr)
     return priced, block
 
 
@@ -6519,7 +6529,8 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
             args, "feed_max_age_minutes", FEED_MAX_AGE_MINUTES))
     df = sd.melt_showdown_salary_csv(
         str(salary), lineups_feed=feed,
-        keep_arms=bool(getattr(args, "keep_arms", False)))
+        keep_arms=bool(getattr(args, "keep_arms", False)),
+        keep_arm_ids=getattr(args, "keep_arm", None) or None)
     # R208. A confirmed lineup for a side DK left blank that matches almost
     # nobody in the pool is a crosswalk failure, and CLAUDE.md lists it as
     # Ben's at any clock: the real lineup is in hand and the pool would build on
@@ -9571,6 +9582,17 @@ def main() -> int:
                          "rostered one. When to use it: "
                          "references/showdown.md. Labeled priors, never a "
                          "projection or a probability of pitching.")
+    ap.add_argument("--keep-arm", dest="keep_arm", action="append", default=None,
+                    metavar="ID",
+                    help="Showdown only, repeatable: --keep-arms restricted to "
+                         "the named arms (a DK id from either the CPT or the "
+                         "UTIL row). Use it on a postseason slate, where DK "
+                         "lists arms the series roster does not carry with a "
+                         "blank Status: name the active roster's arms. An id "
+                         "that keeps nobody (not on the file, a hitter, already "
+                         "DK-declared, OUT, or on an unposted side) is named "
+                         "with the reason in pool.operator_widening and on "
+                         "stderr, never refused.")
     ap.add_argument("--feed-max-age-minutes", type=float, default=FEED_MAX_AGE_MINUTES,
                     help="refetch a disk-cached lineups feed older than this "
                          "(default 90). Lineups confirm through the afternoon, so "
@@ -9852,7 +9874,8 @@ def main() -> int:
     # participation; Classic's pool is `build_slate_pool`, which keeps an arm
     # only on a probable or a `--declare-pitcher`, so the flag would apply
     # nothing there and read as a widening that never happened.
-    if getattr(args, "keep_arms", False) and contest != "showdown":
+    if ((getattr(args, "keep_arms", False) or getattr(args, "keep_arm", None))
+            and contest != "showdown"):
         print(json.dumps({
             "status": "keep_arms_not_supported_on_classic",
             "date": args.date,

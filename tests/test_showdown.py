@@ -10326,13 +10326,14 @@ class KeepArmsPoolTests(_ShowdownExitDoorHarness, unittest.TestCase):
                     pid += 1
         return rows
 
-    def _melt(self, keep_arms=None, **kw):
+    def _melt(self, keep_arms=None, keep_arm_ids=None, **kw):
         path = self.base / "DKSalaries_keep_arms.csv"
         with path.open("w", newline="", encoding="utf-8") as fh:
             csv.writer(fh).writerows(self._rows(**kw))
-        if keep_arms is None:
-            return sd.melt_showdown_salary_csv(str(path))
-        return sd.melt_showdown_salary_csv(str(path), keep_arms=keep_arms)
+        opts = {} if keep_arms is None else {"keep_arms": keep_arms}
+        if keep_arm_ids is not None:
+            opts["keep_arm_ids"] = keep_arm_ids
+        return sd.melt_showdown_salary_csv(str(path), **opts)
 
     @staticmethod
     def _names(df, team=None):
@@ -10566,22 +10567,85 @@ class KeepArmsPoolTests(_ShowdownExitDoorHarness, unittest.TestCase):
 
     def test_a_classic_build_refuses_the_flag_before_anything_is_staged(self):
         mod = self._module()
-        root = self._root()
-        sal, ent = root / "DKSalaries.csv", root / "DKEntries.csv"
-        shutil.copy2(SAL, sal)
-        shutil.copy2(ENT, ent)
-        argv = ["build_slate.py", "--date", self._DATE, "--salary", str(sal),
-                "--entries", str(ent), "--keep-arms"]
-        out = io.StringIO()
-        with unittest.mock.patch.object(sys, "argv", argv), \
-                unittest.mock.patch.object(mod, "detect_contest_type",
-                                           lambda *_a, **_k: "classic"), \
-                unittest.mock.patch.object(mod, "REPO", root), \
-                contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
-            code = mod.main()
-        self.assertEqual(4, code)
-        self.assertEqual("keep_arms_not_supported_on_classic",
-                         json.loads(out.getvalue())["status"])
-        self.assertEqual(["DKEntries.csv", "DKSalaries.csv"],
-                         sorted(p.name for p in root.iterdir()),
-                         "nothing was staged and no run directory was created")
+        for flag in (["--keep-arms"], ["--keep-arm", "43628631"]):
+            with self.subTest(flag=flag):
+                root = self._root(flag[0].strip("-"))
+                sal, ent = root / "DKSalaries.csv", root / "DKEntries.csv"
+                shutil.copy2(SAL, sal)
+                shutil.copy2(ENT, ent)
+                argv = ["build_slate.py", "--date", self._DATE, "--salary", str(sal),
+                        "--entries", str(ent), *flag]
+                out = io.StringIO()
+                with unittest.mock.patch.object(sys, "argv", argv), \
+                        unittest.mock.patch.object(mod, "detect_contest_type",
+                                                   lambda *_a, **_k: "classic"), \
+                        unittest.mock.patch.object(mod, "REPO", root), \
+                        contextlib.redirect_stdout(out), \
+                        contextlib.redirect_stderr(io.StringIO()):
+                    code = mod.main()
+                self.assertEqual(4, code)
+                self.assertEqual("keep_arms_not_supported_on_classic",
+                                 json.loads(out.getvalue())["status"])
+                self.assertEqual(["DKEntries.csv", "DKSalaries.csv"],
+                                 sorted(p.name for p in root.iterdir()),
+                                 "nothing was staged and no run directory was created")
+
+    def test_the_named_form_keeps_only_the_named_arms(self):
+        """`--keep-arm ID` (either of a person's two ids) is the postseason
+        form: DK lists arms the series roster does not carry, with a blank
+        Status (2026-10-03 ALDS G1: 24 of 47 arms off the active rosters, 17
+        of them blank), and the bare flag would keep every one."""
+        full = self._melt(keep_arms=True, post=("AAA", "BBB"), arm=("AAA", "BBB"))
+        ids = {n: (str(c), str(u)) for n, c, u in
+               zip(full["Name"], full["CPT_ID"], full["UTIL_ID"])}
+        named = [ids["AAA Reliever"][1], ids["BBB Closer"][0]]
+        df = self._melt(keep_arms=True, keep_arm_ids=named,
+                        post=("AAA", "BBB"), arm=("AAA", "BBB"))
+        report = df.attrs["participation_report"]
+        self.assertEqual(report["arms_kept"], ["AAA AAA Reliever", "BBB BBB Closer"])
+        self.assertEqual(report["keep_arm_ids"], sorted(named))
+        self.assertEqual(report["keep_arm_ids_not_kept"], [])
+        kept = df[df["Participation"] == self.KEPT]
+        self.assertEqual(set(kept["Name"]), {"AAA Reliever", "BBB Closer"})
+        for name in ("AAA Closer", "AAA Swingman", "BBB Reliever", "BBB Rookie"):
+            self.assertNotIn(name, self._names(df), "an unnamed arm leaves as before")
+        # The ids alone imply the widening; everyone else is the default pool.
+        alone = self._melt(keep_arm_ids=named, post=("AAA", "BBB"), arm=("AAA", "BBB"))
+        pd.testing.assert_frame_equal(alone, df)
+        default = self._melt(post=("AAA", "BBB"), arm=("AAA", "BBB"))
+        pd.testing.assert_frame_equal(
+            df[df["Participation"] != self.KEPT].reset_index(drop=True),
+            default.reset_index(drop=True))
+
+    def test_an_id_that_keeps_nobody_is_named_and_the_build_still_delivers(self):
+        full = self._melt(keep_arms=True, post=("BBB",), arm=("AAA", "BBB"))
+        ids = {n: str(u) for n, u in zip(full["Name"], full["UTIL_ID"])}
+        with (self.base / "DKSalaries_keep_arms.csv").open(
+                newline="", encoding="utf-8") as fh:
+            every = {r["Name"]: r["ID"] for r in csv.DictReader(fh)
+                     if r["Roster Position"] == "UTIL"}
+        named = ["999999", ids["BBB Bat1"], ids["BBB Arm"], every["BBB Hurt"],
+                 ids["AAA Reliever"], ids["BBB Rookie"]]
+        df = self._melt(keep_arm_ids=named, post=("BBB",), arm=("AAA", "BBB"))
+        why = {m["id"]: m["reason"]
+               for m in df.attrs["participation_report"]["keep_arm_ids_not_kept"]}
+        self.assertEqual(set(why), set(named) - {ids["BBB Rookie"]})
+        self.assertIn("no CPT and UTIL pair", why["999999"])
+        self.assertIn("a hitter", why[ids["BBB Bat1"]])
+        self.assertIn("DK names him (Starting=SP)", why[ids["BBB Arm"]])
+        self.assertIn("Status IL", why[every["BBB Hurt"]])
+        self.assertIn("has not posted", why[ids["AAA Reliever"]])
+        self.assertEqual(df.attrs["participation_report"]["arms_kept"],
+                         ["BBB BBB Rookie"])
+        # Through the door: a typo'd id costs nothing but its own line.
+        rows = self._salary_rows()
+        rea = next(pid for pid, r in rows.items()
+                   if r["Name"] == "Colin Rea" and r["Roster Position"] == "UTIL")
+        r = self._build(self._root(), args_extra={"keep_arm": ["999999", rea]})
+        self.assertEqual(r.code, 0, r.err[-3000:])
+        block = r.brief["pool"]["operator_widening"]
+        self.assertEqual((block["flag"], block["kept"]), ("--keep-arm", 1))
+        self.assertEqual([a["name"] for a in block["arms"]], ["Colin Rea"])
+        self.assertEqual([m["id"] for m in block["named_not_kept"]], ["999999"])
+        self.assertIn("--keep-arm 999999 (nobody) kept no arm", r.err)
+        self.assertEqual(r.brief["declared_pitchers"], {rea: self.KEPT})
