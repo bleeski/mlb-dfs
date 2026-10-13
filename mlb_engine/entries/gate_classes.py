@@ -310,6 +310,14 @@ REFUSAL_SITE_VALIDITY: Dict[str, Validity] = {
         note="the under-five wall is a repository rule, not a demonstrated DK "
              "rule; its authority stays claude_md_wall, so it remains Ben's at "
              "any clock (CLAUDE.md Autonomy)"),
+    # R208. The Showdown door's twin, classed as the Classic row is: the same
+    # wall on a pool built from the melt rather than `build_slate_pool`.
+    "showdown_pool_blocked_crosswalk": _m(
+        ("authoritative_identity", V),
+        ("under_five_name_wall", P),
+        note="the Showdown twin of pool_blocked_crosswalk: a lineups feed's "
+             "confirmed side for a side DK left blank matched under five pool "
+             "persons; authority claude_md_wall, so Ben's at any clock"),
     "bank_thin_partial": Validity(
         S, note="candidate count and pair coverage are bank targets, which §2 "
                 "lists as S; not proof that no usable entry exists"),

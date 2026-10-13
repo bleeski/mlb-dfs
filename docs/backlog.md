@@ -20,6 +20,16 @@ R-number comes from scanning this file AND CHANGELOG.md.
 
 ## Workstream 1 — Showdown correctness and certification
 
+### R503. The Showdown feed lift stops at two shapes R208 left as they were: a DK partial side beside a complete confirmed feed, and a side DK declares no arm on (P2, S; S) | new 2026-10-13, split from R208 at its landing (Session 53) | Roadmap: Session 171
+
+- **What.** R208 lifts a side from the lineups feed only when DK posted NO slot on it and declares an arm on it (`showdown._feed_orders_for_blank_sides`). Two shapes are named in `participation_report["feed_orders"]["not_lifted"]` and keep the `all_healthy` pool with its non-confirmed bats:
+  - (a) DK posted part of the order (mid-post) and the feed carries a complete confirmed nine. R143 ranks only a COMPLETE DK 1-9 above a paste, and Classic's `merge_dk_starting_into_feed` leaves a DK partial side to the feed, so Classic takes the feed's nine where Showdown does not.
+  - (b) DK declares no arm on the side (a salary file downloaded before DK flagged probables) and the feed confirms its nine and names a probable. Lifting decides the side, and every arm DK does not declare then leaves the pool, so R208 does not lift. Classic's pool takes the feed's probable as the starter.
+- **Why.** Both are R208's defect on rarer shapes: a confirmed lineup in hand and a pool built on the whole roster. Band 1 construction.
+- **Fix.** (a) A DK partial side yields to a complete confirmed feed: the feed's slots replace DK's partial tokens, and every overridden slot is named. (b) The feed's probable, crosswalked to a person on the side, takes `SP` when DK declares no arm, and a DK arm that differs from the feed's probable is named with DK winning. Both reuse `showdown_feed_sides`, whose records already carry the side's rows; (b) needs the probable's UTIL id added.
+- **Acceptance.** `UT test_showdown.ShowdownLineupMergeTests` gains (a) DK's four posted slots plus a complete feed lifts the side, names the overrides and gives a 20-person pool; (b) a side with no DK arm plus a feed probable lifts with that probable as the one arm kept. The two R208 not-lifted tests are rewritten to the new fact. Mutation-check each. `LINT`; `GATE`.
+- **Needs** nothing. **Walls kept.** DK's complete nine always wins; Showdown stays review-grade; nothing here is a win rate, ROI or probability.
+
 ### R501. Showdown's pitcher-captain share sits at the ceiling the per-player captain cap allows, so no thesis or rotation change can move it toward the winners' share; the one lever left is a pitcher-only captain cap (P1, S; S) | new 2026-10-11, split from R263's remainder on Ben's instruction after the DraftKings results review (requirement R3) | Roadmap: Session 168
 
 > **Rider 2026-10-12 (Session 166, R500's Showdown axis).** The first own-finish evidence D-3 lacked, on 757 of our archived Showdown entries in 29 slates (through 2026-08-27; observed outcomes, 90% slate bootstrap; the captain's role from the vendored season tables, a labelled prior, unknown on 47): our pitcher-captain share is 41.4% of 710 known against the field's 47.0% in the same contests (-5.6 [-11.8, -0.3]); our hitter captains carry the busts (bottom decile 16.59% against a uniform 10.59%, +6.00 [+2.2, +10.2], and +4.53 [+0.8, +8.6] over the field's hitter captains; finish 59.69 against their 54.19), while our pitcher captains bust less than uniform (-4.71 [-6.9, -2.0]) and finish 45.51 against the field's pitcher captains' 41.77 (+3.74 [+0.2, +7.3]). It says which role carries our busts, not which cap value to set; D-3 stays Ben's. Rerun: `python tools/results_ledger.py attribute --showdown`. Not built, for whoever grades this next: most of the 62 names both season tables hold are position players with a mop-up inning or pitchers with a plate appearance, and a volume rule (both tables; IP at most 10, GS 0 and PA at least 15 reads hitter; PA at most 5 and IP at least 20 reads pitcher) would decide 18 of our 47 unknown captains and 854 of the field's 3,337.
@@ -611,44 +621,7 @@ repair one, so finding 2's guard has to sit at the PRIOR and not at the cap.
   Showdown brief is the win-share basis it actually used
   (`win_share_basis: moneyline_no_vig`).
 
-### R208. Showdown never merges a confirmed batting order from `--lineups`: R143 has no Showdown equivalent, and the fallback bank has its own ceiling (P1, S-M) | new 2026-08-23, merged from BUILD fragment `2026-08-22_BUILD_showdown-batting-order-not-merged-from-feed.md`; both halves observed on 1335_1g_sd
-
-> **Rider 2026-10-02 (Session 144, Phase 3, the board rebuild).** premise re-verified at HEAD e4588bc, PARTLY: the merge is still absent (`showdown.py:427-428` takes `Batting_Order` from DK `Starting` only; `build_slate.py:5878` melts the staged DK file; `--lineups` reaches Showdown only through `showdown_handedness` :5211). Corrections: 'basis declared_starters with posted 0' is FALSE since R36 F8; the bank ceiling is FALSE at HEAD (`build_showdown_bank` builds 19 of 19 in 7s on the reconstructed shape). The HEAD consequence is a 71-person `all_healthy` pool with a player outside the confirmed 20 in 19 of 19 lineups (68 of 114 slots). The 1335_1g_sd file shipped (hand-derived), and the shape is ~1 of 54 Showdown slates, so this is band 1 (construction on a non-confirmed bat), not the exception band. S-M.
-
-- **What:** `Pool_Basis` and `Batting_Order` in `melt_showdown_salary_csv`
-  (`showdown.py` ~160-209) are derived ONLY from the DK salary file's own
-  `Starting` column — there is no Showdown equivalent of R143's
-  `merge_dk_starting_into_feed`. On 2026-08-22 `1335_1g_sd` (TOR @ NYY) DK had
-  flagged both probables (`Dylan Cease` → `P`, `Ryan Weathers` → `SP`) and left
-  `Starting` BLANK for all 18 hitters, while mlb.com carried a full confirmed
-  1-9 for both sides that Ben pasted and `lineups_from_paste.py` resolved
-  cleanly against this draftgroup's ids. Effect: `declared` held only the two
-  pitcher rows, so `basis` still read `declared_starters` **misleadingly** while
-  `Batting_Order.notna().sum()` was 0, and `run_showdown`'s `use_ladder =
-  (basis == "declared_starters" and posted >= 18)` evaluated False with a
-  perfectly good `--lineups` feed sitting right there. `showdown_handedness`
-  reads that feed for `bat_side` and pitcher hand only; it never touches
-  `Batting_Order` or `Pool_Basis`.
-- **Why:** it is DK-FILE-DEPENDENT and a build cannot assume either shape —
-  contrast 2026-08-19 ARI@BOS, where DK's own file DID carry 1-9 for both
-  sides. So the same slate type silently takes the good path or the fallback
-  depending on how DK filled one column, and `basis: declared_starters` reads
-  identically in both cases. Second half, filed as an observation because it
-  needs `build_showdown_bank` context: losing the ladder routed to
-  `sd.build_showdown_bank`, which returned `{"status": "bank_short", "built":
-  11, "needed": 19}` IDENTICALLY across two attempts at 14s and 18s
-  `--max-seconds` — the built count did not move, which smells structural
-  rather than search-bounded, and means "grow the bank" (the standing autonomy
-  default) did nothing. Worth checking whether it has its own version of the
-  ceiling R204 describes for the joint MILP.
-- **Fix:** give the Showdown melt the same source ranking the Classic front door
-  has — DK's `Starting` first, the `--lineups` feed second — so a resolved paste
-  or feed can supply `Batting_Order` and lift `Pool_Basis` when DK's column is
-  blank. The shipping workaround was a derived salary file with `Starting`
-  written onto both CPT and UTIL rows from the resolved feed, which is exactly
-  the merge, done by hand, outside the engine. And make `basis:
-  declared_starters` unable to coexist with `posted_hitters: 0`: that pair is
-  the misleading half and it is a one-line assertion.
+### R208. CLOSED 2026-10-13 (Session 53). A confirmed 1-9 in the lineups feed reaches the Showdown pool for a side DK left blank: `live_data_adapters.showdown_feed_sides` runs Classic's two front-door calls (`merge_dk_starting_into_feed`, `build_status_map_from_lineups_feed`) on the file's UTIL rows, and `melt_showdown_salary_csv(lineups_feed=)` lifts a side only when DK posted no slot on it, DK declares an arm on it, the feed calls it confirmed for this date and all nine rows match pool persons on slots 1-9. `run_showdown` reads the feed once, before the melt, and refuses a confirmed side that matches under five as `showdown_pool_blocked_crosswalk` (exit 3). 1335_1g_sd's shape on MIN@CHC: pool 70 `all_healthy` with 54 of 84 slots outside the confirmed twenty, now pool 20 `declared_starters` with 0. The register's one-line assertion is declined (R36 F8 already makes `declared_starters` with 0 posted impossible); a DK partial side and a side with no DK arm are R503. Full text, premises corrected and gate line: `CHANGELOG.md` 2026-10-13.
 
 ### R273. The clock-expiry mislabel is real and it is in DEAD CODE; the item is now a quarantine decision, not a label fix (P3, was P1) | new 2026-08-30 from R158's R233 enumeration | **DEMOTED OUT OF SLOT 1 on 2026-08-31**: the premise that put it there was checked against the tree and is false
 

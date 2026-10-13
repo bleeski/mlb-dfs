@@ -292,9 +292,9 @@ that happened BEFORE any solve — bad input, a feed for another slate — is ex
 `4`, so the supervisor stops instead of retrying against a verdict that does
 not exist.
 
-There are eleven refusal exits (R290(c)): eight literal `return 3`, two
+There are twelve refusal exits (R290(c), R208): nine literal `return 3`, two
 conditional returns of 3, and one at exit `10`. Three write a brief; the other
-eight print their JSON to stdout and nothing else. `REFUSAL_SITES` in
+nine print their JSON to stdout and nothing else. `REFUSAL_SITES` in
 `build_slate.py` is the one table of them, and
 `test_every_refusal_exit_is_classified` fails the suite if a refusal exit is
 ever added without a row in it, so trust the table over this count.

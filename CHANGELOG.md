@@ -2,6 +2,139 @@
 
 What changed in the engine, the tools and the contracts, when, and why.
 
+## 2026-10-13 — R208: a confirmed lineups feed reaches the Showdown pool for a side DK left blank, and a confirmed side that crosswalks to almost nobody refuses by name (roadmap Session 53)
+
+**Scope.**
+- `mlb_engine/intake/live_data_adapters.py`:
+  - `showdown_feed_sides`, new. It runs Classic's own two front-door calls (`merge_dk_starting_into_feed`, then `build_status_map_from_lineups_feed`) on the Showdown file's UTIL rows and returns, per slate team, the feed status, source label, rows, `order_by_util_id`, unmatched names and whether R325's date check ignored the game, plus the merge's disagreements.
+  - `FEED_CROSSWALK_MIN_MATCHED = 5`, new. The confirmed-side check and the DK-posted backstop in `build_slate_pool` read it in place of two `5` literals, unchanged in value.
+  - `LEG_START_TOLERANCE_MINUTES = 10`, new: the default the two doubleheader leg selectors and the odds-packet leg match already had, named and now read by the Showdown start check.
+- `mlb_engine/optimize/showdown.py`:
+  - `melt_showdown_salary_csv(..., lineups_feed=None)`.
+  - `_feed_orders_for_blank_sides` and `SHOWDOWN_FEED_ORDERS_NOTE`, new.
+  - One local `_token` is read by `_is_declared`, the completeness input, `_participation` and `Batting_Order`.
+  - `participation_report["feed_orders"]` and each side's `order_source` are new.
+  - The docstring gains an R208 paragraph.
+- `skills/generate-lineups/scripts/build_slate.py`:
+  - `showdown_lineups_feed`, new, lifted unchanged out of `showdown_handedness`, with `getattr` on `args.lineups`. Its `max_age_minutes` ages a cached feed by Classic's rule, and only `run_showdown` passes it.
+  - `FEED_MAX_AGE_MINUTES = 90.0`, new: `--feed-max-age-minutes`' default, named.
+  - `showdown_handedness(..., loaded=None)`.
+  - `run_showdown` reads the feed once before the melt, passes it to the melt and to the handedness step, prints one stderr line per side not lifted, and refuses a crosswalk failure.
+  - `REFUSAL_SITES` gains `showdown_pool_blocked_crosswalk`.
+- `mlb_engine/entries/gate_classes.py`: `REFUSAL_SITE_VALIDITY` gains the new key, classed as the Classic crosswalk row is.
+- `tests/test_showdown.py`:
+  - `ShowdownLineupMergeTests`, new (+16).
+  - `R291ShowdownExcludedColumnTests.test_an_exclusion_that_leaves_one_team_refuses_with_the_reason` stubs `fetch_lineups`. Its refusal is now reached after a feed read, and it stays network-free.
+- `tests/test_core.py`: the refusal-table pins move, `len(REFUSAL_SITES)` 11 -> 12 and refusal return statements 10 -> 11, each with a comment.
+- `tools/audit.py`: `test_showdown` pin 465 -> 481.
+- `skills/generate-lineups/references/showdown.md`: one paragraph on the feed lift, `order_source`, `feed_orders` and the refusal.
+- `skills/generate-lineups/SKILL.md`: the refusal-exit count, eleven -> twelve (nine literal `return 3`, nine that print JSON only).
+- `docs/backlog.md`: R208 collapsed to a CLOSED stub; R503 filed under Workstream 1.
+- `docs/ROADMAP.md`:
+  - Session 53 Complete.
+  - Session 171 (R503) added at rank 20b.
+  - **NEXT** Session 153. It skips Sessions 118 and 136, which need D-2 and D-10.
+  - A Progress Ledger row, and Session 152's SHA backfilled (`b988c61`).
+- Not touched: `showdown_theses.py`, the solver and bank builders, `certify_showdown`, the export writer, preflight, the Classic path's precedence (it calls the same merge it always did), and the inbox fragment `2026-10-03_BUILD_showdown-handedness-drops-accented-names.md`. That fragment's first observation is R399(b), landed in Session 33, and its second, a roster allowlist for relievers, is not this item.
+
+**What was wrong, reproduced at b988c61 before any edit.** `melt_showdown_salary_csv` set `Batting_Order` and pool participation from DK's `Starting` column alone (`showdown.py:428-429`; the row said 427-428). `--lineups` reached Showdown only through `showdown_handedness`, after the melt, and only for bat side and pitcher hand. The vendored MIN@CHC Showdown file was reshaped to 1335_1g_sd's shape: every hitter's `Starting` blank, DK's SP tokens kept on Taj Bradley and Matthew Boyd, and a pasted confirmed nine per side passed as `--lineups`. Through `run_showdown`:
+
+| | HEAD | now |
+|---|---|---|
+| pool | 70 (`all_healthy`, MIN 36, CHC 34) | 20 (`declared_starters`, 10 and 10) |
+| posted hitters | 0 | 18 |
+| construction | points-max bank | thesis ladder |
+| lineups with a person outside the confirmed twenty | 14 of 14 | 0 of 14 |
+| slots outside the confirmed twenty | 54 of 84 | 0 of 84 |
+
+The filed shape was 71, 19 of 19 and 68 of 114 on the real slate, which is not on this host.
+
+**Premises corrected.**
+- The register's second half, that `basis: declared_starters` coexists with `posted_hitters: 0`, is false since R36 F8, as the 2026-10-02 rider said. The basis needs every side decided, and a decided side posts nine slots. The one-line assertion is declined because it guards a state the code cannot reach.
+- The bank-ceiling half was already corrected (19 of 19 build in 7s at HEAD).
+- Two facts the entry did not have decided the design:
+  - A paste resolved against a Showdown file carries the UTIL row's DK id (R45).
+  - Classic's name crosswalk on BOTH rows calls every name ambiguous (20 of 20 in the scratch run), and on the UTIL rows matches 9 of 9 per side for a paste and for a names-only API feed. That is why the crosswalk is Classic's own, on a UTIL-only map, rather than a second copy.
+
+**What shipped.**
+- A side takes the feed's nine only when all of these hold:
+  - DK posted no slot on it.
+  - DK declares an arm on it (SP, P, PLR or PO).
+  - The feed calls it `confirmed`, for the salary file's date.
+  - Nine rows match nine pool persons on slots 1-9.
+- The arm condition is there because lifting DECIDES a side, and on a decided side every arm DK does not declare is a confirmed nonstarter. A side with no DK arm would lose its whole staff from the pool.
+- A lifted side's slots reach participation, `Batting_Order` and the shared `posted_order_completeness` predicate through one token, so the pool and the referee still read one rule. The frame's `Starting` column stays DK's own value.
+- `feed_orders` is present on every frame (`applied: false` with a reason when no feed reached the melt). It names:
+  - the sides lifted;
+  - every side not lifted, with its reason (DK malformed, DK partial, the feed's status, another day's game, an incomplete crosswalk, no DK arm);
+  - unmatched names;
+  - the merge's disagreements with a side DK posted. DK wins, and the pair is named.
+- A crosswalk that throws costs the lift and never the build.
+- A confirmed feed side that matches fewer than five pool persons is a crosswalk failure. `run_showdown` refuses it at exit 3 with `status: pool_blocked` and the new `showdown_pool_blocked_crosswalk` stamp (`claude_md_wall`, `illegal`, no override), because CLAUDE.md lists that failure as Ben's at any clock. It fires only when a feed loaded and calls the side confirmed. A missing or unfetchable feed never refuses.
+- `tools/autobuild.py` reads the refusal as a pool blocker it cannot classify (`classify_pool_blocker` returns None on its text, checked) and stops for a human. It never retries the Showdown door with `--ignore-pool-blockers`.
+
+**Declined and changed from the plan.**
+- The plan reused `pool_blocked_crosswalk`. `test_every_refusal_exit_is_classified` forbids stamping one key literally at two sites and pins the count of exit-3/10 return statements, which is the N+1 guard working. The Showdown door therefore gets its own row with the Classic row's authority, class and remedy, its own V/S/P class, and both pins moved with comments.
+- R503 is filed, not built:
+  - (a) A DK partial side beside a complete confirmed feed. Classic's merge takes the feed there.
+  - (b) A side with no DK arm, where Classic's pool takes the feed's probable as its starter.
+
+  Both keep today's pool and are named in `not_lifted`.
+
+**One definition (R233).**
+- `grep -rn "melt_showdown_salary_csv(" mlb_engine tools skills`: one production caller, `build_slate.py` `run_showdown`. The other two hits are comments.
+- `grep -n 'get("Starting")' mlb_engine/optimize/showdown.py`:
+  - :406 and :444-445 are the parse that collects DK's raw value per person, kept: it is the source fact.
+  - :290 is the lift's arm check, which reads DK's raw value on purpose, since the question is what DK declared.
+  - :495 is `_token`'s DK fallback.
+  - The four readers that used to read `Starting` for order now read `_token`.
+  - `showdown.py:1804` and `showdown_theses.py:1190` are comments about the melt and stay true.
+- `grep -rn "n < 5\b\|matched < 5\|FEED_CROSSWALK_MIN_MATCHED"`:
+  - the constant, its two Classic uses (`build_slate_pool`'s confirmed-side check and its DK-posted backstop) and the Showdown lift.
+  - Kept: `tools/autobuild.py:227` (`matched >= 5`). It parses a pool blocker's text and returns None, meaning a human decides, below the same bar, so it reads the pool's decision rather than drawing the line.
+- `grep -rn "LEG_START_TOLERANCE_MINUTES\|tolerance_minutes: int = "`: the constant, its three defaults (`select_one_leg_per_matchup`, `_select_slate_legs`, `parse_the_odds_api_totals`; each was a literal 10) and the Showdown start check. No other copy.
+- `grep -rn "FEED_MAX_AGE_MINUTES\|feed_max_age_minutes"`: the constant, the argparse default, Classic's staged-feed leg (`args.feed_max_age_minutes`, unchanged) and `run_showdown`'s read. No tool restates it.
+- `grep -n "showdown_lineups_feed(\|fetch_lineups(" build_slate.py`: on the Showdown path the feed is read at one place, `run_showdown`, and handed to `showdown_handedness`, whose own read survives only for direct callers. The other two `fetch_lineups` calls are Classic's.
+
+**The before-done review (an independent agent on f591e70), four findings, all fixed in the second commit.**
+1. A stale cached feed decided the pool. `showdown_lineups_feed` read `data/slates/<date>/lineups_feed.json` whatever its age. Before the lift that moved only platoon factors; now a morning file would seat a scratched bat as `confirmed_starter` and drop his replacement, or keep an early `tbd` read and never lift. Fixed: `run_showdown`'s read ages the cached file by Classic's `--feed-max-age-minutes` rule (refetch when older or undated; a failed refetch reuses it with a stderr warning). A named `--lineups` is never aged, and `showdown_handedness`' own read passes no age, so its direct callers are unchanged.
+2. A feed game with no parseable start time (or a timestamp with no zone) was refused as a crosswalk failure at Ben's wall, with a remedy about names. The status map cannot date such a game, so it never crosswalks it and the side read "matched 0 of 9". A confirmed side with almost no rows read the same. Fixed: `showdown_feed_sides` carries `lock_time_missing`, the lift skips that side with the real remedy, and a side with fewer rows than `FEED_CROSSWALK_MIN_MATCHED` is not lifted and is never a crosswalk failure.
+3. A lone feed leg on a doubleheader day lifted the other game's nines. The leg selector keeps a lone leg whatever its time, and R325's date check lets an earlier start on the same day stand. Fixed: `start_off_minutes` is set when the feed's start sits more than `LEG_START_TOLERANCE_MINUTES` from the salary file's, and the lift skips that side.
+4. A side with no DK arm could refuse on its names, though it can never be lifted. Fixed: the arm check runs before the crosswalk count.
+
+The review's notes, kept as they are:
+- An IL player in the feed's nine lifts as a degraded side, which is how DK's own degraded nine is read.
+- A side whose only DK arm is a PO opener lifts, as a DK-posted side does.
+- A feed that does not carry the matchup prints one stderr line per DK-blank side.
+
+**Tests and mutations.**
+- `ShowdownLineupMergeTests` has 16 tests:
+  - The row's verification through the exit door: a pasted confirmed 1-9 on blank-`Starting` sides gives a 20-person pool, `declared_starters`, 18 posted, the ladder, and every delivered lineup (ladder and baseline) inside the confirmed eighteen plus the two DK arms.
+  - An API-shaped feed lifts both sides, and a whole-day feed's other game adds nothing.
+  - DK's complete nine outranks a contradicting feed and the contradiction is named.
+  - Each of these is not lifted and says why: a DK partial side, a malformed DK side, a side with no DK arm, seven of nine, another day's feed, a partial feed side (not a crosswalk failure).
+  - Under five refuses through the exit door with no file.
+  - An empty feed leaves the frame equal.
+  - The review's four: no start time and a three-row side are not crosswalk failures; a leg 240 minutes off is not lifted; a no-arm side never refuses on its names; a six-hour-old cached feed is refetched (and reused with a warning when the refetch fails).
+  - The paste tool's own output: an mlb.com-style paste through `resolve_paste_to_feed` against the reshaped Showdown file lifts both sides. Run end to end through the CLI too, `lineups_from_paste.py` wrote a dated feed with the salary file's start and 20 names resolved, and `run_showdown` built pool 20 and the ladder on it, both as a named `--lineups` and as a fresh cached file.
+- 21 hand mutations were run with `python -B`, `PYTHONDONTWRITEBYTECODE=1` and pycache cleared, and all 21 were killed:
+  - Seven conditions in the lift dropped one at a time: no-digit, arm, 1-9, date, DK-complete precedence, malformed, feed status.
+  - The crosswalk floor and the refusal dropped.
+  - `Batting_Order` back on `Starting`.
+  - `order_source` ignoring DK.
+  - The melt not passed the feed.
+  - The crosswalk on both roles.
+  - The date flag never set.
+  - The review's five: the age gate, the no-start-time skip, the off-leg skip and its flag, and the short-side guard.
+  - The lift dropped, against the paste-resolver test.
+
+**Gate.**
+- Local (Python 3.13), on f591e70: `FAIL  test suite FAILED in tests.test_core (ran 3749); do not build`. That is the host's known `ReplaySlateTests::test_settle_scores_requires_integer_hundredths_so_ties_are_exact` (`155.6 == 155.6`, the 3.13 float sum), and nothing else: a full `test_core` run read 2476 passed, 4 skipped, 1 failed, identical to the b988c61 baseline. The suites the local gate never reaches, run directly: `test_showdown` 480 OK (1 skipped), `test_upload_integrity` + `test_paste_lineups` 643 OK, `test_greenfield_regressions` + `test_production` 140 passed.
+- PR gate (3.11, the merge authority), PR #151 on f591e70: `PASS  v2.26.0  45 modules  3749 tests  5 skipped  {test_core 2481/2481 (4 skipped) skipped_in_place; test_showdown 476/476 (1 skipped) skipped_in_place}`, the same five documented skips as PR #150's base. On the code-final head 9d77d65: `PASS  v2.26.0  45 modules  3754 tests  5 skipped  {test_core 2481/2481 (4 skipped) skipped_in_place; test_showdown 481/481 (1 skipped) skipped_in_place}`, all 16 new tests run (3738 + 16) and the same five documented skips. The commit after it records this line and changes no code.
+- `GOLD` unmoved: `test_golden_replay` 9 OK, no re-freeze.
+- `python tools/plan_status.py --check` exits 0.
+- The register entry as filed is `git show b988c61:docs/backlog.md` under `### R208`.
+
 ## 2026-10-13 — R483: the five-stack floor and quota bands bind per contest on a mixed entered set, and the checkpoint names which contests carried which band (roadmap Session 152)
 
 **Scope.**
