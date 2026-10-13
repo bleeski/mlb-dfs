@@ -6565,6 +6565,12 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
     for rec in feed_orders.get("not_lifted") or []:
         print(f"lineups feed: {rec['team']} takes no batting order from the "
               f"feed: {rec['reason']}", file=sys.stderr)
+    # R503(a). A DK partial side yields to the feed's confirmed nine; each DK
+    # slot that changed hands is named, never silently replaced.
+    for rec in feed_orders.get("dk_slots_overridden") or []:
+        print(f"lineups feed: {rec['team']} slot {rec['slot']}: DK posted "
+              f"{rec['dk']}, the feed's confirmed nine has {rec['feed']}; the "
+              f"feed's nine is used", file=sys.stderr)
     # R484. Priced here, off the melt and before anything reads a Base, so the
     # baseline, the ladder, every report and a supplied Base (which still
     # replaces it) all see the same kept-arm prior.

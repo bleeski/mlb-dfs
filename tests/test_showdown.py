@@ -8125,16 +8125,95 @@ class ShowdownLineupMergeTests(_ShowdownExitDoorHarness, unittest.TestCase):
         self.assertEqual({t: s["order_source"] for t, s in self._orders(df).items()},
                          {"CHC": "dk_starting", "MIN": "dk_starting"})
 
-    def test_a_dk_partial_side_is_not_lifted_and_says_why(self):
-        df = self._melt(self._salary(keep_slots={"MIN": 4}), self._feed())
+    def _overriding_feed(self):
+        """MIN's confirmed nine with DK's 1 and 2 swapped and Matt Wallner
+        (MIN's bench bat on the file) where DK posts Josh Bell at 3."""
+        posted = self._posted()["MIN"]
+        return posted, self._feed(rename={("MIN", 1): posted[2][0],
+                                          ("MIN", 2): posted[1][0],
+                                          ("MIN", 3): "Matt Wallner"})
+
+    def test_a_dk_partial_side_takes_a_complete_feed_and_names_each_overridden_slot(self):
+        """R503(a), rewritten from R208's not-lifted test on purpose. R143
+        ranks only a COMPLETE DK 1-9 above a paste, and Classic's merge leaves
+        a DK partial side to the feed, so DK's MIN 1-4 beside the feed's
+        confirmed nine takes the feed's nine. Each DK slot that changed hands
+        is named and slot 4, which agrees, is not; Bell, whom DK posted at 3
+        and the feed's nine does not carry, leaves the pool instead of holding
+        a second claim on slot 3 (the side would read malformed)."""
+        posted, feed = self._overriding_feed()
+        df = self._melt(self._salary(keep_slots={"MIN": 4}), feed)
         report = df.attrs["participation_report"]
         orders = report["feed_orders"]
-        self.assertEqual(orders["lifted"], ["CHC"])
-        self.assertEqual([n["team"] for n in orders["not_lifted"]], ["MIN"])
-        self.assertIn("posted 4 of 9", orders["not_lifted"][0]["reason"])
-        self.assertEqual(report["slate_basis"], "mixed_declared_and_projected")
-        self.assertIsNone(self._orders(df)["MIN"]["order_source"])
-        self.assertGreater(int((df["Team"] == "MIN").sum()), 10)
+        self.assertEqual(orders["lifted"], ["CHC", "MIN"], orders)
+        self.assertEqual(orders["not_lifted"], [])
+        self.assertEqual(len(df), 20)
+        self.assertEqual(report["slate_basis"], "declared_starters")
+        side = self._orders(df)["MIN"]
+        self.assertEqual((side["state"], side["order_source"]),
+                         ("confirmed", "operator_paste"))
+        self.assertEqual(orders["dk_slots_overridden"], [
+            {"team": "MIN", "slot": 1, "dk": posted[1][0], "feed": posted[2][0]},
+            {"team": "MIN", "slot": 2, "dk": posted[2][0], "feed": posted[1][0]},
+            {"team": "MIN", "slot": 3, "dk": posted[3][0], "feed": "Matt Wallner"}])
+        want = {name: slot for slot, (name, _i) in posted.items()}
+        want.update({posted[2][0]: 1, posted[1][0]: 2, "Matt Wallner": 3})
+        del want[posted[3][0]]
+        got = {r.Name: int(r.Batting_Order) for r in df.itertuples()
+               if r.Team == "MIN" and r.Batting_Order == r.Batting_Order
+               and r.Batting_Order is not None}
+        self.assertEqual(got, want)
+        self.assertNotIn(posted[3][0], set(df["Name"]))
+        with self.subTest("a partial feed side leaves DK's four slots alone"):
+            df = self._melt(self._salary(keep_slots={"MIN": 4}),
+                            self._feed(statuses={"MIN": "partial"}))
+            orders = df.attrs["participation_report"]["feed_orders"]
+            self.assertEqual(orders["lifted"], ["CHC"])
+            self.assertEqual([n["team"] for n in orders["not_lifted"]], ["MIN"])
+            self.assertIn("'partial'", orders["not_lifted"][0]["reason"])
+            self.assertEqual(orders["dk_slots_overridden"], [])
+            self.assertIsNone(self._orders(df)["MIN"]["order_source"])
+            got = {r.Name: int(r.Batting_Order) for r in df.itertuples()
+                   if r.Team == "MIN" and r.Batting_Order == r.Batting_Order
+                   and r.Batting_Order is not None}
+            self.assertEqual(got, {posted[n][0]: n for n in range(1, 5)})
+            self.assertGreater(int((df["Team"] == "MIN").sum()), 10)
+
+    def test_a_dk_partial_side_lifts_through_the_exit_door_and_names_the_overrides(self):
+        """R503(a) end to end. The feed sits beside the salary file, which is
+        where preflight resolves its evidence when DK has not posted every
+        side (`resolve_feed_source`), so the test pins which feed cleared the
+        file as well as the exit code."""
+        posted, feed = self._overriding_feed()
+        root = self._root()
+        feed_path = root / "lineups_feed.json"
+        feed_path.write_text(json.dumps(feed), encoding="utf-8")
+        r = self._build(root, salary_csv=self._salary(keep_slots={"MIN": 4}),
+                        args_extra={"lineups": str(feed_path)})
+        self.assertEqual(r.code, 0, r.err[-3000:])
+        pool = r.brief.get("pool") or {}
+        self.assertEqual(pool.get("players"), 20, pool)
+        self.assertEqual(pool.get("basis"), "declared_starters")
+        for slot, dk, fed in ((1, posted[1][0], posted[2][0]),
+                              (2, posted[2][0], posted[1][0]),
+                              (3, posted[3][0], "Matt Wallner")):
+            self.assertIn(f"lineups feed: MIN slot {slot}: DK posted {dk}, the "
+                          f"feed's confirmed nine has {fed}; the feed's nine is "
+                          f"used", r.err)
+        self.assertNotIn("MIN slot 4:", r.err)
+        names = {row["ID"]: row["Name"] for row in self._salary_rows().values()}
+        allowed = (self._confirmed_twenty() - {posted[3][0]}) | {"Matt Wallner"}
+        files = self._file_lines(r.err)
+        self.assertTrue(files, r.err[-2000:])
+        for line in files:
+            path = self._path_of(line)
+            for entry in self._entry_rows(path):
+                players = {names[pid] for pid in entry["cells"] if pid}
+                self.assertLessEqual(players, allowed, (line, players - allowed))
+            code, report = self._preflight(path, r.salary, r.root)
+            self.assertEqual(code, 0, report)
+            self.assertIn("lineups_feed.json",
+                          report["info"].get("feed_autoresolve", ""), report["info"])
 
     def test_a_side_with_no_dk_arm_is_not_lifted(self):
         """Lifting decides the side, and on a decided side every arm DK does
