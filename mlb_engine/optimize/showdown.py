@@ -189,6 +189,20 @@ SHOWDOWN_FEED_ORDERS_NOTE = (
     "own complete nine always wins and a feed that contradicts it is named in "
     "`disagreements`. Every other side keeps the pool it had, with the reason.")
 
+#: R484. The participation an arm takes when `--keep-arms` keeps him on a
+#: decided side, where he would otherwise be `confirmed_nonstarter` and leave
+#: the pool. Also the role his ids carry in the brief's `declared_pitchers`,
+#: which is how preflight's R114 path acknowledges him rather than failing him
+#: as absent from the posted lineup.
+KEPT_ARM_PARTICIPATION = "operator_kept_arm"
+
+#: R484. One relief inning: a kept arm's expected innings on R470's workload
+#: prior (`ip / STARTER_REFERENCE_IP`) when the operator types none. Ben chose
+#: the tiered rule this prices on 2026-10-13 (Session 153's plan): measured on
+#: the widened MIN_CHC pool, raw APPG put kept arms in 28 of 60 points-max
+#: slots, four rotation starters who were not starting in 5 of 10 entries each.
+KEPT_ARM_EXPECTED_IP = 1.0
+
 
 def _feed_orders_for_blank_sides(path: str | Path, rows: Sequence[Mapping[str, Any]],
                                  dk_sides: Mapping[tuple, Mapping[str, Any]],
@@ -326,6 +340,7 @@ def _feed_orders_for_blank_sides(path: str | Path, rows: Sequence[Mapping[str, A
 def melt_showdown_salary_csv(path: str | Path, exclude_out: bool = True,
                              starters_only: bool = True,
                              lineups_feed: Optional[Mapping[str, Any]] = None,
+                             keep_arms: bool = False,
                              ) -> pd.DataFrame:
     """Melt a DK Showdown salary export (two rows per player, CPT and UTIL) to one
     row per player carrying CPT_ID/CPT_Salary, UTIL_ID/UTIL_Salary, team, opponent,
@@ -396,6 +411,16 @@ def melt_showdown_salary_csv(path: str | Path, exclude_out: bool = True,
     through one token, and the frame's ``Starting`` column stays DK's own value.
     ``participation_report["feed_orders"]`` is present on every frame, and each
     side carries its ``order_source``. ``None`` is the pool it always was.
+
+    R484. ``keep_arms`` is the door's ``--keep-arms``. On a DECIDED side an
+    arm DK did not name is ``KEPT_ARM_PARTICIPATION`` instead of
+    ``confirmed_nonstarter``, so ``starters_only`` keeps him; ``exclude_out``
+    still drops an OUT arm, a hitter is never touched, and no side's
+    ``decided`` reading moves. It runs after R208's lift on purpose: a lifted
+    side keeps its arms like a posted one, and a kept arm never counts as the
+    DK declaration the lift requires. ``participation_report["arms_kept"]``
+    names each one; ``apply_kept_arm_prior`` prices them. ``False`` is the
+    pool it always was.
     """
     by_key: Dict[tuple, Dict[str, Any]] = {}
     # R291(c). Whether the FILE carried the column is a different fact from
@@ -598,6 +623,13 @@ def melt_showdown_salary_csv(path: str | Path, exclude_out: bool = True,
         # a man DK named.
         if value in DK_STARTING_OPENER_TOKENS:
             return "declared_opener"
+        # R484. The operator's widening, and only of an arm a posted nine
+        # would otherwise rule out. Not `confirmed_starter` (DK did not name
+        # him) and not `unknown` (the side is decided): his own value, which
+        # `starters_only` keeps and `describe_slate` never takes for a starter.
+        if (keep_arms and _side_key(rec) in decided
+                and not _is_showdown_hitter(rec.get("Position"))):
+            return KEPT_ARM_PARTICIPATION
         return "confirmed_nonstarter" if _side_key(rec) in decided else "unknown"
 
     for rec in rows:
@@ -660,6 +692,11 @@ def melt_showdown_salary_csv(path: str | Path, exclude_out: bool = True,
         "openers_kept": sorted(
             f"{r.get('Team')} {r.get('Name')}"
             for r in rows if r.get("Is_Declared_Opener")),
+        # R484. Read from the final `rows` for `openers_kept`'s reason: a
+        # shelved arm left on the health filter is not claimed as kept.
+        "arms_kept": sorted(
+            f"{r.get('Team')} {r.get('Name')}"
+            for r in rows if r.get("Participation") == KEPT_ARM_PARTICIPATION),
         "role_disagreements": sorted(
             f"{r['Player_Key']}: {r['Role_Disagreement']}"
             for r in rows if r.get("Role_Disagreement")),
@@ -727,6 +764,106 @@ SMALL_SAMPLE_BASE_SALARY_PERCENTILE = 50.0
 def _is_showdown_hitter(position: Any) -> bool:
     tokens = {t.strip().upper() for t in str(position or "").split("/")}
     return not (tokens & SHOWDOWN_PITCHER_POSITION_TOKENS)
+
+
+def apply_kept_arm_prior(df: pd.DataFrame,
+                         typed_ip: Optional[Mapping[str, Any]] = None) -> pd.DataFrame:
+    """R484. Price every ``KEPT_ARM_PARTICIPATION`` row on a labeled, tiered
+    prior, and say how in ``attrs["kept_arm_prior_report"]``.
+
+    APPG is the melt's Base, and for a kept arm it is the wrong number in two
+    of three cases. A reliever's APPG is already a relief appearance, so he
+    keeps it. An arm DK tags SP who is not today's starter carries a STARTER's
+    APPG, which is R489's defect (an arm priced as a starter with nothing
+    said): it takes R470's ``ip / STARTER_REFERENCE_IP`` on his own APPG. An
+    arm with no APPG has nothing to scale, so he takes the declared prior: the
+    same factor on the slate's reference, the mean APPG of the pool's
+    DK-declared starters. ``ip`` is ``KEPT_ARM_EXPECTED_IP`` unless
+    ``typed_ip`` (``{dk id: innings}``, R470's ``:ip=N``, on either of a
+    person's two ids) gives one; typed innings on a reliever price him off the
+    reference too, and typed innings for an arm the flag did not keep are named
+    in ``ip_not_applied`` and change nothing. With no declared starter there is
+    no reference: a Base-less arm keeps 0 and is named ``no_reference``.
+
+    Every other row is untouched, and a supplied Base (R249) still replaces
+    this one downstream. A deterministic prior, never a projection, a
+    probability of pitching, or an edge.
+    """
+    from mlb_engine.intake.live_data_adapters import (  # noqa: PLC0415
+        STARTER_REFERENCE_IP, declared_arm_workload)
+    out = df.copy()
+    out.attrs = dict(df.attrs)
+    typed = {str(k): float(v) for k, v in (typed_ip or {}).items()}
+    report: Dict[str, Any] = {
+        "applied": False, "kept": 0, "by_team": {}, "arms": [],
+        "reference_base": None, "reference_from": [], "relief_median_appg": None,
+        "default_ip": KEPT_ARM_EXPECTED_IP, "reference_ip": STARTER_REFERENCE_IP,
+        "ip_not_applied": [], "no_reference": [],
+        "label": ("a kept arm's Base is a labeled tiered prior: a reliever "
+                  "keeps his APPG, an arm DK tags SP who is not starting takes "
+                  "ip/5.5 of his own APPG, an arm with no APPG takes ip/5.5 of "
+                  "the declared starters' mean APPG, ip 1.0 unless typed. "
+                  "Never a projection, a probability of pitching, or an edge."),
+    }
+    if not len(out) or "Participation" not in out.columns:
+        report["ip_not_applied"] = sorted(typed)
+        out.attrs["kept_arm_prior_report"] = report
+        return out
+    kept = out["Participation"] == KEPT_ARM_PARTICIPATION
+    arm = ~out["Position"].map(_is_showdown_hitter)
+    appg = out["Base"].astype(float)
+    starters = out[out["Is_Declared_Starter"].fillna(False).astype(bool) & arm
+                   & (appg > 0)].sort_values("Player_Key")
+    reference = float(starters["Base"].astype(float).mean()) if len(starters) else None
+
+    def _sp_tagged(position: Any) -> bool:
+        return "SP" in {t.strip().upper() for t in str(position or "").split("/")}
+
+    relief = sorted(float(b) for b, p, k in zip(appg, out["Position"], kept)
+                    if k and b > 0 and not _sp_tagged(p))
+    report.update(
+        reference_base=None if reference is None else round(reference, 4),
+        reference_from=[f"{t} {n}" for t, n in zip(starters["Team"], starters["Name"])],
+        relief_median_appg=round(float(np.median(relief)), 4) if relief else None)
+    used: set = set()
+    for idx in out.index[kept]:
+        row = out.loc[idx]
+        own = float(row["Base"] or 0.0)
+        ids = [str(row.get(c) or "") for c in ("CPT_ID", "UTIL_ID")]
+        hit = [i for i in ids if i in typed]
+        used.update(hit)
+        ip = typed[hit[0]] if hit else None
+        sp_tag = _sp_tagged(row.get("Position"))
+        if ip is None and not sp_tag and own > 0:
+            base, source, factor, ip_used, ip_source = (
+                own, "appg_relief", 1.0, None, "relief_appearance")
+        else:
+            factor, ip_used, _src = declared_arm_workload(
+                None, KEPT_ARM_EXPECTED_IP if ip is None else ip)
+            ip_source = "kept_arm_default" if ip is None else "--declare-pitcher ip="
+            scale_from, source = ((own, "starter_appg_workload_prior")
+                                  if sp_tag and own > 0
+                                  else (reference, "declared_prior"))
+            if scale_from is None:
+                base, source = own, "no_reference"
+                report["no_reference"].append(f"{row['Team']} {row['Name']}")
+            else:
+                base = scale_from * factor
+        out.at[idx, "Base"] = float(base)
+        report["arms"].append({
+            "name": str(row["Name"]), "team": str(row["Team"]),
+            "position": str(row.get("Position") or ""),
+            "cpt_id": ids[0], "util_id": ids[1], "appg": round(own, 4),
+            "base": round(float(base), 4), "base_source": source,
+            "ip": ip_used, "ip_source": ip_source, "factor": round(factor, 6)})
+    report["arms"].sort(key=lambda a: (a["team"], a["name"]))
+    report["kept"] = len(report["arms"])
+    report["applied"] = bool(report["arms"])
+    for a in report["arms"]:
+        report["by_team"][a["team"]] = report["by_team"].get(a["team"], 0) + 1
+    report["ip_not_applied"] = sorted(set(typed) - used)
+    out.attrs["kept_arm_prior_report"] = report
+    return out
 
 
 def small_sample_base_report(df: pd.DataFrame) -> Dict[str, Any]:

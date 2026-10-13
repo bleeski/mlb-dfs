@@ -62,6 +62,53 @@ clean when the relaxation counts are zero.** Override all three through
 `--controls-override`, which reads them from one dict. CLAUDE.md's `## Showdown`
 section is the authority for all of this.
 
+## Keeping the bullpen (`--keep-arms`, R484)
+
+Once a side posts its 1-9, the pool keeps that side's nine and the arms DK
+names (SP, P, PLR, PO). Every other arm is `confirmed_nonstarter` and leaves.
+`--keep-arms` keeps every non-OUT arm of a posted side instead, as
+`operator_kept_arm`. It adds and removes no hitter, an unposted side is
+unchanged, and a side's starter is still the arm DK names.
+
+**When to use it.** Use it in an elimination or late-postseason game where both
+pens are rested and the field rosters relievers. ALDS G5 on 2026-10-10 is the
+shape: every win in the series went to an arm who did not start the game.
+2000_1g_sd on 2026-10-01 and that G5 build were both widened by hand. It is the
+session's S call, like a posture, and the brief records it. Leave it off on a
+regular-season slate, where it only adds cheap relievers as filler.
+
+**How a kept arm is priced** (a labeled prior; Ben chose the tiers on
+2026-10-13):
+
+| kept arm | Base |
+|---|---|
+| reliever (DK `RP`/`P`) with APPG | his APPG, already a relief appearance |
+| DK `SP` who is not today's starter | his APPG x ip/5.5 (R470's workload prior) |
+| no APPG | the declared starters' mean APPG x ip/5.5 |
+
+`ip` is 1.0 (`KEPT_ARM_EXPECTED_IP`) unless `--declare-pitcher ID=ROLE:ip=N`
+types it. Typed innings on a reliever price him off the declared starters'
+mean. `--projections` replaces any of these. Without the tiers, raw APPG put
+four rotation starters who were not starting in 5 of 10 MIN_CHC entries each.
+With them, the MIN_CHC ladder fills 26 of 84 slots with $4,000 relievers and
+rosters none of those starters. Use `:ip=3` for a known bulk arm, and
+`--projections` for an arm you expect to close.
+
+**What the ladder does with them.** A kept arm is UTIL fill on the thesis
+ladder. No template captains him, and `describe_slate` never takes him for a
+side's starter, so `pitchers_duel` locks only DK's arms. The points-max bank
+can captain him.
+
+**The record and preflight.** `pool.operator_widening` lists each kept arm
+(APPG, Base, `base_source`, ip, factor), the reference and the reliever median
+beside it. `pool.participation.arms_kept` names the same people.
+`declared_pitchers` carries each kept arm as `operator_kept_arm`, and a role
+typed with `--declare-pitcher` wins. So `preflight_upload.py` reports a
+rostered kept arm as an acknowledged WARN ("DECLARED by the build ... declared
+operator_kept_arm") rather than failing him as absent from the confirmed
+lineup, which is the exit 2 the G5 file hit on 33 slots. Classic refuses the
+flag at exit 4 (`keep_arms_not_supported_on_classic`).
+
 ## The captain leverage sleeve (R381)
 
 `--captain-sleeve '{"entries": 4, "from": ["12345", "Name|TEAM"]}'` designates

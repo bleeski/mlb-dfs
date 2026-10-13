@@ -520,8 +520,9 @@ VERIFY_CLASSIC_FAILURE_CLASS = {
 # be discovered, because "which exits does the governor not reach" is the
 # question the item makes the governor answer out loud.
 #
-# EXIT 4, TWENTY-TWO sites (run_classic:1 through leverage_unresolved,
-# run_showdown:6, main:15). R122 added two (`platoon_splits_unreadable`,
+# EXIT 4, TWENTY-THREE sites (run_classic:1 through leverage_unresolved,
+# run_showdown:6, main:16). R484 added `keep_arms_not_supported_on_classic`.
+# R122 added two (`platoon_splits_unreadable`,
 # `platoon_splits_not_supported_on_classic`). R388(b) added
 # `never_relax_not_holdable`. R382
 # added two (`captain_prior_unresolved`,
@@ -1006,7 +1007,10 @@ def _write_baseline_brief(args, salary: Path, block: Mapping[str, Any]) -> dict:
             "delivered_sha256": block.get("sha256"),
             "label": block.get("label"),
             "run_id": block.get("run_id"),
-            "declared_pitchers": parse_declared_pitchers(args.declare_pitcher),
+            # R484. A Showdown baseline can roster an arm --keep-arms kept,
+            # so it names him as the ladder's brief does; Classic sets no
+            # kept arm and this is the typed declarations exactly.
+            "declared_pitchers": brief_declared_pitchers(args),
             # R470. The typed innings, so a swap of the baseline inherits them.
             "declared_pitcher_workload": declared_pitcher_workload(args.declare_pitcher),
             # R471. The operator's note behind each declaration that has one.
@@ -6421,6 +6425,86 @@ def showdown_record_prediction(record_basis, frame, lineups, rows,
     return out
 
 
+def showdown_keep_arms(args, df) -> tuple:
+    """R484. ``(frame, pool.operator_widening)`` for the door's ``--keep-arms``.
+
+    The melt already kept the arms (``keep_arms=True``); this prices them
+    (`showdown.apply_kept_arm_prior`, with R470's typed ``:ip=N`` from
+    ``--declare-pitcher``), prints one review line per side, and stashes each
+    kept person's two ids on ``args._kept_arms`` (the ``_governor``
+    convention) so every brief that writes ``declared_pitchers`` names him.
+    Without the flag the frame is returned untouched and the block says so,
+    because "was the pool widened" has to be answerable off every brief.
+    """
+    from mlb_engine.optimize import showdown as sd
+    args._kept_arms = []
+    if not getattr(args, "keep_arms", False):
+        return df, {"applied": False, "flag": None, "kept": 0, "arms": [],
+                    "reason": "--keep-arms was not passed: a side whose nine "
+                              "is posted keeps only the arms DK names"}
+    priced = sd.apply_kept_arm_prior(
+        df, declared_pitcher_workload(getattr(args, "declare_pitcher", None)))
+    report = dict(priced.attrs.get("kept_arm_prior_report") or {})
+    args._kept_arms = [(a["cpt_id"], a["util_id"]) for a in report.get("arms") or []]
+    block = {**report, "flag": "--keep-arms",
+             "preflight": ("each kept arm is in declared_pitchers as "
+                           f"{sd.KEPT_ARM_PARTICIPATION} (a role typed with "
+                           "--declare-pitcher wins), so preflight_upload and "
+                           "verify_export acknowledge a rostered one rather "
+                           "than failing him as absent from the posted lineup")}
+    for team, n in sorted((report.get("by_team") or {}).items()):
+        priced_on = [a["name"] for a in report["arms"]
+                     if a["team"] == team and a["base_source"] != "appg_relief"]
+        print(f"keep-arms: {team} keeps {n} arm(s) its posted nine would have "
+              f"dropped; {len(priced_on)} priced on the workload prior "
+              f"({', '.join(priced_on[:6])}{' ...' if len(priced_on) > 6 else ''}), "
+              f"the rest on their relief APPG. pool.operator_widening has each "
+              f"one; --projections or --declare-pitcher ID=ROLE:ip=N overrides",
+              file=sys.stderr)
+    if not report.get("applied"):
+        print("keep-arms: no arm was kept; the flag widens only a side whose "
+              "1-9 is posted", file=sys.stderr)
+    for pid in report.get("ip_not_applied") or []:
+        print(f"keep-arms: --declare-pitcher ip= for {pid}, which is not a kept "
+              f"arm; no workload prior applied", file=sys.stderr)
+    return priced, block
+
+
+def brief_declared_pitchers(args) -> dict:
+    """R484. The brief's ``declared_pitchers``: the operator's typed
+    declarations, plus each arm ``--keep-arms`` kept (``args._kept_arms``) as
+    ``operator_kept_arm`` on his UTIL id.
+
+    A role the operator TYPED for a kept arm wins. A typed id with no role
+    (``ID`` or ``ID=:ip=1``) is the parser's ``declared_probable_sp`` default,
+    which would record a reliever as a probable starter, so it reads as kept
+    instead: the raw value is read the way `plr_declarations_without_role`
+    reads it. Without a kept arm this is `parse_declared_pitchers` exactly, on
+    every Classic path included.
+    """
+    values = getattr(args, "declare_pitcher", None)
+    declared = parse_declared_pitchers(values)
+    kept = list(getattr(args, "_kept_arms", None) or [])
+    if not kept:
+        return declared
+    from mlb_engine.optimize.showdown import KEPT_ARM_PARTICIPATION
+    typed_role = set()
+    for raw in values or []:
+        pid, _, rest = str(raw).strip().partition("=")
+        if pid.strip() and rest.partition(":")[0].strip():
+            typed_role.add(pid.strip())
+    for cpt_id, util_id in kept:
+        ids = [i for i in (cpt_id, util_id) if i]
+        if any(i in typed_role for i in ids):
+            continue
+        for pid in ids:
+            if pid in declared:
+                declared[pid] = KEPT_ARM_PARTICIPATION
+        if util_id:
+            declared[util_id] = KEPT_ARM_PARTICIPATION
+    return dict(sorted(declared.items()))
+
+
 def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[int, dict]:
     from mlb_engine.optimize import showdown as sd
     from mlb_engine.optimize import showdown_theses as st
@@ -6433,7 +6517,9 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
     feed, feed_load_note = showdown_lineups_feed(
         args, slate_dir, max_age_minutes=getattr(
             args, "feed_max_age_minutes", FEED_MAX_AGE_MINUTES))
-    df = sd.melt_showdown_salary_csv(str(salary), lineups_feed=feed)
+    df = sd.melt_showdown_salary_csv(
+        str(salary), lineups_feed=feed,
+        keep_arms=bool(getattr(args, "keep_arms", False)))
     # R208. A confirmed lineup for a side DK left blank that matches almost
     # nobody in the pool is a crosswalk failure, and CLAUDE.md lists it as
     # Ben's at any clock: the real lineup is in hand and the pool would build on
@@ -6461,6 +6547,10 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
     for rec in feed_orders.get("not_lifted") or []:
         print(f"lineups feed: {rec['team']} takes no batting order from the "
               f"feed: {rec['reason']}", file=sys.stderr)
+    # R484. Priced here, off the melt and before anything reads a Base, so the
+    # baseline, the ladder, every report and a supplied Base (which still
+    # replaces it) all see the same kept-arm prior.
+    df, sd_widening = showdown_keep_arms(args, df)
     # R291(c). Read before anything is built, so a restriction that leaves no
     # legal lineup refuses HERE with the reason, rather than surfacing as an
     # empty bank three hundred lines later. The melt's own single-team refusal
@@ -6839,8 +6929,8 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                    # one, matching `run_classic`: a refusal is read harder than
                    # a delivery, and the operator's declaration is an input to
                    # the attempt whether or not it produced a file.
-                   "declared_pitchers": parse_declared_pitchers(
-                       args.declare_pitcher),
+                   # R484. Kept arms included, like the delivered brief.
+                   "declared_pitchers": brief_declared_pitchers(args),
                    # R471. Recorded on both contest types, like the roles.
                    "declared_pitcher_evidence": declared_pitcher_evidence(
                        args.declare_pitcher)}
@@ -7314,7 +7404,15 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         # him. The flag was never the fix for the PO case here; the pool
         # dropping him was the defect, and `pool.openers_kept` on this brief is
         # where a reader sees it did not.
-        "declared_pitchers": parse_declared_pitchers(args.declare_pitcher),
+        #
+        # R484 is the one pool fact this key now carries, and only under
+        # `--keep-arms`: each arm the widening kept is listed here as
+        # `operator_kept_arm` (a role the operator typed wins), because a kept
+        # reliever on a confirmed side is absent from the posted lineup and
+        # preflight hard-failed every slot he filled on 2026-10-10 (ALDS G5,
+        # 33 slots). The typed declarations still never reach the Showdown
+        # pool; `pool.operator_widening` is the full record of the kept arms.
+        "declared_pitchers": brief_declared_pitchers(args),
         # R471. The notes ride beside the roles here too; Showdown does not
         # check them (its pool takes no declaration).
         "declared_pitcher_evidence": declared_pitcher_evidence(args.declare_pitcher),
@@ -7398,6 +7496,12 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
             # it never refuses. `applied: false` with a reason when no
             # --projections file was supplied.
             "supplied_base_sanity": sd_base_sanity,
+            # R484. `--keep-arms`: present on every Showdown brief, `applied:
+            # false` without the flag, because "was the pool widened past the
+            # posted nines, and how was each kept arm priced" has to be
+            # answerable off the delivered brief. `participation.arms_kept`
+            # names the same people from the melt's side.
+            "operator_widening": sd_widening,
         },
         "slate_clock": {
             "first_lock_utc": clock.get("first_lock_utc"),
@@ -9198,7 +9302,9 @@ def main() -> int:
                          "starter's 5.5 IP, a labeled prior); `:ip=N` sets the "
                          "expected innings for any role, capped at 5.5, and "
                          "the brief lists each arm's factor under "
-                         "declared_arm_workload. Classic only. R471: on "
+                         "declared_arm_workload. Classic only, except that "
+                         "R484's --keep-arms reads `:ip=N` for a kept Showdown "
+                         "arm. R471: on "
                          "Classic, declaring an arm DK tags Starting=PO needs "
                          ":evidence=\"...\" (what you read, e.g. his "
                          "strikeout prop against his season norm); without it "
@@ -9448,6 +9554,23 @@ def main() -> int:
                          "flat factor. Used on the thesis-ladder path only; the brief "
                          "records the path, sha256 and who took a split. A labeled "
                          "review prior, never a projection.")
+    # R484. The bullpen door for an elimination game, where the field rosters
+    # and captains relievers a posted nine would rule out of the pool.
+    ap.add_argument("--keep-arms", dest="keep_arms", action="store_true",
+                    help="Showdown only: once a side's 1-9 is posted, keep every "
+                         "non-OUT arm DK did not name (each is "
+                         "`operator_kept_arm`) instead of dropping him; no hitter "
+                         "is added or removed. A kept reliever keeps his APPG; an "
+                         "arm DK tags SP who is not starting, and an arm with no "
+                         "APPG, take one relief inning of R470's workload prior "
+                         "(ip/5.5, of his own APPG or of the declared starters' "
+                         "mean). --declare-pitcher ID=ROLE:ip=N sets a kept arm's "
+                         "innings and --projections replaces his Base. The brief "
+                         "records each kept arm under pool.operator_widening and "
+                         "in declared_pitchers, so preflight acknowledges a "
+                         "rostered one. When to use it: "
+                         "references/showdown.md. Labeled priors, never a "
+                         "projection or a probability of pitching.")
     ap.add_argument("--feed-max-age-minutes", type=float, default=FEED_MAX_AGE_MINUTES,
                     help="refetch a disk-cached lineups feed older than this "
                          "(default 90). Lineups confirm through the afternoon, so "
@@ -9722,6 +9845,23 @@ def main() -> int:
                      "(a 100% budget over one slot). A Classic roster has no "
                      "captain slot; the Classic ownership seam is --leverage. "
                      "Nothing was staged and no run directory was created."),
+        }, indent=1))
+        return 4
+
+    # R484. Same door, same class. `--keep-arms` widens the SHOWDOWN melt's
+    # participation; Classic's pool is `build_slate_pool`, which keeps an arm
+    # only on a probable or a `--declare-pitcher`, so the flag would apply
+    # nothing there and read as a widening that never happened.
+    if getattr(args, "keep_arms", False) and contest != "showdown":
+        print(json.dumps({
+            "status": "keep_arms_not_supported_on_classic",
+            "date": args.date,
+            "contest": contest,
+            "note": ("--keep-arms keeps a posted Showdown side's undeclared "
+                     "arms in the pool. A Classic pool admits an arm through "
+                     "the probables or --declare-pitcher, so nothing would "
+                     "apply it. Nothing was staged and no run directory was "
+                     "created."),
         }, indent=1))
         return 4
 

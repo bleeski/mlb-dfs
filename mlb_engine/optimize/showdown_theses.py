@@ -59,6 +59,7 @@ from mlb_engine.optimize.showdown import (
     DEFAULT_MAX_CPT_PER_CONTEST,
     DEFAULT_MAX_PLAYER_EXPOSURE_PCT,
     DEFAULT_MAX_SHARED_PLAYERS,
+    KEPT_ARM_PARTICIPATION,
     build_showdown_lineup,
     certify_showdown,
     exposure_cap_count,
@@ -666,6 +667,12 @@ def describe_slate(df: pd.DataFrame,
         # here.
         if "Is_Declared_Opener" in arms.columns:
             arms = arms[~arms["Is_Declared_Opener"].fillna(False).astype(bool)]
+        # R484. The same rule for an arm `--keep-arms` kept: rosterable, and
+        # never this side's starter. Picking by Base alone named a rotation
+        # arm who was not starting (MIN_CHC widened: Imanaga 15.6 over DK's
+        # Boyd 14.9), and `pitchers_duel` hard-locks whoever is named here.
+        if "Participation" in arms.columns:
+            arms = arms[arms["Participation"] != KEPT_ARM_PARTICIPATION]
         sp = arms.sort_values("Base", ascending=False)
         starters[team] = str(sp.iloc[0]["Player_Key"]) if len(sp) else None
         hitters = sub[sub["Batting_Order"].notna()]

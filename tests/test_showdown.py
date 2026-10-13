@@ -7128,8 +7128,8 @@ class R382CaptainPriorWiringTests(unittest.TestCase):
                         n += 1
                 counts[fn.name] = n
         total = sum(counts.values())
-        self.assertIn(f"# EXIT 4, TWENTY-TWO sites", self.src)
-        self.assertEqual(total, 22, counts)
+        self.assertIn(f"# EXIT 4, TWENTY-THREE sites", self.src)
+        self.assertEqual(total, 23, counts)
         self.assertIn(f"run_showdown:{counts['run_showdown']}, "
                       f"main:{counts['main']})", self.src)
 
@@ -10261,3 +10261,327 @@ class ShowdownRecordPredictionTests(_ShowdownExitDoorHarness, unittest.TestCase)
         self.assertNotEqual(roster["own_pct_by_player_key"], captain["own_pct_by_player_key"])
         with self.assertRaises(st.CaptainPriorError):
             st.captain_prior_by_person(df, payload, "large_field_gpp", market="classic")
+
+
+# ---------------------------------------------------------------------------
+# R484. `--keep-arms`: the Showdown door keeps the bullpen once a side posts.
+# ---------------------------------------------------------------------------
+class KeepArmsPoolTests(_ShowdownExitDoorHarness, unittest.TestCase):
+    """On a side whose 1-9 is posted, every arm DK did not tag SP/P/PLR/PO
+    was `confirmed_nonstarter` and `starters_only` dropped him, so an
+    elimination game where the field rosters relievers could be built that way
+    only by hand: 2000_1g_sd on 2026-10-01, and ALDS G5 on 2026-10-10 (ten
+    relievers through a scratch driver, then `preflight_upload` exit 2 on 33
+    reliever slots). Reproduced at 3290a28 on MIN_CHC: pool 20 of a 94-person
+    universe, 35 of the 74 dropped persons arms.
+
+    `--keep-arms` keeps every non-OUT arm of a decided side as
+    `operator_kept_arm`, never touches a hitter, prices each kept arm on a
+    labeled tiered prior (Ben, 2026-10-13), records the widening in
+    `pool.operator_widening`, and lists each kept arm in `declared_pitchers`
+    so preflight's R114 path acknowledges him. The ladder never takes a kept
+    arm for a side's starter: without that guard MIN_CHC's widened pool named
+    Imanaga (15.6, not starting) CHC's starter over Boyd (14.9, DK SP), and
+    `pitchers_duel` hard-locks whoever it names.
+    """
+
+    HEADER = ["Position", "Name + ID", "Name", "ID", "Roster Position",
+              "Salary", "Game Info", "TeamAbbrev", "AvgPointsPerGame",
+              "Status", "Starting"]
+    GAME = "AAA@BBB 09/30/2026 07:05PM ET"
+    KEPT = "operator_kept_arm"
+    # R208's helpers, borrowed rather than copied (a mixin would re-run that
+    # class's tests under this name).
+    _ARMS = ShowdownLineupMergeTests._ARMS
+    _posted = staticmethod(ShowdownLineupMergeTests._posted)
+    _blank_salary = ShowdownLineupMergeTests._salary
+    _feed = ShowdownLineupMergeTests._feed
+
+    def _rows(self, post=(), arm=(), opener=()):
+        """Per team: nine bats (posted on `post`), four bench bats, the arm DK
+        tags SP on `arm` (APPG 11), a reliever (3.0), a closer (5.0), a
+        rotation starter not starting today whose APPG (16.0) tops the real
+        starter's, a call-up with no APPG, and an IL arm."""
+        rows = [self.HEADER]
+        pid = 1000
+        for team in ("AAA", "BBB"):
+            people = [(f"{team} Bat{i + 1}", "OF", 4000, "9.0", "",
+                       str(i + 1) if team in post else "") for i in range(9)]
+            people += [(f"{team} Bench{i + 1}", "OF", 3000, "5.0", "", "")
+                       for i in range(4)]
+            people += [(f"{team} Arm", "SP", 9000, "11.0", "",
+                        "SP" if team in arm else ""),
+                       (f"{team} Reliever", "RP", 2000, "3.0", "", ""),
+                       (f"{team} Closer", "RP", 2400, "5.0", "", ""),
+                       (f"{team} Swingman", "SP", 8800, "16.0", "", ""),
+                       (f"{team} Rookie", "RP", 2000, "0", "", ""),
+                       (f"{team} Hurt", "RP", 2000, "4.0", "IL", "")]
+            if team in opener:
+                people.append((f"{team} Opener", "RP", 4000, "6.0", "", "PO"))
+            for name, pos, salary, appg, status, token in people:
+                for role, mult in (("UTIL", 1.0), ("CPT", 1.5)):
+                    rows.append([pos, f"{name} ({pid})", name, str(pid), role,
+                                 str(int(salary * mult)), self.GAME, team, appg,
+                                 status, token])
+                    pid += 1
+        return rows
+
+    def _melt(self, keep_arms=None, **kw):
+        path = self.base / "DKSalaries_keep_arms.csv"
+        with path.open("w", newline="", encoding="utf-8") as fh:
+            csv.writer(fh).writerows(self._rows(**kw))
+        if keep_arms is None:
+            return sd.melt_showdown_salary_csv(str(path))
+        return sd.melt_showdown_salary_csv(str(path), keep_arms=keep_arms)
+
+    @staticmethod
+    def _names(df, team=None):
+        sub = df if team is None else df[df["Team"] == team]
+        return set(sub["Name"])
+
+    def _row(self, df, name):
+        sub = df.loc[df["Name"] == name]
+        self.assertEqual(len(sub), 1, f"{name} is not in the pool")
+        return sub.iloc[0]
+
+    def test_a_posted_side_keeps_its_relievers_and_all_nine_hitters(self):
+        df = self._melt(keep_arms=True, post=("AAA", "BBB"), arm=("AAA", "BBB"))
+        for team in ("AAA", "BBB"):
+            names = self._names(df, team)
+            self.assertTrue({f"{team} Bat{i}" for i in range(1, 10)} <= names)
+            self.assertFalse({f"{team} Bench{i}" for i in range(1, 5)} & names,
+                             "a bench bat stays out: the flag keeps arms only")
+            for label in ("Reliever", "Closer", "Swingman", "Rookie"):
+                rec = self._row(df, f"{team} {label}")
+                self.assertEqual(rec["Participation"], self.KEPT)
+                self.assertFalse(rec["Is_Declared_Starter"])
+                self.assertFalse(rec["Projected_Candidate"])
+                self.assertEqual(rec["Pool_Basis"], "declared_starters")
+            self.assertEqual(self._row(df, f"{team} Arm")["Participation"],
+                             "confirmed_starter")
+        report = df.attrs["participation_report"]
+        self.assertEqual(report["slate_basis"], "declared_starters",
+                         "keeping arms decides nothing about a side")
+        self.assertTrue(all(s["decided"] for s in report["sides"]))
+        self.assertEqual(report["arms_kept"], sorted(
+            f"{t} {t} {label}" for t in ("AAA", "BBB")
+            for label in ("Closer", "Reliever", "Rookie", "Swingman")))
+        self.assertEqual(len(df), 2 * (9 + 1 + 4))
+
+    def test_without_the_flag_the_pool_is_unchanged(self):
+        kw = {"post": ("AAA", "BBB"), "arm": ("AAA", "BBB")}
+        default = self._melt(**kw)
+        off = self._melt(keep_arms=False, **kw)
+        pd.testing.assert_frame_equal(default, off)
+        self.assertEqual(default.attrs["participation_report"],
+                         off.attrs["participation_report"])
+        self.assertEqual(default.attrs["participation_report"]["arms_kept"], [])
+        self.assertEqual(len(default), 20)
+        on = self._melt(keep_arms=True, **kw)
+        # The flag only ADDS arms: drop them and the frame is the default one.
+        pd.testing.assert_frame_equal(
+            on[on["Participation"] != self.KEPT].reset_index(drop=True),
+            default.reset_index(drop=True))
+
+    def test_an_out_arm_is_never_kept_and_an_undecided_side_is_untouched(self):
+        df = self._melt(keep_arms=True, post=("BBB",), arm=("AAA", "BBB"))
+        report = df.attrs["participation_report"]
+        self.assertEqual(report["slate_basis"], "mixed_declared_and_projected")
+        for team in ("AAA", "BBB"):
+            self.assertNotIn(f"{team} Hurt", self._names(df))
+        # AAA posted nothing: it establishes nothing, and its arms were in the
+        # pool before the flag as `unknown`. They are not relabelled.
+        self.assertEqual(self._row(df, "AAA Reliever")["Participation"], "unknown")
+        self.assertTrue(self._row(df, "AAA Bench1")["Projected_Candidate"])
+        self.assertEqual(self._row(df, "BBB Reliever")["Participation"], self.KEPT)
+        self.assertEqual(report["arms_kept"], sorted(
+            f"BBB BBB {label}" for label in ("Closer", "Reliever", "Rookie",
+                                             "Swingman")))
+
+    def test_the_kept_arm_prior_is_tiered_and_ip_overrides_it(self):
+        df = self._melt(keep_arms=True, post=("AAA", "BBB"), arm=("AAA", "BBB"))
+        ids = {n: (str(c), str(u)) for n, c, u in
+               zip(df["Name"], df["CPT_ID"], df["UTIL_ID"])}
+        ref = 5.5   # starter reference innings (R470)
+        out = sd.apply_kept_arm_prior(df)
+        base = dict(zip(out["Name"], out["Base"]))
+        rep = out.attrs["kept_arm_prior_report"]
+        src = {a["name"]: a["base_source"] for a in rep["arms"]}
+        self.assertEqual(rep["reference_base"], 11.0,
+                         "the mean APPG of DK's two declared starters")
+        self.assertAlmostEqual(base["AAA Reliever"], 3.0)      # a relief appearance
+        self.assertEqual(src["AAA Reliever"], "appg_relief")
+        self.assertAlmostEqual(base["AAA Swingman"], 16.0 / ref)
+        self.assertEqual(src["AAA Swingman"], "starter_appg_workload_prior")
+        self.assertAlmostEqual(base["AAA Rookie"], 11.0 / ref)
+        self.assertEqual(src["AAA Rookie"], "declared_prior")
+        self.assertEqual(rep["relief_median_appg"], 4.0,
+                         "the cross-check: median APPG of the kept relievers")
+        self.assertAlmostEqual(base["AAA Arm"], 11.0, msg="a DK starter is untouched")
+        self.assertAlmostEqual(base["AAA Bat1"], 9.0, msg="a hitter is untouched")
+        self.assertEqual(rep["kept"], 8)
+        # Typed innings (R470's grammar), on either of a person's two ids.
+        typed = {ids["AAA Swingman"][1]: 3.0, ids["AAA Reliever"][0]: 2.0,
+                 ids["AAA Closer"][1]: 9.0, ids["AAA Arm"][1]: 2.0}
+        out = sd.apply_kept_arm_prior(df, typed)
+        base = dict(zip(out["Name"], out["Base"]))
+        rep = out.attrs["kept_arm_prior_report"]
+        self.assertAlmostEqual(base["AAA Swingman"], 16.0 * 3.0 / ref)
+        self.assertAlmostEqual(base["AAA Reliever"], 11.0 * 2.0 / ref,
+                               msg="typed innings price him off the reference")
+        self.assertAlmostEqual(base["AAA Closer"], 11.0,
+                               msg="the factor is capped at 1.0 (R470)")
+        self.assertAlmostEqual(base["AAA Arm"], 11.0)
+        self.assertEqual(rep["ip_not_applied"], [ids["AAA Arm"][1]],
+                         "typed innings for an arm the flag did not keep are named")
+
+    def test_the_ladder_never_takes_a_kept_arm_for_a_sides_starter(self):
+        df = sd.apply_kept_arm_prior(
+            self._melt(keep_arms=True, post=("AAA", "BBB"), arm=("AAA", "BBB")))
+        # Before the prior too: the guard is on participation, not on price.
+        raw = self._melt(keep_arms=True, post=("AAA", "BBB"), arm=("AAA", "BBB"))
+        for frame in (raw, df):
+            shape = st.describe_slate(frame)
+            self.assertEqual(shape["starters"], {"AAA": "AAA Arm|AAA",
+                                                 "BBB": "BBB Arm|BBB"})
+            self.assertEqual(shape["bullpen_teams"], [])
+        # A side whose only DK arm is an opener stays a bullpen game.
+        pen = self._melt(keep_arms=True, post=("AAA", "BBB"), arm=("BBB",),
+                         opener=("AAA",))
+        shape = st.describe_slate(pen)
+        self.assertIsNone(shape["starters"]["AAA"])
+        self.assertEqual(shape["bullpen_teams"], ["AAA"])
+
+    def test_a_feed_lifted_side_keeps_its_relievers_and_the_lift_rule_holds(self):
+        """R208's carry-over: the widening runs after the lift, so it neither
+        turns a lifted side's arms back into nonstarters nor counts a kept arm
+        as a DK declaration for the lift."""
+        lifted = sd.melt_showdown_salary_csv(
+            str(self._blank_salary()), lineups_feed=self._feed(), keep_arms=True)
+        report = lifted.attrs["participation_report"]
+        self.assertEqual(report["feed_orders"]["lifted"], ["CHC", "MIN"])
+        kept = lifted[lifted["Participation"] == self.KEPT]
+        self.assertEqual(set(kept["Team"]), {"CHC", "MIN"})
+        self.assertIn("Shota Imanaga", set(kept["Name"]))
+        self.assertEqual(report["slate_basis"], "declared_starters")
+        no_arm = sd.melt_showdown_salary_csv(
+            str(self._blank_salary(name="DKSalaries_no_arm.csv", drop_arm="CHC")),
+            lineups_feed=self._feed(), keep_arms=True)
+        orders = no_arm.attrs["participation_report"]["feed_orders"]
+        self.assertEqual(orders["lifted"], ["MIN"])
+        self.assertIn("CHC", {s["team"] for s in orders["not_lifted"]})
+        self.assertFalse((no_arm.loc[no_arm["Team"] == "CHC", "Participation"]
+                          == self.KEPT).any(),
+                         "an undecided side's arms stay `unknown`")
+
+    def test_the_brief_records_the_widening_and_each_kept_arm(self):
+        rows = self._salary_rows()
+        by_name = collections.defaultdict(dict)
+        for pid, row in rows.items():
+            by_name[row["Name"]][row["Roster Position"]] = pid
+        rea, kelly = by_name["Colin Rea"], by_name["Antoine Kelly"]
+        r = self._build(self._root("on"), args_extra={
+            "keep_arms": True,
+            "declare_pitcher": [f"{rea['UTIL']}=viable_bulk_or_alt_sp:ip=3",
+                                f"{kelly['CPT']}=:ip=2"]})
+        self.assertEqual(r.code, 0, r.err[-3000:])
+        block = r.brief["pool"]["operator_widening"]
+        self.assertTrue(block["applied"])
+        self.assertEqual(block["flag"], "--keep-arms")
+        self.assertEqual(block["kept"], 35)
+        arms = {a["name"]: a for a in block["arms"]}
+        self.assertEqual(arms["Colin Rea"]["ip"], 3.0)
+        self.assertEqual(arms["Antoine Kelly"]["base_source"], "declared_prior")
+        self.assertEqual(arms["Joe Ryan"]["base_source"], "starter_appg_workload_prior")
+        declared = r.brief["declared_pitchers"]
+        self.assertEqual(declared[rea["UTIL"]], "viable_bulk_or_alt_sp",
+                         "a role the operator typed wins")
+        self.assertEqual(declared[kelly["CPT"]], self.KEPT,
+                         "`ID=:ip=2` typed no role, so he is not recorded as the "
+                         "parser's default `declared_probable_sp`")
+        self.assertEqual(declared[by_name["Joe Ryan"]["UTIL"]], self.KEPT)
+        self.assertNotIn(by_name["Taj Bradley"]["UTIL"], declared)
+        self.assertIn("keep-arms:", r.err)
+        # The priced frame is the one the solver used: at raw APPG the four
+        # rotation starters who were not starting rode 5 of 10 points-max
+        # entries each (Session 153's measurement); on the prior none is in
+        # either delivered file.
+        off_day = {by_name[n][role] for n in ("Joe Ryan", "Shota Imanaga",
+                                               "Zebby Matthews", "Bailey Ober")
+                   for role in ("CPT", "UTIL")}
+        files = self._file_lines(r.err)
+        self.assertEqual(len(files), 2, files)
+        for line in files:
+            cells = {c for row in self._entry_rows(self._path_of(line))
+                     for c in row["cells"]}
+            self.assertFalse(cells & off_day, line)
+        off = self._build(self._root("off"))
+        self.assertEqual(off.code, 0, off.err[-3000:])
+        self.assertFalse(off.brief["pool"]["operator_widening"]["applied"])
+        self.assertEqual(off.brief["declared_pitchers"], {})
+        self.assertEqual(off.brief["pool"]["participation"]["arms_kept"], [])
+
+    def test_a_kept_arm_passes_preflight_through_the_brief(self):
+        """The G5 shape end to end: a rostered reliever on a confirmed side
+        fails preflight as absent unless the brief names him."""
+        rows = self._salary_rows()
+        morris = {r["Roster Position"]: pid for pid, r in rows.items()
+                  if r["Name"] == "Andrew Morris"}
+        proj = self.base / "proj.csv"
+        proj.write_text(f"Player_ID,Base\n{morris['UTIL']},30\n{morris['CPT']},30\n",
+                        encoding="utf-8")
+        r = self._build(self._root(), args_extra={"keep_arms": True,
+                                                  "projections": str(proj)})
+        self.assertEqual(r.code, 0, r.err[-3000:])
+        # The harness stands in for `main()`, which is what writes the
+        # ladder's brief; write it the way `main()` does. The baseline's brief
+        # is written inside `run_showdown` and needs no help.
+        outputs = r.root / "outputs" / self._DATE
+        r.mod.write_brief_files(r.brief, brief_arg=None, outputs_dir=outputs,
+                                suffix="_showdown", tag="keep_arms")
+        files = self._file_lines(r.err)
+        self.assertEqual(len(files), 2, files)
+        for path in (self._path_of(files[0]), self._path_of(files[-1])):
+            cells = {c for row in self._entry_rows(path) for c in row["cells"]}
+            self.assertTrue(cells & set(morris.values()), "Morris is rostered")
+            code, report = self._preflight(path, r.salary, r.root)
+            self.assertEqual(code, 0, report)
+            acknowledged = report["info"]["feed_acknowledged_pitchers"]
+            self.assertEqual(acknowledged["Andrew Morris (MIN)"]["role"], self.KEPT)
+        # The counterfactual: the same file against a brief that does not name
+        # him is the 2026-10-10 exit 2.
+        stripped = json.loads(json.dumps(r.brief))
+        stripped["declared_pitchers"] = {}
+        bare = self.base / "brief_without_kept_arms.json"
+        bare.write_text(json.dumps(stripped), encoding="utf-8")
+        from tools import preflight_upload
+        out = io.StringIO()
+        with unittest.mock.patch.object(preflight_upload, "REPO_ROOT", r.root), \
+                contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+            code = preflight_upload.main([
+                "--entries", str(self._path_of(files[-1])), "--salary", str(r.salary),
+                "--brief", str(bare), "--json", "--as-of", self._AS_OF])
+        self.assertEqual(code, 2, out.getvalue()[-2000:])
+        self.assertIn("absent from a confirmed posted lineup", out.getvalue())
+
+    def test_a_classic_build_refuses_the_flag_before_anything_is_staged(self):
+        mod = self._module()
+        root = self._root()
+        sal, ent = root / "DKSalaries.csv", root / "DKEntries.csv"
+        shutil.copy2(SAL, sal)
+        shutil.copy2(ENT, ent)
+        argv = ["build_slate.py", "--date", self._DATE, "--salary", str(sal),
+                "--entries", str(ent), "--keep-arms"]
+        out = io.StringIO()
+        with unittest.mock.patch.object(sys, "argv", argv), \
+                unittest.mock.patch.object(mod, "detect_contest_type",
+                                           lambda *_a, **_k: "classic"), \
+                unittest.mock.patch.object(mod, "REPO", root), \
+                contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+            code = mod.main()
+        self.assertEqual(4, code)
+        self.assertEqual("keep_arms_not_supported_on_classic",
+                         json.loads(out.getvalue())["status"])
+        self.assertEqual(["DKEntries.csv", "DKSalaries.csv"],
+                         sorted(p.name for p in root.iterdir()),
+                         "nothing was staged and no run directory was created")
