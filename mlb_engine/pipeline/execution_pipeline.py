@@ -2162,6 +2162,15 @@ MID_BREADTH_RANGE = (0.10, 0.22)
 # The band Ben sized. The quota lands inside it; it is never set outside it.
 MID_BREADTH_QUOTA_BAND = (0.15, 0.25)
 
+# R483, 2026-10-13. Each floor key the shape bands declare, paired with the map
+# the merge carries it in when R34's unanimity rule leaves it out of the
+# portfolio scalar: a band binds the entries of the contests that declared it,
+# and a mixed entered set no longer retires it for everyone.
+SHAPE_BAND_CONTEST_MAPS = (
+    ("primary_stack_min_size", "primary_stack_min_size_by_contest"),
+    ("min_five_stack_share_pct", "min_five_stack_share_pct_by_contest"),
+)
+
 # How the quota reads the field. `MID_BREADTH_QUOTA_SHARE_RATIO` is the fraction
 # of the shape's CURRENT field share we ask for, clamped into the band above.
 #
@@ -2374,11 +2383,16 @@ def resolve_shape_bands(
     floor entirely if any posture is silent, because ONE portfolio serves every
     contest and forcing a narrow-breadth contest's floor onto a broad-payout one
     is a strategy change for that contest made invisibly. Routing per contest and
-    then merging by that rule means a mixed entered set lands back on the stage-1
-    floor of 4 automatically. Floor 5 binds only when EVERY contest in the set is
-    narrow-breadth; the quota binds only when every contest is mid-breadth. That
-    is the conservative direction and it is not a coincidence -- it is the reason
-    the routing goes here rather than into a posture default.
+    then merging by that rule means the PORTFOLIO scalar lands back on the
+    stage-1 floor of 4 on a mixed set: floor 5 binds every entry only when EVERY
+    contest is narrow-breadth, the quota only when every contest is mid-breadth.
+
+    R483, 2026-10-13: and on a mixed set the band no longer retires. The merge
+    carries what the scalar dropped in `primary_stack_min_size_by_contest` and
+    `min_five_stack_share_pct_by_contest`, and the allocator binds each on the
+    entries of the contests that declared it. The contest that never asked
+    still gets nothing, which is the property the paragraph above protects.
+    `shape_band_application` says which contests carried which band.
     """
     breadth_by_shape = _payout_breadth_by_shape_from_csv(archetypes_path)
     bucket = slate_size_bucket(game_count)
@@ -2443,8 +2457,10 @@ def resolve_shape_bands(
         "contests": rows,
         "narrow_breadth_contests": len(narrow_rows),
         "mid_breadth_contests": len(mid_rows),
-        # What the merge will actually do, stated here so the checkpoint does not
-        # require re-deriving R34's unanimity rule by hand.
+        # Whether the merge's PORTFOLIO scalar carries each band, stated here so
+        # the checkpoint does not require re-deriving R34's unanimity rule by
+        # hand. False on a mixed set; since R483 the band then binds per contest,
+        # and `application` (set by run_slate after the merge) names where.
         "floor_5_binds_portfolio": bool(rows) and all(
             r["primary_stack_min_size_declared"] == NARROW_BREADTH_PRIMARY_STACK_FLOOR
             for r in rows),
@@ -2452,6 +2468,105 @@ def resolve_shape_bands(
             r["min_five_stack_share_pct_declared"] is not None for r in rows),
     }
 
+
+
+def shape_band_application(
+    shape_bands: Optional[Mapping[str, Any]],
+    controls: Optional[Mapping[str, Any]],
+    allocation: Optional[Mapping[str, Any]] = None,
+    provenance: Optional[Mapping[str, Any]] = None,
+) -> Dict[str, Any]:
+    """R483. Which contests CARRY each R37(2) band once the merge, the slate
+    floors and any override have run; with ``allocation``, what the delivered
+    set holds against it.
+
+    Pure: a function of the bands' rows, the merged controls and the
+    allocator's two blocks, so the checkpoint and the brief call it on the same
+    inputs and cannot disagree. ``scope`` is ``portfolio`` (the scalar carries
+    the band to every entry), ``contests`` (the `_by_contest` map carries it to
+    the contests that declared it) or ``none``. A contest that declared a band
+    and does not carry it is named under ``not_carried`` with the reason.
+    ``provenance`` (the merge's `provenance_out`, or the brief's
+    `control_provenance.by_control`) only sharpens that reason.
+    """
+    rows = list((shape_bands or {}).get("contests") or [])
+    ctl = dict(controls or {})
+    prov = dict(provenance or {})
+    every = sorted(str(r.get("contest_id")) for r in rows)
+    out: Dict[str, Any] = {
+        "label": "R483 SHAPE BAND APPLICATION -- deterministic construction "
+                 "controls over labeled priors; never a win rate, cash rate, or "
+                 "probability claim",
+        "rule": "a band binds the entries of the contests that declared it; on a "
+                "unanimous set that is every entry, through the portfolio scalar",
+    }
+    for band, (key, map_key), declared_key in (
+            ("floor_5", SHAPE_BAND_CONTEST_MAPS[0], "primary_stack_min_size_declared"),
+            ("quota", SHAPE_BAND_CONTEST_MAPS[1], "min_five_stack_share_pct_declared")):
+        declared = sorted(str(r.get("contest_id")) for r in rows
+                          if r.get(declared_key) is not None)
+        cmap = {str(c): v for c, v in dict(ctl.get(map_key) or {}).items()}
+        try:
+            if band == "floor_5":
+                on_portfolio = (int(ctl.get(key) or 0)
+                                >= NARROW_BREADTH_PRIMARY_STACK_FLOOR)
+                on_map = sorted(c for c, v in cmap.items()
+                                if int(v or 0) >= NARROW_BREADTH_PRIMARY_STACK_FLOOR)
+            else:
+                on_portfolio = float(ctl.get(key) or 0.0) > 0.0
+                on_map = sorted(c for c, v in cmap.items() if float(v or 0.0) > 0.0)
+        except (TypeError, ValueError):
+            on_portfolio, on_map = False, []
+        carried = every if on_portfolio else on_map
+        source = prov.get(key)
+        source = (source.get("provenance") if isinstance(source, Mapping)
+                  else source) or ""
+        reason = (f"a typed --controls-override of {key} set it for every entry "
+                  f"(the escape)" if str(source).startswith("operator") else
+                  "the merged controls carry no value for this contest: a slate "
+                  "feasibility floor lowered it to 0")
+        entry: Dict[str, Any] = {
+            "scope": ("portfolio" if on_portfolio else
+                      ("contests" if on_map else "none")),
+            "value": ctl.get(key) if on_portfolio else ({c: cmap[c] for c in on_map}
+                                                         or None),
+            "declared_by": declared,
+            "carried_by": carried,
+            "not_carried": {cid: reason for cid in declared if cid not in carried},
+        }
+        if allocation is not None:
+            if band == "floor_5":
+                blk = dict(allocation.get("primary_stack_floor") or {})
+                entry["realized"] = ({
+                    cid: {"status": row.get("status"),
+                          "assigned_below_requested": row.get("assigned_below_requested")}
+                    for cid, row in dict(blk.get("by_contest") or {}).items()}
+                    if entry["scope"] == "contests" else
+                    {k: blk.get(k) for k in ("status", "applied",
+                                             "assigned_below_requested", "relaxations")}
+                    if blk else None)
+            else:
+                blk = dict(allocation.get("five_stack_quota") or {})
+                entry["realized"] = ({k: blk.get(k) for k in (
+                    "status", "scope", "scope_entries", "applied_share", "applied_need",
+                    "assigned_qualifying", "need_met", "relaxations")} if blk else None)
+        out[band] = entry
+    return out
+
+
+def shape_bands_brief_block(result: Optional[Mapping[str, Any]]) -> Optional[Dict[str, Any]]:
+    """R483. The build brief's `shape_bands` block: the checkpoint's per-contest
+    rows plus `shape_band_application` realized against this result's
+    allocation. None when the result carries no bands (a refusal before the
+    merge), so absence is visible rather than an empty block (R237)."""
+    bands = ((result or {}).get("checkpoint_plan") or {}).get("shape_bands")
+    if not isinstance(bands, Mapping):
+        return None
+    out = {k: v for k, v in bands.items() if k != "application"}
+    out["application"] = shape_band_application(
+        bands, (result or {}).get("merged_controls"), allocation=result,
+        provenance=((result or {}).get("control_provenance") or {}).get("by_control"))
+    return out
 
 #: The stack floor BOTH bank builders default to, named once here so the
 #: derivation below cannot drift from them silently. R340: the defaults live in
@@ -2490,7 +2605,9 @@ def resolve_bank_stack_request(
     directly, which matters: R34's floor merge already applied unanimity (floor 5
     binds only when EVERY contest is narrow-breadth, the quota only when every
     contest is mid-breadth) and reading the bands again here would be a second
-    copy of that rule that can disagree with the first.
+    copy of that rule that can disagree with the first. R483: on a mixed set
+    the merge carries the dropped bands in the two `_by_contest` maps, and this
+    reads those too, so a satellite among GPPs asks the bank for fives.
 
     ``sizes`` is what a builder with ONE size per call (``extend_bank``) asks
     for, in priority order, and it holds BOTH sizes whenever a five is wanted --
@@ -2517,6 +2634,17 @@ def resolve_bank_stack_request(
                         NARROW_BREADTH_PRIMARY_STACK_FLOOR)
     except (TypeError, ValueError):
         five_size = NARROW_BREADTH_PRIMARY_STACK_FLOOR
+    # R483. The per-contest bands the merge carried beside the scalars.
+    floor_map: Dict[str, int] = {}
+    quota_map: Dict[str, float] = {}
+    try:
+        floor_map = {str(c): int(v) for c, v in
+                     dict(merged.get("primary_stack_min_size_by_contest") or {}).items()}
+        quota_map = {str(c): float(v) for c, v in
+                     dict(merged.get("min_five_stack_share_pct_by_contest") or {}).items()
+                     if float(v or 0.0) > 0.0}
+    except (TypeError, ValueError):
+        floor_map, quota_map = {}, {}
 
     if floor >= five_size:
         # Every contest in the entered set asked for the floor, so every
@@ -2529,10 +2657,26 @@ def resolve_bank_stack_request(
         target = quota
         reason = (f"min_five_stack_share_pct {quota} over stacks of "
                   f"{five_size}: that share of the entered set needs one")
+    elif any(v >= five_size for v in floor_map.values()):
+        # R483. A mixed set: the narrow contests' entries each need a five.
+        # The controls carry no entry counts, so this asks as the portfolio
+        # floor does and the doors' budget clamp keeps the fours unstarved.
+        target = 1.0
+        reason = (f"primary_stack_min_size_by_contest: "
+                  f"{', '.join(sorted(c for c, v in floor_map.items() if v >= five_size))} "
+                  f"need a stack of {five_size} on every entry they hold")
+    elif quota_map:
+        # R483. A mixed set: the asking contests' quota, at the share the
+        # allocator enforces (the least demanding among them).
+        target = min(quota_map.values())
+        reason = (f"min_five_stack_share_pct_by_contest {target} over stacks of "
+                  f"{five_size}: that share of {', '.join(sorted(quota_map))}' "
+                  f"entries needs one")
     else:
         target = 0.0
         reason = ("neither primary_stack_min_size nor min_five_stack_share_pct "
-                  "asks for a stack above the bank default")
+                  "asks for a stack above the bank default, on the portfolio or "
+                  "on any contest")
 
     wants_five = target > 0.0
     return {
@@ -4806,6 +4950,16 @@ def _merged_controls_for_build(
     _fraction_control_dict_keys = ("max_game_exposure_pct_by_game",)
     coerced_override: Dict[str, Any] = dict(override or {})
     for key, value in list(coerced_override.items()):
+        # R483. The per-contest band maps are DERIVED here from the postures and
+        # the bands, never typed: the escape is the scalar, which applies to
+        # every entry and retires the map. Refused by name, so a typed map is
+        # never half-honoured.
+        for scalar_key, map_key in SHAPE_BAND_CONTEST_MAPS:
+            if key == map_key:
+                raise ValueError(
+                    f"{map_key} is derived from the contests' shape bands and is "
+                    f"not an override; type {scalar_key} to set it for every "
+                    f"entry, or set it to 0 to turn the band off (R483)")
         if value is None:
             continue
         if key == CONSENSUS_PAIR_SEAT_CONTROL:
@@ -4831,8 +4985,15 @@ def _merged_controls_for_build(
     # R37 adds `primary_stack_min_size` to the same rule for the same reason.
     # Every posture declares it today, so the unanimity branch below returns 4
     # and the merge is a no-op; the rule still has to hold, because a posture
-    # that stops declaring it must retire the floor for the whole portfolio
-    # rather than inherit one it never asked for.
+    # that stops declaring it must not inherit a floor it never asked for.
+    #
+    # R483, 2026-10-13. Unanimity decides the PORTFOLIO scalar and nothing
+    # else. It used to decide the band too, so a mixed entered set (one
+    # satellite among GPPs: 1840_5g, three narrow and two mid contests, built
+    # with neither band) retired both for everyone. A contest whose declared
+    # floor exceeds the scalar now carries it in `<key>_by_contest`, and the
+    # allocator binds it on that contest's entries alone, which is what the
+    # rule above was protecting: the contest that never asked gets nothing.
     #
     # R37(2)(a)+(b), Ben's dated decision of 2026-08-28. The two live bands enter
     # HERE, as a per-contest DECLARED value layered over the posture default, so
@@ -4912,6 +5073,19 @@ def _merged_controls_for_build(
         # print a floor of 4.0 hitters.
         if key == "primary_stack_min_size":
             merged[key] = int(merged[key])
+    # R483. What the scalar did not carry, per contest. A unanimous set adds no
+    # key at all (every declared value equals the scalar), so its controls are
+    # byte-identical to the pre-R483 merge.
+    for key, map_key in SHAPE_BAND_CONTEST_MAPS:
+        portfolio_value = float(merged.get(key) or 0.0)
+        asked: Dict[str, Any] = {}
+        for cid, contest_controls in zip(posture_by_contest, declared):
+            value = contest_controls.get(key)
+            if value is not None and float(value or 0.0) > portfolio_value:
+                asked[str(cid)] = (int(value) if key == "primary_stack_min_size"
+                                   else float(value))
+        if asked:
+            merged[map_key] = dict(sorted(asked.items()))
 
     # R388(b). Everything so far is what the contests' postures (and their
     # shape bands, a declared value layered over the posture) asked for. The
@@ -4944,12 +5118,30 @@ def _merged_controls_for_build(
             merged[key] = max(int(merged[key]), int(floor_val))
         if merged[key] != before_floor:
             prov[key] = _gc.PROV_DERIVED_FLOOR
+    # R483. The per-contest quota is floored by the slate ceiling its scalar
+    # gets (R34's preventive rung), by the same rule: relaxing a lower bound
+    # means lowering it.
+    _quota_ceiling = (feasibility_floors or {}).get("min_five_stack_share_pct")
+    _quota_map = merged.get("min_five_stack_share_pct_by_contest")
+    if (_quota_ceiling is not None and _quota_map
+            and "min_five_stack_share_pct" not in holding):
+        floored = {cid: max(0.0, min(float(v), float(_quota_ceiling)))
+                   for cid, v in _quota_map.items()}
+        if floored != _quota_map:
+            merged["min_five_stack_share_pct_by_contest"] = floored
+            prov["min_five_stack_share_pct_by_contest"] = _gc.PROV_DERIVED_FLOOR
     # R215(c). The COERCED override, not the raw one: validating a copy and
     # storing the original is a gate that looks and then lets the value past.
     merged.update(coerced_override)
     # R388(b): a typed cap alone is relaxable (audit §2).
     for key in coerced_override:
         prov[key] = (override_provenance or {}).get(key) or _gc.PROV_OPERATOR_RELAXABLE
+    # R483. The escape: a typed scalar is the operator's answer for EVERY
+    # entry, so the per-contest map it would otherwise sit beside is retired.
+    for scalar_key, map_key in SHAPE_BAND_CONTEST_MAPS:
+        if scalar_key in coerced_override:
+            merged.pop(map_key, None)
+            prov.pop(map_key, None)
     # Never-relax reaches the game scalar before the per-game expansion reads
     # its provenance, so every game the held scalar sets reads held too.
     if "max_game_exposure_pct" in holding and "max_game_exposure_pct" in merged:
@@ -7246,6 +7438,10 @@ def run_slate(
         never_relax=never_relax, provenance_out=provenance,
         override_provenance=moved_provenance,
     )
+    # R483. Which contests carry which band once the merge, the floors and any
+    # override have run, on the checkpoint a reviewer reads before approving.
+    checkpoint["shape_bands"]["application"] = shape_band_application(
+        shape_bands, controls, provenance=provenance)
     # Re-derived from the merged controls rather than carried out of the merge:
     # same pure function, same three inputs, so the record and the enforced dict
     # cannot disagree (CC-1's pattern).

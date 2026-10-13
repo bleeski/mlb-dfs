@@ -2,6 +2,104 @@
 
 What changed in the engine, the tools and the contracts, when, and why.
 
+## 2026-10-13 — R483: the five-stack floor and quota bands bind per contest on a mixed entered set, and the checkpoint names which contests carried which band (roadmap Session 152)
+
+**Scope.**
+- `mlb_engine/pipeline/execution_pipeline.py`: `SHAPE_BAND_CONTEST_MAPS`, new. In `_merged_controls_for_build`:
+  - the two `_by_contest` maps are derived after the R34 floor merge;
+  - the quota map is floored by the scalar's slate ceiling;
+  - a typed scalar retires its map, and a typed map is refused by name;
+  - the R34 comment is rewritten.
+  
+  Elsewhere in the file: `resolve_bank_stack_request` reads both maps. `shape_band_application` and `shape_bands_brief_block` are new. `run_slate` writes `checkpoint["shape_bands"]["application"]`. `resolve_shape_bands`'s docstring and its `*_binds_portfolio` comment are updated.
+- `mlb_engine/allocate/contest_allocator.py`:
+  - `_resolve_contest_stack_floors` and `_floor_report_with_contests` are new.
+  - In `select_and_assign_entries`: the contest-floor mask after the portfolio floor's; the quota's scope; the floor slot's re-entry, one guarded call site for the contest step and the portfolio rungs; the delivered and refused floor and quota blocks; the contest-floor warning.
+  - `LADDER_RELAXED_CONTROLS` gains both map keys.
+- `mlb_engine/pipeline/deadline_governor.py`: `NEVER_RELAX_NOT_HONOURED` gains both map keys with the reason.
+- `tests/test_core.py`: `ShapeBandsMixedSetTests`, new (+6). Two `ShapeBandRoutingTests` are renamed with their assertions unchanged (`test_the_portfolio_floor_5_binds_only_when_every_contest_is_narrow`, `test_the_portfolio_quota_retires_when_any_contest_is_outside_the_mid_band`).
+- `tools/audit.py`: `test_core` pin 2475 -> 2481.
+- Not touched: the optimizer, the bank builders, certification, the export validator (it checks no floor or quota), `tools/late_swap.py` (its merge and bank request pick both maps up unchanged at the call), `mlb_engine/production/` (stage 0 reads its own `ProductionControls`, not the merge).
+
+**What was wrong, reproduced at b29468e before any edit.**
+- **The setup.** A `wta_satellite` contest on `wta_ticket_satellite` (narrow, 0.002) plus a `large_gpp` contest on `large_field_gpp` (mid, 0.12), 4 games.
+- **The rows declared both bands.** `resolve_shape_bands` gave the satellite floor 5 and the GPP quota 0.159.
+- **The merge dropped both.** `_merged_controls_for_build` (EP:4898-4914 at HEAD, where the row said EP:2408-2411) returned floor 4 and quota 0.0. The rule is `min(vals) if len(vals) == len(declared) else 0.0`, applied to a satellite that declares 0.0 and a GPP that declares 0.159.
+- **The bank was never asked.** `resolve_bank_stack_request` said `wants_five: False, sizes [4]`.
+- **The allocator followed.** It put 4-stacks on both satellite entries and emitted no quota block.
+- **Not reported in the brief.** `checkpoint['shape_bands']` (EP:7226, not EP:6745) already said both bands were inert, through `floor_5_binds_portfolio` and `quota_binds_portfolio`. That never reached the build brief, which carries no band, floor or quota key.
+
+**What shipped.**
+- **The rule.** A band binds the entries of the contests that declared it. Unanimity still decides the PORTFOLIO scalar, so a unanimous set adds no key and its controls are byte-identical to before.
+  - On a mixed set, a contest whose declared floor exceeds the scalar carries it in `primary_stack_min_size_by_contest`.
+  - A contest whose declared quota exceeds the scalar carries it in `min_five_stack_share_pct_by_contest`.
+  - The contest that never asked gets nothing, which is the property R34's unanimity protected.
+- **The floor, per contest.** The allocator masks those contests' entries to stacks at the floor, after the portfolio floor's mask and before the prefilter.
+  - A contest the bank starves is relaxed off before the solve, counted, and the step carries R340's bank verdict.
+  - On a proven infeasibility, the contest floors step off first, in one counted step (`proven_infeasible_with_contest_floor`), and then the portfolio floor's rungs. The newer, thinner-evidenced control relaxes first, the quota's own rule.
+  - The state rides `_floor_state` and the call site stays single, so the recursive-call pin (7) and the guarded-If pin (7) hold.
+  - `primary_stack_floor.by_contest` carries each contest's row and `assigned_below_requested`. `relaxations` is the total; `contest_relaxations` is the per-contest share of it.
+- **The quota, scoped.** One row over the asking contests' entries, pooled, at the least demanding share among them (R34's rule restricted to the asking contests), on the quota's own ladder.
+  - `five_stack_quota` gains `scope` (`portfolio` or `contests`), `contests`, `share_by_contest`, `scope_entries` and `assigned_qualifying_by_contest`.
+  - `assigned_qualifying` and `need_met` count only the scoped rows, so a satellite's fives never read as a GPP's quota met.
+- **The bank.** `resolve_bank_stack_request` asks for `[5, 4]` off either map: target 1.0 for a floor map (the portfolio floor's ask), and the enforced share for a quota map. All four doors (sliced, direct, plan leg, late swap) read it with no caller edit.
+- **The escape.** A typed `min_five_stack_share_pct` or `primary_stack_min_size` is the operator's answer for every entry and retires its map; 0 turns the band off. A typed `_by_contest` map is refused by name: the maps are derived, so the zero-cost units gate in `build_slate.py` and its pinned key tuple do not move. `--never-relax` on either map is refused with the ladder reason, where before it read "not a control this engine knows".
+- **The report.** `shape_band_application(shape_bands, controls, allocation=None, provenance=None)` is pure. For each band it gives:
+  - `scope` (`portfolio`, `contests` or `none`), `value`, `declared_by` and `carried_by`;
+  - `not_carried`, with the reason (the typed-override escape, or a slate floor at 0);
+  - with an allocation, `realized`.
+  
+  `run_slate` writes it to `checkpoint["shape_bands"]["application"]`, which the approve=False review reads. `shape_bands_brief_block(result)` composes the brief's block from a run result.
+
+**The R233 class: every reader of the two scalars that decides where a band applies.** `grep -rn 'get("primary_stack_min_size"\|get("min_five_stack_share_pct"\|\["primary_stack_min_size"\]\|\["min_five_stack_share_pct"\]\|controls.primary_stack_min_size' --include=*.py mlb_engine tools skills`, 19 hits:
+- **EP:2625, 2629** `resolve_bank_stack_request`: reads the maps too (above).
+- **EP:5026-5044** `_declared_controls`: the per-contest band layering the maps are derived from. Unchanged.
+- **EP:5124** the floor merge's int cast. Unchanged.
+- **EP:5255** `feasibility_floors_from`'s quota ceiling. The merge now applies it to the map too.
+- **CA:3243, 3367, 3383, 3393**, the two resolvers: their scalar input is the scoped share on a contest-scoped quota. Unchanged.
+- **CA:4399** the new scope check.
+- **CA:1859** `_resolve_classic_sleeves`'s tail token reads the PORTFOLIO floor only, kept: a sleeve seat on a narrow entry with no five relaxes that contest's floor, counted (named below).
+- **production/optimizer.py:387, 394, 483, 503 and production/referee.py:88**: R302's stage 0 reads `ProductionControls.primary_stack_min_size`, its own contract and not the merge; not the build path, kept.
+
+**Named, not fixed.**
+- **The sleeves run first.** The sleeve mask runs before both floors, so a narrow entry seated in a sleeve whose candidates hold no five relaxes its contest's floor (counted, named in the warning). The unanimous scalar floor has had this failure mode since R406; this change localizes it to one contest.
+- **The bank request is coarse.** The controls carry no entry counts. A floor map on 2 of 20 entries asks for target 1.0, which the doors clamp to 0.75. A quota map whose need floors to 0 still asks at the 0.25 clamp. Both are search effort, never legality.
+- **A late swap inherits R61's class.** The contest-scoped quota counts over the entries in the solve (E), not `total`, so a swap ignores untouched rows that already carry fives. The portfolio quota has the same asymmetry today.
+
+**Corrections to the filed premise.**
+- **The incident slate.** The fragment (only on `ben/reference-refresh-2026-09-22`, 2006c74) measured 1840_5g on 2026-09-15 (5 contests, 8 entries, 3 narrow and 2 mid), not 1310_4g.
+- **The goldens.** "Golden sets are unanimous" is half false:
+  - The loose golden is unanimous (two `satellite` contests and one `large_field_gpp` contest, all mid).
+  - The production golden is MIXED: two `large_wta` contests (narrow) and one `large_field_gpp` contest (mid).
+  - It stays unmoved anyway, shown on the run result rather than argued: 2026-06-03 is two games (BAL@BOS, SD@PHI), so the narrow floor is exempt and the floor map is absent. The quota map is `{191047506: 0.15}`, and 4 entries x 0.15 floors to need 0, so `five_stack_quota` reads `status off, scope contests, scope_entries 4, applied_need 0`.
+  - Every golden solve passes `candidates_override`, so the bank request flipping to `wants_five` reaches no bank.
+
+**Tests.** `ShapeBandsMixedSetTests` +6:
+- a satellite and a large GPP each carry their own band through the real merge and allocator (the GPP's quota scoped to its 16 entries and met, the satellite's entries all five-plus, and `shape_band_application` naming both);
+- a unanimous all-mid set and an all-narrow set add no key, and the quota scope is the portfolio;
+- a cash contest sits in neither map, its entries take fours, and the satellite's fives are not counted toward the GPP's quota;
+- the escape works and a typed map is refused;
+- the bank is asked for fives off either map;
+- a contest floor relaxes and counts on a starved bank, and on a proven infeasibility (one five, two satellite entries, F-3) with the portfolio floor unmoved.
+
+Ten hand mutations, all killed: no maps, the quota always portfolio, no contest mask, no contest re-entry, a typed scalar keeping its map, a typed map accepted, the bank request blind to either map (two mutants), maps on a unanimous set (`>=`), and the quota counted over every row.
+
+A false survivor from the first pass, recorded because it will recur: mutating `if asked:` to `if False:` keeps the file size, and the restore landed in the same second, so Python reused the mutant's `.pyc` for the next three mutants. The rerun used `python -B` with `PYTHONDONTWRITEBYTECODE=1` after clearing `__pycache__`.
+
+The fixture bank holds 20 fours over 10 fives because F-3 seats a signature once per contest: with 10 fours, a 16-entry GPP was forced onto fives and the quota was met trivially. Caught when the cash entries took a five.
+
+**Golden histogram, before and after (unmoved).**
+- **Loose:** 18 entries, 7 distinct; primary stack BAL 3, BOS 10, PHI 5; SP pairs {01+02: 5, 01+6001: 5, 01+6009: 8}.
+- **Production:** 18 entries, 18 distinct; BAL 6, BOS 6, PHI 2, SD 4; 12 SP pairs.
+- `UT test_golden_replay`: 9 OK, golden files untouched.
+
+**Gate.**
+- `PROBE`: FITS (projected 4s against 630s).
+- `LINT`: exit 0.
+- Local `GATE` on Python 3.13.16: `FAIL  test suite FAILED in tests.test_core (ran 3738)`. The baseline at b29468e was the same line at 3732. The one failure, before and after, is `ReplaySlateTests.test_settle_scores_requires_integer_hundredths_so_ties_are_exact`: 3.13's `sum()` is compensated, so `155.6 == 155.6`. That is the host carry-over.
+- `test_core` alone: 2481 run, that one failure. The other audited suites: 1117 OK and 140 passed.
+- The PR's 3.11 `gate` check is the merge authority.
+
 ## 2026-10-12 — R164 + R454 + R115 + R138: the sliced bank's job grid stops solving jobs it can never answer, the depth slices stop re-solving answered ones, and SP-pair coverage's sliced half closes (roadmap Session 40)
 
 **Scope.**

@@ -1326,6 +1326,10 @@ LADDER_RELAXED_CONTROLS = frozenset({
     # R469, 2026-09-30. The chalk-core seat steps on a proven infeasibility
     # (after the quota, before the floor), counted.
     CONSENSUS_PAIR_SEAT_CONTROL,
+    # R483, 2026-10-13. The per-contest shape bands step on their scalars'
+    # ladders: the contest floors off before the portfolio floor's rungs, the
+    # contest-scoped quota on the quota's own rungs.
+    "primary_stack_min_size_by_contest", "min_five_stack_share_pct_by_contest",
 })
 
 
@@ -3463,6 +3467,109 @@ def _resolve_primary_stack_floor(
     return report
 
 
+def _resolve_contest_stack_floors(
+    candidates: Sequence[Dict[str, Any]],
+    full_compatible: Sequence[Sequence[bool]],
+    entries: Sequence[Mapping[str, Any]],
+    controls: Mapping[str, Any],
+    floor_report: Mapping[str, Any],
+    floor_state: Optional[Mapping[str, Any]] = None,
+    bank_report: Optional[Mapping[str, Any]] = None,
+) -> Dict[str, Any]:
+    """R483. The narrow band's floor on the entries of the contests that asked.
+
+    ``controls['primary_stack_min_size_by_contest']`` is what the merge carries
+    when R34's unanimity rule dropped a contest's declared floor: the portfolio
+    floor serves every entry, and this one serves only its own contest's. Each
+    contest is resolved on its own, after the portfolio floor's mask, so the
+    starvation check sees the set the solve will actually choose from.
+
+    Statuses: ``applied`` (its entries are masked to stacks at the floor),
+    ``relaxed_off`` (the bank starved an entry before the solve, or a proven
+    infeasibility already stepped it; counted once either way),
+    ``carried_by_portfolio_floor``, ``no_entries_in_solve`` and
+    ``unmeasurable`` (no candidate reports a size, the portfolio floor's own
+    rule). Returns the report rows, the masks to apply, and ``relaxed``, the
+    contests a re-entry must keep off. Never a refusal: a floor that refuses
+    leaves a blank reserved row.
+    """
+    state = dict(floor_state or {})
+    relaxed: Dict[str, str] = {str(k): str(v) for k, v in
+                               dict(state.get("contest_floors_relaxed") or {}).items()}
+    steps: List[Dict[str, Any]] = list(state.get("contest_floor_steps") or [])
+    requested = {str(k): int(v) for k, v in
+                 dict(controls.get("primary_stack_min_size_by_contest") or {}).items()}
+    report: Dict[str, Any] = {"by_contest": {}, "masks": {}, "relaxed": relaxed,
+                              "relaxation_steps": steps}
+    if not requested:
+        report["relaxations"] = len(steps)
+        return report
+    sizes = [_candidate_primary_stack_size(c) for c in candidates]
+    measurable = not candidates or any(int(s) > 0 for s in sizes)
+    portfolio = int(floor_report.get("applied") or 0)
+    members_of: Dict[str, List[int]] = defaultdict(list)
+    for e, entry in enumerate(entries):
+        members_of[str(entry.get("contest_id") or "")].append(e)
+    for cid in sorted(requested):
+        floor = requested[cid]
+        members = members_of.get(cid, [])
+        row: Dict[str, Any] = {"requested": floor, "entries": len(members),
+                               "applied": None}
+        if not members:
+            row["status"] = "no_entries_in_solve"
+        elif cid in relaxed:
+            row["status"] = "relaxed_off"
+            row["reason"] = relaxed[cid]
+        elif not measurable:
+            row["status"] = "unmeasurable"
+        elif floor < PRIMARY_STACK_FLOOR_MIN_RUNG or floor <= portfolio:
+            row["status"] = "carried_by_portfolio_floor"
+        else:
+            eligible = {k for k, s in enumerate(sizes) if int(s) >= floor}
+            starved = [str(entries[e].get("entry_id") or "") for e in members
+                       if not any(full_compatible[e][k] for k in eligible)]
+            if starved:
+                verdict = bank_stack_size_verdict(bank_report, floor)
+                reason = (f"contest {cid}: {len(starved)} entry/entries retain no "
+                          f"compatible candidate at primary stack size >= {floor} "
+                          f"(first: {', '.join(starved[:3])}). {verdict['note']}")
+                steps.append({"contest_id": cid, "from": floor, "to": None,
+                              "reason": reason, "trigger": "entry_starved_before_solve"})
+                relaxed[cid] = reason
+                row["status"] = "relaxed_off"
+                row["reason"] = reason
+            else:
+                row["status"] = "applied"
+                row["applied"] = floor
+                report["masks"][cid] = (list(members), eligible)
+        report["by_contest"][cid] = row
+    report["relaxations"] = len(steps)
+    return report
+
+
+
+def _floor_report_with_contests(floor_report: Mapping[str, Any],
+                                contest_report: Mapping[str, Any]) -> Dict[str, Any]:
+    """R483. The portfolio floor's report with the per-contest floors folded in.
+
+    Rows under ``by_contest``, their steps after the portfolio's, and
+    ``relaxations`` the TOTAL, so every reader that counts the floor's ladder
+    (the warnings, `manifest_strategy_state`) counts both without a second
+    key to learn; ``contest_relaxations`` is the per-contest share of it.
+    Byte-identical to the portfolio report when no contest floor was asked.
+    """
+    out = dict(floor_report)
+    if not contest_report.get("by_contest") and not contest_report.get("relaxation_steps"):
+        return out
+    out["by_contest"] = {cid: dict(row)
+                         for cid, row in dict(contest_report.get("by_contest") or {}).items()}
+    out["contest_relaxations"] = int(contest_report.get("relaxations") or 0)
+    out["relaxations"] = (int(floor_report.get("relaxations") or 0)
+                          + out["contest_relaxations"])
+    out["relaxation_steps"] = (list(floor_report.get("relaxation_steps") or [])
+                               + list(contest_report.get("relaxation_steps") or []))
+    return out
+
 def fraction_for_count(count: int, total: int, places: int = 4) -> float:
     """The smallest fraction, at ``places`` decimals, that `_cap_count`
     resolves to at least ``count`` entries of ``total``.
@@ -3975,6 +4082,18 @@ def select_and_assign_entries(
         for k in floor_report["excluded_candidate_idx"]:
             for e in range(E):
                 full_compatible[e][k] = False
+    # R483. And the narrow band's floor on its own contests' entries, where the
+    # merge's unanimity rule left it out of the portfolio floor above. Same
+    # point in the pipeline for the same reasons: after the real compatible
+    # set exists, before the prefilter spends its keep-target.
+    contest_floor_report = _resolve_contest_stack_floors(
+        candidates, full_compatible, entries, controls, floor_report,
+        _floor_state, bank_report=bank_report)
+    for _members, _eligible in contest_floor_report["masks"].values():
+        for e in _members:
+            for k in range(len(candidates)):
+                if k not in _eligible:
+                    full_compatible[e][k] = False
 
     # R469. The chalk-core seat, planned here for the reason R405's cap is:
     # the prefilter below has to KEEP the pair's lineups, and a score-ordered
@@ -4266,13 +4385,33 @@ def select_and_assign_entries(
     # now runs through `_resolve_five_stack_quota`, which steps the ladder, counts
     # the step, and reports the rung it landed on. A quota that cannot be carried
     # costs a named relaxation; it no longer costs the delivery.
-    quota_report = _resolve_five_stack_quota(stack_sizes, E, controls,
+    #
+    # R483, 2026-10-13. The SCOPE. A portfolio quota (every contest asked) binds
+    # every entry, as it always did. On a mixed set the merge carries the
+    # quota in `min_five_stack_share_pct_by_contest` instead, and the row binds
+    # only those contests' entries, pooled, at the least demanding share among
+    # them: R34's least-demanding rule, restricted to the contests that asked.
+    # The ladder, the re-entry and the report are the quota's own.
+    quota_idx = list(range(E))
+    quota_controls: Mapping[str, Any] = controls
+    quota_scope: Dict[str, Any] = {"scope": "portfolio"}
+    _quota_map = dict(controls.get("min_five_stack_share_pct_by_contest") or {})
+    if not float(controls.get("min_five_stack_share_pct") or 0.0) > 0.0 and _quota_map:
+        _asked = {str(cid): float(share) for cid, share in sorted(_quota_map.items())
+                  if float(share or 0.0) > 0.0 and by_contest_entries.get(str(cid))}
+        if _asked:
+            quota_idx = sorted(e for cid in _asked for e in by_contest_entries[cid])
+            quota_controls = {**controls, "min_five_stack_share_pct": min(_asked.values())}
+            quota_scope = {"scope": "contests", "contests": sorted(_asked),
+                           "share_by_contest": _asked}
+    quota_report = _resolve_five_stack_quota(stack_sizes, len(quota_idx), quota_controls,
                                              quota_state=_quota_state,
                                              bank_report=bank_report)
+    quota_report.update(quota_scope, scope_entries=len(quota_idx))
     if quota_report.get("applied_need"):
         qualifying = [k for k in range(K)
                       if stack_sizes[k] >= int(quota_report["min_size"])]
-        add({x_idx(e, k): 1.0 for e in range(E) for k in qualifying},
+        add({x_idx(e, k): 1.0 for e in quota_idx for k in qualifying},
             float(quota_report["applied_need"]), np.inf)
 
     # R469. One lower-bound row per contest owing a seat: its eligible entries
@@ -4872,22 +5011,62 @@ def select_and_assign_entries(
         # rule that a compute limit may not move a strategy control is the same
         # rule that stops a slow solve from quietly buying a looser portfolio,
         # and it is the rule the DU ladder already follows two modules over.
+        #
+        # R483, 2026-10-13. The per-contest floors step FIRST in this slot, all
+        # off in one counted step, and only then the portfolio floor's rungs:
+        # floor 5 on narrow contests is one dated decision old, the floor of 4
+        # has three tranches behind it, and the newer, thinner-evidenced
+        # control relaxes first (the quota's rule above). One call site for
+        # both, so every sibling state rides either step.
+        contest_floors_on = sorted(
+            cid for cid, row in contest_floor_report["by_contest"].items()
+            if row.get("status") == "applied")
         if (proven_infeasible and (not slate_blocked) and not _probe
-                and floor_report.get("applied") is not None):
-            ladder = primary_stack_floor_rungs(int(floor_report["requested"]))
-            rung_idx = int(floor_report.get("rung_index") or 0)
-            if rung_idx + 1 < len(ladder):
-                stepped = list(floor_report.get("relaxation_steps") or [])
-                stepped.append({
-                    "from": floor_report["applied"],
-                    "to": ladder[rung_idx + 1],
-                    "reason": (
-                        "entry-level joint MILP proven infeasible with the primary-"
-                        "stack floor active; the floor is one of the controls whose "
-                        "interaction the solver could not satisfy"
-                    ),
-                    "trigger": "proven_infeasible_with_floor",
-                })
+                and (contest_floors_on or floor_report.get("applied") is not None)):
+            next_floor_state: Optional[Dict[str, Any]] = None
+            if contest_floors_on:
+                step_reason = (
+                    "entry-level joint MILP proven infeasible with the per-contest "
+                    "primary-stack floor active on " + ", ".join(contest_floors_on)
+                    + "; the floor is one of the controls whose interaction the "
+                    "solver could not satisfy")
+                next_floor_state = {
+                    **(_floor_state or {}),
+                    "contest_floors_relaxed": {
+                        **contest_floor_report["relaxed"],
+                        **{cid: step_reason for cid in contest_floors_on}},
+                    "contest_floor_steps": list(contest_floor_report["relaxation_steps"]) + [{
+                        "contest_id": ", ".join(contest_floors_on),
+                        "from": {cid: contest_floor_report["by_contest"][cid]["requested"]
+                                 for cid in contest_floors_on},
+                        "to": None,
+                        "reason": step_reason,
+                        "trigger": "proven_infeasible_with_contest_floor",
+                    }],
+                }
+            else:
+                ladder = primary_stack_floor_rungs(int(floor_report["requested"]))
+                rung_idx = int(floor_report.get("rung_index") or 0)
+                if rung_idx + 1 < len(ladder):
+                    stepped = list(floor_report.get("relaxation_steps") or [])
+                    stepped.append({
+                        "from": floor_report["applied"],
+                        "to": ladder[rung_idx + 1],
+                        "reason": (
+                            "entry-level joint MILP proven infeasible with the primary-"
+                            "stack floor active; the floor is one of the controls whose "
+                            "interaction the solver could not satisfy"
+                        ),
+                        "trigger": "proven_infeasible_with_floor",
+                    })
+                    next_floor_state = {
+                        # R483: spread, so a contest floor already stepped stays off.
+                        **(_floor_state or {}),
+                        "rung_index": rung_idx + 1,
+                        "relaxations": int(floor_report.get("relaxations") or 0) + 1,
+                        "relaxation_steps": stepped,
+                    }
+            if next_floor_state is not None:
                 return select_and_assign_entries(
                     _all_candidates, entry_requirements, portfolio_controls,
                     bank_report=bank_report, fixed_exposure=fixed_exposure,
@@ -4903,11 +5082,7 @@ def select_and_assign_entries(
                     # R37(2)(b): and the quota's state, for the same reason.
                     _quota_state=_quota_state,
                     _seat_state=_seat_state,
-                    _floor_state={
-                        "rung_index": rung_idx + 1,
-                        "relaxations": int(floor_report.get("relaxations") or 0) + 1,
-                        "relaxation_steps": stepped,
-                    },
+                    _floor_state=next_floor_state,
                     # R326: and the search scope's, for the same reason.
                     _search_state=_search_state,
                 )
@@ -4986,8 +5161,11 @@ def select_and_assign_entries(
             # where a reader under a clock does not go. Emitted only when there
             # is something to say, so every other refusal is byte-identical.
             **({"warnings": list(prefilter_warnings)} if prefilter_warnings else {}),
-            **({"primary_stack_floor": floor_report}
-               if floor_report.get("status") != "not_requested" else {}),
+            # R483: with the per-contest floors folded in.
+            **({"primary_stack_floor": _floor_report_with_contests(
+                    floor_report, contest_floor_report)}
+               if (floor_report.get("status") != "not_requested"
+                   or contest_floor_report.get("by_contest")) else {}),
             **({"five_stack_quota": quota_report}
                if quota_report.get("status") != "not_requested" else {}),
             # R469. Known before the solve, so it rides the refusal too.
@@ -5103,11 +5281,19 @@ def select_and_assign_entries(
     # output, so the output is where it gets checked; `below_requested` is 0 on
     # a clean portfolio and nonzero exactly when the ladder stepped.
     floor_block: Dict[str, Any] = {}
-    if floor_report.get("status") != "not_requested":
+    if (floor_report.get("status") != "not_requested"
+            or contest_floor_report.get("by_contest")):
         assigned_sizes = [int(a.get("primary_stack_size") or 0) for a in assignments]
         requested_floor = floor_report.get("requested")
+        # R483: the per-contest rows, each counted off its own contest's rows.
+        _floor_out = _floor_report_with_contests(floor_report, contest_floor_report)
+        for _cid, _row in (_floor_out.get("by_contest") or {}).items():
+            _row["assigned_below_requested"] = sum(
+                1 for a in assignments
+                if str(a.get("contest_id") or "") == _cid
+                and int(a.get("primary_stack_size") or 0) < int(_row["requested"]))
         floor_block = {"primary_stack_floor": {
-            **{k: v for k, v in floor_report.items()
+            **{k: v for k, v in _floor_out.items()
                if k not in ("excluded_candidate_idx",)},
             "candidates_excluded": len(floor_report.get("excluded_candidate_idx") or []),
             "assigned_size_histogram": dict(sorted(
@@ -5129,14 +5315,25 @@ def select_and_assign_entries(
     quota_block: Dict[str, Any] = {}
     if quota_report.get("status") != "not_requested":
         _min_size = int(quota_report.get("min_size") or 5)
-        assigned_q = sum(1 for a in assignments
+        # R483. Counted over the rows the quota bound: every row on a portfolio
+        # quota, the asking contests' rows on a contest-scoped one, so another
+        # contest's fives never read as this quota met.
+        _quota_contests = set(quota_report.get("contests") or [])
+        _scoped = [a for a in assignments
+                   if not _quota_contests
+                   or str(a.get("contest_id") or "") in _quota_contests]
+        assigned_q = sum(1 for a in _scoped
                          if int(a.get("primary_stack_size") or 0) >= _min_size)
         quota_block = {"five_stack_quota": {
             **dict(quota_report),
             "assigned_qualifying": assigned_q,
             "assigned_qualifying_share": (
-                round(assigned_q / len(assignments), 4) if assignments else 0.0),
+                round(assigned_q / len(_scoped), 4) if _scoped else 0.0),
             "need_met": (assigned_q >= int(quota_report.get("applied_need") or 0)),
+            **({"assigned_qualifying_by_contest": {
+                cid: sum(1 for a in _scoped if str(a.get("contest_id") or "") == cid
+                         and int(a.get("primary_stack_size") or 0) >= _min_size)
+                for cid in sorted(_quota_contests)}} if _quota_contests else {}),
         }}
 
     # R405. What the DELIVERED set carries, counted off the assignments on the
@@ -5269,9 +5466,14 @@ def select_and_assign_entries(
                 f"contain what it was filtering for (R340)")
     _fr = floor_block.get("primary_stack_floor") if floor_block else None
     if _fr:
-        if _fr.get("relaxations"):
+        # R483. The portfolio floor's own count; the per-contest floors get
+        # their own line below, naming the contests, because "requested 4,
+        # applied 4" next to a relaxed contest floor of 5 would read as clean.
+        _portfolio_floor_steps = (int(_fr.get("relaxations") or 0)
+                                  - int(_fr.get("contest_relaxations") or 0))
+        if _portfolio_floor_steps:
             floor_warnings.append(
-                f"primary_stack_min_size relaxed {_fr['relaxations']} time(s): "
+                f"primary_stack_min_size relaxed {_portfolio_floor_steps} time(s): "
                 f"requested {_fr['requested']}, applied "
                 f"{_fr['applied'] if _fr['applied'] is not None else 'none'}. "
                 f"A portfolio is not clean because the gates passed; it is clean "
@@ -5283,6 +5485,15 @@ def select_and_assign_entries(
                 "in this bank reports a primary_stack_size. The producer of these "
                 "payloads is the thing to fix"
             )
+        _contest_off = sorted(cid for cid, row in (_fr.get("by_contest") or {}).items()
+                              if row.get("status") == "relaxed_off")
+        if _contest_off:
+            floor_warnings.append(
+                f"primary_stack_min_size_by_contest relaxed off on "
+                f"{', '.join(_contest_off)} ({_fr.get('contest_relaxations')} "
+                f"counted step(s)): those contests' entries were not held to their "
+                f"narrow-breadth floor. A portfolio is clean when the relaxation "
+                f"counts are zero")
 
     return {
         **fixed_report,
