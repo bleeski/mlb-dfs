@@ -1,0 +1,454 @@
+{
+ "code": {
+  "contest_allocator": "v1.12",
+  "execution_pipeline": "v1.17",
+  "git_dirty": false,
+  "git_sha": "5552b42a6bc1a0adaa6299d39d91b590cbc191dd"
+ },
+ "controls": {
+  "classic_sleeves": false,
+  "consensus_sp_pair": [
+   "44489469",
+   "44489468"
+  ],
+  "five_stack_min_size": 5,
+  "max_consensus_cluster_share_pct": 1.0,
+  "max_game_exposure_pct": 1.0,
+  "max_game_exposure_pct_by_game": {
+   "CLE@TB": 1.0,
+   "MIL@LAD": 1.0
+  },
+  "max_pitcher_exposure_pct": 1.0,
+  "max_player_exposure_pct": 1.0,
+  "max_primary_stack_exposure_pct": 1.0,
+  "max_shared_players": 9,
+  "max_sp_pair_repetition": 999,
+  "max_team_exposure_pct": 1.0,
+  "min_five_stack_share_pct": 0.0,
+  "min_five_stack_share_pct_by_contest": {
+   "196680261": 0.15
+  },
+  "player_game_by_id": {
+   "distinct_values": 2,
+   "players_mapped": 40,
+   "wired": true
+  },
+  "player_team_by_id": {
+   "distinct_values": 4,
+   "players_mapped": 40,
+   "wired": true
+  },
+  "primary_stack_min_size": 4
+ },
+ "date": "2026-10-14",
+ "egress": "egress: statsapi 200, odds 401, savant 200, mlb-lineups 200, fangraphs 200 (curl), open-meteo timeout",
+ "egress_source": "session_start 2026-10-13T22:24:49+00:00",
+ "entries": [
+  {
+   "contest_id": "196680261",
+   "contest_name": "MLB $400 Quarter Jukebox [Just $0.25!] (Tue-Wed)",
+   "entry_fee": 0.25,
+   "entry_id": "5295011676",
+   "filled": true,
+   "prediction": {
+    "base_sum": 97.8,
+    "candidate_id": "bank0",
+    "ceiling_sum": 144.82,
+    "contest_fit_score": 144.8155,
+    "contest_shape": "large_field_gpp",
+    "fit_rank_in_contest": 1,
+    "fit_rank_of_n": 2,
+    "hitter_roles": {
+     "44489475": "platoon_projected",
+     "44489477": "confirmed_lineup",
+     "44489478": "platoon_projected",
+     "44489482": "platoon_projected",
+     "44489489": "platoon_projected",
+     "44489492": "confirmed_lineup",
+     "44489501": "confirmed_lineup",
+     "44489507": "platoon_projected"
+    },
+    "lineup_signature": "44489469|44489470|44489475|44489477|44489478|44489482|44489489|44489492|44489501|44489507",
+    "primary_stack": "MIL",
+    "prior_own_sum": null,
+    "run_id": "20261013T222844Z_0a0cb917",
+    "source": "runs/20261013T222844Z_0a0cb917/final",
+    "sp_ids": [
+     "44489469",
+     "44489470"
+    ]
+   },
+   "roster_ids": [
+    "44489469",
+    "44489470",
+    "44489482",
+    "44489489",
+    "44489478",
+    "44489477",
+    "44489507",
+    "44489475",
+    "44489492",
+    "44489501"
+   ]
+  },
+  {
+   "contest_id": "196680261",
+   "contest_name": "MLB $400 Quarter Jukebox [Just $0.25!] (Tue-Wed)",
+   "entry_fee": 0.25,
+   "entry_id": "5295011690",
+   "filled": true,
+   "prediction": {
+    "base_sum": 98.6,
+    "candidate_id": "bank1",
+    "ceiling_sum": 142.39,
+    "contest_fit_score": 141.5623,
+    "contest_shape": "large_field_gpp",
+    "fit_rank_in_contest": 2,
+    "fit_rank_of_n": 2,
+    "hitter_roles": {
+     "44489472": "platoon_projected",
+     "44489477": "confirmed_lineup",
+     "44489486": "platoon_projected",
+     "44489491": "platoon_projected",
+     "44489492": "confirmed_lineup",
+     "44489493": "confirmed_lineup",
+     "44489501": "confirmed_lineup",
+     "44489505": "confirmed_lineup"
+    },
+    "lineup_signature": "44489468|44489469|44489472|44489477|44489486|44489491|44489492|44489493|44489501|44489505",
+    "primary_stack": "CLE",
+    "prior_own_sum": null,
+    "run_id": "20261013T222844Z_0a0cb917",
+    "source": "runs/20261013T222844Z_0a0cb917/final",
+    "sp_ids": [
+     "44489468",
+     "44489469"
+    ]
+   },
+   "roster_ids": [
+    "44489469",
+    "44489468",
+    "44489491",
+    "44489472",
+    "44489493",
+    "44489477",
+    "44489505",
+    "44489486",
+    "44489501",
+    "44489492"
+   ]
+  },
+  {
+   "contest_id": "196714994",
+   "contest_name": "MLB $75 Solo Shot (Tue-Wed)",
+   "entry_fee": 1.0,
+   "entry_id": "5295008567",
+   "filled": true,
+   "prediction": {
+    "base_sum": 97.8,
+    "candidate_id": "bank0",
+    "ceiling_sum": 144.82,
+    "contest_fit_score": 144.8155,
+    "contest_shape": "large_wta",
+    "fit_rank_in_contest": 1,
+    "fit_rank_of_n": 2,
+    "hitter_roles": {
+     "44489475": "platoon_projected",
+     "44489477": "confirmed_lineup",
+     "44489478": "platoon_projected",
+     "44489482": "platoon_projected",
+     "44489489": "platoon_projected",
+     "44489492": "confirmed_lineup",
+     "44489501": "confirmed_lineup",
+     "44489507": "platoon_projected"
+    },
+    "lineup_signature": "44489469|44489470|44489475|44489477|44489478|44489482|44489489|44489492|44489501|44489507",
+    "primary_stack": "MIL",
+    "prior_own_sum": null,
+    "run_id": "20261013T222844Z_0a0cb917",
+    "source": "runs/20261013T222844Z_0a0cb917/final",
+    "sp_ids": [
+     "44489469",
+     "44489470"
+    ]
+   },
+   "roster_ids": [
+    "44489469",
+    "44489470",
+    "44489482",
+    "44489489",
+    "44489478",
+    "44489477",
+    "44489507",
+    "44489475",
+    "44489492",
+    "44489501"
+   ]
+  },
+  {
+   "contest_id": "196714994",
+   "contest_name": "MLB $75 Solo Shot (Tue-Wed)",
+   "entry_fee": 1.0,
+   "entry_id": "5295011662",
+   "filled": true,
+   "prediction": {
+    "base_sum": 98.6,
+    "candidate_id": "bank1",
+    "ceiling_sum": 142.39,
+    "contest_fit_score": 141.5623,
+    "contest_shape": "large_wta",
+    "fit_rank_in_contest": 2,
+    "fit_rank_of_n": 2,
+    "hitter_roles": {
+     "44489472": "platoon_projected",
+     "44489477": "confirmed_lineup",
+     "44489486": "platoon_projected",
+     "44489491": "platoon_projected",
+     "44489492": "confirmed_lineup",
+     "44489493": "confirmed_lineup",
+     "44489501": "confirmed_lineup",
+     "44489505": "confirmed_lineup"
+    },
+    "lineup_signature": "44489468|44489469|44489472|44489477|44489486|44489491|44489492|44489493|44489501|44489505",
+    "primary_stack": "CLE",
+    "prior_own_sum": null,
+    "run_id": "20261013T222844Z_0a0cb917",
+    "source": "runs/20261013T222844Z_0a0cb917/final",
+    "sp_ids": [
+     "44489468",
+     "44489469"
+    ]
+   },
+   "roster_ids": [
+    "44489469",
+    "44489468",
+    "44489491",
+    "44489472",
+    "44489493",
+    "44489477",
+    "44489505",
+    "44489486",
+    "44489501",
+    "44489492"
+   ]
+  }
+ ],
+ "entries_binding": {
+  "source": "outputs/2026-10-14/DO_NOT_UPLOAD_DKEntries_2000_2g_BASELINE_20261013T222844Z_0a0cb917.5bd7e0460a3b.csv",
+  "source_sha256": "317bcc6be46a5447a58f2d1de8f32bda06ad5302c36e437330a59b90073759d2",
+  "status": "bound"
+ },
+ "extra": {
+  "market": {
+   "applied": false,
+   "reason": "no implied team totals reached the build: run_slate's slate_market_record returned None (no odds pull, or one whose totals normalized to none)"
+  }
+ },
+ "host": {
+  "call_budget_s": 630.0,
+  "declared_ceiling_s": 900.0,
+  "host": "claude_code"
+ },
+ "kind": "delivery",
+ "labels": "deterministic review proxies and labeled priors only; never ROI, win rate, cash rate, or probability",
+ "manifest_row": {
+  "certification": "review_grade_baseline",
+  "contest_ids": [
+   "196680261",
+   "196714994"
+  ],
+  "contest_names": [
+   "MLB $400 Quarter Jukebox [Just $0.25!] (Tue-Wed)",
+   "MLB $75 Solo Shot (Tue-Wed)"
+  ],
+  "contest_type": "classic",
+  "delivered_file": "outputs/2026-10-14/DKEntries_2000_2g_BASELINE_20261013T222844Z_0a0cb917.csv",
+  "entries": 4,
+  "lineage": "baseline",
+  "notes": "baseline (R389(b)): built before research on the unenriched frame, every portfolio cap opened to the deadline rung's value (never-relax held); review-grade, never certified",
+  "projection_tier": "proxy",
+  "recorded_utc": "2026-10-13T22:28:44.469254+00:00",
+  "run_id": "20261013T222844Z_0a0cb917",
+  "sha256": "317bcc6be46a5447a58f2d1de8f32bda06ad5302c36e437330a59b90073759d2",
+  "slate_tag": "2000_2g",
+  "status": "candidate",
+  "strategy_state": {
+   "bank_warnings": [],
+   "counts": {
+    "controls_opened": 9
+   },
+   "evidence": "recorded",
+   "state": "relaxed",
+   "warnings": []
+  }
+ },
+ "players": {
+  "44489468": [
+   "Blake Snell",
+   "LAD",
+   "P",
+   9000,
+   "MIL@LAD 10/14/2026 08:00PM ET"
+  ],
+  "44489469": [
+   "Parker Messick",
+   "CLE",
+   "P",
+   8500,
+   "CLE@TB 10/13/2026 08:00PM ET"
+  ],
+  "44489470": [
+   "Robert Gasser",
+   "MIL",
+   "P",
+   7500,
+   "MIL@LAD 10/14/2026 08:00PM ET"
+  ],
+  "44489472": [
+   "Shohei Ohtani",
+   "LAD",
+   "1B/OF",
+   5900,
+   "MIL@LAD 10/14/2026 08:00PM ET"
+  ],
+  "44489475": [
+   "Jackson Chourio",
+   "MIL",
+   "OF",
+   5400,
+   "MIL@LAD 10/14/2026 08:00PM ET"
+  ],
+  "44489477": [
+   "Jose Ramirez",
+   "CLE",
+   "3B",
+   5000,
+   "CLE@TB 10/13/2026 08:00PM ET"
+  ],
+  "44489478": [
+   "Brice Turang",
+   "MIL",
+   "2B",
+   4900,
+   "MIL@LAD 10/14/2026 08:00PM ET"
+  ],
+  "44489482": [
+   "William Contreras",
+   "MIL",
+   "C",
+   4400,
+   "MIL@LAD 10/14/2026 08:00PM ET"
+  ],
+  "44489486": [
+   "Andy Pages",
+   "LAD",
+   "OF",
+   4100,
+   "MIL@LAD 10/14/2026 08:00PM ET"
+  ],
+  "44489489": [
+   "Jake Bauers",
+   "MIL",
+   "1B",
+   3800,
+   "MIL@LAD 10/14/2026 08:00PM ET"
+  ],
+  "44489491": [
+   "Will Smith",
+   "LAD",
+   "C",
+   3700,
+   "MIL@LAD 10/14/2026 08:00PM ET"
+  ],
+  "44489492": [
+   "Chase DeLauter",
+   "CLE",
+   "OF",
+   3700,
+   "CLE@TB 10/13/2026 08:00PM ET"
+  ],
+  "44489493": [
+   "Travis Bazzana",
+   "CLE",
+   "2B",
+   3600,
+   "CLE@TB 10/13/2026 08:00PM ET"
+  ],
+  "44489501": [
+   "Steven Kwan",
+   "CLE",
+   "OF",
+   3300,
+   "CLE@TB 10/13/2026 08:00PM ET"
+  ],
+  "44489505": [
+   "Brayan Rocchio",
+   "CLE",
+   "SS",
+   3100,
+   "CLE@TB 10/13/2026 08:00PM ET"
+  ],
+  "44489507": [
+   "Cooper Pratt",
+   "MIL",
+   "SS",
+   3000,
+   "MIL@LAD 10/14/2026 08:00PM ET"
+  ]
+ },
+ "prediction_source": {
+  "filled": 4,
+  "hitter_roles_basis": "the frame's Notes tag per hitter: 'confirmed_order:' (intake, a confirmed side's posted slot) is confirmed_lineup, 'platoon_order:' (run_slate, a projected slot) is platoon_projected, neither is unknown; R342(c)'s role_source vocabulary. The intake's late-swap status map is not in the run, so a partial side's posted hitters read platoon_projected or unknown",
+  "label": "what the build that chose each lineup predicted for it, copied from runs/<run_id>/final/ at delivery: the allocator's contest shape, fit score and its rank among that run's entries in the contest, the stack and arms, and roster sums of the frame's Base, Ceiling and labeled ownership prior. Deterministic review proxies and labeled priors, never ROI, a win rate or a probability",
+  "players_missing": [],
+  "predicted": 4,
+  "runs_read": [
+   "20261013T222844Z_0a0cb917"
+  ],
+  "start_run_id": "20261013T222844Z_0a0cb917",
+  "status": "resolved",
+  "unmatched_entry_ids": []
+ },
+ "recorded_utc": "2026-10-13T22:28:44.470740+00:00",
+ "relaxations": {},
+ "run": {
+  "certification": {
+   "allocation_certified": true,
+   "failed_post_export_gates": [],
+   "post_export_gates": {
+    "entry_reconciliation_passed": true,
+    "export_hash_binding_passed": true,
+    "locked_immutability_passed": true,
+    "portfolio_caps_passed": true,
+    "roster_legality_passed": true,
+    "template_preservation_passed": true
+   },
+   "pre_export_passed": true,
+   "selection_certified": true,
+   "workflow_valid": true
+  },
+  "environment": {
+   "lock_file": "requirements.lock",
+   "lock_sha256": "dd7723e54043e8c2644100beba5069959d835258f96e1cf6dc100ea1617ac0d6",
+   "packages": {
+    "numpy": "2.2.6",
+    "pandas": "2.3.3",
+    "scipy": "1.15.3"
+   },
+   "python": "3.13.16"
+  },
+  "inputs": {
+   "DKEntries.csv": {
+    "sha256": "4ebc1c97c0399ed4dce6185aceb38ec89a25d53a9d1aaaab2bf4c84281d5b1ea",
+    "size_bytes": 21143,
+    "source_path": "/home/user/mlb-dfs/data/slates/2026-10-14/DKEntries.csv"
+   },
+   "DKSalaries.csv": {
+    "sha256": "1a8d53858a27a6a92c65966354a3b26f8ad5faff680f5e98f5acc4462c95d684",
+    "size_bytes": 17843,
+    "source_path": "/home/user/mlb-dfs/data/slates/2026-10-14/DKSalaries.csv"
+   }
+  }
+ },
+ "schema_version": 1
+}
