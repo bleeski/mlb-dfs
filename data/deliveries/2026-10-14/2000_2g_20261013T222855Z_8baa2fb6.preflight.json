@@ -1,0 +1,10 @@
+{
+ "entries_sha256": "777671dcd01a00eb86a229e493b4ac037a131d7758a688a6bf866c69e0448479",
+ "exit_code": 0,
+ "kind": "preflight",
+ "preflight_version": "1.1",
+ "record": "2000_2g_20261013T222855Z_8baa2fb6.json",
+ "schema_version": 1,
+ "utc": "2026-10-13T22:31:59.183586+00:00",
+ "verdict": "upload_ready"
+}
