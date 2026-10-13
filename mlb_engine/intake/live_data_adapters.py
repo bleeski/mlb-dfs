@@ -265,12 +265,18 @@ def _salary_game_times(players: Mapping[str, Any]) -> Dict[str, datetime]:
     return out
 
 
+#: How far a feed or boxscore leg's start may sit from the salary file's and
+#: still be read as the same game. The doubleheader leg selector's default since
+#: it was written; R208 named it so the Showdown feed lift reads the same bar.
+LEG_START_TOLERANCE_MINUTES = 10
+
+
 def select_one_leg_per_matchup(
     entries: Sequence[Any],
     key_of,
     start_of,
     slate_game_times: Mapping[str, datetime],
-    tolerance_minutes: int = 10,
+    tolerance_minutes: int = LEG_START_TOLERANCE_MINUTES,
 ) -> Tuple[List[Any], List[Dict[str, Any]]]:
     """Keep exactly the doubleheader leg that is on the DK slate.
 
@@ -377,7 +383,7 @@ def _legs_for_extraction(
 def _select_slate_legs(
     games: Sequence[Mapping[str, Any]],
     salary_game_times: Mapping[str, datetime],
-    tolerance_minutes: int = 10,
+    tolerance_minutes: int = LEG_START_TOLERANCE_MINUTES,
 ) -> Tuple[List[Mapping[str, Any]], List[Dict[str, Any]]]:
     """Lineups-feed wrapper over ``select_one_leg_per_matchup``."""
 
@@ -1079,8 +1085,14 @@ def showdown_feed_sides(feed: Optional[Mapping[str, Any]],
     salary file's teams only; a whole-day feed's other games are not this
     draftgroup's business. Each record carries ``feed_status`` (the side's
     ``lineup_status``, ``absent`` when the feed has nothing for it), ``source``,
-    ``rows``, ``order_by_util_id`` (confirmed sides only), ``unmatched`` and
-    ``date_ignored`` (the feed's date for the game is not the salary file's).
+    ``rows``, ``order_by_util_id`` (confirmed sides only), ``unmatched``,
+    ``date_ignored`` (the feed's date for the game is not the salary file's),
+    ``lock_time_missing`` (the feed gives the game no parseable start, so the
+    crosswalk never ran on it) and ``start_off_minutes`` (how far the feed's
+    start sits from the salary file's when that exceeds
+    ``LEG_START_TOLERANCE_MINUTES``: a lone leg is kept by the leg selector
+    whatever its time, so on a doubleheader day a feed carrying only game 1
+    would otherwise read as game 2's lineup).
     """
     from mlb_engine.intake.slate_intake_manager import parse_dk_salary_csv
 
@@ -1093,28 +1105,43 @@ def showdown_feed_sides(feed: Optional[Mapping[str, Any]],
     teams: Dict[str, Dict[str, Any]] = {
         team: {"team": team, "game_id": None, "feed_status": "absent",
                "source": None, "rows": 0, "order_by_util_id": {},
-               "unmatched": [], "date_ignored": False}
+               "unmatched": [], "date_ignored": False,
+               "lock_time_missing": False, "start_off_minutes": None}
         for team in sorted(set(team_of.values()) - {""})}
     ignored = {r["game_id"] for r in status.get("feed_dates_ignored") or []}
+    no_lock = {r["game_id"] for r in status.get("games_without_lock_time") or []}
+    salary_times = _salary_game_times(util)
     kept, _dropped = _select_slate_legs(list(merged.get("games") or []),
-                                        _salary_game_times(util))
+                                        salary_times)
     for game in kept:
         away = to_dk_abbrev((game.get("away") or {}).get("team_abbrev"))
         home = to_dk_abbrev((game.get("home") or {}).get("team_abbrev"))
+        gid = f"{away}@{home}"
+        off = None
+        try:
+            feed_start = _parse_utc(game.get("game_date_utc"))
+        except (TypeError, ValueError):
+            feed_start = None
+        if feed_start is not None and salary_times.get(gid) is not None:
+            minutes = abs((feed_start - salary_times[gid]).total_seconds()) / 60.0
+            if minutes > LEG_START_TOLERANCE_MINUTES:
+                off = round(minutes)
         for key, team in (("away", away), ("home", home)):
             if team not in teams:
                 continue
             side = game.get(key) or {}
             rows = side.get("lineup") or []
             teams[team].update({
-                "game_id": f"{away}@{home}",
+                "game_id": gid,
                 "feed_status": (str(side.get("lineup_status") or "").strip().lower()
                                 or "absent"),
                 "source": (side.get("lineup_source") or side.get("source")
                            or game.get("source") or (feed or {}).get("source")
                            or "lineups_feed"),
                 "rows": len(rows),
-                "date_ignored": f"{away}@{home}" in ignored,
+                "date_ignored": gid in ignored,
+                "lock_time_missing": gid in no_lock,
+                "start_off_minutes": off,
             })
     for pid, order in sorted(status["confirmed_order_by_player_id"].items()):
         if team_of.get(pid) in teams:

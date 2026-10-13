@@ -207,7 +207,9 @@ def _feed_orders_for_blank_sides(path: str | Path, rows: Sequence[Mapping[str, A
       a partial one (some slots posted) is left as it was, because whether a
       complete feed outranks DK's partial on this geometry is filed (R503), not
       decided here.
-    * The feed must call the side ``confirmed``, for the salary file's date.
+    * The feed must call the side ``confirmed``, for the salary file's date,
+      with a start time within ``LEG_START_TOLERANCE_MINUTES`` of the salary
+      file's (a lone leg of a doubleheader is otherwise read as this game).
     * Nine rows must crosswalk to nine pool persons on slots 1-9. Fewer than
       ``FEED_CROSSWALK_MIN_MATCHED`` is a crosswalk failure, which
       ``run_showdown`` refuses because CLAUDE.md lists it as Ben's.
@@ -269,6 +271,27 @@ def _feed_orders_for_blank_sides(path: str | Path, rows: Sequence[Mapping[str, A
             _skip("the feed's date for this matchup is not the salary file's, "
                   "so it is another day's game")
             continue
+        if side.get("lock_time_missing"):
+            _skip("the feed gives this game no parseable start time, so it "
+                  "cannot be dated against the salary file; supply a feed "
+                  "with a real start time")
+            continue
+        if side.get("start_off_minutes") is not None:
+            _skip(f"the feed's start for this matchup is "
+                  f"{side['start_off_minutes']} minutes from the salary "
+                  f"file's, so it is another leg of a doubleheader or a "
+                  f"rescheduled game, not this one")
+            continue
+        arm_tokens = DK_STARTING_DECLARED_TOKENS | DK_STARTING_OPENER_TOKENS
+        if not any(str(p.get("Starting") or "").strip().upper() in arm_tokens
+                   for p in persons.get(key, [])):
+            # Before the crosswalk count on purpose: a side that cannot be
+            # lifted whatever its names match is not a lineup going unused
+            # for a crosswalk reason, so it never reaches the refusal.
+            _skip("DK declares no arm on this side, and lifting it would make "
+                  "every arm on it a confirmed nonstarter; the feed's probable "
+                  "is not read as a declaration (R503)")
+            continue
         report["unmatched"].extend(side.get("unmatched") or [])
         slots = {}
         for util_id, slot in sorted((side.get("order_by_util_id") or {}).items()):
@@ -276,6 +299,11 @@ def _feed_orders_for_blank_sides(path: str | Path, rows: Sequence[Mapping[str, A
             if person is not None and side_key(person) == key:
                 slots[str(person["Player_Key"])] = int(slot)
         of = int(side.get("rows") or 0)
+        if of < FEED_CROSSWALK_MIN_MATCHED:
+            # Too few rows to have failed a crosswalk: a malformed feed side.
+            _skip(f"the feed calls this side confirmed and carries {of} "
+                  f"rows; a side is lifted only on a complete 1-9")
+            continue
         if len(slots) < FEED_CROSSWALK_MIN_MATCHED:
             report["crosswalk_failures"].append(
                 {"team": team, "matched": len(slots), "of": of})
@@ -285,13 +313,6 @@ def _feed_orders_for_blank_sides(path: str | Path, rows: Sequence[Mapping[str, A
         if sorted(slots.values()) != list(range(1, 10)):
             _skip(f"the feed's confirmed lineup matched {len(slots)} of {of} "
                   f"to this pool, and a side is lifted only on a complete 1-9")
-            continue
-        arm_tokens = DK_STARTING_DECLARED_TOKENS | DK_STARTING_OPENER_TOKENS
-        if not any(str(p.get("Starting") or "").strip().upper() in arm_tokens
-                   for p in persons.get(key, [])):
-            _skip("DK declares no arm on this side, and lifting it would make "
-                  "every arm on it a confirmed nonstarter; the feed's probable "
-                  "is not read as a declaration (R503)")
             continue
         slots_out.update(slots)
         sources[key] = str(side.get("source") or "lineups_feed")

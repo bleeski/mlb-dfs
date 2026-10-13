@@ -8158,6 +8158,85 @@ class ShowdownLineupMergeTests(_ShowdownExitDoorHarness, unittest.TestCase):
         self.assertIs(empty.attrs["participation_report"]["feed_orders"]["applied"], True)
         pd.testing.assert_frame_equal(empty, plain)
 
+    def test_a_feed_game_with_no_start_time_or_a_short_side_is_not_a_crosswalk_failure(self):
+        """Review of R208. A feed game with no parseable start never reaches
+        the crosswalk (the status map cannot date it), and a side carrying
+        three rows cannot have failed one. Both used to read "matched 0 of 9"
+        and refuse at Ben's wall with a remedy about names."""
+        undated = self._feed()
+        undated["games"][0].pop("game_date_utc")
+        short = self._feed()
+        short["games"][0]["home"]["lineup"] = short["games"][0]["home"]["lineup"][:3]
+        for label, feed, needle in (("no start time", undated, "start time"),
+                                    ("three rows", short, "carries 3 rows")):
+            with self.subTest(label):
+                df = self._melt(self._salary(), feed)
+                orders = df.attrs["participation_report"]["feed_orders"]
+                self.assertEqual(orders["crosswalk_failures"], [], label)
+                reasons = {n["team"]: n["reason"] for n in orders["not_lifted"]}
+                self.assertIn(needle, reasons["CHC"], label)
+
+    def test_a_feed_leg_hours_from_the_salary_start_is_not_lifted(self):
+        """A lone feed leg is kept by the leg selector whatever its time, so
+        on a doubleheader day game 1's nines would read as game 2's. The
+        salary file's start is MIN@CHC 02:20PM ET (18:20Z); this leg is four
+        hours earlier on the same day, which R325's date check lets stand."""
+        df = self._melt(self._salary(), self._feed(date="2026-07-18T14:20:00Z"))
+        orders = df.attrs["participation_report"]["feed_orders"]
+        self.assertEqual(orders["lifted"], [])
+        self.assertEqual(len(orders["not_lifted"]), 2)
+        for rec in orders["not_lifted"]:
+            self.assertIn("240 minutes", rec["reason"])
+        self.assertEqual(orders["crosswalk_failures"], [])
+
+    def test_a_side_that_cannot_lift_never_refuses_on_its_names(self):
+        """No DK arm means the side keeps its pool whatever the feed's names
+        match, so its names are not a lineup going unused and never reach
+        the crosswalk refusal."""
+        rename = {("MIN", n): f"Not A Player {n}" for n in range(1, 7)}
+        df = self._melt(self._salary(drop_arm="MIN"), self._feed(rename=rename))
+        orders = df.attrs["participation_report"]["feed_orders"]
+        self.assertEqual(orders["crosswalk_failures"], [])
+        self.assertIn("no arm", orders["not_lifted"][0]["reason"])
+        self.assertEqual(orders["lifted"], ["CHC"])
+
+    def test_a_stale_cached_feed_is_refetched_before_it_decides_the_pool(self):
+        """Review of R208. Before the lift, a morning feed on disk only moved
+        platoon factors; now it decides who is in the pool. The cached file is
+        aged by Classic's rule (`--feed-max-age-minutes`): a six-hour-old one
+        is refetched, and the fresh read decides. A refetch that fails reuses
+        it with a warning, as Classic does."""
+        from datetime import datetime, timedelta, timezone
+        now = datetime.now(timezone.utc)
+        stale = self._feed()
+        stale["fetched_at"] = (now - timedelta(hours=6)).isoformat()
+        fresh = self._feed(statuses={"CHC": "partial"})
+        fresh["fetched_at"] = now.isoformat()
+        calls = []
+
+        def refetch(*_a, **_k):
+            calls.append(1)
+            return fresh
+
+        def offline(*_a, **_k):
+            raise OSError("no egress in a test")
+
+        for label, fetch, lifted in (("refetched", refetch, ["MIN"]),
+                                     ("refetch failed", offline, ["CHC", "MIN"])):
+            with self.subTest(label):
+                mod = self._module()
+                root = self._root(label.replace(" ", "_"))
+                (root / "lineups_feed.json").write_text(json.dumps(stale),
+                                                        encoding="utf-8")
+                r = self._build(root, salary_csv=self._salary(),
+                                patches=((mod, "fetch_lineups", fetch),), mod=mod)
+                self.assertEqual(r.code, 0, r.err[-2000:])
+                orders = r.brief["pool"]["participation"]["feed_orders"]
+                self.assertEqual(orders["lifted"], lifted, label)
+                if fetch is offline:
+                    self.assertIn("stale feed reused; refetch failed", r.err)
+        self.assertEqual(len(calls), 1, "the stale file was refetched exactly once")
+
     # -- the refusal: a confirmed lineup in hand that crosswalks to almost nothing -- #
 
     def test_a_crosswalk_failure_refuses_through_the_exit_door(self):

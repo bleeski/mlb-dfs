@@ -15,10 +15,13 @@ nine from the feed `run_showdown` reads once (`--lineups`, else the slate
 folder's `lineups_feed.json`, else a fetch). It does so only if all of these
 hold:
 - DK declares an arm on the side.
-- The feed calls the side confirmed, for the salary file's date.
+- The feed calls the side confirmed, for the salary file's date, with a start
+  within `LEG_START_TOLERANCE_MINUTES` (10) of the salary file's.
 - All nine rows match pool persons on slots 1-9, through Classic's name+team
   crosswalk on the UTIL rows.
 
+A cached `lineups_feed.json` older than `--feed-max-age-minutes` is refetched
+first, the same rule Classic applies; a named `--lineups` file is never aged.
 `brief.pool.participation` shows the result. Each side carries its
 `order_source`, and `feed_orders` names the sides lifted, every side not lifted
 with its reason, unmatched names, and any disagreement with a side DK posted

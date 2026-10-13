@@ -2100,6 +2100,12 @@ def rotowire_window(slate_date: str, today_et: str, tomorrow_et: str) -> str | N
     return None
 
 
+#: `--feed-max-age-minutes`' default, named so the Showdown door's feed read
+#: (R208) ages a cached feed by the same bar as Classic's when a caller's args
+#: carry no value.
+FEED_MAX_AGE_MINUTES = 90.0
+
+
 def feed_age_minutes(feed: dict) -> float | None:
     """Minutes since the feed was fetched, or None when it does not say.
 
@@ -5509,7 +5515,9 @@ def run_classic(args, slate_dir: Path, salary: Path, entries: Path,
 # --------------------------------------------------------------------------- #
 # Showdown
 # --------------------------------------------------------------------------- #
-def showdown_lineups_feed(args, slate_dir: Path) -> tuple[dict | None, dict]:
+def showdown_lineups_feed(args, slate_dir: Path,
+                          max_age_minutes: float | None = None,
+                          ) -> tuple[dict | None, dict]:
     """(feed or None, note): the one read of the lineups feed a Showdown build
     makes. R208.
 
@@ -5520,6 +5528,13 @@ def showdown_lineups_feed(args, slate_dir: Path) -> tuple[dict | None, dict]:
     (``melt_showdown_salary_csv(lineups_feed=)``) and does so first: one read,
     so the pool and the platoon prior cannot be looking at two different feeds,
     and a fetch happens at most once.
+
+    ``max_age_minutes`` ages a CACHED feed by Classic's rule (``main``'s staged
+    leg): older than that, or undated, it is refetched, and a failed refetch
+    reuses it with a warning. A named ``--lineups`` file is the operator's and
+    is never aged. ``run_showdown`` passes it because the feed now decides the
+    POOL, where a morning file on disk would seat a scratched bat and drop his
+    replacement; ``showdown_handedness``' own read passes nothing, as before.
     """
     note: dict = {}
     named = getattr(args, "lineups", None)
@@ -5532,6 +5547,15 @@ def showdown_lineups_feed(args, slate_dir: Path) -> tuple[dict | None, dict]:
             note["age_minutes"] = feed_age_minutes(feed)
         except Exception as exc:
             note["warning"] = f"unreadable lineups feed: {exc}"
+    if feed is not None and not named and max_age_minutes is not None:
+        age = note.get("age_minutes")
+        if age is None or age > max_age_minutes:
+            try:
+                feed = fetch_lineups(args.date, slate_dir / "lineups_feed.json")
+                note = {"source": "refetched", "replaced_age_minutes": age}
+            except Exception as exc:  # network failure must not kill the build
+                note["warning"] = f"stale feed reused; refetch failed: {exc}"
+                print(note["warning"], file=sys.stderr)
     if feed is None:
         try:
             feed = fetch_lineups(args.date, slate_dir / "lineups_feed.json")
@@ -6406,7 +6430,9 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
     # R208. The lineups feed is read ONCE, here, before the melt: the pool takes
     # a confirmed nine from it for a side DK left blank, and the platoon prior
     # below reuses the same read rather than fetching a second time.
-    feed, feed_load_note = showdown_lineups_feed(args, slate_dir)
+    feed, feed_load_note = showdown_lineups_feed(
+        args, slate_dir, max_age_minutes=getattr(
+            args, "feed_max_age_minutes", FEED_MAX_AGE_MINUTES))
     df = sd.melt_showdown_salary_csv(str(salary), lineups_feed=feed)
     # R208. A confirmed lineup for a side DK left blank that matches almost
     # nobody in the pool is a crosswalk failure, and CLAUDE.md lists it as
@@ -9422,7 +9448,7 @@ def main() -> int:
                          "flat factor. Used on the thesis-ladder path only; the brief "
                          "records the path, sha256 and who took a split. A labeled "
                          "review prior, never a projection.")
-    ap.add_argument("--feed-max-age-minutes", type=float, default=90.0,
+    ap.add_argument("--feed-max-age-minutes", type=float, default=FEED_MAX_AGE_MINUTES,
                     help="refetch a disk-cached lineups feed older than this "
                          "(default 90). Lineups confirm through the afternoon, so "
                          "a stale feed downgrades confirmed teams to projected "
