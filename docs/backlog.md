@@ -2055,22 +2055,28 @@ land, the salary anchor gains a TAIL delta (P(Y ≥ q) against the
 salary-implied distribution, q salary/role-conditioned) beside the mean
 delta — mean-only mispricing misses the spike this lane hunts.
 
-### R253. Park factor conditioned on handedness and profile: the F5 refinement that reprices power for tonight's venue (P2, M) | new 2026-08-27, from Ben's greenfield instruction (his own example: xwOBA that plays up in a specific park)
+### R253. REMAINDER (b): the profile term (pull rate x porch geometry) beside the park factor by batter side -- (a) SHIPPED 2026-10-13, Session 59 (P2, S-M once its inputs exist) | new 2026-08-27, from Ben's greenfield instruction (his own example: xwOBA that plays up in a specific park)
 
-**What.** F5 is a global park/weather run environment. The example Ben named
-needs park×handedness at minimum (the short-porch LHH case), and Statcast
-publishes the direct instrument: per-park expected HR ("a HR in N of 30
-parks"), which reprices a batter whose season line is suppressed or inflated
-by home park the moment tonight's venue differs.
+**STATUS 2026-10-13: (a) SHIPPED, its text migrated to CHANGELOG.md
+(`grep -n "R253(a)" CHANGELOG.md`).** `build_f5_map` gives each hitter the
+calibration ledger's applied-park rule evaluated for the side he bats from
+tonight, `clip(Run_Factor_Raw x Index_Runs[side] / Index_Runs[All], 0.94, 1.08)`,
+from the vendored `data/reference/park_factors_by_hand.csv` (Savant, 3-year).
+Two premises were corrected there: the home-park half already existed (the xwOBA
+Base correction strips each batter's own home park before F1-F5), and the
+instrument is the runs index, not HR (F5 is a run factor; the file carries
+`Index_HR` by side for a later ceiling term). The 2026-08-28 rider below still
+binds (a): R255's grade of component (b) owes the ablation with and without the
+total anchor, and every brief's `park_hand.by_team` carries the inputs.
 
-**Why.** Power is where the spike in nightly FPTS lives (R259's shape
-finding), so park×hand mispricing concentrates exactly where top-1% scores
-come from.
-
-**Fix.** A per-park×hand factor table (S), an optional profile term
-(pull-rate × porch geometry) after; applies as an F5 refinement and R252
-component (b). **Sequenced AFTER R252 grades a cycle:** add components where
-R255's residuals say they matter, not on principle.
+**What is open: (b), the profile term.** A batter's spray profile (pull rate,
+or the codex critique's shrunk EV/LA/spray bins, 2026-08-28 §R253) transformed
+through tonight's venue and compared with a neutral one: the short-porch pull
+lefty, not every lefty. **There is no input in the tree** -- no batter pull
+rate and no fence geometry anywhere (grep `pull_rate`, `porch`, `fence`,
+2026-10-13). **Gated on R255's residuals** (Session 60): add the term where the
+residuals say park-by-side misprices, not on principle; the same gate as R256 in
+Session 92.
 
 **Rider 2026-08-28 (ed9 §2.3, accepted).** The park component is graded
 with an ablation against the market anchor: team totals already price the
@@ -3021,9 +3027,36 @@ and is what says whether the step earns its three minutes.
 pays for in his own signed-in browser is not a scripted DK read. Nothing here
 touches the money-and-entry wall, the manual-DK rule, or the truthful labels.
 
-### R310. APPG as the Base prior is broken for a sub-5-game callup and the 0.60 salary shrink does not catch it (P1, S) -- WARNING HALF SHIPPED 2026-09-08, the SHRINK half is what remains open and it holds no slot | new 2026-09-03, from BUILD fragment `2026-09-03_BUILD_appg-base-is-broken-for-sub-5-game-callups.md`; measured on 2210_1g_sd with a counterfactual build
+### R310. APPG as the Base prior is broken for a sub-5-game callup -- REMAINDER (a2): the games-played weight on the 0.40 APPG term; (a1) leave-one-out SHIPPED 2026-10-13 (Session 59), (b) the warning SHIPPED 2026-09-08 (P1, S once a count exists) | new 2026-09-03, from BUILD fragment `2026-09-03_BUILD_appg-base-is-broken-for-sub-5-game-callups.md`; measured on 2210_1g_sd with a counterfactual build
 
-**Rider 2026-09-25 (the code review, model area): the shrink half, measured on the two vendored fixtures.** `showdown_theses.py:106-107` fits `np.polyfit` over ALL ordered hitters, outlier included and unweighted, and `:118` blends `0.60 * Salary_Fit + 0.40 * APPG_Raw` with no games-played term. STL@LAD 09-03: Leo Bernal $5,000, APPG 12.5, `Salary_Fit 5.25`, `Base_Prior 8.15`, APPG rank #1 to Base_Prior #3 of 18; the line refit WITHOUT him gives 4.60 at his salary. WSH@LAD 09-04: Yohandy Morales $3,400, APPG 13.5, fit 5.45, Base_Prior 8.41, #1 to #3 of 18, above Max Muncy (7.42); the line without him 3.01. The shrink target is inflated 0.65-2.4 points by the row it is meant to discipline. Fix: a leave-one-out fit (or the posted nines' median), and an APPG weight as a games-played function once that count is on the frame. XS-S.
+**STATUS 2026-10-13: (a1) SHIPPED, its text migrated to CHANGELOG.md
+(`grep -n "R310(a1)" CHANGELOG.md`).** `apply_base_prior` fits each hitter's
+salary target through the OTHER hitters: Bernal 5.25 -> 4.60 (prior 8.15 ->
+7.76, hitter rank 3 -> 6 of 18), Morales 5.45 -> 3.01 (8.41 -> 6.99, rank 3 ->
+8, below Muncy). The rider's other proposal, the posted nines' median, was
+measured and declined: it RAISES both (8.84, 9.05).
+
+**What is open: (a2), and leave-one-out alone does not close this entry.** The
+0.40 APPG weight still carries 5.0 and 5.4 points off one or two games. **There
+is no games-played count to read** (premise corrected 2026-10-13): DK ships none;
+the vendored `expected_stats_batting.csv` (min PA 1) carried neither callup on
+either incident date (its 08-30 vintage) and has run 25 days stale between
+refreshes (`620d801`), so a missing row is not "sub-5 games"; a live count needs
+MLBAM ids for Showdown hitters, and the paste-fed lineup feed carries `id: null`.
+This entry's "(a) ... a flat floor needs no feed at all" was false: the floor
+needs the count. Design note for whoever builds it: one StatsAPI team-roster call
+per side with `hydrate=person(stats(type=season,group=hitting))` (gamesPlayed and
+plateAppearances), joined by name AND team (the R133 crosswalk class), the APPG
+weight scaled below about five games and unchanged above, the hitter named in
+the brief, and an offline host keeping today's 0.40. **Trigger: callups play
+again (2027 regular season); Session 92.**
+
+**Found 2026-10-13, filed here because it is the same prior:** the Showdown
+fallback path (`use_ladder=False`, `build_slate.py` `price_showdown_pool`) runs
+no shrink at all -- Base is raw APPG there -- so on an unposted slate the (b)
+warning is the only protection.
+
+**Rider 2026-09-25 (the code review, model area), its leave-one-out fix SHIPPED 2026-10-13 as (a1); the measurement and the fix migrated to CHANGELOG.md (`grep -n "R310(a1)" CHANGELOG.md`).** The games-played half of its fix is (a2), above.
 
 
 **Cross-reference 2026-09-09.** The third APPG failure mode, opposing-arm

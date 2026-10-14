@@ -7,3 +7,5 @@
 **Candidate item.** In `_assemble_projection_frame`'s carry block, give a not-carried HITTER the single F1 (and F5) value every carried teammate on his team shares, only when they all agree within `NEUTRAL_TOLERANCE`, and count it as `team_filled` apart from `applied_count`; the label says "F1/F5 filled from teammates" for those rows. Test: a team whose carried hitters share F1 fills a newcomer, a team whose carried hitters disagree fills nothing, and a pitcher is never filled. S; Band 1 (S, P).
 
 Nothing here is a lift, an edge, an ROI or a win rate.
+
+**Rider 2026-10-13 (Session 59, R253(a)).** Hitter F5 is no longer one number per team: `build_f5_map` now gives each hitter the park for the side he bats from tonight (16 of 30 venues split L from R). Under this fragment's own rule ("fill only when every carried teammate agrees") a team with both sides carried fills NO F5, and F1 still fills. If the item is built, fill F5 from teammates on the newcomer's SIDE (his `batter_hands` side, or the side opposite the opposing arm for a switch hitter), or leave F5 out and fill F1 alone.

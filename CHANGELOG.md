@@ -2,6 +2,216 @@
 
 What changed in the engine, the tools and the contracts, when, and why.
 
+## 2026-10-13 — R253(a) + R310(a1): a hitter's F5 park is the ledger rule for the side he bats from tonight, and the Showdown salary line is fitted through the other hitters (roadmap Session 59)
+
+**Scope.**
+- `mlb_engine/optimize/showdown_theses.py`:
+  - `apply_base_prior` now gives each hitter a `Salary_Fit` from the line fitted through the OTHER hitters, read at his salary (leave-one-out, R310(a1)).
+  - Others all on one salary have no slope, so his target is their mean. (The full-pool line would run through his own point; the review caught it.)
+  - With fewer than two others the full-pool line stands, so a one- or two-hitter frame prices exactly as before.
+  - Pitchers sit outside the fit and keep raw APPG.
+  - The docstring says so, and `portfolio_report`'s `prior_note` reads "salary-regressed (leave-one-out: the line through the other hitters)".
+- `mlb_engine/intake/slate_intake_manager.py`, new:
+  - `PARK_FACTOR_APPLIED_CLIP = (0.94, 1.08)`, the calibration ledger's applied-park band.
+  - `load_park_hand_factors(path)`.
+  - `park_run_factor_for_side(venue, side, park_factors, hand_table) -> (factor, basis)` computes `clip(Run_Factor_Raw x Index_Runs[side] / Index_Runs[All], 0.94, 1.08)`. When the side's factor does not apply, the venue's `Run_Factor_Applied` stands, with the basis `no_side`, `no_venue_row` or `no_raw`.
+  - `compute_f5_factor` is unchanged.
+- `skills/generate-lineups/scripts/build_slate.py`, `build_f5_map`:
+  - Per team, it computes the L and R results through `compute_f5_factor` with a one-row park override, the existing "no second multiplication site" pattern, so wind composes on a side's park exactly as on the team's.
+  - Each hitter takes the result for his side from `pool["batter_hands"]`, whose keys are read as strings, as F4 reads them. A switch hitter takes the side opposite `pool["opposing_probables"][team]["hand"]`.
+  - These hitters keep the team factor and are named in the new `report["park_hand"]` block, with reasons `no_side`, `switch_vs_unknown_hand`, `no_venue_row` and `venue_override`: a hitter with no side, a switch hitter facing an unknown hand, a venue with no side row (Sutter Health Park), and a `game_override` venue.
+  - An unreadable table leaves every hitter on the team factor, with the reason `table_unreadable` and `park_hand.skipped` naming why.
+  - `park_hand` also carries per-team L, R, their mean beside the applied factor, the formula, and a vintage note.
+  - These all still read the one team-level result, unchanged: `f5_by_team`, `game_exposure_caps`, `game_exposure_caps_by_game_id`, `excluded_games`, and F1's de-park.
+  - The docstring and the F5 `note` say so.
+- `skills/generate-lineups/scripts/build_slate.py`, `summarize_enrichment`, the brief's `enrichment` block (from the review):
+  - It carries `f5_park_hand` (the whole block) and `counts.f5_hitters_on_side_factor`.
+  - When the side table is unreadable, it warns that every hitter is on the team park factor.
+  - Before this, the block was built and never copied, so the brief's `f5_by_team` showed a team value that no hitter with a resolved side received.
+- `data/reference/park_factors_by_hand.csv`, new:
+  - Savant's statcast park factors by bat side, `rolling=3`, `year=2026` (window 2024-2026): 29 venues × {L, R, All}, 87 rows.
+  - Columns: `Venue, Bat_Side, Index_Runs, Index_wOBA, Index_HR, N_PA, Savant_Venue_ID, Savant_Venue_Name, Year_Range, Source, Pulled`. Source, window and pull date (2026-10-13) ride in every row, which is the ledger's provenance rule.
+  - Venue keys are canonical per `team_to_venue.csv`, with the ledger's one alias (Savant's "UNIQLO Field at Dodger Stadium" is "Dodger Stadium").
+  - Sutter Health Park has no 3-year row (the A's have played there two seasons).
+- `tools/audit.py`:
+  - A `CSV_REQUIRED` entry for the new file.
+  - A `park_side_join` check: a side row for a venue the level file lacks is an error.
+  - Pins: `test_core` 2481 -> 2490 -> 2491 and `test_showdown` 497 -> 500 -> 502 (each code commit, then the review's).
+- `MLB_Classic.md` §5 "Deterministic F5": the hitter line states the per-side park, its fallbacks, and the clip.
+- `tests/test_core.py`: `ParkFactorTests`, 10 new.
+- `tests/test_showdown.py`: `SalaryFitLeaveOneOutTests`, 5 new.
+- `docs/backlog.md`: R253 and R310 rewritten to their open remainders, R253(b) and R310(a2).
+- `docs/ROADMAP.md`:
+  - Session 59 is Complete.
+  - R253(b) and R310(a2) join Session 92.
+  - **NEXT** is Session 148.
+  - There is a Progress Ledger row, and Session 171's SHA is backfilled (two merges, `1bc392f` and `5552b42`).
+- `ledger/inbox/2026-10-13_DEV_park-factors-by-hand-provenance.md`, new: a fragment for ARCHIVE, see "Found and filed".
+- Not touched:
+  - `mlb_engine/projections/projection_builder.py`, although the roadmap row named it (`PB`). The F5 producer is `build_slate.build_f5_map` with `slate_intake_manager.compute_f5_factor`; the row's target files were wrong.
+  - F1's de-park.
+  - `compute_f5_factor`.
+  - The pitcher F5.
+  - Showdown's F5, which has none: `apply_f1_prior` notes the de-park cancels on one game.
+
+**R310(a1): what was wrong, reproduced at 5552b42 before any edit.** `apply_base_prior` fitted `np.polyfit(UTIL_Salary, Base)` over every hitter with an order, the outlier included, then blended `0.60 * Salary_Fit + 0.40 * APPG_Raw`. The rider's line numbers (`:106-107`, `:118`) were stale; the fit is at `:320`, the blend at `:336`. On the two vendored incident files, through the production function:
+
+| incident | full-pool fit | leave-one-out | prior before → after | hitter rank before → after |
+|---|---|---|---|---|
+| Leo Bernal, STL@LAD 09-03, $5,000, APPG 12.5 | 5.25 | 4.60 | 8.15 → 7.76 | 3 → 6 of 18 |
+| Yohandy Morales, WSH@LAD 09-04, $3,400, APPG 13.5 | 5.45 | 3.01 | 8.41 → 6.99 | 3 → 8 of 18, below Muncy (7.42) |
+
+- **The rider's other proposal was measured and declined.** "The posted nines' median" raises both callups, to 8.84 and 9.05, because it ignores salary. Only a leave-one-out fit (or Theil-Sen: 7.88 and 7.32) lowers both.
+- **Leave-one-out moves every hitter a little,** because each target loses that hitter's own residual: on STL@LAD at most 0.13; on WSH@LAD Wood 9.81 -> 9.37 and Abrams 8.97 -> 8.69. The order at the top holds on both.
+- On the MIN_CHC fixture the solver-output tests run on, the largest move is 0.17 and the only rank change is a 17↔18 swap.
+
+**R253(a): what was wrong, checked against the tree.**
+- F5 was one number per TEAM. `build_f5_map` gave every hitter on a team `Run_Factor_Applied × wind`, so a lefty and a righty in the same park took the same park factor.
+- **Half of what R253 asked for already existed.** The entry wants to reprice "a batter whose season line is suppressed or inflated by home park". The xwOBA Base correction (PB, before F1-F5, `est_woba / woba` per batter) already strips each batter's own home-park contamination. What was missing was TONIGHT's venue by batter side.
+- Bat side was already in the pool F5 receives (`pool["batter_hands"]`, LDA), as was the opposing starter's hand (`pool["opposing_probables"]`). Only F4 read them.
+- No park-by-side data existed in the tree. Savant publishes it.
+
+**Why the rule is the ledger's band per side.**
+- The ledger (`MLB_Classic_Calibration_Ledger.md`, 2026-07-07) defines the level: `Run_Factor_Raw = Savant R index / 100`, `applied = clip(raw, 0.94, 1.08)`. The side factor is that rule evaluated per side, on the same instrument (the R index), with no new constant.
+- The level stays the venue's own raw, the number F1 de-parks by through its applied value. So the new information is the split by side, which a team's implied total cannot carry.
+- That is the structural answer to R253's 2026-08-28 rider (a park term on top of a total that already moved counts the same information twice). The rider's grade, R255's ablation of component (b), is still owed; the brief records each team's two sides so it can be run.
+- Runs, not HR. The entry names Savant's per-park HR as "the direct instrument". F5 is a run factor, though, and `HR_Factor_Applied` is surfaced as `hr_environment` and deliberately never multiplied. An HR term would be a new multiplication site that R255 should grade first. The vendored file carries `Index_HR` by side, so a later ceiling term has its input.
+
+**Three consequences, stated rather than discovered.**
+1. **The clip erases the split wherever both sides pass one bound.**
+   - 16 of 30 venues split, for example Yankee Stadium L 1.080 / R 1.018, Chase 0.940 / 1.035, Target 0.940 / 1.017, Rogers 0.961 / 1.039, Tropicana 0.940 / 1.080.
+   - 13 take one value on both sides: ten at 0.94 (Angel, Busch, Comerica, Globe Life, Oracle, Petco, Progressive, T-Mobile, Truist, loanDepot) and three at 1.08 (Coors, Kauffman, Nationals).
+   - Sutter Health Park has no row.
+   - Pinned: `test_the_clip_erases_the_split_at_coors_and_the_floor_parks`.
+2. **The redistribution is not mean-zero.** The band is asymmetric and lineups are not balanced.
+   - On the vendored 2026-06-03 slate, with sides read from `handedness.csv` (31 of 80 hitters resolved): at Fenway lefties rise 1.9% and righties fall 1.9%, with the mean held at 0.960.
+   - At Citizens Bank Park (raw 1.08, already at the cap) lefties stay at 1.080 and righties fall 3.8% to 1.038, so the two sides average 1.059 against the 1.080 F1 de-parks by.
+   - `park_hand.by_team` prints `mean_LR` beside `applied` so the gap is on every brief.
+3. **Vintage.** The ratio is a 3-year window (2024-2026, pulled 2026-10-13). The level is `f5_park_factors.csv`'s raw from the 07-07 pull, whose window is not recorded and which tracks the single-year 2026 numbers more closely than the 3-year ones.
+   - It disagrees with today's 3-year all-sides index at most venues: Chase 0.98 vs 1.06, Kauffman 1.14 vs 1.04, Nationals 1.17 vs 1.04, and Wrigley 1.04 vs 0.96 (the opposite sign).
+   - The rule puts a 3-year side RATIO on that LEVEL. That is defensible, because the level is the one F1 de-parks by.
+   - The cost, measured by the review: at Chase (level 0.98, 3-year all-sides 1.06) lefties land on the 0.94 floor, where a consistent level would put them near 1.00. At Tropicana (1.02 against 0.94, on 37k PA because the Rays were away in 2025) the split is L 0.940 / R 1.080, the widest in the table, so right-handed bats there take the cap.
+   - It is named in `park_hand.note`. The level file's refresh is ARCHIVE's; see the fragment.
+
+**The sequencing conflict, decided at plan approval.**
+- R253's register text says "sequenced AFTER R252 grades a cycle", and R252 (Session 54) and R255 (Session 60) are Pending.
+- The board puts Session 59 NEXT, and R385 makes the board the only queue. R252's "no solver input until R255 grades it" governs R252's mispricing score, not F5, which was already a solver input.
+- Ben approved building it applied, with the per-side factors in the brief for R255's ablation. Default-off was the offered alternative.
+
+**Declined this session, each moved to Session 92 with its trigger.**
+- **R253(b), the profile term (pull rate × porch geometry).**
+  - There is no input in the tree: no batter pull rate and no fence geometry, by grep.
+  - The entry gates it on R255's residuals, which is R256's gate in the same row.
+  - The codex critique's §R253 model (a batter's shrunk EV/LA/spray profile transformed through the venue) is recorded beside it.
+- **R310(a2), the games-played APPG weight.**
+  - There is no count to read. DK ships none.
+  - The on-host `expected_stats_batting.csv` (min PA 1) carried neither callup on either incident date (its 08-30 vintage), and the vendored file has run 25 days stale between refreshes (`620d801`).
+  - A live count needs MLBAM ids for Showdown hitters, and the paste-fed lineup feed carries `id: null`.
+  - The entry's "a flat floor needs no feed at all" was false.
+  - Design note: a StatsAPI team-roster call with `hydrate=person(stats(type=season,group=hitting))`, joined by name and team. It can matter only once callups play again (2027).
+  - **Leave-one-out alone does not close R310:** the 0.40 APPG weight still carries 5.0 and 5.4 points off one or two games.
+
+**R233 class greps.**
+- `grep -rn "compute_f5_factor(" --include=*.py mlb_engine tools skills` gives two calls, both in `build_f5_map` (the team result and the side result); the third hit is a comment in `slate_intake_manager.py`. F5 has one producer.
+- `grep -rln "run_factor_applied\|Run_Factor_Applied"` adds three park readers that stay TEAM-level on purpose, because they rank GAMES, not hitters: `classic_sleeves.static_park_run_factor_by_game`, `tail_candidate_scanner._load_park_factors`, and the `slate_intake_manager` override check. The fourth is `audit.py`.
+- `grep -rn "polyfit" --include=*.py mlb_engine tools skills` gives two hits, both in `apply_base_prior`: the full-pool line and the leave-one-out line. The shrink has one site.
+
+**Tests and mutations.**
+- `SalaryFitLeaveOneOutTests` (5):
+  - Bernal's target equals an independent `polyfit` over the other 17 at $5,000 (4.60), and pitchers keep raw APPG.
+  - Both callups leave the top three hitters, and Morales prices below Muncy.
+  - Three hitters already take the line through the other two.
+  - Others on one salary take their mean.
+  - A two-hitter frame keeps the full-pool line.
+- `ParkFactorTests` (10):
+  - The vendored table joins every venue, holds L, R and All per venue, and records its provenance.
+  - Every venue's side factor equals the ledger clip recomputed from the table.
+  - The short porch and its mirror (Yankee L > R; Target and Chase R > L).
+  - No split at Coors (1.08) or Petco (0.94).
+  - No side, `S` passed raw, and Sutter Health Park each keep the team factor with their basis.
+  - `build_f5_map` on BOS@NYY: L 1.080 and R 1.018, with no hitter's side equal to the team factor. A switch hitter bats L vs a RHP and R vs a LHP. A BOS switch hitter with no posted arm and a BOS hitter with no side stay on 1.06. The pitcher stays on 1.0, the team result is intact, and int-keyed hands still resolve.
+  - Wind blowing out composes on each side's park.
+  - A Field of Dreams override keeps the team factor.
+  - An unreadable table leaves every hitter on the team factor, reason `table_unreadable`, and the brief's warnings say so.
+  - The brief carries the side parks and their count.
+- Mutations, 14 in all, each restored, every one red:
+  - Restoring the full-pool fit reddens 2 of the 3 R310 tests.
+  - A mean-of-others fallback on small frames reddens the third.
+  - Assigning the team factor instead of the side reddens 2.
+  - Removing the clip reddens 2.
+  - Inverting the switch-hitter mapping reddens 1.
+  - Not catching an unreadable table reddens 1.
+  - Dropping the override branch reddens 1.
+  - From the review, 7 more, each red:
+    - `park_hand` left out of the brief;
+    - no warning on an unreadable table;
+    - un-normalized keys;
+    - a switch hitter vs LHP mapped to L;
+    - no `table_unreadable` reason;
+    - leave-one-out starting at four hitters;
+    - one shared salary falling back to the full-pool line.
+
+**The review (an agent on the diff, before the PR).**
+- **Fixed:**
+  - The side parks never reached the brief.
+  - An unreadable table was silent.
+  - Hand keys were not normalized.
+  - A one-shared-salary frame was not shrunk at all.
+  - The tests left the three-hitter threshold, the LHP switch mapping and the side-equals-team count unpinned.
+  - The unreadable-table venues were mislabelled `no_venue_row`.
+- **Recorded, not changed:**
+  - The level/ratio vintage cost above.
+  - The `test_an_override_venue...` assertion `(1.0, 1.0)` cannot tell the team factor from neutral at Field of Dreams. The reason assertion carries it.
+
+**Found and filed.**
+- `ledger/inbox/2026-10-13_DEV_park-factors-by-hand-provenance.md` (for ARCHIVE), with two items:
+  1. Extend the ledger's park-factor provenance rule to the new file.
+  2. Review the level file's vintage. Its window is unrecorded, and it diverges from the 3-year index at most venues, Wrigley in the opposite direction. A refresh should pull both files from one window.
+- A rider on `docs/backlog_inbox/2026-10-06_DEV_late-swap-team-level-fill-for-a-newly-confirmed-hitter.md` (R428's carry gap). Its "fill F5 from teammates when they agree" now fills no F5 on a team with both sides carried; fill by the newcomer's side, or fill F1 alone.
+- Into R310's remainder: the Showdown fallback path (`use_ladder=False`, `price_showdown_pool`) runs no shrink at all, so on an unposted slate the (b) warning is the only protection.
+
+**R253 as filed (migrated from the register; the open part, (b), stays there).**
+
+> ### R253. Park factor conditioned on handedness and profile: the F5 refinement that reprices power for tonight's venue (P2, M) | new 2026-08-27, from Ben's greenfield instruction (his own example: xwOBA that plays up in a specific park)
+>
+> **What.** F5 is a global park/weather run environment. The example Ben named
+> needs park×handedness at minimum (the short-porch LHH case), and Statcast
+> publishes the direct instrument: per-park expected HR ("a HR in N of 30
+> parks"), which reprices a batter whose season line is suppressed or inflated
+> by home park the moment tonight's venue differs.
+>
+> **Why.** Power is where the spike in nightly FPTS lives (R259's shape
+> finding), so park×hand mispricing concentrates exactly where top-1% scores
+> come from.
+>
+> **Fix.** A per-park×hand factor table (S), an optional profile term
+> (pull-rate × porch geometry) after; applies as an F5 refinement and R252
+> component (b). **Sequenced AFTER R252 grades a cycle:** add components where
+> R255's residuals say they matter, not on principle.
+>
+> **Rider 2026-08-28 (ed9 §2.3, accepted).** The park component is graded
+> with an ablation against the market anchor: team totals already price the
+> public run environment, so a park term that adds to a projection the total
+> has already moved counts the same information twice and mints fake edge.
+> R255's grade for component (b) therefore reports attribution with and
+> without the total anchor. The full batted-ball venue transform (§2.3's
+> six-step chain) stays the L-shaped refinement behind the existing pull
+> condition; the v1 instrument is unchanged.
+
+**R310's 2026-09-25 rider as filed (migrated; its leave-one-out fix is (a1)).**
+
+> **Rider 2026-09-25 (the code review, model area): the shrink half, measured on the two vendored fixtures.** `showdown_theses.py:106-107` fits `np.polyfit` over ALL ordered hitters, outlier included and unweighted, and `:118` blends `0.60 * Salary_Fit + 0.40 * APPG_Raw` with no games-played term. STL@LAD 09-03: Leo Bernal $5,000, APPG 12.5, `Salary_Fit 5.25`, `Base_Prior 8.15`, APPG rank #1 to Base_Prior #3 of 18; the line refit WITHOUT him gives 4.60 at his salary. WSH@LAD 09-04: Yohandy Morales $3,400, APPG 13.5, fit 5.45, Base_Prior 8.41, #1 to #3 of 18, above Max Muncy (7.42); the line without him 3.01. The shrink target is inflated 0.65-2.4 points by the row it is meant to discipline. Fix: a leave-one-out fit (or the posted nines' median), and an APPG weight as a games-played function once that count is on the frame. XS-S.
+
+**Gates.**
+- Local, this host (Windows, Python 3.13). The main tree's read-only fixtures add host errors (CLAUDE.local.md), so each suite ran in a fresh worktree and its failing NAMES were diffed against base 5552b42.
+  - `test_core` at d9e282b: 16 failed / 2471 passed / 4 skipped, against base 16 / 2461 / 4. The same 16 names.
+  - `test_showdown` + `test_upload_integrity`: 3 / 987 / 1, against base 3 / 982 / 1. The same 3 names.
+  - All 19 are CLAUDE.local.md's host list: R477 re-promotion, host profile and budget, claim host, `ReplaySlateTests`, `AwaitingPerDraftgroupTests` and `MinerMoneyHonestyTests`.
+- `python tools/plan_status.py --check` exits 0.
+- `GOLD` is unmoved, and it was run: `test_golden_replay` 9 passed at d9e282b. Both replays run F5 at 1.0, and Showdown has no golden.
+- The local full gate (`tools/audit.py --run-tests --terse`) in a fresh worktree at d5e1570 printed `FAIL  test suite FAILED in tests.test_core, tests.test_showdown, tests.test_upload_integrity (ran 3785)`. Those are the three suites carrying the host failures above, at the pinned count.
+- PR #157's `gate` (3.11, the merge authority) on d5e1570, both runs (push and PR): `PASS  v2.26.0  45 modules  3785 tests  5 skipped  {test_core 2491/2491 (4 skipped) skipped_in_place; test_showdown 502/502 (1 skipped) skipped_in_place}`. These are the five absent-optional-file skips that every host shows.
+
 ## 2026-10-13 — R503: the Showdown feed lift takes a DK partial side beside a complete confirmed feed, and a side DK declares no arm on takes the feed's probable as its arm, DK's arm winning where both name one (roadmap Session 171)
 
 **Scope.**

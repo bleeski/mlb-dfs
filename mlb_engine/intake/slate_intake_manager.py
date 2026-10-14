@@ -1983,6 +1983,78 @@ def compute_f5_factor(
 
 
 # ---------------------------------------------------------------------------
+# R253(a) park run factor by batter side
+# ---------------------------------------------------------------------------
+# The calibration ledger's park-factor rule (2026-07-07): Run_Factor_Raw is
+# Savant's R index / 100 and the applied factor is clip(raw, 0.94, 1.08).
+# R253(a) evaluates that same rule per batter side: the side's raw is the
+# venue's Run_Factor_Raw times Savant's runs index for that side over its
+# all-sides index (park_factors_by_hand.csv, 3-year rolling). The LEVEL stays
+# the venue's own raw, the number F1 de-parks by through its applied value, so
+# the new information is the split by side, which a team's implied total cannot
+# carry. Two consequences, stated rather than discovered: the clip erases the
+# split wherever both sides land past one bound (Coors, every floor-clipped
+# park), and because the band is asymmetric a team's side factors need not
+# average to its applied factor. The ratio is a 3-year window applied to a
+# level from the 07-07 pull; the brief note says so. Runs, not HR: F5 is a run
+# factor and HR_Factor_Applied is surfaced, never multiplied.
+PARK_FACTOR_APPLIED_CLIP = (0.94, 1.08)
+
+
+def load_park_hand_factors(path: str) -> Dict[str, Dict[str, Dict[str, Any]]]:
+    """``{Venue: {"L" | "R" | "All": row}}`` from park_factors_by_hand.csv."""
+    out: Dict[str, Dict[str, Dict[str, Any]]] = {}
+    with open(path, newline="", encoding="utf-8-sig") as f:
+        for row in csv.DictReader(f):
+            venue = str(row.get("Venue") or "").strip()
+            side = str(row.get("Bat_Side") or "").strip()
+            if not venue or side not in ("L", "R", "All"):
+                continue
+            out.setdefault(venue, {})[side] = {
+                "index_runs": _to_float_or_none(row.get("Index_Runs")),
+                "index_woba": _to_float_or_none(row.get("Index_wOBA")),
+                "index_hr": _to_float_or_none(row.get("Index_HR")),
+                "n_pa": _to_float_or_none(row.get("N_PA")),
+                "year_range": str(row.get("Year_Range") or "").strip(),
+                "pulled": str(row.get("Pulled") or "").strip(),
+            }
+    return out
+
+
+def park_run_factor_for_side(
+    venue_name: str,
+    side: str,
+    park_factors: Dict[str, Dict[str, Any]],
+    hand_table: Dict[str, Dict[str, Dict[str, Any]]],
+) -> Tuple[float, str]:
+    """Return ``(applied park run factor for one batter side, basis)``.
+
+    ``side`` is the side the batter hits from TONIGHT ("L" or "R"; a switch
+    hitter is resolved by the caller against the opposing arm). ``basis`` is
+    ``"side"`` when the side's own factor applied; otherwise the venue's
+    ``Run_Factor_Applied``, today's team factor, stands and the basis names why:
+    ``"no_side"``, ``"no_venue_row"`` (no row for the venue or for that side),
+    ``"no_raw"`` (the level file carries no raw factor). A labeled deterministic
+    prior, never a run projection or a probability claim.
+    """
+    venue = str(venue_name or "").strip()
+    park = park_factors.get(venue) or {}
+    team = float(park.get("run_factor_applied") or 1.0)
+    if side not in ("L", "R"):
+        return team, "no_side"
+    rows = hand_table.get(venue) or {}
+    side_index = (rows.get(side) or {}).get("index_runs")
+    all_index = (rows.get("All") or {}).get("index_runs")
+    if not side_index or not all_index:
+        return team, "no_venue_row"
+    raw = park.get("run_factor_raw")
+    if raw is None:
+        return team, "no_raw"
+    low, high = PARK_FACTOR_APPLIED_CLIP
+    return round(min(high, max(low, float(raw) * side_index / all_index)), 6), "side"
+
+
+# ---------------------------------------------------------------------------
 # v1.7 slate clock: first lock and the T-minus-buffer delivery deadline
 # ---------------------------------------------------------------------------
 

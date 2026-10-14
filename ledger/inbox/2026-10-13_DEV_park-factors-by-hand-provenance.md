@@ -1,0 +1,7 @@
+# 2026-10-13 DEV (Session 59, R253(a)): a second park reference file, and the level file's vintage
+
+For ARCHIVE, the ledger's owner. Two items, neither urgent; nothing here is a lift, an edge or a probability.
+
+1. **Extend the park-factor provenance rule (ledger "Park factor provenance must be recorded on every refresh", 2026-07-07) to `data/reference/park_factors_by_hand.csv`.** New in Session 59: Savant's statcast park factors by bat side, `rolling=3`, `year=2026` (window 2024-2026), 29 venues x {L, R, All}, pulled 2026-10-13; source, window and pull date ride in every row. `build_f5_map` applies `clip(Run_Factor_Raw x Index_Runs[side] / Index_Runs[All], 0.94, 1.08)` per hitter (the ledger's rule per side). A refresh should pull the side table and the level file from one window.
+
+2. **The level file's window is unrecorded and diverges from the 3-year index.** `f5_park_factors.csv`'s `Run_Factor_Raw` (the 07-07 pull) tracks the single-year 2026 numbers more than the 3-year ones. Against today's 3-year all-sides runs index: Chase 0.98 vs 1.06, Fenway 0.96 vs 1.06, Kauffman 1.14 vs 1.04, Nationals 1.17 vs 1.04, Truist 0.90 vs 1.00, Comerica 0.94 vs 1.00, loanDepot 0.90 vs 1.00, Wrigley 1.04 vs 0.96 (opposite sign). The R253(a) side ratio is a 3-year window applied to that level, named in every brief's `park_hand.note`. Deciding the level's window (single-year vs 3-year) and recording it is the refresh this asks for; it moves every Classic hitter's F5 and F1's de-park together.

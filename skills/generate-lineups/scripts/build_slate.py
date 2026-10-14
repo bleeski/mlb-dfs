@@ -2968,6 +2968,13 @@ def build_f5_map(pool: dict, args, venues_by_game_id: dict | None = None) -> tup
     of the available signal: Coors is Coors in any weather. F18 confirmed park
     as F5's to own; F1 now de-parks the implied total so it is priced once.
 
+    R253(a). A hitter takes the park factor for the side he bats from tonight
+    (``park_run_factor_for_side``; a switch hitter takes the side opposite the
+    opposing probable's hand), composed with wind exactly as the team factor is.
+    F1 still de-parks by the TEAM factor and every cap and exclusion still reads
+    the team result; ``report["park_hand"]`` names each hitter left on the team
+    factor and why.
+
     Three F18 fixes live here. The wind gate tested ``roof_type == "outdoor"``
     while the library's own ``OUTDOOR_ROOF_TYPES`` also contains ``temporary``,
     so Sutter Health Park (the ATH home, wind sensitivity HIGH, threshold 8mph,
@@ -2979,7 +2986,8 @@ def build_f5_map(pool: dict, args, venues_by_game_id: dict | None = None) -> tup
     """
     from mlb_engine.intake.slate_intake_manager import (
         OUTDOOR_ROOF_TYPES, compute_f5_factor, load_f5_park_factors,
-        load_f5_weather_adjustments, risk_from_precip_probability,
+        load_f5_weather_adjustments, load_park_hand_factors,
+        park_run_factor_for_side, risk_from_precip_probability,
     )
     from mlb_engine.optimize.optimizer_v3 import wind_bearing_to_f5_label
 
@@ -3014,6 +3022,15 @@ def build_f5_map(pool: dict, args, venues_by_game_id: dict | None = None) -> tup
     except Exception as exc:
         report["skipped"] = f"F5 reference data unreadable: {exc}"
         return {}, report
+    # R253(a). The split by batter side is a refinement: an unreadable table
+    # leaves every hitter on the team factor, which is F5 exactly as before.
+    hand_table: dict = {}
+    hand_skipped = None
+    try:
+        hand_table = load_park_hand_factors(
+            str(REPO / "data/reference/park_factors_by_hand.csv"))
+    except Exception as exc:                            # noqa: BLE001
+        hand_skipped = f"park_factors_by_hand.csv unreadable: {exc}"
 
     venues_by_game_id = venues_by_game_id or {}
     # Game_ID is AWAY@HOME, so the game names the venue.
@@ -3029,6 +3046,7 @@ def build_f5_map(pool: dict, args, venues_by_game_id: dict | None = None) -> tup
                                          str(row.get("Team") or ""))
 
     f5_by_team: dict = {}
+    f5_by_side_by_team: dict = {}
     for team in sorted({str(t).strip().upper() for t in team_by_player_id.values() if t}):
         record = venues_by_game_id.get(game_by_team.get(team) or "")
         if not record:
@@ -3089,18 +3107,108 @@ def build_f5_map(pool: dict, args, venues_by_game_id: dict | None = None) -> tup
                                    roof_closed=roof_closed or roof_type == "retractable")
         f5_by_team[team] = result
         report["games_scored"] += 1
+        # R253(a). The same composition once per batter side, through the same
+        # one-row park override, so wind multiplies a side's park exactly as it
+        # multiplies the team's. The team-level result above stays what every
+        # cap and exclusion reads.
+        sides: dict = {}
+        if hand_skipped:
+            sides["reason"] = "table_unreadable"
+        elif record.get("venue_source") == "game_override":
+            sides["reason"] = "venue_override"
+        else:
+            for side in ("L", "R"):
+                park, basis = park_run_factor_for_side(venue, side, park_factors, hand_table)
+                if basis != "side":
+                    sides["reason"] = basis
+                    break
+                side_table = dict(park_factors)
+                side_table[venue] = {"run_factor_applied": park}
+                side_result = compute_f5_factor(
+                    venue, weather, side_table, adjustments,
+                    wind_threshold_mph=record.get("wind_min_speed_mph"),
+                    roof_closed=roof_closed or roof_type == "retractable")
+                sides[side] = {"park": park, "hitter_f5": side_result["hitter_f5"]}
+        f5_by_side_by_team[team] = sides
 
+    batter_hands = {str(k): v for k, v in (pool.get("batter_hands") or {}).items()}
+    opposing = pool.get("opposing_probables") or {}
+    neutral_hitters: list = []
+    side_hitters = 0
+    side_equals_team = 0
     f5_by_player: dict = {}
     for pid, team in team_by_player_id.items():
-        result = f5_by_team.get(str(team).strip().upper())
+        team_key = str(team).strip().upper()
+        result = f5_by_team.get(team_key)
         if not result:
             f5_by_player[str(pid)] = 1.0
             continue
-        f5_by_player[str(pid)] = float(
-            result["pitcher_f5"] if str(pid) in pitcher_roles else result["hitter_f5"])
+        if str(pid) in pitcher_roles:
+            f5_by_player[str(pid)] = float(result["pitcher_f5"])
+            continue
+        f5_by_player[str(pid)] = float(result["hitter_f5"])
+        sides = f5_by_side_by_team.get(team_key) or {}
+        bats = str(batter_hands.get(str(pid)) or "").strip().upper()[:1]
+        opp_hand = str((opposing.get(team_key) or {}).get("hand") or "").strip().upper()[:1]
+        side = bats if bats in ("L", "R") else (
+            {"R": "L", "L": "R"}.get(opp_hand) if bats == "S" else None)
+        if sides.get("reason"):
+            reason = sides["reason"]
+        elif not bats:
+            reason = "no_side"
+        elif not side:
+            reason = "switch_vs_unknown_hand"
+        else:
+            reason = None
+        if reason:
+            neutral_hitters.append({"player_id": str(pid), "team": team_key,
+                                    "reason": reason})
+            continue
+        f5_by_player[str(pid)] = float(sides[side]["hitter_f5"])
+        side_hitters += 1
+        if abs(float(sides[side]["hitter_f5"]) - float(result["hitter_f5"])) <= 1e-9:
+            side_equals_team += 1
 
     report["non_neutral_f5"] = sum(
         1 for v in f5_by_player.values() if abs(float(v) - 1.0) > 1e-9)
+    # R253(a). Per team, the two sides' parks beside the applied factor F1
+    # de-parks by: the clipped band is asymmetric, so the sides need not average
+    # to it, and the brief shows by how much.
+    reasons: dict = {}
+    for row in neutral_hitters:
+        reasons[row["reason"]] = reasons.get(row["reason"], 0) + 1
+    report["park_hand"] = {
+        "applied": bool(side_hitters),
+        "skipped": hand_skipped,
+        "hitters_on_side_factor": side_hitters,
+        "hitters_side_equals_team": side_equals_team,
+        "hitters_on_team_factor": len(neutral_hitters),
+        "team_factor_reasons": dict(sorted(reasons.items())),
+        "team_factor_hitters": sorted(neutral_hitters,
+                                      key=lambda r: (r["team"], r["player_id"])),
+        "venues_without_side_row": sorted({
+            str(f5_by_team[t]["components"]["venue"])
+            for t, s in f5_by_side_by_team.items() if s.get("reason") == "no_venue_row"}),
+        "by_team": {
+            t: {"venue": f5_by_team[t]["components"]["venue"],
+                "applied": f5_by_team[t]["components"]["park_run_factor"],
+                "L": (s.get("L") or {}).get("park"), "R": (s.get("R") or {}).get("park"),
+                "mean_LR": (round(((s["L"]["park"] + s["R"]["park"]) / 2), 6)
+                            if s.get("L") and s.get("R") else None),
+                "reason": s.get("reason")}
+            for t, s in sorted(f5_by_side_by_team.items())},
+        "formula": ("hitter_f5 = clip(Run_Factor_Raw x Index_Runs[side] / "
+                    "Index_Runs[All], 0.94, 1.08) x wind_hitter; a switch hitter "
+                    "takes the side opposite the opposing probable's hand"),
+        "note": ("R253(a). The ledger's applied-park rule evaluated per batter "
+                 "side; the ratio is Savant's 3-year (2024-2026) runs index by "
+                 "side, the level is f5_park_factors.csv's Run_Factor_Raw from the "
+                 "07-07 pull. The clip erases the split where both sides pass one "
+                 "bound. A hitter with no side, a switch hitter facing an unknown "
+                 "hand, a venue with no side row, or an override venue keeps the "
+                 "team factor. Labeled prior, never a run projection or a "
+                 "probability claim."),
+    }
     report["f5_by_team"] = {
         t: {"venue": r["components"]["venue"],
             "hitter_f5": r["hitter_f5"], "pitcher_f5": r["pitcher_f5"],
@@ -3130,7 +3238,8 @@ def build_f5_map(pool: dict, args, venues_by_game_id: dict | None = None) -> tup
     report["excluded_games"] = sorted(
         t for t, r in f5_by_team.items() if r.get("exclude_game"))
     report["note"] = (
-        "Deterministic F5 prior: park run factor times a wind adjustment that "
+        "Deterministic F5 prior: park run factor (by batter side for a hitter "
+        "whose side resolves, R253(a); see park_hand) times a wind adjustment that "
         "applies only when the roof is open (outdoor, temporary or open), "
         "direction is out/in, and speed meets the venue threshold, times a "
         "pitcher-only delay factor derived from the worst precipitation hour in "
@@ -3467,6 +3576,8 @@ def summarize_enrichment(reference_status: dict, enrichment: dict,
         "f1_pitchers_unpriced": len(f1_report.get("pitchers_unpriced") or []),
         "f5_non_neutral": int(f5_report.get("non_neutral_f5") or 0),
         "f5_games_scored": int(f5_report.get("games_scored") or 0),
+        "f5_hitters_on_side_factor": int(
+            (f5_report.get("park_hand") or {}).get("hitters_on_side_factor") or 0),
     }
     warnings = list(reference_status.get("warnings") or [])
     warnings += list(enrichment.get("warnings") or [])
@@ -3477,6 +3588,12 @@ def summarize_enrichment(reference_status: dict, enrichment: dict,
             warnings.append(f"f1: {f1_report[key]}")
         if f5_report.get(key):
             warnings.append(f"f5: {f5_report[key]}")
+    # R253(a) review. An unreadable side table puts every hitter back on the
+    # team factor; that is F5 as it was, and the brief says so rather than
+    # reading like a slate where no side resolved.
+    if (f5_report.get("park_hand") or {}).get("skipped"):
+        warnings.append(f"f5: {f5_report['park_hand']['skipped']}; every "
+                        "hitter is on the team park factor")
     if (f1_report.get("odds") or {}).get("warning"):
         warnings.append(f"f1: {f1_report['odds']['warning']}")
     unpriced_arms = f1_report.get("pitchers_unpriced") or []
@@ -3631,6 +3748,10 @@ def summarize_enrichment(reference_status: dict, enrichment: dict,
         "f1_pitchers_unpriced": f1_report.get("pitchers_unpriced") or [],
         "f1_implied_total_by_team": f1_report.get("implied_total_by_team"),
         "f5_by_team": f5_report.get("f5_by_team"),
+        # R253(a). f5_by_team is the TEAM result, which a hitter whose side
+        # resolved did not receive; this block carries each side's park and
+        # every hitter left on the team factor, with the reason.
+        "f5_park_hand": f5_report.get("park_hand"),
         "f5_retractable_unresolved": f5_report.get("retractable_unresolved") or [],
         "warnings": warnings,
         "note": "Enrichment counts are deterministic labeled priors applied to the "

@@ -12156,6 +12156,197 @@ class EnvironmentFactorOwnershipTests(unittest.TestCase):
         self.assertAlmostEqual(f1_report["park_run_factor_by_team"]["MIN"], park)
 
 
+class ParkFactorTests(unittest.TestCase):
+    """R253(a). A hitter's F5 park is the ledger's applied-park rule evaluated
+    for the side he bats from tonight: clip(Run_Factor_Raw x Index_Runs[side] /
+    Index_Runs[All], 0.94, 1.08), from the vendored park_factors_by_hand.csv.
+    F1 still de-parks by the team factor, and every cap reads the team result.
+    A labeled deterministic prior, never a run projection or a probability."""
+
+    HAND = REPO / "data" / "reference" / "park_factors_by_hand.csv"
+    PARKS = REPO / "data" / "reference" / "f5_park_factors.csv"
+
+    @staticmethod
+    def _sim():
+        from mlb_engine.intake import slate_intake_manager as sim
+        return sim
+
+    @staticmethod
+    def _module():
+        return BuildSlateScriptTests._module()
+
+    def _tables(self):
+        sim = self._sim()
+        return (sim.load_f5_park_factors(str(self.PARKS)),
+                sim.load_park_hand_factors(str(self.HAND)))
+
+    def _pool(self):
+        # BOS@NYY at Yankee Stadium. NYY bats face a RHP; BOS bats face an arm
+        # the feed never posted, so a BOS switch hitter has no side tonight.
+        return {"team_by_player_id": {"1": "NYY", "2": "NYY", "3": "NYY",
+                                      "5": "BOS", "6": "BOS", "9": "NYY"},
+                "pitcher_roles": {"9": "declared_probable_sp"},
+                "batter_hands": {"1": "L", "2": "R", "3": "S", "5": "S"},
+                "opposing_probables": {"NYY": {"id": "1", "name": "A", "hand": "R"}},
+                "projection_rows": [{"Player_ID": p, "Team": t, "Game_ID": "BOS@NYY"}
+                                    for p, t in (("1", "NYY"), ("2", "NYY"), ("3", "NYY"),
+                                                 ("5", "BOS"), ("6", "BOS"), ("9", "NYY"))]}
+
+    def test_the_table_joins_every_venue_and_records_its_provenance(self):
+        parks, hand = self._tables()
+        self.assertTrue(set(hand) <= set(parks), sorted(set(hand) - set(parks)))
+        self.assertEqual(sorted(set(parks) - set(hand)), ["Sutter Health Park"])
+        for venue, rows in hand.items():
+            self.assertEqual(sorted(rows), ["All", "L", "R"], venue)
+        with self.HAND.open(newline="", encoding="utf-8") as fh:
+            raw = list(csv.DictReader(fh))
+        self.assertEqual(len(raw), 87)
+        for row in raw:   # the ledger's rule: source, window and pull date recorded
+            self.assertTrue(row["Source"] and row["Year_Range"] and row["Pulled"], row)
+
+    def test_a_side_factor_is_the_ledger_rule_evaluated_per_side(self):
+        sim = self._sim()
+        parks, hand = self._tables()
+        low, high = sim.PARK_FACTOR_APPLIED_CLIP
+        self.assertEqual((low, high), (0.94, 1.08))
+        for venue, rows in sorted(hand.items()):
+            for side in ("L", "R"):
+                raw = parks[venue]["run_factor_raw"] * rows[side]["index_runs"] / rows["All"]["index_runs"]
+                got, basis = sim.park_run_factor_for_side(venue, side, parks, hand)
+                self.assertEqual(basis, "side")
+                self.assertAlmostEqual(got, min(high, max(low, raw)), places=6, msg=venue)
+
+    def test_the_short_porch_and_its_mirror(self):
+        sim = self._sim()
+        parks, hand = self._tables()
+        side = lambda v, s: sim.park_run_factor_for_side(v, s, parks, hand)[0]
+        self.assertGreater(side("Yankee Stadium", "L"), side("Yankee Stadium", "R"))
+        self.assertGreater(side("Target Field", "R"), side("Target Field", "L"))
+        self.assertGreater(side("Chase Field", "R"), side("Chase Field", "L"))
+
+    def test_the_clip_erases_the_split_at_coors_and_the_floor_parks(self):
+        """Deliberate: the ledger's band holds per side, so where both sides pass
+        one bound there is no split. Un-clip it and Coors splits."""
+        sim = self._sim()
+        parks, hand = self._tables()
+        for venue, bound in (("Coors Field", 1.08), ("Petco Park", 0.94)):
+            got = {s: sim.park_run_factor_for_side(venue, s, parks, hand)[0] for s in ("L", "R")}
+            self.assertEqual(got, {"L": bound, "R": bound}, venue)
+
+    def test_no_side_or_no_row_keeps_the_team_factor(self):
+        sim = self._sim()
+        parks, hand = self._tables()
+        applied = parks["Yankee Stadium"]["run_factor_applied"]
+        self.assertEqual(sim.park_run_factor_for_side("Yankee Stadium", "", parks, hand),
+                         (applied, "no_side"))
+        self.assertEqual(sim.park_run_factor_for_side("Yankee Stadium", "S", parks, hand),
+                         (applied, "no_side"))
+        self.assertEqual(
+            sim.park_run_factor_for_side("Sutter Health Park", "L", parks, hand),
+            (parks["Sutter Health Park"]["run_factor_applied"], "no_venue_row"))
+
+    def test_build_f5_map_gives_two_sides_of_one_team_different_parks(self):
+        sim, mod = self._sim(), self._module()
+        parks, hand = self._tables()
+        left = sim.park_run_factor_for_side("Yankee Stadium", "L", parks, hand)[0]
+        right = sim.park_run_factor_for_side("Yankee Stadium", "R", parks, hand)[0]
+        team = parks["Yankee Stadium"]["run_factor_applied"]
+        self.assertNotAlmostEqual(left, right)
+        pool = self._pool()
+        venues, _ = mod.resolve_slate_venues(pool, "2026-08-12")
+        f5, report = mod.build_f5_map(pool, types.SimpleNamespace(bundle=None), venues)
+        self.assertAlmostEqual(f5["1"], left)
+        self.assertAlmostEqual(f5["2"], right)
+        self.assertAlmostEqual(f5["3"], left, msg="a switch hitter bats L against a RHP")
+        self.assertAlmostEqual(f5["5"], team)
+        self.assertAlmostEqual(f5["6"], team)
+        self.assertAlmostEqual(f5["9"], 1.0, msg="a pitcher's F5 takes no park")
+        block = report["park_hand"]
+        self.assertTrue(block["applied"])
+        self.assertEqual(block["hitters_on_side_factor"], 3)
+        self.assertEqual(block["team_factor_reasons"],
+                         {"no_side": 1, "switch_vs_unknown_hand": 1})
+        self.assertEqual(block["by_team"]["NYY"]["L"], left)
+        self.assertEqual(block["by_team"]["NYY"]["R"], right)
+        self.assertEqual(block["hitters_side_equals_team"], 0)
+        # Every cap and exclusion still reads one team-level result.
+        self.assertAlmostEqual(report["f5_by_team"]["NYY"]["hitter_f5"], team)
+        # Against a LHP the same switch hitter bats R.
+        pool["opposing_probables"]["NYY"]["hand"] = "L"
+        f5, _ = mod.build_f5_map(pool, types.SimpleNamespace(bundle=None), venues)
+        self.assertAlmostEqual(f5["3"], right, msg="a switch hitter bats R against a LHP")
+        # The pool's keys are read the way F4 reads them, as strings.
+        pool["batter_hands"] = {int(k): v for k, v in pool["batter_hands"].items()}
+        f5, _ = mod.build_f5_map(pool, types.SimpleNamespace(bundle=None), venues)
+        self.assertAlmostEqual(f5["1"], left)
+
+    def test_wind_composes_with_the_side_park_exactly_as_with_the_team_park(self):
+        sim, mod = self._sim(), self._module()
+        parks, hand = self._tables()
+        left = sim.park_run_factor_for_side("Yankee Stadium", "L", parks, hand)[0]
+        right = sim.park_run_factor_for_side("Yankee Stadium", "R", parks, hand)[0]
+        pool = self._pool()
+        venues, _ = mod.resolve_slate_venues(pool, "2026-08-12")
+        blowing_out = (float(venues["BOS@NYY"]["cf_azimuth_degrees"]) + 180.0) % 360.0
+        with tempfile.TemporaryDirectory() as tmp:
+            bundle = Path(tmp) / "bundle.json"
+            bundle.write_text(json.dumps({"weather": {"Yankee Stadium": {
+                "hourly_window": [{"wind_speed_mph": 20.0,
+                                   "wind_direction_deg": blowing_out,
+                                   "precip_probability_pct": 0}] * 3}}}),
+                encoding="utf-8")
+            f5, report = mod.build_f5_map(pool, types.SimpleNamespace(bundle=str(bundle)),
+                                          venues)
+        wind = report["f5_by_team"]["NYY"]["wind"]
+        self.assertIsNotNone(wind)
+        self.assertEqual(wind["direction"], "out")
+        self.assertAlmostEqual(f5["1"], round(left * wind["hitter_factor"], 6))
+        self.assertAlmostEqual(f5["2"], round(right * wind["hitter_factor"], 6))
+
+    def test_an_override_venue_keeps_the_team_factor(self):
+        mod = self._module()
+        pool = {"team_by_player_id": {"1": "MIN", "2": "MIN"}, "pitcher_roles": {},
+                "batter_hands": {"1": "L", "2": "R"},
+                "projection_rows": [{"Player_ID": p, "Team": "MIN", "Game_ID": "PHI@MIN"}
+                                    for p in ("1", "2")]}
+        venues, _ = mod.resolve_slate_venues(pool, "2026-08-13")   # Field of Dreams
+        self.assertEqual(venues["PHI@MIN"]["venue_source"], "game_override")
+        f5, report = mod.build_f5_map(pool, types.SimpleNamespace(bundle=None), venues)
+        self.assertEqual((f5["1"], f5["2"]), (1.0, 1.0))
+        self.assertEqual(report["park_hand"]["team_factor_reasons"], {"venue_override": 2})
+
+    def test_an_unreadable_table_leaves_every_hitter_on_the_team_factor(self):
+        mod = self._module()
+        pool = self._pool()
+        venues, _ = mod.resolve_slate_venues(pool, "2026-08-12")
+        with unittest.mock.patch(
+                "mlb_engine.intake.slate_intake_manager.load_park_hand_factors",
+                side_effect=OSError("gone")):
+            f5, report = mod.build_f5_map(pool, types.SimpleNamespace(bundle=None), venues)
+        team = venues["BOS@NYY"]["park_run_factor"]
+        self.assertEqual({f5[p] for p in ("1", "2", "3", "5", "6")}, {team})
+        self.assertFalse(report["park_hand"]["applied"])
+        self.assertIn("gone", report["park_hand"]["skipped"])
+        self.assertEqual(report["park_hand"]["team_factor_reasons"], {"table_unreadable": 5})
+        self.assertEqual(report["park_hand"]["venues_without_side_row"], [])
+        # The brief, not just the process, says every hitter fell back.
+        summary = mod.summarize_enrichment({"enabled": True}, {}, {}, None, f5_report=report)
+        self.assertTrue(any("gone" in w and "team park factor" in w
+                            for w in summary["warnings"]), summary["warnings"])
+
+    def test_the_brief_carries_the_side_parks(self):
+        """The enrichment block is the brief's copy of F5; ``f5_by_team`` there is
+        the TEAM result, which a hitter whose side resolved did not receive."""
+        mod = self._module()
+        pool = self._pool()
+        venues, _ = mod.resolve_slate_venues(pool, "2026-08-12")
+        _, report = mod.build_f5_map(pool, types.SimpleNamespace(bundle=None), venues)
+        summary = mod.summarize_enrichment({"enabled": True}, {}, {}, None, f5_report=report)
+        self.assertEqual(summary["f5_park_hand"], report["park_hand"])
+        self.assertEqual(summary["counts"]["f5_hitters_on_side_factor"], 3)
+        self.assertFalse(any("team park factor" in w for w in summary["warnings"]))
+
+
 class ClaimWriteSetTests(unittest.TestCase):
     """R353: `claim.py`'s DEV write set must cover what CLAUDE.md's DEV bullet
     names, because `dirt` is the only thing that reads it.

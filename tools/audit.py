@@ -1006,7 +1006,9 @@ EXPECTED_SUITE_COUNTS = {
     # R500(a), 2026-10-12: 2459 -> 2464, the 5 that pin `results_ledger.py attribute --rank` (`ResultsRankTests`: Spearman at 1.0 in order and -1.0 reversed on 3+ entries, 0.8 on five so a sign alone fails, midrank ties, under two and no spread read None; each contest's own rho with median and numpy's linear p25/p75, one-entry, no-spread, missing and NaN keys counted; one unit per build; Showdown's rank_in_build with 1 as best, one unit per record; the CLI through records and a resolution, and not measurable without one; 18 hand mutations killed)
     # Session 40 (R164, R454, R115, R138), 2026-10-12: 2464 -> 2475, the 11 that pin the sliced bank's job grid (`BankCoverageTests`: the opponent stacks the solver proves infeasible skipped and the arms' own kept; the skip only below the stack floor, k=3 skips and k=4 does not; a cache holding the old opponent keys still exhausted; a pinned entry below a two-stack one job per pair; a `P/OF` arm read as the solver reads it; a depth slice solving nothing its ordinary twin answered and still exhausted, and only the unanswered rest after a truncated walk; the tail and environment sleeve reports; the resume loop growing coverage until met, and ending on exhaustion when it cannot be; every legal team stacked over the full walk; the one opponent rule; 15 hand mutations killed).
     # Session 152 (R483), 2026-10-13: 2475 -> 2481, the 6 that pin the shape bands on a mixed entered set (`ShapeBandsMixedSetTests`: a satellite and a large GPP each carrying its own band through the real merge and allocator, the GPP's quota scoped to its 16 entries and met, the satellite's entries all five-plus, and `shape_band_application` naming both; a unanimous all-mid and all-narrow set adding no `_by_contest` key with the quota scoped to the portfolio; a cash contest in neither map and its entries on fours, the satellite's fives not counted toward the GPP's quota; a typed scalar retiring its map and a typed map refused by name, at the merge, both late-swap doors and both front-door gates; the bank asked for fives off either map; a contest floor relaxed and counted on a starved bank and on a proven infeasibility with the portfolio floor unmoved; 14 hand mutations killed)
-    "tests.test_core": 2481,
+    # R253(a), 2026-10-13: 2481 -> 2490, the 9 that pin the park factor by batter side (`ParkFactorTests`: the vendored table joins every venue and records its provenance, the ledger clip evaluated per side, the short porch and its mirror, no split at Coors or a floor park, no side or no row keeps the team factor, two sides of one team through `build_f5_map`, wind composed on the side park, an override venue and an unreadable table on the team factor).
+    # R253(a) review, 2026-10-13: 2490 -> 2491, the one that pins the side parks reaching the brief (`summarize_enrichment` carries `f5_park_hand` and its count; the unreadable-table test now also pins the brief's warning, the `table_unreadable` reason, a switch hitter against a LHP and str-keyed hands).
+    "tests.test_core": 2491,
     # R113's solve_ladder half, 2026-08-15: 55 -> 56, lock_relaxation_detail
     # naming the thesis and the substituted captain.
     # R153, 2026-08-19: 56 -> 62, the six that pin Ben's tightened Showdown caps
@@ -1328,7 +1330,9 @@ EXPECTED_SUITE_COUNTS = {
     # R503(a), 2026-10-13: 492 -> 493, the one that pins a DK partial side lifting through the exit door (the feed's confirmed nine over DK's MIN 1-4, each overridden slot on stderr, preflight cleared on the feed beside the salary file); R208's not-lifted partial test is rewritten to the new fact, not added.
     # R503(b), 2026-10-13: 493 -> 496, the three that pin the arm (DK's arm wins over a different feed probable and it is named on a lifted side, a DK-posted side and stderr; an OUT feed probable never lifts a side with no DK arm; a file with every Starting cell blank builds on the feed's twenty with both feed probables declared, preflight cleared on the feed beside the salary file); R208's no-arm and cannot-lift tests and R484's lifted-side test are rewritten to the new fact, not added.
     # R503 review, 2026-10-13: 496 -> 497, the one that pins an OUT DK arm as no declaration (DK posts MIN 1-4 with its SP Status O and the feed names Joe Ryan: the side lifts on Ryan, and nothing disagrees).
-    "tests.test_showdown": 497,
+    # R310(a1), 2026-10-13: 497 -> 500, the 3 that pin the leave-one-out salary line (`SalaryFitLeaveOneOutTests`: Bernal's target is the line through the other 17, both callups leave the top three and Morales falls below Muncy, a two-hitter frame keeps the full-pool line).
+    # R310(a1) review, 2026-10-13: 500 -> 502, the two that pin the small frames (three hitters already take the line through the other two; others on one salary take their mean, not the full-pool line through his own point).
+    "tests.test_showdown": 502,
     # R96, 2026-08-11: 141 -> 162, the twenty-one tests that pin the delivery
     # path. A `grew` verdict is the one case where moving a pin is correct.
     # R46 round 2, 2026-08-12: 162 -> 168, the six that pin the PARTIAL side.
@@ -1677,6 +1681,11 @@ CSV_REQUIRED = {
     "data/reference/f5_park_factors.csv": {
         "Venue", "Run_Factor_Applied", "HR_Factor_Applied", "Wind_Sensitivity",
     },
+    # R253(a): the park run factor by batter side; source, window and pull
+    # date ride in every row (the calibration ledger's provenance rule).
+    "data/reference/park_factors_by_hand.csv": {
+        "Venue", "Bat_Side", "Index_Runs", "N_PA", "Year_Range", "Source", "Pulled",
+    },
     "data/reference/f5_weather_adjustments.csv": {
         "Adjustment_Type", "Level", "Direction", "Hitter_Factor", "Pitcher_Factor",
         "Game_Exposure_Cap", "Exclude_Game",
@@ -1792,6 +1801,21 @@ def run_audit(root: Path, run_tests: bool = False,
         if venue_join_missing:
             errors.append(f"venues missing park factors: {venue_join_missing}")
     checks["venue_factor_join"] = {"passed": not venue_join_missing, "missing": venue_join_missing}
+
+    # R253(a). A side row for a venue the level file does not carry would be a
+    # split with nothing to split; the reverse (a venue with no side row) is
+    # allowed and keeps the team factor, named in the F5 report.
+    side_join_orphans = []
+    ph = root / "data/reference/park_factors_by_hand.csv"
+    if ph.exists() and pf.exists():
+        with pf.open(newline="", encoding="utf-8-sig") as handle:
+            factor_venues = {row["Venue"] for row in csv.DictReader(handle)}
+        with ph.open(newline="", encoding="utf-8-sig") as handle:
+            side_venues = {row["Venue"] for row in csv.DictReader(handle)}
+        side_join_orphans = sorted(side_venues - factor_venues)
+        if side_join_orphans:
+            errors.append(f"park-by-side venues with no park factor: {side_join_orphans}")
+    checks["park_side_join"] = {"passed": not side_join_orphans, "orphans": side_join_orphans}
 
     compile_failures = []
     py_files = sorted(
