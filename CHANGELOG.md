@@ -209,7 +209,8 @@ What changed in the engine, the tools and the contracts, when, and why.
   - All 19 are CLAUDE.local.md's host list: R477 re-promotion, host profile and budget, claim host, `ReplaySlateTests`, `AwaitingPerDraftgroupTests` and `MinerMoneyHonestyTests`.
 - `python tools/plan_status.py --check` exits 0.
 - `GOLD` is unmoved, and it was run: `test_golden_replay` 9 passed at d9e282b. Both replays run F5 at 1.0, and Showdown has no golden.
-- The PR's `gate` (3.11) is the merge authority; its line is added below when it reports.
+- The local full gate (`tools/audit.py --run-tests --terse`) in a fresh worktree at d5e1570 printed `FAIL  test suite FAILED in tests.test_core, tests.test_showdown, tests.test_upload_integrity (ran 3785)`. Those are the three suites carrying the host failures above, at the pinned count.
+- PR #157's `gate` (3.11, the merge authority) on d5e1570, both runs (push and PR): `PASS  v2.26.0  45 modules  3785 tests  5 skipped  {test_core 2491/2491 (4 skipped) skipped_in_place; test_showdown 502/502 (1 skipped) skipped_in_place}`. These are the five absent-optional-file skips that every host shows.
 
 ## 2026-10-13 — R503: the Showdown feed lift takes a DK partial side beside a complete confirmed feed, and a side DK declares no arm on takes the feed's probable as its arm, DK's arm winning where both name one (roadmap Session 171)
 
