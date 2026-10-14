@@ -328,9 +328,10 @@ def apply_base_prior(df: pd.DataFrame,
     # R310(a1). A hitter's shrink target is the line through the OTHER hitters,
     # read at his salary: fitted with him in it, the target leaned toward the
     # very APPG it exists to discipline (Morales, 2026-09-04: 5.45 with him,
-    # 3.01 without; Bernal, 09-03: 5.25 against 4.60). Fewer than two others, or
-    # others on one salary, keep the full-pool line above, so a one- or
-    # two-hitter frame prices exactly as before.
+    # 3.01 without; Bernal, 09-03: 5.25 against 4.60). Others all on one salary
+    # have no slope, so his target is their mean (the full-pool line would run
+    # through his own point). Fewer than two others keep the full-pool line
+    # above, so a one- or two-hitter frame prices exactly as before.
     if len(h) >= 3:
         salaries = h["UTIL_Salary"].astype(float).to_numpy()
         bases = h["Base"].astype(float).to_numpy()
@@ -340,6 +341,8 @@ def apply_base_prior(df: pd.DataFrame,
             if len(np.unique(salaries[keep])) > 1:
                 s, c = np.polyfit(salaries[keep], bases[keep], 1)
                 loo[pos] = salaries[pos] * s + c
+            else:
+                loo[pos] = float(bases[keep].mean())
         out.loc[hit, "Salary_Fit"] = loo
     out["APPG_Raw"] = out["Base"].astype(float)
 

@@ -10976,6 +10976,35 @@ class SalaryFitLeaveOneOutTests(unittest.TestCase):
         self.assertLess(prior["Yohandy Morales"], prior["Max Muncy"],
                         "a 2-game, 8-PA callup priced above Muncy")
 
+    def _three(self, salaries):
+        raw = sd.melt_showdown_salary_csv(str(self.STL_LAD))
+        names = ["Leo Bernal", "Jordan Walker", "Freddie Freeman"]
+        keep = raw["Batting_Order"].isna() | raw["Name"].isin(names)
+        three = raw[keep].reset_index(drop=True)
+        for name, salary in zip(names, salaries):
+            three.loc[three["Name"] == name, "UTIL_Salary"] = salary
+        priced = st.apply_base_prior(three, bat_side={}, pitcher_hand={})
+        return three, priced.set_index("Name")
+
+    def test_three_hitters_already_take_the_line_through_the_other_two(self):
+        import numpy as np
+        raw, priced = self._three([5000.0, 9000.0, 8600.0])
+        h = raw[raw["Batting_Order"].notna()].set_index("Name")
+        for name in h.index:
+            others = h.drop(index=name)
+            s, c = np.polyfit(others["UTIL_Salary"].astype(float), others["Base"].astype(float), 1)
+            self.assertAlmostEqual(float(priced.loc[name, "Salary_Fit"]),
+                                   float(h.loc[name, "UTIL_Salary"]) * s + c, places=9, msg=name)
+
+    def test_others_on_one_salary_take_their_mean_not_his_own_point(self):
+        """Two others on one salary have no slope. The full-pool line would run
+        through his own point and shrink him by nothing."""
+        raw, priced = self._three([5000.0, 3000.0, 3000.0])
+        h = raw[raw["Batting_Order"].notna()].set_index("Name")
+        mean = float(h.loc[["Jordan Walker", "Freddie Freeman"], "Base"].astype(float).mean())
+        self.assertAlmostEqual(float(priced.loc["Leo Bernal", "Salary_Fit"]), mean, places=9)
+        self.assertNotAlmostEqual(mean, float(h.loc["Leo Bernal", "Base"]), places=3)
+
     def test_a_two_hitter_frame_keeps_the_full_pool_line(self):
         """One other hitter is not a line. Below three hitters the target stays
         the full-pool fit, which on two points passes through both, so each

@@ -3112,7 +3112,9 @@ def build_f5_map(pool: dict, args, venues_by_game_id: dict | None = None) -> tup
         # multiplies the team's. The team-level result above stays what every
         # cap and exclusion reads.
         sides: dict = {}
-        if record.get("venue_source") == "game_override":
+        if hand_skipped:
+            sides["reason"] = "table_unreadable"
+        elif record.get("venue_source") == "game_override":
             sides["reason"] = "venue_override"
         else:
             for side in ("L", "R"):
@@ -3129,7 +3131,7 @@ def build_f5_map(pool: dict, args, venues_by_game_id: dict | None = None) -> tup
                 sides[side] = {"park": park, "hitter_f5": side_result["hitter_f5"]}
         f5_by_side_by_team[team] = sides
 
-    batter_hands = pool.get("batter_hands") or {}
+    batter_hands = {str(k): v for k, v in (pool.get("batter_hands") or {}).items()}
     opposing = pool.get("opposing_probables") or {}
     neutral_hitters: list = []
     side_hitters = 0
@@ -3574,6 +3576,8 @@ def summarize_enrichment(reference_status: dict, enrichment: dict,
         "f1_pitchers_unpriced": len(f1_report.get("pitchers_unpriced") or []),
         "f5_non_neutral": int(f5_report.get("non_neutral_f5") or 0),
         "f5_games_scored": int(f5_report.get("games_scored") or 0),
+        "f5_hitters_on_side_factor": int(
+            (f5_report.get("park_hand") or {}).get("hitters_on_side_factor") or 0),
     }
     warnings = list(reference_status.get("warnings") or [])
     warnings += list(enrichment.get("warnings") or [])
@@ -3584,6 +3588,12 @@ def summarize_enrichment(reference_status: dict, enrichment: dict,
             warnings.append(f"f1: {f1_report[key]}")
         if f5_report.get(key):
             warnings.append(f"f5: {f5_report[key]}")
+    # R253(a) review. An unreadable side table puts every hitter back on the
+    # team factor; that is F5 as it was, and the brief says so rather than
+    # reading like a slate where no side resolved.
+    if (f5_report.get("park_hand") or {}).get("skipped"):
+        warnings.append(f"f5: {f5_report['park_hand']['skipped']}; every "
+                        "hitter is on the team park factor")
     if (f1_report.get("odds") or {}).get("warning"):
         warnings.append(f"f1: {f1_report['odds']['warning']}")
     unpriced_arms = f1_report.get("pitchers_unpriced") or []
@@ -3738,6 +3748,10 @@ def summarize_enrichment(reference_status: dict, enrichment: dict,
         "f1_pitchers_unpriced": f1_report.get("pitchers_unpriced") or [],
         "f1_implied_total_by_team": f1_report.get("implied_total_by_team"),
         "f5_by_team": f5_report.get("f5_by_team"),
+        # R253(a). f5_by_team is the TEAM result, which a hitter whose side
+        # resolved did not receive; this block carries each side's park and
+        # every hitter left on the team factor, with the reason.
+        "f5_park_hand": f5_report.get("park_hand"),
         "f5_retractable_unresolved": f5_report.get("retractable_unresolved") or [],
         "warnings": warnings,
         "note": "Enrichment counts are deterministic labeled priors applied to the "

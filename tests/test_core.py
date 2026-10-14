@@ -12268,8 +12268,17 @@ class ParkFactorTests(unittest.TestCase):
                          {"no_side": 1, "switch_vs_unknown_hand": 1})
         self.assertEqual(block["by_team"]["NYY"]["L"], left)
         self.assertEqual(block["by_team"]["NYY"]["R"], right)
+        self.assertEqual(block["hitters_side_equals_team"], 0)
         # Every cap and exclusion still reads one team-level result.
         self.assertAlmostEqual(report["f5_by_team"]["NYY"]["hitter_f5"], team)
+        # Against a LHP the same switch hitter bats R.
+        pool["opposing_probables"]["NYY"]["hand"] = "L"
+        f5, _ = mod.build_f5_map(pool, types.SimpleNamespace(bundle=None), venues)
+        self.assertAlmostEqual(f5["3"], right, msg="a switch hitter bats R against a LHP")
+        # The pool's keys are read the way F4 reads them, as strings.
+        pool["batter_hands"] = {int(k): v for k, v in pool["batter_hands"].items()}
+        f5, _ = mod.build_f5_map(pool, types.SimpleNamespace(bundle=None), venues)
+        self.assertAlmostEqual(f5["1"], left)
 
     def test_wind_composes_with_the_side_park_exactly_as_with_the_team_park(self):
         sim, mod = self._sim(), self._module()
@@ -12318,6 +12327,24 @@ class ParkFactorTests(unittest.TestCase):
         self.assertEqual({f5[p] for p in ("1", "2", "3", "5", "6")}, {team})
         self.assertFalse(report["park_hand"]["applied"])
         self.assertIn("gone", report["park_hand"]["skipped"])
+        self.assertEqual(report["park_hand"]["team_factor_reasons"], {"table_unreadable": 5})
+        self.assertEqual(report["park_hand"]["venues_without_side_row"], [])
+        # The brief, not just the process, says every hitter fell back.
+        summary = mod.summarize_enrichment({"enabled": True}, {}, {}, None, f5_report=report)
+        self.assertTrue(any("gone" in w and "team park factor" in w
+                            for w in summary["warnings"]), summary["warnings"])
+
+    def test_the_brief_carries_the_side_parks(self):
+        """The enrichment block is the brief's copy of F5; ``f5_by_team`` there is
+        the TEAM result, which a hitter whose side resolved did not receive."""
+        mod = self._module()
+        pool = self._pool()
+        venues, _ = mod.resolve_slate_venues(pool, "2026-08-12")
+        _, report = mod.build_f5_map(pool, types.SimpleNamespace(bundle=None), venues)
+        summary = mod.summarize_enrichment({"enabled": True}, {}, {}, None, f5_report=report)
+        self.assertEqual(summary["f5_park_hand"], report["park_hand"])
+        self.assertEqual(summary["counts"]["f5_hitters_on_side_factor"], 3)
+        self.assertFalse(any("team park factor" in w for w in summary["warnings"]))
 
 
 class ClaimWriteSetTests(unittest.TestCase):
