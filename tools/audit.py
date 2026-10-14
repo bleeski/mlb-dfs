@@ -1328,7 +1328,8 @@ EXPECTED_SUITE_COUNTS = {
     # R503(a), 2026-10-13: 492 -> 493, the one that pins a DK partial side lifting through the exit door (the feed's confirmed nine over DK's MIN 1-4, each overridden slot on stderr, preflight cleared on the feed beside the salary file); R208's not-lifted partial test is rewritten to the new fact, not added.
     # R503(b), 2026-10-13: 493 -> 496, the three that pin the arm (DK's arm wins over a different feed probable and it is named on a lifted side, a DK-posted side and stderr; an OUT feed probable never lifts a side with no DK arm; a file with every Starting cell blank builds on the feed's twenty with both feed probables declared, preflight cleared on the feed beside the salary file); R208's no-arm and cannot-lift tests and R484's lifted-side test are rewritten to the new fact, not added.
     # R503 review, 2026-10-13: 496 -> 497, the one that pins an OUT DK arm as no declaration (DK posts MIN 1-4 with its SP Status O and the feed names Joe Ryan: the side lifts on Ryan, and nothing disagrees).
-    "tests.test_showdown": 497,
+    # R310(a1), 2026-10-13: 497 -> 500, the 3 that pin the leave-one-out salary line (`SalaryFitLeaveOneOutTests`: Bernal's target is the line through the other 17, both callups leave the top three and Morales falls below Muncy, a two-hitter frame keeps the full-pool line).
+    "tests.test_showdown": 500,
     # R96, 2026-08-11: 141 -> 162, the twenty-one tests that pin the delivery
     # path. A `grew` verdict is the one case where moving a pin is correct.
     # R46 round 2, 2026-08-12: 162 -> 168, the six that pin the PARTIAL side.

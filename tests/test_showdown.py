@@ -10921,3 +10921,70 @@ class KeepArmsPoolTests(_ShowdownExitDoorHarness, unittest.TestCase):
         self.assertEqual([m["id"] for m in block["named_not_kept"]], ["999999"])
         self.assertIn("--keep-arm 999999 (nobody) kept no arm", r.err)
         self.assertEqual(r.brief["declared_pitchers"], {rea: self.KEPT})
+
+
+class SalaryFitLeaveOneOutTests(unittest.TestCase):
+    """R310(a1). A hitter's salary-shrink target is the line through the OTHER
+    hitters. Fitted with him in it, the target leaned toward the APPG it exists
+    to discipline; both incidents are the vendored 2210_1g_sd salary files, run
+    through the production ``apply_base_prior``. A labeled review prior, never a
+    projection or an edge."""
+
+    STL_LAD = FIX / "DKSalaries_showdown_STL_LAD_frozen_2026-09-03.csv"
+    WSH_LAD = FIX / "DKSalaries_showdown_WSH_LAD_frozen_2026-09-04.csv"
+
+    @staticmethod
+    def _priced(path):
+        raw = sd.melt_showdown_salary_csv(str(path))
+        return raw, st.apply_base_prior(raw, bat_side={}, pitcher_hand={})
+
+    @staticmethod
+    def _rank(priced, name):
+        hitters = priced[priced["Batting_Order"].notna()]
+        ranks = hitters["Base_Prior"].rank(ascending=False, method="min")
+        return int(ranks[hitters["Name"] == name].iloc[0]), len(hitters)
+
+    def test_a_hitters_target_is_the_line_through_the_other_hitters(self):
+        import numpy as np
+        raw, priced = self._priced(self.STL_LAD)
+        hitters = raw[raw["Batting_Order"].notna()]
+        me = hitters["Name"] == "Leo Bernal"
+        others = hitters[~me]
+        slope, intercept = np.polyfit(others["UTIL_Salary"].astype(float),
+                                      others["Base"].astype(float), 1)
+        full = np.polyfit(hitters["UTIL_Salary"].astype(float),
+                          hitters["Base"].astype(float), 1)
+        got = float(priced.loc[priced["Name"] == "Leo Bernal", "Salary_Fit"].iloc[0])
+        self.assertAlmostEqual(got, 5000.0 * slope + intercept, places=9)
+        self.assertAlmostEqual(got, 4.60, places=2)
+        # The full-pool line, him included, read 5.25 at his salary.
+        self.assertGreater(5000.0 * full[0] + full[1] - got, 0.6)
+        # Pitchers sit outside the fit and keep their raw APPG.
+        arms = priced["Batting_Order"].isna()
+        self.assertTrue(arms.any())
+        self.assertEqual(list(priced.loc[arms, "Base"]), list(raw.loc[arms, "Base"]))
+
+    def test_the_two_incident_callups_leave_the_top_three_hitters(self):
+        _raw, stl = self._priced(self.STL_LAD)
+        rank, n = self._rank(stl, "Leo Bernal")
+        self.assertEqual(n, 18)
+        self.assertGreater(rank, 3, "Bernal held #3 of 18 on the full-pool line")
+        _raw, wsh = self._priced(self.WSH_LAD)
+        rank, _n = self._rank(wsh, "Yohandy Morales")
+        self.assertGreater(rank, 3, "Morales held #3 of 18 on the full-pool line")
+        prior = wsh.set_index("Name")["Base_Prior"]
+        self.assertLess(prior["Yohandy Morales"], prior["Max Muncy"],
+                        "a 2-game, 8-PA callup priced above Muncy")
+
+    def test_a_two_hitter_frame_keeps_the_full_pool_line(self):
+        """One other hitter is not a line. Below three hitters the target stays
+        the full-pool fit, which on two points passes through both, so each
+        prior is that hitter's own APPG times the order factor, as before."""
+        raw = sd.melt_showdown_salary_csv(str(self.STL_LAD))
+        keep = raw["Batting_Order"].isna() | raw["Name"].isin(["Leo Bernal", "Jordan Walker"])
+        two = raw[keep].reset_index(drop=True)
+        priced = st.apply_base_prior(two, bat_side={}, pitcher_hand={})
+        hitters = priced[priced["Batting_Order"].notna()]
+        self.assertEqual(len(hitters), 2)
+        for _, row in hitters.iterrows():
+            self.assertAlmostEqual(float(row["Salary_Fit"]), float(row["APPG_Raw"]), places=9)

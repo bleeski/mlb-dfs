@@ -284,7 +284,10 @@ def apply_base_prior(df: pd.DataFrame,
 
     The salary regression exists because AvgPointsPerGame on a short sample can
     sit far off the market's own read of a player. Left unregressed, one
-    small-sample outlier captains most of the portfolio.
+    small-sample outlier captains most of the portfolio. Each hitter's target is
+    the line fitted through the OTHER hitters (leave-one-out, R310(a1)), so the
+    outlier cannot pull his own target toward himself; the 0.40 APPG weight still
+    carries no games-played term (R310(a2), open).
 
     Platoon handles BOTH starter hands. An earlier version only modeled LHP
     starters, so a slate with two RHP starters silently got a flat 1.00 for
@@ -322,6 +325,22 @@ def apply_base_prior(df: pd.DataFrame,
     else:                                    # degenerate pool: skip the regression
         slope, intercept = 0.0, float(h["Base"].mean()) if len(h) else 0.0
     out["Salary_Fit"] = out["UTIL_Salary"].astype(float) * slope + intercept
+    # R310(a1). A hitter's shrink target is the line through the OTHER hitters,
+    # read at his salary: fitted with him in it, the target leaned toward the
+    # very APPG it exists to discipline (Morales, 2026-09-04: 5.45 with him,
+    # 3.01 without; Bernal, 09-03: 5.25 against 4.60). Fewer than two others, or
+    # others on one salary, keep the full-pool line above, so a one- or
+    # two-hitter frame prices exactly as before.
+    if len(h) >= 3:
+        salaries = h["UTIL_Salary"].astype(float).to_numpy()
+        bases = h["Base"].astype(float).to_numpy()
+        loo = out.loc[hit, "Salary_Fit"].astype(float).to_numpy().copy()
+        for pos in range(len(h)):
+            keep = np.arange(len(h)) != pos
+            if len(np.unique(salaries[keep])) > 1:
+                s, c = np.polyfit(salaries[keep], bases[keep], 1)
+                loo[pos] = salaries[pos] * s + c
+        out.loc[hit, "Salary_Fit"] = loo
     out["APPG_Raw"] = out["Base"].astype(float)
 
     unresolved: set[str] = set()
@@ -3657,7 +3676,8 @@ def portfolio_report(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
         # R381. None when no sleeve was designated, so the key has one shape
         # across every Showdown brief rather than appearing only sometimes.
         "captain_sleeve": captain_sleeve_report(df, theses, lineups, captain_sleeve),
-        "prior_note": ("Base = 0.60*salary-regressed + 0.40*AvgPointsPerGame, "
+        "prior_note": ("Base = 0.60*salary-regressed (leave-one-out: the line "
+                       "through the other hitters) + 0.40*AvgPointsPerGame, "
                        "x batting-order PA factor x platoon factor"
                        + (" x F1 implied-team-total factor"
                           if (df.attrs.get("f1_prior_report") or {}).get("applied")
