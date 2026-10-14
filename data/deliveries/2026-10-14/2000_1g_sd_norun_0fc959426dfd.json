@@ -1,0 +1,380 @@
+{
+ "code": {
+  "contest_allocator": "v1.12",
+  "execution_pipeline": "v1.17",
+  "git_dirty": true,
+  "git_sha": "9ed92216058ba267b7ba3fa52f91e719e23507dd"
+ },
+ "controls": {},
+ "date": "2026-10-14",
+ "egress": "egress: statsapi 200, odds 401, savant 200, mlb-lineups 200, fangraphs 200 (curl), open-meteo 200",
+ "egress_source": "session_start 2026-10-14T22:32:49+00:00",
+ "entries": [
+  {
+   "contest_id": "196718330",
+   "contest_name": "MLB Showdown Satellite to $15 Relay Throw (MIL @ LAD)",
+   "entry_fee": 0.25,
+   "entry_id": "5295555200",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44496166",
+    "44496070",
+    "44496075",
+    "44496078",
+    "44496079",
+    "44496083"
+   ]
+  },
+  {
+   "contest_id": "196718330",
+   "contest_name": "MLB Showdown Satellite to $15 Relay Throw (MIL @ LAD)",
+   "entry_fee": 0.25,
+   "entry_id": "5295555228",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44496163",
+    "44496071",
+    "44496072",
+    "44496074",
+    "44496089",
+    "44496093"
+   ]
+  },
+  {
+   "contest_id": "196718334",
+   "contest_name": "MLB Showdown Satellite to NBA 10-20 $20 Opening Tip Off (MIL @ LAD)",
+   "entry_fee": 0.25,
+   "entry_id": "5295564430",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44496164",
+    "44496072",
+    "44496076",
+    "44496078",
+    "44496079",
+    "44496089"
+   ]
+  },
+  {
+   "contest_id": "196718334",
+   "contest_name": "MLB Showdown Satellite to NBA 10-20 $20 Opening Tip Off (MIL @ LAD)",
+   "entry_fee": 0.25,
+   "entry_id": "5295564474",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44496162",
+    "44496071",
+    "44496074",
+    "44496083",
+    "44496087",
+    "44496089"
+   ]
+  },
+  {
+   "contest_id": "196719588",
+   "contest_name": "MLB Showdown $5K Solo Shot [$1K to 1st] (MIL @ LAD)",
+   "entry_fee": 1.0,
+   "entry_id": "5295564042",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44496162",
+    "44496072",
+    "44496078",
+    "44496079",
+    "44496087",
+    "44496089"
+   ]
+  },
+  {
+   "contest_id": "196719594",
+   "contest_name": "MLB Showdown $2K Daily Dollar [Single Entry] (MIL @ LAD)",
+   "entry_fee": 1.0,
+   "entry_id": "5295563799",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44496166",
+    "44496068",
+    "44496078",
+    "44496079",
+    "44496080",
+    "44496090"
+   ]
+  },
+  {
+   "contest_id": "196744625",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (MIL @ LAD)",
+   "entry_fee": 0.1,
+   "entry_id": "5295556044",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44496176",
+    "44496068",
+    "44496075",
+    "44496078",
+    "44496079",
+    "44496080"
+   ]
+  },
+  {
+   "contest_id": "196744625",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (MIL @ LAD)",
+   "entry_fee": 0.1,
+   "entry_id": "5295556382",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44496165",
+    "44496070",
+    "44496072",
+    "44496078",
+    "44496080",
+    "44496089"
+   ]
+  },
+  {
+   "contest_id": "196746443",
+   "contest_name": "MLB Showdown $300 Dime Time [Just $0.10!] (MIL @ LAD)",
+   "entry_fee": 0.1,
+   "entry_id": "5295564564",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44496181",
+    "44496069",
+    "44496072",
+    "44496073",
+    "44496074",
+    "44496080"
+   ]
+  },
+  {
+   "contest_id": "196746443",
+   "contest_name": "MLB Showdown $300 Dime Time [Just $0.10!] (MIL @ LAD)",
+   "entry_fee": 0.1,
+   "entry_id": "5295564594",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44496162",
+    "44496069",
+    "44496078",
+    "44496079",
+    "44496093",
+    "44496094"
+   ]
+  },
+  {
+   "contest_id": "196749605",
+   "contest_name": "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (MIL @ LAD)",
+   "entry_fee": 0.1,
+   "entry_id": "5295556444",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44496166",
+    "44496070",
+    "44496074",
+    "44496078",
+    "44496079",
+    "44496084"
+   ]
+  },
+  {
+   "contest_id": "196749605",
+   "contest_name": "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (MIL @ LAD)",
+   "entry_fee": 0.1,
+   "entry_id": "5295556445",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44496162",
+    "44496075",
+    "44496076",
+    "44496079",
+    "44496082",
+    "44496094"
+   ]
+  },
+  {
+   "contest_id": "196749605",
+   "contest_name": "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (MIL @ LAD)",
+   "entry_fee": 0.1,
+   "entry_id": "5295556446",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44496164",
+    "44496068",
+    "44496075",
+    "44496076",
+    "44496084",
+    "44496094"
+   ]
+  },
+  {
+   "contest_id": "196749605",
+   "contest_name": "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (MIL @ LAD)",
+   "entry_fee": 0.1,
+   "entry_id": "5295556447",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44496165",
+    "44496070",
+    "44496073",
+    "44496074",
+    "44496080",
+    "44496089"
+   ]
+  },
+  {
+   "contest_id": "196749605",
+   "contest_name": "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (MIL @ LAD)",
+   "entry_fee": 0.1,
+   "entry_id": "5295556448",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44496163",
+    "44496071",
+    "44496074",
+    "44496080",
+    "44496084",
+    "44496089"
+   ]
+  },
+  {
+   "contest_id": "196749605",
+   "contest_name": "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (MIL @ LAD)",
+   "entry_fee": 0.1,
+   "entry_id": "5295556449",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44496165",
+    "44496073",
+    "44496074",
+    "44496076",
+    "44496080",
+    "44496083"
+   ]
+  },
+  {
+   "contest_id": "196749605",
+   "contest_name": "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (MIL @ LAD)",
+   "entry_fee": 0.1,
+   "entry_id": "5295564362",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44496163",
+    "44496068",
+    "44496071",
+    "44496087",
+    "44496089",
+    "44496093"
+   ]
+  }
+ ],
+ "entries_binding": {
+  "source": "outputs/2026-10-14/DKEntries_showdown_2000_1g_sd_REVIEW_GRADE_final.csv",
+  "source_sha256": "0fc959426dfd0afe7494e1a8a8d92fbe499b23122ff42a00943415086c906af0",
+  "status": "bound"
+ },
+ "host": {
+  "call_budget_s": 630.0,
+  "declared_ceiling_s": 900.0,
+  "host": "claude_code"
+ },
+ "kind": "delivery",
+ "labels": "deterministic review proxies and labeled priors only; never ROI, win rate, cash rate, or probability",
+ "manifest_row": {
+  "certification": "review_grade",
+  "contest_ids": [
+   "196718330",
+   "196718334",
+   "196719588",
+   "196719594",
+   "196744625",
+   "196746443",
+   "196749605"
+  ],
+  "contest_names": [
+   "MLB Showdown $100 Dime Time [Just $0.10!] (MIL @ LAD)",
+   "MLB Showdown $2K Daily Dollar [Single Entry] (MIL @ LAD)",
+   "MLB Showdown $300 Dime Time [Just $0.10!] (MIL @ LAD)",
+   "MLB Showdown $5K Solo Shot [$1K to 1st] (MIL @ LAD)",
+   "MLB Showdown Satellite to $15 Relay Throw (MIL @ LAD)",
+   "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (MIL @ LAD)",
+   "MLB Showdown Satellite to NBA 10-20 $20 Opening Tip Off (MIL @ LAD)"
+  ],
+  "contest_type": "showdown",
+  "delivered_file": "outputs/2026-10-14/DKEntries_showdown_2000_1g_sd_REVIEW_GRADE_final.csv",
+  "entries": 17,
+  "notes": "Operator assembly, review-grade, never certified. The 17 lineups are exactly the thesis-ladder rows of build sd_87f55d515c4c (v2: supplied SP Base Snell 15.9 = APPG x0.85, Gasser 11.0 = APPG x0.80 for postseason hooks, sha256 386d2d24; platoon splits blended 50/50 toward overall OPS for bullpen PA, sha256 of file in brief; odds cbs+si paste). Two row swaps, no lineup changed: Solo Shot 5295564042 takes the Snell-CPT LAD-close lineup from $100 Dime Time 5295556044, which takes the Smith-CPT bottom-order lineup; Daily Dollar SE 5295563799 takes the Betts-CPT LAD-close lineup from $300 Dime Time 5295564564, which takes the Pratt-CPT bottom-order lineup. The ladder deals templates by file position, so both single-entry contests had drawn leverage templates and both $300 Dime Time entries were LAD 4-2 builds.",
+  "projection_tier": "unknown",
+  "recorded_utc": "2026-10-14T22:43:26.281697+00:00",
+  "run_id": null,
+  "sha256": "0fc959426dfd0afe7494e1a8a8d92fbe499b23122ff42a00943415086c906af0",
+  "slate_tag": "2000_1g_sd",
+  "status": "candidate",
+  "strategy_state": {
+   "counts": {},
+   "state": "unknown"
+  }
+ },
+ "players": {},
+ "pool": null,
+ "prediction_source": {
+  "build_id": null,
+  "ceiling_basis": "null on every Showdown entry: the melted and priced frames carry Base and no Ceiling column on either path (the thesis ladder or the points-max bank), so there is no ceiling sum to record",
+  "filled": 17,
+  "held_entry_ids": [],
+  "label": "what the Showdown build predicted for each lineup it chose, handed to the record in process at delivery because a Showdown build has no run folder: the thesis template (or points_max for the baseline and the points-max bank), the realized captain and whether it is a pitcher or a hitter, the team split, the Base sum with the captain at 1.5x and its rank in the build, and the labeled captain-slot and six-slot roster priors or null. build_id is one per build's inputs (date, slate tag, salary and template bytes): the baseline and the ladder of a build share it, and two builds over the same inputs share it too, told apart by their sha256 and recorded_utc. Deterministic review proxies and labeled priors, never ROI, a win rate or a probability",
+  "players_missing": [
+   "44496068",
+   "44496069",
+   "44496070",
+   "44496071",
+   "44496072",
+   "44496073",
+   "44496074",
+   "44496075",
+   "44496076",
+   "44496078",
+   "44496079",
+   "44496080",
+   "44496082",
+   "44496083",
+   "44496084",
+   "44496087",
+   "44496089",
+   "44496090",
+   "44496093",
+   "44496094",
+   "44496162",
+   "44496163",
+   "44496164",
+   "44496165",
+   "44496166",
+   "44496176",
+   "44496181"
+  ],
+  "predicted": 0,
+  "priors": null,
+  "rank_basis": "rank_in_build orders this build's own lineups by base_sum descending, ties by slot; slot is the lineup's 1-based place in the build (the ladder's deal order or the bank's solve order), which is the order of the reserved rows it filled",
+  "status": "not_supplied",
+  "unmatched_entry_ids": []
+ },
+ "recorded_utc": "2026-10-14T22:43:26.581339+00:00",
+ "relaxations": {},
+ "run": {},
+ "schema_version": 1
+}
