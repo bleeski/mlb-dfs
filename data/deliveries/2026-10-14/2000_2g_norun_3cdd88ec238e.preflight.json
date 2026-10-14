@@ -1,0 +1,10 @@
+{
+ "entries_sha256": "3cdd88ec238ee9884b7dba4ff616473e60e8f15815bbdca8a8d95cc38cdb14b3",
+ "exit_code": 0,
+ "kind": "preflight",
+ "preflight_version": "1.1",
+ "record": "2000_2g_norun_3cdd88ec238e.json",
+ "schema_version": 1,
+ "utc": "2026-10-14T22:47:41.906191+00:00",
+ "verdict": "review_ready"
+}
