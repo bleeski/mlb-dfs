@@ -1,0 +1,79 @@
+{
+ "code": {
+  "contest_allocator": "v1.12",
+  "execution_pipeline": "v1.17",
+  "git_dirty": true,
+  "git_sha": "5bb5c4f84ac27d5e31fcbf9eb426f27121f4f059"
+ },
+ "controls": {},
+ "date": "2026-10-13",
+ "egress": "egress: statsapi 200, odds 401, savant 200, mlb-lineups 200, fangraphs 200 (curl), open-meteo 200",
+ "egress_source": "session_start 2026-10-13T23:26:24+00:00",
+ "entries": [],
+ "entries_binding": {
+  "source": "outputs/2026-10-13/DO_NOT_UPLOAD_DKEntries_showdown_2000_1g_sd_QA1.f08dd38910af.csv",
+  "source_sha256": "ef50907230b1c15e2895a3736cfd8c7ec8cae188f9d611daef2964150055d801",
+  "status": "bound"
+ },
+ "host": {
+  "call_budget_s": 630.0,
+  "declared_ceiling_s": 900.0,
+  "host": "claude_code"
+ },
+ "kind": "delivery",
+ "labels": "deterministic review proxies and labeled priors only; never ROI, win rate, cash rate, or probability",
+ "manifest_row": {
+  "certification": "review_grade",
+  "contest_ids": [
+   "196680460",
+   "196680464",
+   "196711369",
+   "196713409",
+   "196716875"
+  ],
+  "contest_names": [
+   "MLB Showdown $250 Daily Dollar [Single Entry] (CLE @ TB)",
+   "MLB Showdown $300 Dime Time [Just $0.10!] (CLE @ TB)",
+   "MLB Showdown Satellite to $15 Relay Throw (CLE @ TB)",
+   "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (CLE @ TB)",
+   "MLB Showdown Satellite to NBA 10-20 $20 Opening Tip Off (CLE @ TB)"
+  ],
+  "contest_type": "showdown",
+  "delivered_file": "outputs/2026-10-13/DKEntries_showdown_2000_1g_sd_QA1.csv",
+  "entries": 27,
+  "notes": "R272 repair of 8049dfbe7b30 (run none recorded): entry 5295045811 UTIL: Petey Halpin -> Austin Hedges; entry 5295046025 UTIL: Nathaniel Lowe -> Brayan Rocchio, via tools/repair_entry.py. Review-grade, not certified.",
+  "projection_tier": "unknown",
+  "recorded_utc": "2026-10-13T23:40:20.750886+00:00",
+  "repair_of": {
+   "run_id": null,
+   "sha256": "8049dfbe7b30eafcf8c6365e5c1d47eb1abbf78459c91077ac8343093433730f"
+  },
+  "run_id": null,
+  "sha256": "ef50907230b1c15e2895a3736cfd8c7ec8cae188f9d611daef2964150055d801",
+  "slate_tag": "2000_1g_sd",
+  "status": "candidate",
+  "strategy_state": {
+   "counts": {},
+   "state": "unknown"
+  }
+ },
+ "players": {},
+ "pool": null,
+ "prediction_source": {
+  "build_id": null,
+  "ceiling_basis": "null on every Showdown entry: the melted and priced frames carry Base and no Ceiling column on either path (the thesis ladder or the points-max bank), so there is no ceiling sum to record",
+  "filled": 0,
+  "held_entry_ids": [],
+  "label": "what the Showdown build predicted for each lineup it chose, handed to the record in process at delivery because a Showdown build has no run folder: the thesis template (or points_max for the baseline and the points-max bank), the realized captain and whether it is a pitcher or a hitter, the team split, the Base sum with the captain at 1.5x and its rank in the build, and the labeled captain-slot and six-slot roster priors or null. build_id is one per build's inputs (date, slate tag, salary and template bytes): the baseline and the ladder of a build share it, and two builds over the same inputs share it too, told apart by their sha256 and recorded_utc. Deterministic review proxies and labeled priors, never ROI, a win rate or a probability",
+  "players_missing": [],
+  "predicted": 0,
+  "priors": null,
+  "rank_basis": "rank_in_build orders this build's own lineups by base_sum descending, ties by slot; slot is the lineup's 1-based place in the build (the ladder's deal order or the bank's solve order), which is the order of the reserved rows it filled",
+  "status": "not_supplied",
+  "unmatched_entry_ids": []
+ },
+ "recorded_utc": "2026-10-13T23:40:20.971711+00:00",
+ "relaxations": {},
+ "run": {},
+ "schema_version": 1
+}
