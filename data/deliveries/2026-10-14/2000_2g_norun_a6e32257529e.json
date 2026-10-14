@@ -1,0 +1,185 @@
+{
+ "code": {
+  "contest_allocator": "v1.12",
+  "execution_pipeline": "v1.17",
+  "git_dirty": true,
+  "git_sha": "e859330b0e7cc4c85a82ad23d188f131c6e2565e"
+ },
+ "controls": {},
+ "date": "2026-10-14",
+ "egress": "egress: statsapi 200, odds 401, savant 200, mlb-lineups 200, fangraphs 200 (curl), open-meteo 429",
+ "egress_source": "session_start 2026-10-14T21:57:30+00:00",
+ "entries": [
+  {
+   "contest_id": "196680261",
+   "contest_name": "MLB $400 Quarter Jukebox [Just $0.25!] (Tue-Wed)",
+   "entry_fee": 0.25,
+   "entry_id": "5295011676",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44489469",
+    "44489468",
+    "44489491",
+    "44489506",
+    "44489497",
+    "44489477",
+    "44489476",
+    "44489485",
+    "44489492",
+    "44489486"
+   ]
+  },
+  {
+   "contest_id": "196680261",
+   "contest_name": "MLB $400 Quarter Jukebox [Just $0.25!] (Tue-Wed)",
+   "entry_fee": 0.25,
+   "entry_id": "5295011690",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44489468",
+    "44489469",
+    "44489482",
+    "44489489",
+    "44489493",
+    "44489477",
+    "44489505",
+    "44489492",
+    "44489496",
+    "44489487"
+   ]
+  },
+  {
+   "contest_id": "196714994",
+   "contest_name": "MLB $75 Solo Shot (Tue-Wed)",
+   "entry_fee": 1.0,
+   "entry_id": "5295008567",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44489471",
+    "44489468",
+    "44489495",
+    "44489488",
+    "44489478",
+    "44489483",
+    "44489507",
+    "44489503",
+    "44489499",
+    "44489472"
+   ]
+  },
+  {
+   "contest_id": "196714994",
+   "contest_name": "MLB $75 Solo Shot (Tue-Wed)",
+   "entry_fee": 1.0,
+   "entry_id": "5295011662",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44489470",
+    "44489471",
+    "44489482",
+    "44489488",
+    "44489516",
+    "44489483",
+    "44489476",
+    "44489480",
+    "44489499",
+    "44489475"
+   ]
+  }
+ ],
+ "entries_binding": {
+  "source": "outputs/2026-10-14/DKEntries_2000_2g_LATESWAP_review_grade.csv",
+  "source_sha256": "a6e32257529e8a720ce9025fac3fbae6f0c8814edd1bd12005175b1688f39e4f",
+  "status": "bound"
+ },
+ "extra": {
+  "market": {
+   "applied": false,
+   "reason": "a late swap passes no market: run_late_swap takes no implied totals, and the parent build's record holds the market that build was ranked by, if it had one"
+  }
+ },
+ "host": {
+  "call_budget_s": 630.0,
+  "declared_ceiling_s": 900.0,
+  "host": "claude_code"
+ },
+ "kind": "delivery",
+ "labels": "deterministic review proxies and labeled priors only; never ROI, win rate, cash rate, or probability",
+ "manifest_row": {
+  "certification": "review_grade",
+  "contest_ids": [
+   "196680261",
+   "196714994"
+  ],
+  "contest_names": [],
+  "contest_type": "classic",
+  "delivered_file": "outputs/2026-10-14/DKEntries_2000_2g_LATESWAP_review_grade.csv",
+  "entries": 4,
+  "notes": "standings-aware hand late swap of 777671dcd01a (run 20261013T222855Z_8baa2fb6), MIL@LAD slots only, on Ben's request (2026-10-14) for first-place equity vs total washout: 5295011690 P Gasser->Snell, OF Chourio->Mitchell; 5295008567 2B Edman->Turang, SS Betts->Pratt; 5295011662 SS Pratt->Betts, OF Mitchell->Tucker; 5295011676 unchanged. Chosen by a scratch scenario sim (tools/_scratch_lcs1013/swap_sim.py, swap_eval.py: the engine's UNCALIBRATED_CORRELATED_PRIOR loadings, market-calibrated team totals, field modeled from the live standings) as the lowest-washout portfolio, improving both washout and any-1st shares over the delivered file in 6 of 6 assumption variants. tools/late_swap.py refused (inherited pre-lock caps, -20.01 on 5295011676). verify_export exit 0, preflight --parent exit 0. Review-grade, not certified.",
+  "projection_tier": "proxy",
+  "recorded_utc": "2026-10-14T22:13:04.223905+00:00",
+  "run_id": null,
+  "sha256": "a6e32257529e8a720ce9025fac3fbae6f0c8814edd1bd12005175b1688f39e4f",
+  "slate_tag": "2000_2g",
+  "status": "candidate",
+  "strategy_state": {
+   "counts": {},
+   "state": "unknown"
+  }
+ },
+ "players": {},
+ "prediction_source": {
+  "filled": 4,
+  "hitter_roles_basis": "the frame's Notes tag per hitter: 'confirmed_order:' (intake, a confirmed side's posted slot) is confirmed_lineup, 'platoon_order:' (run_slate, a projected slot) is platoon_projected, neither is unknown; R342(c)'s role_source vocabulary. The intake's late-swap status map is not in the run, so a partial side's posted hitters read platoon_projected or unknown",
+  "label": "what the build that chose each lineup predicted for it, copied from runs/<run_id>/final/ at delivery: the allocator's contest shape, fit score and its rank among that run's entries in the contest, the stack and arms, and roster sums of the frame's Base, Ceiling and labeled ownership prior. Deterministic review proxies and labeled priors, never ROI, a win rate or a probability",
+  "players_missing": [
+   "44489468",
+   "44489469",
+   "44489470",
+   "44489471",
+   "44489472",
+   "44489475",
+   "44489476",
+   "44489477",
+   "44489478",
+   "44489480",
+   "44489482",
+   "44489483",
+   "44489485",
+   "44489486",
+   "44489487",
+   "44489488",
+   "44489489",
+   "44489491",
+   "44489492",
+   "44489493",
+   "44489495",
+   "44489496",
+   "44489497",
+   "44489499",
+   "44489503",
+   "44489505",
+   "44489506",
+   "44489507",
+   "44489516"
+  ],
+  "predicted": 0,
+  "runs_read": [],
+  "start_run_id": null,
+  "status": "no_run",
+  "unmatched_entry_ids": [
+   "5295011676",
+   "5295011690",
+   "5295008567",
+   "5295011662"
+  ]
+ },
+ "recorded_utc": "2026-10-14T22:13:04.516812+00:00",
+ "relaxations": {},
+ "run": {},
+ "schema_version": 1
+}
