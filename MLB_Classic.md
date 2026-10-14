@@ -156,7 +156,7 @@ One current game total, source, and timestamp are required per game. Team totals
 
 F5 is computed, not eyeballed. `slate_intake_manager.compute_f5_factor(...)` derives hitter and pitcher F5 from `f5_park_factors.csv` and `f5_weather_adjustments.csv`:
 
-- Hitter F5 = park `Run_Factor_Applied` × wind hitter factor.
+- Hitter F5 = park `Run_Factor_Applied` × wind hitter factor, where the park is evaluated for the side the hitter bats from tonight (R253(a), `park_run_factor_for_side`): clip(`Run_Factor_Raw` × Savant runs index for that side / all-sides index, 0.94, 1.08), from `park_factors_by_hand.csv` (3-year rolling). A switch hitter takes the side opposite the opposing probable's hand. A hitter with no side, a switch hitter facing an unknown hand, a venue with no side row, or an override venue keeps the team factor; `build_f5_map`'s `park_hand` block names each. F1 still de-parks by the team factor, and the clip erases the split where both sides pass one bound.
 - Pitcher F5 = wind pitcher factor × delay pitcher factor (park factor for pitchers is intentionally 1.0 here; a pitcher's park is carried by the park-inclusive opponent total in his F1, R433).
 - Wind applies only when direction is `out` or `in`, speed meets the venue threshold, and the roof is not closed. Speed bands: 8–12, 13–17, 18+.
 - The same call returns `hr_environment`, the postponement-driven `game_exposure_cap`, and `exclude_game`.

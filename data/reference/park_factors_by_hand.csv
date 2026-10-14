@@ -1,0 +1,88 @@
+Venue,Bat_Side,Index_Runs,Index_wOBA,Index_HR,N_PA,Savant_Venue_ID,Savant_Venue_Name,Year_Range,Source,Pulled
+American Family Field,All,96,98,103,57261,32,American Family Field,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+American Family Field,L,94,97,95,25513,32,American Family Field,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+American Family Field,R,96,98,109,31747,32,American Family Field,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Angel Stadium,All,98,99,100,55123,1,Angel Stadium,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Angel Stadium,L,98,99,94,20777,1,Angel Stadium,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Angel Stadium,R,98,99,104,34345,1,Angel Stadium,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Busch Stadium,All,94,97,76,54707,2889,Busch Stadium,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Busch Stadium,L,92,96,73,24919,2889,Busch Stadium,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Busch Stadium,R,96,98,79,29787,2889,Busch Stadium,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Chase Field,All,106,103,93,55777,15,Chase Field,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Chase Field,L,100,100,80,25821,15,Chase Field,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Chase Field,R,112,106,105,29956,15,Chase Field,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Citi Field,All,96,98,101,58192,3289,Citi Field,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Citi Field,L,98,99,94,26377,3289,Citi Field,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Citi Field,R,96,98,107,31814,3289,Citi Field,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Citizens Bank Park,All,104,102,114,55813,2681,Citizens Bank Park,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Citizens Bank Park,L,108,104,126,25123,2681,Citizens Bank Park,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Citizens Bank Park,R,100,100,102,30690,2681,Citizens Bank Park,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Comerica Park,All,100,100,101,54953,2394,Comerica Park,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Comerica Park,L,100,100,98,25321,2394,Comerica Park,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Comerica Park,R,100,100,105,29631,2394,Comerica Park,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Coors Field,All,125,112,108,56977,19,Coors Field,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Coors Field,L,128,113,112,24914,19,Coors Field,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Coors Field,R,123,111,104,32063,19,Coors Field,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Daikin Park,All,100,100,113,55294,2392,Daikin Park,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Daikin Park,L,102,101,118,20486,2392,Daikin Park,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Daikin Park,R,98,99,109,34808,2392,Daikin Park,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Dodger Stadium,All,102,101,124,58548,22,UNIQLO Field at Dodger Stadium,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Dodger Stadium,L,96,98,117,27319,22,UNIQLO Field at Dodger Stadium,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Dodger Stadium,R,106,103,130,31224,22,UNIQLO Field at Dodger Stadium,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Fenway Park,All,106,103,87,56456,3,Fenway Park,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Fenway Park,L,108,104,86,25858,3,Fenway Park,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Fenway Park,R,104,102,88,30598,3,Fenway Park,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Globe Life Field,All,88,94,93,55261,5325,Globe Life Field,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Globe Life Field,L,88,94,95,24359,5325,Globe Life Field,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Globe Life Field,R,86,93,92,30902,5325,Globe Life Field,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Great American Ball Park,All,102,101,113,55404,2602,Great American Ball Park,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Great American Ball Park,L,108,104,117,21990,2602,Great American Ball Park,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Great American Ball Park,R,100,100,111,33413,2602,Great American Ball Park,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Kauffman Stadium,All,104,102,89,54828,7,Kauffman Stadium,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Kauffman Stadium,L,104,102,82,24573,7,Kauffman Stadium,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Kauffman Stadium,R,104,102,95,30255,7,Kauffman Stadium,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Nationals Park,All,104,102,105,55873,3309,Nationals Park,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Nationals Park,L,106,103,107,27556,3309,Nationals Park,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Nationals Park,R,104,102,102,28317,3309,Nationals Park,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Oracle Park,All,94,97,79,55526,2395,Oracle Park,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Oracle Park,L,96,98,76,24613,2395,Oracle Park,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Oracle Park,R,92,96,81,30913,2395,Oracle Park,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Oriole Park at Camden Yards,All,104,102,109,56774,2,Oriole Park at Camden Yards,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Oriole Park at Camden Yards,L,104,102,120,27455,2,Oriole Park at Camden Yards,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Oriole Park at Camden Yards,R,102,101,99,29319,2,Oriole Park at Camden Yards,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+PNC Park,All,102,101,83,56378,31,PNC Park,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+PNC Park,L,108,104,98,24553,31,PNC Park,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+PNC Park,R,96,98,70,31826,31,PNC Park,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Petco Park,All,94,97,105,56800,2680,Petco Park,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Petco Park,L,90,95,93,25110,2680,Petco Park,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Petco Park,R,98,99,115,31689,2680,Petco Park,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Progressive Field,All,98,99,93,55839,5,Progressive Field,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Progressive Field,L,96,98,102,31197,5,Progressive Field,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Progressive Field,R,98,99,82,24639,5,Progressive Field,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Rate Field,All,98,99,99,56730,4,Rate Field,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Rate Field,L,100,100,104,25800,4,Rate Field,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Rate Field,R,98,99,93,30930,4,Rate Field,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Rogers Centre,All,102,101,105,57857,14,Rogers Centre,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Rogers Centre,L,98,99,102,24984,14,Rogers Centre,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Rogers Centre,R,106,103,108,32873,14,Rogers Centre,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+T-Mobile Park,All,85,92,98,54519,680,T-Mobile Park,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+T-Mobile Park,L,86,93,98,26778,680,T-Mobile Park,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+T-Mobile Park,R,83,91,98,27742,680,T-Mobile Park,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Target Field,All,106,103,94,56135,3312,Target Field,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Target Field,L,100,100,92,26267,3312,Target Field,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Target Field,R,110,105,97,29866,3312,Target Field,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Tropicana Field,All,94,97,105,37433,12,Tropicana Field,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Tropicana Field,L,85,92,88,16380,12,Tropicana Field,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Tropicana Field,R,102,101,118,21053,12,Tropicana Field,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Truist Park,All,100,100,100,56523,4705,Truist Park,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Truist Park,L,100,100,106,25335,4705,Truist Park,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Truist Park,R,100,100,94,31188,4705,Truist Park,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Wrigley Field,All,96,98,106,56878,17,Wrigley Field,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Wrigley Field,L,96,98,106,24434,17,Wrigley Field,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Wrigley Field,R,94,97,106,32444,17,Wrigley Field,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Yankee Stadium,All,102,101,118,58810,3313,Yankee Stadium,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Yankee Stadium,L,106,103,121,28781,3313,Yankee Stadium,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+Yankee Stadium,R,98,99,115,30029,3313,Yankee Stadium,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+loanDepot park,All,100,100,87,56494,4169,loanDepot park,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+loanDepot park,L,104,102,96,25824,4169,loanDepot park,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
+loanDepot park,R,96,98,80,30670,4169,loanDepot park,2024-2026,baseballsavant statcast-park-factors rolling=3 year=2026,2026-10-13
