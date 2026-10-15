@@ -1,0 +1,233 @@
+{
+ "code": {
+  "contest_allocator": "v1.12",
+  "execution_pipeline": "v1.17",
+  "git_dirty": true,
+  "git_sha": "4012bcfda988c4a63a7e7dc95fb17c0872167113"
+ },
+ "controls": {
+  "max_cpt_exposure_pct": 0.25,
+  "max_player_exposure_pct": 0.5,
+  "max_shared_players": 4
+ },
+ "date": "2026-10-15",
+ "egress": "",
+ "egress_source": "not_measured",
+ "entries": [
+  {
+   "contest_id": "196765394",
+   "contest_name": "MLB Showdown $750 Solo Shot (TB @ CLE)",
+   "entry_fee": 1.0,
+   "entry_id": "5296167169",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44512550",
+    "44512461",
+    "44512466",
+    "44512473",
+    "44512478",
+    "44512485"
+   ]
+  },
+  {
+   "contest_id": "196765442",
+   "contest_name": "MLB Showdown $125 Quarter Jukebox [Just $0.25!] (TB @ CLE)",
+   "entry_fee": 0.25,
+   "entry_id": "5296166739",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44512552",
+    "44512464",
+    "44512465",
+    "44512470",
+    "44512473",
+    "44512478"
+   ]
+  },
+  {
+   "contest_id": "196765442",
+   "contest_name": "MLB Showdown $125 Quarter Jukebox [Just $0.25!] (TB @ CLE)",
+   "entry_fee": 0.25,
+   "entry_id": "5296167081",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44512549",
+    "44512467",
+    "44512469",
+    "44512471",
+    "44512472",
+    "44512477"
+   ]
+  },
+  {
+   "contest_id": "196765666",
+   "contest_name": "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (TB @ CLE)",
+   "entry_fee": 1.0,
+   "entry_id": "5296167236",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44512547",
+    "44512462",
+    "44512470",
+    "44512477",
+    "44512479",
+    "44512485"
+   ]
+  },
+  {
+   "contest_id": "196767704",
+   "contest_name": "MLB Showdown $50 Quarter Jukebox [Just $0.25!] (TB @ CLE)",
+   "entry_fee": 0.25,
+   "entry_id": "5296167137",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44512551",
+    "44512461",
+    "44512466",
+    "44512473",
+    "44512479",
+    "44512481"
+   ]
+  },
+  {
+   "contest_id": "196767704",
+   "contest_name": "MLB Showdown $50 Quarter Jukebox [Just $0.25!] (TB @ CLE)",
+   "entry_fee": 0.25,
+   "entry_id": "5296175706",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44512555",
+    "44512462",
+    "44512463",
+    "44512467",
+    "44512470",
+    "44512485"
+   ]
+  },
+  {
+   "contest_id": "196767803",
+   "contest_name": "MLB Showdown $300 Solo Shot (TB @ CLE)",
+   "entry_fee": 1.0,
+   "entry_id": "5296176009",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44512548",
+    "44512463",
+    "44512469",
+    "44512472",
+    "44512477",
+    "44512478"
+   ]
+  }
+ ],
+ "entries_binding": {
+  "source": "outputs/2026-10-15/DO_NOT_UPLOAD_DKEntries_showdown_1300_1g_sd_REVIEW_GRADE_satswap.d93888660129.csv",
+  "source_sha256": "1e563ec54c3f484f9f0ddf0b92e670876f095603c86941f712595a1149b1e271",
+  "status": "bound"
+ },
+ "host": {
+  "call_budget_s": 130.0,
+  "declared_ceiling_s": null,
+  "host": "unknown"
+ },
+ "kind": "delivery",
+ "labels": "deterministic review proxies and labeled priors only; never ROI, win rate, cash rate, or probability",
+ "manifest_row": {
+  "certification": "review_grade",
+  "contest_ids": [
+   "196765394",
+   "196765442",
+   "196765666",
+   "196767704",
+   "196767803"
+  ],
+  "contest_names": [
+   "MLB Showdown $125 Quarter Jukebox [Just $0.25!] (TB @ CLE)",
+   "MLB Showdown $300 Solo Shot (TB @ CLE)",
+   "MLB Showdown $50 Quarter Jukebox [Just $0.25!] (TB @ CLE)",
+   "MLB Showdown $750 Solo Shot (TB @ CLE)",
+   "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (TB @ CLE)"
+  ],
+  "contest_type": "showdown",
+  "delivered_file": "outputs/2026-10-15/DKEntries_showdown_1300_1g_sd_REVIEW_GRADE_satswap.csv",
+  "entries": 7,
+  "notes": "Operator assembly, review-grade, never certified. The 7 lineups are exactly the thesis-ladder rows of the build recorded at sha256 454538605850 (supplied SP Base: Williams 19.5, Jax 11.0, file sha256 8b9614cca85e; odds paste draftkings+fanduel TB +110 / CLE -133/-130, total 6.5; no kept arms). One row swap, no lineup changed: Satellite to $20 NFL Millionaire 5296167236 takes the Williams-CPT pitchers_duel lineup (proxy 64.18) from $300 Solo Shot 5296176009, which takes the Jax-CPT underdog_win_big lineup (proxy 52.60). The ladder deals templates by file position and postures do not steer it, so the flat-payout satellite had drawn the most fragile thesis. Same call as 2026-10-06 2130_1g_sd and 2026-10-14 2000_1g_sd.",
+  "projection_tier": "unknown",
+  "recorded_utc": "2026-10-15T16:18:25.842908+00:00",
+  "run_id": null,
+  "sha256": "1e563ec54c3f484f9f0ddf0b92e670876f095603c86941f712595a1149b1e271",
+  "slate_tag": "1300_1g_sd",
+  "status": "candidate",
+  "strategy_state": {
+   "counts": {},
+   "state": "unknown"
+  }
+ },
+ "players": {},
+ "pool": null,
+ "prediction_source": {
+  "build_id": null,
+  "ceiling_basis": "null on every Showdown entry: the melted and priced frames carry Base and no Ceiling column on either path (the thesis ladder or the points-max bank), so there is no ceiling sum to record",
+  "filled": 7,
+  "held_entry_ids": [],
+  "label": "what the Showdown build predicted for each lineup it chose, handed to the record in process at delivery because a Showdown build has no run folder: the thesis template (or points_max for the baseline and the points-max bank), the realized captain and whether it is a pitcher or a hitter, the team split, the Base sum with the captain at 1.5x and its rank in the build, and the labeled captain-slot and six-slot roster priors or null. build_id is one per build's inputs (date, slate tag, salary and template bytes): the baseline and the ladder of a build share it, and two builds over the same inputs share it too, told apart by their sha256 and recorded_utc. Deterministic review proxies and labeled priors, never ROI, a win rate or a probability",
+  "players_missing": [
+   "44512461",
+   "44512462",
+   "44512463",
+   "44512464",
+   "44512465",
+   "44512466",
+   "44512467",
+   "44512469",
+   "44512470",
+   "44512471",
+   "44512472",
+   "44512473",
+   "44512477",
+   "44512478",
+   "44512479",
+   "44512481",
+   "44512485",
+   "44512547",
+   "44512548",
+   "44512549",
+   "44512550",
+   "44512551",
+   "44512552",
+   "44512555"
+  ],
+  "predicted": 0,
+  "priors": null,
+  "rank_basis": "rank_in_build orders this build's own lineups by base_sum descending, ties by slot; slot is the lineup's 1-based place in the build (the ladder's deal order or the bank's solve order), which is the order of the reserved rows it filled",
+  "status": "not_supplied",
+  "unmatched_entry_ids": []
+ },
+ "recorded_utc": "2026-10-15T16:18:25.860972+00:00",
+ "relaxations": {
+  "both_relaxed_slots": 0,
+  "cap_reassignments_withdrawn": 0,
+  "captain_apportionment_shortfall": 0,
+  "captain_budget_inversions": [],
+  "captain_relaxed_slots": 0,
+  "clean": true,
+  "contest_cap_relaxed_slots": 0,
+  "cpt_cap_relaxed_slots": 0,
+  "ignored_locks": [],
+  "min_per_team_relaxed_detail": [],
+  "min_per_team_relaxed_slots": 0,
+  "min_per_team_slots_carrying_floor": 2,
+  "overlap_relaxed_slots": 0,
+  "per_contest_cap_breaches": 0,
+  "player_relaxed_slots": 0
+ },
+ "run": {},
+ "schema_version": 1
+}

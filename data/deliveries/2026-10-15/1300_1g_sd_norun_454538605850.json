@@ -1,0 +1,506 @@
+{
+ "code": {
+  "contest_allocator": "v1.12",
+  "execution_pipeline": "v1.17",
+  "git_dirty": true,
+  "git_sha": "4012bcfda988c4a63a7e7dc95fb17c0872167113"
+ },
+ "controls": {
+  "max_cpt_exposure_pct": 0.25,
+  "max_cpt_per_contest": 2,
+  "max_player_exposure_pct": 0.5,
+  "max_shared_players": 4
+ },
+ "date": "2026-10-15",
+ "egress": "",
+ "egress_source": "not_measured",
+ "entries": [
+  {
+   "contest_id": "196765394",
+   "contest_name": "MLB Showdown $750 Solo Shot (TB @ CLE)",
+   "entry_fee": 1.0,
+   "entry_id": "5296167169",
+   "filled": true,
+   "prediction": {
+    "base_sum": 61.0,
+    "build_id": "sd_aaddbb7a3ef4",
+    "captain_id": "44512550",
+    "captain_prior_own": null,
+    "captain_role": "hitter",
+    "ceiling_sum": null,
+    "flex_prior_own_sum": null,
+    "rank_in_build": 2,
+    "rank_of_n": 7,
+    "slot": 1,
+    "team_counts": {
+     "CLE": 5,
+     "TB": 1
+    },
+    "team_split": "5-1",
+    "thesis": "favorite_win_big"
+   },
+   "roster_ids": [
+    "44512550",
+    "44512461",
+    "44512466",
+    "44512473",
+    "44512478",
+    "44512485"
+   ]
+  },
+  {
+   "contest_id": "196765442",
+   "contest_name": "MLB Showdown $125 Quarter Jukebox [Just $0.25!] (TB @ CLE)",
+   "entry_fee": 0.25,
+   "entry_id": "5296166739",
+   "filled": true,
+   "prediction": {
+    "base_sum": 52.03,
+    "build_id": "sd_aaddbb7a3ef4",
+    "captain_id": "44512552",
+    "captain_prior_own": null,
+    "captain_role": "hitter",
+    "ceiling_sum": null,
+    "flex_prior_own_sum": null,
+    "rank_in_build": 5,
+    "rank_of_n": 7,
+    "slot": 2,
+    "team_counts": {
+     "CLE": 5,
+     "TB": 1
+    },
+    "team_split": "5-1",
+    "thesis": "favorite_win_big_no_sp"
+   },
+   "roster_ids": [
+    "44512552",
+    "44512464",
+    "44512465",
+    "44512470",
+    "44512473",
+    "44512478"
+   ]
+  },
+  {
+   "contest_id": "196765442",
+   "contest_name": "MLB Showdown $125 Quarter Jukebox [Just $0.25!] (TB @ CLE)",
+   "entry_fee": 0.25,
+   "entry_id": "5296167081",
+   "filled": true,
+   "prediction": {
+    "base_sum": 48.49,
+    "build_id": "sd_aaddbb7a3ef4",
+    "captain_id": "44512549",
+    "captain_prior_own": null,
+    "captain_role": "hitter",
+    "ceiling_sum": null,
+    "flex_prior_own_sum": null,
+    "rank_in_build": 7,
+    "rank_of_n": 7,
+    "slot": 3,
+    "team_counts": {
+     "CLE": 1,
+     "TB": 5
+    },
+    "team_split": "5-1",
+    "thesis": "underdog_win_big_no_sp"
+   },
+   "roster_ids": [
+    "44512549",
+    "44512467",
+    "44512469",
+    "44512471",
+    "44512472",
+    "44512477"
+   ]
+  },
+  {
+   "contest_id": "196765666",
+   "contest_name": "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (TB @ CLE)",
+   "entry_fee": 1.0,
+   "entry_id": "5296167236",
+   "filled": true,
+   "prediction": {
+    "base_sum": 52.6,
+    "build_id": "sd_aaddbb7a3ef4",
+    "captain_id": "44512548",
+    "captain_prior_own": null,
+    "captain_role": "pitcher",
+    "ceiling_sum": null,
+    "flex_prior_own_sum": null,
+    "rank_in_build": 4,
+    "rank_of_n": 7,
+    "slot": 4,
+    "team_counts": {
+     "CLE": 1,
+     "TB": 5
+    },
+    "team_split": "5-1",
+    "thesis": "underdog_win_big"
+   },
+   "roster_ids": [
+    "44512548",
+    "44512463",
+    "44512469",
+    "44512472",
+    "44512477",
+    "44512478"
+   ]
+  },
+  {
+   "contest_id": "196767704",
+   "contest_name": "MLB Showdown $50 Quarter Jukebox [Just $0.25!] (TB @ CLE)",
+   "entry_fee": 0.25,
+   "entry_id": "5296167137",
+   "filled": true,
+   "prediction": {
+    "base_sum": 57.85,
+    "build_id": "sd_aaddbb7a3ef4",
+    "captain_id": "44512551",
+    "captain_prior_own": null,
+    "captain_role": "hitter",
+    "ceiling_sum": null,
+    "flex_prior_own_sum": null,
+    "rank_in_build": 3,
+    "rank_of_n": 7,
+    "slot": 5,
+    "team_counts": {
+     "CLE": 4,
+     "TB": 2
+    },
+    "team_split": "4-2",
+    "thesis": "favorite_win_close"
+   },
+   "roster_ids": [
+    "44512551",
+    "44512461",
+    "44512466",
+    "44512473",
+    "44512479",
+    "44512481"
+   ]
+  },
+  {
+   "contest_id": "196767704",
+   "contest_name": "MLB Showdown $50 Quarter Jukebox [Just $0.25!] (TB @ CLE)",
+   "entry_fee": 0.25,
+   "entry_id": "5296175706",
+   "filled": true,
+   "prediction": {
+    "base_sum": 51.13,
+    "build_id": "sd_aaddbb7a3ef4",
+    "captain_id": "44512555",
+    "captain_prior_own": null,
+    "captain_role": "hitter",
+    "ceiling_sum": null,
+    "flex_prior_own_sum": null,
+    "rank_in_build": 6,
+    "rank_of_n": 7,
+    "slot": 6,
+    "team_counts": {
+     "CLE": 2,
+     "TB": 4
+    },
+    "team_split": "4-2",
+    "thesis": "underdog_win_close"
+   },
+   "roster_ids": [
+    "44512555",
+    "44512462",
+    "44512463",
+    "44512467",
+    "44512470",
+    "44512485"
+   ]
+  },
+  {
+   "contest_id": "196767803",
+   "contest_name": "MLB Showdown $300 Solo Shot (TB @ CLE)",
+   "entry_fee": 1.0,
+   "entry_id": "5296176009",
+   "filled": true,
+   "prediction": {
+    "base_sum": 64.18,
+    "build_id": "sd_aaddbb7a3ef4",
+    "captain_id": "44512547",
+    "captain_prior_own": null,
+    "captain_role": "pitcher",
+    "ceiling_sum": null,
+    "flex_prior_own_sum": null,
+    "rank_in_build": 1,
+    "rank_of_n": 7,
+    "slot": 7,
+    "team_counts": {
+     "CLE": 4,
+     "TB": 2
+    },
+    "team_split": "4-2",
+    "thesis": "pitchers_duel"
+   },
+   "roster_ids": [
+    "44512547",
+    "44512462",
+    "44512470",
+    "44512477",
+    "44512479",
+    "44512485"
+   ]
+  }
+ ],
+ "entries_binding": {
+  "source": "outputs/2026-10-15/DO_NOT_UPLOAD_DKEntries_showdown_1300_1g_sd.ad1f0c4ef353.csv",
+  "source_sha256": "454538605850f36de53ea24e551ce761d40277c913dd6cd074cd15fcf1a7f423",
+  "status": "bound"
+ },
+ "host": {
+  "call_budget_s": 130.0,
+  "declared_ceiling_s": null,
+  "host": "unknown"
+ },
+ "kind": "delivery",
+ "labels": "deterministic review proxies and labeled priors only; never ROI, win rate, cash rate, or probability",
+ "manifest_row": {
+  "certification": "review_grade",
+  "contest_ids": [
+   "196765394",
+   "196765442",
+   "196765666",
+   "196767704",
+   "196767803"
+  ],
+  "contest_names": [
+   "MLB Showdown $125 Quarter Jukebox [Just $0.25!] (TB @ CLE)",
+   "MLB Showdown $300 Solo Shot (TB @ CLE)",
+   "MLB Showdown $50 Quarter Jukebox [Just $0.25!] (TB @ CLE)",
+   "MLB Showdown $750 Solo Shot (TB @ CLE)",
+   "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (TB @ CLE)"
+  ],
+  "contest_type": "showdown",
+  "delivered_file": "outputs/2026-10-15/DKEntries_showdown_1300_1g_sd.csv",
+  "entries": 7,
+  "notes": "Showdown ships review-grade; it does not pass the three certification gates. See CLAUDE.md.",
+  "projection_tier": "unknown",
+  "recorded_utc": "2026-10-15T16:16:01.538821+00:00",
+  "run_id": null,
+  "sha256": "454538605850f36de53ea24e551ce761d40277c913dd6cd074cd15fcf1a7f423",
+  "slate_tag": "1300_1g_sd",
+  "status": "candidate",
+  "strategy_state": {
+   "counts": {},
+   "state": "unknown"
+  }
+ },
+ "players": {
+  "44512461": [
+   "Gavin Williams",
+   "CLE",
+   "UTIL",
+   12000,
+   "TB@CLE 10/15/2026 01:00PM ET"
+  ],
+  "44512462": [
+   "Griffin Jax",
+   "TB",
+   "UTIL",
+   10000,
+   "TB@CLE 10/15/2026 01:00PM ET"
+  ],
+  "44512463": [
+   "Junior Caminero",
+   "TB",
+   "UTIL",
+   9600,
+   "TB@CLE 10/15/2026 01:00PM ET"
+  ],
+  "44512464": [
+   "Jose Ramirez",
+   "CLE",
+   "UTIL",
+   9200,
+   "TB@CLE 10/15/2026 01:00PM ET"
+  ],
+  "44512465": [
+   "Jo Adell",
+   "CLE",
+   "UTIL",
+   8600,
+   "TB@CLE 10/15/2026 01:00PM ET"
+  ],
+  "44512466": [
+   "Chase DeLauter",
+   "CLE",
+   "UTIL",
+   8400,
+   "TB@CLE 10/15/2026 01:00PM ET"
+  ],
+  "44512467": [
+   "Yandy Diaz",
+   "TB",
+   "UTIL",
+   8000,
+   "TB@CLE 10/15/2026 01:00PM ET"
+  ],
+  "44512469": [
+   "Jonathan Aranda",
+   "TB",
+   "UTIL",
+   7600,
+   "TB@CLE 10/15/2026 01:00PM ET"
+  ],
+  "44512470": [
+   "Travis Bazzana",
+   "CLE",
+   "UTIL",
+   7200,
+   "TB@CLE 10/15/2026 01:00PM ET"
+  ],
+  "44512471": [
+   "Liam Hicks",
+   "TB",
+   "UTIL",
+   7000,
+   "TB@CLE 10/15/2026 01:00PM ET"
+  ],
+  "44512472": [
+   "Victor Mesa Jr.",
+   "TB",
+   "UTIL",
+   6800,
+   "TB@CLE 10/15/2026 01:00PM ET"
+  ],
+  "44512473": [
+   "Steven Kwan",
+   "CLE",
+   "UTIL",
+   6400,
+   "TB@CLE 10/15/2026 01:00PM ET"
+  ],
+  "44512477": [
+   "Nathaniel Lowe",
+   "CLE",
+   "UTIL",
+   5600,
+   "TB@CLE 10/15/2026 01:00PM ET"
+  ],
+  "44512478": [
+   "Chandler Simpson",
+   "TB",
+   "UTIL",
+   5400,
+   "TB@CLE 10/15/2026 01:00PM ET"
+  ],
+  "44512479": [
+   "Richie Palacios",
+   "TB",
+   "UTIL",
+   5200,
+   "TB@CLE 10/15/2026 01:00PM ET"
+  ],
+  "44512481": [
+   "Taylor Walls",
+   "TB",
+   "UTIL",
+   4800,
+   "TB@CLE 10/15/2026 01:00PM ET"
+  ],
+  "44512485": [
+   "Patrick Bailey",
+   "CLE",
+   "UTIL",
+   3800,
+   "TB@CLE 10/15/2026 01:00PM ET"
+  ],
+  "44512547": [
+   "Gavin Williams",
+   "CLE",
+   "CPT",
+   18000,
+   "TB@CLE 10/15/2026 01:00PM ET"
+  ],
+  "44512548": [
+   "Griffin Jax",
+   "TB",
+   "CPT",
+   15000,
+   "TB@CLE 10/15/2026 01:00PM ET"
+  ],
+  "44512549": [
+   "Junior Caminero",
+   "TB",
+   "CPT",
+   14400,
+   "TB@CLE 10/15/2026 01:00PM ET"
+  ],
+  "44512550": [
+   "Jose Ramirez",
+   "CLE",
+   "CPT",
+   13800,
+   "TB@CLE 10/15/2026 01:00PM ET"
+  ],
+  "44512551": [
+   "Jo Adell",
+   "CLE",
+   "CPT",
+   12900,
+   "TB@CLE 10/15/2026 01:00PM ET"
+  ],
+  "44512552": [
+   "Chase DeLauter",
+   "CLE",
+   "CPT",
+   12600,
+   "TB@CLE 10/15/2026 01:00PM ET"
+  ],
+  "44512555": [
+   "Jonathan Aranda",
+   "TB",
+   "CPT",
+   11400,
+   "TB@CLE 10/15/2026 01:00PM ET"
+  ]
+ },
+ "pool": {
+  "basis": "declared_starters",
+  "posted_sides": [
+   "CLE",
+   "TB"
+  ]
+ },
+ "prediction_source": {
+  "build_id": "sd_aaddbb7a3ef4",
+  "ceiling_basis": "null on every Showdown entry: the melted and priced frames carry Base and no Ceiling column on either path (the thesis ladder or the points-max bank), so there is no ceiling sum to record",
+  "filled": 7,
+  "held_entry_ids": [],
+  "label": "what the Showdown build predicted for each lineup it chose, handed to the record in process at delivery because a Showdown build has no run folder: the thesis template (or points_max for the baseline and the points-max bank), the realized captain and whether it is a pitcher or a hitter, the team split, the Base sum with the captain at 1.5x and its rank in the build, and the labeled captain-slot and six-slot roster priors or null. build_id is one per build's inputs (date, slate tag, salary and template bytes): the baseline and the ladder of a build share it, and two builds over the same inputs share it too, told apart by their sha256 and recorded_utc. Deterministic review proxies and labeled priors, never ROI, a win rate or a probability",
+  "players_missing": [],
+  "predicted": 7,
+  "priors": {
+   "captain": {
+    "applied": false,
+    "reason": "no --captain-prior supplied"
+   },
+   "flex": {
+    "applied": false,
+    "reason": "no --captain-prior supplied"
+   }
+  },
+  "rank_basis": "rank_in_build orders this build's own lineups by base_sum descending, ties by slot; slot is the lineup's 1-based place in the build (the ladder's deal order or the bank's solve order), which is the order of the reserved rows it filled",
+  "status": "resolved",
+  "unmatched_entry_ids": []
+ },
+ "recorded_utc": "2026-10-15T16:16:01.540123+00:00",
+ "relaxations": {
+  "both_relaxed": 0,
+  "captain_cap_relaxed": 0,
+  "captain_contest_cap_relaxed": 0,
+  "captain_lock_relaxed": 0,
+  "contest_cap_relaxed": 0,
+  "cpt_cap_relaxed": 0,
+  "min_per_team_relaxed": 0,
+  "overlap_relaxed": 0,
+  "player_relaxed": 0
+ },
+ "run": {},
+ "schema_version": 1
+}
