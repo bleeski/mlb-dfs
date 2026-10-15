@@ -29075,9 +29075,12 @@ class FiveStackQuotaLadderTests(unittest.TestCase):
         # and the floor, and every re-entry now carries its state too.
         # R434 grew it to seven: the named-stack seat's rung, between the quota
         # and the pair seat, carrying every sibling state like the rest.
-        self.assertEqual(len(recursive), 7,
-                         "five relaxation ladders plus R326's full-bank retry: "
-                         "engine-default reuse cap, five-stack quota, named-stack "
+        # R504(e) grew it to eight: the within-contest overlap bound's rung,
+        # after the reuse cap and before the quota, carrying every sibling state.
+        self.assertEqual(len(recursive), 8,
+                         "six relaxation ladders plus R326's full-bank retry: "
+                         "engine-default reuse cap, within-contest overlap bound, "
+                         "five-stack quota, named-stack "
                          "seat, consensus-pair seat, primary-stack floor, and the "
                          "retry that widens the SEARCH before any of them moves a "
                          "STRATEGY control; plus R207's interaction probe")
@@ -35847,8 +35850,9 @@ class AllocatorTruthTests(unittest.TestCase):
                      and getattr(n.value.func, "id", "") == "select_and_assign_entries"]
         # R469 made it six: the chalk-core seat's rung, guarded the same way.
         # R434 made it seven: the named-stack seat's rung, guarded the same way.
-        self.assertEqual(len(reentries), 7,
-                         f"expected six ladder re-entries and the probe's solve, "
+        # R504(e) made it eight: the within-contest overlap bound's rung, the same.
+        self.assertEqual(len(reentries), 8,
+                         f"expected seven ladder re-entries and the probe's solve, "
                          f"found {len(reentries)}")
         probing = [n for n in reentries
                    if any(k.arg == "_probe" and getattr(k.value, "value", None) is True
@@ -35857,7 +35861,7 @@ class AllocatorTruthTests(unittest.TestCase):
         ladder_guards = [n for n in ast.walk(func) if isinstance(n, ast.If)
                          and "not _probe" in ast.unparse(n.test)
                          and "proven_infeasible" in ast.unparse(n.test)]
-        self.assertEqual(len(ladder_guards), 7,
+        self.assertEqual(len(ladder_guards), 8,
                          "every ladder re-entry and the probe itself skip probe mode")
         guards = [n for n in ast.walk(func)
                   if isinstance(n, ast.If)
@@ -35869,7 +35873,7 @@ class AllocatorTruthTests(unittest.TestCase):
             test = ast.unparse(node.test)
             if "proven_infeasible" in test and "not slate_blocked" in test:
                 guarded += 1
-        self.assertEqual(guarded, 7,
+        self.assertEqual(guarded, 8,
                          "a re-entry is not guarded on both conjuncts")
         # And the verdict it reads is computed from the failing checks, not
         # inlined per guard, so the three cannot disagree.
@@ -40712,7 +40716,9 @@ class StackSleeveTests(unittest.TestCase):
                 for kw in call.keywords:
                     if kw.arg == "_seat_state" and isinstance(kw.value, ast.Dict):
                         literals.append(kw.value)
-        self.assertEqual(len(literals), 2, "the pair seat's rung and the stack seat's")
+        # R504(e): the within-contest overlap bound's rung rides `_seat_state` too.
+        self.assertEqual(len(literals), 3, "the pair seat's rung, the stack seat's "
+                                           "and the overlap bound's")
         for literal in literals:
             self.assertIsNone(literal.keys[0], "a `**` spread of the incoming `_seat_state` comes first")
 
@@ -54033,3 +54039,351 @@ class PerContestFirstPlaceTests(unittest.TestCase):
         self.assertEqual(headings[:-1], [c for c, _ in rl.CUTS])
         for banned in ("roi", "win rate", "cash rate", "probability", "return on"):
             self.assertNotIn(banned, text.lower())
+
+
+class PerContestAllocationTests(unittest.TestCase):
+    """R504(e). The allocator chooses per contest: a within-contest overlap
+    bound (`max_shared_players_by_contest`, derived by the merge from each
+    contest's own floor) beside the file-wide cap, and single-entry contests
+    drawing first through a two-stage solve; the file-wide caps stay the
+    washout guardrails. Every number here is a construction rule over a
+    synthetic bank, never a probability."""
+
+    SA, SB = "large_wta", "small_field_gpp"
+
+    @staticmethod
+    def _cand(cid, roster, by_shape, stack):
+        return {"candidate_id": cid, "lineup_ids": list(roster), "player_ids": list(roster),
+                "sp_ids": list(roster[:2]), "primary_stack": stack,
+                "objective": max(by_shape.values()), "contest_fit_score": max(by_shape.values()),
+                "contest_fit_by_shape": dict(by_shape)}
+
+    def _family(self, tag, scores_a, scores_b, size=2):
+        """`size` lineups on one SP pair and five shared hitters: any two share 7."""
+        core = [f"{tag}p1", f"{tag}p2"] + [f"{tag}h{i}" for i in range(5)]
+        return [self._cand(f"{tag}{n + 1}", core + [f"{tag}{n}x{i}" for i in range(3)],
+                           {self.SA: scores_a[n], self.SB: scores_b[n]}, tag.upper())
+                for n in range(size)]
+
+    def _bank(self, families=3):
+        rows = [("f1", (100, 99), (60, 59)), ("f2", (60, 59), (100, 99)),
+                ("f3", (30, 29), (30, 29)), ("f4", (10, 9), (10, 9))]
+        bank = []
+        for tag, a, b in rows[:families]:
+            bank += self._family(tag, a, b)
+        return bank
+
+    @staticmethod
+    def _entries(spec):
+        return [{"entry_id": f"{cid}{n}", "contest_id": cid, "contest_shape": shape}
+                for cid, count, shape in spec for n in range(1, count + 1)]
+
+    @staticmethod
+    def _held(out, cid):
+        return [set(a["lineup_ids"]) for a in out["assignments"] if a["contest_id"] == cid]
+
+    @staticmethod
+    def _max_overlap(sets):
+        return max((len(sets[i] & sets[j]) for i in range(len(sets))
+                    for j in range(i + 1, len(sets))), default=0)
+
+    def _solve(self, bank, entries, **controls):
+        return ca.select_and_assign_entries(bank, entries, dict(controls))
+
+    # -- inside a contest, beside the file-wide cap --------------------------
+
+    def test_the_within_contest_bound_binds_while_the_file_wide_one_keeps_its_value(self):
+        entries = self._entries([("A", 2, self.SA), ("B", 2, self.SB)])
+        out = self._solve(self._bank(), entries, max_shared_players=8,
+                          max_shared_players_by_contest={"A": 5}, max_candidate_reuse=1)
+        self.assertTrue(out["passed"], out.get("errors"))
+        self.assertLessEqual(self._max_overlap(self._held(out, "A")), 5,
+                             "contest A's entries are distinct paths under its bound")
+        self.assertEqual(self._max_overlap(self._held(out, "B")), 7,
+                         "B carries no bound, so the file-wide 8 still lets it share 7")
+        self.assertEqual(out["direct_constraints"]["max_shared_players"], 8)
+        row = out["contest_deal"]["overlap"]["by_contest"]["A"]
+        self.assertEqual((row["status"], row["bound"], row["file_wide"]), ("applied", 5, 8))
+        self.assertLessEqual(row["delivered_max_overlap"], 5)
+        self.assertGreater(row["rows_added"], 0)
+        self.assertEqual(out["contest_deal"]["relaxations"], 0)
+        self.assertNotIn("B", out["contest_deal"]["overlap"]["by_contest"])
+
+    def test_a_bound_at_or_above_the_file_cap_adds_no_row_and_moves_nothing(self):
+        entries = self._entries([("A", 2, self.SA), ("B", 2, self.SB)])
+        plain = self._solve(self._bank(), entries, max_shared_players=8, max_candidate_reuse=1)
+        vacuous = self._solve(self._bank(), entries, max_shared_players=8,
+                              max_shared_players_by_contest={"A": 8, "B": 9},
+                              max_candidate_reuse=1)
+        self.assertEqual([a["candidate_id"] for a in plain["assignments"]],
+                         [a["candidate_id"] for a in vacuous["assignments"]])
+        rows = vacuous["contest_deal"]["overlap"]["by_contest"]
+        self.assertEqual({c: r["status"] for c, r in rows.items()},
+                         {"A": "vacuous", "B": "vacuous"})
+        self.assertEqual(vacuous["contest_deal"]["overlap"]["rows_added"], 0)
+        self.assertNotIn("contest_deal", plain, "no map, no block: the result keeps its keys")
+        # Below the cap but with no pair between them: every family shares exactly
+        # 7, so a bound of 7 under a cap of 8 has no row to add either.
+        pairless = self._solve(self._bank(), entries, max_shared_players=8,
+                               max_shared_players_by_contest={"A": 7}, max_candidate_reuse=1)
+        self.assertEqual([a["candidate_id"] for a in plain["assignments"]],
+                         [a["candidate_id"] for a in pairless["assignments"]])
+        self.assertEqual(pairless["contest_deal"]["overlap"]["by_contest"]["A"]["status"],
+                         "vacuous")
+        self.assertIsNone(epi.contest_deal_fields("A", pairless["contest_deal"])["overlap_bound"])
+        # Without a file-wide cap the map has nothing to sit under and adds nothing.
+        no_cap = self._solve(self._bank(), entries, max_shared_players_by_contest={"A": 5},
+                             max_candidate_reuse=1)
+        self.assertEqual(no_cap["contest_deal"]["overlap"]["by_contest"]["A"]["status"],
+                         "no_file_cap")
+
+    # -- the file-wide caps stay the washout guardrails ----------------------
+
+    def test_the_file_wide_overlap_cap_still_binds_across_contests(self):
+        entries = self._entries([("A", 2, self.SA), ("B", 2, self.SB)])
+        out = self._solve(self._bank(families=4), entries, max_shared_players=6,
+                          max_shared_players_by_contest={"A": 5}, max_candidate_reuse=1)
+        self.assertTrue(out["passed"], out.get("errors"))
+        every = [set(a["lineup_ids"]) for a in out["assignments"]]
+        self.assertLessEqual(self._max_overlap(every), 6,
+                             "no pair in the file, across contests included, passes 6")
+        self.assertLessEqual(self._max_overlap(self._held(out, "A")), 5)
+
+    def test_a_player_exposure_cap_still_binds_across_contests(self):
+        entries = self._entries([("A", 2, self.SA), ("B", 2, self.SB)])
+        out = self._solve(self._bank(families=4), entries, max_shared_players=8,
+                          max_shared_players_by_contest={"A": 5}, max_candidate_reuse=1,
+                          max_player_exposure_pct=0.25)
+        self.assertTrue(out["passed"], out.get("errors"))
+        counts = Counter(p for a in out["assignments"] for p in a["lineup_ids"])
+        self.assertEqual(max(counts.values()), 1,
+                         "0.25 of 4 entries is one appearance per player, file-wide")
+
+    # -- a single-entry contest draws first ----------------------------------
+
+    def _se_bank(self):
+        """Three lineups sharing no player. The single-entry shape reads L2
+        nearly level with L1; the two-entry contest's shape reads L1 far above
+        L2, so equal entry weights strictly prefer handing L1 to the pair."""
+        def lineup(tag):
+            return [f"{tag}p1", f"{tag}p2"] + [f"{tag}h{i}" for i in range(8)]
+        scores = {"L1": (100, 100), "L2": (99, 10), "L3": (0, 0)}
+        return [self._cand(cid, lineup(cid.lower()), {self.SA: a, self.SB: b}, cid)
+                for cid, (a, b) in scores.items()]
+
+    def test_a_single_entry_contest_draws_its_best_read_first(self):
+        entries = self._entries([("S", 1, self.SA), ("M", 2, self.SB)])
+        out = self._solve(self._se_bank(), entries, max_candidate_reuse=1)
+        self.assertTrue(out["passed"], out.get("errors"))
+        se = {a["entry_id"]: a["candidate_id"] for a in out["assignments"]}
+        self.assertEqual(se["S1"], "L1", "the contest's only path is its best read")
+        block = out["contest_deal"]["single_entry"]
+        self.assertEqual((block["held"], block["stage1_status"]), (True, "optimal"))
+        self.assertEqual(block["drawn"][0]["holds_best"], True)
+        self.assertIsNotNone(block["stage1_elapsed_s"])
+        self.assertIsNone(out["contest_deal"]["overlap"])
+        self.assertEqual(out["contest_deal"]["relaxations"], 0)
+
+    def test_two_single_entry_contests_hold_the_best_pair_the_file_cap_allows_together(self):
+        """L1 and L2 share 8 against a file-wide 6, so they never sit in one
+        file; the best pair the two single-entry contests can hold together is
+        L1 and L3, while the multi-entry contest's shape wants L1 and L3 most."""
+        def lineup(tag, shared=()):
+            return list(shared) + [f"{tag}x{i}" for i in range(10 - len(shared))]
+        core = ["cp1", "cp2"] + [f"ch{i}" for i in range(6)]
+        rows = {"L1": (lineup("l1", core), 100, 100), "L2": (lineup("l2", core), 99, 0),
+                "L3": (lineup("l3"), 98, 100), "L4": (lineup("l4"), 50, 0),
+                "L5": (lineup("l5"), 40, 30), "L6": (lineup("l6"), 0, 20)}
+        bank = [self._cand(cid, roster, {self.SA: a, self.SB: b}, cid)
+                for cid, (roster, a, b) in rows.items()]
+        entries = self._entries([("S", 1, self.SA), ("T", 1, self.SA), ("M", 2, self.SB)])
+        out = self._solve(bank, entries, max_candidate_reuse=1, max_shared_players=6)
+        self.assertTrue(out["passed"], out.get("errors"))
+        held = {a["contest_id"]: a["candidate_id"] for a in out["assignments"]
+                if a["contest_id"] in ("S", "T")}
+        self.assertEqual(sorted(held.values()), ["L1", "L3"])
+        self.assertTrue(out["contest_deal"]["single_entry"]["held"])
+        self.assertEqual(out["contest_deal"]["relaxations"], 0, "nothing relaxed")
+
+    def test_a_contest_with_untouchable_rows_or_a_file_of_single_entries_runs_one_solve(self):
+        bank = self._se_bank()
+        only_se = self._solve(bank, self._entries([("S", 1, self.SA), ("T", 1, self.SA)]),
+                              max_candidate_reuse=1)
+        self.assertTrue(only_se["passed"])
+        self.assertNotIn("contest_deal", only_se,
+                         "single-entry contests alone already maximize their reads")
+        # A swap: S keeps an untouched row beside its one authorized entry, so it is
+        # not a single-entry contest in this solve and draws through the objective.
+        fixed_roster = [f"zp{i}" for i in range(10)]
+        fixed = {"row_count": 1, "rosters": [fixed_roster],
+                 "signatures_by_contest": {"S": [sorted(fixed_roster)]},
+                 "player_counts": {p: 1 for p in fixed_roster}}
+        swap = ca.select_and_assign_entries(
+            bank, self._entries([("S", 1, self.SA), ("M", 2, self.SB)]),
+            {"max_candidate_reuse": 1}, fixed_exposure=fixed)
+        self.assertTrue(swap["passed"], swap.get("errors"))
+        self.assertNotIn("contest_deal", swap)
+
+    def test_a_stage_one_without_an_incumbent_adds_no_row_and_counts_a_relaxation(self):
+        """Stage 1 gets a quarter of the clock; when it returns nothing usable
+        the solve still ships through the ordinary objective, and the record
+        says the draw did not hold and why, naming the clock only when it was."""
+        import scipy.optimize as so
+        real = so.milp
+        calls = []
+
+        def first_call_times_out(*args, **kwargs):
+            calls.append(kwargs.get("options", {}).get("time_limit"))
+            if len(calls) == 1:
+                return types.SimpleNamespace(status=1, x=None, message="time limit",
+                                             mip_gap=None)
+            return real(*args, **kwargs)
+
+        entries = self._entries([("S", 1, self.SA), ("M", 2, self.SB)])
+        with unittest.mock.patch.object(so, "milp", first_call_times_out):
+            out = ca.select_and_assign_entries(self._se_bank(), entries,
+                                               {"max_candidate_reuse": 1, "time_limit": 20})
+        self.assertTrue(out["passed"], out.get("errors"))
+        self.assertEqual(calls[:2], [5.0, 20.0], "stage 1 runs on a quarter of the clock")
+        block = out["contest_deal"]["single_entry"]
+        self.assertFalse(block["held"])
+        self.assertTrue(block["reason"].startswith("stage 1 hit its time limit"))
+        self.assertEqual(out["contest_deal"]["relaxations"], 1)
+        self.assertTrue(any(w.startswith("single-entry contests (S) did not draw first")
+                            for w in out["warnings"]))
+        self.assertEqual(epi.manifest_strategy_state(out)["state"], "relaxed")
+
+    def test_the_prefilter_keeps_a_single_entry_contests_own_best_read(self):
+        """The prefilter fills by each candidate's best score over EVERY entry's
+        shape, so forty-five lineups the two-entry contest's shape reads high
+        crowd out the one the single-entry shape reads best; the reserve keeps
+        it, and stage 1 can then hand it over."""
+        def lineup(tag):
+            return [f"{tag}p1", f"{tag}p2"] + [f"{tag}h{i}" for i in range(8)]
+        bank = [self._cand(f"C{n:02d}", lineup(f"c{n:02d}"),
+                           {self.SA: 50 - n * 0.1, self.SB: 200 - n}, f"C{n:02d}")
+                for n in range(45)]
+        bank.append(self._cand("X", lineup("x"), {self.SA: 100, self.SB: 0}, "X"))
+        entries = self._entries([("S", 1, self.SA), ("M", 2, self.SB)])
+        out = self._solve(bank, entries, max_candidate_reuse=1)
+        self.assertTrue(out["passed"], out.get("errors"))
+        prefilter = out["allocation_solver_report"]["candidate_prefilter"]
+        self.assertTrue(prefilter["applied"], "the bank is past the keep target")
+        self.assertGreaterEqual(prefilter.get("single_entry_best_kept", 0), 1)
+        se = {a["entry_id"]: a["candidate_id"] for a in out["assignments"]}
+        self.assertEqual(se["S1"], "X")
+
+    # -- the ladder ------------------------------------------------------------
+
+    def test_an_infeasible_bound_relaxes_once_counted_and_the_file_ships(self):
+        """Contest A holds three entries and the bank two families (three and two
+        lineups, each family sharing 7): no three pairwise at 5 or under exist."""
+        bank = (self._family("f1", (100, 99, 98), (60, 59, 58), size=3)
+                + self._family("f2", (60, 59), (100, 99)))
+        entries = self._entries([("A", 3, self.SA), ("B", 2, self.SB)])
+        out = self._solve(bank, entries, max_shared_players=8,
+                          max_shared_players_by_contest={"A": 5}, max_candidate_reuse=1)
+        self.assertTrue(out["passed"], out.get("errors"))
+        deal = out["contest_deal"]
+        self.assertEqual(deal["overlap"]["by_contest"]["A"]["status"], "relaxed_by_ladder")
+        self.assertEqual(deal["relaxations"], 1)
+        step = deal["overlap"]["relaxation_steps"][0]
+        self.assertEqual((step["from"], step["to"], step["trigger"]),
+                         ({"A": 5}, None, "proven_infeasible_with_contest_overlap_bound"))
+        self.assertTrue(any(w.startswith("max_shared_players_by_contest relaxed off on A")
+                            for w in out["warnings"]))
+        state = epi.manifest_strategy_state({"contest_deal": deal})
+        self.assertEqual((state["state"], state["counts"]), ("relaxed", {"contest_deal": 1}))
+        self.assertIn("max_shared_players_by_contest", ca.LADDER_RELAXED_CONTROLS)
+
+    # -- the merge -------------------------------------------------------------
+
+    POSTURES = {"A": {"posture": "large_gpp"}, "B": {"posture": "wta_satellite"},
+                "C": {"posture": "large_gpp"}}
+
+    def test_the_merge_derives_the_map_from_each_contests_own_floor(self):
+        """The production replay's arithmetic: the file's floor is 8 (more entries
+        than SP pairs) while each contest's own is 6. A contest with no floor of
+        its own (one entry) gets no bound."""
+        floors = {"max_shared_players": 8,
+                  "max_shared_players_by_contest": {"A": 6, "B": 6}}
+        prov = {}
+        merged = epi._merged_controls_for_build(self.POSTURES, None, floors,
+                                                provenance_out=prov)
+        self.assertEqual(merged["max_shared_players"], 8)
+        self.assertEqual(merged["max_shared_players_by_contest"], {"A": 6, "B": 6},
+                         "wta_satellite's 5 is floored to its contest's own 6")
+        self.assertEqual(prov["max_shared_players_by_contest"], "derived_floor")
+        tighter = epi._merged_controls_for_build(
+            self.POSTURES, None, {"max_shared_players": 8,
+                                  "max_shared_players_by_contest": {"A": 7, "B": 8}})
+        self.assertEqual(tighter["max_shared_players_by_contest"], {"A": 7},
+                         "a contest whose own bound reaches the file's cap is left out")
+
+    def test_a_typed_scalar_retires_the_map_and_a_typed_map_is_refused(self):
+        floors = {"max_shared_players": 8,
+                  "max_shared_players_by_contest": {"A": 6, "B": 6}}
+        typed = epi._merged_controls_for_build(self.POSTURES, {"max_shared_players": 9},
+                                               floors)
+        self.assertEqual(typed["max_shared_players"], 9)
+        self.assertNotIn("max_shared_players_by_contest", typed)
+        with self.assertRaises(ValueError) as caught:
+            epi._merged_controls_for_build(
+                self.POSTURES, {"max_shared_players_by_contest": {"A": 5}}, floors)
+        self.assertIn("type max_shared_players", str(caught.exception))
+        # The swap's doors apply the same helper on top of a recorded set.
+        recorded = {"max_shared_players": 8, "max_shared_players_by_contest": {"A": 6}}
+        self.assertEqual(epi.apply_shape_band_override(recorded, {"max_shared_players": 9}),
+                         ["max_shared_players_by_contest"])
+        self.assertNotIn("max_shared_players_by_contest", recorded)
+
+    def test_a_slate_whose_cap_was_not_raised_or_is_held_gets_no_map(self):
+        from mlb_engine.pipeline import deadline_governor as dg
+        # A normal slate: every contest's floor equals the file's (no pair repeats).
+        normal = epi._merged_controls_for_build(
+            self.POSTURES, None, {"max_shared_players": 6,
+                                  "max_shared_players_by_contest": {"A": 6, "B": 6}})
+        self.assertEqual(normal["max_shared_players"], 6)
+        self.assertNotIn("max_shared_players_by_contest", normal)
+        held = epi._merged_controls_for_build(
+            self.POSTURES, None, {"max_shared_players": 8,
+                                  "max_shared_players_by_contest": {"A": 6, "B": 6}},
+            never_relax=["max_shared_players"])
+        self.assertEqual(held["max_shared_players"], 5, "a held cap is never raised")
+        self.assertNotIn("max_shared_players_by_contest", held)
+        self.assertIn("max_shared_players_by_contest", dg.NEVER_RELAX_NOT_HONOURED)
+
+    def test_one_floor_function_serves_the_file_and_each_contest(self):
+        floor = epi.shared_players_floor
+        self.assertEqual(floor(18, 16, 5), 8, "18 entries on 16 pairs repeat a pair")
+        self.assertEqual(floor(7, 16, 5), 6)
+        self.assertEqual(floor(4, 0, 5), 6)
+        self.assertIsNone(floor(1, 16, 5))
+        self.assertEqual(floor(40, 2, 5), 8)
+        floors = epi.feasibility_floors_from({
+            "available": True, "floor_shared_players": 8,
+            "floor_shared_players_by_contest": {"B": 6, "A": 6}})
+        self.assertEqual(floors["max_shared_players_by_contest"], {"A": 6, "B": 6})
+        self.assertNotIn("max_shared_players_by_contest",
+                         epi.feasibility_floors_from({"available": True,
+                                                      "floor_shared_players": 6}))
+
+    # -- the read ---------------------------------------------------------------
+
+    def test_the_per_contest_read_names_the_bound_and_the_draw(self):
+        entered = [({"contest_id": "A", "entry_id": "1"}, ["a", "b"], 100.0),
+                   ({"contest_id": "A", "entry_id": "2"}, ["a", "c"], 90.0),
+                   ({"contest_id": "S", "entry_id": "3"}, ["d", "e"], 80.0),
+                   ({"contest_id": "B", "entry_id": "4"}, ["f", "g"], 70.0),
+                   ({"contest_id": "B", "entry_id": "5"}, ["f", "h"], 60.0)]
+        read = epi.per_contest_first_place(entered)
+        self.assertEqual({(r["overlap_bound"], r["single_entry_draw"])
+                          for r in read["contests"]}, {(None, None)})
+        epi.attach_contest_deal({"by_contest": read}, {
+            "overlap": {"by_contest": {"A": {"bound": 5, "status": "applied"},
+                                       "B": {"bound": 6, "status": "relaxed_by_ladder"}}},
+            "single_entry": {"contests": ["S"], "held": True}})
+        rows = {r["contest_id"]: (r["overlap_bound"], r["single_entry_draw"])
+                for r in read["contests"]}
+        self.assertEqual(rows, {"A": (5, None), "B": (None, None), "S": (None, "held")})
+        epi.attach_contest_deal({"by_contest": None}, None)  # never raises
