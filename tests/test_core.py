@@ -53620,8 +53620,25 @@ class PerContestFirstPlaceTests(unittest.TestCase):
             e.pop("contest_id")
         by = self._frontier(self._projections(), entries)["by_contest"]
         self.assertFalse(by["available"])
-        self.assertIn("no assignment carries a contest_id", by["unavailable_reason"])
+        self.assertIn("5 of 5 assignments carry no contest_id", by["unavailable_reason"])
         self.assertEqual([], by["contests"])
+
+    def test_one_assignment_without_a_contest_id_makes_the_split_unavailable(self):
+        """A partial split would put the unplaced entry in a phantom contest and
+        report an overlap between entries that share no contest."""
+        entries = self._two_contests()
+        entries[0].pop("contest_id")
+        by = self._frontier(self._projections(), entries)["by_contest"]
+        self.assertFalse(by["available"])
+        self.assertIn("1 of 5 assignments carry no contest_id", by["unavailable_reason"])
+
+    def test_a_nan_game_id_is_not_a_slate_game(self):
+        """Two real games plus a NaN Game_ID is a 2-game slate (138.9), not 3-4 (144.6)."""
+        proj = self._projections()
+        proj.loc[proj["Player_ID"].isin(["AAAh0", "AAAh1"]), "Game_ID"] = float("nan")
+        by = self._frontier(proj, self._two_contests())["by_contest"]
+        self.assertEqual(2, by["slate_games"])
+        self.assertEqual(138.9, by["contests"][0]["winning_score_bar"]["value"])
 
     def test_the_block_rides_the_wrapper_and_the_label_sweep_passes(self):
         from mlb_engine.pipeline import execution_pipeline as ep
@@ -53868,6 +53885,36 @@ class PerContestFirstPlaceTests(unittest.TestCase):
         self.assertIn("rank 1 was shared in a", counted["reason"])
         empty = orv.portfolio_first_place([])
         self.assertEqual((0, 0, 0), (empty["won"], empty["graded"], empty["unknown"]))
+        self.assertFalse(empty["lower_bound"])
+        # An entry this record could not grade may have won: the count says so,
+        # the way portfolio_washout demotes to UNKNOWN for the same entries.
+        partial = orv.portfolio_first_place(
+            [{"contest_id": "a", "won_first": False}], not_graded=1)
+        self.assertEqual((0, 1, 1), (partial["won"], partial["graded"],
+                                     partial["not_graded_entries"]))
+        self.assertTrue(partial["lower_bound"])
+        self.assertIn("lower bound", partial["reason"])
+
+    def test_an_ungradable_entry_makes_the_first_place_count_a_lower_bound(self):
+        """The record's own answer, through `review_record`: one entry graded at rank 4
+        and one unresolved. `portfolio_washout` says UNKNOWN for the unresolved
+        entry; the first-place count must not read as a firm 0 of 1 either."""
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            helper, path = self._review_fixture(
+                root, [("912345678", 4), ("912345679", 1)])
+            record = json.loads(path.read_text(encoding="utf-8"))
+            record["_path"] = str(path.relative_to(root))
+            resolution = helper._entered(path)
+            resolution.pop("E912345679")
+            mod = helper._mod()
+            review = mod.review_record(record, root, resolution, "fixture")
+            text = mod.render(review)
+        first = review["portfolio_first_place"]
+        self.assertEqual((0, 1, 1), (first["won"], first["graded"], first["not_graded_entries"]))
+        self.assertTrue(first["lower_bound"])
+        self.assertEqual("UNKNOWN", review["portfolio_washout"])
+        self.assertIn("(lower bound: some entries were not graded here)", text)
 
     def test_the_review_text_prints_the_count_and_clears_the_label_guard(self):
         with tempfile.TemporaryDirectory() as raw:

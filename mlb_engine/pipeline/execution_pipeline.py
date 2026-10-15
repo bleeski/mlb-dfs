@@ -4009,10 +4009,13 @@ def per_contest_first_place(
     for row in entered:
         cid = str((row[0] or {}).get("contest_id") or "").strip()
         groups.setdefault(cid, []).append(row)
-    if not any(groups):
+    unplaced = len(groups.get("", []))
+    if unplaced:
+        # All or some: a partial split would put the unplaced entries in a phantom
+        # contest and report an overlap between entries that share no contest.
         out["unavailable_reason"] = (
-            "no assignment carries a contest_id, so the entered set cannot be "
-            "split by contest")
+            f"{unplaced} of {len(entered)} assignments carry no contest_id, so the "
+            "entered set cannot be split by contest")
         return out
     bar = winning_score_bar("classic", slate_games)
     rows: List[Dict[str, Any]] = []
@@ -4213,7 +4216,9 @@ def compute_portfolio_frontier(
     # survives a frame the washout cannot be built from; its bar then reads ABSENT.
     out["by_contest"] = per_contest_first_place(
         [(a, ids, total) for a, (_eid, ids), (total, _e) in zip(assignments, rosters, totals)],
-        slate_games=(len({g for g in game_of.values() if g}) or None) if game_col else None)
+        slate_games=(len({g for g in game_of.values()
+                          if g and g.lower() not in ("nan", "none")}) or None)
+        if game_col else None)
     out["roster_players"] = sum(len(ids) for _, ids in rosters)
     out["unpriced_roster_players"] = sorted(unpriced)
     if unpriced:

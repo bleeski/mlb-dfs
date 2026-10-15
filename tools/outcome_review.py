@@ -456,13 +456,18 @@ def first_place_fields(block: Mapping[str, Any], mined: Mapping[str, Any]) -> Di
             "rank_one_rows": rows}
 
 
-def portfolio_first_place(contests: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
+def portfolio_first_place(contests: Sequence[Mapping[str, Any]],
+                          not_graded: int = 0) -> Dict[str, Any]:
     """R504(c). In how many of this delivery's contests did an entry of ours finish first?
 
     Counts, with the contests they come from named: ``won`` contests with
     ``won_first`` True, ``graded`` those read True or False, ``unknown`` those
     that could not say. An unknown contest is never counted as a loss, and the
     count is of contests, never of entries (two of ours cannot both win one).
+    ``not_graded`` is how many of this record's entries could not be graded here
+    (unresolved, or entered from another record): `portfolio_washout` demotes its
+    answer to UNKNOWN for them, and a first-place count must not read as firm when
+    one of those entries may have won, so it says it is a lower bound.
     Observed outcomes, conditioned on nothing and compared with nothing here;
     the any-first cut against the uniform reference lives in `results_ledger`.
     """
@@ -481,9 +486,14 @@ def portfolio_first_place(contests: Sequence[Mapping[str, Any]]) -> Dict[str, An
         reason += f"; rank 1 was shared in {', '.join(tied)}"
     if unknown:
         reason += f"; {len(unknown)} contest(s) could not say: " + ", ".join(unknown)
+    if not_graded:
+        reason += (f"; {int(not_graded)} entr{'y' if int(not_graded) == 1 else 'ies'} of this "
+                   f"record could not be graded here (unresolved, or entered from another "
+                   f"record), so this is a lower bound")
     return {"won": len(won), "graded": graded, "unknown": len(unknown),
             "contests": len(contests), "won_contest_ids": won,
-            "tied_contest_ids": tied, "reason": reason}
+            "tied_contest_ids": tied, "not_graded_entries": int(not_graded),
+            "lower_bound": bool(not_graded), "reason": reason}
 
 
 def portfolio_washout(contests: Sequence[Mapping[str, Any]]) -> Tuple[Any, str]:
@@ -593,7 +603,8 @@ def review_record(record: Mapping[str, Any], root: Path,
         "contests": contests,
         "portfolio_washout": washout,
         "portfolio_washout_reason": reason,
-        "portfolio_first_place": portfolio_first_place(contests),
+        "portfolio_first_place": portfolio_first_place(
+            contests, len(unresolved) + len(states["not_entered"]) + len(states["same_bytes"])),
         "labels": LABEL,
     }
 
@@ -634,7 +645,9 @@ def render(review: Mapping[str, Any]) -> str:
     first = review.get("portfolio_first_place")
     if first:
         out.append(f"CONTESTS WON FIRST (an entry of ours at rank 1): {first.get('won')} "
-                   f"of {first.get('graded')} graded, {first.get('unknown')} unknown")
+                   f"of {first.get('graded')} graded, {first.get('unknown')} unknown"
+                   + (" (lower bound: some entries were not graded here)"
+                      if first.get("lower_bound") else ""))
         out.append(f"  {first.get('reason')}")
     out.append("")
     for block in review.get("contests") or []:
