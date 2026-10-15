@@ -1,0 +1,368 @@
+{
+ "code": {
+  "contest_allocator": "v1.12",
+  "execution_pipeline": "v1.17",
+  "git_dirty": false,
+  "git_sha": "813117b485f23aaa5810fa932e0cd1644b42e755"
+ },
+ "controls": {},
+ "date": "2026-10-15",
+ "egress": "egress: statsapi 200, odds 401, savant 200, mlb-lineups 200, fangraphs 200 (curl), open-meteo timeout",
+ "egress_source": "session_start 2026-10-15T20:32:21+00:00",
+ "entries": [
+  {
+   "contest_id": "196753088",
+   "contest_name": "MLB $500 Quarter Jukebox [Just $0.25!]",
+   "entry_fee": 0.25,
+   "entry_id": "5296162436",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44512266",
+    "44512267",
+    "44512323",
+    "44512305",
+    "44512292",
+    "44512274",
+    "44512275",
+    "44512278",
+    "44512299",
+    "44512286"
+   ]
+  },
+  {
+   "contest_id": "196753088",
+   "contest_name": "MLB $500 Quarter Jukebox [Just $0.25!]",
+   "entry_fee": 0.25,
+   "entry_id": "5296171432",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44512268",
+    "44512266",
+    "44512293",
+    "44512289",
+    "44512312",
+    "44512321",
+    "44512275",
+    "44512270",
+    "44512278",
+    "44512298"
+   ]
+  },
+  {
+   "contest_id": "196753389",
+   "contest_name": "MLB 40x Micro Booster [Top 5 Win $10]",
+   "entry_fee": 0.25,
+   "entry_id": "5296171467",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44512266",
+    "44512267",
+    "44512323",
+    "44512305",
+    "44512292",
+    "44512274",
+    "44512275",
+    "44512278",
+    "44512299",
+    "44512286"
+   ]
+  },
+  {
+   "contest_id": "196753389",
+   "contest_name": "MLB 40x Micro Booster [Top 5 Win $10]",
+   "entry_fee": 0.25,
+   "entry_id": "5296172422",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44512267",
+    "44512268",
+    "44512290",
+    "44512287",
+    "44512276",
+    "44512310",
+    "44512303",
+    "44512270",
+    "44512273",
+    "44512286"
+   ]
+  },
+  {
+   "contest_id": "196753389",
+   "contest_name": "MLB 40x Micro Booster [Top 5 Win $10]",
+   "entry_fee": 0.25,
+   "entry_id": "5296172423",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44512267",
+    "44512266",
+    "44512290",
+    "44512305",
+    "44512292",
+    "44512321",
+    "44512275",
+    "44512270",
+    "44512299",
+    "44512286"
+   ]
+  },
+  {
+   "contest_id": "196753389",
+   "contest_name": "MLB 40x Micro Booster [Top 5 Win $10]",
+   "entry_fee": 0.25,
+   "entry_id": "5296172424",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44512267",
+    "44512266",
+    "44512323",
+    "44512277",
+    "44512292",
+    "44512321",
+    "44512301",
+    "44512281",
+    "44512278",
+    "44512282"
+   ]
+  },
+  {
+   "contest_id": "196753389",
+   "contest_name": "MLB 40x Micro Booster [Top 5 Win $10]",
+   "entry_fee": 0.25,
+   "entry_id": "5296172425",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44512269",
+    "44512268",
+    "44512293",
+    "44512287",
+    "44512276",
+    "44512284",
+    "44512303",
+    "44512298",
+    "44512291",
+    "44512297"
+   ]
+  },
+  {
+   "contest_id": "196753389",
+   "contest_name": "MLB 40x Micro Booster [Top 5 Win $10]",
+   "entry_fee": 0.25,
+   "entry_id": "5296172426",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44512267",
+    "44512269",
+    "44512279",
+    "44512287",
+    "44512292",
+    "44512274",
+    "44512303",
+    "44512282",
+    "44512291",
+    "44512281"
+   ]
+  },
+  {
+   "contest_id": "196753389",
+   "contest_name": "MLB 40x Micro Booster [Top 5 Win $10]",
+   "entry_fee": 0.25,
+   "entry_id": "5296172427",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44512268",
+    "44512266",
+    "44512293",
+    "44512289",
+    "44512311",
+    "44512284",
+    "44512275",
+    "44512270",
+    "44512278",
+    "44512298"
+   ]
+  },
+  {
+   "contest_id": "196753409",
+   "contest_name": "MLB Satellite to $20 NFL Fantasy Football Millionaire",
+   "entry_fee": 0.25,
+   "entry_id": "5296162687",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44512267",
+    "44512266",
+    "44512290",
+    "44512305",
+    "44512292",
+    "44512321",
+    "44512275",
+    "44512270",
+    "44512299",
+    "44512286"
+   ]
+  },
+  {
+   "contest_id": "196753409",
+   "contest_name": "MLB Satellite to $20 NFL Fantasy Football Millionaire",
+   "entry_fee": 0.25,
+   "entry_id": "5296172039",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44512269",
+    "44512268",
+    "44512293",
+    "44512287",
+    "44512276",
+    "44512284",
+    "44512303",
+    "44512298",
+    "44512291",
+    "44512297"
+   ]
+  },
+  {
+   "contest_id": "196766327",
+   "contest_name": "MLB $100 Solo Shot",
+   "entry_fee": 1.0,
+   "entry_id": "5296162629",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44512267",
+    "44512266",
+    "44512290",
+    "44512305",
+    "44512292",
+    "44512321",
+    "44512275",
+    "44512270",
+    "44512299",
+    "44512286"
+   ]
+  }
+ ],
+ "entries_binding": {
+  "source": "outputs/2026-10-15/DKEntries_1300_2g_REVIEW_GRADE_lateswap1.csv",
+  "source_sha256": "1e306d9a2f5c063c022191117505fa75803787607e3ccc11859796c10c24ab4c",
+  "status": "bound"
+ },
+ "extra": {
+  "market": {
+   "applied": false,
+   "reason": "a late swap passes no market: run_late_swap takes no implied totals, and the parent build's record holds the market that build was ranked by, if it had one"
+  }
+ },
+ "host": {
+  "call_budget_s": 630.0,
+  "declared_ceiling_s": 900.0,
+  "host": "claude_code"
+ },
+ "kind": "delivery",
+ "labels": "deterministic review proxies and labeled priors only; never ROI, win rate, cash rate, or probability",
+ "manifest_row": {
+  "certification": "review_grade",
+  "contest_ids": [
+   "196753088",
+   "196753389",
+   "196753409",
+   "196766327"
+  ],
+  "contest_names": [
+   "MLB $100 Solo Shot",
+   "MLB $500 Quarter Jukebox [Just $0.25!]",
+   "MLB 40x Micro Booster [Top 5 Win $10]",
+   "MLB Satellite to $20 NFL Fantasy Football Millionaire"
+  ],
+  "contest_type": "classic",
+  "delivered_file": "outputs/2026-10-15/DKEntries_1300_2g_REVIEW_GRADE_lateswap1.csv",
+  "entries": 12,
+  "notes": "Late swap 1 after TB@CLE final (standings-aware, scratch tools/_scratch_lcs1015/swap_sim.py). Repairs: Muncy and Edman not in LAD's posted nine (6 entries). Strategy: 4 Pareto moves (172422 MIL-heavier, 172423/162687/162629 Teoscar->Ohtani, 171432 Pages->Tucker). MIL nine still projected; Booster field is a proxy (Jukebox sample). Review-grade hand edit.",
+  "projection_tier": "unknown",
+  "recorded_utc": "2026-10-15T20:53:59.316610+00:00",
+  "repair_of": {
+   "run_id": null,
+   "sha256": "24df8037353d5f7ea746d0b519fb403bc7009121ef6edf331e28a396c72e47e0"
+  },
+  "run_id": null,
+  "sha256": "1e306d9a2f5c063c022191117505fa75803787607e3ccc11859796c10c24ab4c",
+  "slate_tag": "1300_2g",
+  "status": "candidate",
+  "strategy_state": {
+   "counts": {},
+   "state": "unknown"
+  }
+ },
+ "players": {},
+ "prediction_source": {
+  "filled": 12,
+  "hitter_roles_basis": "the frame's Notes tag per hitter: 'confirmed_order:' (intake, a confirmed side's posted slot) is confirmed_lineup, 'platoon_order:' (run_slate, a projected slot) is platoon_projected, neither is unknown; R342(c)'s role_source vocabulary. The intake's late-swap status map is not in the run, so a partial side's posted hitters read platoon_projected or unknown",
+  "label": "what the build that chose each lineup predicted for it, copied from runs/<run_id>/final/ at delivery: the allocator's contest shape, fit score and its rank among that run's entries in the contest, the stack and arms, and roster sums of the frame's Base, Ceiling and labeled ownership prior. Deterministic review proxies and labeled priors, never ROI, a win rate or a probability",
+  "players_missing": [
+   "44512266",
+   "44512267",
+   "44512268",
+   "44512269",
+   "44512270",
+   "44512273",
+   "44512274",
+   "44512275",
+   "44512276",
+   "44512277",
+   "44512278",
+   "44512279",
+   "44512281",
+   "44512282",
+   "44512284",
+   "44512286",
+   "44512287",
+   "44512289",
+   "44512290",
+   "44512291",
+   "44512292",
+   "44512293",
+   "44512297",
+   "44512298",
+   "44512299",
+   "44512301",
+   "44512303",
+   "44512305",
+   "44512310",
+   "44512311",
+   "44512312",
+   "44512321",
+   "44512323"
+  ],
+  "predicted": 0,
+  "runs_read": [],
+  "start_run_id": null,
+  "status": "no_run",
+  "unmatched_entry_ids": [
+   "5296162436",
+   "5296171432",
+   "5296171467",
+   "5296172422",
+   "5296172423",
+   "5296172424",
+   "5296172425",
+   "5296172426",
+   "5296172427",
+   "5296162687",
+   "5296172039",
+   "5296162629"
+  ]
+ },
+ "recorded_utc": "2026-10-15T20:53:59.613401+00:00",
+ "relaxations": {},
+ "run": {},
+ "schema_version": 1
+}
