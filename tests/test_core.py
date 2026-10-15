@@ -29075,9 +29075,12 @@ class FiveStackQuotaLadderTests(unittest.TestCase):
         # and the floor, and every re-entry now carries its state too.
         # R434 grew it to seven: the named-stack seat's rung, between the quota
         # and the pair seat, carrying every sibling state like the rest.
-        self.assertEqual(len(recursive), 7,
-                         "five relaxation ladders plus R326's full-bank retry: "
-                         "engine-default reuse cap, five-stack quota, named-stack "
+        # R504(e) grew it to eight: the within-contest overlap bound's rung,
+        # after the reuse cap and before the quota, carrying every sibling state.
+        self.assertEqual(len(recursive), 8,
+                         "six relaxation ladders plus R326's full-bank retry: "
+                         "engine-default reuse cap, within-contest overlap bound, "
+                         "five-stack quota, named-stack "
                          "seat, consensus-pair seat, primary-stack floor, and the "
                          "retry that widens the SEARCH before any of them moves a "
                          "STRATEGY control; plus R207's interaction probe")
@@ -35847,8 +35850,9 @@ class AllocatorTruthTests(unittest.TestCase):
                      and getattr(n.value.func, "id", "") == "select_and_assign_entries"]
         # R469 made it six: the chalk-core seat's rung, guarded the same way.
         # R434 made it seven: the named-stack seat's rung, guarded the same way.
-        self.assertEqual(len(reentries), 7,
-                         f"expected six ladder re-entries and the probe's solve, "
+        # R504(e) made it eight: the within-contest overlap bound's rung, the same.
+        self.assertEqual(len(reentries), 8,
+                         f"expected seven ladder re-entries and the probe's solve, "
                          f"found {len(reentries)}")
         probing = [n for n in reentries
                    if any(k.arg == "_probe" and getattr(k.value, "value", None) is True
@@ -35857,7 +35861,7 @@ class AllocatorTruthTests(unittest.TestCase):
         ladder_guards = [n for n in ast.walk(func) if isinstance(n, ast.If)
                          and "not _probe" in ast.unparse(n.test)
                          and "proven_infeasible" in ast.unparse(n.test)]
-        self.assertEqual(len(ladder_guards), 7,
+        self.assertEqual(len(ladder_guards), 8,
                          "every ladder re-entry and the probe itself skip probe mode")
         guards = [n for n in ast.walk(func)
                   if isinstance(n, ast.If)
@@ -35869,7 +35873,7 @@ class AllocatorTruthTests(unittest.TestCase):
             test = ast.unparse(node.test)
             if "proven_infeasible" in test and "not slate_blocked" in test:
                 guarded += 1
-        self.assertEqual(guarded, 7,
+        self.assertEqual(guarded, 8,
                          "a re-entry is not guarded on both conjuncts")
         # And the verdict it reads is computed from the failing checks, not
         # inlined per guard, so the three cannot disagree.
@@ -40712,7 +40716,9 @@ class StackSleeveTests(unittest.TestCase):
                 for kw in call.keywords:
                     if kw.arg == "_seat_state" and isinstance(kw.value, ast.Dict):
                         literals.append(kw.value)
-        self.assertEqual(len(literals), 2, "the pair seat's rung and the stack seat's")
+        # R504(e): the within-contest overlap bound's rung rides `_seat_state` too.
+        self.assertEqual(len(literals), 3, "the pair seat's rung, the stack seat's "
+                                           "and the overlap bound's")
         for literal in literals:
             self.assertIsNone(literal.keys[0], "a `**` spread of the incoming `_seat_state` comes first")
 
