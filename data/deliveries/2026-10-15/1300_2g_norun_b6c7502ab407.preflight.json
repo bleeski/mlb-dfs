@@ -1,0 +1,10 @@
+{
+ "entries_sha256": "b6c7502ab407f553b640060287df401c30c6d7730ba7c9ae784d4aeb6a03de15",
+ "exit_code": 0,
+ "kind": "preflight",
+ "preflight_version": "1.1",
+ "record": "1300_2g_norun_b6c7502ab407.json",
+ "schema_version": 1,
+ "utc": "2026-10-15T21:38:38.172888+00:00",
+ "verdict": "review_ready"
+}
