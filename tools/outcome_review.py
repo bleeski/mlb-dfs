@@ -368,6 +368,7 @@ def review_contest(root: Path, slate_date: str, contest_id: str,
     if not candidates:
         block["status"] = "standings_absent"
         block["in_the_money"] = "UNKNOWN"
+        block["won_first"] = "UNKNOWN"
         block["note"] = (
             f"no standings export for {contest_id} under data/archive/ or "
             f"data/standings/inbox/; pull it (tools/awaiting_standings.py scan "
@@ -382,6 +383,7 @@ def review_contest(root: Path, slate_date: str, contest_id: str,
     except (OSError, ValueError) as exc:
         block["status"] = "standings_unreadable"
         block["in_the_money"] = "UNKNOWN"
+        block["won_first"] = "UNKNOWN"
         block["note"] = f"{path.name} could not be parsed ({exc})"
         return block
 
@@ -406,6 +408,7 @@ def review_contest(root: Path, slate_date: str, contest_id: str,
         block["in_the_money"] = "UNKNOWN"
     else:
         block["in_the_money"] = bool(summary.get("cashed_entries"))
+    block.update(first_place_fields(block, mined))
 
     planned: Counter = Counter()
     planned_lineups = 0
@@ -427,6 +430,70 @@ def review_contest(root: Path, slate_date: str, contest_id: str,
     block["exposures"] = exposure_diff(planned, realized, planned_lineups,
                                        realized_lineups, crosswalk, join_note)
     return block
+
+
+def first_place_fields(block: Mapping[str, Any], mined: Mapping[str, Any]) -> Dict[str, Any]:
+    """R504(c). Did one of our entries finish first in this contest? Three-valued.
+
+    ``won_first`` is True when our best rank is 1, False when it is anything else,
+    and ``"UNKNOWN"`` when no rank was read (no standings, unmatched entries): an
+    absence is never False, the rule `portfolio_washout` already keeps. First is
+    RANK 1 in every contest. In a one-seat satellite the seat is rank 1, so the
+    two coincide; a seat in a multi-seat satellite is not rank 1 and is not
+    counted here (the ledger's seat read is a separate field).
+
+    ``won_first_tied`` names a shared rank 1 (DK gives tied entries the same
+    rank, so a tie reads as first for every entry in it): True when more than one
+    row holds rank 1 in the standings, None when we did not win.
+    """
+    best = block.get("best_rank")
+    if block.get("status") != "graded" or best is None:
+        return {"won_first": "UNKNOWN", "won_first_tied": None, "rank_one_rows": None}
+    rows = (mined.get("meta") or {}).get("winner_rank1_rows")
+    won = int(best) == 1
+    return {"won_first": won,
+            "won_first_tied": (rows is not None and int(rows) > 1) if won else None,
+            "rank_one_rows": rows}
+
+
+def portfolio_first_place(contests: Sequence[Mapping[str, Any]],
+                          not_graded: int = 0) -> Dict[str, Any]:
+    """R504(c). In how many of this delivery's contests did an entry of ours finish first?
+
+    Counts, with the contests they come from named: ``won`` contests with
+    ``won_first`` True, ``graded`` those read True or False, ``unknown`` those
+    that could not say. An unknown contest is never counted as a loss, and the
+    count is of contests, never of entries (two of ours cannot both win one).
+    ``not_graded`` is how many of this record's entries could not be graded here
+    (unresolved, or entered from another record): `portfolio_washout` demotes its
+    answer to UNKNOWN for them, and a first-place count must not read as firm when
+    one of those entries may have won, so it says it is a lower bound.
+    Observed outcomes, conditioned on nothing and compared with nothing here;
+    the any-first cut against the uniform reference lives in `results_ledger`.
+    """
+    won = [str(c.get("contest_id")) for c in contests if c.get("won_first") is True]
+    lost = [c for c in contests if c.get("won_first") is False]
+    unknown = [str(c.get("contest_id")) for c in contests
+               if c.get("won_first") not in (True, False)]
+    tied = [str(c.get("contest_id")) for c in contests if c.get("won_first_tied") is True]
+    graded = len(won) + len(lost)
+    reason = (f"an entry of ours took rank 1 in {len(won)} of {graded} contest(s) "
+              f"with standings read" if graded else
+              "no contest here has a rank read, so there is nothing to count")
+    if won:
+        reason += ": " + ", ".join(won)
+    if tied:
+        reason += f"; rank 1 was shared in {', '.join(tied)}"
+    if unknown:
+        reason += f"; {len(unknown)} contest(s) could not say: " + ", ".join(unknown)
+    if not_graded:
+        reason += (f"; {int(not_graded)} entr{'y' if int(not_graded) == 1 else 'ies'} of this "
+                   f"record could not be graded here (unresolved, or entered from another "
+                   f"record), so this is a lower bound")
+    return {"won": len(won), "graded": graded, "unknown": len(unknown),
+            "contests": len(contests), "won_contest_ids": won,
+            "tied_contest_ids": tied, "not_graded_entries": int(not_graded),
+            "lower_bound": bool(not_graded), "reason": reason}
 
 
 def portfolio_washout(contests: Sequence[Mapping[str, Any]]) -> Tuple[Any, str]:
@@ -536,6 +603,8 @@ def review_record(record: Mapping[str, Any], root: Path,
         "contests": contests,
         "portfolio_washout": washout,
         "portfolio_washout_reason": reason,
+        "portfolio_first_place": portfolio_first_place(
+            contests, len(unresolved) + len(states["not_entered"]) + len(states["same_bytes"])),
         "labels": LABEL,
     }
 
@@ -573,6 +642,13 @@ def render(review: Mapping[str, Any]) -> str:
     shown = "UNKNOWN" if washout == "UNKNOWN" else ("YES" if washout else "NO")
     out.append(f"PORTFOLIO WASHOUT (no entry in a paid position): {shown}")
     out.append(f"  {review.get('portfolio_washout_reason')}")
+    first = review.get("portfolio_first_place")
+    if first:
+        out.append(f"CONTESTS WON FIRST (an entry of ours at rank 1): {first.get('won')} "
+                   f"of {first.get('graded')} graded, {first.get('unknown')} unknown"
+                   + (" (lower bound: some entries were not graded here)"
+                      if first.get("lower_bound") else ""))
+        out.append(f"  {first.get('reason')}")
     out.append("")
     for block in review.get("contests") or []:
         out.append(f"## {block.get('contest_id')} {block.get('contest_name') or ''}".rstrip())
@@ -590,6 +666,12 @@ def render(review: Mapping[str, Any]) -> str:
         out.append(f"  rank {block.get('best_rank')} to {block.get('worst_rank')}"
                    f"   points best {block.get('best_points')}"
                    f"   contest best {block.get('winning_points')}")
+        won = block.get("won_first")
+        if won is not None:
+            shown_won = "UNKNOWN" if won == "UNKNOWN" else ("yes" if won else "no")
+            tie_note = (f" (rank 1 shared by {block.get('rank_one_rows')} rows)"
+                        if block.get("won_first_tied") else "")
+            out.append(f"  won first: {shown_won}{tie_note}")
         places = block.get("paid_places")
         itm = block.get("in_the_money")
         itm_shown = "UNKNOWN" if itm == "UNKNOWN" else ("yes" if itm else "no")

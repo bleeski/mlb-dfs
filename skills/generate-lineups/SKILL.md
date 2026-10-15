@@ -647,9 +647,11 @@ Four things follow:
 
 ### The two washout-axis caps: team footprint and game exposure (R343, R333, Classic only)
 
-Ben's dual objective has two halves and the washout half binds at the PORTFOLIO
-level (CLAUDE.md), not inside a lineup. `max_player_exposure_pct` reaches it
-per player; the two caps below reach it per team and per game.
+Ben's dual objective has two halves: first place within each contest (read per
+contest in the brief's `exposure.frontier.by_contest`), and no washout across the
+portfolio, which binds at the PORTFOLIO level (CLAUDE.md), not inside a lineup.
+`max_player_exposure_pct` reaches the washout half per player; the two caps below
+reach it per team and per game.
 
 **`max_team_exposure_pct` — a team's footprint over EVERY hitter slot, any stack
 role.** `max_primary_stack_exposure_pct` counts the PRIMARY stack alone, so a

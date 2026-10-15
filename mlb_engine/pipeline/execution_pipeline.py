@@ -3971,6 +3971,89 @@ def _correlated_block_report(
     return out
 
 
+_BY_CONTEST_NOTE = (
+    "first place is won inside one contest, so this reads the entered set contest "
+    "by contest where apex and washout above read the whole file. distinct_lineups "
+    "counts paths: two entries holding one lineup in a contest are one path. "
+    "max_pairwise_overlap is the most players any two of that contest's entries "
+    "share. Ceiling is a projection input and the winning-score bar is a pooled "
+    "seed mean, so entries_reaching_bar is a deterministic review proxy, never an "
+    "observed outcome and never a probability; an ABSENT bar leaves it None, which "
+    "is not zero. A Ceiling total is short by any rostered player the run priced no "
+    "Ceiling for (unpriced_roster_players names them), so a short total can miss the bar")
+
+
+def per_contest_first_place(
+    entered: Sequence[Tuple[Mapping[str, Any], Sequence[str], float]],
+    slate_games: Optional[int] = None,
+) -> Dict[str, Any]:
+    """R504(b). The entered set, one row per contest, off the same ``Ceiling``.
+
+    ``entered`` is one ``(assignment, lineup ids, ceiling total)`` per ENTERED
+    row, in the order `compute_portfolio_frontier` already built them, so the
+    totals here are the totals the apex block summed. Ben's first goal is first
+    place within each contest: at least one of our entries in a contest finishing
+    first, a property of the set held in THAT contest because two of ours cannot
+    both win it. The portfolio blocks cannot see that, so this groups on the
+    assignment's own ``contest_id`` (`contest_allocator` writes it on every row).
+
+    A report, never a gate: nothing here steers the allocator (Session 173's
+    work) and nothing certifies on it.
+    """
+    from mlb_engine.field.field_miner import winning_score_bar
+    out: Dict[str, Any] = {
+        "available": False, "score_basis": "Ceiling", "slate_games": slate_games,
+        "contests": [], "note": _BY_CONTEST_NOTE,
+    }
+    groups: Dict[str, List[Tuple[Mapping[str, Any], Sequence[str], float]]] = {}
+    for row in entered:
+        cid = str((row[0] or {}).get("contest_id") or "").strip()
+        groups.setdefault(cid, []).append(row)
+    unplaced = len(groups.get("", []))
+    if unplaced:
+        # All or some: a partial split would put the unplaced entries in a phantom
+        # contest and report an overlap between entries that share no contest.
+        out["unavailable_reason"] = (
+            f"{unplaced} of {len(entered)} assignments carry no contest_id, so the "
+            "entered set cannot be split by contest")
+        return out
+    bar = winning_score_bar("classic", slate_games)
+    rows: List[Dict[str, Any]] = []
+    for cid in sorted(groups):
+        members = sorted(groups[cid], key=lambda m: str((m[0] or {}).get("entry_id") or ""))
+        eids = [str((m[0] or {}).get("entry_id") or "") for m in members]
+        sets = [frozenset(str(p) for p in m[1]) for m in members]
+        # The two entries of this contest sharing the most players, tie-broken on
+        # their ids so the pair named does not move between runs.
+        pair: Optional[Tuple[int, str, str]] = None
+        for i in range(len(members)):
+            for j in range(i + 1, len(members)):
+                shared = len(sets[i] & sets[j])
+                if pair is None or shared > pair[0]:
+                    pair = (shared, eids[i], eids[j])
+        best = min(range(len(members)), key=lambda k: (-members[k][2], eids[k]))
+        stacks = {str((m[0] or {}).get("primary_stack") or "").strip() for m in members} - {""}
+        first = members[0][0] or {}
+        reaching = (sum(1 for m in members if m[2] >= bar["value"])
+                    if bar.get("status") == "SEED" else None)
+        rows.append({
+            "contest_id": cid,
+            "contest_name": str(first.get("contest_name") or ""),
+            "contest_shape": str(first.get("contest_shape") or ""),
+            "entries": len(members),
+            "distinct_lineups": len(set(sets)),
+            "distinct_primary_stacks": len(stacks) if stacks else None,
+            "max_pairwise_overlap": pair[0] if pair else None,
+            "max_overlap_entries": [pair[1], pair[2]] if pair else None,
+            "best_entry": {"entry_id": eids[best], "ceiling": round(members[best][2], 2)},
+            "winning_score_bar": bar,
+            "entries_reaching_bar": reaching,
+        })
+    out["available"] = True
+    out["contests"] = rows
+    return out
+
+
 def compute_portfolio_frontier(
     projections: Any, assignments: Sequence[Mapping[str, Any]]
 ) -> Dict[str, Any]:
@@ -4001,6 +4084,11 @@ def compute_portfolio_frontier(
     lineup. Two entries holding the same lineup die together, and correlated
     failure across ENTRIES is what the washout objective binds on (CLAUDE.md's
     dual-objective note says so, and it is why this is not a floor metric).
+
+    R504(b). ``by_contest`` reads the same entered set contest by contest
+    (`per_contest_first_place`): Ben's first goal is first place WITHIN each
+    contest, which the whole-file apex and washout above cannot see. The
+    washout reading stays portfolio-wide on purpose.
 
     A counterfactual over data already in hand: no solve, no network, nothing
     that can delay a build. Deterministic review proxies throughout. ``Ceiling``
@@ -4124,6 +4212,13 @@ def compute_portfolio_frontier(
     # pool, which is both exact and cheap -- 45 pairs and 120 triples per entry
     # against C(100,3) = 161,700 triples for a 100-player pool.
     out["correlated_block"] = _correlated_block_report(rosters, name_of)
+    # R504(b). Before the no-game-column return below, so the per-contest read
+    # survives a frame the washout cannot be built from; its bar then reads ABSENT.
+    out["by_contest"] = per_contest_first_place(
+        [(a, ids, total) for a, (_eid, ids), (total, _e) in zip(assignments, rosters, totals)],
+        slate_games=(len({g for g in game_of.values()
+                          if g and g.lower() not in ("nan", "none")}) or None)
+        if game_col else None)
     out["roster_players"] = sum(len(ids) for _, ids in rosters)
     out["unpriced_roster_players"] = sorted(unpriced)
     if unpriced:

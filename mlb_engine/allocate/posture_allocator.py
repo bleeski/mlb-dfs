@@ -19,6 +19,11 @@ pretend one does.
 THE WATERFALL (from the 2026-07-04 strategic brief, approved):
   Priority 1, the floor, is purchased in fee allocation, not lineup space.
   Priority 2, the apex, is decorrelated ceiling with duplication screening.
+    R504 (Ben, 2026-10-14): the apex is first place WITHIN EACH CONTEST, a
+    property of the entries held in that contest, not a prize size. Tier A is
+    where rank 1 is the whole payout (paid_places == 1) and a contest's entries
+    are meant as distinct paths to first; concentration across contests is the
+    washout cost the portfolio caps bound, never a first-place gain.
   Priority 3, the volume, follows the concentration rule below.
 
 TIERS (policy constants, documented and overridable):

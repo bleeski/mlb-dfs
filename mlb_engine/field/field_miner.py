@@ -142,6 +142,27 @@ DEGRADED_SALARY_LEFT = 5000
 # sits just outside the observed p90 and catches the sighting.
 DEGRADED_PROXY_MARGIN_PCT = 25.0
 
+# R504(b). The bar a contest's best entry is read against, for "how many of our
+# entries reach the winning score". Ledger 3.21 (the 2026-08-28 greenfield review
+# of 610 standings) is the only place a winning score by slate size is written
+# down: MEANS, by slate size alone, pooled across contest archetypes and field
+# sizes, and nothing in the tree conditions it further. R258's mining half would
+# (per archetype and field band, from `winning_points` below) and is unbuilt, so
+# this seed stands in, labelled as the pooled prior it is; when that table lands
+# it replaces this one at `winning_score_bar` and nowhere else. Showdown has no
+# row here on purpose: the ledger gives a RANGE (winners 83-98 by field bucket),
+# and a range is not a bar. Each tuple is (largest slate game count it covers,
+# label, mean winning score); None covers the rest.
+WINNING_SCORE_SEED_CLASSIC = (
+    (2, "1-2 games", 138.9),
+    (4, "3-4 games", 144.6),
+    (6, "5-6 games", 161.1),
+    (None, "7+ games", 162.8),
+)
+WINNING_SCORE_SEED_SOURCE = (
+    "ledger 3.21 (2026-08-28 greenfield review, 610 contests): mean winning "
+    "score by slate size, pooled across contest archetypes and field sizes")
+
 # R422(a). The engine's primary-stack threshold (optimizer_v3.PRIMARY_STACK_MIN_HITTERS),
 # mirrored rather than imported so the miner stays off the solver's import graph;
 # ClassicTailSeatTests pins the two equal.
@@ -1026,6 +1047,40 @@ def degraded_entry_flags(
         "illegal entry: it is one the operator should look at before uploading, "
         "because every existing counter reads clean on exactly this failure")
     return out
+
+
+def winning_score_bar(contest_type: str, slate_games: Optional[int]) -> Dict[str, Any]:
+    """R504(b). The score a contest's best entry is read against, or ABSENT.
+
+    ``{"status": "SEED", "value", "bucket", "kind", "basis", "slate_games"}``
+    when the ledger 3.21 seed holds a mean for this format and slate size;
+    ``{"status": "ABSENT", "unavailable_reason"}`` otherwise, never a zero and
+    never a guess: a missing bar is one fact about the build, and a reader who
+    saw 0 would take it for a contest nobody could fall short of. The bar is a
+    labelled prior, pooled across archetypes and field sizes, so a count of
+    entries against it is a review proxy and never an observed outcome (the
+    outcome is `winning_points`, mined per archived contest).
+    """
+    kind = str(contest_type or "").strip().lower()
+    if kind != "classic":
+        return {"status": "ABSENT", "unavailable_reason": (
+            f"the seed holds no winning-score bar for {kind or 'an unnamed format'}: "
+            "Showdown winners run 83-98 by field bucket, a range, and R258's "
+            "per-contest table is unbuilt")}
+    try:
+        games = int(slate_games)
+    except (TypeError, ValueError):
+        games = 0
+    if games < 1:
+        return {"status": "ABSENT", "unavailable_reason": (
+            "this run's projections name no slate size, so no bucket of the seed "
+            "applies")}
+    for upper, label, value in WINNING_SCORE_SEED_CLASSIC:
+        if upper is None or games <= upper:
+            return {"status": "SEED", "value": value, "bucket": label,
+                    "kind": "mean winning score", "basis": WINNING_SCORE_SEED_SOURCE,
+                    "slate_games": games}
+    return {"status": "ABSENT", "unavailable_reason": "no seed bucket covers this slate size"}
 
 
 WINNER_OBSERVED = "OBSERVED"

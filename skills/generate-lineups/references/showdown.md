@@ -48,7 +48,10 @@ the citation:
 | `max_player_exposure_pct` | `DEFAULT_MAX_PLAYER_EXPOSURE_PCT = 0.50` | no PLAYER in ANY role above half of it |
 
 The third one is the portfolio-level washout axis the dual objective names and
-the module did not have: on the 2026-08-19 ARI@BOS build the overlap bound was
+the module did not have (the first-place half is per contest: `max_cpt_per_contest`,
+R239, keeps a contest's entries from repeating a captain, and the brief's
+`per_contest` rows count each contest's distinct lineups, captain included, and
+its best entry, R504): on the 2026-08-19 ARI@BOS build the overlap bound was
 clean, the captain cap was clean, and one cheap leadoff bat was in 12 of 19
 entries.
 
