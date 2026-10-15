@@ -239,6 +239,11 @@ NEVER_RELAX_NOT_HONOURED: Dict[str, str] = {
     "min_five_stack_share_pct_by_contest": "the allocator's re-entry ladder "
                                            "relaxes the contest-scoped quota "
                                            "(LADDER_RELAXED_CONTROLS)",
+    # R504(e), 2026-10-15. The within-contest overlap bound, derived by the
+    # merge and never typed; the ladder drops it in one counted step.
+    "max_shared_players_by_contest": "the allocator's re-entry ladder drops "
+                                     "the within-contest overlap bound "
+                                     "(LADDER_RELAXED_CONTROLS)",
     # R469, 2026-09-30. The chalk-core seat relaxes on the same ladder and when
     # the bank holds no pair lineup, counted either way.
     "min_consensus_pair_entries_per_contest": "the allocator relaxes the seat "

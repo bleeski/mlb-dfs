@@ -789,6 +789,9 @@ def execute_portfolio(
         # hand; a caller writing the brief would otherwise have to re-join the export
         # against projections.csv, which is exactly what BUILD did by hand.
         portfolio_frontier = _portfolio_frontier(projections, assignments)
+        # R504(e). Each per-contest row names the bound its entries were held to
+        # and whether a single-entry contest drew first.
+        attach_contest_deal(portfolio_frontier, allocation.get("contest_deal"))
         assignment_path = run_dir / "final" / "assignments.csv"
         _write_assignments(assignment_path, assignments)
         assignment_record = register_artifact(run_dir, assignment_path, "assignments")
@@ -1011,6 +1014,8 @@ def execute_portfolio(
                 "classic_sleeves": allocation.get("classic_sleeves"),
                 # R469, the same.
                 "consensus_pair_seats": allocation.get("consensus_pair_seats"),
+                # R504(e), the same.
+                "contest_deal": allocation.get("contest_deal"),
                 "workflow_valid": True,
                 "selection_certified": certification["selection_certified"],
                 "allocation_certified": certification["allocation_certified"],
@@ -1044,6 +1049,8 @@ def execute_portfolio(
             "classic_sleeves": allocation.get("classic_sleeves"),
             # R469, the same.
             "consensus_pair_seats": allocation.get("consensus_pair_seats"),
+            # R504(e), the same.
+            "contest_deal": allocation.get("contest_deal"),
             "workflow_valid": bool(promotion["passed"]),
             "selection_certified": certification["selection_certified"],
             "allocation_certified": certification["allocation_certified"],
@@ -2171,6 +2178,14 @@ SHAPE_BAND_CONTEST_MAPS = (
     ("min_five_stack_share_pct", "min_five_stack_share_pct_by_contest"),
 )
 
+# R504(e), 2026-10-15. The within-contest overlap bound, a CEILING map beside
+# the two floor maps above and under the same escape: derived by the merge from
+# each contest's posture and its own feasibility floor, never typed, and retired
+# by a typed scalar. Kept out of `SHAPE_BAND_CONTEST_MAPS` because that table
+# also builds the floor maps (a value ABOVE the scalar) and is mirrored by
+# build_slate's shape-band gate; this map holds values BELOW its scalar.
+CONTEST_OVERLAP_MAP = ("max_shared_players", "max_shared_players_by_contest")
+
 
 def apply_shape_band_override(controls: MutableMapping[str, Any],
                               override: Optional[Mapping[str, Any]]) -> List[str]:
@@ -2184,6 +2199,10 @@ def apply_shape_band_override(controls: MutableMapping[str, Any],
     parent's recorded controls), calls it at both of its doors: one
     implementation, because two would diverge (R29(3)). Returns the map keys it
     retired, so a caller keeping provenance can drop theirs.
+
+    R504(e) puts `max_shared_players_by_contest` under the same two rules: a
+    typed `max_shared_players` (the loose replay's, the T-15 rung's open) is the
+    answer for every pair in the file, inside a contest included.
     """
     typed = dict(override or {})
     for scalar_key, map_key in SHAPE_BAND_CONTEST_MAPS:
@@ -2192,8 +2211,14 @@ def apply_shape_band_override(controls: MutableMapping[str, Any],
                 f"{map_key} is derived from the contests' shape bands and is "
                 f"not an override; type {scalar_key} to set it for every "
                 f"entry, or set it to 0 to turn the band off (R483)")
+    if CONTEST_OVERLAP_MAP[1] in typed:
+        raise ValueError(
+            f"{CONTEST_OVERLAP_MAP[1]} is derived from each contest's posture and "
+            f"its own feasibility floor and is not an override; type "
+            f"{CONTEST_OVERLAP_MAP[0]} to set one bound for every pair in the "
+            f"file, inside a contest included (R504)")
     retired: List[str] = []
-    for scalar_key, map_key in SHAPE_BAND_CONTEST_MAPS:
+    for scalar_key, map_key in SHAPE_BAND_CONTEST_MAPS + (CONTEST_OVERLAP_MAP,):
         if scalar_key in typed and map_key in controls:
             controls.pop(map_key, None)
             retired.append(map_key)
@@ -3983,6 +4008,38 @@ _BY_CONTEST_NOTE = (
     "Ceiling for (unpriced_roster_players names them), so a short total can miss the bar")
 
 
+def contest_deal_fields(contest_id: str,
+                        contest_deal: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
+    """R504(e). What the allocator's per-contest deal did in one contest.
+
+    ``overlap_bound`` is the within-contest bound its entries were held to, None
+    when the contest carried none or the ladder relaxed it (the block's own
+    ``status`` says which). ``single_entry_draw`` is ``held`` when a
+    single-entry contest drew first through the two-stage solve, ``not_held``
+    when it was one and did not, None when it was not one.
+    """
+    deal = dict(contest_deal or {})
+    cid = str(contest_id)
+    row = dict(((deal.get("overlap") or {}).get("by_contest") or {}).get(cid) or {})
+    single = dict(deal.get("single_entry") or {})
+    return {
+        "overlap_bound": row.get("bound") if row.get("status") == "applied" else None,
+        "single_entry_draw": (("held" if single.get("held") else "not_held")
+                              if cid in {str(c) for c in (single.get("contests") or [])}
+                              else None),
+    }
+
+
+def attach_contest_deal(frontier: MutableMapping[str, Any],
+                        contest_deal: Optional[Mapping[str, Any]]) -> None:
+    """Fill each ``by_contest`` row's deal fields in place; never raises."""
+    try:
+        for row in ((frontier or {}).get("by_contest") or {}).get("contests") or []:
+            row.update(contest_deal_fields(row.get("contest_id"), contest_deal))
+    except Exception:  # noqa: BLE001 - a review proxy must not kill a run
+        pass
+
+
 def per_contest_first_place(
     entered: Sequence[Tuple[Mapping[str, Any], Sequence[str], float]],
     slate_games: Optional[int] = None,
@@ -3997,8 +4054,10 @@ def per_contest_first_place(
     both win it. The portfolio blocks cannot see that, so this groups on the
     assignment's own ``contest_id`` (`contest_allocator` writes it on every row).
 
-    A report, never a gate: nothing here steers the allocator (Session 173's
-    work) and nothing certifies on it.
+    A report, never a gate, and nothing certifies on it. R504(e) made the
+    allocator steer per contest; each row carries `contest_deal_fields`' two
+    keys, None here and filled by `attach_contest_deal` from the allocator's
+    block once a build has one.
     """
     from mlb_engine.field.field_miner import winning_score_bar
     out: Dict[str, Any] = {
@@ -4048,6 +4107,7 @@ def per_contest_first_place(
             "best_entry": {"entry_id": eids[best], "ceiling": round(members[best][2], 2)},
             "winning_score_bar": bar,
             "entries_reaching_bar": reaching,
+            **contest_deal_fields(cid, None),
         })
     out["available"] = True
     out["contests"] = rows
@@ -5244,6 +5304,33 @@ def _merged_controls_for_build(
         if floored != _quota_map:
             merged["min_five_stack_share_pct_by_contest"] = floored
             prov["min_five_stack_share_pct_by_contest"] = _gc.PROV_DERIVED_FLOOR
+    # R504(e), 2026-10-15. Overlap INSIDE a contest. `max_shared_players` is one
+    # pairwise cap over the whole file, MIN-merged and then floored by the
+    # file's own arithmetic, so on a thin slate (more entries than cross-game SP
+    # pairs) every contest inherits a cap raised for a pair repeat that only the
+    # file as a whole needs: the production replay merges 5, floors to 8, and
+    # each of its three contests (7, 7 and 4 entries against 16 pairs) needs 6.
+    # Each contest keeps the larger of its own posture's value and its own
+    # floor, and the map holds only the contests where that is below the file's
+    # cap, so a slate whose cap was never raised adds no key and solves as
+    # before. A held cap is never raised, so it adds none either. Its provenance
+    # is the floor that made it differ.
+    _contest_shared_floors = dict(
+        (feasibility_floors or {}).get(CONTEST_OVERLAP_MAP[1]) or {})
+    _file_shared = merged.get(CONTEST_OVERLAP_MAP[0])
+    if _contest_shared_floors and _file_shared is not None:
+        _bounds: Dict[str, int] = {}
+        for cid, contest_controls in zip(posture_by_contest, declared):
+            own = contest_controls.get(CONTEST_OVERLAP_MAP[0])
+            own_floor = _contest_shared_floors.get(str(cid))
+            if own is None or own_floor is None:
+                continue
+            bound = max(int(own), int(own_floor))
+            if bound < int(_file_shared):
+                _bounds[str(cid)] = bound
+        if _bounds:
+            merged[CONTEST_OVERLAP_MAP[1]] = dict(sorted(_bounds.items()))
+            prov[CONTEST_OVERLAP_MAP[1]] = _gc.PROV_DERIVED_FLOOR
     # R215(c). The COERCED override, not the raw one: validating a copy and
     # storing the original is a gate that looks and then lets the value past.
     merged.update(coerced_override)
@@ -5333,6 +5420,16 @@ def feasibility_floors_from(feasibility_inputs: Mapping[str, Any]) -> Dict[str, 
         floors["max_sp_pair_repetition"] = feasibility_inputs["floor_sp_pair_repetition"]
     if feasibility_inputs.get("floor_shared_players"):
         floors["max_shared_players"] = feasibility_inputs["floor_shared_players"]
+    # R504(e). Each contest's own floor, which the merge reads to build the
+    # within-contest map. Dict-valued and never in the merged scalars, so the
+    # v1.9 loop below the merge skips it ("a floor may only relax an existing
+    # cap") and only the map's builder reads it.
+    by_contest_shared = {
+        str(cid): int(v) for cid, v in sorted(
+            (feasibility_inputs.get("floor_shared_players_by_contest") or {}).items())
+        if v is not None}
+    if by_contest_shared:
+        floors["max_shared_players_by_contest"] = by_contest_shared
     for floor_key, control_key in (
         ("floor_player_exposure_pct", "max_player_exposure_pct"),
         ("floor_pitcher_exposure_pct", "max_pitcher_exposure_pct"),
@@ -5473,6 +5570,25 @@ def attach_consensus_pair(controls: Mapping[str, Any],
     return out
 
 
+def shared_players_floor(entries: int, n_pairs: Optional[int],
+                         max_stack: int) -> Optional[int]:
+    """The smallest ``max_shared_players`` ``entries`` lineups can carry.
+
+    Two lineups on one SP pair and one ``max_stack`` stack share
+    ``max_stack + 2``; the pair has to repeat once ``entries`` exceeds the
+    slate's cross-game pairs. One more than the inherent overlap, capped at 9
+    (a roster of 10). None at one entry, which has no pair to bound. R504(e)
+    made this a function so the file's floor and each contest's are one
+    implementation.
+    """
+    from math import ceil as _ceil
+    if int(entries) <= 1:
+        return None
+    floor_rep = int(_ceil(int(entries) / int(n_pairs))) if (n_pairs or 0) >= 1 else 1
+    inherent = int(max_stack) + (2 if floor_rep >= 2 else 0)
+    return min(9, inherent + 1)
+
+
 def _slate_feasibility(
     posture_by_contest: Mapping[str, Mapping[str, Any]],
     entry_requirements: Sequence[Mapping[str, Any]],
@@ -5493,6 +5609,7 @@ def _slate_feasibility(
         "viable_sp_count": None, "viable_sp_pairs": None, "entries": None,
         "largest_contest_entries": None, "max_stack_size": None,
         "floor_sp_pair_repetition": None, "floor_shared_players": None,
+        "floor_shared_players_by_contest": {},
         "stackable_team_count": None,
         "game_count": None,
         "floor_team_exposure_count": None, "floor_team_exposure_pct": None,
@@ -5542,11 +5659,16 @@ def _slate_feasibility(
 
         floor_rep = int(_ceil(entries / n_pairs)) if (entries > 1 and n_pairs >= 1) else 1
         info["floor_sp_pair_repetition"] = floor_rep
-        if entries > 1:
-            inherent = max_stack + (2 if floor_rep >= 2 else 0)
-            info["floor_shared_players"] = min(9, inherent + 1)
-        else:
-            info["floor_shared_players"] = None
+        info["floor_shared_players"] = shared_players_floor(entries, n_pairs, max_stack)
+        # R504(e). The same arithmetic over each contest's own entries. The
+        # file's floor counts every entry against the slate's SP pairs, so on a
+        # thin slate it raises the cap for every contest, while a contest
+        # smaller than the pair count needs no pair to repeat inside it. The
+        # merge reads this to bound overlap INSIDE a contest at what that
+        # contest's own size allows.
+        info["floor_shared_players_by_contest"] = {
+            cid: shared_players_floor(n, n_pairs, max_stack)
+            for cid, n in sorted(by_contest.items()) if n > 1}
 
         # v1.9 pct exposure floors. Some arm must take ceil(2E / viable SPs)
         # pitcher slots and some team ceil(E / stackable teams) primary stacks,
@@ -8754,7 +8876,10 @@ def manifest_strategy_state(result: Mapping[str, Any]) -> Dict[str, Any]:
     # relaxations, and this read none of them, so a Classic row read `unknown`
     # with reuse, floor and quota all relaxed. `execute_portfolio` returns the
     # three blocks on the result; a block present is evidence the ladder ran.
-    for ladder in ("candidate_reuse", "primary_stack_floor", "five_stack_quota"):
+    # R504(e) adds the per-contest deal: its overlap bound's one ladder step and
+    # a single-entry draw that could not be held both count.
+    for ladder in ("candidate_reuse", "primary_stack_floor", "five_stack_quota",
+                   "contest_deal"):
         block = result.get(ladder)
         if not isinstance(block, Mapping):
             continue

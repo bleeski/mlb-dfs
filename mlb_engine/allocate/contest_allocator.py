@@ -447,15 +447,21 @@ def _candidate_right_tail_tier(candidate: Dict[str, Any]) -> str:
 def right_tail_candidate_passes_quality_gate(candidate: Dict[str, Any]) -> bool:
     """Validate that a right-tail candidate is useful volatility, not noise.
 
-    Explicit low-ceiling/no-first-place-path flags fail. Explicit high or extreme
-    duplication risk fails unless the candidate carries an affirmative
-    first_place_path override. Missing diagnostic fields remain permissive so
-    older candidate-bank records do not silently disappear.
+    An explicit no-ceiling flag fails. Explicit high or extreme duplication risk
+    fails. Missing diagnostic fields remain permissive so older candidate-bank
+    records do not silently disappear.
+
+    R504(e), 2026-10-15. A ``first_place_path`` flag read here, as a fail and as
+    an override of the duplication rule, is gone: nothing in the tree wrote it,
+    so the fail never fired and the override never applied, and first place is
+    read per contest (`execution_pipeline.per_contest_first_place`), never per
+    candidate. This function's only caller is the legacy
+    `assign_lineups_to_contests`, which nothing calls (R273).
     """
     tier = _candidate_right_tail_tier(candidate)
     if tier not in {"Volatile", "Eruption"}:
         return True
-    if candidate.get("first_place_path") is False or candidate.get("ceiling_story") == "none":
+    if candidate.get("ceiling_story") == "none":
         return False
     dup_tier = str(candidate.get("duplication_risk_tier") or candidate.get("duplication_risk") or "").strip().lower()
     projected_dupes = candidate.get("projected_duplicate_count")
@@ -464,7 +470,7 @@ def right_tail_candidate_passes_quality_gate(candidate: Dict[str, Any]) -> bool:
         high_dup = high_dup or (projected_dupes is not None and float(projected_dupes) >= 6)
     except (TypeError, ValueError):
         pass
-    if high_dup and candidate.get("first_place_path") is not True:
+    if high_dup:
         return False
     return True
 
@@ -1330,6 +1336,10 @@ LADDER_RELAXED_CONTROLS = frozenset({
     # ladders: the contest floors off before the portfolio floor's rungs, the
     # contest-scoped quota on the quota's own rungs.
     "primary_stack_min_size_by_contest", "min_five_stack_share_pct_by_contest",
+    # R504(e), 2026-10-15. The within-contest overlap bound, one counted step
+    # off after the engine's reuse default. The file-wide `max_shared_players`
+    # it sits under stays CHECKED and is never moved by a ladder.
+    "max_shared_players_by_contest",
 })
 
 
@@ -4185,6 +4195,35 @@ def select_and_assign_entries(
         if _on_pair:
             prefilter_reserves["consensus_pair"] = (
                 _on_pair, min(len(_on_pair), 2 * sum(seat_need.values())))
+    by_contest_entries: Dict[str, List[int]] = defaultdict(list)
+    for e, entry in enumerate(entries):
+        by_contest_entries[str(entry.get("contest_id") or "")].append(e)
+    # R504(e). A single-entry contest: one entry in this solve and no
+    # untouchable row beside it, so that entry is the contest's only path to
+    # first. It draws first, through the two-stage solve below, and only on a
+    # file that also holds a multi-entry contest (a file of single-entry
+    # contests alone already maximizes exactly their reads). Each one's own
+    # best reads are kept through the prefilter for R405's reason: a
+    # score-ordered fill ranks by the best shape over every entry, which is not
+    # this entry's shape.
+    _fixed_contests = {str(c) for c, sigs in
+                       ((fixed_exposure or {}).get("signatures_by_contest") or {}).items()
+                       if sigs} if fixed_rows else set()
+    single_entry_idx = [
+        members[0] for cid, members in sorted(by_contest_entries.items())
+        if cid and len(members) == 1 and cid not in _fixed_contests]
+    if len(single_entry_idx) == E:
+        single_entry_idx = []
+    if single_entry_idx:
+        _se_keep: List[int] = []
+        for e in single_entry_idx:
+            _shape = str(entries[e].get("contest_shape") or "large_wta")
+            _own = sorted((k for k in range(len(candidates)) if full_compatible[e][k]),
+                          key=lambda k: (-_candidate_shape_score(candidates[k], _shape),
+                                         _candidate_id(candidates[k], k)))
+            _se_keep.extend(_own[:len(single_entry_idx)])
+        _se_keep = sorted(set(_se_keep))
+        prefilter_reserves["single_entry_best"] = (_se_keep, len(_se_keep))
     kept_idx, prefilter_report = _prefilter_candidates(
         candidates, entries, full_compatible, keep_target,
         reserve=prefilter_reserves or None,
@@ -4224,7 +4263,63 @@ def select_and_assign_entries(
     x_count = E * K
     use_y = controls.get("max_shared_players") is not None
     y_offset = x_count
-    n_vars = x_count + (K if use_y else 0)
+
+    # R504(e). Overlap INSIDE a contest. `max_shared_players` (the `y` block
+    # below) bounds every pair in the file with one number, and on a thin slate
+    # that number is the file's feasibility floor; the merge's
+    # `max_shared_players_by_contest` holds each contest's own, lower one. It is
+    # read only beside a file-wide cap (the map is defined against it, and the
+    # interaction probe's "drop max_shared_players alone" then drops the whole
+    # overlap family). A contest's rows are the pairs whose overlap sits in
+    # (its bound, the file's cap]: above the cap the `y` rows already forbid
+    # the pair anywhere, and a row that cannot bind never enters (R343).
+    file_overlap_limit = (int(controls["max_shared_players"]) if use_y else None)
+    overlap_relaxed = bool((_seat_state or {}).get("contest_overlap_relaxed"))
+    overlap_by_contest: Dict[str, Dict[str, Any]] = {}
+    contest_bounds: Dict[str, int] = {}
+    for _cid, _bound in sorted(
+            dict(controls.get("max_shared_players_by_contest") or {}).items()):
+        _members = by_contest_entries.get(str(_cid), [])
+        _row: Dict[str, Any] = {"bound": int(_bound), "file_wide": file_overlap_limit,
+                                "entries": len(_members), "rows_added": 0}
+        if overlap_relaxed:
+            _row["status"] = "relaxed_by_ladder"
+        elif file_overlap_limit is None:
+            _row["status"] = "no_file_cap"
+        elif len(_members) < 2:
+            _row["status"] = "under_two_entries"
+        elif int(_bound) >= file_overlap_limit:
+            _row["status"] = "vacuous"
+        else:
+            _row["status"] = "applied"
+            contest_bounds[str(_cid)] = int(_bound)
+        overlap_by_contest[str(_cid)] = _row
+    # One pass over the pairs for both blocks, each pair's overlap counted once.
+    over_pairs: List[Tuple[int, int, int]] = []
+    if use_y:
+        _threshold = min([file_overlap_limit] + list(contest_bounds.values()))
+        for i in range(K):
+            for j in range(i + 1, K):
+                if signatures[i] != signatures[j]:
+                    _shared = len(player_sets[i] & player_sets[j])
+                    if _shared > _threshold:
+                        over_pairs.append((i, j, _shared))
+    contest_pairs: Dict[str, List[Tuple[int, int]]] = {}
+    z_index: Dict[Tuple[str, int], int] = {}
+    _z_next = x_count + (K if use_y else 0)
+    for _cid, _bound in sorted(contest_bounds.items()):
+        _members = by_contest_entries[_cid]
+        _reach = [any(compatible[e][k] for e in _members) for k in range(K)]
+        _pairs = [(i, j) for i, j, _shared in over_pairs
+                  if _bound < _shared <= file_overlap_limit and _reach[i] and _reach[j]]
+        if not _pairs:
+            overlap_by_contest[_cid]["status"] = "vacuous"
+            continue
+        contest_pairs[_cid] = _pairs
+        for k in sorted({i for i, _ in _pairs} | {j for _, j in _pairs}):
+            z_index[(_cid, k)] = _z_next
+            _z_next += 1
+    n_vars = _z_next
     def x_idx(e: int, k: int) -> int: return e * K + k
     def y_idx(k: int) -> int: return y_offset + k
 
@@ -4274,9 +4369,6 @@ def select_and_assign_entries(
     for e in range(E):
         add({x_idx(e, k): 1.0 for k in range(K)}, 1.0, 1.0)
 
-    by_contest_entries: Dict[str, List[int]] = defaultdict(list)
-    for e, entry in enumerate(entries):
-        by_contest_entries[str(entry.get("contest_id") or "")].append(e)
     sig_groups: Dict[Tuple[str, ...], List[int]] = defaultdict(list)
     for k, sig in enumerate(signatures):
         sig_groups[sig].append(k)
@@ -4607,19 +4699,50 @@ def select_and_assign_entries(
             add({**usage, y_idx(k): -float(E)}, -np.inf, 0.0)
             add({y_idx(k): 1.0, **{x_idx(e, k): -1.0 for e in range(E)}}, -np.inf, 0.0)
         limit = int(controls["max_shared_players"])
-        for i in range(K):
-            for j in range(i + 1, K):
-                if signatures[i] != signatures[j] and len(player_sets[i] & player_sets[j]) > limit:
-                    add({y_idx(i): 1.0, y_idx(j): 1.0}, -np.inf, 1.0)
+        for i, j, _shared in over_pairs:
+            if _shared > limit:
+                add({y_idx(i): 1.0, y_idx(j): 1.0}, -np.inf, 1.0)
+    # R504(e). Per contest: z_{c,k} is 1 when any of the contest's entries takes
+    # k (n_c * z >= its usage), and two candidates sharing more than the bound
+    # cannot both be used inside it. Across contests only the `y` block applies.
+    contest_overlap_rows = 0
+    for _cid, _pairs in sorted(contest_pairs.items()):
+        _members = by_contest_entries[_cid]
+        for (_zc, k), col in sorted(z_index.items()):
+            if _zc == _cid:
+                add({**{x_idx(e, k): 1.0 for e in _members}, col: -float(len(_members))},
+                    -np.inf, 0.0)
+        for i, j in _pairs:
+            add({z_index[(_cid, i)]: 1.0, z_index[(_cid, j)]: 1.0}, -np.inf, 1.0)
+        overlap_by_contest[_cid]["rows_added"] = len(_pairs)
+        contest_overlap_rows += len(_pairs)
 
-    row_idx: List[int] = []
-    col_idx: List[int] = []
-    data: List[float] = []
-    for r, coefs in enumerate(rows):
-        for col, value in coefs.items():
-            if value:
-                row_idx.append(r); col_idx.append(col); data.append(float(value))
-    matrix = coo_matrix((data, (row_idx, col_idx)), shape=(len(rows), n_vars)).tocsr()
+    def _build_matrix() -> Any:
+        row_idx: List[int] = []
+        col_idx: List[int] = []
+        data: List[float] = []
+        for r, coefs in enumerate(rows):
+            for col, value in coefs.items():
+                if value:
+                    row_idx.append(r); col_idx.append(col); data.append(float(value))
+        return coo_matrix((data, (row_idx, col_idx)), shape=(len(rows), n_vars)).tocsr()
+
+    def _verified(res: Any) -> Any:
+        """The solve's ``x`` rounded, when it satisfies every row and bound."""
+        if res.x is None:
+            return None
+        x = np.asarray(res.x, dtype=float)
+        rounded = np.round(x)
+        if x.size and float(np.max(np.abs(x - rounded))) <= 1e-5:
+            lhs = matrix @ rounded
+            within_bounds = bool(
+                np.all(rounded >= lower - 1e-6) and np.all(rounded <= upper + 1e-6)
+            )
+            if within_bounds and np.all(lhs >= lb_array - 1e-6) and np.all(lhs <= ub_array + 1e-6):
+                return rounded
+        return None
+
+    matrix = _build_matrix()
     lower = np.zeros(n_vars)
     upper = np.ones(n_vars)
     for e in range(E):
@@ -4629,7 +4752,69 @@ def select_and_assign_entries(
     lb_array = np.array(lbs)
     ub_array = np.array(ubs)
     time_limit_s = float(controls.get("time_limit", 30))
-    result = milp(
+
+    # R504(e). Single-entry contests draw first. Stage 1 solves THIS model with
+    # the objective restricted to their entries; stage 2, the solve below, keeps
+    # their total at stage 1's value. Naming each one's best lineup as a seat
+    # was the alternative and fails live: several single-entry contests share
+    # one top lineup at reuse 1, and a thin slate's top lineups overlap past the
+    # file's cap, so named seats collide and a ladder would drop them all.
+    # Stage 1's incumbent satisfies every row of stage 2, the new one included,
+    # so the row can never make the solve infeasible and owns no ladder rung.
+    # Its value is read off the verified rounded vector, never `fun`. A stage 1
+    # proven infeasible is the same model's proof, so it stands for stage 2 and
+    # every ladder below re-enters on one solve, as before.
+    single_entry_report: Optional[Dict[str, Any]] = None
+    stage1_result: Any = None
+    if single_entry_idx:
+        single_entry_report = {
+            "entries": [entry_ids[e] for e in single_entry_idx],
+            "contests": [str(entries[e].get("contest_id") or "") for e in single_entry_idx],
+            "stage1_status": None, "stage1_elapsed_s": None, "stage1_value": None,
+            "held": False,
+        }
+        if _probe:
+            # The row never changes feasibility, which is all a probe asks.
+            single_entry_report["stage1_status"] = "skipped_in_probe"
+        else:
+            import time as _time
+            c1 = np.zeros(n_vars, dtype=float)
+            for e in single_entry_idx:
+                for k in range(K):
+                    c1[x_idx(e, k)] = objective[x_idx(e, k)]
+            _t1 = _time.monotonic()
+            r1 = milp(
+                c=c1,
+                integrality=np.ones(n_vars, dtype=int),
+                bounds=Bounds(lower, upper),
+                constraints=LinearConstraint(matrix, lb_array, ub_array),
+                options={"time_limit": time_limit_s, "disp": False},
+            )
+            single_entry_report["stage1_elapsed_s"] = round(_time.monotonic() - _t1, 3)
+            _s1 = getattr(r1, "status", None)
+            single_entry_report["stage1_status"] = {
+                0: "optimal", 1: "time_limit", 2: "infeasible"}.get(_s1, f"status_{_s1}")
+            inc1 = _verified(r1)
+            if inc1 is not None:
+                se_coefs = {x_idx(e, k): -float(objective[x_idx(e, k)])
+                            for e in single_entry_idx for k in range(K)
+                            if objective[x_idx(e, k)]}
+                v1 = float(sum(c * inc1[col] for col, c in se_coefs.items()))
+                add(se_coefs, v1 - 1e-6, np.inf)
+                matrix = _build_matrix()
+                lb_array = np.array(lbs)
+                ub_array = np.array(ubs)
+                single_entry_report["stage1_value"] = round(v1, 6)
+                single_entry_report["held"] = True
+            elif _s1 == 2:
+                stage1_result = r1
+            else:
+                single_entry_report["reason"] = (
+                    "stage 1 returned no verifiable incumbent inside its time "
+                    "limit, so no row was added and the single-entry contests "
+                    "drew through the ordinary objective; counted as a relaxation")
+
+    result = stage1_result if stage1_result is not None else milp(
         c=objective,
         integrality=np.ones(n_vars, dtype=int),
         bounds=Bounds(lower, upper),
@@ -4687,17 +4872,57 @@ def select_and_assign_entries(
         ),
     }
 
-    incumbent = None
-    if result.x is not None:
-        x = np.asarray(result.x, dtype=float)
-        rounded = np.round(x)
-        if x.size and float(np.max(np.abs(x - rounded))) <= 1e-5:
-            lhs = matrix @ rounded
-            within_bounds = bool(
-                np.all(rounded >= lower - 1e-6) and np.all(rounded <= upper + 1e-6)
-            )
-            if within_bounds and np.all(lhs >= lb_array - 1e-6) and np.all(lhs <= ub_array + 1e-6):
-                incumbent = rounded
+    def _contest_deal_block(chosen: Optional[Sequence[int]] = None) -> Dict[str, Any]:
+        """R504(e). The per-contest deal, on the refusal and the delivery alike.
+
+        Absent unless a contest carried a within-contest bound or a single-entry
+        contest sat beside a multi-entry one, so every other result keeps its
+        keys. ``chosen`` (the delivered candidate per entry) adds what the
+        delivered set holds, counted off the assignments (R37's precedent).
+        """
+        if not overlap_by_contest and single_entry_report is None:
+            return {}
+        steps = list((_seat_state or {}).get("contest_overlap_steps") or [])
+        overlap_block: Optional[Dict[str, Any]] = None
+        if overlap_by_contest:
+            by_c = {cid: dict(row) for cid, row in sorted(overlap_by_contest.items())}
+            if chosen is not None:
+                for cid, row in by_c.items():
+                    held = [player_sets[chosen[e]] for e in by_contest_entries.get(cid, [])]
+                    row["delivered_max_overlap"] = max(
+                        (len(held[a] & held[b]) for a in range(len(held))
+                         for b in range(a + 1, len(held))), default=None)
+            overlap_block = {"file_wide": file_overlap_limit, "by_contest": by_c,
+                             "rows_added": contest_overlap_rows,
+                             "relaxation_steps": steps}
+        se_block: Optional[Dict[str, Any]] = None
+        if single_entry_report is not None:
+            se_block = dict(single_entry_report)
+            if chosen is not None:
+                drawn = []
+                for e in single_entry_idx:
+                    best = max((raw_scores[(e, k)] for k in range(K) if compatible[e][k]),
+                               default=None)
+                    score = raw_scores[(e, chosen[e])]
+                    drawn.append({
+                        "entry_id": entry_ids[e],
+                        "contest_id": str(entries[e].get("contest_id") or ""),
+                        "candidate_id": candidate_ids[chosen[e]],
+                        "score": round(score, 4),
+                        "best_score": round(best, 4) if best is not None else None,
+                        "holds_best": best is not None and score >= best - 1e-9,
+                    })
+                se_block["drawn"] = drawn
+        return {"contest_deal": {
+            "overlap": overlap_block,
+            "single_entry": se_block,
+            "relaxations": len(steps) + (1 if (se_block or {}).get("reason") else 0),
+            "label": ("R504(e): the deal read contest by contest; the bound is a "
+                      "construction rule over this bank and the read is the "
+                      "allocator's shape score, never a probability or an edge"),
+        }}
+
+    incumbent = _verified(result)
 
     if incumbent is None:
         # R207: the interaction case is a proven infeasibility whose `binding`
@@ -4880,6 +5105,43 @@ def select_and_assign_entries(
                 _seat_state=_seat_state,
                 # R326: and the search scope's, for the same reason.
                 _search_state=_search_state,
+            )
+
+        # R504(e). The within-contest overlap bound steps next: after the
+        # engine's own reuse guess and before every control Ben or the archive
+        # sized, because it is the newest and has no archive evidence behind its
+        # number (the quota's rule below: the thinner-evidenced control relaxes
+        # first). One step, every contest off, counted and named; dropping it
+        # returns the pre-R504(e) model, so it never costs a file that model
+        # would have certified. It rides `_seat_state` under its own keys
+        # (R434's precedent), which every re-entry already carries.
+        if (proven_infeasible and (not slate_blocked) and not _probe
+                and contest_overlap_rows):
+            return select_and_assign_entries(
+                _all_candidates, entry_requirements, portfolio_controls,
+                bank_report=bank_report, fixed_exposure=fixed_exposure,
+                feasibility_inputs=feasibility_inputs,
+                feasibility_checks=feasibility_checks,
+                interaction_probe_budget_s=interaction_probe_budget_s,
+                interaction_probe_not_after=interaction_probe_not_after,
+                _floor_state=_floor_state,
+                _reuse_state=_reuse_state,
+                _quota_state=_quota_state,
+                _search_state=_search_state,
+                _seat_state={
+                    **(_seat_state or {}),
+                    "contest_overlap_relaxed": True,
+                    "contest_overlap_steps": list(
+                        (_seat_state or {}).get("contest_overlap_steps") or []) + [{
+                            "from": dict(sorted(contest_bounds.items())),
+                            "to": None,
+                            "reason": ("entry-level joint MILP proven infeasible with "
+                                       "the within-contest overlap bound active; the "
+                                       "bound is one of the controls whose interaction "
+                                       "the solver could not satisfy"),
+                            "trigger": "proven_infeasible_with_contest_overlap_bound",
+                        }],
+                },
             )
 
         # R37(2)(b), 2026-08-28. The five-stack quota steps BEFORE the
@@ -5171,6 +5433,8 @@ def select_and_assign_entries(
             # R469. Known before the solve, so it rides the refusal too.
             **({"consensus_pair_seats": seat_report}
                if seat_report.get("status") != "not_requested" else {}),
+            # R504(e). And the per-contest deal, for the same reason.
+            **_contest_deal_block(),
         }
 
     # A time-limited incumbent satisfies every constraint in the matrix; it is
@@ -5494,6 +5758,18 @@ def select_and_assign_entries(
                 f"counted step(s)): those contests' entries were not held to their "
                 f"narrow-breadth floor. A portfolio is clean when the relaxation "
                 f"counts are zero")
+    # R504(e). Either half of the per-contest deal, when it did not hold.
+    if overlap_relaxed and overlap_by_contest:
+        floor_warnings.append(
+            f"max_shared_players_by_contest relaxed off on "
+            f"{', '.join(sorted(overlap_by_contest))} (one counted step): inside those "
+            f"contests only the file-wide max_shared_players="
+            f"{file_overlap_limit} held. A portfolio is clean when the relaxation "
+            f"counts are zero")
+    if single_entry_report is not None and single_entry_report.get("reason"):
+        floor_warnings.append(
+            f"single-entry contests ({', '.join(single_entry_report['contests'])}) did "
+            f"not draw first: {single_entry_report['reason']}")
 
     return {
         **fixed_report,
@@ -5503,6 +5779,7 @@ def select_and_assign_entries(
         **cluster_block,
         **sleeve_block,
         **seat_block,
+        **_contest_deal_block(chosen_k),
         "passed": True,
         "assignments": assignments,
         "selection_certified": True,

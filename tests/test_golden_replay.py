@@ -682,6 +682,20 @@ class GoldenProductionReplayTests(unittest.TestCase):
                                   for k in ("status", "pair", "required_by_contest",
                                             "seated_by_contest", "relaxations")},
                     },
+                    # R504(e). The per-contest deal: each contest's own overlap
+                    # bound under the file's floored cap, whether it applied,
+                    # and the overlap its entries delivered. This grid has no
+                    # single-entry contest, so the two-stage half reads None.
+                    "contest_deal": {
+                        "relaxations": (cert.get("contest_deal") or {}).get("relaxations"),
+                        "single_entry": (cert.get("contest_deal") or {}).get("single_entry"),
+                        "overlap": {
+                            cid: {k: row.get(k) for k in ("bound", "file_wide", "status",
+                                                          "delivered_max_overlap")}
+                            for cid, row in sorted(
+                                (((cert.get("contest_deal") or {}).get("overlap") or {})
+                                 .get("by_contest") or {}).items())},
+                    },
                 },
                 "assignments": summary["assignments"],
             }
