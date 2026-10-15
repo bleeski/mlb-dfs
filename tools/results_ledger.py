@@ -40,6 +40,17 @@ Per entry:
   start_block    date, start time and game type: the export's stand-in for a
                  draftgroup, which it does not carry.
 
+`report` also cuts FIRST PLACE per contest (R504(c)): in how many contests did any
+entry of ours take Place 1, against the uniform reference, the sum over contests of
+our entries in the contest over N (a uniform draw from the field lands on one of
+our m entries m times in N, so the reference is arithmetic). Cells are archetype x
+field band and never pooled, each with its contests, entries and slates. First is
+RANK 1 in every contest. A one-seat satellite's seat is rank 1, so the two coincide;
+a seat in a multi-seat satellite (Places_Paid of 2 or more) is NOT counted as first,
+so its cell also carries `multi_seat_contests` and, separately, how many of them
+awarded a seat to one of ours (Place within Places_Paid). The seat read is its own
+field and is never folded into first.
+
 `resolve` (R497) answers which delivery record each entry was entered from,
 since most entry IDs sit in several records (baseline, rebuild, repair, late
 swap) and the upload is manual. Every candidate record's roster is scored in
@@ -757,6 +768,108 @@ def blank_blocks(rows: Sequence[Mapping[str, str]]) -> List[Dict[str, Any]]:
     return out
 
 
+def contest_first_place(population: Sequence[Mapping[str, str]]) -> List[Dict[str, Any]]:
+    """R504(c). One record per contest of the population: did any entry of ours take Place 1?
+
+    ``ref`` is the uniform reference, our entries in the contest over its field
+    size N (capped at 1): the share of uniform draws from the field that land on
+    one of our entries, which is all the reference claims. A multi-seat
+    satellite (title-inferred satellite, `Places_Paid` of 2 or more) keeps its
+    rank-1 read and gains a separate seat read, never folded into first.
+    """
+    by_contest: Dict[str, List[Mapping[str, str]]] = defaultdict(list)
+    for r in population:
+        by_contest[r["Contest_Key"]].append(r)
+    out: List[Dict[str, Any]] = []
+    for key in sorted(by_contest):
+        members = by_contest[key]
+        head = members[0]
+        n = int(head["Contest_Entries"])
+        places = [int(r["Place"]) for r in members]
+        try:
+            paid = int(head["Places_Paid"])
+        except (TypeError, ValueError):
+            paid = None
+        multi = head["archetype"] == "satellite" and paid is not None and paid >= 2
+        out.append({
+            "contest": key, "slate": head["slate"], "archetype": head["archetype"],
+            "field_band": head["field_band"], "entries": len(members), "field": n,
+            "first": min(places) == 1, "ref": min(1.0, len(members) / n),
+            "multi_seat": multi,
+            "seat_won": bool(multi and min(places) <= paid),
+        })
+    return out
+
+
+def first_place_cell(contests: Sequence[Mapping[str, Any]], seed: int = BOOTSTRAP_SEED,
+                     draws: int = BOOTSTRAP_DRAWS) -> Dict[str, Any]:
+    """One cell of the first-place cut, with a slate bootstrap on the excess.
+
+    Same rule as `cell_stats`: slates sorted before sampling, a fresh generator
+    per cell, and no interval under two slates (every draw would be the same
+    slate, and a zero-width interval would read as certainty). One more here:
+    none when no contest of the cell saw a first-place finish. A resample of zero
+    finishes varies only through the reference, so the interval collapses on the
+    estimate (-4.35 [-4.3, -4.3] on the 2026-10-09 exports) and says the cell is
+    certain when it has no events to be uncertain about.
+    """
+    import numpy as np
+
+    sums: Dict[str, List[float]] = {}
+    for c in contests:
+        vec = sums.setdefault(c["slate"], [0.0, 0.0, 0.0])
+        vec[0] += 1
+        vec[1] += 1.0 if c["first"] else 0.0
+        vec[2] += float(c["ref"])
+    keys = sorted(sums)
+    A = np.array([sums[k] for k in keys], dtype=float).reshape(len(keys), 3)
+    total = A.sum(axis=0)
+    n = int(total[0])
+    cell: Dict[str, Any] = {
+        "contests": n, "entries": sum(int(c["entries"]) for c in contests),
+        "slates": len(keys), "first_contests": int(total[1]),
+        "first_ref": round(float(total[2]), 4),
+        "first_share": round(100.0 * float(total[1]) / n, 4) if n else None,
+        "first_ref_share": round(100.0 * float(total[2]) / n, 4) if n else None,
+        "first_excess": round(100.0 * float(total[1] - total[2]) / n, 4) if n else None,
+        "first_excess_interval": None,
+        "multi_seat_contests": sum(1 for c in contests if c["multi_seat"]),
+        "multi_seat_seat_won": sum(1 for c in contests if c["seat_won"]),
+    }
+    if len(keys) >= 2 and total[1] > 0:
+        rng = np.random.default_rng(seed)
+        S = A[rng.integers(0, len(keys), size=(draws, len(keys)))].sum(axis=1)
+        cell["first_excess_interval"] = _interval((S[:, 1] - S[:, 2]) / S[:, 0])
+    return cell
+
+
+def build_first_place(population: Sequence[Mapping[str, str]], seed: int = BOOTSTRAP_SEED,
+                      draws: int = BOOTSTRAP_DRAWS) -> Dict[str, Any]:
+    """R504(c). Cells of archetype x field band over the population's contests."""
+    cells: Dict[str, List[Mapping[str, Any]]] = defaultdict(list)
+    for c in contest_first_place(population):
+        cells[(c["archetype"], c["field_band"])].append(c)
+    bands = [label for _, label in FIELD_BANDS] + [FIELD_BAND_OVER]
+
+    def order(item: Tuple[Tuple[str, str], Any]) -> Tuple[Any, ...]:
+        (archetype, band), _ = item
+        return (archetype, bands.index(band) if band in bands else len(bands), band)
+
+    return {
+        "unit": "contest: did any entry of ours take Place 1",
+        "conditioning": "archetype x field band, never pooled",
+        "cells": {f"{a} | {b}": first_place_cell(members, seed, draws)
+                  for (a, b), members in sorted(cells.items(), key=order)},
+        "labels": [
+            "Observed outcomes. First is Place 1 in every contest; a seat in a "
+            "multi-seat satellite (Places_Paid of 2 or more) is not counted as first "
+            "and is its own field.",
+            "Uniform reference: our entries in the contest over its field size, summed; "
+            "arithmetic, not a forecast.",
+        ],
+    }
+
+
 def build_report(rows: Sequence[Mapping[str, str]], sport: str, exclude_blanks: bool,
                  seed: int = BOOTSTRAP_SEED, draws: int = BOOTSTRAP_DRAWS) -> Dict[str, Any]:
     population = report_population(rows, sport, exclude_blanks)
@@ -780,6 +893,7 @@ def build_report(rows: Sequence[Mapping[str, str]], sport: str, exclude_blanks: 
         "overall": cell_stats(population, seed, draws),
         "cuts": cuts,
         "blank_blocks": blank_blocks(population),
+        "first_place": build_first_place(population, seed, draws),
     }
 
 
@@ -794,6 +908,15 @@ def _span(interval: Optional[Sequence[float]], signed: bool = False, money: bool
         return f"[{_money(interval[0])}, {_money(interval[1])}]"
     fmt = "{:+.1f}" if signed else "{:.1f}"
     return f"[{fmt.format(interval[0])}, {fmt.format(interval[1])}]"
+
+
+def _first_span(cell: Mapping[str, Any]) -> str:
+    """The first-place cell's interval, or the reason there is none."""
+    if cell["first_excess_interval"]:
+        return _span(cell["first_excess_interval"], signed=True)
+    if cell["slates"] < 2:
+        return "[no interval: under 2 slates]"
+    return "[no interval: no first-place finish to resample]"
 
 
 def _num(value: Optional[float], fmt: str = "{:.2f}") -> str:
@@ -848,6 +971,22 @@ def render_report(report: Mapping[str, Any], results: Path, meta: Optional[Mappi
             f"  {block['start_block']:<40} {block['zero_points']} of {block['entries']} entries, "
             f"{block['all_zero_contests']} of {block['contests']} contests all zero: "
             + ", ".join(f"{c} {block['blanks'][c]}" for c in BLANK_CLASSES))
+    first = report.get("first_place") or {}
+    lines.append("")
+    lines.append("-- first place by contest: did any entry of ours take Place 1? "
+                 "(cells are archetype x field band, never pooled) --")
+    for label in first.get("labels") or []:
+        lines.append(f"  label:   {label}")
+    if not first.get("cells"):
+        lines.append("  none")
+    for name, cell in (first.get("cells") or {}).items():
+        lines.append(
+            f"  {name:<28} contests {cell['contests']}  entries {cell['entries']}  "
+            f"slates {cell['slates']}  first {cell['first_contests']} vs uniform "
+            f"{_num(cell['first_ref'])}  ({_num(cell['first_excess'], '{:+.2f}')} points "
+            f"per contest {_first_span(cell)})"
+            + (f"  multi-seat {cell['multi_seat_contests']}, seat awarded "
+               f"{cell['multi_seat_seat_won']}" if cell["multi_seat_contests"] else ""))
     return "\n".join(lines) + "\n"
 
 

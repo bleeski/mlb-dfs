@@ -71,11 +71,16 @@ Cost every recommendation. A swap you cannot price is a gap, not a finding: say
 bank rebuild" so the recommendation arrives with its price attached. A hand
 swap you have not checked for cap feasibility is stated as unchecked.
 
-**Axis 2: dual-objective adherence, at contest AND portfolio level, as one
-frontier.** CLAUDE.md's dual objective: large wins and no total washout are the
-same frontier, and concentration wins a winner-take-all ticket while losing
-every entry at once. The washout axis binds at the PORTFOLIO level, so a
-per-contest read alone is not an answer. Report both ends. Where the portfolio
+**Axis 2: dual-objective adherence, first place within each contest and no
+washout across the portfolio, as one frontier.** CLAUDE.md's dual objective
+(R504): first place WITHIN EACH CONTEST, and no single game, team, arm or blank
+row sinking the entered set. Two of ours cannot both win one contest, so the
+first end is read contest by contest: per contest, its entries, distinct
+lineups, the most players two of them share and the best Ceiling (section 3's
+per-contest lines, from `exposure.frontier.by_contest`; a contest holding copies
+holds one path to first). The second end binds at the PORTFOLIO level, so a
+per-contest read alone is not an answer, and concentration across contests is a
+washout cost, never a first-place gain. Report both ends. Where the portfolio
 sits on the frontier is Ben's call; where it sits is yours to state.
 
 **Axis 3: leverage against SOURCED ownership.** Only against the ownership

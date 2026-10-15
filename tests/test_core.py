@@ -53458,3 +53458,531 @@ class DayPlanTests(unittest.TestCase):
                 self.assertEqual(hook().day_plan_line(), "day plan: not measured (RuntimeError)")
             with unittest.mock.patch.object(dp, "hook_line", side_effect=KeyError("x")):
                 self.assertEqual(hook().day_plan_line(), "day plan: not measured (KeyError)")
+
+
+class PerContestFirstPlaceTests(unittest.TestCase):
+    """R504(b)+(c), Session 172: first place is read per contest, and graded per contest.
+
+    Ben, 2026-10-14: the first goal is first place WITHIN EACH CONTEST, a property
+    of the set of our entries in that contest (two of ours cannot both win it), and
+    washout stays portfolio-level. The frontier summed Ceiling over the whole file
+    and nothing grouped by contest, though every assignment row carries
+    `contest_id`. These pin the per-contest read on both formats, the QA lines that
+    print it, and the grade that counts contests won, not entries.
+    """
+
+    G1, G2 = PortfolioFrontierTests.G1, PortfolioFrontierTests.G2
+
+    # ------------------------------------------------------------- helpers
+
+    @staticmethod
+    def _frontier(projections, assignments):
+        from mlb_engine.pipeline.execution_pipeline import compute_portfolio_frontier
+        return compute_portfolio_frontier(projections, assignments)
+
+    @staticmethod
+    def _projections(**kw):
+        return PortfolioFrontierTests()._projections(**kw)
+
+    @staticmethod
+    def _bats(team, k, start=0):
+        return [f"{team}h{j}" for j in range(start, start + k)]
+
+    def _entry(self, eid, cid, bats, stack="AAA", shape="wta_satellite",
+               arms=("AAAp", "CCCp")):
+        return {"entry_id": str(eid), "contest_id": cid, "contest_name": f"Cup {cid}",
+                "contest_shape": shape, "sp_ids": list(arms),
+                "lineup_ids": list(arms) + list(bats), "primary_stack": stack}
+
+    def _two_contests(self):
+        """C1 holds three different lineups; C2 holds one lineup twice."""
+        a = self._bats("AAA", 8)                              # 148.0 with the arms
+        b = self._bats("AAA", 4) + self._bats("CCC", 4)       # 132.0
+        c = self._bats("CCC", 8)                              # 148.0
+        return [self._entry(1, "C1", a, "AAA"), self._entry(2, "C1", b, "AAA"),
+                self._entry(3, "C1", c, "CCC"),
+                self._entry(4, "C2", b, "AAA", "mme_top_heavy"),
+                self._entry(5, "C2", b, "AAA", "mme_top_heavy")]
+
+    def _rows(self, block):
+        return {r["contest_id"]: r for r in block["by_contest"]["contests"]}
+
+    # ------------------------------------------------- Classic: the split
+
+    def test_entries_in_two_contests_split_correctly(self):
+        block = self._frontier(self._projections(), self._two_contests())
+        rows = self._rows(block)
+        self.assertEqual(["C1", "C2"], [r["contest_id"] for r in block["by_contest"]["contests"]])
+        self.assertEqual((3, 2), (rows["C1"]["entries"], rows["C2"]["entries"]))
+        self.assertEqual("wta_satellite", rows["C1"]["contest_shape"])
+        self.assertEqual({"entry_id": "1", "ceiling": 148.0}, rows["C1"]["best_entry"],
+                         "the best entry ties at 148.0 and the lower id is named")
+        self.assertEqual({"entry_id": "4", "ceiling": 132.0}, rows["C2"]["best_entry"])
+        self.assertEqual(2, rows["C1"]["distinct_primary_stacks"])
+        self.assertEqual(1, rows["C2"]["distinct_primary_stacks"])
+        self.assertEqual("Ceiling", block["by_contest"]["score_basis"])
+        # The whole-file blocks are unmoved by the new key.
+        self.assertEqual(5, block["entries"])
+        self.assertEqual(round(148 + 132 + 148 + 132 + 132, 2), block["apex"]["ceiling_total"])
+
+    def test_a_lineup_copied_inside_one_contest_counts_one_path(self):
+        a = self._bats("AAA", 8)
+        block = self._frontier(self._projections(), [
+            self._entry(1, "C1", a), self._entry(2, "C1", a),
+            self._entry(3, "C2", a)])
+        rows = self._rows(block)
+        self.assertEqual((2, 1), (rows["C1"]["entries"], rows["C1"]["distinct_lineups"]),
+                         "two entries, one lineup, one path to first")
+        self.assertEqual(8 + 2, rows["C1"]["max_pairwise_overlap"])
+        self.assertEqual((1, 1), (rows["C2"]["entries"], rows["C2"]["distinct_lineups"]),
+                         "the same lineup in ANOTHER contest is that contest's own path")
+
+    def test_lineup_identity_ignores_slot_order(self):
+        a = self._bats("AAA", 8)
+        block = self._frontier(self._projections(), [
+            self._entry(1, "C1", a), self._entry(2, "C1", list(reversed(a)))])
+        self.assertEqual(1, self._rows(block)["C1"]["distinct_lineups"])
+
+    def test_max_overlap_names_the_two_entries_and_is_stable_on_ties(self):
+        a = self._bats("AAA", 8)
+        b = self._bats("AAA", 6) + self._bats("CCC", 2)      # 8 shared with a, 8 with c
+        c = self._bats("AAA", 4) + self._bats("CCC", 4)      # only 6 shared with a
+        entries = [self._entry(7, "C1", a), self._entry(3, "C1", b), self._entry(5, "C1", c)]
+        first = self._rows(self._frontier(self._projections(), entries))["C1"]
+        again = self._rows(self._frontier(self._projections(), list(reversed(entries))))["C1"]
+        self.assertEqual(8, first["max_pairwise_overlap"])
+        self.assertEqual(["3", "5"], first["max_overlap_entries"],
+                         "entries 3/5 and 3/7 tie at 8; the lowest ids are named")
+        self.assertEqual(first["max_overlap_entries"], again["max_overlap_entries"],
+                         "a reordered assignment list renamed the pair")
+        solo = self._rows(self._frontier(self._projections(), [self._entry(1, "C9", a)]))["C9"]
+        self.assertIsNone(solo["max_pairwise_overlap"])
+        self.assertIsNone(solo["max_overlap_entries"])
+
+    def test_a_rows_stacks_read_none_when_no_assignment_carries_one(self):
+        entries = self._two_contests()
+        for e in entries:
+            e.pop("primary_stack")
+        rows = self._rows(self._frontier(self._projections(), entries))
+        self.assertIsNone(rows["C1"]["distinct_primary_stacks"],
+                          "not carried is None, never 0 stacks")
+
+    # ------------------------------------------- Classic: the winning-score bar
+
+    def test_a_missing_bar_reads_absent_never_zero(self):
+        block = self._frontier(self._projections(drop=["Game_ID"]), self._two_contests())
+        by = block["by_contest"]
+        self.assertTrue(by["available"], "the block survives the no-game-column return")
+        self.assertFalse(block["washout"]["available"])
+        self.assertIsNone(by["slate_games"])
+        for row in by["contests"]:
+            self.assertEqual("ABSENT", row["winning_score_bar"]["status"])
+            self.assertIn("slate size", row["winning_score_bar"]["unavailable_reason"])
+            self.assertIsNone(row["entries_reaching_bar"])
+
+    def test_the_seed_bucket_boundaries_pick_the_ledgers_mean(self):
+        from mlb_engine.field.field_miner import winning_score_bar
+        want = {1: 138.9, 2: 138.9, 3: 144.6, 4: 144.6, 5: 161.1, 6: 161.1,
+                7: 162.8, 12: 162.8}
+        for games, value in want.items():
+            bar = winning_score_bar("classic", games)
+            self.assertEqual(("SEED", value), (bar["status"], bar["value"]), games)
+            self.assertIn("pooled across contest archetypes and field sizes", bar["basis"])
+        for bad in (None, 0, -1, "x"):
+            self.assertEqual("ABSENT", winning_score_bar("classic", bad)["status"], bad)
+        showdown = winning_score_bar("showdown", 1)
+        self.assertEqual("ABSENT", showdown["status"])
+        self.assertIn("range", showdown["unavailable_reason"])
+
+    def test_entries_reaching_the_bar_counts_at_or_above_and_zero_is_a_real_zero(self):
+        block = self._frontier(self._projections(), self._two_contests())
+        rows = self._rows(block)
+        self.assertEqual(2, block["by_contest"]["slate_games"])
+        self.assertEqual(138.9, rows["C1"]["winning_score_bar"]["value"])
+        self.assertEqual(2, rows["C1"]["entries_reaching_bar"],
+                         "148.0 and 148.0 reach 138.9; 132.0 does not")
+        self.assertEqual(0, rows["C2"]["entries_reaching_bar"],
+                         "a present bar nobody reaches is 0 of n, not ABSENT")
+        self.assertEqual("SEED", rows["C2"]["winning_score_bar"]["status"])
+
+    def test_reaching_the_bar_is_at_or_above_it(self):
+        from mlb_engine.field import field_miner
+        entries = self._two_contests()
+        for bar, want in ((148.0, 2), (148.01, 0)):
+            with unittest.mock.patch.object(
+                    field_miner, "WINNING_SCORE_SEED_CLASSIC", ((None, "all", bar),)):
+                row = self._rows(self._frontier(self._projections(), entries))["C1"]
+            self.assertEqual(want, row["entries_reaching_bar"], bar)
+
+    def test_no_contest_id_says_unavailable_with_a_reason(self):
+        entries = self._two_contests()
+        for e in entries:
+            e.pop("contest_id")
+        by = self._frontier(self._projections(), entries)["by_contest"]
+        self.assertFalse(by["available"])
+        self.assertIn("no assignment carries a contest_id", by["unavailable_reason"])
+        self.assertEqual([], by["contests"])
+
+    def test_the_block_rides_the_wrapper_and_the_label_sweep_passes(self):
+        from mlb_engine.pipeline import execution_pipeline as ep
+        block = ep._portfolio_frontier(self._projections(), self._two_contests())
+        self.assertTrue(block["by_contest"]["available"])
+        banned = ("win rate", "cash rate", "roi", "probability", "chance",
+                  "expected value", "profit")
+        notes = ("note", "unavailable_reason", "unpriced_note")
+
+        def sweep(value, key=""):
+            if isinstance(value, dict):
+                for k, v in value.items():
+                    for word in banned:
+                        self.assertNotIn(word, str(k).lower(), f"key {k!r} claims {word!r}")
+                    sweep(v, str(k))
+            elif isinstance(value, list):
+                for item in value:
+                    sweep(item, key)
+            elif isinstance(value, str) and key not in notes:
+                for word in banned:
+                    self.assertNotIn(word, value.lower(), f"{key!r} claims {word!r}")
+
+        sweep(block["by_contest"])
+        self.assertIn("never an observed outcome", block["by_contest"]["note"])
+
+    # --------------------------------------------------------- Showdown
+
+    def _showdown_df(self):
+        return pd.DataFrame({
+            "Player_Key": [f"k{i}" for i in range(8)],
+            "Name": [f"n{i}" for i in range(8)],
+            "Team": ["A"] * 4 + ["B"] * 4,
+            "Base": [20.0, 14.0, 12.0, 10.0, 9.0, 8.0, 7.0, 6.0],
+            "CPT_ID": [f"c{i}" for i in range(8)],
+            "CPT_Salary": [12000, 9000, 8000, 7000, 6000, 5000, 4000, 3000],
+            "UTIL_ID": [f"u{i}" for i in range(8)],
+            "UTIL_Salary": [8000, 6000, 5400, 4600, 4000, 3400, 2600, 2000],
+        })
+
+    def _assembled(self, df, cpt, utils):
+        from mlb_engine.optimize import showdown as sd
+        from mlb_engine.optimize.roster_contracts import SHOWDOWN
+        mult = SHOWDOWN.multiplier_for(SHOWDOWN.captain_slot or "CPT")
+        return sd._assemble_lineup(df, cpt, utils, mult, SHOWDOWN)
+
+    def test_a_showdown_captain_counts_at_one_and_a_half_times(self):
+        from mlb_engine.optimize import showdown_theses as st
+        df = self._showdown_df()
+        big = self._assembled(df, 0, [1, 2, 3, 4, 5])     # CPT is the 20.0 bat
+        small = self._assembled(df, 5, [0, 1, 2, 3, 4])   # same six players, CPT 8.0
+        self.assertEqual(round(1.5 * 20.0 + 14 + 12 + 10 + 9 + 8, 3), big["proj_points"])
+        rep = st.per_contest_report(df, [big, small], ["A", "A"], max_cpt_per_contest=2)
+        row = rep["by_contest"]["A"]
+        self.assertEqual(round(1.5 * 20.0 + 14 + 12 + 10 + 9 + 8, 3), row["best_proj_points"],
+                         "the best entry is the one whose captain is the 20.0 bat, at 1.5x")
+        self.assertEqual("Base with the captain at 1.5x", rep["score_basis"])
+
+    def test_the_same_six_players_under_two_captains_are_two_paths(self):
+        from mlb_engine.optimize import showdown_theses as st
+        df = self._showdown_df()
+        lineups = [self._assembled(df, 0, [1, 2, 3, 4, 5]),
+                   self._assembled(df, 5, [0, 1, 2, 3, 4]),
+                   self._assembled(df, 0, [1, 2, 3, 4, 5])]
+        row = st.per_contest_report(df, lineups, ["A"] * 3,
+                                    max_cpt_per_contest=3)["by_contest"]["A"]
+        self.assertEqual(2, row["distinct_lineups"], "two captains, plus one exact copy")
+        self.assertEqual(6, row["max_pairwise_overlap"])
+
+    def test_a_showdown_lineup_with_no_points_reads_missing_not_zero(self):
+        from mlb_engine.optimize import showdown_theses as st
+        df = self._showdown_df()
+        bare = {"captain": {"player_key": "k0"},
+                "player_keys": ["k0", "k1", "k2", "k3", "k4", "k5"]}
+        row = st.per_contest_report(df, [bare], ["A"])["by_contest"]["A"]
+        self.assertIsNone(row["best_proj_points"])
+        self.assertEqual(1, row["distinct_lineups"])
+
+    def test_the_showdown_bar_is_absent_and_says_why(self):
+        from mlb_engine.optimize import showdown_theses as st
+        df = self._showdown_df()
+        row = st.per_contest_report(
+            df, [self._assembled(df, 0, [1, 2, 3, 4, 5])], ["A"])["by_contest"]["A"]
+        self.assertEqual("ABSENT", row["winning_score_bar"]["status"])
+        self.assertIn("range", row["winning_score_bar"]["unavailable_reason"])
+        self.assertIsNone(row["entries_reaching_bar"])
+
+    # ------------------------------------------------------------------ QA
+
+    @staticmethod
+    def _qa():
+        sys.path.insert(0, str(REPO / "tools"))
+        import qa_portfolio
+        return qa_portfolio
+
+    def test_qa_prints_one_line_per_contest_and_flags_a_repeated_lineup(self):
+        block = self._frontier(self._projections(), self._two_contests())
+        text = "\n".join(self._qa().frontier_from_brief({"exposure": {"frontier": block}}))
+        self.assertIn("PER-CONTEST FIRST PLACE", text)
+        self.assertIn("C1 [wta_satellite]: 3 entries, 3 distinct lineups, 2 primary stacks", text)
+        self.assertIn("max overlap", text)
+        self.assertIn("2 of 3 reach the 1-2 games seed mean 138.9 [pooled across archetypes "
+                      "and field sizes]", text)
+        self.assertIn("C2 [mme_top_heavy]: 2 entries, 1 distinct lineup", text)
+        self.assertIn("1 of 2 entries repeat a lineup already in this contest", text)
+        self.assertNotIn("C1 [wta_satellite]: 3 entries, 3 distinct lineups, 2 primary "
+                         "stacks, max overlap 10", text)
+        self.assertIn("WASHOUT binds on", text, "the portfolio washout lines stay")
+
+    def test_qa_says_by_contest_is_absent_on_a_frontier_that_predates_r504(self):
+        block = self._frontier(self._projections(), self._two_contests())
+        block.pop("by_contest")
+        text = "\n".join(self._qa().frontier_from_brief({"exposure": {"frontier": block}}))
+        self.assertIn("by_contest absent from this run's frontier", text)
+        self.assertNotIn("absent from this brief", text,
+                         "a different branch from a brief with no frontier at all")
+        self.assertIn("absent from this brief",
+                      "\n".join(self._qa().frontier_from_brief({})))
+
+    def test_qa_says_why_when_the_split_is_unavailable_and_states_an_absent_bar_once(self):
+        qa = self._qa()
+        entries = self._two_contests()
+        for e in entries:
+            e.pop("contest_id")
+        text = "\n".join(qa.frontier_from_brief({"exposure": {"frontier": self._frontier(
+            self._projections(), entries)}}))
+        self.assertIn("PER-CONTEST FIRST PLACE: unavailable", text)
+        blind = self._frontier(self._projections(drop=["Game_ID"]), self._two_contests())
+        lines = qa.by_contest_lines(blind)
+        self.assertEqual(1, sum("winning-score bar ABSENT:" in l for l in lines),
+                         "one reason, not one per contest")
+
+    def test_the_apex_concentration_line_is_a_washout_cost_not_a_first_place_gain(self):
+        sal = {"9": {"Roster Position": "P", "Name": "Arm", "TeamAbbrev": "AAA",
+                     "Game Info": "AAA@BBB 01:00PM ET"},
+               **{str(i): {"Roster Position": "OF", "Name": f"n{i}", "TeamAbbrev": "AAA",
+                           "Game Info": "AAA@BBB 01:00PM ET"} for i in range(9)}}
+        text = "\n".join(self._qa().section_frontier(
+            sal, ["Entry ID", "P", "C", "1B", "2B", "3B", "SS", "OF", "OF", "OF"],
+            [["1", "9", "0", "1", "2", "3", "4", "5", "6", "7"]]))
+        self.assertIn("APEX-CONCENTRATION PROXY", text)
+        self.assertIn("washout cost, not a first-place gain", text)
+        self.assertNotIn("what a winner-take-all ticket needs", text)
+
+    def test_the_showdown_qa_lines_list_every_contest_including_single_entry_ones(self):
+        lines = self._qa().per_contest_lines({
+            "contest_type": "showdown",
+            "per_contest": {
+                "available": True, "contests": 2, "multi_entry_contests": 1,
+                "max_cpt_per_contest": 2, "score_basis": "Base with the captain at 1.5x",
+                "by_contest": {
+                    "A": {"n": 2, "distinct_captains": 2, "captain_counts": {"X": 1, "Y": 1},
+                          "max_pairwise_overlap": 4, "team_shape_spread": 1, "over_cap": [],
+                          "distinct_lineups": 2, "best_proj_points": 71.5,
+                          "contest_shape": "wta_satellite",
+                          "winning_score_bar": {"status": "ABSENT",
+                                                "unavailable_reason": "a range"}},
+                    "B": {"n": 1, "distinct_captains": 1, "captain_counts": {"X": 1},
+                          "max_pairwise_overlap": 0, "team_shape_spread": 1, "over_cap": [],
+                          "distinct_lineups": 1, "best_proj_points": None,
+                          "winning_score_bar": {"status": "ABSENT",
+                                                "unavailable_reason": "a range"}}},
+                "over_cap": []}})
+        text = "\n".join(lines)
+        self.assertIn("first place per contest (Base with the captain at 1.5x", text)
+        self.assertIn("A [wta_satellite]: 2 entries, 2 distinct lineups (captain included), "
+                      "best 71.5", text)
+        self.assertIn("B [no shape]: 1 entry, 1 distinct lineup (captain included), best "
+                      "not carried", text)
+        self.assertEqual(1, text.count("winning-score bar ABSENT: a range"))
+        # A slice that predates R504 prints exactly what it printed before.
+        old = self._qa().per_contest_lines({
+            "contest_type": "showdown",
+            "per_contest": {"available": True, "contests": 1, "multi_entry_contests": 1,
+                            "max_cpt_per_contest": 2, "over_cap": [],
+                            "by_contest": {"A": {"n": 2, "distinct_captains": 1,
+                                                 "captain_counts": {"X": 2},
+                                                 "max_pairwise_overlap": 4,
+                                                 "team_shape_spread": 1, "over_cap": []}}}})
+        self.assertFalse(any("first place per contest" in l for l in old))
+
+    # --------------------------------------------------- outcome_review
+
+    def _review_fixture(self, root, ranks):
+        """One delivery record naming one entry in each of ``ranks``' contests."""
+        helper = OutcomeReviewTests()
+        record_path = None
+        entries = []
+        for i, (cid, rank) in enumerate(ranks):
+            if rank is not None:
+                helper._standings(root / "data" / "archive" / helper.DATE /
+                                  f"contest-standings-{cid}.csv", [f"E{cid}"], mine_rank=rank)
+            entries.append((cid, f"E{cid}"))
+        helper._money(root, {})
+        record_path = helper._record(root, [entries[0][1]], cid=entries[0][0])
+        record = json.loads(record_path.read_text(encoding="utf-8"))
+        for cid, eid in entries[1:]:
+            record["entries"].append({"entry_id": eid, "contest_id": cid,
+                                      "contest_name": "Other", "entry_fee": 5.0,
+                                      "roster_ids": [str(n) for n in range(10)],
+                                      "filled": True})
+        record_path.write_text(json.dumps(record), encoding="utf-8")
+        return helper, record_path
+
+    def test_best_rank_one_reads_won_and_anything_else_reads_not(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            helper, path = self._review_fixture(
+                root, [("912345678", 1), ("912345679", 4), ("912345680", None)])
+            _, review = helper._review(root, path)
+        by = {c["contest_id"]: c for c in review["contests"]}
+        self.assertIs(by["912345678"]["won_first"], True)
+        self.assertIs(by["912345679"]["won_first"], False)
+        self.assertEqual("UNKNOWN", by["912345680"]["won_first"],
+                         "no standings is unknown, never a loss")
+        first = review["portfolio_first_place"]
+        self.assertEqual((1, 2, 1, 3), (first["won"], first["graded"], first["unknown"],
+                                        first["contests"]))
+        self.assertEqual(["912345678"], first["won_contest_ids"])
+
+    def test_a_shared_rank_one_is_named_and_a_loss_never_carries_a_tie(self):
+        from importlib import import_module
+        sys.path.insert(0, str(REPO / "tools"))
+        orv = import_module("outcome_review")
+        graded = {"status": "graded", "best_rank": 1}
+        tied = orv.first_place_fields(graded, {"meta": {"winner_rank1_rows": 2}})
+        self.assertEqual((True, True, 2), (tied["won_first"], tied["won_first_tied"],
+                                           tied["rank_one_rows"]))
+        alone = orv.first_place_fields(graded, {"meta": {"winner_rank1_rows": 1}})
+        self.assertIs(alone["won_first_tied"], False)
+        lost = orv.first_place_fields({"status": "graded", "best_rank": 3},
+                                      {"meta": {"winner_rank1_rows": 2}})
+        self.assertEqual((False, None), (lost["won_first"], lost["won_first_tied"]))
+        runner_up = orv.first_place_fields({"status": "graded", "best_rank": 2},
+                                           {"meta": {"winner_rank1_rows": 1}})
+        self.assertIs(runner_up["won_first"], False, "second is not first")
+        unmatched = orv.first_place_fields({"status": "entries_unmatched"}, {})
+        self.assertEqual("UNKNOWN", unmatched["won_first"])
+        counted = orv.portfolio_first_place([
+            {"contest_id": "a", "won_first": True, "won_first_tied": True},
+            {"contest_id": "b", "won_first": False},
+            {"contest_id": "c", "won_first": "UNKNOWN"}])
+        self.assertEqual((1, 2, 1), (counted["won"], counted["graded"], counted["unknown"]))
+        self.assertEqual(["a"], counted["tied_contest_ids"])
+        self.assertIn("rank 1 was shared in a", counted["reason"])
+        empty = orv.portfolio_first_place([])
+        self.assertEqual((0, 0, 0), (empty["won"], empty["graded"], empty["unknown"]))
+
+    def test_the_review_text_prints_the_count_and_clears_the_label_guard(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            helper, path = self._review_fixture(root, [("912345678", 1), ("912345679", 4)])
+            mod, review = helper._review(root, path)
+            text = mod.render(review)
+        self.assertIn("CONTESTS WON FIRST (an entry of ours at rank 1): 1 of 2 graded, 0 unknown",
+                      text)
+        self.assertIn("won first: yes", text)
+        self.assertIn("won first: no", text)
+        for word in ("roi", "win rate", "cash rate", "edge", "profitab",
+                     "probability", "expected value", "return on"):
+            self.assertNotRegex(text.lower(), r"\b" + word, word)
+
+    # ------------------------------------------------------ results_ledger
+
+    @staticmethod
+    def _ledger():
+        return ResultsLedgerTests._tool()
+
+    @staticmethod
+    def _entry_row(contest, place, n, *, slate="MLB|2026-09-01|Classic", archetype="satellite",
+                   band="101-500", paid="1"):
+        return {"Contest_Key": str(contest), "Place": str(place), "Contest_Entries": str(n),
+                "Places_Paid": paid, "archetype": archetype, "field_band": band, "slate": slate}
+
+    def test_any_first_is_read_against_our_entries_over_n(self):
+        rl = self._ledger()
+        rows = [self._entry_row("A", 1, 20), self._entry_row("A", 7, 20),    # m=2, N=20
+                self._entry_row("B", 3, 10)]                                  # m=1, N=10
+        contests = {c["contest"]: c for c in rl.contest_first_place(rows)}
+        self.assertTrue(contests["A"]["first"])
+        self.assertFalse(contests["B"]["first"])
+        self.assertAlmostEqual(0.1, contests["A"]["ref"])
+        self.assertAlmostEqual(0.1, contests["B"]["ref"])
+        cell = rl.first_place_cell(list(contests.values()))
+        self.assertEqual((2, 3, 1), (cell["contests"], cell["entries"], cell["first_contests"]))
+        self.assertAlmostEqual(0.2, cell["first_ref"])
+        self.assertAlmostEqual(100 * (1 - 0.2) / 2, cell["first_excess"])
+
+    def test_cells_are_archetype_by_field_band_and_never_pooled(self):
+        rl = self._ledger()
+        rows = [self._entry_row("A", 1, 20, archetype="satellite", band="<=25"),
+                self._entry_row("B", 9, 20, archetype="satellite", band="<=25"),
+                self._entry_row("C", 1, 300, archetype="satellite", band="101-500"),
+                self._entry_row("D", 5, 300, archetype="wta", band="101-500")]
+        cells = rl.build_first_place(rows)["cells"]
+        self.assertEqual(["satellite | <=25", "satellite | 101-500", "wta | 101-500"],
+                         list(cells))
+        self.assertEqual((2, 1), (cells["satellite | <=25"]["contests"],
+                                  cells["satellite | <=25"]["first_contests"]))
+        self.assertEqual((1, 1), (cells["satellite | 101-500"]["contests"],
+                                  cells["satellite | 101-500"]["first_contests"]))
+        self.assertEqual((1, 0), (cells["wta | 101-500"]["contests"],
+                                  cells["wta | 101-500"]["first_contests"]))
+
+    def test_a_multi_seat_satellite_keeps_its_rank_and_its_seat_is_a_separate_field(self):
+        rl = self._ledger()
+        rows = [self._entry_row("A", 2, 30, paid="2"),      # a seat, not first
+                self._entry_row("B", 1, 30, paid="1"),      # a one-seat satellite: first
+                self._entry_row("C", 6, 30, paid="5")]      # multi-seat, no seat
+        by = {c["contest"]: c for c in rl.contest_first_place(rows)}
+        self.assertEqual((False, True, True), (by["A"]["first"], by["A"]["multi_seat"],
+                                               by["A"]["seat_won"]))
+        self.assertEqual((True, False, False), (by["B"]["first"], by["B"]["multi_seat"],
+                                                by["B"]["seat_won"]))
+        self.assertEqual((False, True, False), (by["C"]["first"], by["C"]["multi_seat"],
+                                                by["C"]["seat_won"]))
+        cell = rl.first_place_cell(list(by.values()))
+        self.assertEqual(1, cell["first_contests"], "a seat is not counted as first")
+        self.assertEqual((2, 1), (cell["multi_seat_contests"], cell["multi_seat_seat_won"]))
+
+    def test_the_interval_needs_two_slates_and_at_least_one_first_finish(self):
+        rl = self._ledger()
+
+        def cell(places_by_slate):
+            rows = [self._entry_row(f"c{i}", p, 20, slate=slate)
+                    for i, (slate, p) in enumerate(places_by_slate)]
+            return rl.first_place_cell(rl.contest_first_place(rows))
+
+        none_first = cell([("s1", 5), ("s2", 9), ("s3", 7)])
+        self.assertIsNone(none_first["first_excess_interval"],
+                          "no first finish to resample: a collapsed interval reads as certainty")
+        self.assertEqual("[no interval: no first-place finish to resample]",
+                         rl._first_span(none_first))
+        one_slate = cell([("s1", 1), ("s1", 9)])
+        self.assertIsNone(one_slate["first_excess_interval"])
+        self.assertEqual("[no interval: under 2 slates]", rl._first_span(one_slate))
+        ok = cell([("s1", 1), ("s2", 9), ("s3", 7), ("s4", 1)])
+        self.assertEqual(2, len(ok["first_excess_interval"]))
+        self.assertEqual(ok, cell([("s4", 1), ("s3", 7), ("s2", 9), ("s1", 1)]),
+                         "blind to row order")
+
+    def test_the_report_carries_the_cut_without_moving_the_pinned_headings(self):
+        helper = ResultsLedgerTests()
+        helper.setUp()
+        self.addCleanup(helper.tmp.cleanup)
+        rows = [helper._row(1, 100, "2026-09-01 19:05:00", 1, 150.0, 20),
+                helper._row(2, 101, "2026-09-02 19:05:00", 9, 90.0, 20),
+                helper._row(3, 102, "2026-09-03 19:05:00", 4, 100.0, 20)]
+        helper._ingest(helper._export("draftkings-contest-entry-history_2026-09-10.csv", rows))
+        results = helper.root / "scratch" / "dk_entry_results.csv"
+        report = helper._report(results)
+        cells = report["first_place"]["cells"]
+        self.assertEqual(1, len(cells))
+        cell = next(iter(cells.values()))
+        self.assertEqual((3, 1), (cell["contests"], cell["first_contests"]))
+        rl = helper.rl
+        self.assertEqual(sorted(c for c, _ in rl.CUTS), sorted(report["cuts"]),
+                         "the cut sits beside the cuts, never among them")
+        code, text, _ = helper._run("report", "--results", str(results))
+        self.assertEqual(0, code)
+        self.assertIn("-- first place by contest: did any entry of ours take Place 1?", text)
+        headings = [l[3:-3] for l in text.splitlines() if l.startswith("== ")]
+        self.assertEqual(headings[:-1], [c for c, _ in rl.CUTS])
+        for banned in ("roi", "win rate", "cash rate", "probability", "return on"):
+            self.assertNotIn(banned, text.lower())

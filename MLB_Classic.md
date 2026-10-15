@@ -56,7 +56,7 @@ Earlier version-change sections (v2.25.0 back to v2.20.0) live in docs/legacy/ML
 
 ## 1. Objective
 
-Create legal DraftKings MLB Classic lineups that match the contest shape and, for GPP/WTA portfolios, provide multiple coherent first-place paths. Deterministic contest-fit, ownership, exposure, tail, stack, allocation, and redundancy diagnostics are review proxies only. Never label them ROI, profitability, win rate, cash rate, or Perfect% without a real simulation. The calibration loop in §15 exists to measure whether those proxies deserve continued use.
+Create legal DraftKings MLB Classic lineups that match the contest shape and, for GPP/WTA portfolios, provide multiple coherent first-place paths. The objective has two goals (Ben, 2026-10-14; R504): first place within each contest, a property of the set of our entries in that contest, which therefore wants them to be distinct paths and never copies; and no washout across the portfolio. The brief reads the first per contest (`exposure.frontier.by_contest`) and the second portfolio-wide. Deterministic contest-fit, ownership, exposure, tail, stack, allocation, and redundancy diagnostics are review proxies only. Never label them ROI, profitability, win rate, cash rate, or Perfect% without a real simulation. The calibration loop in §15 exists to measure whether those proxies deserve continued use.
 
 ## 2. Non-negotiable rules
 
@@ -585,6 +585,8 @@ v1.1 adds slate memory on top of the per-entry loop:
 - `extract_winner_archetype(parsed, salary_name_team_map=None, top_pct=0.01)` returns the winning score, the top-1% threshold score, the winner's primary and secondary hitter stack sizes, distinct game count (None without a team map), and chalk_index, the mean %Drafted of the winner's players from the embedded ownership table.
 - `append_slate_archetype(archetype_csv, slate_profile, archetype_row)` records one row per contest per slate. The slate profile carries game_count, top_game_total, and mean_game_total from the odds packet.
 - `winning_threshold(archetype_csv, game_count_range=None, total_range=None)` returns the matching-slate count and the median winning and median top-1% scores for slates whose profile matches tonight's.
+
+> Corrected 2026-10-15 (R504): `winning_threshold`, `extract_winner_archetype` and the archetype CSV are not in this repo (this section is retired, as its header says). A contest's winning score is read off archived standings by `field_miner` (`winning_points` per mined contest). Until R258's mining half builds a per-archetype, per-field-band table from those, `field_miner.winning_score_bar` reads ledger 3.21's seed: MEAN winning scores by slate size, pooled across archetypes and field sizes, and labelled that way wherever it is printed. Showdown has no bar (the seed gives a range).
 
 For WTA contest shapes, when the archetype table holds at least 8 comparable slates for tonight's profile, candidate review prefers `p_ge_threshold` against that historical winning score; otherwise it uses p99. Both are simulated review metrics, never win-rate claims.
 

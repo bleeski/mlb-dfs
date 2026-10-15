@@ -18,11 +18,14 @@ Four sections, in the order that catches the most for the least reading:
      arm and bat allocation against Savant expected stats. Each finding names
      its evidence and its magnitude so it can be argued with.
 
-  3. THE DUAL-OBJECTIVE FRONTIER. Ben's standing objective is to maximize
-     large wins while minimizing total washouts. Those are not two independent
-     maxima: concentration is what wins a winner-take-all satellite and it is
-     also exactly what loses every entry at once. This section measures both
-     ends as deterministic review proxies and shows where the portfolio sits.
+  3. THE DUAL-OBJECTIVE FRONTIER. Ben's standing objective (R504, 2026-10-14)
+     has two goals: first place WITHIN EACH CONTEST, and no washout ACROSS THE
+     PORTFOLIO. Two of our entries cannot both win one contest, so a contest's
+     entries want to be distinct paths to first, while one best lineup entered
+     everywhere serves every contest's first half and fails them all at once.
+     That trade across contests is the frontier. This section measures both
+     ends as deterministic review proxies: the run's per-contest read, then the
+     portfolio's washout axes, and shows where the portfolio sits.
 
   4. FIELD-FACING LEVERAGE (R136). Sections 2 and 3 both measure the portfolio
      against the SLATE. Neither says whether the entered set looks like
@@ -227,6 +230,27 @@ def per_contest_lines(brief: dict) -> List[str]:
     if pc.get("over_cap"):
         out.append(f"PER-CONTEST CAP BREACHED in {len(pc['over_cap'])} slot(s): "
                    f"NOT clean, whatever the portfolio counters say")
+    # R504(b). The first-place read, for EVERY contest: the lines above skip a
+    # one-entry contest because it cannot repeat a captain, and a one-entry
+    # contest is exactly one shot at first place. Older slices lack the keys.
+    rows = [(cid, b) for cid, b in sorted((pc.get("by_contest") or {}).items())
+            if "distinct_lineups" in b]
+    if rows:
+        basis = pc.get("score_basis") or "Base with the captain at 1.5x"
+        out.append(f"first place per contest ({basis}; a review proxy, never an "
+                   f"observed outcome):")
+        for cid, b in rows:
+            best = b.get("best_proj_points")
+            bar = b.get("winning_score_bar") or {}
+            out.append(
+                f"  {cid} [{b.get('contest_shape') or 'no shape'}]: {b['n']} "
+                f"entr{'y' if b['n'] == 1 else 'ies'}, {b['distinct_lineups']} "
+                f"distinct lineup{'' if b['distinct_lineups'] == 1 else 's'} "
+                f"(captain included), best "
+                f"{best if best is not None else 'not carried'}, "
+                f"{_bar_phrase(bar)}")
+        out.extend(f"  winning-score bar ABSENT: {why}" for why in _absent_bar_reasons(
+            [b.get("winning_score_bar") for _cid, b in rows]))
     return out
 
 
@@ -464,6 +488,79 @@ def frontier_from_brief(brief: dict) -> List[str]:
             "max_shared_players bounds one PAIR of lineups and the exposure "
             "caps bound one PERSON, so a block of three in most of the entered "
             "set passes both and still fails as one thing.")
+    out.extend(by_contest_lines(frontier))
+    return out
+
+
+def _bar_phrase(bar: Optional[Mapping[str, Any]]) -> str:
+    """The winning-score bar as one clause: the seed it is, or ABSENT and why."""
+    bar = bar or {}
+    if bar.get("status") == "SEED":
+        return (f"the {bar.get('bucket')} seed mean {bar.get('value')} "
+                f"[pooled across archetypes and field sizes]")
+    return "winning-score bar ABSENT"
+
+
+def _absent_bar_reasons(bars: Sequence[Optional[Mapping[str, Any]]]) -> List[str]:
+    """Each distinct reason a bar is ABSENT, once, so a per-contest list does not
+    repeat one fact on every row."""
+    seen: List[str] = []
+    for bar in bars:
+        if (bar or {}).get("status") != "SEED":
+            why = (bar or {}).get("unavailable_reason") or "unstated"
+            if why not in seen:
+                seen.append(why)
+    return seen
+
+
+def by_contest_lines(frontier: Mapping[str, Any]) -> List[str]:
+    """R504(b). The run's per-contest first-place read, one line per contest.
+
+    Read from the artifact on section 1's rule: the brief states it, so the brief
+    wins. Ben's first goal is first place within each contest, which the
+    portfolio lines around this cannot see: two of our entries cannot both win
+    one contest, so a contest whose entries are copies holds one path to first
+    however many tickets it bought.
+    """
+    block = frontier.get("by_contest")
+    if block is None:
+        return ["PER-CONTEST FIRST PLACE: by_contest absent from this run's "
+                "frontier (the build predates R504). The lines above read the "
+                "whole file and cannot say whether any one contest holds "
+                "distinct paths to first."]
+    if not block.get("available"):
+        return [f"PER-CONTEST FIRST PLACE: unavailable "
+                f"({block.get('unavailable_reason')})"]
+    out = ["PER-CONTEST FIRST PLACE (Ben, 2026-10-14): first place is won inside "
+           "one contest and two of ours cannot both win it, so each contest's "
+           "entries should be distinct paths, not copies. Washout stays "
+           "portfolio-wide above. Review proxies: Ceiling is a projection input "
+           "and the bar is a pooled seed mean, never an observed outcome."]
+    for row in block.get("contests") or []:
+        n = row.get("entries")
+        distinct = row.get("distinct_lineups")
+        stacks = row.get("distinct_primary_stacks")
+        pair = row.get("max_overlap_entries")
+        best = row.get("best_entry") or {}
+        reach = row.get("entries_reaching_bar")
+        parts = [
+            f"{n} entr{'y' if n == 1 else 'ies'}",
+            f"{distinct} distinct lineup{'' if distinct == 1 else 's'}",
+            (f"{stacks} primary stack{'' if stacks == 1 else 's'}"
+             if stacks is not None else "primary stacks not carried"),
+            (f"max overlap {row.get('max_pairwise_overlap')} "
+             f"({pair[0]}/{pair[1]})" if pair else "no pair to overlap"),
+            f"best Ceiling {best.get('ceiling')} (entry {best.get('entry_id')})",
+            (f"{reach} of {n} reach {_bar_phrase(row.get('winning_score_bar'))}"
+             if reach is not None else _bar_phrase(row.get("winning_score_bar"))),
+        ]
+        copied = (n or 0) - (distinct or 0)
+        flag = (f"  <-- {copied} of {n} entries repeat a lineup already in "
+                f"this contest") if copied > 0 else ""
+        out.append(f"  {row.get('contest_id')} [{row.get('contest_shape') or 'no shape'}]: "
+                   + ", ".join(parts) + flag)
+    out.extend(f"  winning-score bar ABSENT: {why}" for why in _absent_bar_reasons(
+        [r.get("winning_score_bar") for r in block.get("contests") or []]))
     return out
 
 
@@ -608,8 +705,10 @@ def section_frontier(
         top_share = max(stack_ct.values()) / n
         out.append(
             f"APEX-CONCENTRATION PROXY = {top_share:.0%} on the heaviest primary "
-            f"stack, across {len(stack_ct)} distinct stacks. Higher concentrates "
-            f"correlated upside, which is what a winner-take-all ticket needs."
+            f"stack, across {len(stack_ct)} distinct stacks. Across contests this "
+            f"is a washout cost, not a first-place gain: first place is won inside "
+            f"one contest, where that contest's entries want to be distinct paths "
+            f"(the per-contest read above counts them)."
         )
         out.append(
             "These two move together by construction: raising apex concentration "

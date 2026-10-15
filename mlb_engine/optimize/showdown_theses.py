@@ -1710,6 +1710,12 @@ def per_contest_report(df: pd.DataFrame,
     carries ``contest_shape: None`` and ``posture_source: None``, never a
     default: an absent identity is not an answer. Labels only, nothing here
     reads them for a decision.
+
+    R504(b). Each row also reads the contest as a first-place problem, since two
+    of our entries cannot both win it: ``distinct_lineups`` (paths, captain
+    included), ``best_proj_points`` (the best entry's Base with the captain at
+    1.5x, None when no lineup carries one) and ``winning_score_bar`` (ABSENT:
+    the seed's Showdown winners are a range, 83-98, not a point).
     """
     if contest_of_entry is None:
         return {"available": False,
@@ -1723,12 +1729,22 @@ def per_contest_report(df: pd.DataFrame,
         if lu is not None:
             buckets.setdefault(str(cid), []).append(lu)
 
+    # R504(b). The first-place read beside the per-contest slice. Lazily, the way
+    # `execution_pipeline` takes the same bar: `field_miner` owns it, and a second
+    # spelling of "Showdown has no winning-score point" is how the two disagree.
+    from mlb_engine.field.field_miner import winning_score_bar
+    bar = winning_score_bar("showdown", None)
     by_contest: Dict[str, Any] = {}
     over_cap: List[Dict[str, Any]] = []
     for cid in sorted(buckets):
         lus = buckets[cid]
         n = len(lus)
         sets = [set(lu["player_keys"]) for lu in lus]
+        # `proj_points` is Base with the captain at the contract's 1.5x on both
+        # paths (`_assemble_lineup`; `solve_ladder` restates it, R295(b)). A
+        # lineup that carries none is missing, never 0.
+        points = [float(lu["proj_points"]) for lu in lus
+                  if lu.get("proj_points") is not None]
         cpts: Dict[str, int] = {}
         for lu in lus:
             key = lu["captain"]["player_key"]
@@ -1767,8 +1783,15 @@ def per_contest_report(df: pd.DataFrame,
             "team_shape_spread": len(splits),
             "team_shapes": sorted(splits),
             "over_cap": breaches,
+            # R504(b). Paths to first inside this contest: the captain leads
+            # `player_keys`, so the same six under another captain are two.
+            "distinct_lineups": len({tuple(lu["player_keys"]) for lu in lus}),
+            "best_proj_points": round(max(points), 3) if points else None,
+            "winning_score_bar": bar,
+            "entries_reaching_bar": None,
         }
     return {"available": True, "reason": "",
+            "score_basis": "Base with the captain at 1.5x",
             "by_contest": by_contest,
             "over_cap": over_cap,
             "max_cpt_per_contest": int(max_cpt_per_contest),
