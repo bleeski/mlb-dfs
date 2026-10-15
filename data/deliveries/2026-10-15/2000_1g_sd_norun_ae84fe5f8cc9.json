@@ -1,0 +1,487 @@
+{
+ "code": {
+  "contest_allocator": "v1.12",
+  "execution_pipeline": "v1.17",
+  "git_dirty": true,
+  "git_sha": "8abda49e9da1c192cead431c52091b10250e85eb"
+ },
+ "controls": {},
+ "date": "2026-10-15",
+ "egress": "egress: statsapi 200, odds 401, savant 200, mlb-lineups 200, fangraphs 200 (curl), open-meteo 200",
+ "egress_source": "session_start 2026-10-15T23:22:38+00:00",
+ "entries": [
+  {
+   "contest_id": "196753109",
+   "contest_name": "MLB Showdown $7.5K mini-MAX [150 Entry Max] (MIL @ LAD)",
+   "entry_fee": 1.0,
+   "entry_id": "5296639329",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44512738",
+    "44512633",
+    "44512637",
+    "44512640",
+    "44512646",
+    "44512658"
+   ]
+  },
+  {
+   "contest_id": "196753111",
+   "contest_name": "MLB Showdown $750 Quarter Jukebox [Just $0.25!] (MIL @ LAD)",
+   "entry_fee": 0.25,
+   "entry_id": "5296645305",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44512729",
+    "44512637",
+    "44512639",
+    "44512640",
+    "44512646",
+    "44512658"
+   ]
+  },
+  {
+   "contest_id": "196753111",
+   "contest_name": "MLB Showdown $750 Quarter Jukebox [Just $0.25!] (MIL @ LAD)",
+   "entry_fee": 0.25,
+   "entry_id": "5296650961",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44512728",
+    "44512636",
+    "44512638",
+    "44512644",
+    "44512645",
+    "44512659"
+   ]
+  },
+  {
+   "contest_id": "196753465",
+   "contest_name": "MLB Showdown 40x Micro Booster [Top 5 Win $10] (MIL @ LAD)",
+   "entry_fee": 0.25,
+   "entry_id": "5296639398",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44512729",
+    "44512637",
+    "44512639",
+    "44512640",
+    "44512645",
+    "44512659"
+   ]
+  },
+  {
+   "contest_id": "196753465",
+   "contest_name": "MLB Showdown 40x Micro Booster [Top 5 Win $10] (MIL @ LAD)",
+   "entry_fee": 0.25,
+   "entry_id": "5296646807",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44512727",
+    "44512635",
+    "44512637",
+    "44512646",
+    "44512658",
+    "44512659"
+   ]
+  },
+  {
+   "contest_id": "196753465",
+   "contest_name": "MLB Showdown 40x Micro Booster [Top 5 Win $10] (MIL @ LAD)",
+   "entry_fee": 0.25,
+   "entry_id": "5296646808",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44512733",
+    "44512633",
+    "44512635",
+    "44512644",
+    "44512650",
+    "44512659"
+   ]
+  },
+  {
+   "contest_id": "196753465",
+   "contest_name": "MLB Showdown 40x Micro Booster [Top 5 Win $10] (MIL @ LAD)",
+   "entry_fee": 0.25,
+   "entry_id": "5296646809",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44512739",
+    "44512634",
+    "44512635",
+    "44512636",
+    "44512652",
+    "44512647"
+   ]
+  },
+  {
+   "contest_id": "196753465",
+   "contest_name": "MLB Showdown 40x Micro Booster [Top 5 Win $10] (MIL @ LAD)",
+   "entry_fee": 0.25,
+   "entry_id": "5296646810",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44512728",
+    "44512636",
+    "44512638",
+    "44512645",
+    "44512647",
+    "44512657"
+   ]
+  },
+  {
+   "contest_id": "196753465",
+   "contest_name": "MLB Showdown 40x Micro Booster [Top 5 Win $10] (MIL @ LAD)",
+   "entry_fee": 0.25,
+   "entry_id": "5296646811",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44512732",
+    "44512636",
+    "44512641",
+    "44512645",
+    "44512646",
+    "44512647"
+   ]
+  },
+  {
+   "contest_id": "196753465",
+   "contest_name": "MLB Showdown 40x Micro Booster [Top 5 Win $10] (MIL @ LAD)",
+   "entry_fee": 0.25,
+   "entry_id": "5296646812",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44512741",
+    "44512638",
+    "44512644",
+    "44512645",
+    "44512646",
+    "44512634"
+   ]
+  },
+  {
+   "contest_id": "196753498",
+   "contest_name": "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (MIL @ LAD)",
+   "entry_fee": 0.1,
+   "entry_id": "5296646159",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44512731",
+    "44512635",
+    "44512639",
+    "44512640",
+    "44512647",
+    "44512657"
+   ]
+  },
+  {
+   "contest_id": "196753498",
+   "contest_name": "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (MIL @ LAD)",
+   "entry_fee": 0.1,
+   "entry_id": "5296651901",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44512727",
+    "44512635",
+    "44512639",
+    "44512646",
+    "44512657",
+    "44512658"
+   ]
+  },
+  {
+   "contest_id": "196753498",
+   "contest_name": "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (MIL @ LAD)",
+   "entry_fee": 0.1,
+   "entry_id": "5296651902",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44512731",
+    "44512635",
+    "44512639",
+    "44512643",
+    "44512644",
+    "44512655"
+   ]
+  },
+  {
+   "contest_id": "196753498",
+   "contest_name": "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (MIL @ LAD)",
+   "entry_fee": 0.1,
+   "entry_id": "5296651903",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44512732",
+    "44512636",
+    "44512641",
+    "44512643",
+    "44512645",
+    "44512650"
+   ]
+  },
+  {
+   "contest_id": "196753498",
+   "contest_name": "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (MIL @ LAD)",
+   "entry_fee": 0.1,
+   "entry_id": "5296651904",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44512728",
+    "44512636",
+    "44512638",
+    "44512641",
+    "44512650",
+    "44512659"
+   ]
+  },
+  {
+   "contest_id": "196753498",
+   "contest_name": "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (MIL @ LAD)",
+   "entry_fee": 0.1,
+   "entry_id": "5296651905",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44512730",
+    "44512637",
+    "44512638",
+    "44512645",
+    "44512647",
+    "44512650"
+   ]
+  },
+  {
+   "contest_id": "196753498",
+   "contest_name": "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (MIL @ LAD)",
+   "entry_fee": 0.1,
+   "entry_id": "5296651906",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44512727",
+    "44512638",
+    "44512645",
+    "44512647",
+    "44512650",
+    "44512655"
+   ]
+  },
+  {
+   "contest_id": "196777927",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (MIL @ LAD)",
+   "entry_fee": 0.1,
+   "entry_id": "5296639833",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44512729",
+    "44512633",
+    "44512639",
+    "44512643",
+    "44512655",
+    "44512658"
+   ]
+  },
+  {
+   "contest_id": "196777927",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (MIL @ LAD)",
+   "entry_fee": 0.1,
+   "entry_id": "5296644896",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44512732",
+    "44512635",
+    "44512637",
+    "44512645",
+    "44512646",
+    "44512650"
+   ]
+  },
+  {
+   "contest_id": "196778190",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (MIL @ LAD)",
+   "entry_fee": 0.1,
+   "entry_id": "5296639973",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44512729",
+    "44512633",
+    "44512640",
+    "44512646",
+    "44512650",
+    "44512658"
+   ]
+  },
+  {
+   "contest_id": "196778190",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (MIL @ LAD)",
+   "entry_fee": 0.1,
+   "entry_id": "5296645017",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44512727",
+    "44512634",
+    "44512639",
+    "44512646",
+    "44512658",
+    "44512659"
+   ]
+  },
+  {
+   "contest_id": "196779067",
+   "contest_name": "MLB Showdown $125 Quarter Jukebox [Just $0.25!] (MIL @ LAD)",
+   "entry_fee": 0.25,
+   "entry_id": "5296645900",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44512733",
+    "44512633",
+    "44512637",
+    "44512646",
+    "44512647",
+    "44512658"
+   ]
+  },
+  {
+   "contest_id": "196779067",
+   "contest_name": "MLB Showdown $125 Quarter Jukebox [Just $0.25!] (MIL @ LAD)",
+   "entry_fee": 0.25,
+   "entry_id": "5296645942",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44512728",
+    "44512633",
+    "44512645",
+    "44512646",
+    "44512647",
+    "44512659"
+   ]
+  }
+ ],
+ "entries_binding": {
+  "source": "outputs/2026-10-15/DKEntries_showdown_2000_1g_sd_REVIEW_GRADE_final_qa.csv",
+  "source_sha256": "ae84fe5f8cc91b6ff6bda3b85ef98e96abdd0809896827d7473b75de4a12cdd5",
+  "status": "bound"
+ },
+ "host": {
+  "call_budget_s": 630.0,
+  "declared_ceiling_s": 900.0,
+  "host": "claude_code"
+ },
+ "kind": "delivery",
+ "labels": "deterministic review proxies and labeled priors only; never ROI, win rate, cash rate, or probability",
+ "manifest_row": {
+  "certification": "review_grade",
+  "contest_ids": [
+   "196753109",
+   "196753111",
+   "196753465",
+   "196753498",
+   "196777927",
+   "196778190",
+   "196779067"
+  ],
+  "contest_names": [],
+  "contest_type": "showdown",
+  "delivered_file": "outputs/2026-10-15/DKEntries_showdown_2000_1g_sd_REVIEW_GRADE_final_qa.csv",
+  "entries": 23,
+  "notes": "QA-revised delivery, supersedes b8849500. dfs-qa iteration 1 (R344): no verifiable Pareto swap (no per-player projections handed); flagged Micro Booster 5296646807/5296646808 as two Glasnow-CPT LAD-win-big copies sharing 4 players. Iteration 2 (operator): 5296646808 CPT Glasnow->Freeman (Glasnow to UTIL) and Frelick->Mitchell, salary 50000; Micro now 7 distinct captains, Glasnow CPT 5->4 of 23. Iteration 3: no further move. Constraints rechecked: exposure max 11, CPT max 4, per-contest CPT caps, max overlap 4.",
+  "projection_tier": "unknown",
+  "recorded_utc": "2026-10-15T23:38:03.294343+00:00",
+  "run_id": null,
+  "sha256": "ae84fe5f8cc91b6ff6bda3b85ef98e96abdd0809896827d7473b75de4a12cdd5",
+  "slate_tag": "2000_1g_sd",
+  "status": "candidate",
+  "strategy_state": {
+   "counts": {},
+   "state": "unknown"
+  }
+ },
+ "players": {},
+ "pool": null,
+ "prediction_source": {
+  "build_id": null,
+  "ceiling_basis": "null on every Showdown entry: the melted and priced frames carry Base and no Ceiling column on either path (the thesis ladder or the points-max bank), so there is no ceiling sum to record",
+  "filled": 23,
+  "held_entry_ids": [],
+  "label": "what the Showdown build predicted for each lineup it chose, handed to the record in process at delivery because a Showdown build has no run folder: the thesis template (or points_max for the baseline and the points-max bank), the realized captain and whether it is a pitcher or a hitter, the team split, the Base sum with the captain at 1.5x and its rank in the build, and the labeled captain-slot and six-slot roster priors or null. build_id is one per build's inputs (date, slate tag, salary and template bytes): the baseline and the ladder of a build share it, and two builds over the same inputs share it too, told apart by their sha256 and recorded_utc. Deterministic review proxies and labeled priors, never ROI, a win rate or a probability",
+  "players_missing": [
+   "44512633",
+   "44512634",
+   "44512635",
+   "44512636",
+   "44512637",
+   "44512638",
+   "44512639",
+   "44512640",
+   "44512641",
+   "44512643",
+   "44512644",
+   "44512645",
+   "44512646",
+   "44512647",
+   "44512650",
+   "44512652",
+   "44512655",
+   "44512657",
+   "44512658",
+   "44512659",
+   "44512727",
+   "44512728",
+   "44512729",
+   "44512730",
+   "44512731",
+   "44512732",
+   "44512733",
+   "44512738",
+   "44512739",
+   "44512741"
+  ],
+  "predicted": 0,
+  "priors": null,
+  "rank_basis": "rank_in_build orders this build's own lineups by base_sum descending, ties by slot; slot is the lineup's 1-based place in the build (the ladder's deal order or the bank's solve order), which is the order of the reserved rows it filled",
+  "status": "not_supplied",
+  "unmatched_entry_ids": []
+ },
+ "recorded_utc": "2026-10-15T23:38:03.717781+00:00",
+ "relaxations": {
+  "both_relaxed_slots": 0,
+  "cap_reassignments_withdrawn": 0,
+  "captain_apportionment_shortfall": 0,
+  "captain_budget_inversions": [],
+  "captain_relaxed_slots": 0,
+  "clean": true,
+  "contest_cap_relaxed_slots": 0,
+  "cpt_cap_relaxed_slots": 0,
+  "ignored_locks": [],
+  "min_per_team_relaxed_detail": [],
+  "min_per_team_relaxed_slots": 0,
+  "min_per_team_slots_carrying_floor": 6,
+  "overlap_relaxed_slots": 0,
+  "per_contest_cap_breaches": 0,
+  "player_relaxed_slots": 0
+ },
+ "run": {},
+ "schema_version": 1
+}
