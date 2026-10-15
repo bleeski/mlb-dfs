@@ -54218,6 +54218,35 @@ class PerContestAllocationTests(unittest.TestCase):
         self.assertTrue(swap["passed"], swap.get("errors"))
         self.assertNotIn("contest_deal", swap)
 
+    def test_a_stage_one_without_an_incumbent_adds_no_row_and_counts_a_relaxation(self):
+        """Stage 1 gets a quarter of the clock; when it returns nothing usable
+        the solve still ships through the ordinary objective, and the record
+        says the draw did not hold and why, naming the clock only when it was."""
+        import scipy.optimize as so
+        real = so.milp
+        calls = []
+
+        def first_call_times_out(*args, **kwargs):
+            calls.append(kwargs.get("options", {}).get("time_limit"))
+            if len(calls) == 1:
+                return types.SimpleNamespace(status=1, x=None, message="time limit",
+                                             mip_gap=None)
+            return real(*args, **kwargs)
+
+        entries = self._entries([("S", 1, self.SA), ("M", 2, self.SB)])
+        with unittest.mock.patch.object(so, "milp", first_call_times_out):
+            out = ca.select_and_assign_entries(self._se_bank(), entries,
+                                               {"max_candidate_reuse": 1, "time_limit": 20})
+        self.assertTrue(out["passed"], out.get("errors"))
+        self.assertEqual(calls[:2], [5.0, 20.0], "stage 1 runs on a quarter of the clock")
+        block = out["contest_deal"]["single_entry"]
+        self.assertFalse(block["held"])
+        self.assertTrue(block["reason"].startswith("stage 1 hit its time limit"))
+        self.assertEqual(out["contest_deal"]["relaxations"], 1)
+        self.assertTrue(any(w.startswith("single-entry contests (S) did not draw first")
+                            for w in out["warnings"]))
+        self.assertEqual(epi.manifest_strategy_state(out)["state"], "relaxed")
+
     def test_the_prefilter_keeps_a_single_entry_contests_own_best_read(self):
         """The prefilter fills by each candidate's best score over EVERY entry's
         shape, so forty-five lineups the two-entry contest's shape reads high

@@ -4221,7 +4221,9 @@ def select_and_assign_entries(
             _own = sorted((k for k in range(len(candidates)) if full_compatible[e][k]),
                           key=lambda k: (-_candidate_shape_score(candidates[k], _shape),
                                          _candidate_id(candidates[k], k)))
-            _se_keep.extend(_own[:len(single_entry_idx)])
+            # Twice the count, R406's sizing: the top reads of a thin slate
+            # can exclude each other under the file's cap.
+            _se_keep.extend(_own[:2 * len(single_entry_idx)])
         _se_keep = sorted(set(_se_keep))
         prefilter_reserves["single_entry_best"] = (_se_keep, len(_se_keep))
     kept_idx, prefilter_report = _prefilter_candidates(
@@ -4306,6 +4308,7 @@ def select_and_assign_entries(
                         over_pairs.append((i, j, _shared))
     contest_pairs: Dict[str, List[Tuple[int, int]]] = {}
     z_index: Dict[Tuple[str, int], int] = {}
+    z_cols: Dict[str, List[int]] = {}
     _z_next = x_count + (K if use_y else 0)
     for _cid, _bound in sorted(contest_bounds.items()):
         _members = by_contest_entries[_cid]
@@ -4316,7 +4319,8 @@ def select_and_assign_entries(
             overlap_by_contest[_cid]["status"] = "vacuous"
             continue
         contest_pairs[_cid] = _pairs
-        for k in sorted({i for i, _ in _pairs} | {j for _, j in _pairs}):
+        z_cols[_cid] = sorted({i for i, _ in _pairs} | {j for _, j in _pairs})
+        for k in z_cols[_cid]:
             z_index[(_cid, k)] = _z_next
             _z_next += 1
     n_vars = _z_next
@@ -4708,10 +4712,9 @@ def select_and_assign_entries(
     contest_overlap_rows = 0
     for _cid, _pairs in sorted(contest_pairs.items()):
         _members = by_contest_entries[_cid]
-        for (_zc, k), col in sorted(z_index.items()):
-            if _zc == _cid:
-                add({**{x_idx(e, k): 1.0 for e in _members}, col: -float(len(_members))},
-                    -np.inf, 0.0)
+        for k in z_cols[_cid]:
+            add({**{x_idx(e, k): 1.0 for e in _members},
+                 z_index[(_cid, k)]: -float(len(_members))}, -np.inf, 0.0)
         for i, j in _pairs:
             add({z_index[(_cid, i)]: 1.0, z_index[(_cid, j)]: 1.0}, -np.inf, 1.0)
         overlap_by_contest[_cid]["rows_added"] = len(_pairs)
@@ -4782,13 +4785,18 @@ def select_and_assign_entries(
             for e in single_entry_idx:
                 for k in range(K):
                     c1[x_idx(e, k)] = objective[x_idx(e, k)]
+            # A quarter of the solve's clock, so a mixed file costs at most
+            # 1.25x the allocator's limit inside a lock window. A stage 1 cut
+            # short with an incumbent still yields a valid (weaker) row.
+            stage1_limit_s = max(1.0, 0.25 * time_limit_s)
+            single_entry_report["stage1_time_limit_s"] = stage1_limit_s
             _t1 = _time.monotonic()
             r1 = milp(
                 c=c1,
                 integrality=np.ones(n_vars, dtype=int),
                 bounds=Bounds(lower, upper),
                 constraints=LinearConstraint(matrix, lb_array, ub_array),
-                options={"time_limit": time_limit_s, "disp": False},
+                options={"time_limit": stage1_limit_s, "disp": False},
             )
             single_entry_report["stage1_elapsed_s"] = round(_time.monotonic() - _t1, 3)
             _s1 = getattr(r1, "status", None)
@@ -4810,9 +4818,12 @@ def select_and_assign_entries(
                 stage1_result = r1
             else:
                 single_entry_report["reason"] = (
-                    "stage 1 returned no verifiable incumbent inside its time "
-                    "limit, so no row was added and the single-entry contests "
-                    "drew through the ordinary objective; counted as a relaxation")
+                    ("stage 1 hit its time limit with no incumbent"
+                     if _s1 == 1 else
+                     f"stage 1 returned solver status {_s1} with no verifiable "
+                     f"incumbent, neither the clock nor a proof")
+                    + ", so no row was added and the single-entry contests drew "
+                    "through the ordinary objective; counted as a relaxation")
 
     result = stage1_result if stage1_result is not None else milp(
         c=objective,
