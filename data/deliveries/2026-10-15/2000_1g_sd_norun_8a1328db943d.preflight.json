@@ -1,0 +1,10 @@
+{
+ "entries_sha256": "8a1328db943d396b65f0d2b776e7bce7819ee48c971dd43ac98b2710304c005a",
+ "exit_code": 0,
+ "kind": "preflight",
+ "preflight_version": "1.1",
+ "record": "2000_1g_sd_norun_8a1328db943d.json",
+ "schema_version": 1,
+ "utc": "2026-10-15T23:28:48.009122+00:00",
+ "verdict": "review_ready"
+}

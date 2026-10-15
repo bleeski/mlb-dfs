@@ -1,0 +1,1079 @@
+{
+ "code": {
+  "contest_allocator": "v1.12",
+  "execution_pipeline": "v1.17",
+  "git_dirty": true,
+  "git_sha": "8f7ea9e02affc27becf97c6c24509bc5200cb24b"
+ },
+ "controls": {
+  "max_cpt_exposure_pct": 0.25,
+  "max_cpt_per_contest": 2,
+  "max_player_exposure_pct": 0.5,
+  "max_shared_players": 4
+ },
+ "date": "2026-10-15",
+ "egress": "egress: statsapi 200, odds 401, savant 200, mlb-lineups 200, fangraphs 200 (curl), open-meteo 200",
+ "egress_source": "session_start 2026-10-15T23:22:38+00:00",
+ "entries": [
+  {
+   "contest_id": "196753109",
+   "contest_name": "MLB Showdown $7.5K mini-MAX [150 Entry Max] (MIL @ LAD)",
+   "entry_fee": 1.0,
+   "entry_id": "5296639329",
+   "filled": true,
+   "prediction": {
+    "base_sum": 59.83,
+    "build_id": "sd_5df68a263225",
+    "captain_id": "44512738",
+    "captain_prior_own": null,
+    "captain_role": "hitter",
+    "ceiling_sum": null,
+    "flex_prior_own_sum": null,
+    "rank_in_build": 8,
+    "rank_of_n": 23,
+    "slot": 1,
+    "team_counts": {
+     "LAD": 5,
+     "MIL": 1
+    },
+    "team_split": "5-1",
+    "thesis": "favorite_bottom_order"
+   },
+   "roster_ids": [
+    "44512738",
+    "44512633",
+    "44512639",
+    "44512640",
+    "44512646",
+    "44512716"
+   ]
+  },
+  {
+   "contest_id": "196753111",
+   "contest_name": "MLB Showdown $750 Quarter Jukebox [Just $0.25!] (MIL @ LAD)",
+   "entry_fee": 0.25,
+   "entry_id": "5296645305",
+   "filled": true,
+   "prediction": {
+    "base_sum": 54.06,
+    "build_id": "sd_5df68a263225",
+    "captain_id": "44512729",
+    "captain_prior_own": null,
+    "captain_role": "hitter",
+    "ceiling_sum": null,
+    "flex_prior_own_sum": null,
+    "rank_in_build": 13,
+    "rank_of_n": 23,
+    "slot": 2,
+    "team_counts": {
+     "LAD": 5,
+     "MIL": 1
+    },
+    "team_split": "5-1",
+    "thesis": "favorite_win_big_no_sp"
+   },
+   "roster_ids": [
+    "44512729",
+    "44512637",
+    "44512639",
+    "44512643",
+    "44512644",
+    "44512716"
+   ]
+  },
+  {
+   "contest_id": "196753111",
+   "contest_name": "MLB Showdown $750 Quarter Jukebox [Just $0.25!] (MIL @ LAD)",
+   "entry_fee": 0.25,
+   "entry_id": "5296650961",
+   "filled": true,
+   "prediction": {
+    "base_sum": 50.31,
+    "build_id": "sd_5df68a263225",
+    "captain_id": "44512728",
+    "captain_prior_own": null,
+    "captain_role": "pitcher",
+    "ceiling_sum": null,
+    "flex_prior_own_sum": null,
+    "rank_in_build": 20,
+    "rank_of_n": 23,
+    "slot": 3,
+    "team_counts": {
+     "LAD": 2,
+     "MIL": 4
+    },
+    "team_split": "4-2",
+    "thesis": "underdog_win_close"
+   },
+   "roster_ids": [
+    "44512728",
+    "44512636",
+    "44512638",
+    "44512645",
+    "44512646",
+    "44512715"
+   ]
+  },
+  {
+   "contest_id": "196753465",
+   "contest_name": "MLB Showdown 40x Micro Booster [Top 5 Win $10] (MIL @ LAD)",
+   "entry_fee": 0.25,
+   "entry_id": "5296639398",
+   "filled": true,
+   "prediction": {
+    "base_sum": 54.05,
+    "build_id": "sd_5df68a263225",
+    "captain_id": "44512729",
+    "captain_prior_own": null,
+    "captain_role": "hitter",
+    "ceiling_sum": null,
+    "flex_prior_own_sum": null,
+    "rank_in_build": 14,
+    "rank_of_n": 23,
+    "slot": 4,
+    "team_counts": {
+     "LAD": 5,
+     "MIL": 1
+    },
+    "team_split": "5-1",
+    "thesis": "favorite_shootout"
+   },
+   "roster_ids": [
+    "44512729",
+    "44512637",
+    "44512639",
+    "44512640",
+    "44512646",
+    "44512658"
+   ]
+  },
+  {
+   "contest_id": "196753465",
+   "contest_name": "MLB Showdown 40x Micro Booster [Top 5 Win $10] (MIL @ LAD)",
+   "entry_fee": 0.25,
+   "entry_id": "5296646807",
+   "filled": true,
+   "prediction": {
+    "base_sum": 64.52,
+    "build_id": "sd_5df68a263225",
+    "captain_id": "44512727",
+    "captain_prior_own": null,
+    "captain_role": "pitcher",
+    "ceiling_sum": null,
+    "flex_prior_own_sum": null,
+    "rank_in_build": 1,
+    "rank_of_n": 23,
+    "slot": 5,
+    "team_counts": {
+     "LAD": 5,
+     "MIL": 1
+    },
+    "team_split": "5-1",
+    "thesis": "favorite_win_big"
+   },
+   "roster_ids": [
+    "44512727",
+    "44512635",
+    "44512639",
+    "44512646",
+    "44512659",
+    "44512716"
+   ]
+  },
+  {
+   "contest_id": "196753465",
+   "contest_name": "MLB Showdown 40x Micro Booster [Top 5 Win $10] (MIL @ LAD)",
+   "entry_fee": 0.25,
+   "entry_id": "5296646808",
+   "filled": true,
+   "prediction": {
+    "base_sum": 63.87,
+    "build_id": "sd_5df68a263225",
+    "captain_id": "44512727",
+    "captain_prior_own": null,
+    "captain_role": "pitcher",
+    "ceiling_sum": null,
+    "flex_prior_own_sum": null,
+    "rank_in_build": 2,
+    "rank_of_n": 23,
+    "slot": 6,
+    "team_counts": {
+     "LAD": 5,
+     "MIL": 1
+    },
+    "team_split": "5-1",
+    "thesis": "favorite_win_big"
+   },
+   "roster_ids": [
+    "44512727",
+    "44512635",
+    "44512640",
+    "44512646",
+    "44512659",
+    "44512717"
+   ]
+  },
+  {
+   "contest_id": "196753465",
+   "contest_name": "MLB Showdown 40x Micro Booster [Top 5 Win $10] (MIL @ LAD)",
+   "entry_fee": 0.25,
+   "entry_id": "5296646809",
+   "filled": true,
+   "prediction": {
+    "base_sum": 50.77,
+    "build_id": "sd_5df68a263225",
+    "captain_id": "44512746",
+    "captain_prior_own": null,
+    "captain_role": "hitter",
+    "ceiling_sum": null,
+    "flex_prior_own_sum": null,
+    "rank_in_build": 19,
+    "rank_of_n": 23,
+    "slot": 7,
+    "team_counts": {
+     "LAD": 1,
+     "MIL": 5
+    },
+    "team_split": "5-1",
+    "thesis": "underdog_bottom_order"
+   },
+   "roster_ids": [
+    "44512746",
+    "44512634",
+    "44512635",
+    "44512636",
+    "44512645",
+    "44512647"
+   ]
+  },
+  {
+   "contest_id": "196753465",
+   "contest_name": "MLB Showdown 40x Micro Booster [Top 5 Win $10] (MIL @ LAD)",
+   "entry_fee": 0.25,
+   "entry_id": "5296646810",
+   "filled": true,
+   "prediction": {
+    "base_sum": 49.54,
+    "build_id": "sd_5df68a263225",
+    "captain_id": "44512728",
+    "captain_prior_own": null,
+    "captain_role": "pitcher",
+    "ceiling_sum": null,
+    "flex_prior_own_sum": null,
+    "rank_in_build": 21,
+    "rank_of_n": 23,
+    "slot": 8,
+    "team_counts": {
+     "LAD": 1,
+     "MIL": 5
+    },
+    "team_split": "5-1",
+    "thesis": "underdog_win_big"
+   },
+   "roster_ids": [
+    "44512728",
+    "44512636",
+    "44512638",
+    "44512645",
+    "44512647",
+    "44512709"
+   ]
+  },
+  {
+   "contest_id": "196753465",
+   "contest_name": "MLB Showdown 40x Micro Booster [Top 5 Win $10] (MIL @ LAD)",
+   "entry_fee": 0.25,
+   "entry_id": "5296646811",
+   "filled": true,
+   "prediction": {
+    "base_sum": 47.49,
+    "build_id": "sd_5df68a263225",
+    "captain_id": "44512732",
+    "captain_prior_own": null,
+    "captain_role": "hitter",
+    "ceiling_sum": null,
+    "flex_prior_own_sum": null,
+    "rank_in_build": 23,
+    "rank_of_n": 23,
+    "slot": 9,
+    "team_counts": {
+     "LAD": 1,
+     "MIL": 5
+    },
+    "team_split": "5-1",
+    "thesis": "underdog_win_big_no_sp"
+   },
+   "roster_ids": [
+    "44512732",
+    "44512636",
+    "44512641",
+    "44512645",
+    "44512647",
+    "44512715"
+   ]
+  },
+  {
+   "contest_id": "196753465",
+   "contest_name": "MLB Showdown 40x Micro Booster [Top 5 Win $10] (MIL @ LAD)",
+   "entry_fee": 0.25,
+   "entry_id": "5296646812",
+   "filled": true,
+   "prediction": {
+    "base_sum": 51.51,
+    "build_id": "sd_5df68a263225",
+    "captain_id": "44512728",
+    "captain_prior_own": null,
+    "captain_role": "pitcher",
+    "ceiling_sum": null,
+    "flex_prior_own_sum": null,
+    "rank_in_build": 18,
+    "rank_of_n": 23,
+    "slot": 10,
+    "team_counts": {
+     "LAD": 2,
+     "MIL": 4
+    },
+    "team_split": "4-2",
+    "thesis": "underdog_win_close"
+   },
+   "roster_ids": [
+    "44512728",
+    "44512635",
+    "44512638",
+    "44512645",
+    "44512647",
+    "44512715"
+   ]
+  },
+  {
+   "contest_id": "196753498",
+   "contest_name": "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (MIL @ LAD)",
+   "entry_fee": 0.1,
+   "entry_id": "5296646159",
+   "filled": true,
+   "prediction": {
+    "base_sum": 54.07,
+    "build_id": "sd_5df68a263225",
+    "captain_id": "44512731",
+    "captain_prior_own": null,
+    "captain_role": "hitter",
+    "ceiling_sum": null,
+    "flex_prior_own_sum": null,
+    "rank_in_build": 12,
+    "rank_of_n": 23,
+    "slot": 11,
+    "team_counts": {
+     "LAD": 5,
+     "MIL": 1
+    },
+    "team_split": "5-1",
+    "thesis": "favorite_shootout"
+   },
+   "roster_ids": [
+    "44512731",
+    "44512635",
+    "44512639",
+    "44512640",
+    "44512645",
+    "44512659"
+   ]
+  },
+  {
+   "contest_id": "196753498",
+   "contest_name": "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (MIL @ LAD)",
+   "entry_fee": 0.1,
+   "entry_id": "5296651901",
+   "filled": true,
+   "prediction": {
+    "base_sum": 63.66,
+    "build_id": "sd_5df68a263225",
+    "captain_id": "44512727",
+    "captain_prior_own": null,
+    "captain_role": "pitcher",
+    "ceiling_sum": null,
+    "flex_prior_own_sum": null,
+    "rank_in_build": 3,
+    "rank_of_n": 23,
+    "slot": 12,
+    "team_counts": {
+     "LAD": 5,
+     "MIL": 1
+    },
+    "team_split": "5-1",
+    "thesis": "favorite_win_big"
+   },
+   "roster_ids": [
+    "44512727",
+    "44512637",
+    "44512639",
+    "44512646",
+    "44512659",
+    "44512717"
+   ]
+  },
+  {
+   "contest_id": "196753498",
+   "contest_name": "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (MIL @ LAD)",
+   "entry_fee": 0.1,
+   "entry_id": "5296651902",
+   "filled": true,
+   "prediction": {
+    "base_sum": 53.39,
+    "build_id": "sd_5df68a263225",
+    "captain_id": "44512731",
+    "captain_prior_own": null,
+    "captain_role": "hitter",
+    "ceiling_sum": null,
+    "flex_prior_own_sum": null,
+    "rank_in_build": 15,
+    "rank_of_n": 23,
+    "slot": 13,
+    "team_counts": {
+     "LAD": 5,
+     "MIL": 1
+    },
+    "team_split": "5-1",
+    "thesis": "favorite_win_big_no_sp"
+   },
+   "roster_ids": [
+    "44512731",
+    "44512635",
+    "44512639",
+    "44512643",
+    "44512646",
+    "44512717"
+   ]
+  },
+  {
+   "contest_id": "196753498",
+   "contest_name": "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (MIL @ LAD)",
+   "entry_fee": 0.1,
+   "entry_id": "5296651903",
+   "filled": true,
+   "prediction": {
+    "base_sum": 51.6,
+    "build_id": "sd_5df68a263225",
+    "captain_id": "44512732",
+    "captain_prior_own": null,
+    "captain_role": "hitter",
+    "ceiling_sum": null,
+    "flex_prior_own_sum": null,
+    "rank_in_build": 17,
+    "rank_of_n": 23,
+    "slot": 14,
+    "team_counts": {
+     "LAD": 1,
+     "MIL": 5
+    },
+    "team_split": "5-1",
+    "thesis": "underdog_shootout"
+   },
+   "roster_ids": [
+    "44512732",
+    "44512636",
+    "44512637",
+    "44512641",
+    "44512645",
+    "44512716"
+   ]
+  },
+  {
+   "contest_id": "196753498",
+   "contest_name": "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (MIL @ LAD)",
+   "entry_fee": 0.1,
+   "entry_id": "5296651904",
+   "filled": true,
+   "prediction": {
+    "base_sum": 48.26,
+    "build_id": "sd_5df68a263225",
+    "captain_id": "44512728",
+    "captain_prior_own": null,
+    "captain_role": "pitcher",
+    "ceiling_sum": null,
+    "flex_prior_own_sum": null,
+    "rank_in_build": 22,
+    "rank_of_n": 23,
+    "slot": 15,
+    "team_counts": {
+     "LAD": 1,
+     "MIL": 5
+    },
+    "team_split": "5-1",
+    "thesis": "underdog_win_big"
+   },
+   "roster_ids": [
+    "44512728",
+    "44512636",
+    "44512638",
+    "44512647",
+    "44512650",
+    "44512715"
+   ]
+  },
+  {
+   "contest_id": "196753498",
+   "contest_name": "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (MIL @ LAD)",
+   "entry_fee": 0.1,
+   "entry_id": "5296651905",
+   "filled": true,
+   "prediction": {
+    "base_sum": 52.15,
+    "build_id": "sd_5df68a263225",
+    "captain_id": "44512730",
+    "captain_prior_own": null,
+    "captain_role": "hitter",
+    "ceiling_sum": null,
+    "flex_prior_own_sum": null,
+    "rank_in_build": 16,
+    "rank_of_n": 23,
+    "slot": 16,
+    "team_counts": {
+     "LAD": 1,
+     "MIL": 5
+    },
+    "team_split": "5-1",
+    "thesis": "underdog_win_big_no_sp"
+   },
+   "roster_ids": [
+    "44512730",
+    "44512637",
+    "44512638",
+    "44512645",
+    "44512647",
+    "44512650"
+   ]
+  },
+  {
+   "contest_id": "196753498",
+   "contest_name": "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (MIL @ LAD)",
+   "entry_fee": 0.1,
+   "entry_id": "5296651906",
+   "filled": true,
+   "prediction": {
+    "base_sum": 63.02,
+    "build_id": "sd_5df68a263225",
+    "captain_id": "44512727",
+    "captain_prior_own": null,
+    "captain_role": "pitcher",
+    "ceiling_sum": null,
+    "flex_prior_own_sum": null,
+    "rank_in_build": 4,
+    "rank_of_n": 23,
+    "slot": 17,
+    "team_counts": {
+     "LAD": 1,
+     "MIL": 5
+    },
+    "team_split": "5-1",
+    "thesis": "ace_loses"
+   },
+   "roster_ids": [
+    "44512727",
+    "44512638",
+    "44512645",
+    "44512647",
+    "44512650",
+    "44512655"
+   ]
+  },
+  {
+   "contest_id": "196777927",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (MIL @ LAD)",
+   "entry_fee": 0.1,
+   "entry_id": "5296639833",
+   "filled": true,
+   "prediction": {
+    "base_sum": 61.08,
+    "build_id": "sd_5df68a263225",
+    "captain_id": "44512729",
+    "captain_prior_own": null,
+    "captain_role": "hitter",
+    "ceiling_sum": null,
+    "flex_prior_own_sum": null,
+    "rank_in_build": 6,
+    "rank_of_n": 23,
+    "slot": 18,
+    "team_counts": {
+     "LAD": 4,
+     "MIL": 2
+    },
+    "team_split": "4-2",
+    "thesis": "favorite_win_close"
+   },
+   "roster_ids": [
+    "44512729",
+    "44512633",
+    "44512637",
+    "44512646",
+    "44512716",
+    "44512717"
+   ]
+  },
+  {
+   "contest_id": "196777927",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (MIL @ LAD)",
+   "entry_fee": 0.1,
+   "entry_id": "5296644896",
+   "filled": true,
+   "prediction": {
+    "base_sum": 54.45,
+    "build_id": "sd_5df68a263225",
+    "captain_id": "44512732",
+    "captain_prior_own": null,
+    "captain_role": "hitter",
+    "ceiling_sum": null,
+    "flex_prior_own_sum": null,
+    "rank_in_build": 11,
+    "rank_of_n": 23,
+    "slot": 19,
+    "team_counts": {
+     "LAD": 3,
+     "MIL": 3
+    },
+    "team_split": "3-3",
+    "thesis": "both_explode"
+   },
+   "roster_ids": [
+    "44512732",
+    "44512635",
+    "44512637",
+    "44512645",
+    "44512646",
+    "44512650"
+   ]
+  },
+  {
+   "contest_id": "196778190",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (MIL @ LAD)",
+   "entry_fee": 0.1,
+   "entry_id": "5296639973",
+   "filled": true,
+   "prediction": {
+    "base_sum": 60.79,
+    "build_id": "sd_5df68a263225",
+    "captain_id": "44512729",
+    "captain_prior_own": null,
+    "captain_role": "hitter",
+    "ceiling_sum": null,
+    "flex_prior_own_sum": null,
+    "rank_in_build": 7,
+    "rank_of_n": 23,
+    "slot": 20,
+    "team_counts": {
+     "LAD": 4,
+     "MIL": 2
+    },
+    "team_split": "4-2",
+    "thesis": "favorite_win_close"
+   },
+   "roster_ids": [
+    "44512729",
+    "44512633",
+    "44512639",
+    "44512644",
+    "44512716",
+    "44512717"
+   ]
+  },
+  {
+   "contest_id": "196778190",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (MIL @ LAD)",
+   "entry_fee": 0.1,
+   "entry_id": "5296645017",
+   "filled": true,
+   "prediction": {
+    "base_sum": 62.7,
+    "build_id": "sd_5df68a263225",
+    "captain_id": "44512727",
+    "captain_prior_own": null,
+    "captain_role": "pitcher",
+    "ceiling_sum": null,
+    "flex_prior_own_sum": null,
+    "rank_in_build": 5,
+    "rank_of_n": 23,
+    "slot": 21,
+    "team_counts": {
+     "LAD": 2,
+     "MIL": 4
+    },
+    "team_split": "4-2",
+    "thesis": "pitchers_duel"
+   },
+   "roster_ids": [
+    "44512727",
+    "44512634",
+    "44512645",
+    "44512646",
+    "44512716",
+    "44512717"
+   ]
+  },
+  {
+   "contest_id": "196779067",
+   "contest_name": "MLB Showdown $125 Quarter Jukebox [Just $0.25!] (MIL @ LAD)",
+   "entry_fee": 0.25,
+   "entry_id": "5296645900",
+   "filled": true,
+   "prediction": {
+    "base_sum": 59.62,
+    "build_id": "sd_5df68a263225",
+    "captain_id": "44512731",
+    "captain_prior_own": null,
+    "captain_role": "hitter",
+    "ceiling_sum": null,
+    "flex_prior_own_sum": null,
+    "rank_in_build": 9,
+    "rank_of_n": 23,
+    "slot": 22,
+    "team_counts": {
+     "LAD": 4,
+     "MIL": 2
+    },
+    "team_split": "4-2",
+    "thesis": "favorite_win_close"
+   },
+   "roster_ids": [
+    "44512731",
+    "44512633",
+    "44512639",
+    "44512643",
+    "44512716",
+    "44512717"
+   ]
+  },
+  {
+   "contest_id": "196779067",
+   "contest_name": "MLB Showdown $125 Quarter Jukebox [Just $0.25!] (MIL @ LAD)",
+   "entry_fee": 0.25,
+   "entry_id": "5296645942",
+   "filled": true,
+   "prediction": {
+    "base_sum": 58.76,
+    "build_id": "sd_5df68a263225",
+    "captain_id": "44512728",
+    "captain_prior_own": null,
+    "captain_role": "pitcher",
+    "ceiling_sum": null,
+    "flex_prior_own_sum": null,
+    "rank_in_build": 10,
+    "rank_of_n": 23,
+    "slot": 23,
+    "team_counts": {
+     "LAD": 2,
+     "MIL": 4
+    },
+    "team_split": "4-2",
+    "thesis": "pitchers_duel"
+   },
+   "roster_ids": [
+    "44512728",
+    "44512633",
+    "44512639",
+    "44512647",
+    "44512716",
+    "44512717"
+   ]
+  }
+ ],
+ "entries_binding": {
+  "source": "outputs/2026-10-15/DO_NOT_UPLOAD_DKEntries_showdown_2000_1g_sd.f459d1c76dd3.csv",
+  "source_sha256": "4d15919593679418dbfdb12dfce5553faab4679e529d8a63c0fa2a69b7d37cbb",
+  "status": "bound"
+ },
+ "host": {
+  "call_budget_s": 630.0,
+  "declared_ceiling_s": 900.0,
+  "host": "claude_code"
+ },
+ "kind": "delivery",
+ "labels": "deterministic review proxies and labeled priors only; never ROI, win rate, cash rate, or probability",
+ "manifest_row": {
+  "certification": "review_grade",
+  "contest_ids": [
+   "196753109",
+   "196753111",
+   "196753465",
+   "196753498",
+   "196777927",
+   "196778190",
+   "196779067"
+  ],
+  "contest_names": [
+   "MLB Showdown $100 Dime Time [Just $0.10!] (MIL @ LAD)",
+   "MLB Showdown $125 Quarter Jukebox [Just $0.25!] (MIL @ LAD)",
+   "MLB Showdown $7.5K mini-MAX [150 Entry Max] (MIL @ LAD)",
+   "MLB Showdown $750 Quarter Jukebox [Just $0.25!] (MIL @ LAD)",
+   "MLB Showdown 40x Micro Booster [Top 5 Win $10] (MIL @ LAD)",
+   "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (MIL @ LAD)"
+  ],
+  "contest_type": "showdown",
+  "delivered_file": "outputs/2026-10-15/DKEntries_showdown_2000_1g_sd.csv",
+  "entries": 23,
+  "notes": "Showdown ships review-grade; it does not pass the three certification gates. See CLAUDE.md.",
+  "projection_tier": "unknown",
+  "recorded_utc": "2026-10-15T23:27:27.786717+00:00",
+  "run_id": null,
+  "sha256": "4d15919593679418dbfdb12dfce5553faab4679e529d8a63c0fa2a69b7d37cbb",
+  "slate_tag": "2000_1g_sd",
+  "status": "candidate",
+  "strategy_state": {
+   "counts": {},
+   "state": "unknown"
+  }
+ },
+ "players": {
+  "44512633": [
+   "Tyler Glasnow",
+   "LAD",
+   "UTIL",
+   12400,
+   "MIL@LAD 10/15/2026 08:00PM ET"
+  ],
+  "44512634": [
+   "Dustin May",
+   "MIL",
+   "UTIL",
+   10000,
+   "MIL@LAD 10/15/2026 08:00PM ET"
+  ],
+  "44512635": [
+   "Shohei Ohtani",
+   "LAD",
+   "UTIL",
+   9400,
+   "MIL@LAD 10/15/2026 08:00PM ET"
+  ],
+  "44512636": [
+   "Jackson Chourio",
+   "MIL",
+   "UTIL",
+   9200,
+   "MIL@LAD 10/15/2026 08:00PM ET"
+  ],
+  "44512637": [
+   "Mookie Betts",
+   "LAD",
+   "UTIL",
+   9000,
+   "MIL@LAD 10/15/2026 08:00PM ET"
+  ],
+  "44512638": [
+   "Brice Turang",
+   "MIL",
+   "UTIL",
+   8600,
+   "MIL@LAD 10/15/2026 08:00PM ET"
+  ],
+  "44512639": [
+   "Freddie Freeman",
+   "LAD",
+   "UTIL",
+   8400,
+   "MIL@LAD 10/15/2026 08:00PM ET"
+  ],
+  "44512640": [
+   "Kyle Tucker",
+   "LAD",
+   "UTIL",
+   8200,
+   "MIL@LAD 10/15/2026 08:00PM ET"
+  ],
+  "44512641": [
+   "William Contreras",
+   "MIL",
+   "UTIL",
+   8000,
+   "MIL@LAD 10/15/2026 08:00PM ET"
+  ],
+  "44512643": [
+   "Teoscar Hernandez",
+   "LAD",
+   "UTIL",
+   7400,
+   "MIL@LAD 10/15/2026 08:00PM ET"
+  ],
+  "44512644": [
+   "Andy Pages",
+   "LAD",
+   "UTIL",
+   7000,
+   "MIL@LAD 10/15/2026 08:00PM ET"
+  ],
+  "44512645": [
+   "Jake Bauers",
+   "MIL",
+   "UTIL",
+   6800,
+   "MIL@LAD 10/15/2026 08:00PM ET"
+  ],
+  "44512646": [
+   "Will Smith",
+   "LAD",
+   "UTIL",
+   6400,
+   "MIL@LAD 10/15/2026 08:00PM ET"
+  ],
+  "44512647": [
+   "Christian Yelich",
+   "MIL",
+   "UTIL",
+   6200,
+   "MIL@LAD 10/15/2026 08:00PM ET"
+  ],
+  "44512650": [
+   "Garrett Mitchell",
+   "MIL",
+   "UTIL",
+   5400,
+   "MIL@LAD 10/15/2026 08:00PM ET"
+  ],
+  "44512655": [
+   "David Hamilton",
+   "MIL",
+   "UTIL",
+   4200,
+   "MIL@LAD 10/15/2026 08:00PM ET"
+  ],
+  "44512658": [
+   "Sal Frelick",
+   "MIL",
+   "UTIL",
+   3400,
+   "MIL@LAD 10/15/2026 08:00PM ET"
+  ],
+  "44512659": [
+   "Miguel Rojas",
+   "LAD",
+   "UTIL",
+   3200,
+   "MIL@LAD 10/15/2026 08:00PM ET"
+  ],
+  "44512709": [
+   "Alex Vesia",
+   "LAD",
+   "UTIL",
+   4000,
+   "MIL@LAD 10/15/2026 08:00PM ET"
+  ],
+  "44512715": [
+   "Tanner Scott",
+   "LAD",
+   "UTIL",
+   4000,
+   "MIL@LAD 10/15/2026 08:00PM ET"
+  ],
+  "44512716": [
+   "DL Hall",
+   "MIL",
+   "UTIL",
+   4000,
+   "MIL@LAD 10/15/2026 08:00PM ET"
+  ],
+  "44512717": [
+   "Aaron Ashby",
+   "MIL",
+   "UTIL",
+   4000,
+   "MIL@LAD 10/15/2026 08:00PM ET"
+  ],
+  "44512727": [
+   "Tyler Glasnow",
+   "LAD",
+   "CPT",
+   18600,
+   "MIL@LAD 10/15/2026 08:00PM ET"
+  ],
+  "44512728": [
+   "Dustin May",
+   "MIL",
+   "CPT",
+   15000,
+   "MIL@LAD 10/15/2026 08:00PM ET"
+  ],
+  "44512729": [
+   "Shohei Ohtani",
+   "LAD",
+   "CPT",
+   14100,
+   "MIL@LAD 10/15/2026 08:00PM ET"
+  ],
+  "44512730": [
+   "Jackson Chourio",
+   "MIL",
+   "CPT",
+   13800,
+   "MIL@LAD 10/15/2026 08:00PM ET"
+  ],
+  "44512731": [
+   "Mookie Betts",
+   "LAD",
+   "CPT",
+   13500,
+   "MIL@LAD 10/15/2026 08:00PM ET"
+  ],
+  "44512732": [
+   "Brice Turang",
+   "MIL",
+   "CPT",
+   12900,
+   "MIL@LAD 10/15/2026 08:00PM ET"
+  ],
+  "44512738": [
+   "Andy Pages",
+   "LAD",
+   "CPT",
+   10500,
+   "MIL@LAD 10/15/2026 08:00PM ET"
+  ],
+  "44512746": [
+   "Cooper Pratt",
+   "MIL",
+   "CPT",
+   7200,
+   "MIL@LAD 10/15/2026 08:00PM ET"
+  ]
+ },
+ "pool": {
+  "basis": "declared_starters",
+  "posted_sides": [
+   "LAD",
+   "MIL"
+  ]
+ },
+ "prediction_source": {
+  "build_id": "sd_5df68a263225",
+  "ceiling_basis": "null on every Showdown entry: the melted and priced frames carry Base and no Ceiling column on either path (the thesis ladder or the points-max bank), so there is no ceiling sum to record",
+  "filled": 23,
+  "held_entry_ids": [],
+  "label": "what the Showdown build predicted for each lineup it chose, handed to the record in process at delivery because a Showdown build has no run folder: the thesis template (or points_max for the baseline and the points-max bank), the realized captain and whether it is a pitcher or a hitter, the team split, the Base sum with the captain at 1.5x and its rank in the build, and the labeled captain-slot and six-slot roster priors or null. build_id is one per build's inputs (date, slate tag, salary and template bytes): the baseline and the ladder of a build share it, and two builds over the same inputs share it too, told apart by their sha256 and recorded_utc. Deterministic review proxies and labeled priors, never ROI, a win rate or a probability",
+  "players_missing": [],
+  "predicted": 23,
+  "priors": {
+   "captain": {
+    "applied": false,
+    "reason": "no --captain-prior supplied"
+   },
+   "flex": {
+    "applied": false,
+    "reason": "no --captain-prior supplied"
+   }
+  },
+  "rank_basis": "rank_in_build orders this build's own lineups by base_sum descending, ties by slot; slot is the lineup's 1-based place in the build (the ladder's deal order or the bank's solve order), which is the order of the reserved rows it filled",
+  "status": "resolved",
+  "unmatched_entry_ids": []
+ },
+ "recorded_utc": "2026-10-15T23:27:27.788671+00:00",
+ "relaxations": {
+  "both_relaxed": 0,
+  "captain_cap_relaxed": 0,
+  "captain_contest_cap_relaxed": 0,
+  "captain_lock_relaxed": 0,
+  "contest_cap_relaxed": 0,
+  "cpt_cap_relaxed": 0,
+  "min_per_team_relaxed": 0,
+  "overlap_relaxed": 0,
+  "player_relaxed": 0
+ },
+ "run": {},
+ "schema_version": 1
+}
