@@ -1151,10 +1151,9 @@ A contest title is read at word edges (`_pattern_in_title`, the engine and prefl
 
 A pattern whose curated text begins with whitespace matches only as a whole token (`_pattern_in_title`): ` Season`, ` Series`, ` Select` and ` SEA` no longer route `single_entry`. The left edge and every unguarded pattern are unchanged (R464).
 
-### R449. Primary-stack rule seam: the allocator's stack cap buckets on the optimizer's `>= 3` field while the validator re-derives the primary stack with no threshold (P3, XS) | new 2026-09-25, found by the 2026-09-25 code review (allocator area; `review_allocator/repro_stack_seam.py`) | Roadmap: Session 65
+### R449. CLOSED 2026-10-16 -- SHIPPED as roadmap Session 65, entry migrated to CHANGELOG.md
 
-- **What.** `optimizer_v3.py:1546-1555` (`_identify_primary_stack`) is eligible only at `>= PRIMARY_STACK_MIN_HITTERS`, else `""`; `dk_entries_manager.py:804-809` (`_primary_stack`) takes `max(counts)` with an alphabetical tie and no threshold; `contest_allocator.py:532` reads the optimizer's field and `fixed_portfolio_exposure` (`:812`) the validator's for the swap offsets. A stackless 2-2-2-2 roster carries no bucket in the solve and a bucket (`"AAA"`) in the validator and the swap offsets. Reachable when the floor ladder lands on `None` (its last rung) or a swap's locked slots leave a stackless roster; then the stack cap can fail post-export on a portfolio the solve held.
-- **Fix.** Give `_primary_stack` the same threshold (or import `candidate_primary_stack`'s rule).
+`dk_entries_manager._primary_stack` (the export validator and `fixed_portfolio_exposure`) names a primary stack by the optimizer's rule, `PRIMARY_STACK_MIN_HITTERS` hitters or none, imported from `optimizer_v3`, so a 2-2-2-2 roster carries no bucket on either side of the seam and the validator's published `primary_stack_counts` leaves it out. Stage 0's referee keeps the unthresholded copy, filed (`docs/backlog_inbox/2026-10-16_DEV_stage0-referee-primary-stack-has-no-threshold.md`). `test_core.FixedRowDenominatorTests`; gate line and commits in the CHANGELOG entry.
 
 ### R455. CLOSED 2026-10-07 -- SHIPPED as roadmap Session 134 (b), entry migrated to CHANGELOG.md
 
@@ -4672,27 +4671,9 @@ filed. Full hit list, liveness, and the caller analysis that found the fourth
 caller the entry had missed are in CHANGELOG.md. The second FORM of the rule
 (55 string restatements across 18 files) is filed as R282, not fixed here.
 
-### R166. The post-R61 controls never got fixed-row denominators: the reuse default is inert on scoped swaps, an operator's whole-file reuse cap is breachable, and the five-stack floor counts solve entries only (P1, S-M) | new 2026-08-22, from the greenfield sixth edition; VERIFIED-repro (default-inert leg) + VERIFIED-read (`contest_allocator.py` unchanged since the review)
+### R166. CLOSED 2026-10-16 -- SHIPPED as roadmap Session 65, entry migrated to CHANGELOG.md
 
-**Rider 2026-09-25 (the code review, allocator area; `review_allocator/repro_r166.py`): all three legs reproduced at 9990c5f.** `contest_allocator.py:3330` (`total = E + fixed_rows`), `:3666` (rungs from `total`), `:3684` (the reuse row bounds the E solve entries only, no `headroom()`), `:3744` and `:2799` (quota `need` from `E`). (b) operator `max_candidate_reuse=3` with 3 untouchable rows already holding S: `passed=True allocation_certified=True`, assigned S twice more, whole-file count 5 against cap 3. (a) E=2 with 10 fixed rows and 3 distinct lineups: `engine_default_rungs [4, 8]`, cap 4 (from E it would be 1). (c) E=2 with 8 fixed 3-stack rows at share 0.5: `applied_need 1` against a whole-file floor of 5, `need_met True`.
-
-
-**Rider 2026-09-08 (ed12, F17): the Showdown ladder is a fourth site of the same denominator defect.** `run_showdown` (`build_slate.py:3223-3230, 3294-3325`) and `solve_ladder` (`showdown_theses.py:1070-1138`) build the thesis list and initialize captain/player counts from rows selected for NEW construction only, so preserved completed entries consume no headroom and the combined delivered portfolio can breach the configured cap while every new lineup is individually clean. Initialize counts from fixed rows, use the combined denominator, compute `floor(alpha*N)` residuals per person and per captain, and report immutable rows already over a cap as an unsatisfiable current policy rather than silently opening it; if policy intentionally rounds up or floors at one, name it and print the realized percentage. Roadmap: Session 19 with R284.
-
-- **What:** the engine-default `max_candidate_reuse` rungs are sized from
-  `total = E + fixed_rows` but constrain only the E solve entries — measured:
-  10 fixed rows loosen the cap from 1 to 6 and it binds nothing, so R116's
-  de-concentration default silently does not act on exactly the swap path. An
-  operator cap documented as whole-file never subtracts fixed rows' usage of
-  the same signature (unlike every exposure cap's `headroom()`), so 15 of 20
-  file rows can share one lineup while the solve certifies. The five-stack
-  floor computes `need` on E while every ceiling resolves against `total`.
-  No post-export gate grades reuse, so nothing file-derived can see any of it.
-- **Fix:** derive the default from E; give reuse rows the R61 headroom shape
-  (`ub = max(0, cap - fixed_signature_counts[sig])`); compute the floor's
-  `need` on `total` minus fixed qualifiers; mirror a whole-file reuse count
-  into `validate_dk_entries_file` when the control is set. Lands beside
-  R115/R98(3) in Tier 3 if not taken at the Tier 1 boundary.
+The post-R61 controls resolve over the whole file. The reuse cap's engine default is sized from the E entries a solve seats (the smallest cap whose headroom seats them), every reuse row is headroom over what untouchable rows hold, an operator cap they already breach refuses, and the export validator grades a set `max_candidate_reuse` whole-file (`lineup <sig> count N>M`, S). The five-stack quota's need is taken over the file in its scope less the untouchable rows that qualify, clamped to E, any shortfall reported and not counted as a relaxation. Showdown (F17): a template's complete rows join every cap's denominator and start its counts in the bank, the apportionment, the ladder and the baseline, R250's hold carved from the remaining allowance, a held count already over a cap listed in `held_rows`. `test_core.FixedRowDenominatorTests`, `test_showdown.ShowdownFixedRowDenominatorTests`; gate line and commits in the CHANGELOG entry. The diagnosis's other counting checks still size from E on a swap, filed (`docs/backlog_inbox/2026-10-16_DEV_binding-diagnosis-exposure-caps-sized-from-solve-entries.md`).
 
 ### R167 + R168 + R169. CLOSED 2026-08-24 -- the lost-window batch, entries migrated to CHANGELOG.md
 
