@@ -1205,6 +1205,9 @@ _CONTROL_BY_ERROR_PREFIX = (
     # bare else branch with no control named, which is the gap R61 closed for
     # the two above it.
     ("team ", "max_team_exposure_pct"),
+    # R166(b) adds the eighth: "lineup <signature> count N>M", the whole-file
+    # candidate-reuse count the validator now grades when the cap is set.
+    ("lineup ", "max_candidate_reuse"),
 )
 
 # R61: the allocator's own refusals arrive here already carrying their ordered

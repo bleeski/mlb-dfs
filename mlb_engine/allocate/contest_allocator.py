@@ -936,6 +936,7 @@ def _diagnose_binding_constraints(
     consensus_cluster: Optional[Mapping[str, Any]] = None,
     bank_limits_out: Optional[List[Dict[str, Any]]] = None,
     fixed_rows: bool = False,
+    fixed_signature_counts: Optional[Mapping[Any, int]] = None,
 ) -> List[str]:
     """Name the controls that cannot be satisfied by this bank, arithmetically.
 
@@ -996,7 +997,20 @@ def _diagnose_binding_constraints(
 
     distinct_signatures = len(set(signatures))
     max_reuse = controls.get("max_candidate_reuse")
-    if max_reuse is not None and distinct_signatures * int(max_reuse) < total:
+    held = {sig: int(n) for sig, n in (fixed_signature_counts or {}).items()
+            if int(n) > 0 and sig in set(signatures)}
+    if max_reuse is not None and held:
+        # R166(b). The rows are headroom over the untouchable rows' holdings, so
+        # the capacity is the headroom summed, not lineups x cap.
+        capacity = sum(max(0, int(max_reuse) - held.get(sig, 0)) for sig in set(signatures))
+        if capacity < total:
+            findings.append(
+                f"max_candidate_reuse: {distinct_signatures} distinct lineups at cap "
+                f"{int(max_reuse)}, less {sum(held.values())} use(s) the untouchable "
+                f"rows already hold of {len(held)} of them, seat {capacity} < "
+                f"{total} entries"
+            )
+    elif max_reuse is not None and distinct_signatures * int(max_reuse) < total:
         findings.append(
             f"max_candidate_reuse: {distinct_signatures} distinct lineups x cap "
             f"{int(max_reuse)} = {distinct_signatures * int(max_reuse)} < {total} entries"
@@ -1184,7 +1198,8 @@ STRATEGY_CAP_CONTROLS = frozenset({
 CASH_OBJECTIVE_CLASS = "cash"
 
 
-def default_candidate_reuse_cap(entry_total: int, distinct_lineups: int) -> int:
+def default_candidate_reuse_cap(entry_total: int, distinct_lineups: int,
+                                fixed_signature_counts: Optional[Mapping[Any, int]] = None) -> int:
     """The smallest reuse budget that still seats every entry.
 
     R116. This is the legacy path's `minimum_cap` arithmetic (:1062) promoted
@@ -1198,15 +1213,35 @@ def default_candidate_reuse_cap(entry_total: int, distinct_lineups: int) -> int:
     entry count is at most `distinct` -- which is the per-contest uniqueness
     rule's own precondition, already diagnosed at :643. One entry returns 1, so
     the `single_entry` posture is untouched.
+
+    R166(a). ``entry_total`` is the entries the SOLVE seats, never the file's
+    complete rows: sized from ``E + fixed_rows`` the default on a scoped swap was
+    a cap the solve could not reach (10 untouchable rows took it from 1 to 4
+    over 2 entries) and it de-concentrated nothing. The cap is still graded
+    whole-file, so a reuse row's bound is its headroom over what the untouchable
+    rows already hold. ``fixed_signature_counts`` is that holding for the bank's
+    own signatures, and the default is then the smallest cap whose headroom
+    still seats every entry, which keeps the property above. With nothing
+    fixed, or nothing fixed that the bank also holds, it is the arithmetic
+    above unchanged.
     """
     total = max(0, int(entry_total))
     distinct = max(1, int(distinct_lineups))
     if total <= 0:
         return 1
-    return max(1, int(math.ceil(total / distinct)))
+    cap = max(1, int(math.ceil(total / distinct)))
+    held = [int(v) for v in (fixed_signature_counts or {}).values() if int(v) > 0]
+    if not held:
+        return cap
+    unheld = max(0, distinct - len(held))
+    while unheld * cap + sum(max(0, cap - f) for f in held) < total:
+        cap += 1
+    return cap
 
 
-def candidate_reuse_cap_rungs(entry_total: int, distinct_lineups: int) -> List[int]:
+def candidate_reuse_cap_rungs(entry_total: int, distinct_lineups: int,
+                              fixed_signature_counts: Optional[Mapping[Any, int]] = None
+                              ) -> List[int]:
     """The engine default's relaxation ladder, tightest first.
 
     R116. Two rungs and then nothing, deliberately. The all-or-nothing version
@@ -1226,13 +1261,16 @@ def candidate_reuse_cap_rungs(entry_total: int, distinct_lineups: int) -> List[i
 
     A rung at or above ``entry_total`` binds nothing -- one signature could take
     every entry -- so it is dropped rather than solved as a duplicate of the
-    no-cap solve that follows it.
+    no-cap solve that follows it. R166(a): with untouchable rows the rows are
+    headroom, so a rung binds nothing only once even the most-held signature's
+    headroom reaches ``entry_total``.
     """
     total = max(0, int(entry_total))
-    first = default_candidate_reuse_cap(total, distinct_lineups)
+    first = default_candidate_reuse_cap(total, distinct_lineups, fixed_signature_counts)
+    most_held = max((int(v) for v in (fixed_signature_counts or {}).values()), default=0)
     rungs: List[int] = []
     for cap in (first, first * 2):
-        if total and cap >= total:
+        if total and cap >= total + max(0, most_held):
             break
         if cap not in rungs:
             rungs.append(int(cap))
@@ -1678,6 +1716,21 @@ def _untouchable_cap_conflicts(
                     f"max_sp_pair_repetition: SP pair {key} "
                     f"already appears in {int(count)} of the {row_count} row(s) "
                     f"this solve cannot change, against a cap of {int(pair_cap)}"
+                )
+    # R166(b). The sixth count, for R343's reason: the reuse rows now carry
+    # headroom, and `headroom()` clamps a negative at 0. Only a cap in
+    # `controls` here is checked, which is only ever an operator's: the engine
+    # default is resolved after this runs and is never refused on (it gets zero
+    # headroom on a lineup the rows already over-hold, and its ladder relaxes).
+    reuse_cap = controls.get("max_candidate_reuse")
+    if reuse_cap is not None:
+        held = Counter(tuple(sorted(str(p) for p in r)) for r in (fixed.get("rosters") or []))
+        for sig, count in sorted(held.items()):
+            if int(count) > int(reuse_cap):
+                lines.append(
+                    f"max_candidate_reuse: lineup {'|'.join(sig)} already "
+                    f"appears in {int(count)} of the {row_count} row(s) this solve "
+                    f"cannot change, against a whole-file cap of {int(reuse_cap)}"
                 )
     game_caps = dict(controls.get("max_game_exposure_pct_by_game") or {})
     game_counts = fixed.get("game_counts") or {}
@@ -3220,6 +3273,8 @@ def _resolve_five_stack_quota(
     controls: Mapping[str, Any],
     quota_state: Optional[Mapping[str, Any]] = None,
     bank_report: Optional[Mapping[str, Any]] = None,
+    fixed_rows: int = 0,
+    fixed_qualifiers: int = 0,
 ) -> Dict[str, Any]:
     """Resolve the five-stack share quota to a need count this bank can carry.
 
@@ -3246,6 +3301,11 @@ def _resolve_five_stack_quota(
     ``reuse_dependent``, so a proven infeasibility downstream arrives with the
     quota already identified as a probable binder instead of as a bare
     infeasibility with no control attached to it.
+
+    R166(c). ``fixed_rows`` and ``fixed_qualifiers`` are the untouchable complete
+    rows in the quota's scope and how many of them already carry a qualifying
+    stack. The need is taken over the whole file and clamped to ``n_entries``;
+    a part the solve cannot carry is reported in ``whole_file.shortfall``.
     """
     state = dict(quota_state or {})
     verdict = bank_stack_size_verdict(
@@ -3287,11 +3347,42 @@ def _resolve_five_stack_quota(
     min_size = report["min_size"]
     qualifying = [k for k, size in enumerate(stack_sizes) if int(size) >= min_size]
     report["qualifying_candidates"] = len(qualifying)
-    report["requested_need"] = int(math.floor(E * report["requested_share"] + 1e-9))
-    need = int(math.floor(E * float(applied) + 1e-9))
+    # R166(c). The quota is a share of the FILE, so with untouchable rows in its
+    # scope the need is taken over E plus those rows, less the ones that already
+    # qualify, and clamped to the E entries this solve can still place. Both
+    # numbers are 0 without untouchable rows, which is the pre-R166 arithmetic.
+    held = max(0, int(fixed_rows))
+    held_ok = max(0, min(int(fixed_qualifiers), held))
+
+    def _solve_need(share: float) -> int:
+        whole = int(math.floor((E + held) * float(share) + 1e-9))
+        return max(0, min(E, whole - held_ok))
+
+    report["requested_need"] = _solve_need(report["requested_share"])
+    need = _solve_need(applied)
+    if held:
+        # Report-only: nothing here touches `relaxations`, `relaxation_steps`
+        # or `rung_index`, which `_quota_state` carries across re-entries. A
+        # shortfall is a fact about rows nobody asked this solve to change.
+        whole_need = int(math.floor((E + held) * float(applied) + 1e-9))
+        report["whole_file"] = {
+            "entry_denominator": E + held,
+            "fixed_rows_in_scope": held,
+            "fixed_qualifiers": held_ok,
+            "whole_file_need": whole_need,
+            "shortfall": max(0, whole_need - held_ok - E),
+        }
     if need <= 0:
         report["applied_share"] = float(applied)
         report["status"] = "off"
+        if held:
+            report["note"] = (
+                f"quota share {applied} over {E + held} complete rows needs "
+                f"{report['whole_file']['whole_file_need']}, and {held_ok} of the "
+                f"{held} untouchable row(s) in its scope already carry a primary "
+                f"stack of {min_size}+, so this solve owes none. Reported off "
+                f"rather than added as a vacuous constraint. " + report["note"])
+            return report
         report["note"] = (
             f"quota share {applied} over {E} entries floors to a need of 0 "
             f"entries, so the row would bind nothing. Reported off rather than "
@@ -3953,7 +4044,13 @@ def select_and_assign_entries(
     fixed_pitchers: Dict[str, int] = {}
     fixed_stacks: Dict[str, int] = {}
     fixed_pairs: Dict[str, int] = {}
+    # R166(b). The fifth offset: how many untouchable rows hold each lineup, for
+    # the reuse rows' headroom. Derived from `rosters`, the same rows the overlap
+    # and same-contest blocks below read, so it cannot disagree with them.
+    fixed_signatures: Counter = Counter()
     if fixed_rows:
+        fixed_signatures = Counter(tuple(sorted(str(p) for p in r))
+                                   for r in (fixed.get("rosters") or []))
         fixed_players = {str(k): int(v) for k, v in (fixed.get("player_counts") or {}).items()}
         fixed_pitchers = {str(k): int(v) for k, v in (fixed.get("pitcher_counts") or {}).items()}
         fixed_stacks = {str(k): int(v) for k, v in (fixed.get("primary_stack_counts") or {}).items()}
@@ -4400,10 +4497,19 @@ def select_and_assign_entries(
     # it is reported, and only an engine value is droppable by the relaxation
     # below -- an operator who typed a cap gets a refusal naming it, not a
     # quietly widened portfolio.
+    #
+    # R166(a)+(b). The cap is WHOLE-FILE (how many file rows may hold one
+    # lineup), so every reuse row is headroom over what the untouchable rows
+    # already hold, R61's shape, and the engine default is sized from the E
+    # entries this solve seats rather than from `total`: sized from `total` a
+    # scoped swap's default was a cap two entries could never reach. Both reduce
+    # to the pre-R166 rows when nothing is fixed (E == total, no holdings).
     distinct_lineup_count = len(sig_groups)
+    held_in_bank = {sig: int(fixed_signatures[sig]) for sig in sig_groups
+                    if fixed_signatures.get(sig)}
     reuse_cap_source = "operator" if controls.get("max_candidate_reuse") is not None else None
     reuse_cap_skipped: Optional[str] = None
-    reuse_rungs = candidate_reuse_cap_rungs(total, distinct_lineup_count)
+    reuse_rungs = candidate_reuse_cap_rungs(E, distinct_lineup_count, held_in_bank)
     reuse_rung_index = int((_reuse_state or {}).get("rung_index") or 0)
     if reuse_cap_source is None:
         if _is_cash_only(entries):
@@ -4420,8 +4526,9 @@ def select_and_assign_entries(
     if max_reuse is not None:
         # Keyed by signature: duplicate candidate objects with identical rosters
         # share one reuse budget instead of each receiving their own.
-        for group in sig_groups.values():
-            add({x_idx(e, k): 1.0 for e in range(E) for k in group}, -np.inf, int(max_reuse))
+        for sig, group in sig_groups.items():
+            add({x_idx(e, k): 1.0 for e in range(E) for k in group}, -np.inf,
+                max(0, int(max_reuse) - int(fixed_signatures.get(sig, 0))))
     # Known before the solve, so it rides the REFUSAL as well as the delivery.
     # A refusal that does not state which reuse cap was active, and how many
     # rungs the engine already spent getting there, reads as a fact about the
@@ -4437,6 +4544,14 @@ def select_and_assign_entries(
         "relaxations": len(list((_reuse_state or {}).get("relaxation_steps") or [])),
         "relaxation_steps": list((_reuse_state or {}).get("relaxation_steps") or []),
     }
+    if fixed_rows:
+        # R166. Only with untouchable rows, so a build that passes none keeps the
+        # pre-R166 key set. `entry_denominator` stays `total` (the cap is graded
+        # over the file); the default is sized from the E entries the solve seats.
+        reuse_state_report.update({
+            "default_sized_from_entries": E,
+            "fixed_signature_offsets": len(held_in_bank),
+        })
 
     # R61: headroom, not the raw cap. A key already sitting in the untouchable
     # rows spends the cap before this solve chooses anything, and
@@ -4500,10 +4615,37 @@ def select_and_assign_entries(
             quota_controls = {**controls, "min_five_stack_share_pct": min(_asked.values())}
             quota_scope = {"scope": "contests", "contests": sorted(_asked),
                            "share_by_contest": _asked}
+    # R166(c). The untouchable rows in the quota's scope (every one for a
+    # portfolio quota, those in an asked contest for R483's contest scope) and
+    # how many already carry a qualifying stack, read off the per-row sizes
+    # `fixed_portfolio_exposure` takes with the validator's own stack rule. No
+    # salary file means no sizes: the solve then keeps the E-only need and says
+    # the rows were not counted, rather than reading them all as short.
+    quota_fixed_rows = quota_fixed_ok = 0
+    quota_fixed_basis: Optional[str] = None
+    if fixed_rows:
+        _sizes = [int(s) for s in (fixed.get("primary_stack_sizes") or [])]
+        _fixed_ids = [str(x) for x in (fixed.get("entry_ids") or [])]
+        if fixed.get("stacks_derived") and _sizes and len(_sizes) == len(_fixed_ids):
+            _contest_of = {str(k): str(v)
+                           for k, v in (fixed.get("contest_by_entry") or {}).items()}
+            _scoped = set(quota_scope.get("contests") or [])
+            _in_scope = [size for eid, size in zip(_fixed_ids, _sizes)
+                         if quota_scope["scope"] == "portfolio" or _contest_of.get(eid) in _scoped]
+            _min = int(quota_controls.get("five_stack_min_size") or 5)
+            quota_fixed_rows = len(_in_scope)
+            quota_fixed_ok = sum(1 for size in _in_scope if size >= _min)
+            quota_fixed_basis = "counted"
+        else:
+            quota_fixed_basis = "unknown"
     quota_report = _resolve_five_stack_quota(stack_sizes, len(quota_idx), quota_controls,
                                              quota_state=_quota_state,
-                                             bank_report=bank_report)
+                                             bank_report=bank_report,
+                                             fixed_rows=quota_fixed_rows,
+                                             fixed_qualifiers=quota_fixed_ok)
     quota_report.update(quota_scope, scope_entries=len(quota_idx))
+    if quota_fixed_basis is not None and quota_report.get("status") != "not_requested":
+        quota_report["fixed_rows_basis"] = quota_fixed_basis
     if quota_report.get("applied_need"):
         qualifying = [k for k in range(K)
                       if stack_sizes[k] >= int(quota_report["min_size"])]
@@ -4982,6 +5124,7 @@ def select_and_assign_entries(
                 consensus_cluster=cluster_report,
                 bank_limits_out=bank_limits,
                 fixed_rows=bool(fixed_players),
+                fixed_signature_counts=fixed_signatures,
             )
             if not binding:
                 # R311. An interaction refusal, and the bank may be the cause.
@@ -5370,7 +5513,8 @@ def select_and_assign_entries(
                 feasibility_inputs=feasibility_inputs,
                 team_exposure=team_cap_report, game_exposure=game_cap_report,
                 consensus_cluster=cluster_report,
-                fixed_rows=bool(fixed_players))
+                fixed_rows=bool(fixed_players),
+                fixed_signature_counts=fixed_signatures)
             if proven_infeasible else []
         )
         # R207. The interaction case, and only it: proven infeasible, every
@@ -5507,6 +5651,12 @@ def select_and_assign_entries(
         "distinct_lineups": len(assigned_signatures),
         "max_signature_repeat": max(assigned_signatures.values()) if assigned_signatures else 0,
     }}
+    if fixed_rows:
+        # R166(b). The count the validator grades: solve plus untouchable rows.
+        whole_file = Counter({"|".join(sig): int(n) for sig, n in fixed_signatures.items()})
+        whole_file.update(assigned_signatures)
+        reuse_block["candidate_reuse"]["whole_file_max_signature_repeat"] = (
+            max(whole_file.values()) if whole_file else 0)
     reuse_warnings: List[str] = []
     if reuse_block["candidate_reuse"]["relaxations"]:
         _n_distinct = len(assigned_signatures)
@@ -5549,6 +5699,10 @@ def select_and_assign_entries(
                 "max_sp_pair_repetition": sorted(
                     pair for pair in fixed_pairs
                     if pair_cap is not None and fixed_pairs[pair] > 0),
+                # R166(b). Candidate ids, since a signature is ten player ids.
+                "max_candidate_reuse": sorted(
+                    candidate_ids[k] for sig in held_in_bank for k in sig_groups[sig]
+                    if max_reuse is not None and k < len(candidate_ids)),
             },
         }}
     # R37. What the delivered set actually holds, counted from the assignments
@@ -5722,6 +5876,20 @@ def select_and_assign_entries(
                 f"need of {_qr['applied_need']}. The quota held here, and it is the "
                 f"first control to suspect if a later solve on this bank proves "
                 f"infeasible"
+            )
+        _wf = _qr.get("whole_file") or {}
+        if _wf.get("shortfall") and _qr.get("applied_share") is not None:
+            # R166(c). Not a relaxation and not counted as one: no rung moved.
+            # The rows that would have to carry the rest are ones this solve was
+            # not authorized to change.
+            floor_warnings.append(
+                f"min_five_stack_share_pct {_qr['applied_share']} over the whole "
+                f"file needs {_wf['whole_file_need']} of {_wf['entry_denominator']} "
+                f"complete rows at primary stack size >= {_qr['min_size']}; "
+                f"{_wf['fixed_qualifiers']} of the {_wf['fixed_rows_in_scope']} "
+                f"untouchable row(s) in scope carry one and this solve can place at "
+                f"most {_qr['scope_entries']}, so the file is {_wf['shortfall']} "
+                f"short whatever the solve does. Not a relaxation: no rung moved"
             )
     # R340 fix (2). The brief says WHICH of the two a missing size was, on
     # either report that carries the verdict. `bank_never_asked_for_size` is a
