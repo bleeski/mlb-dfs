@@ -9413,7 +9413,9 @@ class ContestTitleRoutingTests(unittest.TestCase):
         self.assertEqual(inferred["inferred_max_entries"], 1)
         self.assertEqual(inferred["max_entries_source"], "archetype")
         self.assertEqual(inferred["title_max_entries"], 20)
-        self.assertEqual(posture, "single_entry")
+        # D-12 (Ben, 2026-10-16): the Solo Shot family routes to small_gpp, not
+        # single_entry; this test's subject is the cap, which is unchanged.
+        self.assertEqual(posture, "small_gpp")
         # A row whose cap is a curated guess ('verify max entries') is held the
         # same way: the fill is for a BLANK only.
         daily, posture, _ = self._route("MLB $1 Daily Dollar [3 Entry Max]")
@@ -11634,7 +11636,7 @@ class LateSwapIdentityTests(unittest.TestCase):
         tool = self._tool()
         with tempfile.TemporaryDirectory() as tmp:
             repo, parent = self._slate(
-                tmp, ["MLB $5 Double Up", "MLB Satellite to the Slam"])
+                tmp, ["MLB $5 Double Up", "MLB Winner Take All"])
             postures = _resolve_contest_postures(
                 list(parse_dk_entry_rows(parent)),
                 tool._parse_postures("801=cash,802=wta_satellite"), None)
@@ -11662,7 +11664,7 @@ class LateSwapIdentityTests(unittest.TestCase):
         tool = self._tool()
         with tempfile.TemporaryDirectory() as tmp:
             repo, parent = self._slate(
-                tmp, ["MLB $5 Double Up", "MLB Satellite to the Slam"])
+                tmp, ["MLB $5 Double Up", "MLB Winner Take All"])
             code, out, err = self._run(
                 tool, repo, parent,
                 extra=["--postures", "801=cash,802=wta_satellite",
@@ -54387,3 +54389,303 @@ class PerContestAllocationTests(unittest.TestCase):
                 for r in read["contests"]}
         self.assertEqual(rows, {"A": (5, None), "B": (None, None), "S": (None, "held")})
         epi.attach_contest_deal({"by_contest": None}, None)  # never raises
+
+
+class PostureMappingTests(unittest.TestCase):
+    """R196 (D-12) and the posture half of Session 148: a title or a table row to a posture.
+
+    Titles run through the vendored archetype table and ``normalize_posture``,
+    the way ``_resolve_contest_postures`` reads an unflagged contest.
+    """
+
+    SOLO_SHOTS = ("MLB $1.25K Solo Shot (Afternoon)", "MLB $1.5K Solo Shot [20 Entry Max]",
+                  "MLB $2.5K Solo Shot (Night)", "MLB $200 Solo Shot (Turbo)")
+    TRIPLE_UPS = ("MLB $1 Triple Up [Top 9 Win $3] (Turbo)",
+                  "MLB Showdown $1 Triple Up [Top 9 Win $3] (SD @ LAD)")
+
+    @staticmethod
+    def _resolve(title, fee=1.0):
+        row = types.SimpleNamespace(contest_id="1", contest_name=title, entry_fee=fee)
+        return epi._resolve_contest_postures([row], None, None)["1"]
+
+    def test_the_solo_shot_family_routes_to_small_gpp_and_gpp_construction(self):
+        """D-12 (Ben, 2026-10-16): ``small_gpp``, not ``single_entry``.
+
+        ``single_entry`` maps to ``single_entry_gpp``, a WTA-construction shape,
+        for a curve that pays a quarter of the field. Teeth: removing the
+        ``se_gpp`` + ``broad_micro_gpp`` branch in ``normalize_posture`` returns
+        ``single_entry`` / ``single_entry_gpp`` for every title.
+        """
+        from mlb_engine.contest_shapes import WTA_CONSTRUCTION_SHAPES
+        for title in self.SOLO_SHOTS:
+            with self.subTest(title=title):
+                rec = self._resolve(title)
+                self.assertEqual((rec["posture"], rec["contest_shape"], rec["posture_source"]),
+                                 ("small_gpp", "small_field_gpp", "name_inference"))
+                self.assertNotIn(rec["contest_shape"], WTA_CONSTRUCTION_SHAPES)
+
+    def test_the_exemption_is_keyed_on_the_rows_two_facts_and_nothing_else(self):
+        """Single-entry by title or by cap keeps ``single_entry``; only the pair moves.
+
+        Teeth: keying the branch on ``se_gpp`` alone (or on ``max_entries == 1``)
+        sends Daily Dollar and Single Entry to ``small_gpp`` and fails here.
+        """
+        for title in ("MLB $1 Daily Dollar", "MLB $5 Single Entry"):
+            with self.subTest(title=title):
+                rec = self._resolve(title)
+                self.assertEqual((rec["posture"], rec["contest_shape"]),
+                                 ("single_entry", "single_entry_gpp"))
+        cases = {("se_gpp", "broad_micro_gpp", 1): "small_gpp",
+                 ("se_gpp", "single_entry_gpp", 1): "single_entry",
+                 ("se_gpp", None, 1): "single_entry",
+                 (None, None, 1): "single_entry",
+                 (None, "broad_micro_gpp", 1): "single_entry",
+                 ("portfolio", "broad_micro_gpp", None): "large_gpp",
+                 ("portfolio_gpp", "broad_micro_gpp", None): "large_gpp"}
+        for args, want in cases.items():
+            with self.subTest(args=args):
+                self.assertEqual(normalize_posture(*args), want)
+
+    def test_a_solo_shot_beside_a_large_gpp_changes_no_merged_cap_and_alone_takes_small_gpp(self):
+        """What D-12 costs, on the record. ``single_entry`` carries every exposure
+        cap at 1.0; ``small_gpp`` carries 0.50 player / 0.60 pitcher. Controls
+        merge by MIN across the entered set, so on a mixed file the tighter
+        ``large_gpp`` value governs either way, and on a file of Solo Shots alone
+        the small_gpp caps now apply. Teeth: routing the family back to
+        ``single_entry`` makes the alone-case read 1.0.
+        """
+        solo = self._resolve(self.SOLO_SHOTS[0])
+        solo_b = dict(self._resolve(self.SOLO_SHOTS[1]), contest_id="3")
+        large = dict(self._resolve("MLB $5 Dime Time"), contest_id="2")
+        self.assertEqual(large["posture"], "large_gpp")
+        mixed = epi._merged_controls_for_build({"1": solo, "2": large}, None)
+        as_single = epi._merged_controls_for_build(
+            {"1": dict(solo, posture="single_entry"), "2": large}, None)
+        for key in ("max_player_exposure_pct", "max_pitcher_exposure_pct",
+                    "max_primary_stack_exposure_pct", "max_team_exposure_pct"):
+            self.assertEqual(mixed[key], as_single[key], key)
+        self.assertEqual(mixed["max_player_exposure_pct"], 0.40)
+        alone = epi._merged_controls_for_build({"1": solo, "3": solo_b}, None)
+        small = epi.STRATEGY_DEFAULTS["small_gpp"]["controls"]
+        self.assertEqual(alone["max_player_exposure_pct"], small["max_player_exposure_pct"])
+        self.assertEqual(alone["max_pitcher_exposure_pct"], small["max_pitcher_exposure_pct"])
+        self.assertLess(alone["max_player_exposure_pct"], 1.0)
+
+    def test_the_triple_up_family_resolves_as_a_labelled_flat_line(self):
+        """The 19 MLB instances (field 26-31, top 9 paid a flat $3) were
+        ``unresolved``. Teeth: removing the row from the table restores
+        ``posture_source == "unresolved"`` and the contest blocker.
+        """
+        from mlb_engine.entries.dk_entries_manager import (
+            find_archetypes_csv, infer_contest_archetype, load_archetypes)
+        archetypes = load_archetypes()
+        for title in self.TRIPLE_UPS:
+            with self.subTest(title=title):
+                inferred = infer_contest_archetype(title, 1.0, archetypes)
+                self.assertEqual((inferred["inferred_type"], inferred["payout_shape_default"],
+                                  inferred["objective_class"], inferred["matched_pattern"]),
+                                 ("cash", "flat_cash", "cash", "Triple Up"))
+                self.assertEqual(inferred["decision_critical_gaps"], [])
+                with open(find_archetypes_csv(), encoding="utf-8", newline="") as handle:
+                    row = next(r for r in csv.DictReader(handle) if r["pattern"] == "Triple Up")
+                self.assertEqual(float(row["payout_breadth"]), 0.29)
+                rec = self._resolve(title)
+                self.assertEqual((rec["posture"], rec["contest_shape"], rec["posture_source"]),
+                                 ("cash", "cash", "name_inference"))
+                self.assertEqual(epi.unresolved_contest_blockers({"1": rec}), [])
+
+
+class PostureRoutingTests(unittest.TestCase):
+    """R195, R106, R66: the operator's posture reaches a shape without a silent default.
+
+    Rows are bare namespaces: ``_resolve_contest_postures`` reads ``contest_id``,
+    ``contest_name`` and ``entry_fee`` and nothing else, so no entries file is
+    staged. Titles are the real ones the vendored archetype table was written for.
+    """
+
+    SATELLITE = "MLB Satellite to $2 Pocket Cup MEGA Qualifier (Turbo)"
+    WTA = "MLB Winner Take All"
+    UNNAMED = "MLB Mystery Contest"
+
+    def _row(self, cid, title, fee=1.0):
+        return types.SimpleNamespace(contest_id=cid, contest_name=title, entry_fee=fee)
+
+    def _resolve(self, title, override):
+        out = epi._resolve_contest_postures(
+            [self._row("1", title)], {"1": override} if override is not None else None, None)
+        return out["1"]
+
+    @staticmethod
+    def _bs():
+        import importlib.util
+        path = (Path(__file__).resolve().parents[1] / "skills" / "generate-lineups"
+                / "scripts" / "build_slate.py")
+        spec = importlib.util.spec_from_file_location("build_slate_r148", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    @staticmethod
+    def _swap_tool():
+        import importlib.util
+        path = Path(__file__).resolve().parents[1] / "tools" / "late_swap.py"
+        spec = importlib.util.spec_from_file_location("late_swap_r148", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    # -- R195: an explicit wta_satellite keeps the posture and finds the family ---
+
+    def test_an_explicit_wta_satellite_on_a_satellite_title_ranks_on_the_satellite_profile(self):
+        """Was ``large_wta``, the pre-R1a mapping, for the string and the bare Mapping.
+
+        Teeth: dropping the family lookup in ``_resolve_contest_postures`` returns
+        ``large_wta`` for both.
+        """
+        for override in ("wta_satellite", {"posture": "wta_satellite"}):
+            with self.subTest(override=override):
+                rec = self._resolve(self.SATELLITE, override)
+                self.assertEqual((rec["posture"], rec["contest_shape"]),
+                                 ("wta_satellite", "satellite"))
+                self.assertEqual(rec["posture_source"], "operator_supplied")
+                self.assertEqual(rec["shape_source"], "name_inference_satellite")
+
+    def test_an_explicit_wta_satellite_on_a_winner_take_all_title_stays_large_wta(self):
+        """``wta_satellite`` is the only posture string that can name a true WTA contest.
+
+        Teeth: adding ``wta_satellite`` to ``SATELLITE_TYPE_TOKENS`` (the literal
+        reading of the filed fix) sends this to ``satellite`` and fails here.
+        """
+        for title in (self.WTA, self.UNNAMED):
+            with self.subTest(title=title):
+                rec = self._resolve(title, "wta_satellite")
+                self.assertEqual(rec["contest_shape"], "large_wta")
+                self.assertEqual(rec["shape_source"], "operator_posture")
+
+    def test_no_other_posture_takes_the_family_lookup(self):
+        """An operator who names ``small_gpp`` on a satellite title gets ``small_field_gpp``."""
+        self.assertEqual(self._resolve(self.SATELLITE, "small_gpp")["contest_shape"],
+                         "small_field_gpp")
+        self.assertEqual(self._resolve(self.SATELLITE, "cash")["contest_shape"], "cash")
+
+    # -- R106: the ticket count reaches the resolver -------------------------------
+
+    def test_a_ticket_count_routes_a_satellite_by_its_count_with_no_type_stated(self):
+        """``{"posture": "wta_satellite", "ticket_count": N}`` has no ``inferred_type``.
+
+        Teeth: without the ``ticket_count is not None`` test in
+        ``resolve_contest_shape`` the unnamed title falls through to ``large_wta``
+        for both counts (the 1505_3g failure: one ticket and five resolved alike).
+        """
+        for title in (self.SATELLITE, self.UNNAMED, self.WTA):
+            for count, want in ((1, "wta_ticket_satellite"), (5, "satellite")):
+                with self.subTest(title=title, tickets=count):
+                    rec = self._resolve(title, {"posture": "wta_satellite", "ticket_count": count})
+                    self.assertEqual(rec["contest_shape"], want)
+                    self.assertEqual(rec["shape_source"], "operator_ticket_count")
+
+    def test_a_ticket_count_means_nothing_on_another_posture(self):
+        rec = self._resolve(self.SATELLITE, {"posture": "large_gpp", "ticket_count": 1})
+        self.assertEqual(rec["contest_shape"], "large_field_gpp")
+
+    def test_both_parsers_take_the_tickets_suffix_and_refuse_the_same_inputs(self):
+        """One grammar, two CLIs. Teeth: restoring either CLI's own loop makes the
+        suffix an 'unknown posture' there while the other still accepts it."""
+        bs, swap = self._bs(), self._swap_tool()
+        text = "1=wta_satellite:tickets=1, 2=small_gpp,3=wta_satellite:tickets=5"
+        want = {"1": {"posture": "wta_satellite", "ticket_count": 1}, "2": "small_gpp",
+                "3": {"posture": "wta_satellite", "ticket_count": 5}}
+        self.assertEqual(bs.parse_postures_arg(text), want)
+        self.assertEqual(swap._parse_postures(text), want)
+        for bad in ("1=small_gpp:tickets=2", "1=wta_satellite:tickets=0",
+                    "1=wta_satellite:tickets=x", "1=wta_satellite:foo=1",
+                    "1=wta_satellite:tickets=1:tickets=2", "1=cash:tickets=1"):
+            with self.subTest(bad=bad):
+                with self.assertRaises(bs.CliValueError):
+                    bs.parse_postures_arg(bad)
+                with self.assertRaises(SystemExit):
+                    swap._parse_postures(bad)
+
+    def test_the_parsed_override_reaches_the_resolver_end_to_end(self):
+        bs = self._bs()
+        parsed = bs.parse_postures_arg("1=wta_satellite:tickets=1")
+        out = epi._resolve_contest_postures(
+            [self._row("1", self.UNNAMED)], parsed, None)
+        self.assertEqual(out["1"]["contest_shape"], "wta_ticket_satellite")
+
+    # -- R66: the silences are named ------------------------------------------------
+
+    def test_an_unknown_posture_string_raises_at_the_api_boundary(self):
+        """Was a build on ``large_gpp`` caps under ``operator_supplied``, which also
+        suppressed the unresolved-contest blocker. Teeth: removing
+        ``_validated_posture`` from either branch restores the silent default."""
+        for override in ("wta", {"posture": "gpp"}):
+            with self.subTest(override=override):
+                with self.assertRaises(ValueError) as caught:
+                    self._resolve(self.SATELLITE, override)
+                self.assertIn("unknown posture", str(caught.exception))
+                self.assertIn("wta_satellite", str(caught.exception))
+
+    def test_a_mapping_naming_only_a_shape_derives_its_posture_and_says_so(self):
+        """Was a silent ``large_gpp`` posture with the named shape. Teeth: reverting
+        the derivation returns ``large_gpp`` for every row below."""
+        for shape, posture in (("satellite", "wta_satellite"), ("small_field_gpp", "small_gpp"),
+                               ("cash", "cash"), ("single_entry_gpp", "single_entry"),
+                               ("mme_gpp", "mme")):
+            with self.subTest(shape=shape):
+                rec = self._resolve(self.UNNAMED, {"contest_shape": shape})
+                self.assertEqual((rec["posture"], rec["contest_shape"]), (posture, shape))
+                self.assertEqual(rec["posture_source"], "operator_shape_derived")
+                self.assertEqual(rec["shape_source"], "operator_shape")
+        with self.assertRaises(ValueError):
+            self._resolve(self.UNNAMED, {"contest_shape": "not_a_shape"})
+
+    def test_a_ticket_count_with_no_type_and_no_posture_is_a_ticket_contest(self):
+        rec = self._resolve(self.UNNAMED, {"ticket_count": 5})
+        self.assertEqual((rec["posture"], rec["contest_shape"], rec["posture_source"]),
+                         ("wta_satellite", "satellite", "operator_ticket_count_derived"))
+
+    def test_the_shape_to_posture_table_covers_the_vocabulary(self):
+        from mlb_engine.contest_shapes import CONTEST_SHAPES
+        self.assertEqual(set(epi._SHAPE_TO_POSTURE), set(CONTEST_SHAPES))
+        self.assertLessEqual(set(epi._SHAPE_TO_POSTURE.values()), set(epi.STRATEGY_DEFAULTS))
+
+    def test_a_swap_with_no_shape_map_names_the_engine_default(self):
+        """``build_entry_requirements(contest_shapes=None)`` scores on ``large_wta``
+        (unchanged) and now says so, per entry and on the swap result. Teeth:
+        reverting the label leaves ``contest_shape_source`` absent."""
+        from mlb_engine.swap import late_swap_manager as lsm
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ids = write_salary(root / "salary.csv")
+            r1, r2 = legal_rosters(ids)
+            entries = root / "entries.csv"
+            write_entries(entries, [r1, r2], contest_ids=["900", "901"])
+            statuses = future_statuses(ids)
+            default = build_entry_requirements(entries, statuses, NOW)
+            self.assertEqual({(r["contest_shape"], r["contest_shape_source"]) for r in default},
+                             {(lsm.ENGINE_DEFAULT_SWAP_SHAPE, "engine_default_large_wta")})
+            partial = build_entry_requirements(entries, statuses, NOW, {"900": "cash"})
+            self.assertEqual({r["contest_id"]: (r["contest_shape"], r["contest_shape_source"])
+                              for r in partial},
+                             {"900": ("cash", "mapped"),
+                              "901": ("large_wta", "engine_default_large_wta")})
+
+    def test_run_late_swap_records_which_contests_took_the_default(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _, ids, _, _, _, initial = build_promoted_initial(root)
+            self.assertTrue(initial["passed"], initial.get("errors"))
+            common = dict(runs_root=root / "runs", current_entries_csv=initial["output_path"],
+                          status_by_player_id=future_statuses(ids), as_of=NOW,
+                          late_swap_mode="validate_only")
+            bare = run_late_swap(**common)
+            contests = sorted({r["contest_id"] for r in bare["entry_requirements"]})
+            self.assertTrue(contests)
+            named = bare["contest_shape_defaults"]
+            self.assertEqual(named["default_shape"], "large_wta")
+            self.assertEqual(named["contest_ids"], contests)
+            partial = run_late_swap(contest_shapes={contests[0]: "cash"}, **common)
+            self.assertEqual(partial["contest_shape_defaults"]["contest_ids"], contests[1:])
+            mapped = run_late_swap(contest_shapes={c: "cash" for c in contests}, **common)
+            self.assertNotIn("contest_shape_defaults", mapped)

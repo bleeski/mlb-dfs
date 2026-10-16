@@ -56,6 +56,7 @@ import sys
 import time
 import uuid
 from pathlib import Path
+from typing import Any
 
 # F19: pinned before any import, for the same reason as build_slate.py. This
 # path writes a file that goes to DraftKings. Script-only, so importing this
@@ -98,6 +99,7 @@ from mlb_engine.pipeline.execution_pipeline import (  # noqa: E402
     resolve_shape_bands, slate_game_count,
     apply_shape_band_override,
     _resolve_contest_postures, _slate_tag, feasibility_floors_from,
+    parse_posture_override,
     CONTROL_ID_MAP_KEYS, parent_realized_controls,
     promote_deferred_run, raise_on_engine_crash, run_late_swap,
     unresolved_contest_blockers,
@@ -105,9 +107,6 @@ from mlb_engine.pipeline.execution_pipeline import (  # noqa: E402
     resolve_bank_stack_request,
 )
 from mlb_engine.swap.late_swap_manager import build_entry_requirements  # noqa: E402
-
-VALID_POSTURES = ("cash", "wta_satellite", "single_entry", "small_gpp",
-                  "large_gpp", "mme")
 
 # Past this the disk feed is describing a different state of the world than the
 # one the swap is being made in. It is a warning, not a block: a swap runs at
@@ -1330,24 +1329,27 @@ def _load_entry_rosters(path: Path) -> dict[str, list[str]]:
     return {str(row.entry_id): list(row.roster_ids) for row in parse_dk_entry_rows(path)}
 
 
-def _parse_postures(value: str | None) -> dict[str, str]:
-    """'<contest_id_or_name>=<posture>,...' -> dict, validated eagerly.
+def _parse_postures(value: str | None) -> dict[str, Any]:
+    """'<contest_id_or_name>=<posture>[:tickets=N],...' -> dict, validated eagerly.
 
-    Same contract and same vocabulary as build_slate.py --postures. A typo that
+    Same contract and same vocabulary as build_slate.py --postures, and the same
+    parser (R106: ``parse_posture_override`` owns the grammar). A typo that
     resolved to a silent default would be the exact failure this closes.
     """
-    out: dict[str, str] = {}
+    out: dict[str, Any] = {}
     for item in str(value or "").split(","):
         item = item.strip()
         if not item:
             continue
         if "=" not in item:
             raise SystemExit(f"--postures entry {item!r} is not <contest>=<posture>")
-        key, posture = (x.strip() for x in item.split("=", 1))
-        if posture not in VALID_POSTURES:
-            raise SystemExit(f"--postures: unknown posture {posture!r}; valid: "
-                             + ", ".join(VALID_POSTURES))
-        out[key] = posture
+        key, raw = (x.strip() for x in item.split("=", 1))
+        try:
+            posture, tickets = parse_posture_override(raw)
+        except ValueError as exc:
+            raise SystemExit(f"--postures: {exc}") from None
+        out[key] = posture if tickets is None else {
+            "posture": posture, "ticket_count": tickets}
     return out
 
 
@@ -1734,7 +1736,9 @@ def main() -> int:
                     help="report requirements and candidate coverage, do not swap")
     ap.add_argument("--postures", default=None,
                     help="comma-separated <contest_id_or_name>=<posture> pairs, the "
-                         "same vocabulary as build_slate.py --postures. A swap used "
+                         "same vocabulary as build_slate.py --postures, including "
+                         "'<id>=wta_satellite:tickets=N' for a satellite's ticket "
+                         "count. A swap used "
                          "to stamp every entry large_wta regardless of what the "
                          "contest was, so a cash entry's high-floor build silently "
                          "became a ceiling build. A contest whose name matches no "
