@@ -15249,6 +15249,312 @@ class MinerCaptainTests(unittest.TestCase):
                          "kevin gausman")
 
 
+class ContestLeverageMiningTests(unittest.TestCase):
+    """R48. Ledger 3.17's leverage measurement was a bespoke pass over the mined
+    JSONs, so nothing persisted it per contest and every regrade re-derived it.
+    `leverage_table` is that measurement as a per-contest block: the top 5 by
+    FPTS (ties at the 5th included) that under 10% of complete lineups rostered,
+    read on the R341 recompute, and who carried them. One 25-entry fixture with
+    the answer worked by hand."""
+
+    @staticmethod
+    def _row(name, fpts, pct, slot="OF"):
+        return {"player": name.title(), "player_norm": name, "roster_position": slot,
+                "pct_drafted": pct, "fpts": fpts}
+
+    def _mined(self, ranks=None):
+        # 25 complete entries, ranks 1..25. Rostering, by entry index:
+        #   a: 0-12 (52%)    b: 6-9 (16%; DK lists ONE row at 8.0, the R341 half-row)
+        #   c: 0 and 4 (8%)  e: 19 (4%)  g: 1 (4%)  f: 3-22 (80%)  d: nobody
+        rostered = {"a": range(0, 13), "b": range(6, 10), "c": (0, 4), "e": (19,),
+                    "g": (1,), "f": range(3, 23)}
+        ranks = list(ranks or range(1, 26))
+        entries = []
+        for i in range(25):
+            people = sorted([n for n, idx in rostered.items() if i in idx] + [f"x{i}"])
+            entries.append({"rank": str(ranks[i]), "entry_id": str(5000 + i),
+                            "points": 150.0 - i, "players_norm": people,
+                            "lineup_complete": True})
+        table = [self._row("a", 30.0, 52.0), self._row("b", 25.0, 8.0, "1B"),
+                 self._row("c", 20.0, 8.0), self._row("d", 18.0, 0.5),
+                 self._row("e", 15.0, 4.0), self._row("g", 15.0, 4.0),
+                 self._row("f", 14.0, 80.0)]
+        return {"contest_type": "classic", "meta": {"entries_total": 25},
+                "entries": entries, "player_table": table}
+
+    def test_the_block_names_the_leverage_players_on_the_recompute(self):
+        from mlb_engine.field import field_miner as fm
+        block = fm.leverage_table(self._mined())
+        names = [p["player_norm"] for p in block["players"]]
+        # b reads 8.0 in DK's column (one row of two equal slots kept) and 16 on
+        # the entry block: not leverage. g ties e at the 5th score: both in.
+        self.assertEqual(["c", "d", "e", "g"], names)
+        self.assertEqual(15.0, block["fpts_cut"])
+        by = {p["player_norm"]: p for p in block["players"]}
+        self.assertEqual(8.0, by["c"]["pct_rostered"])
+        self.assertEqual(8.0, by["c"]["pct_drafted"])
+        # nobody rostered d: listed at 0.0 and marked, never silently absent
+        self.assertEqual((0.0, False), (by["d"]["pct_rostered"], by["d"]["rostered"]))
+        self.assertTrue(by["c"]["rostered"])
+
+    def test_carry_counts_for_winner_top_decile_and_field(self):
+        from mlb_engine.field import field_miner as fm
+        block = fm.leverage_table(self._mined())
+        self.assertEqual({"state": "OBSERVED", "leverage_players": 1}, block["winner"])
+        # floor(25 / 10) = 2: ranks 1 (c) and 2 (g) both carry
+        self.assertEqual({"rank_cut": 2, "entries": 2, "carrying": 2, "carry_pct": 100.0},
+                         block["top_decile"])
+        # entries 0, 1, 4, 19 carry one of c, e, g
+        self.assertEqual({"entries": 25, "carrying": 4, "carry_pct": 16.0}, block["field"])
+
+    def test_no_rank_one_row_leaves_the_winner_unknown_not_the_runner_up(self):
+        from mlb_engine.field import field_miner as fm
+        block = fm.leverage_table(self._mined(ranks=range(2, 27)))
+        self.assertEqual("UNKNOWN_NO_RANK_ONE", block["winner"]["state"])
+        self.assertIsNone(block["winner"]["leverage_players"])
+
+    def test_a_field_under_ten_has_no_top_decile(self):
+        from mlb_engine.field import field_miner as fm
+        mined = self._mined()
+        mined["meta"]["entries_total"] = 9
+        block = fm.leverage_table(mined)
+        self.assertEqual(0, block["top_decile"]["rank_cut"])
+        self.assertIsNone(block["top_decile"]["carry_pct"])
+        self.assertIn("no top decile", block["top_decile"]["unavailable_reason"])
+
+    def test_a_showdown_captain_row_does_not_inflate_the_ranking(self):
+        """DK scores a captain row at 1.5x; the player's own FPTS is the UTIL row,
+        or a CPT-only row divided back down."""
+        from mlb_engine.field import field_miner as fm
+        rows = [self._row("x", 30.0, 20.0, "CPT"), self._row("x", 20.0, 30.0, "UTIL"),
+                self._row("y", 24.0, 5.0, "UTIL"), self._row("z", 27.0, 1.0, "CPT"),
+                self._row("p1", 22.0, 5.0, "UTIL"), self._row("p2", 21.0, 5.0, "UTIL"),
+                self._row("p3", 19.0, 5.0, "UTIL")]
+        entries = [{"rank": str(i + 1), "entry_id": str(i), "points": 90.0 - i,
+                    "players_norm": [f"q{i}"], "captain_norm": f"q{i}",
+                    "lineup_complete": True} for i in range(20)]
+        block = fm.leverage_table({"contest_type": "showdown",
+                                   "meta": {"entries_total": 20},
+                                   "entries": entries, "player_table": rows})
+        self.assertEqual(19.0, block["fpts_cut"])
+        names = [p["player_norm"] for p in block["players"]]
+        self.assertNotIn("z", names, "z's CPT row is 27, his own score 18")
+        self.assertEqual(["y", "p1", "p2", "x", "p3"], names)
+        self.assertEqual(20.0, {p["player_norm"]: p["fpts"] for p in block["players"]}["x"])
+
+
+class ContestThresholdMiningTests(unittest.TestCase):
+    """R258's mining half. Every archived standings holds the score curve, and
+    nothing recorded what a contest REQUIRED: the winning score, the p99/p95/p90
+    lines, the paid line with its boundary, copies of the winner. One block per
+    contest from `mine_contest`, and the same function over the archive on disk
+    (`archive_contest_table`), which needs no re-mine."""
+
+    @staticmethod
+    def _mined(n=59, ranks=None, contest_type="classic"):
+        ranks = list(ranks or [1, 1] + list(range(3, n + 1)))
+        points = [121.55, 121.55] + [120.55 - k for k in range(n - 2)]
+        entries = [{"rank": str(ranks[i]), "entry_id": str(7000 + i), "points": points[i],
+                    "players_norm": ["w1", "w2"] if i < 2 else [f"p{i}"],
+                    "captain_norm": ("w1" if i < 2 else f"p{i}"),
+                    "lineup_complete": True} for i in range(n)]
+        return {"contest_type": contest_type, "meta": {"entries_total": n},
+                "entries": entries, "player_table": []}
+
+    def test_lines_floor_the_field_share_and_a_small_field_has_no_p99(self):
+        from mlb_engine.field import field_miner as fm
+        block = fm.contest_thresholds(self._mined(), strict=True)
+        lines = block["lines"]
+        self.assertEqual((0, None), (lines["p99"]["rank_cut"], lines["p99"]["points"]))
+        self.assertIn("no top 1%", lines["p99"]["unavailable_reason"])
+        self.assertEqual({"rank_cut": 2, "points": 121.55}, lines["p95"])
+        # rank 5 is the fifth row: 120.55 - 2
+        self.assertEqual({"rank_cut": 5, "points": 118.55}, lines["p90"])
+        self.assertEqual(59, block["entries_total"])
+
+    def test_a_shared_rank_inside_the_cut_takes_the_lowest_score_within_it(self):
+        from mlb_engine.field import field_miner as fm
+        ranks = [1, 1, 3, 4, 5, 5, 5] + list(range(8, 60))
+        block = fm.contest_thresholds(self._mined(ranks=ranks), strict=True)
+        # p90 cut 5 holds ranks 1, 1, 3, 4, 5, 5, 5: seven rows, lowest is row 7
+        self.assertEqual(120.55 - 4, block["lines"]["p90"]["points"])
+
+    def test_the_winner_its_copies_and_the_tie_are_read_not_resolved(self):
+        from mlb_engine.field import field_miner as fm
+        mined = self._mined()
+        for entry in mined["entries"][10:13]:   # a bigger duplicate group, not the winner's
+            entry["players_norm"] = ["chalk"]
+        block = fm.contest_thresholds(mined, strict=True)
+        self.assertEqual({"points": 121.55, "state": "TIED", "rank1_complete_rows": 2,
+                          "winner_copies": 2, "identity_basis": "person_set"},
+                         block["winning"])
+
+    def test_the_paid_line_names_a_boundary_tie(self):
+        """193774263's shape: one seat, two rank-1 rows on one lineup."""
+        from mlb_engine.field import field_miner as fm
+        paid = fm.contest_thresholds(self._mined(), 1, "export.csv", strict=True)["paid_line"]
+        self.assertEqual({"status": "OBSERVED", "paid_places": 1,
+                          "paid_fraction": round(1 / 59, 4), "points": 121.55,
+                          "entries_at_or_above": 2, "boundary_tie": True,
+                          "first_unpaid_points": 120.55, "source": "export.csv"}, paid)
+        clean = fm.contest_thresholds(self._mined(), 3, "x", strict=True)["paid_line"]
+        self.assertEqual((120.55, 3, False, 119.55),
+                         (clean["points"], clean["entries_at_or_above"],
+                          clean["boundary_tie"], clean["first_unpaid_points"]))
+
+    def test_unknown_paid_places_read_unknown_never_zero(self):
+        from mlb_engine.field import field_miner as fm
+        for paid in (None, 0):
+            line = fm.contest_thresholds(self._mined(), paid, "x", strict=True)["paid_line"]
+            self.assertEqual("UNKNOWN", line["status"], paid)
+            self.assertNotIn("points", line)
+            self.assertIn("unavailable_reason", line)
+
+    def test_strict_is_the_callers_mode_for_a_captainless_showdown_file(self):
+        from mlb_engine.field import field_miner as fm
+        mined = self._mined(contest_type="showdown")
+        mined["entries"][5]["captain_norm"] = None
+        with self.assertRaises(ValueError):
+            fm.contest_thresholds(mined, strict=True)
+        block = fm.contest_thresholds(mined, strict=False)
+        self.assertEqual("person_set_captain_absent", block["winning"]["identity_basis"])
+
+    # -- the live mine and the archive ------------------------------------
+
+    def _standings_csv(self, tmp):
+        path = Path(tmp) / "contest-standings-777777777.csv"
+        with path.open("w", newline="", encoding="utf-8-sig") as fh:
+            writer = csv.writer(fh)
+            writer.writerow(MinerMoneyHonestyTests.HEADER)
+            for i in range(12):   # two rank-1 rows on one lineup, then 3..12
+                writer.writerow([str(1 if i < 2 else i + 1), str(9000 + i), f"u{i}", "0",
+                                 f"{120 - max(i, 1)}.5", MinerMoneyHonestyTests.CLASSIC,
+                                 "", *(["Aaron Judge", "OF", "100%", "18.5"] if i == 0
+                                       else ["", "", "", ""])])
+        return path
+
+    def _main(self, tmp, *extra):
+        from mlb_engine.field import field_miner as fm
+        out = Path(tmp) / "mined.json"
+        registry = str(Path(tmp) / "reg.json")
+        with unittest.mock.patch.object(fm, "default_registry_path", return_value=registry), \
+                contextlib.redirect_stdout(io.StringIO()):
+            code = fm.main(["--standings", str(self._standings_csv(tmp)),
+                            "--contest-id", "777777777",
+                            "--no-archive-move", "--json", str(out), *extra])
+        self.assertEqual(0, code)
+        return json.loads(out.read_text(encoding="utf-8"))
+
+    def test_a_mine_carries_both_blocks_and_the_cli_reads_the_paid_line(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            bare = self._main(tmp)
+            self.assertIn("leverage", bare)
+            self.assertEqual("UNKNOWN", bare["contest_thresholds"]["paid_line"]["status"])
+            # a non-matching own id keeps the own-results append off the real ledger
+            paid = self._main(tmp, "--paid-places", "1", "--my-entry-ids", "no-such-entry")
+            line = paid["contest_thresholds"]["paid_line"]
+            self.assertEqual(("OBSERVED", 1, True, "--paid-places"),
+                             (line["status"], line["paid_places"], line["boundary_tie"],
+                              line["source"]))
+
+    def test_the_archive_table_runs_the_same_functions_on_the_stored_file(self):
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            live = self._main(tmp)
+            root = Path(tmp) / "archive"
+            (root / "2026-07-01").mkdir(parents=True)
+            (root / "2026-07-01" / "mined_777777777.json").write_text(
+                json.dumps(live), encoding="utf-8")
+            (root / "2026-06-29").mkdir()
+            old = {"version": "0.3-review", "contest_type": None, "meta": {"entries_total": 2},
+                   "entries": [{"entry_id": "1", "points": 9.0, "players_norm": ["a"],
+                                "lineup_complete": True}], "player_table": []}
+            (root / "2026-06-29" / "mined_191787184.json").write_text(
+                json.dumps(old), encoding="utf-8")
+            # 91 archived Showdown files carry no captain: labelled, not refused
+            showdown = self._mined(contest_type="showdown")
+            showdown["entries"][5]["captain_norm"] = None
+            showdown["contest_id"] = "888888888"
+            (root / "2026-07-01" / "mined_888888888.json").write_text(
+                json.dumps(showdown), encoding="utf-8")
+            table = fm.archive_contest_table(root, {"777777777": 1}, "export.csv")
+            self.assertEqual([{"file": "2026-06-29/mined_191787184.json",
+                               "version": "0.3-review",
+                               "reason": ("no contest_type or no entry rank (written "
+                                          "before v0.5-review); a re-mine brings it in")}],
+                             table["skipped"])
+            row, sd = table["contests"]
+            self.assertEqual(("777777777", "2026-07-01", "classic"),
+                             (row["contest_id"], row["slate_date"], row["contest_type"]))
+            self.assertEqual(live["leverage"], row["leverage"])
+            self.assertEqual(fm.contest_thresholds(live, 1, "export.csv", strict=True),
+                             row["contest_thresholds"])
+            self.assertEqual("person_set_captain_absent",
+                             sd["contest_thresholds"]["winning"]["identity_basis"])
+            self.assertEqual(("UNKNOWN", ""),
+                             (sd["contest_thresholds"]["paid_line"]["status"],
+                              sd["contest_thresholds"]["paid_line"].get("source", "")))
+            self.assertEqual({"contests": 2, "skipped": 1, "paid_line_observed": 1,
+                              "boundary_ties": 1}, table["counts"])
+
+    def test_the_entry_history_reader_keeps_mlb_rows_and_names_disagreement(self):
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "draftkings-contest-entry-history_x.csv"
+            with path.open("w", newline="", encoding="utf-8-sig") as fh:
+                writer = csv.writer(fh)
+                writer.writerow(["Sport", "Game_Type", "Entry_Key", "Contest_Key",
+                                 "Places_Paid"])
+                writer.writerows([["MLB", "Classic", "1", "100", "1"],
+                                  ["MLB", "Classic", "2", "100", "1"],
+                                  ["NHL", "Classic", "3", "200", "110"],
+                                  ["MLB", "Classic", "4", "300", "5"],
+                                  ["MLB", "Classic", "5", "300", "6"],
+                                  ["MLB", "Classic", "6", "400", ""]])
+            paid, problems = fm.paid_places_from_entry_history(str(path))
+            self.assertEqual({"100": 1}, paid)
+            self.assertEqual(2, len(problems))
+            self.assertTrue(problems[0].startswith("300:"), problems)
+            self.assertTrue(problems[1].startswith("400:"), problems)
+            bad = Path(tmp) / "not_an_export.csv"
+            bad.write_text("Sport,Contest_Key\nMLB,1\n", encoding="utf-8")
+            with self.assertRaises(ValueError):
+                fm.paid_places_from_entry_history(str(bad))
+
+    def test_the_cli_writes_the_table_from_the_archive(self):
+        from mlb_engine.field import field_miner as fm
+        with tempfile.TemporaryDirectory() as tmp:
+            live = self._main(tmp)
+            day = Path(tmp) / "archive" / "2026-07-01"
+            day.mkdir(parents=True)
+            (day / "mined_777777777.json").write_text(json.dumps(live), encoding="utf-8")
+            export = Path(tmp) / "history.csv"
+            export.write_text("Sport,Contest_Key,Places_Paid\nMLB,777777777,2\n",
+                              encoding="utf-8")
+            out = Path(tmp) / "table.json"
+            with contextlib.redirect_stdout(io.StringIO()):
+                code = fm.main(["--archive-table", str(out),
+                                "--archive-root", str(day.parent),
+                                "--entry-history", str(export)])
+            self.assertEqual(0, code)
+            table = json.loads(out.read_text(encoding="utf-8"))
+            line = table["contests"][0]["contest_thresholds"]["paid_line"]
+            self.assertEqual((2, "history.csv"), (line["paid_places"], line["source"]))
+
+    def test_the_real_archive_holds_193774263s_boundary_tie(self):
+        """Pinned against the tracked archive file, not a fixture: one of the three
+        boundary ties R258's 2026-09-15 rider named."""
+        from mlb_engine.field import field_miner as fm
+        found = sorted((REPO / "data" / "archive").glob("*/mined_193774263.json"))
+        if not found:
+            self.skipTest("the archived mine for 193774263 is not staged")
+        mined = json.loads(found[0].read_text(encoding="utf-8"))
+        line = fm.contest_thresholds(mined, 1, "x", strict=False)["paid_line"]
+        self.assertEqual((121.55, 2, True, 120.55),
+                         (line["points"], line["entries_at_or_above"],
+                          line["boundary_tie"], line["first_unpaid_points"]))
+
+
 class FieldMinerArchiveHousekeepingTests(unittest.TestCase):
     """R23: the miner owns the inbox move, and the ledger block becomes a
     consumable fragment instead of stdout to paste twice."""

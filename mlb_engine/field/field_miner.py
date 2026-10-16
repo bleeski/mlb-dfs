@@ -60,6 +60,8 @@ CLI:
       --contest-id 191787184 --slate-date 2026-06-29 \
       [--registry field_opponent_registry.json] [--emit-ledger] [--json out.json]
   python field_miner.py --selftest
+  python field_miner.py --archive-table out.json \
+      --entry-history data/reference/draftkings-contest-entry-history_2026-10-09.csv
 
 Coverage tiers: with --salary the run is `full`. Without it the run is
 `standings_only`: duplication tables, winner copies, chalk scores, SP pairs
@@ -146,10 +148,12 @@ DEGRADED_PROXY_MARGIN_PCT = 25.0
 # entries reach the winning score". Ledger 3.21 (the 2026-08-28 greenfield review
 # of 610 standings) is the only place a winning score by slate size is written
 # down: MEANS, by slate size alone, pooled across contest archetypes and field
-# sizes, and nothing in the tree conditions it further. R258's mining half would
-# (per archetype and field band, from `winning_points` below) and is unbuilt, so
-# this seed stands in, labelled as the pooled prior it is; when that table lands
-# it replaces this one at `winning_score_bar` and nowhere else. Showdown has no
+# sizes, and nothing in the tree conditions it further. R258's mining half
+# landed the PER-CONTEST table (`contest_thresholds` below, and
+# `archive_contest_table` over the archive); the per-archetype, per-field-band
+# rollup of it is still open, so this seed stands in, labelled as the pooled
+# prior it is; when that rollup lands it replaces this one at
+# `winning_score_bar` and nowhere else. Showdown has no
 # row here on purpose: the ledger gives a RANGE (winners 83-98 by field bucket),
 # and a range is not a bar. Each tuple is (largest slate game count it covers,
 # label, mean winning score); None covers the rest.
@@ -162,6 +166,27 @@ WINNING_SCORE_SEED_CLASSIC = (
 WINNING_SCORE_SEED_SOURCE = (
     "ledger 3.21 (2026-08-28 greenfield review, 610 contests): mean winning "
     "score by slate size, pooled across contest archetypes and field sizes")
+
+# R48. A leverage player: one who finished in the contest's top
+# LEVERAGE_TOP_FPTS_N by FPTS (every player tied with the Nth included, so the
+# set never depends on table order) while fewer than LEVERAGE_MAX_OWN_PCT of the
+# complete lineups rostered him. Ledger 3.17's definition, read on the R341
+# recompute: on DK's per-slot %Drafted rows a two-slot bat reads under the bar
+# on each row while the field holds him above it, which is the closest fit to
+# 3.17's own numbers and the understatement R341 found.
+LEVERAGE_TOP_FPTS_N = 5
+LEVERAGE_MAX_OWN_PCT = 10.0
+# DK's Showdown standings score a captain row at 1.5x the player's own FPTS
+# (402 of 402 CPT/UTIL pairs in the archive on 2026-10-16).
+SHOWDOWN_CAPTAIN_FPTS_MULTIPLIER = 1.5
+
+# R258's mining half. The score each contest REQUIRED to finish inside a share
+# of its field: (key, percent of the field). The rank cut is floor(N * pct / 100),
+# the floor `results_ledger.top_cut` takes for the top decile, with no clamp: a
+# 59-entry field has no top 1%, and fields that small are exactly where first
+# place is more than 1% of the field (R258's 2026-09-15 rider). The winning
+# score is its own key, never a p99 stand-in.
+THRESHOLD_LINES = (("p99", 1), ("p95", 5), ("p90", 10))
 
 # R422(a). The engine's primary-stack threshold (optimizer_v3.PRIMARY_STACK_MIN_HITTERS),
 # mirrored rather than imported so the miner stays off the solver's import graph;
@@ -1065,8 +1090,10 @@ def winning_score_bar(contest_type: str, slate_games: Optional[int]) -> Dict[str
     if kind != "classic":
         return {"status": "ABSENT", "unavailable_reason": (
             f"the seed holds no winning-score bar for {kind or 'an unnamed format'}: "
-            "Showdown winners run 83-98 by field bucket, a range, and R258's "
-            "per-contest table is unbuilt")}
+            "Showdown winners run 83-98 by field bucket, a range; R258's "
+            "per-contest table (contest_thresholds) holds each archived contest's "
+            "winning score, and the per-field-band rollup that would make a bar "
+            "from it is open")}
     try:
         games = int(slate_games)
     except (TypeError, ValueError):
@@ -1123,6 +1150,310 @@ def select_winner(entries: Sequence[Mapping[str, Any]]) -> Tuple[Optional[Mappin
     best = max(e["points"] for e in usable)
     winner = next(e for e in usable if e["points"] == best)
     return winner, (WINNER_OBSERVED if len(rank_one) == 1 else WINNER_TIED), len(rank_one)
+
+
+# ---------------------------------------------------------------------------
+# Per-contest leverage (R48) and threshold lines (R258 mining half)
+#
+# Both read the MINED shape: complete entries carrying rank, points and
+# players_norm, the per-slot player table, and meta.entries_total. That is what
+# `mine_contest` returns and what every v0.5 archived mined JSON holds, so a live
+# mine and the archive run the same function on the same input
+# (`archive_contest_table`). Observed outcomes and deterministic descriptive
+# statistics; never a probability, a win rate, or an edge.
+# ---------------------------------------------------------------------------
+
+def _base_fpts_by_player(player_table: Sequence[Mapping[str, Any]],
+                         contest_type: str) -> Dict[str, float]:
+    """{normalized name: the player's own FPTS}, one value per player. R48.
+
+    A Showdown captain row carries 1.5x the player's FPTS, so it is not his
+    score: his UTIL row is, and a player listed only at CPT scores that row
+    divided back down. A Classic player's slot rows carry one score.
+    """
+    showdown = str(contest_type or "").lower() == "showdown"
+    base: Dict[str, float] = {}
+    captain_only: Dict[str, float] = {}
+    for row in player_table or []:
+        if row.get("fpts") is None:
+            continue
+        name = str(row.get("player_norm") or "")
+        if showdown and row.get("roster_position") == CAPTAIN_SLOT:
+            captain_only.setdefault(
+                name, round(float(row["fpts"]) / SHOWDOWN_CAPTAIN_FPTS_MULTIPLIER, 2))
+            continue
+        base.setdefault(name, float(row["fpts"]))
+    for name, value in captain_only.items():
+        base.setdefault(name, value)
+    return dict(sorted(base.items()))
+
+
+def _complete_entries(mined: Mapping[str, Any]) -> List[Mapping[str, Any]]:
+    return [e for e in mined.get("entries") or [] if e.get("lineup_complete")]
+
+
+def _entries_total(mined: Mapping[str, Any], complete: Sequence[Mapping[str, Any]]) -> int:
+    total = (mined.get("meta") or {}).get("entries_total")
+    return int(total) if total is not None else len(complete)
+
+
+def leverage_table(mined: Mapping[str, Any]) -> Dict[str, Any]:
+    """R48. The contest's leverage players and who carried them.
+
+    ``players`` are the top ``LEVERAGE_TOP_FPTS_N`` by FPTS (ties at the Nth
+    included) that fewer than ``LEVERAGE_MAX_OWN_PCT`` of complete lineups
+    rostered, each with ``pct_rostered`` (the R341 recompute), ``pct_drafted``
+    (DK's column, summed to player grain) and ``fpts``. A top scorer no complete
+    lineup rostered is absent from the recompute; he is listed at 0.0 with
+    ``rostered: false`` and cannot move a carry count.
+
+    Carry counts: ``winner`` (leverage players in the winning lineup, None when
+    the winner is UNKNOWN), ``top_decile`` (complete entries ranked within
+    floor(N / 10), ``results_ledger.top_cut``; a field under 10 has none) and
+    ``field`` (every complete entry).
+    """
+    complete = _complete_entries(mined)
+    contest_type = str(mined.get("contest_type") or "classic").lower()
+    table = mined.get("player_table") or []
+    fpts = _base_fpts_by_player(table, contest_type)
+    rostered, _denominator = rostered_by_player_norm(complete)
+    drafted = own_by_player_norm(table)
+    display: Dict[str, str] = {}
+    for row in table:
+        display.setdefault(str(row.get("player_norm") or ""), str(row.get("player") or ""))
+    ranked = sorted(fpts.items(), key=lambda t: (-t[1], t[0]))
+    fpts_cut = ranked[min(LEVERAGE_TOP_FPTS_N, len(ranked)) - 1][1] if ranked else None
+    players = []
+    for name, value in ranked:
+        if fpts_cut is None or value < fpts_cut:
+            break
+        pct = rostered.get(name)
+        if (pct or 0.0) >= LEVERAGE_MAX_OWN_PCT:
+            continue
+        players.append({"player": display.get(name) or name, "player_norm": name,
+                        "fpts": value, "pct_rostered": pct if pct is not None else 0.0,
+                        "rostered": pct is not None, "pct_drafted": drafted.get(name)})
+    names = {p["player_norm"] for p in players}
+
+    def carried(entry: Mapping[str, Any]) -> int:
+        return len(names & set(entry.get("players_norm") or ()))
+
+    def share(rows: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
+        carrying = sum(1 for e in rows if carried(e))
+        return {"entries": len(rows), "carrying": carrying,
+                "carry_pct": round(100.0 * carrying / len(rows), 1) if rows else None}
+
+    winner, winner_state, _rank1 = select_winner(complete)
+    n_total = _entries_total(mined, complete)
+    decile_cut = n_total // 10
+    if decile_cut >= 1:
+        ranks = [(_rank_int(e), e) for e in complete]
+        top_decile = {"rank_cut": decile_cut, **share(
+            [e for r, e in ranks if r is not None and r <= decile_cut])}
+    else:
+        top_decile = {"rank_cut": 0, "entries": None, "carrying": None, "carry_pct": None,
+                      "unavailable_reason": f"a field of {n_total} has no top decile "
+                                            "(floor(N / 10) = 0)"}
+    return {
+        "top_fpts_n": LEVERAGE_TOP_FPTS_N,
+        "max_own_pct": LEVERAGE_MAX_OWN_PCT,
+        "ownership_basis": "pct_rostered (R341 recompute over complete lineups)",
+        "fpts_cut": fpts_cut,
+        "players": players,
+        "n_players": len(players),
+        "winner": {"state": winner_state,
+                   "leverage_players": carried(winner) if winner else None},
+        "top_decile": top_decile,
+        "field": share(complete),
+        "note": ("observed outcomes and deterministic counts over this contest's "
+                 "standings; never a probability, a win rate or an edge. A top "
+                 "scorer no complete lineup rostered is listed at pct_rostered 0.0 "
+                 "with rostered false"),
+    }
+
+
+def contest_thresholds(
+    mined: Mapping[str, Any],
+    paid_places: Optional[int] = None,
+    paid_places_source: str = "",
+    *,
+    strict: bool,
+) -> Dict[str, Any]:
+    """R258 mining half. The score lines this contest REQUIRED, observed.
+
+    ``winning``: the R226 winner's points and state, the complete rank-1 rows,
+    and ``winner_copies`` (entries sharing the winning lineup, by
+    ``lineup_identity_groups``; ``strict`` is that function's mode: True for a
+    fresh parse, False for an archived file, whose basis it then labels).
+
+    ``lines``: for each ``THRESHOLD_LINES`` key, ``rank_cut`` = floor(N * pct /
+    100) and ``points`` = the lowest score among complete entries ranked within
+    it, which is the line DK's shared ranks on ties put there. A cut of 0 has no
+    line and says why.
+
+    ``paid_line``: UNKNOWN without ``paid_places``; else the lowest score ranked
+    within the paid places, ``entries_at_or_above`` it, ``boundary_tie`` when
+    tied entries straddle the last paid place (more entries ranked within it
+    than places), ``first_unpaid_points``, and the source. A satellite's paid
+    line is its ticket line; which a contest is, this block does not guess.
+    """
+    complete = _complete_entries(mined)
+    contest_type = str(mined.get("contest_type") or "classic").lower()
+    n_total = _entries_total(mined, complete)
+    scored = sorted((r, float(e["points"])) for e in complete
+                    if (r := _rank_int(e)) is not None and e.get("points") is not None)
+
+    def within(cut: int) -> List[float]:
+        return [p for r, p in scored if r <= cut]
+
+    winner, winner_state, rank1 = select_winner(complete)
+    groups, identity_basis = lineup_identity_groups(complete, contest_type, strict=strict)
+    winner_copies = (next(len(ids) for ids in groups.values()
+                          if str(winner["entry_id"]) in ids) if winner else None)
+    lines: Dict[str, Any] = {}
+    for key, pct in THRESHOLD_LINES:
+        cut = n_total * pct // 100
+        inside = within(cut)
+        if cut < 1:
+            lines[key] = {"rank_cut": 0, "points": None, "unavailable_reason": (
+                f"a field of {n_total} has no top {pct}% (floor(N x {pct} / 100) = 0)")}
+        elif not inside:
+            lines[key] = {"rank_cut": cut, "points": None, "unavailable_reason": (
+                "no complete lineup is ranked within the cut")}
+        else:
+            lines[key] = {"rank_cut": cut, "points": min(inside)}
+    if paid_places is None:
+        paid_line: Dict[str, Any] = {"status": "UNKNOWN", "unavailable_reason": (
+            "no paid places supplied (--paid-places or --paid-places-from on a mine; "
+            "the entry-history export for the archive table)")}
+    elif int(paid_places) < 1:
+        paid_line = {"status": "UNKNOWN", "paid_places": int(paid_places),
+                     "source": paid_places_source, "unavailable_reason": (
+                         f"{int(paid_places)} paid places is not a payout line")}
+    else:
+        k = int(paid_places)
+        inside = within(k)
+        outside = [p for r, p in scored if r > k]
+        paid_line = {
+            "status": "OBSERVED",
+            "paid_places": k,
+            "paid_fraction": round(k / n_total, 4) if n_total else None,
+            "points": min(inside) if inside else None,
+            "entries_at_or_above": len(inside),
+            "boundary_tie": len(inside) > k,
+            "first_unpaid_points": max(outside) if outside else None,
+            "source": paid_places_source,
+        }
+    return {
+        "entries_total": n_total,
+        "winning": {"points": winner["points"] if winner else None,
+                    "state": winner_state, "rank1_complete_rows": rank1,
+                    "winner_copies": winner_copies, "identity_basis": identity_basis},
+        "lines": lines,
+        "paid_line": paid_line,
+        "note": ("observed score lines from this contest's standings, over complete "
+                 "lineups; never a prediction, a cash rate or a probability"),
+    }
+
+
+ENTRY_HISTORY_COLUMNS = ("Sport", "Contest_Key", "Places_Paid")
+
+
+def paid_places_from_entry_history(path: str) -> Tuple[Dict[str, int], List[str]]:
+    """({contest id: paid places}, problems) from Ben's DK entry-history export. R258.
+
+    ``draftkings-contest-entry-history_*.csv`` carries ``Places_Paid`` on every
+    row of every contest type (the 2026-10-09 export covers all 613 mined
+    contest ids; the 2026-09-15 money JSON only its 336 satellites). MLB rows
+    only. A contest whose rows disagree, or carry a non-integer, is left out
+    and named in ``problems``, never resolved by picking a row.
+    """
+    seen: Dict[str, set] = defaultdict(set)
+    with open(path, "r", encoding="utf-8-sig", newline="") as fh:
+        reader = csv.DictReader(fh)
+        missing = [c for c in ENTRY_HISTORY_COLUMNS if c not in (reader.fieldnames or [])]
+        if missing:
+            raise ValueError(f"{Path(path).name} is not an entry-history export: "
+                             f"no {', '.join(missing)} column")
+        for row in reader:
+            if (row.get("Sport") or "").strip() != "MLB":
+                continue
+            contest = (row.get("Contest_Key") or "").strip()
+            if contest:
+                seen[contest].add((row.get("Places_Paid") or "").strip())
+    paid: Dict[str, int] = {}
+    problems: List[str] = []
+    for contest, values in sorted(seen.items()):
+        value = next(iter(values))
+        if len(values) == 1 and value.isdigit():
+            paid[contest] = int(value)
+        else:
+            problems.append(f"{contest}: Places_Paid reads {sorted(values)}; left out")
+    return paid, problems
+
+
+def archive_contest_table(
+    archive_root: str | Path,
+    paid_places_by_contest: Optional[Mapping[str, int]] = None,
+    paid_places_source: str = "",
+) -> Dict[str, Any]:
+    """R48 and R258's mining half over the archive already on disk. No re-mine.
+
+    Every v0.5 ``<date>/mined_<id>.json`` holds what both blocks read, so each
+    is run through ``leverage_table`` and ``contest_thresholds`` as stored
+    (``strict=False``: an archived Showdown file without captains is labelled,
+    not refused). A file with no ``contest_type`` or no entry ranks (written
+    before v0.5-review) is skipped and named. Reads the archive and writes
+    nothing; ``main --archive-table`` writes the result where it is told.
+    """
+    root = Path(archive_root)
+    paid_places_by_contest = paid_places_by_contest or {}
+    contests: List[Dict[str, Any]] = []
+    skipped: List[Dict[str, Any]] = []
+    for path in sorted(root.glob("*/mined_*.json"),
+                       key=lambda p: p.relative_to(root).as_posix()):
+        rel = path.relative_to(root).as_posix()
+        try:
+            mined = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            skipped.append({"file": rel, "reason": f"unreadable: {exc}"})
+            continue
+        if (not mined.get("contest_type")
+                or any(_rank_int(e) is None for e in _complete_entries(mined))):
+            skipped.append({"file": rel, "version": mined.get("version"), "reason": (
+                "no contest_type or no entry rank (written before v0.5-review); "
+                "a re-mine brings it in")})
+            continue
+        contest = str(mined.get("contest_id") or path.stem[len("mined_"):])
+        paid = paid_places_by_contest.get(contest)
+        contests.append({
+            "contest_id": contest,
+            "slate_date": mined.get("slate_date") or path.parent.name,
+            "contest_type": str(mined["contest_type"]).lower(),
+            "version": mined.get("version"),
+            "file": rel,
+            "leverage": leverage_table(mined),
+            "contest_thresholds": contest_thresholds(
+                mined, paid, paid_places_source if paid is not None else "", strict=False),
+        })
+    observed = [c for c in contests
+                if c["contest_thresholds"]["paid_line"]["status"] == "OBSERVED"]
+    return {
+        "label": ("R48 leverage and R258 contest_thresholds per archived contest: "
+                  "observed outcomes and deterministic counts, never a prediction, "
+                  "a win rate, a cash rate or a probability. Aggregate only within "
+                  "one contest type, archetype and field size"),
+        "paid_places_source": paid_places_source,
+        "counts": {
+            "contests": len(contests),
+            "skipped": len(skipped),
+            "paid_line_observed": len(observed),
+            "boundary_ties": sum(1 for c in observed
+                                 if c["contest_thresholds"]["paid_line"]["boundary_tie"]),
+        },
+        "contests": contests,
+        "skipped": skipped,
+    }
 
 
 def mine_contest(
@@ -1469,7 +1800,7 @@ def mine_contest(
             "omitting position rows for multi-position players. Lineup-derived ownership is "
             "authoritative for this contest.")
 
-    return {
+    mined: Dict[str, Any] = {
         "label": REVIEW_LABEL,
         "version": VERSION,
         "coverage": "full" if has_salary else "standings_only",
@@ -1578,6 +1909,12 @@ def mine_contest(
         "rostered_by_norm": rostered,
         "fpts_by_norm": fpts,
     }
+    # R48 and R258's mining half, off the slim entries just built, so a live mine
+    # and an archived file run one function on one shape. ``main`` re-attaches
+    # the thresholds once paid places resolve; here the paid line is UNKNOWN.
+    mined["leverage"] = leverage_table(mined)
+    mined["contest_thresholds"] = contest_thresholds(mined, strict=True)
+    return mined
 
 
 # ---------------------------------------------------------------------------
@@ -2477,9 +2814,39 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                          f"{EXIT_MONEY_WITHOUT_OWN_ENTRIES} money flags supplied "
                          f"with no resolvable own entry ids (R30b).")
     ap.add_argument("--selftest", action="store_true")
+    ap.add_argument("--archive-table", dest="archive_table",
+                    help="write R48's leverage block and R258's contest_thresholds "
+                         "for every archived mined JSON to this path, from the "
+                         "archive on disk; mines nothing and writes nothing else")
+    ap.add_argument("--archive-root",
+                    help="the archive --archive-table walks (default data/archive)")
+    ap.add_argument("--entry-history",
+                    help="Ben's DK entry-history export (CSV): the paid places "
+                         "--archive-table reads for every contest type")
     args = ap.parse_args(argv)
     if args.selftest:
         return _selftest()
+    if args.archive_table:
+        if args.standings or args.paid_places is not None or args.paid_places_from:
+            ap.error("--archive-table walks the archive and reads paid places from "
+                     "--entry-history; it takes no --standings or --paid-places*")
+        root = (Path(args.archive_root) if args.archive_root
+                else Path(__file__).resolve().parents[2] / "data" / "archive")
+        paid: Dict[str, int] = {}
+        if args.entry_history:
+            paid, problems = paid_places_from_entry_history(args.entry_history)
+            for problem in problems:
+                print(f"NOTICE: paid places: {problem}")
+        table = archive_contest_table(
+            root, paid, Path(args.entry_history).name if args.entry_history else "")
+        write_json_atomic(args.archive_table, table, indent=1, trailing_newline=True)
+        counts = table["counts"]
+        print(f"archive table: {counts['contests']} contests, {counts['skipped']} "
+              f"skipped, paid line observed on {counts['paid_line_observed']} "
+              f"({counts['boundary_ties']} boundary ties) -> {args.archive_table}")
+        for row in table["skipped"]:
+            print(f"  skipped {row['file']}: {row['reason']}")
+        return 0
     if not args.standings:
         ap.error("--standings is required (or --selftest)")
     # R93: fail on an unusable --json destination BEFORE anything shared is
@@ -2566,7 +2933,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         paid_places, note = paid_places_from_file(
             args.paid_places_from, args.contest_id or mined.get("contest_id"))
         print(f"paid places: {note}")
-    own_ids = [x.strip() for x in (args.my_entry_ids or "").split(",") if x.strip()]
+    if paid_places is not None:
+        # R258: the paid line is read here, where the count is known.
+        mined["contest_thresholds"] = contest_thresholds(
+            mined, paid_places,
+            "--paid-places" if args.paid_places is not None
+            else f"--paid-places-from {Path(args.paid_places_from).name}",
+            strict=True)
+    own_ids =[x.strip() for x in (args.my_entry_ids or "").split(",") if x.strip()]
     if not own_ids and args.slate_date:
         own_ids = harvest_own_entry_ids(args.slate_date, args.contest_id)
         if own_ids:
