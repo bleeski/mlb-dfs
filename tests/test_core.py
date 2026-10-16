@@ -48895,7 +48895,11 @@ class StandingsReadTests(unittest.TestCase):
         """The two digests were computed at HEAD 6859442, BEFORE the keyword existed
         (`tools/_scratch_r472/pin_hash.py`), on the vendored 2026-06-03 export read in
         place. The returned dict embeds the file path, which differs per checkout, so
-        the parse digest excludes that one key; `mine_contest` embeds none."""
+        the parse digest excludes that one key; `mine_contest` embeds none. R48 and
+        R258 (2026-10-16) added two blocks to the mine, `leverage` and
+        `contest_thresholds`; the mine digest excludes exactly those two names, so
+        every key that existed when the hash was frozen is still pinned byte for
+        byte, and the two are asserted present."""
         from mlb_engine.field import field_miner as fm
 
         def digest(obj):
@@ -48914,7 +48918,11 @@ class StandingsReadTests(unittest.TestCase):
                          self.PARSE_191020573_SHA)
         mined = fm.mine_contest(fm.parse_standings_export(str(self.VENDORED)), None,
                                 contest_id="191020573")
-        self.assertEqual(digest(mined), self.MINE_191020573_SHA)
+        added = ("leverage", "contest_thresholds")
+        for key in added:
+            self.assertIn(key, mined)
+        self.assertEqual(digest({k: v for k, v in mined.items() if k not in added}),
+                         self.MINE_191020573_SHA)
 
     def test_with_time_remaining_adds_exactly_one_key_and_nothing_else_moves(self):
         from mlb_engine.field import field_miner as fm
