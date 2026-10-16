@@ -8825,10 +8825,6 @@ def portfolio_exposure(salary_csv: Path, entries_csv: Path) -> dict:
     }
 
 
-VALID_POSTURES = ("cash", "wta_satellite", "single_entry", "small_gpp",
-                  "large_gpp", "mme")
-
-
 class CliValueError(ValueError):
     """A command-line VALUE this build cannot use. R296(a).
 
@@ -8848,28 +8844,35 @@ class CliValueError(ValueError):
     """
 
 
-def parse_postures_arg(value: str | None) -> dict[str, str]:
-    """'<id_or_name>=<posture>,...' -> {key: posture}, validated eagerly.
+def parse_postures_arg(value: str | None) -> dict[str, Any]:
+    """'<id_or_name>=<posture>[:tickets=N],...' -> {key: posture or mapping}, validated eagerly.
 
     A typo here would silently fall through name inference to large_gpp, which is
     the exact failure the flag exists to close, so an unknown posture is an error
-    at parse time rather than a value nothing reads.
+    at parse time rather than a value nothing reads. R106: a plain posture stays a
+    string; the ``:tickets=N`` suffix (``wta_satellite`` only) yields
+    ``{"posture", "ticket_count"}``, the shape the resolver already honours.
+    ``parse_posture_override`` owns the grammar, so ``tools/late_swap.py`` cannot
+    drift from it.
     """
+    from mlb_engine.pipeline.execution_pipeline import parse_posture_override
+
     if not value:
         return {}
-    out: dict[str, str] = {}
+    out: dict[str, Any] = {}
     for item in str(value).split(","):
         item = item.strip()
         if not item:
             continue
         if "=" not in item:
             raise CliValueError(f"--postures entry {item!r} is not <contest>=<posture>")
-        key, posture = (x.strip() for x in item.split("=", 1))
-        if posture not in VALID_POSTURES:
-            raise CliValueError(
-                f"--postures: unknown posture {posture!r}; valid: "
-                + ", ".join(VALID_POSTURES))
-        out[key] = posture
+        key, raw = (x.strip() for x in item.split("=", 1))
+        try:
+            posture, tickets = parse_posture_override(raw)
+        except ValueError as exc:
+            raise CliValueError(f"--postures: {exc}") from None
+        out[key] = posture if tickets is None else {
+            "posture": posture, "ticket_count": tickets}
     return out
 
 
@@ -9489,6 +9492,12 @@ def main() -> int:
                     help="comma-separated <contest_id_or_name>=<posture> pairs, e.g. "
                          "'192707612=wta_satellite,192707473=cash'. Postures: cash, "
                          "wta_satellite, single_entry, small_gpp, large_gpp, mme. "
+                         "A satellite's ticket count rides the posture: "
+                         "'193403851=wta_satellite:tickets=1' ranks it for first "
+                         "place, ':tickets=5' for a cut line. A wta_satellite "
+                         "override keeps the posture and takes the contest's shape "
+                         "from its title (a satellite title ranks on the satellite "
+                         "profile, a WTA title on large_wta). "
                          "These override name inference entirely. The ledger Quick "
                          "Card's standing instruction is to never trust the "
                          "inference; this flag is how to obey it. A contest whose "

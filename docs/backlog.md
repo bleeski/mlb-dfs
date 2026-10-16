@@ -3385,30 +3385,9 @@ Hypothesis-generated mlb.com renders (random posted-side subsets, `1. TBD` place
 
 Kept, not wired and not deleted: `tools/ownership_grade_archive` (R306) is a live caller. `contest_library.infer_from_name` now reads a title through the engine's matcher, ranking and cap parse; preflight's copy stops stripping the guard and the parity test pins it on titles that can tell.
 
-### R106. `build_slate.py --postures` cannot express ticket_count, so the operator's deciding fact cannot reach the resolver (P2, S) | new 2026-08-10, from BUILD fragment 2026-08-08 (1505_3g); not in the spec
+### R106. CLOSED 2026-10-16 -- SHIPPED, roadmap Session 148, entry migrated to CHANGELOG.md
 
-> **Rider 2026-10-02 (Session 144, Phase 3, the board rebuild).** Roadmap: Session 148 (2026-10-02; moved out of Session 79): `--postures` cannot express `ticket_count`, so the operator's deciding fact cannot reach the resolver (1505_3g, one ticket vs five); routing, band 1.
-
-- **What:** `--postures` takes `<contest>=<posture>` strings only and
-  `parse_postures_arg` returns `dict[str, str]`. `satellite_shape_for()`
-  routes ticket_count 1 to `wta_ticket_satellite` and anything else to
-  `satellite`, and `_resolve_contest_postures` already honours a Mapping
-  override with an explicit `contest_shape` — the capability exists; only the
-  CLI cannot reach it. Live case 2026-08-08: Ben supplied the ticket
-  structure for two satellites (193403851 one ticket, 193403935 five), both
-  resolved `satellite`/ticket_line, wrong for the one-ticket Relay Throw,
-  which is a first-place path. Workaround was a per-slate `drive_build.py`
-  driver importing `build_slate` and replacing `parse_postures_arg` — legal
-  (BUILD write set) but a driver script per slate is the tool teaching the
-  operator to bypass it.
-- **Fix:** let `--postures` accept a JSON object, or add `--postures-file
-  <path>`, so a ticket count reaches the resolver without a driver. The
-  archetypes CSV is not the home: it is keyed by name pattern and ticket
-  counts vary between instances of the same family (the 2026-08-09 curated
-  table shows Pocket Cup at 1, 5, and 10), so the per-slate operator channel
-  is correct. Feeds R40's evidence trail (the brief already records
-  `operator_supplied` routing). The fragment's second item (minimum-feasible
-  relaxation hint) was folded into R98's remainder, not here.
+`--postures` takes `<id>=<posture>[:tickets=N]`; `parse_posture_override` (EP) is the one grammar and both `build_slate.py` and `tools/late_swap.py` call it. A suffix yields `{"posture": "wta_satellite", "ticket_count": N}`, and `resolve_contest_shape` routes a `wta_satellite` contest with a ticket count through `satellite_shape_for` (1 -> `wta_ticket_satellite`, more -> `satellite`) with no contest type stated. `PostureRoutingTests`; 5 hand mutations killed. The per-slate driver the entry names is no longer needed.
 
 ### R159 + R160. CLOSED 2026-08-24 -- intake truth on the no-fetch path, entries migrated to CHANGELOG.md
 
@@ -4545,30 +4524,9 @@ Fix: name the PO arm, its price, and the flag, in the refusal. That is R285/R207
 class -- a refusal that does not name the move that clears it -- and it rides
 their slot rather than this decision-first entry.
 
-### R66. Silent shape/posture defaults on the API paths (P2, S) | audit 2026-08-04, verified in tree
+### R66. CLOSED 2026-10-16 -- SHIPPED, roadmap Session 148 ((c) the naive `as_of` was already fixed), entry migrated to CHANGELOG.md
 
-> **Rider 2026-10-02 (Session 144, Phase 3, the board rebuild).** Roadmap: Session 148 (2026-10-02; moved out of Session 21): `run_late_swap(contest_shapes=None)` scoring every entry on the pure-ceiling `large_wta` profile is a routing defect (contests routed to the right shape and posture), band 1.
-
-**Rider 2026-09-25 (the code review, allocator area; `review_allocator/repro_shapes.py` (d)).** Two more silences at the same boundary: a Mapping override carrying only `contest_shape`/`ticket_count` and no `posture` resolves `posture large_gpp` at `execution_pipeline.py:1466`; an unknown posture string (`'wta'`) is accepted unvalidated at `:1459-1462` and builds on `large_gpp` caps under `posture_source="operator_supplied"`, so no blocker fires. Fix: validate posture strings against `STRATEGY_DEFAULTS` at this boundary and derive the posture from `contest_shape` when a Mapping names only the shape. XS, rides Session 21 (c).
-
-
-- **What:** (a) `run_late_swap(contest_shapes=None)` scores every entry's candidates on the pure-ceiling `large_wta` profile (`late_swap_manager.py:311`) — tools/late_swap.py documents and works around it; the engine API neither warns nor records the substitution. (b) operator-supplied posture strings are never validated (`execution_pipeline.py:874`): an unknown token silently builds as `large_gpp` while `posture_source="operator_supplied"` suppresses the unresolved-contest blockers (reproduced with `{"123": "wta"}` — a token `normalize_posture` itself accepts). (c) `run_late_swap` accepts a naive `as_of` and reinterprets it as UTC (`late_swap_manager.py:73`): an ET wall-clock reads 4-5h early and every lock-derived gate shares the same wrong map (PLAUSIBLE as a live event — the shipped tool passes aware UTC; the API is the exposed leg).
-- **Fix:** default swap shapes from the parent run's recorded postures or refuse when unmapped; validate posture strings against `STRATEGY_DEFAULTS` (mirror `validate_shape`'s discipline); raise or warn on naive datetimes at the swap boundary.
-- **This item is a STANDING RED in the skill evals, recorded 2026-08-17 so the
-  next session does not re-derive it.** `skills/generate-lineups/evals/run_evals.py`
-  eval 5 (`adversarial-multi-ticket-satellite`) fails with `forbidden claim
-  present: /large_wta/`, and it fails identically on a pristine checkout — a DEV
-  session that changes anything else and then runs the evals will see one FAIL
-  and has to prove it is not theirs. It was verified pristine on 2026-08-17 while
-  landing R135. **Correction 2026-08-22 (ed6, VERIFIED-repro):** the coupling
-  claim that stood here — "Closing (a) closes the eval" — is FALSE. The
-  harness was re-run on a pristine copy (7 PASS, eval 5 FAIL) and eval 5's two
-  `large_wta` hits are the CHECKPOINT's canonical contest-shape vocabulary
-  (`"posture": "wta_satellite"` mapping to `"contest_shape": "large_wta"`);
-  eval 5 never invokes a swap, so R66(a) cannot clear it. The eval-side fix is
-  R181 (scope the forbidden regex). Until R181 lands, eval 5 red remains the
-  expected state and 7 of 8 passing is a clean run — but do not expect R66(a)
-  to change that.
+The swap names its engine default (`ENGINE_DEFAULT_SWAP_SHAPE`, `contest_shape_source` per requirement, `contest_shape_defaults` on the `run_late_swap` result), an unknown posture string raises at the API boundary (`_validated_posture`), and a Mapping naming only a `contest_shape` derives its posture (`_SHAPE_TO_POSTURE`). Declined: defaulting swap shapes from the parent run (the operators' door, `tools/late_swap.py`, maps every contest). (c) is stale: `PlayerLineupStatus.is_locked` raises on a naive datetime. The skill-eval 5 red the entry recorded is R181's. `PostureRoutingTests`; 5 hand mutations killed.
 
 ### R68. CLOSED 2026-10-10 -- (a) and (b) SHIPPED, (c) already shipped at filing, roadmap Session 29, entry migrated to CHANGELOG.md
 
@@ -4823,40 +4781,9 @@ before supervisor-owned flags. `autobuild.py` had zero tests and has seven.
   of 8.7 APPG. The frontier report is working as designed; this rider is about
   one stale column beside it, not about the section.
 
-### R195. An explicit `--postures <id>=wta_satellite` reintroduces the pre-R1a `large_wta` mapping for a satellite contest (P1, XS) | new 2026-08-23, merged from BUILD fragment `2026-08-20_BUILD_postures-satellite-shape-bug.md`; mechanism traced to the line
+### R195. CLOSED 2026-10-16 -- SHIPPED, roadmap Session 148, entry migrated to CHANGELOG.md
 
-> **Rider 2026-10-02 (Session 144, Phase 3, the board rebuild).** Roadmap: Session 148 (2026-10-02; moved out of Session 72). The XS fix moves production golden bytes: `tests/golden/golden_replay_production_2026-06-03.json` freezes the misroute (191020573/191020574 recorded `large_wta` where inference gives `satellite`), so the chunk re-freezes `GOLD` deliberately with the histogram before and after; `SATELLITE_TYPE_TOKENS` is still `{'satellite'}` at HEAD.
-
-**Rider 2026-09-25 (the code review, allocator area; `review_allocator/repro_shapes.py` (a)): reproduced, and the PRODUCTION golden baseline freezes the misroute.** `execution_pipeline.py:1462` turns the string override into `inferred_type="wta_satellite"`, `:1978` `SATELLITE_TYPE_TOKENS` holds only `"satellite"`, `:1930-1932` maps `wta_satellite` to `large_wta`; `tests/test_golden_replay.py:382` passes the string for both satellites and `tests/golden/golden_replay_production_2026-06-03.json` records `contest_shape: large_wta` for 191020573 and 191020574 (auto inference gives `satellite`). So the fix moves the production golden (both satellites' shape and `contest_fit_by_shape`, possibly the assignment) and needs the recorded re-freeze; `tools/late_swap.py:848` inherits the path through `_resolve_contest_postures`.
-
-
-- **What:** `_resolve_contest_postures` in `execution_pipeline.py` builds
-  `inferred = {"inferred_type": "wta_satellite", ...}` from a plain-string CLI
-  override. `resolve_contest_shape` tests `itype in SATELLITE_TYPE_TOKENS`, and
-  `SATELLITE_TYPE_TOKENS = frozenset({"satellite"})` — the literal
-  `"wta_satellite"` is not a member, the check fails, and the call falls
-  through to `_posture_to_shape("wta_satellite")`, which is exactly the mapping
-  to `large_wta` that `contest_shapes.py`'s own docstring calls dead and wrong.
-  The AUTOMATIC path is fine: `infer_contest_archetype` reads
-  `inferred_type="satellite"` off the archetype row, which IS a member.
-- **Why:** the ledger Quick Card's standing instruction — pass explicit
-  postures by contest id, never trust name inference on family names — is the
-  thing that reintroduces the bug, because `wta_satellite` is the only
-  CLI-accepted posture string for that family (`VALID_POSTURES`). The 08-20
-  `1835_3g` build worked around it by deliberately NOT passing `--postures` for
-  two SUPERSatellite ids and letting inference run, confirmed correct via the
-  brief's `contest_shape: "satellite"`. So the documented-safe move is the
-  unsafe one, silently, for one family.
-- **Fix:** route the string-override path through the same satellite detection
-  the automatic path reaches — treat `wta_satellite` as a `SATELLITE_TYPE_TOKENS`
-  member, or have `_resolve_contest_postures` set
-  `payout_shape_default="ticket_line"` for that override. If neither, document
-  that an explicit `wta_satellite` override is WTA-ONLY and a satellite must be
-  left to inference, and make `VALID_POSTURES` say so. Related, and Ben's:
-  `dk_contest_archetypes.csv` carries no `ticket_count` for the
-  Satellite/Qualifier/Ticket rows (R1c), so `satellite_shape_for(None)` used a
-  default here — the `[2x]` in "MLB SUPERSatellite to NFL 9-13 … [2x]" may be
-  the count.
+`_resolve_contest_postures` keeps an explicit `wta_satellite` as the operator's posture and asks name inference for the FAMILY: a satellite title ranks on `satellite` (a counted one on `wta_ticket_satellite`), a winner-take-all or unnamed title stays `large_wta`. The filed fix (adding `wta_satellite` to `SATELLITE_TYPE_TOKENS`) would have sent a true WTA to the satellite blend, so it was not taken. `tests/golden/golden_replay_production_2026-06-03.json` re-frozen for this alone (14 entries `large_wta` -> `satellite`, 16 of 18 lineups moved, `contest_deal` bounds 6/6/6 held). `PostureRoutingTests`; 2 hand mutations killed.
 
 ### R202. `solver_probe.py` reads the staged slate, not the one being uploaded, and cannot be given a salary path (P2, XS) | new 2026-08-23, merged from BUILD fragment `2026-08-19_BUILD_pitchhand-missing-and-bank-solve-ceiling.md` item 3
 
@@ -7546,6 +7473,8 @@ item's effective priority without changing its label.
 - **Rider added 2026-08-23, from ARCHIVE fragment `2026-08-22_ARCHIVE_extract-zips-never-moves-r44-evidence.md`.** The missing call is now named rather than inferred: `grep -n "processed_zips\|shutil.move\|os.replace\|rename" tools/extract_inbox_zips.py` returns NOTHING. The tool extracts and returns; it has never relocated a zip. `data/standings/processed_zips/` holds 127 files and every one was moved there **by hand**, which means the hand-move IS this item's mechanism — the loop is not "the mine forgets the zip", it is "nothing in the tooling has ever moved one." The 08-22 pass added 60 more hand-moves, the 128th through 187th in the archive's history. Two constraints on the fix, both already recorded elsewhere: on this mount `rm` is refused and `mv` works (R109), so the fix must MOVE to `processed_zips/` and can never delete; and the cheap independent second guard is to skip a zip whose contest id already has a `data/archive/*/mined_<id>.json`, which is the same exclusion `awaiting_standings.py` already computes.
 
 ### R196, remainder. The archetype table cannot express "single entry, broad curve": the Solo Shot row is WRITTEN and posture inference still needs a hand override (P2, XS-S) | **RETITLED 2026-08-30** when the row half closed after six sightings; the rows exist, the tax does not go away, and this entry's own Fix line was wrong. Original title: "`dk_contest_archetypes.csv` has no Solo Shot row" | new 2026-08-23, merged from THREE BUILD fragments (`2026-08-19_BUILD_solo-shot-archetype.md`, `..._-recurred.md`, `2026-08-22_BUILD_solo-shot-archetype-3rd-occurrence.md`); THREE occurrences in four days. **FOURTH occurrence 2026-08-27, from `2026-08-25_BUILD_posture-vocab-and-solo-shot.md` §2:** "MLB $100 Solo Shot (Turbo)" matched no row and name-inferred to `large_gpp` — wrong for a single-entry contest — until `--postures <id>=single_entry` was passed by hand; and a FIFTH sighting the same week, "MLB Showdown $1K Solo Shot" absent on 1905_1g_sd (the R238 fragment). The family recurs on both formats; the Tier 4 decision this waits on is unchanged.
+
+> **Rider 2026-10-16 (Session 148, LANDED; CHANGELOG 2026-10-16).** D-12 answered by Ben: `small_gpp`. `normalize_posture` returns `small_gpp` for `se_gpp` + `broad_micro_gpp` (the table's two facts, no title read), so the Solo Shot family builds in gpp mode and no `--postures <id>=small_gpp` is needed; the Solo Shot `notes` OPERATOR NOTE is rewritten as resolved; the `Triple Up` row landed (cash / flat_cash, breadth 0.29, from 19 observed MLB instances) and its fragment is retired. A labelled convention until a graded Solo Shot cohort says otherwise. **OPEN REMAINDER, both Ben's:** (1) which of max 1 and `[20 Entry Max]` `ContestCard.max_entries` carries for the family (rider 2026-09-29, unchanged); (2) the graded Solo Shot cohort that would re-open `small_gpp` (n=11, 5-2-1 +2.0; the lineup effect is unmeasured). Roadmap: Session 90 (Awaiting Ben, strategy).
 
 > **Rider 2026-10-14 (DEV, R504; Ben's instruction).** A single-entry contest is one shot at first place in that contest, so where it routes (D-12) and which lineup it draws (R504(e), Session 173) are one question under the per-contest goal. D-12 stays Ben's.
 

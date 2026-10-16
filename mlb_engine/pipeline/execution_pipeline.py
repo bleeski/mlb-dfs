@@ -179,8 +179,8 @@ from mlb_engine.allocate.contest_allocator import (
     select_and_assign_entries,
 )
 from mlb_engine.contest_shapes import (
-    SATELLITE_PAYOUT_TOKENS, SATELLITE_TYPE_TOKENS, WTA_CONSTRUCTION_SHAPES,
-    satellite_shape_for, validate_shape,
+    CONTEST_SHAPES, SATELLITE_PAYOUT_TOKENS, SATELLITE_TYPE_TOKENS,
+    WTA_CONSTRUCTION_SHAPES, satellite_shape_for, validate_shape,
 )
 from mlb_engine.entries.dk_entries_manager import (
     classify_export_failures,
@@ -191,7 +191,8 @@ from mlb_engine.entries.dk_entries_manager import (
     validate_upload_ready_gates, write_candidate_from_template,
 )
 from mlb_engine.swap.late_swap_manager import (
-    PlayerLineupStatus, build_entry_requirements, late_swap_certification,
+    ENGINE_DEFAULT_SWAP_SHAPE, PlayerLineupStatus, build_entry_requirements,
+    late_swap_certification,
     resolve_parent_run, validate_late_swap_delta,
 )
 
@@ -1190,6 +1191,19 @@ def run_late_swap(
         authorized_entry_ids=authorized_entry_ids,
         missing_status_policy=missing_status_policy,
     )
+    # R66. Name the default when any entry took it: the swap scores that entry
+    # on the pure-ceiling profile whatever its contest is, and a result that
+    # says nothing leaves the caller to find that out from the numbers.
+    defaulted = sorted({str(r["contest_id"]) for r in requirements
+                        if r.get("contest_shape_source") != "mapped"})
+    if defaulted:
+        lineage_metadata["contest_shape_defaults"] = {
+            "default_shape": ENGINE_DEFAULT_SWAP_SHAPE,
+            "contest_ids": defaulted,
+            "reason": ("no contest_shapes entry for these contests, so each entry "
+                       "was scored on the engine default; pass contest_shapes "
+                       "(tools/late_swap.py resolves one per contest)"),
+        }
 
     if late_swap_mode == "validate_only":
         run = create_run(
@@ -1492,6 +1506,18 @@ def normalize_posture(
         return "cash"
     if itype in ("wta", "satellite") or shape in ("winner_take_all", "ticket_line"):
         return "wta_satellite"
+    if itype == "se_gpp" and shape == "broad_micro_gpp":
+        # R196, D-12 (Ben, 2026-10-16). A single entry on a BROAD, shallow curve
+        # (the Solo Shot family: 1 entry, paid to 23.5% of the field) is not the
+        # 1%-breadth contest `single_entry` builds for. `single_entry` maps to
+        # `single_entry_gpp`, which is in WTA_CONSTRUCTION_SHAPES and builds
+        # max-concentration; `small_gpp` is the posture the hand overrides had
+        # been passing, and maps to `small_field_gpp` (gpp construction). A
+        # labelled convention, not a rule: the lineup effect is unmeasured (n=11,
+        # 5-2-1 +2.0 files Solo Shot with the WTA family by its winners) and it
+        # stands until a graded Solo Shot cohort says otherwise. The table's own
+        # two facts express "single entry, broad curve"; no title is read here.
+        return "small_gpp"
     if itype == "se_gpp" or shape == "single_entry_gpp" or max_entries == 1:
         return "single_entry"
     if shape == "mme_top_heavy" or (max_entries is not None and max_entries >= 100):
@@ -1503,12 +1529,91 @@ def normalize_posture(
     return "large_gpp"
 
 
+def _validated_posture(posture: str) -> str:
+    """A posture string that names a ``STRATEGY_DEFAULTS`` row, or ValueError.
+
+    R66. ``STRATEGY_DEFAULTS.get(posture, STRATEGY_DEFAULTS["large_gpp"])`` is
+    the fallback every caps lookup takes, so an unknown posture built on
+    ``large_gpp`` caps under ``posture_source="operator_supplied"``, which also
+    suppressed the unresolved-contest blocker. The CLI validated; the API did not.
+    """
+    if posture not in STRATEGY_DEFAULTS:
+        raise ValueError(
+            f"unknown posture {posture!r}; valid: " + ", ".join(STRATEGY_DEFAULTS))
+    return posture
+
+
+def parse_posture_override(text: str) -> Tuple[str, Optional[int]]:
+    """One ``--postures`` value, ``<posture>[:tickets=N]``, as (posture, tickets).
+
+    R106. A satellite's ticket count is the fact that decides whether it is
+    ranked for first place (one ticket) or for a cut line (several), and the
+    operator is the one party who knows it per contest instance (the curated
+    table cannot: Pocket Cup runs at 1, 5 and 10). ``tickets=N`` is accepted on
+    ``wta_satellite`` only, because it means nothing on any other posture. This
+    parser asserts no contest type: it reports the count and the resolver
+    decides what a count means. Both CLIs (``build_slate.py``,
+    ``tools/late_swap.py``) call it, so the grammar has one owner. Raises
+    ``ValueError``; each CLI wraps it in its own error type.
+    """
+    head, *suffixes = [part.strip() for part in str(text).split(":")]
+    posture = _validated_posture(head)
+    tickets: Optional[int] = None
+    for suffix in suffixes:
+        key, sep, raw = suffix.partition("=")
+        if key.strip().lower() != "tickets" or not sep:
+            raise ValueError(
+                f"unknown posture suffix {suffix!r}; the only suffix is tickets=<N>")
+        if tickets is not None:
+            raise ValueError("tickets=<N> given twice")
+        try:
+            tickets = int(raw)
+        except ValueError:
+            raise ValueError(f"tickets={raw.strip()!r} is not an integer") from None
+        if tickets < 1:
+            raise ValueError(f"tickets={tickets} must be at least 1")
+    if tickets is not None and posture != "wta_satellite":
+        raise ValueError(
+            f"tickets=<N> is only meaningful on wta_satellite, not {posture!r}")
+    return posture, tickets
+
+
+def _carry_satellite_family(
+    inferred: Dict[str, Any], cname: str, fee: float, archetypes: Any,
+) -> bool:
+    """Copy the title's satellite family into ``inferred``, only when name
+    inference reads one; True when it did. The operator's posture is untouched:
+    this changes only what ``resolve_contest_shape`` sees (type, payout, count)."""
+    from mlb_engine.entries.dk_entries_manager import infer_contest_archetype
+
+    guess = infer_contest_archetype(cname, fee, archetypes)
+    itype = str(guess.get("inferred_type") or "").strip().lower()
+    payout = str(guess.get("payout_shape_default") or "").strip().lower()
+    if itype not in SATELLITE_TYPE_TOKENS and payout not in SATELLITE_PAYOUT_TOKENS:
+        return False
+    inferred.update(
+        inferred_type=guess.get("inferred_type"),
+        payout_shape_default=guess.get("payout_shape_default"),
+        ticket_count=guess.get("ticket_count"))
+    return True
+
+
 def _resolve_contest_postures(
     entry_rows: Sequence[Any],
     contest_postures: Optional[Mapping[str, Any]],
     archetypes_path: Optional[str],
 ) -> Dict[str, Dict[str, Any]]:
-    """Resolve a posture and contest shape for each distinct contest in the entries file."""
+    """Resolve a posture and contest shape for each distinct contest in the entries file.
+
+    ``contest_postures`` values are a posture string or a Mapping. R195: an
+    operator ``wta_satellite`` is the only way to name a true winner-take-all
+    contest AND the way to name a satellite, so the posture alone cannot say
+    which; the resolver asks name inference for the FAMILY and keeps the
+    operator's posture. A satellite title then ranks on ``satellite`` (a
+    one-ticket count on ``wta_ticket_satellite``) instead of ``large_wta``, the
+    pre-R1a mapping; a WTA title, an unnamed title and every other posture keep
+    the posture's own shape. ``shape_source`` says which of those happened.
+    """
     from mlb_engine.entries.dk_entries_manager import infer_contest_archetype, load_archetypes
 
     archetypes = load_archetypes(archetypes_path)
@@ -1521,17 +1626,43 @@ def _resolve_contest_postures(
         if cid in resolved:
             continue
         override = postures.get(cid) if cid in postures else postures.get(cname)
+        shape_source = "operator_posture"
         if isinstance(override, str):
-            posture = override
+            posture = _validated_posture(override)
             inferred = {"inferred_type": override, "payout_shape_default": None, "inferred_max_entries": None}
             source = "operator_supplied"
+            if posture == "wta_satellite":
+                if _carry_satellite_family(inferred, cname, fee, archetypes):
+                    shape_source = "name_inference_satellite"
         elif isinstance(override, Mapping):
             inferred = dict(override)
-            posture = str(inferred.get("posture") or normalize_posture(
-                inferred.get("inferred_type"), inferred.get("payout_shape_default"),
-                inferred.get("inferred_max_entries"),
-            ))
-            source = "operator_supplied"
+            if inferred.get("posture"):
+                posture = _validated_posture(str(inferred["posture"]))
+                source = "operator_supplied"
+            elif inferred.get("contest_shape"):
+                # R66. Was a silent ``large_gpp``. The shape names its own posture.
+                posture = _SHAPE_TO_POSTURE[
+                    validate_shape(inferred["contest_shape"], "contest_shape override")]
+                source = "operator_shape_derived"
+            elif inferred.get("ticket_count") is not None and not inferred.get("inferred_type"):
+                # R66. A ticket count with no type and no posture can only mean a
+                # ticket contest; it was a silent ``large_gpp``.
+                posture = "wta_satellite"
+                source = "operator_ticket_count_derived"
+            else:
+                posture = normalize_posture(
+                    inferred.get("inferred_type"), inferred.get("payout_shape_default"),
+                    inferred.get("inferred_max_entries"),
+                )
+                source = "operator_supplied"
+            if inferred.get("contest_shape"):
+                shape_source = "operator_shape"
+            elif posture == "wta_satellite" and inferred.get("ticket_count") is not None:
+                shape_source = "operator_ticket_count"
+            elif (posture == "wta_satellite" and not inferred.get("inferred_type")
+                  and not inferred.get("payout_shape_default")):
+                if _carry_satellite_family(inferred, cname, fee, archetypes):
+                    shape_source = "name_inference_satellite"
         else:
             inferred = infer_contest_archetype(cname, fee, archetypes)
             posture = normalize_posture(
@@ -1541,6 +1672,7 @@ def _resolve_contest_postures(
             source = ("name_inference"
                       if inferred.get("inferred_type") not in (None, "", "unknown")
                       else "unresolved")
+            shape_source = "name_inference"
         shape = resolve_contest_shape(posture, inferred)
         resolved[cid] = {
             "contest_id": cid, "contest_name": cname, "posture": posture,
@@ -1551,6 +1683,9 @@ def _resolve_contest_postures(
             # "the name matched nothing so it fell through to large_gpp" is the
             # whole of F3.
             "posture_source": source,
+            # How the shape was reached (R195, R66): the posture's own mapping,
+            # the operator's named shape or ticket count, or name inference.
+            "shape_source": shape_source,
             "matched_pattern": inferred.get("matched_pattern"),
             "competing_patterns": list(inferred.get("competing_patterns") or []),
         }
@@ -2040,6 +2175,37 @@ for _shape in list(_POSTURE_TO_SHAPE.values()) + [_POSTURE_TO_SHAPE_FALLBACK]:
     validate_shape(_shape, "execution_pipeline._POSTURE_TO_SHAPE")
 del _shape
 
+# R66. The posture an operator-named shape implies, for a Mapping override that
+# names a ``contest_shape`` and no ``posture`` (it resolved ``large_gpp`` before).
+# The shapes with a posture of their own invert ``_POSTURE_TO_SHAPE``; the rest
+# take the posture whose caps their construction matches: every WTA-family and
+# satellite shape takes ``wta_satellite`` (the posture that serves them in
+# ``normalize_posture``), and the two shapes no posture produces
+# (``mid_field_gpp``, ``portfolio_gpp``) take ``large_gpp``, which is what
+# ``normalize_posture`` gives a ``portfolio_gpp`` / ``broad_micro_gpp`` title.
+_SHAPE_TO_POSTURE = {
+    "cash": "cash",
+    "single_entry_gpp": "single_entry",
+    "small_field_gpp": "small_gpp",
+    "mid_field_gpp": "large_gpp",
+    "large_field_gpp": "large_gpp",
+    "portfolio_gpp": "large_gpp",
+    "mme_gpp": "mme",
+    "small_wta": "wta_satellite",
+    "mid_wta": "wta_satellite",
+    "large_wta": "wta_satellite",
+    "wta_ticket_satellite": "wta_satellite",
+    "satellite": "wta_satellite",
+}
+# Complete over the vocabulary and closed over the caps table, at import.
+if set(_SHAPE_TO_POSTURE) != set(CONTEST_SHAPES):
+    raise ValueError(
+        "execution_pipeline._SHAPE_TO_POSTURE must cover every contest shape: "
+        f"{sorted(set(CONTEST_SHAPES) ^ set(_SHAPE_TO_POSTURE))}")
+if not set(_SHAPE_TO_POSTURE.values()) <= set(STRATEGY_DEFAULTS):
+    raise ValueError(
+        "execution_pipeline._SHAPE_TO_POSTURE names a posture STRATEGY_DEFAULTS lacks")
+
 
 def _posture_to_shape(posture: str) -> str:
     return _POSTURE_TO_SHAPE.get(posture, _POSTURE_TO_SHAPE_FALLBACK)
@@ -2067,6 +2233,11 @@ def resolve_contest_shape(posture: str, inferred: Optional[Mapping[str, Any]] = 
     if explicit:
         return validate_shape(explicit, "contest_shape override")
 
+    # R106. A ticket count the operator supplied on a ``wta_satellite`` contest
+    # says it is a ticket contest whatever its title says, so it routes by the
+    # count. Gated on the posture: a count means nothing on any other one.
+    if posture == "wta_satellite" and info.get("ticket_count") is not None:
+        return satellite_shape_for(info.get("ticket_count"))
     itype = str(info.get("inferred_type") or "").strip().lower()
     payout = str(info.get("payout_shape_default") or "").strip().lower()
     if itype in SATELLITE_TYPE_TOKENS or payout in SATELLITE_PAYOUT_TOKENS:

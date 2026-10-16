@@ -141,7 +141,7 @@ Ben has delegated build decisions (CLAUDE.md, Autonomy). Start here:
 ```bash
 python <repo>/tools/autobuild.py \
   --salary <DKSalaries.csv> --entries <DKEntries.csv> \
-  --lineups <feed.json> --postures '<id>=<posture>,...' \
+  --lineups <feed.json> --postures '<id>=<posture>[:tickets=N],...' \
   --stop-after-minutes 12   # + --declare-pitcher <id>=<role> per PLR/PO arm (R345; bare PLR refused, R489)
 ```
 

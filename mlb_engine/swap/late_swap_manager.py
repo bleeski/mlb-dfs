@@ -37,6 +37,10 @@ SAFE_UNLOCKED_STATUSES = {CONFIRMED_STARTER, PROJECTED_STARTER}
 TBD_STATUSES = {PROJECTED_STARTER, BENCH_RISK, UNKNOWN}
 BLOCK_STATUSES = {CONFIRMED_OUT}
 LATE_SWAP_MODES = {"reoptimize", "validate_only"}
+# R66. The shape a swap scores an entry on when the caller maps no shape for its
+# contest: the pure-ceiling profile. `tools/late_swap.py` always maps every
+# contest, so only an API caller reaches it; it is a named default, not a rule.
+ENGINE_DEFAULT_SWAP_SHAPE = "large_wta"
 MISSING_STATUS_POLICIES = {"error", "treat_as_locked"}
 
 
@@ -456,7 +460,12 @@ def build_entry_requirements(
             "entry_id": entry.entry_id,
             "contest_id": entry.contest_id,
             "contest_name": entry.contest_name,
-            "contest_shape": (contest_shapes or {}).get(entry.contest_id, "large_wta"),
+            "contest_shape": (contest_shapes or {}).get(entry.contest_id, ENGINE_DEFAULT_SWAP_SHAPE),
+            # R66. A contest the caller did not map takes the engine default, the
+            # pure-ceiling profile. It is named on the requirement so the swap
+            # cannot score an entry on it without saying so.
+            "contest_shape_source": ("mapped" if entry.contest_id in (contest_shapes or {})
+                                     else "engine_default"),
             "locked_slot_assignments": locked_slots,
             "locked_player_ids": list(locked_slots.values()),
             "excluded_new_teams": locked_teams,
