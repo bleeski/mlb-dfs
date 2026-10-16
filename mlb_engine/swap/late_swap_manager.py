@@ -465,7 +465,7 @@ def build_entry_requirements(
             # pure-ceiling profile. It is named on the requirement so the swap
             # cannot score an entry on it without saying so.
             "contest_shape_source": ("mapped" if entry.contest_id in (contest_shapes or {})
-                                     else "engine_default_large_wta"),
+                                     else "engine_default"),
             "locked_slot_assignments": locked_slots,
             "locked_player_ids": list(locked_slots.values()),
             "excluded_new_teams": locked_teams,

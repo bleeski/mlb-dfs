@@ -1578,18 +1578,24 @@ def parse_posture_override(text: str) -> Tuple[str, Optional[int]]:
     return posture, tickets
 
 
-def _satellite_family_guess(
-    cname: str, fee: float, archetypes: Any,
-) -> Optional[Dict[str, Any]]:
-    """Name inference, only when it reads the contest as the satellite family."""
+def _carry_satellite_family(
+    inferred: Dict[str, Any], cname: str, fee: float, archetypes: Any,
+) -> bool:
+    """Copy the title's satellite family into ``inferred``, only when name
+    inference reads one; True when it did. The operator's posture is untouched:
+    this changes only what ``resolve_contest_shape`` sees (type, payout, count)."""
     from mlb_engine.entries.dk_entries_manager import infer_contest_archetype
 
     guess = infer_contest_archetype(cname, fee, archetypes)
     itype = str(guess.get("inferred_type") or "").strip().lower()
     payout = str(guess.get("payout_shape_default") or "").strip().lower()
-    if itype in SATELLITE_TYPE_TOKENS or payout in SATELLITE_PAYOUT_TOKENS:
-        return guess
-    return None
+    if itype not in SATELLITE_TYPE_TOKENS and payout not in SATELLITE_PAYOUT_TOKENS:
+        return False
+    inferred.update(
+        inferred_type=guess.get("inferred_type"),
+        payout_shape_default=guess.get("payout_shape_default"),
+        ticket_count=guess.get("ticket_count"))
+    return True
 
 
 def _resolve_contest_postures(
@@ -1626,12 +1632,7 @@ def _resolve_contest_postures(
             inferred = {"inferred_type": override, "payout_shape_default": None, "inferred_max_entries": None}
             source = "operator_supplied"
             if posture == "wta_satellite":
-                family = _satellite_family_guess(cname, fee, archetypes)
-                if family is not None:
-                    inferred.update(
-                        inferred_type=family.get("inferred_type"),
-                        payout_shape_default=family.get("payout_shape_default"),
-                        ticket_count=family.get("ticket_count"))
+                if _carry_satellite_family(inferred, cname, fee, archetypes):
                     shape_source = "name_inference_satellite"
         elif isinstance(override, Mapping):
             inferred = dict(override)
@@ -1660,12 +1661,7 @@ def _resolve_contest_postures(
                 shape_source = "operator_ticket_count"
             elif (posture == "wta_satellite" and not inferred.get("inferred_type")
                   and not inferred.get("payout_shape_default")):
-                family = _satellite_family_guess(cname, fee, archetypes)
-                if family is not None:
-                    inferred.update(
-                        inferred_type=family.get("inferred_type"),
-                        payout_shape_default=family.get("payout_shape_default"),
-                        ticket_count=family.get("ticket_count"))
+                if _carry_satellite_family(inferred, cname, fee, archetypes):
                     shape_source = "name_inference_satellite"
         else:
             inferred = infer_contest_archetype(cname, fee, archetypes)
@@ -2202,11 +2198,13 @@ _SHAPE_TO_POSTURE = {
     "satellite": "wta_satellite",
 }
 # Complete over the vocabulary and closed over the caps table, at import.
-assert set(_SHAPE_TO_POSTURE) == set(CONTEST_SHAPES), (
-    "execution_pipeline._SHAPE_TO_POSTURE must cover every contest shape: "
-    f"{sorted(set(CONTEST_SHAPES) ^ set(_SHAPE_TO_POSTURE))}")
-assert set(_SHAPE_TO_POSTURE.values()) <= set(STRATEGY_DEFAULTS), (
-    "execution_pipeline._SHAPE_TO_POSTURE names a posture STRATEGY_DEFAULTS lacks")
+if set(_SHAPE_TO_POSTURE) != set(CONTEST_SHAPES):
+    raise ValueError(
+        "execution_pipeline._SHAPE_TO_POSTURE must cover every contest shape: "
+        f"{sorted(set(CONTEST_SHAPES) ^ set(_SHAPE_TO_POSTURE))}")
+if not set(_SHAPE_TO_POSTURE.values()) <= set(STRATEGY_DEFAULTS):
+    raise ValueError(
+        "execution_pipeline._SHAPE_TO_POSTURE names a posture STRATEGY_DEFAULTS lacks")
 
 
 def _posture_to_shape(posture: str) -> str:

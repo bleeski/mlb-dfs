@@ -54664,12 +54664,12 @@ class PostureRoutingTests(unittest.TestCase):
             statuses = future_statuses(ids)
             default = build_entry_requirements(entries, statuses, NOW)
             self.assertEqual({(r["contest_shape"], r["contest_shape_source"]) for r in default},
-                             {(lsm.ENGINE_DEFAULT_SWAP_SHAPE, "engine_default_large_wta")})
+                             {(lsm.ENGINE_DEFAULT_SWAP_SHAPE, "engine_default")})
             partial = build_entry_requirements(entries, statuses, NOW, {"900": "cash"})
             self.assertEqual({r["contest_id"]: (r["contest_shape"], r["contest_shape_source"])
                               for r in partial},
                              {"900": ("cash", "mapped"),
-                              "901": ("large_wta", "engine_default_large_wta")})
+                              "901": ("large_wta", "engine_default")})
 
     def test_run_late_swap_records_which_contests_took_the_default(self):
         with tempfile.TemporaryDirectory() as tmp:
