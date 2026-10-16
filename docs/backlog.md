@@ -1106,6 +1106,16 @@ checkpoint has both objects in scope roughly 240 lines above.
 
 ## Workstream 2 — Strategy controls and the evidence that moves them
 
+### R505. The winning-score bar from the mined table: roll `contest_thresholds` up by archetype and field band and replace `WINNING_SCORE_SEED_CLASSIC` at `winning_score_bar` (P1, S-M) | new 2026-10-16, split from R258's mining half (Session 45) on the R504(b) rider | Roadmap: Session 174
+
+- **What:** `field_miner.winning_score_bar`, the bar R504(b)'s per-contest first-place read prints and Session 173's per-contest term may read, is still ledger 3.21's seed: Classic MEANS by slate size alone (138.9 / 144.6 / 161.1 / 162.8), pooled across archetypes and field sizes, and Showdown ABSENT. Session 45 landed the per-contest table it was waiting for (`contest_thresholds`; `archive_contest_table` over 610 archived contests: Classic winning-score median 147.55 over 361, Showdown 83.15 over 249), but not the rollup the R504(b) rider keys the replacement on: per archetype, per field band.
+- **Why:** first place is won against one contest's field, and a single-entry satellite of 23 and a 47,000-entry GPP on the same slate size share one bar today. The rollup is also the human-readable table R258's rider (iii) names for R13 and contest selection.
+- **Fix, and the choices inside it:** (i) one home for the field-band vocabulary, which exists twice in `tools/` (`results_ledger.FIELD_BANDS`, `ownership_grade_archive.field_band`) and nowhere in the engine; (ii) archetype per archived contest from the entry-history export's title and fee through `dk_entries_manager.infer_contest_archetype`, without putting FM on that import graph (R422(a) mirrors a constant for that reason), so the rollup is most likely a table the CLI writes and the build reads; (iii) `winning_score_bar` takes the contest's archetype and field size, which `execution_pipeline.per_contest_first_place` must pass per row, so EP's `by_contest` rows move and GOLD may re-freeze; (iv) median or mean (the seed holds means) and a minimum cell size below which the bar stays ABSENT, never a guess; (v) Showdown gets a bar where a cell clears that size. Slate size stays a dimension only if derivable: no archived mine records slate games.
+
+> **Rider 2026-10-15, carried from R258 (DEV, Session 172, R504(b)).** The bar R504(b) reads shipped as `field_miner.winning_score_bar`: ledger 3.21's seed, which holds MEANS by slate size (Classic 138.9 / 144.6 / 161.1 / 162.8 for 1-2 / 3-4 / 5-6 / 7+ games), pooled across archetypes and field sizes, not the per-contest median the rider below calls it, and Showdown's only a range (83-98), so its bar is ABSENT. It is labelled a pooled seed wherever it prints. When this entry's mining half lands, its per-archetype, per-field-band table replaces `WINNING_SCORE_SEED_CLASSIC` at `winning_score_bar` and nowhere else.
+
+> **Rider 2026-10-14, carried from R258 (DEV, R504; Ben's instruction).** The first goal is now first place within each contest, not the top 1% the 2026-08-27 refinement named, so this entry's TOP line is each contest's winning score; p99 stays a secondary column. The mining half's per-contest winning score is the bar R504(b) reads and Session 173's per-contest term may read; until it lands, ledger §3.21's seed (Classic 138.9 / 144.6 / 161.1 / 162.8 by slate size; Showdown winners 83-98 by field bucket) stands in, labelled as the seed it is.
+
 ### R504. CLOSED 2026-10-15 (Sessions 172-173). First place is read per contest and the allocator now chooses per contest: (a)-(d) landed in Session 172 (the frontier's `by_contest`, Showdown's per-contest slice, QA, `outcome_review` and `results_ledger` graded per contest, the doctrine sentences); (e) landed in Session 173: `max_shared_players_by_contest` bounds overlap inside each contest at the larger of its posture's value and its own feasibility floor wherever that is below the file's cap (the production replay's per-contest max overlap 4 / 6 / 7 -> 4 / 5 / 5 under a file-wide 8, the same 18 lineups re-dealt), single-entry contests draw first through a two-stage solve whose row can never make the solve infeasible, the file-wide caps stay the washout guardrails, and `first_place_path` is gone (its only reader is R273's dead surface). Showdown's `thesis_deal` stays the 2026-10-14 fragment's triage. Full text, decisions, the golden histograms and the gate lines: `CHANGELOG.md` 2026-10-15 (two entries).
 
 ### R498. CLOSED 2026-10-12 (Session 164). `tools/results_ledger.py attribute` cuts our paid Classic finishes by construction: every entry with a complete lineup in a standings export against the uniform reference and against the field in the same cell of the same contests on one paired slate draw, on the field-relative chalk third (midrank / N), stack and stack group, primary team and its field share, dead slots, posture (the build's default inference), field band and month, and, for R497-resolved entries, hitter roles, market, implied total and contest shape; findings only when an interval excludes 0, above a 20-entry, 5-slate floor. On the archive (791 entries, 38 slates) the prototype's figures reproduce; the large-secondary four-stacks bust above the field's same group (+14.10 [+7.8, +20.1]); the R6 check is not measurable until a resolved entry carries hitter roles, so no D-row is filed. Full text, premises corrected and gate line: `CHANGELOG.md` 2026-10-12.
@@ -1844,11 +1854,7 @@ against zero pulls. This is the one input on this item that no DEV session can
 supply. Surfaced in the queue's decisions-owed line rather than left inside this
 entry.
 
-### R48. `field_miner` emits a per-contest leverage table (P2, S) | new 2026-08-04, from ARCHIVE fragment `2026-08-04_ARCHIVE_miner-leverage-table.md`, merged 2026-08-04
-
-- **What:** the 3.17 leverage measurement — in 104 of 116 Classic contests (>= 40 entries) at least one player finished top-5 in contest FPTS under 10% drafted (mean 2.19 per contest); winners carried >= 1 in 51% against a 13% field base rate — was a bespoke pass over the mined JSONs. Nothing persists it per contest, so every regrade re-derives it and no build-time surface can ever cite it.
-- **Why:** it operationalizes the one differentiation channel the archive shows paying (low-owned pieces inside chalk-positive lineups) and is the natural grading target for R10's satellite prior. R39 was the Showdown half of the same blindness and landed 2026-08-08: `captain_norm` now rides every parsed entry and the miner emits a per-contest captain table, so the leverage table's Showdown counterpart has its input.
-- **Fix:** a `leverage` block per mined contest (players under 10% drafted with top-5 FPTS: name, %drafted, FPTS; carry rates for winner / top decile / field), same truthful labels as the rest of the block — deterministic descriptive statistics, never a probability claim. Backfill is one idempotent re-mine of the archive (~10 minutes in the cloud container per the 2026-08-04 registry-rebuild pattern). Pairs with the R30 miner batch.
+### R48. CLOSED 2026-10-16 (Session 45). `field_miner.leverage_table` writes ledger 3.17's leverage measurement per contest, on every mine and over the archive on disk: the top 5 players by their own FPTS (ties at the 5th included) that fewer than 10% of complete lineups rostered (the R341 recompute, DK's column beside it), and how many the winner, the top decile (`floor(N / 10)`) and the field carried. On the recompute 3.17 reads 100 of 116 contests and a 44.0% winner carry where it said 104 and 51%; across the 267 archived Classic contests of 40 or more entries, 235 hold a leverage player and the winner carries one in 49.4% against a 13.0% field rate. No re-mine: `archive_contest_table` reads the 610 v0.5 archived mines as stored. Full text, premises, the archive reading and the gate line: `CHANGELOG.md` 2026-10-16 (R48 + R258 mining half).
 
 ### R206. Every portfolio control counts ENTRIES, and the money is not distributed that way (P1, M + one Ben decision) | new 2026-08-23, merged from BUILD fragment `2026-08-19_BUILD_portfolio-controls-count-entries-not-dollars.md`; surfaced by an external red team that three internal passes missed
 
@@ -2229,33 +2235,11 @@ question the 08-24/08-26 fragments kept answering by hand.
 thesis labels → script axis and print per-contest script coverage in the
 R239(c) block. Proxies, labeled as such, in the brief beside apex/washout.
 
-### R258. The threshold model: mine what top-1% and cashing REQUIRED, then predict it pre-lock and grade it (P1; mining half S rides the R48+R83 batch, predict half M) | new 2026-08-27, from Ben's greenfield instruction; the load-bearing idea of the dual-objective lane
+### R258. The threshold model's predict half: predict each contest's lines pre-lock and grade the prediction per slate (P1, M; the mining half LANDED 2026-10-16, Session 45, entry in CHANGELOG.md; the archetype x field-band rollup and the seed swap split to R505; this entry holds the predict half only) | new 2026-08-27, from Ben's greenfield instruction; the load-bearing idea of the dual-objective lane | Roadmap: Session 50
 
-> **Rider 2026-10-15 (DEV, Session 172, R504(b)).** The bar R504(b) reads shipped as `field_miner.winning_score_bar`: ledger 3.21's seed, which holds MEANS by slate size (Classic 138.9 / 144.6 / 161.1 / 162.8 for 1-2 / 3-4 / 5-6 / 7+ games), pooled across archetypes and field sizes, not the per-contest median the rider below calls it, and Showdown's only a range (83-98), so its bar is ABSENT. It is labelled a pooled seed wherever it prints. When this entry's mining half lands, its per-archetype, per-field-band table replaces `WINNING_SCORE_SEED_CLASSIC` at `winning_score_bar` and nowhere else.
+> **Rider 2026-10-16 (DEV, Session 45; the mining half landed).** The observed lines the predict half fits on exist: `field_miner.contest_thresholds` rides every mine (the winner's points and state, `winner_copies`, `p99`/`p95`/`p90` at `floor(N x pct / 100)` with no clamp, and the paid line with `boundary_tie` and `first_unpaid_points`), and `archive_contest_table` (CLI `--archive-table`) computes it over the 610 v0.5 archived mines as stored, with paid places from `data/reference/draftkings-contest-entry-history_2026-10-09.csv` (610 of 610 observed; 100 boundary ties). No re-mine was needed, so rider (i) below has nothing left to amortize: the realized run environment per date is not in the mined JSONs (it needs boxscores), and the predict half joins it by `slate_date` when it fits. The pre-lock per-archetype table rider (iii) names, and the swap for `WINNING_SCORE_SEED_CLASSIC` the R504 riders asked for, are R505.
 
-> **Rider 2026-10-14 (DEV, R504; Ben's instruction).** The first goal is now first place within each contest, not the top 1% the 2026-08-27 refinement named, so this entry's TOP line is each contest's winning score; p99 stays a secondary column. The mining half's per-contest winning score is the bar R504(b) reads and Session 173's per-contest term may read; until it lands, ledger §3.21's seed (Classic 138.9 / 144.6 / 161.1 / 162.8 by slate size; Showdown winners 83-98 by field bucket) stands in, labelled as the seed it is.
-
-**Rider 2026-09-15 (DEV, from the mine; roadmap CC-10 mining half, CC-20 predict half).** Paid-place coverage is no longer 97 of 610: `dk_contest_money_2026-09-15.json` carries `paid_places` for 611 contests through 09-14, satellites and Best Ball only. The satellite cell simplifies further than the 08-28 rider said and is now measured on receipts: of 123 mined-window matches 104 pay one place, 14 pay two, 5 pay five; paid fraction 0.46% to 6.67% of the field, median 4.35%, none 20%; of Ben's 172 matched entries 29 finished in the top 20% and six were awarded, all six OUTSIDE a literal `Place / field <= 1%` filter because fields of 23 and 95 make first place more than 1%. So the satellite threshold IS the win line, "top 20% is not cash" is a measured statement, and the mining half's per-contest table records the exact paid boundary (with the three boundary ties 193708561, 193774263, 194182641 named, not averaged away). The GPP threshold cells still have no cash curve (Ben's decision).
-
-**Rider 2026-08-28 (ARCHIVE, ledger 3.21): a seed threshold table exists, and
-the satellite cell simplifies.** Mean winning / top-decile scores by slate size:
-Classic 138.9/116.2 (1-2g), 144.6/116.4 (3-4g), 161.1/127.3 (5-6g), 162.8/128.8
-(7g+); Showdown winners 83-98 by field bucket, top-decile bar ~72. One
-structural fact collapses T[s,c] where most of our volume sits: observed
-satellites pay ONE seat in 75 of 81 paid-known rows
-(`data/reference/dk_contest_paid_places.json`), so the satellite threshold IS
-the win line and "cash" is not a separate target there — the washout axis stays
-portfolio-level, per the dual objective. Paid-place coverage is 97 of 610
-(16%, all ≤07-29), not zero; R30's data half is what extends it.
-
-**What.** Every archived contest's standings hold the full realized score
-curve. Mine per-contest: winning score, p99 / p95 / p90 lines, cash line,
-ticket line for satellites, and duplicate count at the top, into a
-per-archetype × field-size table (preconditions: R226's rank truth; R118's
-draftgroup keying caveat). Then the predict half: pre-lock, predict
-tonight's thresholds from slate features (implied-run environment, field
-size, archetype, format) and grade the prediction per slate in the ledger,
-R135-style.
+**What.** Pre-lock, predict tonight's thresholds per contest (the winning score first, R504's line; p99 secondary; the paid line) from slate features (implied-run environment, field size, archetype, format), and grade the prediction per slate in the ledger, R135-style, against `contest_thresholds`.
 
 **Why.** This converts "maximize P(top 1%)" from a field-simulation problem
 into a scalar prediction problem: P(top 1%) = P(own score ≥ p99 line), no
@@ -2267,10 +2251,8 @@ and D2 have been waiting on, and R40's routing reads it too. A threshold is
 an observed outcome; a predicted threshold graded per slate is exactly the
 label discipline the ledger already runs.
 
-**Fix.** Mining pass emits `contest_thresholds` beside R48's leverage table
-(one batch, one re-mine); predict half is a small model with two baselines
-(archetype median; environment-scaled) so beating naive is demonstrated, not
-asserted.
+**Fix.** A small model with two baselines (archetype median;
+environment-scaled) so beating naive is demonstrated, not asserted.
 
 **Rider 2026-08-28 (ed9 §4.3, accepted — the edition's sharpest point,
 landed before the mining batch could bake the biased version in).** A
@@ -2288,7 +2270,8 @@ scenario, never against one frozen point. Three consequences now: (i) the
 mining half's ONE batch also captures per-contest realized slate covariates
 (the run environment per archived date is reconstructable), so the
 conditional fit has its columns without a re-mine — this rider exists so
-the batch runs once; (ii) the predict half gains a third named baseline,
+the batch runs once (2026-10-16: not captured, see the rider above; joined
+by date in this half); (ii) the predict half gains a third named baseline,
 the environment-blind marginal threshold, and the conditional model must
 beat all three on held-out slate DATES; (iii) the pre-lock per-archetype
 table stays the human-readable summary R13 and contest selection read — the
