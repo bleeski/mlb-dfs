@@ -9446,8 +9446,10 @@ class PitchersDuelFloorTests(_ShowdownExitDoorHarness, unittest.TestCase):
 # R238 + R239(a), roadmap Session 52
 # --------------------------------------------------------------------------- #
 _SD_SAT = "MLB Showdown Satellite to $2 MLB Pocket Cup MEGA Qualifier (MIN @ CHC)"
-# DK's own title from the 2026-09 deliveries: matches no archetype row.
-_SD_TRIPLE = "MLB Showdown $1 Triple Up [Top 9 Win $3] (MIN @ CHC)"
+# A title that matches no archetype row. It was DK's `Triple Up [Top 9 Win $3]`
+# until Session 148 (R196) gave that family a row, so the unidentified-contest
+# tests below use a made-up family name and keep their subject.
+_SD_UNIDENTIFIED = "MLB Showdown $1 Mystery Pick [Top 9 Win $3] (MIN @ CHC)"
 
 
 class ShowdownContestShapeTests(_ShowdownExitDoorHarness, unittest.TestCase):
@@ -9508,7 +9510,10 @@ class ShowdownContestShapeTests(_ShowdownExitDoorHarness, unittest.TestCase):
         arg = ",".join(f"{k}={v}" for k, v in posture.items())
         r = self._build(root, entries_csv=entries_csv, args_extra={"postures": arg})
         self.assertEqual(r.code, 0, r.err[-3000:])
-        shape_of = {"wta_satellite": "large_wta", "small_gpp": "small_field_gpp",
+        # R195 (Session 148): an explicit wta_satellite on a satellite title takes
+        # the satellite shape, which is also what inference gives, so the rows that
+        # prove the operator's value won are the other three postures.
+        shape_of = {"wta_satellite": "satellite", "small_gpp": "small_field_gpp",
                     "single_entry": "single_entry_gpp", "large_gpp": "large_field_gpp"}
         contests = {c["contest_id"]: c for c in r.brief["contests"]}
         self.assertEqual(sorted(contests), sorted(ids))
@@ -9554,7 +9559,7 @@ class ShowdownContestShapeTests(_ShowdownExitDoorHarness, unittest.TestCase):
         fall-through large_gpp is kept only as `fallback_*`), so section 4 will
         not price a crowd nobody identified."""
         root = self._root("triple")
-        layout = ([("7001", _SD_TRIPLE)] * 7) + ([("7002", _SD_SAT)] * 7)
+        layout = ([("7001", _SD_UNIDENTIFIED)] * 7) + ([("7002", _SD_SAT)] * 7)
         r = self._build(root, entries_csv=self._entries(root, layout))
         self.assertEqual(r.code, 0, r.err[-3000:])
         by_id = {c["contest_id"]: c for c in r.brief["contests"]}
@@ -9598,14 +9603,14 @@ class ShowdownContestShapeTests(_ShowdownExitDoorHarness, unittest.TestCase):
         that wrote only `per_contest` left every contest UNRESOLVED."""
         from tools.qa_portfolio import section_leverage
         root = self._root("qa")
-        layout = ([("7001", _SD_TRIPLE)] * 7) + ([("7002", _SD_SAT)] * 7)
+        layout = ([("7001", _SD_UNIDENTIFIED)] * 7) + ([("7002", _SD_SAT)] * 7)
         r = self._build(root, entries_csv=self._entries(root, layout))
         self.assertEqual(r.code, 0, r.err[-3000:])
         hdr = ["Entry ID", "Contest Name", "Contest ID", "Entry Fee",
                "CPT", "UTIL", "UTIL", "UTIL", "UTIL", "UTIL"]
         body = [[str(100 + i), name, cid, "$0.01", "c1", "u1", "u2", "u3", "u4", "u5"]
                 for i, (cid, name) in enumerate(
-                    [("7001", _SD_TRIPLE)] * 2 + [("7002", _SD_SAT)] * 2)]
+                    [("7001", _SD_UNIDENTIFIED)] * 2 + [("7002", _SD_SAT)] * 2)]
         prior = {"schema": "ownership_pred/v1", "prior_version": "t",
                  "slate_date": "2026-07-18", "slate_tag": "t",
                  "salary_file": {"sha256": ""},
