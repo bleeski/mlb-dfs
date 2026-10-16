@@ -1014,3 +1014,26 @@ def test_contest_title_tokens_meet_word_edges_and_a_stated_cap_is_read():
     }
     for title, want in cases.items():
         assert infer_shape(title) == want, title
+
+
+def test_stage0_title_edges_and_cap_read_match_the_engine():
+    """R464: stage 0 keeps copies of the engine's edge rule and cap parse (an
+    import would pull optimizer_v3 into the contracts module), so the copies are
+    pinned to the originals here, the way preflight's copy is."""
+    from mlb_engine.entries import dk_entries_manager as dkm
+    from mlb_engine.production import contracts
+
+    titles = ("MLB $5 Summer Slam [20 Entry Max]", "MLB $5 Ticketmaster Cup",
+              "MLB $5 Knuckleball [120-Max]", "MLB $5 Knuckleball [20-Max]",
+              "MLB SUPERSatellite to $2 MLB Pocket Cup MEGA Qualifier [10x]",
+              "MLB $4 Satellite [1 Ticket]", "MLB $5 Double Upside", "MLB $5 50/50",
+              "MLB $4.5K mini-MAX [$1K to 1st, 150 Entry Max]", "MLB $150 Entry Max Special",
+              "MLB $5 Foo [3 Entry Max] [20 Entry Max]", "MLB $5 Foo [2,500 Entry Max]")
+    tokens = ("mme", "ticket", "20-max", "150-max", "satellite", "qualifier",
+              "double up", "50/50", "wta", "gpp")
+    for title in titles:
+        low = title.casefold()
+        assert contracts._stated_entry_cap(low) == dkm._explicit_max_entries(title), title
+        for token in tokens:
+            assert contracts._title_token(low, token) == dkm._pattern_in_title(token, title), (
+                token, title)

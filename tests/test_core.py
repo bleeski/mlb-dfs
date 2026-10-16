@@ -9559,9 +9559,15 @@ class ContestTitleRoutingTests(unittest.TestCase):
         self.assertEqual(len(epi.unresolved_contest_blockers({"1": bare})), 1)
         source = epi.inferred_posture_source
         self.assertEqual(source({"inferred_type": "cash"}), "name_inference")
-        self.assertEqual(source({"inferred_type": "unknown", "max_entries_source": "title"}),
-                         "name_inference")
+        self.assertEqual(source({"inferred_type": "unknown", "max_entries_source": "title",
+                                 "inferred_max_entries": 5}), "name_inference")
+        # A cap that does not route lands on the fall-through and stays unresolved.
+        capped = self._resolve("MLB $5 Mystery Cup [50 Entry Max]")
+        self.assertEqual((capped["posture"], capped["posture_source"]), ("large_gpp", "unresolved"))
+        self.assertEqual(len(epi.unresolved_contest_blockers({"1": capped})), 1)
         for inferred in ({"inferred_type": "unknown", "max_entries_source": None},
+                         {"inferred_type": "unknown", "max_entries_source": "title",
+                          "inferred_max_entries": 50},
                          {"inferred_type": "unknown"}, {}):
             with self.subTest(inferred=inferred):
                 self.assertEqual(source(inferred), "unresolved")

@@ -1606,13 +1606,19 @@ def inferred_posture_source(inferred: Mapping[str, Any]) -> str:
     fact the title states and ``normalize_posture`` routes on it, which is not the
     ``large_gpp`` fall-through ``unresolved_contest_blockers`` exists to stop. The
     type stays ``unknown`` and its ``contest_type`` gap stays on the record, with
-    ``max_entries_source: "title"`` and no ``matched_pattern``. One rule:
+    ``max_entries_source: "title"`` and no ``matched_pattern``. Only a cap that
+    ROUTES counts: ``[50 Entry Max]`` lands on the same ``large_gpp`` the cap-less
+    fall-through gives, so it stays ``unresolved``. One rule:
     ``tools/results_ledger.title_postures`` reads this function too.
     """
-    if inferred.get("inferred_type") not in (None, "", "unknown"):
+    itype = inferred.get("inferred_type")
+    if itype not in (None, "", "unknown"):
         return "name_inference"
     if inferred.get("max_entries_source") == "title":
-        return "name_inference"
+        shape = inferred.get("payout_shape_default")
+        if (normalize_posture(itype, shape, inferred.get("inferred_max_entries"))
+                != normalize_posture(itype, shape, None)):
+            return "name_inference"
     return "unresolved"
 
 

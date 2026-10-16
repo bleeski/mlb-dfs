@@ -1617,9 +1617,10 @@ EXPECTED_SUITE_COUNTS = {
     # flag, a truthful label, the counts repo_env stores, an identifiable
     # contest) and its nearest-rank percentile.
     "tests.test_greenfield_regressions": 39,
-    # R464 (Session 133), 2026-10-16: 101 -> 102, stage 0's `infer_shape` at
-    # word edges and reading DK's `[N Entry Max]` cap.
-    "tests.test_production": 102,
+    # R464 (Session 133), 2026-10-16: 101 -> 103, stage 0's `infer_shape` at
+    # word edges and reading DK's `[N Entry Max]` cap, and its copies of the
+    # engine's edge rule and cap parse pinned to the originals.
+    "tests.test_production": 103,
 }
 # The sum, not a second number to keep in step: R70 left this comment reading
 # 901 while the dict already summed to 928, which is the exact staleness this
