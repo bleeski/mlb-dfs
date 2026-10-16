@@ -1,0 +1,333 @@
+{
+ "code": {
+  "contest_allocator": "v1.12",
+  "execution_pipeline": "v1.17",
+  "git_dirty": true,
+  "git_sha": "0d2ef2e010416c0f099853339dae111420f8ff8e"
+ },
+ "controls": {},
+ "date": "2026-10-16",
+ "egress": "egress: statsapi 200, odds 401, savant 200, mlb-lineups 200, fangraphs 200 (curl), open-meteo 429",
+ "egress_source": "session_start 2026-10-16T22:50:56+00:00",
+ "entries": [
+  {
+   "contest_id": "196791298",
+   "contest_name": "MLB Showdown $15K mini-MAX [150 Entry Max] (TB @ CLE)",
+   "entry_fee": 1.0,
+   "entry_id": "5297787277",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44531235",
+    "44531139",
+    "44531141",
+    "44531142",
+    "44531145",
+    "44531146"
+   ]
+  },
+  {
+   "contest_id": "196791300",
+   "contest_name": "MLB Showdown $1.5K Quarter Jukebox [Just $0.25!] (TB @ CLE)",
+   "entry_fee": 0.25,
+   "entry_id": "5297791132",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44531224",
+    "44531139",
+    "44531141",
+    "44531146",
+    "44531151",
+    "44531153"
+   ]
+  },
+  {
+   "contest_id": "196791300",
+   "contest_name": "MLB Showdown $1.5K Quarter Jukebox [Just $0.25!] (TB @ CLE)",
+   "entry_fee": 0.25,
+   "entry_id": "5297791150",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44531223",
+    "44531140",
+    "44531142",
+    "44531144",
+    "44531150",
+    "44531196"
+   ]
+  },
+  {
+   "contest_id": "196791304",
+   "contest_name": "MLB Showdown $1K Daily Dollar [Single Entry] (TB @ CLE)",
+   "entry_fee": 1.0,
+   "entry_id": "5297791271",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44531234",
+    "44531135",
+    "44531140",
+    "44531144",
+    "44531146",
+    "44531150"
+   ]
+  },
+  {
+   "contest_id": "196791400",
+   "contest_name": "MLB Showdown Satellite to $15 Relay Throw (TB @ CLE)",
+   "entry_fee": 0.25,
+   "entry_id": "5297786712",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44531222",
+    "44531138",
+    "44531145",
+    "44531146",
+    "44531151",
+    "44531209"
+   ]
+  },
+  {
+   "contest_id": "196791400",
+   "contest_name": "MLB Showdown Satellite to $15 Relay Throw (TB @ CLE)",
+   "entry_fee": 0.25,
+   "entry_id": "5297791398",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44531221",
+    "44531142",
+    "44531144",
+    "44531146",
+    "44531150",
+    "44531196"
+   ]
+  },
+  {
+   "contest_id": "196791404",
+   "contest_name": "MLB Showdown Satellite to NBA 10-20 $20 Opening Tip Off (TB @ CLE)",
+   "entry_fee": 0.25,
+   "entry_id": "5297786753",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44531224",
+    "44531141",
+    "44531145",
+    "44531146",
+    "44531150",
+    "44531151"
+   ]
+  },
+  {
+   "contest_id": "196791404",
+   "contest_name": "MLB Showdown Satellite to NBA 10-20 $20 Opening Tip Off (TB @ CLE)",
+   "entry_fee": 0.25,
+   "entry_id": "5297791476",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44531222",
+    "44531135",
+    "44531142",
+    "44531150",
+    "44531153",
+    "44531159"
+   ]
+  },
+  {
+   "contest_id": "196807794",
+   "contest_name": "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (TB @ CLE)",
+   "entry_fee": 0.25,
+   "entry_id": "5297786881",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44531222",
+    "44531138",
+    "44531141",
+    "44531150",
+    "44531151",
+    "44531157"
+   ]
+  },
+  {
+   "contest_id": "196807794",
+   "contest_name": "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (TB @ CLE)",
+   "entry_fee": 0.25,
+   "entry_id": "5297786907",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44531223",
+    "44531138",
+    "44531141",
+    "44531150",
+    "44531151",
+    "44531153"
+   ]
+  },
+  {
+   "contest_id": "196811273",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (TB @ CLE)",
+   "entry_fee": 0.1,
+   "entry_id": "5297786291",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44531223",
+    "44531140",
+    "44531142",
+    "44531144",
+    "44531151",
+    "44531157"
+   ]
+  },
+  {
+   "contest_id": "196811273",
+   "contest_name": "MLB Showdown $100 Dime Time [Just $0.10!] (TB @ CLE)",
+   "entry_fee": 0.1,
+   "entry_id": "5297791094",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44531221",
+    "44531141",
+    "44531145",
+    "44531146",
+    "44531151",
+    "44531156"
+   ]
+  },
+  {
+   "contest_id": "196811348",
+   "contest_name": "MLB Showdown $150 Quarter Jukebox [Just $0.25!] (TB @ CLE)",
+   "entry_fee": 0.25,
+   "entry_id": "5297791198",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44531228",
+    "44531135",
+    "44531140",
+    "44531144",
+    "44531153",
+    "44531196"
+   ]
+  },
+  {
+   "contest_id": "196811348",
+   "contest_name": "MLB Showdown $150 Quarter Jukebox [Just $0.25!] (TB @ CLE)",
+   "entry_fee": 0.25,
+   "entry_id": "5297791234",
+   "filled": true,
+   "prediction": null,
+   "roster_ids": [
+    "44531221",
+    "44531136",
+    "44531142",
+    "44531147",
+    "44531159",
+    "44531196"
+   ]
+  }
+ ],
+ "entries_binding": {
+  "source": "outputs/2026-10-16/DKEntries_showdown_2000_1g_sd_FINAL.csv",
+  "source_sha256": "63265c3aa5a1d21fa3dba394b0205ba5979df103223b1f1d36d1a005d40a75ce",
+  "status": "bound"
+ },
+ "host": {
+  "call_budget_s": 630.0,
+  "declared_ceiling_s": 900.0,
+  "host": "claude_code"
+ },
+ "kind": "delivery",
+ "labels": "deterministic review proxies and labeled priors only; never ROI, win rate, cash rate, or probability",
+ "manifest_row": {
+  "certification": "review_grade",
+  "contest_ids": [
+   "196791298",
+   "196791300",
+   "196791304",
+   "196791400",
+   "196791404",
+   "196807794",
+   "196811273",
+   "196811348"
+  ],
+  "contest_names": [
+   "MLB Showdown $1.5K Quarter Jukebox [Just $0.25!] (TB @ CLE)",
+   "MLB Showdown $100 Dime Time [Just $0.10!] (TB @ CLE)",
+   "MLB Showdown $150 Quarter Jukebox [Just $0.25!] (TB @ CLE)",
+   "MLB Showdown $15K mini-MAX [150 Entry Max] (TB @ CLE)",
+   "MLB Showdown $1K Daily Dollar [Single Entry] (TB @ CLE)",
+   "MLB Showdown Satellite to $15 Relay Throw (TB @ CLE)",
+   "MLB Showdown Satellite to $20 NFL Fantasy Football Millionaire (TB @ CLE)",
+   "MLB Showdown Satellite to NBA 10-20 $20 Opening Tip Off (TB @ CLE)"
+  ],
+  "contest_type": "showdown",
+  "delivered_file": "outputs/2026-10-16/DKEntries_showdown_2000_1g_sd_FINAL.csv",
+  "entries": 14,
+  "notes": "Showdown ships review-grade; it does not pass the three certification gates. Hand re-deal of the thesis ladder's rows: the lineups of entries 5297791476 (NBA satellite) and 5297791094 ($100 Dime Time) swapped so each 2-entry contest holds one CLE-win and one TB-win path. Same 14 lineups as engine file sha256 90741b99b4ea95c3557c7cac0df71d6c53710e5643caf0bcff322c2045a337b6; no lineup added, removed or edited.",
+  "projection_tier": "unknown",
+  "recorded_utc": "2026-10-16T23:00:47.454810+00:00",
+  "run_id": null,
+  "sha256": "63265c3aa5a1d21fa3dba394b0205ba5979df103223b1f1d36d1a005d40a75ce",
+  "slate_tag": "2000_1g_sd",
+  "status": "candidate",
+  "strategy_state": {
+   "counts": {},
+   "state": "unknown"
+  }
+ },
+ "players": {},
+ "pool": null,
+ "prediction_source": {
+  "build_id": null,
+  "ceiling_basis": "null on every Showdown entry: the melted and priced frames carry Base and no Ceiling column on either path (the thesis ladder or the points-max bank), so there is no ceiling sum to record",
+  "filled": 14,
+  "held_entry_ids": [],
+  "label": "what the Showdown build predicted for each lineup it chose, handed to the record in process at delivery because a Showdown build has no run folder: the thesis template (or points_max for the baseline and the points-max bank), the realized captain and whether it is a pitcher or a hitter, the team split, the Base sum with the captain at 1.5x and its rank in the build, and the labeled captain-slot and six-slot roster priors or null. build_id is one per build's inputs (date, slate tag, salary and template bytes): the baseline and the ladder of a build share it, and two builds over the same inputs share it too, told apart by their sha256 and recorded_utc. Deterministic review proxies and labeled priors, never ROI, a win rate or a probability",
+  "players_missing": [
+   "44531135",
+   "44531136",
+   "44531138",
+   "44531139",
+   "44531140",
+   "44531141",
+   "44531142",
+   "44531144",
+   "44531145",
+   "44531146",
+   "44531147",
+   "44531150",
+   "44531151",
+   "44531153",
+   "44531156",
+   "44531157",
+   "44531159",
+   "44531196",
+   "44531209",
+   "44531221",
+   "44531222",
+   "44531223",
+   "44531224",
+   "44531228",
+   "44531234",
+   "44531235"
+  ],
+  "predicted": 0,
+  "priors": null,
+  "rank_basis": "rank_in_build orders this build's own lineups by base_sum descending, ties by slot; slot is the lineup's 1-based place in the build (the ladder's deal order or the bank's solve order), which is the order of the reserved rows it filled",
+  "status": "not_supplied",
+  "unmatched_entry_ids": []
+ },
+ "recorded_utc": "2026-10-16T23:00:47.765545+00:00",
+ "relaxations": {},
+ "run": {},
+ "schema_version": 1
+}
