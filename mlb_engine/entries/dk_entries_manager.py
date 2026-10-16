@@ -438,24 +438,34 @@ def archetype_rank_key(inferred_type: Any, has_max_entries: bool, pattern: str) 
 
 
 def _pattern_in_title(pattern: Any, title: Any) -> bool:
-    """Does a curated archetype pattern occur in a contest title? (R447)
+    """Does a curated archetype pattern occur in a contest title? (R447, R464)
 
-    A pattern whose curated text BEGINS with whitespace is a token guard: the
-    CSV's ' SE' row says its leading space "prevents false-positive matches on
-    titles containing USE, POSE, or similar substrings". The guard only covered
-    the left edge, so ' SE' still matched ' Season', ' Series', ' Select' and
-    ' SEA' (a Showdown "(ATH @ SEA)" suffix). A guarded pattern therefore has to
-    end at a token edge too: end of title, a space, a bracket, any character that
-    is not a letter or digit. Every other pattern stays a plain substring, so
-    'Quarter', 'MME' and 'Ticket' route as they always did.
+    A word edge is any position not next to a letter or digit (end of title, a
+    space, a bracket, '!', '-'). Three clauses:
+
+    - A pattern that ENDS in a letter or digit must end at a word edge, so
+      'MME' is not in "Summer", 'Quarter' not in "Quarterback", 'Ticket' not in
+      "Ticketmaster", 'Double Up' not in "Double Upside".
+    - A pattern that BEGINS with a digit must begin at one, so '20-Max' is not
+      in "[120-Max]" and '3-Max' not in "[13-Max]": a digit inside a larger
+      number is a different number.
+    - A pattern that begins with a letter may end a compound. DK writes
+      "SUPERSatellite" (119 MLB titles), and a letter left edge would drop 77 of
+      them from a satellite to a large-field GPP. A pattern whose curated text
+      begins with whitespace keeps that space as its left guard (the CSV's ' SE'
+      row, R447), so "(SE)" and "[SE]" still do not match.
+
+    Measured on 2,006 distinct MLB titles: this rule moves none of them. The
+    hazards it closes were all constructed; the residuals (a left compound such
+    as "Disqualifier", a plural such as "Tickets") occur in none.
     """
     pat = str(pattern or "").lower()
     low = str(title or "").lower()
     if not pat.strip():
         return False
-    if pat[0].isspace():
-        return re.search(re.escape(pat) + r"(?![^\W_])", low) is not None
-    return pat in low
+    left = r"(?<![^\W_])" if pat[0].isdigit() else ""
+    right = r"(?![^\W_])" if pat[-1].isalnum() else ""
+    return re.search(left + re.escape(pat) + right, low) is not None
 
 
 # R446: DK spells the entry cap "[20 Entry Max]"; the CSV's rows carry "20-Max".

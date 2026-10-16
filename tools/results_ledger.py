@@ -1736,11 +1736,12 @@ def title_postures(titles: Iterable[Tuple[str, Decimal]]) -> Dict[Tuple[str, Dec
 
     `_resolve_contest_postures` infers the archetype from the title and fee and
     maps it with `normalize_posture` when the operator supplies none. `inferred`
-    is the pipeline's `name_inference` source; False is its `unresolved`, where
-    the posture comes from the entry cap alone or the large_gpp default.
+    is the pipeline's `name_inference` source, read from the same function
+    (`inferred_posture_source`, R464), so a title that states its entry cap is
+    inferred; False is its `unresolved`, the large_gpp default.
     """
     from mlb_engine.entries import dk_entries_manager as dm
-    from mlb_engine.pipeline.execution_pipeline import normalize_posture
+    from mlb_engine.pipeline.execution_pipeline import inferred_posture_source, normalize_posture
 
     curated = dm.load_archetypes(dm.find_archetypes_csv())
     out: Dict[Tuple[str, Decimal], Tuple[str, bool]] = {}
@@ -1749,7 +1750,7 @@ def title_postures(titles: Iterable[Tuple[str, Decimal]]) -> Dict[Tuple[str, Dec
         out[(title, fee)] = (
             normalize_posture(inferred.get("inferred_type"), inferred.get("payout_shape_default"),
                               inferred.get("inferred_max_entries")),
-            inferred.get("inferred_type") not in (None, "", "unknown"))
+            inferred_posture_source(inferred) == "name_inference")
     return out
 
 
@@ -2334,8 +2335,8 @@ def render_attribution(report: Mapping[str, Any], results: Path) -> str:
              f"  team map: {cov['team_mapped_entries']} of our entries in {cov['team_mapped_contests']} "
              "contests (primary team and its field share are unknown elsewhere)",
              f"  posture: {report['postures_inferred']['name_inference']} of our entries by "
-             f"name_inference, {report['postures_inferred']['unresolved']} unresolved (the entry cap "
-             "or the large_gpp default)",
+             f"name_inference, {report['postures_inferred']['unresolved']} unresolved (the "
+             "large_gpp default)",
              f"  build-time axes: {report['builds']['note']}",
              f"  intervals: 90%, {boot['unit']} bootstrap, {boot['draws']} draws, seed {boot['seed']}, "
              f"{boot['order']}; ours and the field paired on one draw per cell"]
@@ -2816,8 +2817,8 @@ def render_showdown_attribution(report: Mapping[str, Any], results: Path) -> str
              f"{role['unknown']['field']} field lineups; {role['recorded']} of ours from a record, "
              f"{role['disagree']} of the {role['recorded_and_table']} the tables also name disagree",
              f"  posture: {report['postures_inferred']['name_inference']} of our entries by "
-             f"name_inference, {report['postures_inferred']['unresolved']} unresolved (the entry cap "
-             "or the large_gpp default)",
+             f"name_inference, {report['postures_inferred']['unresolved']} unresolved (the "
+             "large_gpp default)",
              f"  build-time axes: {report['builds']['note']}",
              f"  intervals: 90%, {boot['unit']} bootstrap, {boot['draws']} draws, seed {boot['seed']}, "
              f"{boot['order']}; ours and the field paired on one draw per cell"]

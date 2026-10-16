@@ -6,6 +6,7 @@ assertion that a model has been calibrated. Supplied distributions remain priors
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Annotated, Literal
@@ -52,25 +53,66 @@ SHAPE = Literal[
 ]
 
 
+def _title_token(text: str, token: str) -> bool:
+    """R464: a token occurs at a word edge, the engine's rule for archetype rows.
+
+    A copy of ``dk_entries_manager._pattern_in_title``'s edges, because importing
+    it would pull ``optimizer_v3`` into this module: a token ending in a letter
+    or digit must end where a word does ("ticket" is not in "ticketmaster"), one
+    beginning with a digit must begin where a number does ("20-max" is not in
+    "[120-max]"), and one beginning with a letter may end a compound
+    ("SUPERSatellite").
+    """
+    left = r"(?<![^\W_])" if token[0].isdigit() else ""
+    right = r"(?![^\W_])" if token[-1].isalnum() else ""
+    return re.search(left + re.escape(token) + right, text) is not None
+
+
+# R464: the cap a title states as "N Entry Max", read as the engine reads it
+# (``dk_entries_manager._ENTRY_MAX_RE``): not after a word character, dot, comma
+# or "$", so a price or the tail of "2,500" is never a cap.
+_ENTRY_MAX = re.compile(r"(?<![\w.,$])(\d{1,6})\s+entry\s+max\b", re.IGNORECASE)
+
+
+def _stated_entry_cap(text: str) -> int | None:
+    caps = {int(x) for x in _ENTRY_MAX.findall(text)}
+    caps.discard(0)
+    return next(iter(caps)) if len(caps) == 1 else None
+
+
 def infer_shape(name: str) -> str | None:
-    """Conservative title inference. An unknown title never becomes a GPP by default."""
+    """Conservative title inference. An unknown title never becomes a GPP by default.
+
+    R464: tokens match at word edges, and a cap stated as ``[N Entry Max]`` (how
+    DK writes it) reads like the ``N-max`` tokens: 1 is single entry, 2 to 20 is
+    the ``20-max`` portfolio shape, 100 or more is the ``150-max`` MME shape. A
+    cap between 21 and 99 names no shape here.
+    """
     text = name.casefold()
-    if "satellite" in text or "qualifier" in text:
+
+    def has(*tokens: str) -> bool:
+        return any(_title_token(text, token) for token in tokens)
+
+    if has("satellite", "qualifier"):
         return "satellite"  # A ticket count of one needs explicit contest evidence.
-    if any(
-        token in text
-        for token in ("double up", "50/50", "head-to-head", "head to head", "h2h")
-    ):
+    if has("double up", "50/50", "head-to-head", "head to head", "h2h"):
         return "cash"
-    if "wta" in text or "winner take all" in text or "winner-take-all" in text:
+    if has("wta", "winner take all", "winner-take-all"):
         return "wta"
-    if "single entry" in text or "single-entry" in text:
+    if has("single entry", "single-entry"):
         return "single_entry_gpp"
-    if "150-max" in text:
+    if has("150-max"):
         return "mme_gpp"
-    if "20-max" in text:
+    if has("20-max"):
         return "portfolio_gpp"
-    if "gpp" in text:
+    cap = _stated_entry_cap(text)
+    if cap == 1:
+        return "single_entry_gpp"
+    if cap is not None and cap >= 100:
+        return "mme_gpp"
+    if cap is not None and cap <= 20:
+        return "portfolio_gpp"
+    if has("gpp"):
         return "large_gpp"
     return None
 

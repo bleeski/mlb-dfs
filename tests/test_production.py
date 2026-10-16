@@ -974,3 +974,66 @@ def test_contest_title_inference_and_unknown_fallback(fixture):
     edit_bundle(fixture, lambda d: d.update(contests=[]))
     result = build(fixture)
     assert result["contest_profiles"][0]["shape"] == "large_gpp"
+
+
+def test_contest_title_tokens_meet_word_edges_and_a_stated_cap_is_read():
+    """R464: stage 0 reads a title the way the engine's archetype matcher does.
+
+    A token inside a longer word or number is not that token, a letter-led one
+    may end DK's 'SUPERSatellite' compound, and '[N Entry Max]' (DK's spelling)
+    reads like the 'N-max' tokens. Teeth: a raw substring reads Ticketmaster as
+    a satellite and [120-Max] as a 20-max; dropping the cap read returns None
+    for every capped title.
+    """
+    from mlb_engine.production.contracts import infer_shape
+
+    cases = {
+        # inside a longer word or number: not the token
+        "MLB $5 Ticketmaster Cup": None,
+        "MLB $5 Double Upside": None,
+        "MLB $5 Knuckleball [120-Max]": None,
+        "MLB $5 Knuckleball [1150-Max]": None,
+        "MLB $5 SWTAB Special": None,
+        # at a word edge, or ending a compound
+        "MLB $5 Knuckleball [20-Max]": "portfolio_gpp",
+        "MLB $0.25 Knuckleball [150-Max]": "mme_gpp",
+        "MLB SUPERSatellite to NFL 9-13 $5 Fantasy Football Millionaire [2x]": "satellite",
+        "MLB $5 Double Up (Early)": "cash",
+        # the stated cap
+        "MLB $15K mini-MAX [150 Entry Max]": "mme_gpp",
+        "MLB $4.5K mini-MAX [$1K to 1st, 150 Entry Max] (Night)": "mme_gpp",
+        "MLB $1K Strike Three [5 Entry Max]": "portfolio_gpp",
+        "MLB $5 Knuckleball [20 Entry Max]": "portfolio_gpp",
+        "MLB $1 Foo [1 Entry Max]": "single_entry_gpp",
+        "MLB $5 Foo [50 Entry Max]": None,
+        "MLB $5 Foo GPP [50 Entry Max]": "large_gpp",
+        "MLB $150 Entry Max Special": None,
+        # a type word keeps its precedence over a cap
+        "MLB $5 Satellite to Knuckleball [20 Entry Max]": "satellite",
+        "MLB $5 Double Up [20 Entry Max]": "cash",
+    }
+    for title, want in cases.items():
+        assert infer_shape(title) == want, title
+
+
+def test_stage0_title_edges_and_cap_read_match_the_engine():
+    """R464: stage 0 keeps copies of the engine's edge rule and cap parse (an
+    import would pull optimizer_v3 into the contracts module), so the copies are
+    pinned to the originals here, the way preflight's copy is."""
+    from mlb_engine.entries import dk_entries_manager as dkm
+    from mlb_engine.production import contracts
+
+    titles = ("MLB $5 Summer Slam [20 Entry Max]", "MLB $5 Ticketmaster Cup",
+              "MLB $5 Knuckleball [120-Max]", "MLB $5 Knuckleball [20-Max]",
+              "MLB SUPERSatellite to $2 MLB Pocket Cup MEGA Qualifier [10x]",
+              "MLB $4 Satellite [1 Ticket]", "MLB $5 Double Upside", "MLB $5 50/50",
+              "MLB $4.5K mini-MAX [$1K to 1st, 150 Entry Max]", "MLB $150 Entry Max Special",
+              "MLB $5 Foo [3 Entry Max] [20 Entry Max]", "MLB $5 Foo [2,500 Entry Max]")
+    tokens = ("mme", "ticket", "20-max", "150-max", "satellite", "qualifier",
+              "double up", "50/50", "wta", "gpp")
+    for title in titles:
+        low = title.casefold()
+        assert contracts._stated_entry_cap(low) == dkm._explicit_max_entries(title), title
+        for token in tokens:
+            assert contracts._title_token(low, token) == dkm._pattern_in_title(token, title), (
+                token, title)

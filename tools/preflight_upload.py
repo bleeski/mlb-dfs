@@ -635,21 +635,23 @@ def load_archetypes(path: Path = ARCHETYPES_CSV) -> List[Dict[str, str]]:
 
 
 def _pattern_in_title(pattern: object, title: object) -> bool:
-    """A copy of dk_entries_manager._pattern_in_title (R447, R17), by contract.
+    """A copy of dk_entries_manager._pattern_in_title (R447, R17, R464), by contract.
 
-    A pattern whose curated text begins with whitespace is a token guard (the
-    ' SE' row) and must end at a token edge as well; every other pattern is a
-    plain substring. The pattern is never stripped: this reader used to strip it,
-    which turned ' SE' into 'se' and matched "Baseball". Preflight may not
-    import the engine, so the parity test pins the two copies to each other.
+    A pattern ending in a letter or digit must end at a word edge (the next
+    character is not a letter or digit); one beginning with a digit must begin
+    at one; one beginning with a letter may end a compound ("SUPERSatellite");
+    one beginning with whitespace keeps that space as its left guard (' SE').
+    The pattern is never stripped: this reader used to strip it, which turned
+    ' SE' into 'se' and matched "Baseball". Preflight may not import the engine,
+    so the parity test pins the two copies to each other.
     """
     pat = str(pattern or "").casefold()
     low = str(title or "").casefold()
     if not pat.strip():
         return False
-    if pat[0].isspace():
-        return re.search(re.escape(pat) + r"(?![^\W_])", low) is not None
-    return pat in low
+    left = r"(?<![^\W_])" if pat[0].isdigit() else ""
+    right = r"(?![^\W_])" if pat[-1].isalnum() else ""
+    return re.search(left + re.escape(pat) + right, low) is not None
 
 
 def match_archetype(contest_name: str,

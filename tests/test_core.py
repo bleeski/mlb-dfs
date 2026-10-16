@@ -9333,13 +9333,16 @@ class ContestLibraryTests(unittest.TestCase):
 
 
 class ContestTitleRoutingTests(unittest.TestCase):
-    """R446 + R447 + R17: what a contest TITLE says decides its posture.
+    """R446 + R447 + R17 + R464: what a contest TITLE says decides its posture.
 
     Posture routing sets the caps and the shape score for a whole contest, so a
-    title read wrong builds the wrong contest. Three defects, each tested alone:
+    title read wrong builds the wrong contest. Four defects, each tested alone:
     (a) DK spells the cap "[20 Entry Max]" and nothing parsed it, (b) the
     curated ' SE' guard covered only its left edge, so ' Season' and ' SEA'
-    matched, (c) contest_library kept its own copy of the matcher and ranking.
+    matched, (c) contest_library kept its own copy of the matcher and ranking,
+    (d) every other pattern was a raw substring ('MME' in Summer, '20-Max' in
+    [120-Max]) and a contest routed by its title cap alone still blocked as
+    unresolved.
     """
 
     @classmethod
@@ -9460,15 +9463,114 @@ class ContestTitleRoutingTests(unittest.TestCase):
             with self.subTest(title=title):
                 self.assertIsNone(self._route(title)[0]["matched_pattern"])
 
-    def test_the_boundary_is_scoped_to_patterns_with_a_curated_guard(self):
-        """Only a pattern that begins with whitespace is a token. 'MME' and
-        'Quarter' stay substrings; that hazard is filed (R464), not changed here."""
+    def test_the_right_edge_applies_to_every_pattern_not_only_the_curated_guard(self):
+        """R447 scoped the right edge to ' SE' and pinned 'MME' in Summer and
+        'Quarter' in Quarterback as the open hazard; R464 closed it for every
+        pattern that ends in a letter or digit. A blank pattern still matches
+        nothing."""
         match = self.dkm._pattern_in_title
-        self.assertTrue(match("MME", "MLB $5 Summer Special"))
-        self.assertTrue(match("Quarter", "MLB $5 Quarterback Special"))
+        self.assertFalse(match("MME", "MLB $5 Summer Special"))
+        self.assertFalse(match("Quarter", "MLB $5 Quarterback Special"))
         self.assertFalse(match(" SE", "MLB $5 Season Opener"))
         self.assertFalse(match("", "MLB $5 Season Opener"))
         self.assertFalse(match("   ", "MLB $5 Season Opener"))
+
+    # ---- (d) R464: every pattern meets a word edge; a title cap identifies ------
+    HAZARDS = (("MME", "MLB $5 Summer Slam"), ("MME", "MLB $5 Hammer Time"),
+               ("MME", "MLB $5 Immediate Cup"), ("Quarter", "MLB $5 Quarterback Special"),
+               ("Quarter", "MLB $5 Quarterly"), ("Ticket", "MLB $5 Ticketmaster Cup"),
+               ("Double Up", "MLB $5 Double Upside"), ("Dime Time", "MLB $5 Dime Timer"),
+               ("3-Max", "MLB $5 Knuckleball [13-Max]"), ("3-Max", "MLB $5 Knuckleball [33-Max]"),
+               ("20-Max", "MLB $5 Knuckleball [120-Max]"),
+               ("150-Max", "MLB $5 Knuckleball [1150-Max]"))
+
+    def test_a_pattern_inside_a_longer_word_or_number_is_not_that_pattern(self):
+        """Each pair matched as a raw substring until R464. Teeth: dropping the
+        right edge reddens the words, dropping the digit left edge the caps."""
+        for pattern, title in self.HAZARDS:
+            with self.subTest(pattern=pattern, title=title):
+                self.assertFalse(self.dkm._pattern_in_title(pattern, title))
+                inferred, _, _ = self._route(title)
+                self.assertNotEqual(inferred["matched_pattern"], pattern)
+                self.assertNotIn(pattern, inferred["competing_patterns"])
+        # What each misread used to build: a satellite, a cash game, an MME, a 20-max.
+        for title, want in (("MLB $5 Ticketmaster Cup", "large_gpp"),
+                            ("MLB $5 Double Upside", "large_gpp"),
+                            ("MLB $5 Hammer Time", "large_gpp"),
+                            ("MLB $5 Knuckleball [120-Max]", "large_gpp"),
+                            ("MLB $5 Knuckleball [1150-Max]", "large_gpp")):
+            with self.subTest(title=title):
+                self.assertEqual(self._route(title)[1], want)
+
+    def test_a_pattern_at_a_word_edge_still_matches(self):
+        match = self.dkm._pattern_in_title
+        for pattern, title in (("Quarter", "MLB $0.25 Quarter Jukebox"),
+                               ("Just $0.10", "MLB $25 Dime Time [Just $0.10!]"),
+                               ("Dime Time", "MLB $25 Dime Time (Turbo)"),
+                               ("20-Max", "MLB $5 Knuckleball [20-Max]"),
+                               ("150-Max", "MLB $0.25 Knuckleball [150-Max]"),
+                               ("3-Max", "MLB $5 Knuckleball 3-Max"),
+                               ("Ticket", "MLB $4 Satellite [1 Ticket]"),
+                               ("Double Up", "MLB $5 Double Up (Early)"),
+                               ("MME", "MLB $5 MME Special"), ("50/50", "MLB $5 50/50"),
+                               ("mini-MAX", "MLB $15K mini-MAX [150 Entry Max]"),
+                               (" SE", "MLB $5 Foo SE]")):
+            with self.subTest(pattern=pattern, title=title):
+                self.assertTrue(match(pattern, title))
+
+    def test_a_letter_led_pattern_may_end_a_compound(self):
+        """DK writes 'SUPERSatellite' on 119 archived MLB titles. A left letter
+        edge would route the Millionaire satellites, which match no other row,
+        to large_gpp. Teeth: applying the left edge to letter-led patterns."""
+        for title, pattern in (
+                ("MLB SUPERSatellite to NFL 9-13 $5 Fantasy Football Millionaire [2x]", "Satellite"),
+                ("MLB SUPERSatellite to $2 MLB Pocket Cup MEGA Qualifier [10x]", "Satellite")):
+            with self.subTest(title=title):
+                inferred, posture, shape = self._route(title)
+                self.assertEqual(inferred["matched_pattern"], pattern)
+                self.assertEqual((posture, shape), ("wta_satellite", "satellite"))
+
+    @staticmethod
+    def _resolve(title, fee=5.0):
+        row = types.SimpleNamespace(contest_id="1", contest_name=title, entry_fee=fee)
+        return epi._resolve_contest_postures([row], None, None)["1"]
+
+    def test_a_contest_routed_by_its_title_cap_alone_is_identified_not_unresolved(self):
+        """'Strike Three [5 Entry Max]' and 'Hot Corner [3 Entry Max]' are the two
+        archived titles that match no row and state a cap. R446 routed them
+        small_gpp and the build still refused them as unresolved. Teeth:
+        reverting the label to 'type known' alone restores the blocker."""
+        for title in ("MLB $1K Strike Three [5 Entry Max]",
+                      "MLB $500 Hot Corner [3 Entry Max] (Night)",
+                      # 'MME' inside Summer no longer decides this one; its cap does.
+                      "MLB $5 Summer Slam [20 Entry Max]"):
+            with self.subTest(title=title):
+                rec = self._resolve(title)
+                self.assertEqual((rec["posture"], rec["contest_shape"], rec["posture_source"]),
+                                 ("small_gpp", "small_field_gpp", "name_inference"))
+                self.assertIsNone(rec["matched_pattern"])
+                # The evidence the label rests on stays on the record.
+                self.assertEqual(rec["inferred"]["inferred_type"], "unknown")
+                self.assertEqual(rec["inferred"]["max_entries_source"], "title")
+                self.assertIn("contest_type", rec["inferred"]["decision_critical_gaps"])
+                self.assertEqual(epi.unresolved_contest_blockers({"1": rec}), [])
+        bare = self._resolve("MLB $3 Wednesday Special")
+        self.assertEqual(bare["posture_source"], "unresolved")
+        self.assertEqual(len(epi.unresolved_contest_blockers({"1": bare})), 1)
+        source = epi.inferred_posture_source
+        self.assertEqual(source({"inferred_type": "cash"}), "name_inference")
+        self.assertEqual(source({"inferred_type": "unknown", "max_entries_source": "title",
+                                 "inferred_max_entries": 5}), "name_inference")
+        # A cap that does not route lands on the fall-through and stays unresolved.
+        capped = self._resolve("MLB $5 Mystery Cup [50 Entry Max]")
+        self.assertEqual((capped["posture"], capped["posture_source"]), ("large_gpp", "unresolved"))
+        self.assertEqual(len(epi.unresolved_contest_blockers({"1": capped})), 1)
+        for inferred in ({"inferred_type": "unknown", "max_entries_source": None},
+                         {"inferred_type": "unknown", "max_entries_source": "title",
+                          "inferred_max_entries": 50},
+                         {"inferred_type": "unknown"}, {}):
+            with self.subTest(inferred=inferred):
+                self.assertEqual(source(inferred), "unresolved")
 
     # ---- (c) R17: contest_library reads a title the way the engine does ----------
     def test_contest_library_agrees_with_the_engine_on_every_title_above(self):
@@ -9483,7 +9585,12 @@ class ContestTitleRoutingTests(unittest.TestCase):
                   "MLB $5 Knuckleball [3 Entry Max]", "MLB $5 Knuckleball [150-Max]",
                   "MLB $15K mini-MAX [150 Entry Max]", "MLB $1K Strike Three [5 Entry Max]",
                   "MLB $1.5K Solo Shot [20 Entry Max]", "MLB $5 Double Up [20 Entry Max]",
-                  "MLB $5 Satellite to Knuckleball [20 Entry Max]")
+                  "MLB $5 Satellite to Knuckleball [20 Entry Max]",
+                  # R464: contest_library reads through the engine's matcher, so the
+                  # word edges reach it with no edit there.
+                  *(title for _, title in self.HAZARDS),
+                  "MLB SUPERSatellite to NFL 9-13 $5 Fantasy Football Millionaire [2x]",
+                  "MLB $0.25 Quarter Jukebox", "MLB $5 Summer Slam [20 Entry Max]")
         for title in titles:
             with self.subTest(title=title):
                 theirs = cl.infer_from_name(title, rows)
@@ -52325,7 +52432,9 @@ class ResultsAttributionTests(unittest.TestCase):
                                       ("Zzz Mystery Cup", Decimal("1"))])
         self.assertEqual(got[(self.SATELLITE, Decimal("5"))], ("wta_satellite", True))
         self.assertEqual(got[("MLB $3 Single Entry [Single Entry]", Decimal("3"))], ("single_entry", True))
-        self.assertEqual(got[("MLB $10 Moonshot [20 Entry Max]", Decimal("10"))], ("small_gpp", False))
+        # R464: a title that states its cap is identified by the build, so the
+        # mirror reads it as inferred (it read False, "the entry cap alone").
+        self.assertEqual(got[("MLB $10 Moonshot [20 Entry Max]", Decimal("10"))], ("small_gpp", True))
         self.assertEqual(got[("Zzz Mystery Cup", Decimal("1"))], ("large_gpp", False))
         table = self._table({"Lo Pick": 1.0})
         self._standings(self.C1, [(1, "8001", self._lineup("Lo Pick")), (2, "9001", self._lineup("Lo Pick"))],

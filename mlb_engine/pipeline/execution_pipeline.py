@@ -1598,6 +1598,30 @@ def _carry_satellite_family(
     return True
 
 
+def inferred_posture_source(inferred: Mapping[str, Any]) -> str:
+    """``name_inference`` or ``unresolved``: did name inference identify the contest?
+
+    It did when an archetype row typed it, or when the title states its entry cap
+    (R464): ``MLB $1K Strike Three [5 Entry Max]`` matches no row, but the cap is a
+    fact the title states and ``normalize_posture`` routes on it, which is not the
+    ``large_gpp`` fall-through ``unresolved_contest_blockers`` exists to stop. The
+    type stays ``unknown`` and its ``contest_type`` gap stays on the record, with
+    ``max_entries_source: "title"`` and no ``matched_pattern``. Only a cap that
+    ROUTES counts: ``[50 Entry Max]`` lands on the same ``large_gpp`` the cap-less
+    fall-through gives, so it stays ``unresolved``. One rule:
+    ``tools/results_ledger.title_postures`` reads this function too.
+    """
+    itype = inferred.get("inferred_type")
+    if itype not in (None, "", "unknown"):
+        return "name_inference"
+    if inferred.get("max_entries_source") == "title":
+        shape = inferred.get("payout_shape_default")
+        if (normalize_posture(itype, shape, inferred.get("inferred_max_entries"))
+                != normalize_posture(itype, shape, None)):
+            return "name_inference"
+    return "unresolved"
+
+
 def _resolve_contest_postures(
     entry_rows: Sequence[Any],
     contest_postures: Optional[Mapping[str, Any]],
@@ -1669,9 +1693,7 @@ def _resolve_contest_postures(
                 inferred.get("inferred_type"), inferred.get("payout_shape_default"),
                 inferred.get("inferred_max_entries"),
             )
-            source = ("name_inference"
-                      if inferred.get("inferred_type") not in (None, "", "unknown")
-                      else "unresolved")
+            source = inferred_posture_source(inferred)
             shape_source = "name_inference"
         shape = resolve_contest_shape(posture, inferred)
         resolved[cid] = {
