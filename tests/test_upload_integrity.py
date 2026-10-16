@@ -456,7 +456,14 @@ class PreflightContestIdentityTests(unittest.TestCase):
                      "MLB $5 Knuckleball Select",
                      "MLB $10 Pocket Cup (ATH @ SEA)",
                      "MLB $5 Foo SE)", "MLB $5 SE", "MLB $5 Foo (SE)",
-                     "MLB $1K Strike Three [5 Entry Max]"):
+                     "MLB $1K Strike Three [5 Entry Max]",
+                     # R464: a pattern inside a longer word or number, a word-edge
+                     # match, and the left compound DK really writes.
+                     "MLB $5 Summer Slam [20 Entry Max]", "MLB $5 Quarterback Special",
+                     "MLB $5 Ticketmaster Cup", "MLB $5 Double Upside",
+                     "MLB $5 Knuckleball [120-Max]", "MLB $5 Knuckleball [1150-Max]",
+                     "MLB $5 Knuckleball [20-Max]", "MLB $4 Satellite [1 Ticket]",
+                     "MLB SUPERSatellite to NFL 9-13 $5 Fantasy Football Millionaire [2x]"):
             mine = self.pf.match_archetype(name, rows)
             theirs = dem.infer_contest_archetype(name, None, engine_rows)
             self.assertEqual(

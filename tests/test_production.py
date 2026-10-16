@@ -974,3 +974,43 @@ def test_contest_title_inference_and_unknown_fallback(fixture):
     edit_bundle(fixture, lambda d: d.update(contests=[]))
     result = build(fixture)
     assert result["contest_profiles"][0]["shape"] == "large_gpp"
+
+
+def test_contest_title_tokens_meet_word_edges_and_a_stated_cap_is_read():
+    """R464: stage 0 reads a title the way the engine's archetype matcher does.
+
+    A token inside a longer word or number is not that token, a letter-led one
+    may end DK's 'SUPERSatellite' compound, and '[N Entry Max]' (DK's spelling)
+    reads like the 'N-max' tokens. Teeth: a raw substring reads Ticketmaster as
+    a satellite and [120-Max] as a 20-max; dropping the cap read returns None
+    for every capped title.
+    """
+    from mlb_engine.production.contracts import infer_shape
+
+    cases = {
+        # inside a longer word or number: not the token
+        "MLB $5 Ticketmaster Cup": None,
+        "MLB $5 Double Upside": None,
+        "MLB $5 Knuckleball [120-Max]": None,
+        "MLB $5 Knuckleball [1150-Max]": None,
+        "MLB $5 SWTAB Special": None,
+        # at a word edge, or ending a compound
+        "MLB $5 Knuckleball [20-Max]": "portfolio_gpp",
+        "MLB $0.25 Knuckleball [150-Max]": "mme_gpp",
+        "MLB SUPERSatellite to NFL 9-13 $5 Fantasy Football Millionaire [2x]": "satellite",
+        "MLB $5 Double Up (Early)": "cash",
+        # the stated cap
+        "MLB $15K mini-MAX [150 Entry Max]": "mme_gpp",
+        "MLB $4.5K mini-MAX [$1K to 1st, 150 Entry Max] (Night)": "mme_gpp",
+        "MLB $1K Strike Three [5 Entry Max]": "portfolio_gpp",
+        "MLB $5 Knuckleball [20 Entry Max]": "portfolio_gpp",
+        "MLB $1 Foo [1 Entry Max]": "single_entry_gpp",
+        "MLB $5 Foo [50 Entry Max]": None,
+        "MLB $5 Foo GPP [50 Entry Max]": "large_gpp",
+        "MLB $150 Entry Max Special": None,
+        # a type word keeps its precedence over a cap
+        "MLB $5 Satellite to Knuckleball [20 Entry Max]": "satellite",
+        "MLB $5 Double Up [20 Entry Max]": "cash",
+    }
+    for title, want in cases.items():
+        assert infer_shape(title) == want, title

@@ -524,7 +524,7 @@ Required regression coverage includes:
 - Adapter parsing: status map construction, totals packet, implied probabilities, vig removal.
 - Tail candidate scanner: all four signal paths, coverage-tier degradation, threshold overrides, and the park-only fallback.
 - xwOBA baseline correction: batter and pitcher ratio direction, PA shrinkage, clip bands, sub-floor neutral fallback, BOM handling, and unmatched fallback.
-- Contest-type classification from dk_contest_archetypes.csv by longest-pattern match.
+- Contest-type classification from dk_contest_archetypes.csv: type precedence (satellite, cash, WTA, single entry, GPP), then a row that pins max entries, then the longer pattern. A pattern matches at a word edge (R464): one ending in a letter or digit must end where a word does, one beginning with a digit must begin where a number does, a letter-led one may end a compound such as `SUPERSatellite`, and a space-led one keeps its curated guard (` SE`). A title's stated `[N Entry Max]` fills a blank cap (R446) and identifies a contest no row types.
 - Curated archetype columns (R1c, 2026-07-27): `objective_class` is a cross-check
   against the row's own `payout_shape_default` and fails the load on a
   disagreement, never routing anything; `ticket_count` is the one satellite fact
