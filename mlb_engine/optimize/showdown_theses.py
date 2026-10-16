@@ -3280,8 +3280,9 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
             "player_relaxed": player_relaxed,
             "player_cap_cpt_reassigned": list(player_cap_cpt_reassigned),
             "player_cap_locks_dropped": list(player_cap_locks_dropped),
+            # R166 (F17): over the whole file the cap is resolved against.
             "player_cap_structural_floor": player_cap_structural_floor(
-                len(df), len(theses)),
+                len(df), len(theses) + held_rows),
             "max_cpt_exposure_pct": max_cpt_exposure_pct,
             "cpt_cap_count": cpt_cap,
             "cpt_cap_reassigned": list(cpt_cap_reassigned),
@@ -3352,7 +3353,7 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
                 player_cap=player_cap, cpt_cap=cpt_cap,
                 player_pct=max_player_exposure_pct, cpt_pct=max_cpt_exposure_pct,
                 player_counts=player_counts, cpt_counts=cpt_counts,
-                contest_caps=cap_for_contest)
+                contest_caps=cap_for_contest, cap_rows=len(theses) + held_rows)
     return out
 
 

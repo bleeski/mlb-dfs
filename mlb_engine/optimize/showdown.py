@@ -2043,8 +2043,9 @@ def build_showdown_bank(df: pd.DataFrame, n: int, contract: RosterContract = SHO
         diagnostics["player_cap_count"] = player_cap
         diagnostics["player_exposure"] = bank_players
         diagnostics["player_relaxed_slots"] = player_relaxed_slots
+        # R166 (F17): over the whole file the cap is resolved against.
         diagnostics["player_cap_structural_floor"] = player_cap_structural_floor(
-            len(df), n_target, contract)
+            len(df), n_target + held_rows, contract)
         # R158. Compute facts, never summed into the relaxation counters above. A
         # bank short with `solver_timeouts` nonzero and every relaxation at zero is
         # reporting an infrastructure limit: raise the time limit, do not touch a
@@ -2060,7 +2061,8 @@ def build_showdown_bank(df: pd.DataFrame, n: int, contract: RosterContract = SHO
             diagnostics["held_rows"] = held_cap_report(
                 held, len(bank), player_cap=player_cap, cpt_cap=cap,
                 player_pct=max_player_exposure_pct, cpt_pct=max_cpt_exposure_pct,
-                player_counts=player_counts, cpt_counts=cpt_counts)
+                player_counts=player_counts, cpt_counts=cpt_counts,
+                cap_rows=n_target + held_rows)
     return bank
 
 
@@ -2287,7 +2289,8 @@ def held_cap_report(held: Optional[Mapping[str, Any]], n_new: int, *,
                     player_cap: Optional[int], cpt_cap: Optional[int],
                     player_pct: Optional[float], cpt_pct: Optional[float],
                     player_counts: Mapping[str, int], cpt_counts: Mapping[str, int],
-                    contest_caps: Optional[Mapping[str, int]] = None) -> Dict[str, Any]:
+                    contest_caps: Optional[Mapping[str, int]] = None,
+                    cap_rows: Optional[int] = None) -> Dict[str, Any]:
     """R166 (F17). The whole-file reading of a run that started from held rows.
 
     ``player_counts`` and ``cpt_counts`` are the run's WHOLE-FILE counts (held
@@ -2297,7 +2300,9 @@ def held_cap_report(held: Optional[Mapping[str, Any]], n_new: int, *,
     new lineups simply cannot take that player there). ``floored_at_one`` names
     a cap whose ``floor(pct x n)`` was 0 and that ``exposure_cap_count`` set to
     1, beside the realized whole-file share, because the floor lets the share
-    run past the requested percentage by design.
+    run past the requested percentage by design. ``cap_rows`` is the count the
+    caps were resolved over (planned rows plus held), which can exceed the
+    denominator when slots went unbuilt; the floor is judged against it.
     """
     held = dict(held or {})
     rows = int(held.get("row_count") or 0)
@@ -2327,7 +2332,8 @@ def held_cap_report(held: Optional[Mapping[str, Any]], n_new: int, *,
                 "realized_max_pct": _max_pct(counts)}
                for control, pct, counts in (("max_player_exposure_pct", player_pct, player_counts),
                                             ("max_cpt_exposure_pct", cpt_pct, cpt_counts))
-               if pct is not None and math.floor(float(pct) * denominator + 1e-9) < 1]
+               if pct is not None and math.floor(
+                   float(pct) * (denominator if cap_rows is None else int(cap_rows)) + 1e-9) < 1]
     return {"row_count": rows, "denominator": denominator,
             "over_cap": over, "floored_at_one": floored,
             "whole_file_realized_max_pct": {"player": _max_pct(player_counts),

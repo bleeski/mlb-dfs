@@ -7506,6 +7506,11 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         for key, count in sorted(player_counts.items(), key=lambda kv: -kv[1])
     }
     realized_player_pct = max((v["pct"] for v in player_exposure.values()), default=0.0)
+    # R166 (F17). With held complete rows the caps resolve over the whole file
+    # while `realized_max_pct` stays this build's entries, so the whole-file
+    # share rides beside it in each block; read that one against `cap_pct`.
+    sd_held_block = (solve_diag if use_ladder else cpt_diagnostics).get("held_rows")
+    sd_whole = (sd_held_block or {}).get("whole_file_realized_max_pct") or {}
 
     degraded_entries = showdown_degraded_entries(assignments, bank)
     print(f"degraded: {format_degraded_line(degraded_entries)}", file=sys.stderr)
@@ -7681,6 +7686,7 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
             "cap_pct": cpt_cap,
             "cap_count": cap_count,
             "realized_max_pct": realized_cpt_pct,
+            **({"whole_file_realized_max_pct": sd_whole.get("captain")} if sd_held_block else {}),
             "by_player": captain_exposure,
             "relaxed_slots": relaxed_slots,
             # R113. Split so a reader can tell which control actually gave way:
@@ -7698,6 +7704,7 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
             "cap_pct": player_cap_pct,
             "cap_count": player_cap_count,
             "realized_max_pct": realized_player_pct,
+            **({"whole_file_realized_max_pct": sd_whole.get("player")} if sd_held_block else {}),
             "by_player": player_exposure,
             "relaxed_slots": player_relaxed,
             # NOT relaxations. A capped player was taken off a thesis's own captain
@@ -7721,8 +7728,7 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
         # `by_player` and `realized_max_pct` stay this build's own entries. This
         # block is the whole-file reading and names any held count already over
         # a cap, which no new lineup can undo.
-        **({"held_rows": (solve_diag if use_ladder else cpt_diagnostics).get("held_rows")}
-           if (solve_diag if use_ladder else cpt_diagnostics).get("held_rows") else {}),
+        **({"held_rows": sd_held_block} if sd_held_block else {}),
         # R263 shadow, Ben's dated decision of 2026-08-28. Sits HERE, between the
         # two exposure caps and the diversity block, because "beside the caps" is
         # where the item put it and because that is where the reader already is.

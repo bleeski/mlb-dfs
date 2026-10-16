@@ -997,12 +997,13 @@ def _diagnose_binding_constraints(
 
     distinct_signatures = len(set(signatures))
     max_reuse = controls.get("max_candidate_reuse")
+    bank_sigs = set(signatures)
     held = {sig: int(n) for sig, n in (fixed_signature_counts or {}).items()
-            if int(n) > 0 and sig in set(signatures)}
+            if int(n) > 0 and sig in bank_sigs}
     if max_reuse is not None and held:
         # R166(b). The rows are headroom over the untouchable rows' holdings, so
         # the capacity is the headroom summed, not lineups x cap.
-        capacity = sum(max(0, int(max_reuse) - held.get(sig, 0)) for sig in set(signatures))
+        capacity = sum(max(0, int(max_reuse) - held.get(sig, 0)) for sig in bank_sigs)
         if capacity < total:
             findings.append(
                 f"max_candidate_reuse: {distinct_signatures} distinct lineups at cap "

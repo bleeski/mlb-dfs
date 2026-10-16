@@ -1261,7 +1261,12 @@ class ShowdownFixedRowDenominatorTests(unittest.TestCase):
                 stack.enter_context(unittest.mock.patch.object(sd, "build_showdown_bank", spy_bank))
                 stack.enter_context(contextlib.redirect_stdout(io.StringIO()))
                 stack.enter_context(contextlib.redirect_stderr(io.StringIO()))
-                mod.run_showdown(args, root, sal, ent)
+                _code, brief = mod.run_showdown(args, root, sal, ent)
+        self.assertEqual(brief["held_rows"]["row_count"], 1)
+        for block in ("captain_exposure", "player_exposure"):
+            with self.subTest(block=block):
+                self.assertIn("whole_file_realized_max_pct", brief[block],
+                              "the whole-file share must sit beside the build's own")
         # The baseline is R389(c)'s points-max bank, published before the ladder.
         for site in ("ladder", "solve", "baseline"):
             with self.subTest(site=site):
