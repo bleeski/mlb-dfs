@@ -1792,6 +1792,7 @@ def build_showdown_bank(df: pd.DataFrame, n: int, contract: RosterContract = SHO
                         *, stop_at: Optional[float] = None,
                         clock: Callable[[], float] = _time.monotonic,
                         seed_forbidden: Optional[Sequence[Sequence[str]]] = None,
+                        held: Optional[Mapping[str, Any]] = None,
                         **kwargs) -> List[Dict[str, Any]]:
     """Up to ``n`` distinct legal lineups sharing at most ``max_shared_players``
     with any prior lineup, with no single captain filling more than
@@ -1833,17 +1834,28 @@ def build_showdown_bank(df: pd.DataFrame, n: int, contract: RosterContract = SHO
       of its own lineups under the same overlap rule: the template's complete
       rows (``complete_row_player_keys``), so no lineup repeats one (F-3).
       They count toward no exposure.
+
+    R166 (F17). ``held`` is ``complete_row_exposure`` over the same complete
+    rows, and it is what makes them count: both caps resolve over ``n`` plus
+    its ``row_count`` and both running counts start from its counts, so a held
+    row spends the cap before the bank chooses anything. ``captain_exposure``
+    and ``player_exposure`` stay the BANK's own counts (the brief divides them
+    by its entries); ``diagnostics["held_rows"]`` carries the whole-file reading.
+    None, the default, is the pre-R166 bank.
     """
     bank: List[Dict[str, Any]] = []
     forbidden: List[List[str]] = [list(s) for s in (seed_forbidden or [])]
-    cpt_counts: Dict[str, int] = {}
-    player_counts: Dict[str, int] = {}
+    held_rows = int((held or {}).get("row_count") or 0)
+    held_cpts = {str(k): int(v) for k, v in ((held or {}).get("cpt_counts") or {}).items()}
+    held_players = {str(k): int(v) for k, v in ((held or {}).get("player_counts") or {}).items()}
+    cpt_counts: Dict[str, int] = dict(held_cpts) if held_rows else {}
+    player_counts: Dict[str, int] = dict(held_players) if held_rows else {}
     n_target = max(1, int(n))
     # floor, not ceil/round: this is an upper bound, so rounding must never let
     # the realized exposure pct push above the requested cap. Both caps share one
     # helper so the two can never drift apart on the rounding rule.
-    cap = exposure_cap_count(max_cpt_exposure_pct, n_target)
-    player_cap = exposure_cap_count(max_player_exposure_pct, n_target)
+    cap = exposure_cap_count(max_cpt_exposure_pct, n_target + held_rows)
+    player_cap = exposure_cap_count(max_player_exposure_pct, n_target + held_rows)
     relaxed_slots = 0
     overlap_relaxed_slots = 0
     both_relaxed_slots = 0
@@ -2010,9 +2022,15 @@ def build_showdown_bank(df: pd.DataFrame, n: int, contract: RosterContract = SHO
         for key in lu["player_keys"]:
             player_counts[key] = player_counts.get(key, 0) + 1
     if diagnostics is not None:
+        # R166 (F17). The bank's own counts, as before: the held rows' are taken
+        # back out, so a caller dividing by its entries reads the bank alone.
+        bank_cpts = {k: c - held_cpts.get(k, 0) for k, c in cpt_counts.items()
+                     if c - held_cpts.get(k, 0) > 0} if held_rows else dict(cpt_counts)
+        bank_players = {k: c - held_players.get(k, 0) for k, c in player_counts.items()
+                        if c - held_players.get(k, 0) > 0} if held_rows else dict(player_counts)
         diagnostics["max_cpt_exposure_pct"] = max_cpt_exposure_pct
         diagnostics["cap_count"] = cap
-        diagnostics["captain_exposure"] = dict(cpt_counts)
+        diagnostics["captain_exposure"] = bank_cpts
         diagnostics["relaxed_slots"] = relaxed_slots
         diagnostics["max_shared_players"] = max_shared_players
         diagnostics["overlap_relaxed_slots"] = overlap_relaxed_slots
@@ -2023,7 +2041,7 @@ def build_showdown_bank(df: pd.DataFrame, n: int, contract: RosterContract = SHO
         # two so a caller reading "clean" is reading all three controls.
         diagnostics["max_player_exposure_pct"] = max_player_exposure_pct
         diagnostics["player_cap_count"] = player_cap
-        diagnostics["player_exposure"] = dict(player_counts)
+        diagnostics["player_exposure"] = bank_players
         diagnostics["player_relaxed_slots"] = player_relaxed_slots
         diagnostics["player_cap_structural_floor"] = player_cap_structural_floor(
             len(df), n_target, contract)
@@ -2038,6 +2056,11 @@ def build_showdown_bank(df: pd.DataFrame, n: int, contract: RosterContract = SHO
             diagnostics["window_stopped"] = window_stopped
         if seed_forbidden is not None:
             diagnostics["seed_forbidden"] = len(seed_forbidden)
+        if held_rows:
+            diagnostics["held_rows"] = held_cap_report(
+                held, len(bank), player_cap=player_cap, cpt_cap=cap,
+                player_pct=max_player_exposure_pct, cpt_pct=max_cpt_exposure_pct,
+                player_counts=player_counts, cpt_counts=cpt_counts)
     return bank
 
 
@@ -2201,6 +2224,115 @@ def complete_row_player_keys(df: pd.DataFrame,
             continue
         sets.append(sorted(set(keys)))
     return sorted(sets), sorted(set(unmapped))
+
+
+def complete_row_exposure(df: pd.DataFrame,
+                          reserved_rows: Sequence[Mapping[str, Any]],
+                          contract: RosterContract = SHOWDOWN) -> Dict[str, Any]:
+    """R166 (F17). What a template's COMPLETE rows already spend of each cap.
+
+    ``complete_row_player_keys``' sibling, on the same ID-to-``Player_Key`` map.
+    A complete row is a lineup already entered and immutable, so it is in the
+    delivered file and in every exposure DK and the brief count over it; the
+    ladder and the bank used to size their caps from the blank rows alone and
+    start every count at zero, so a file whose complete rows held a player could
+    take him past the cap with every new lineup clean. The callers add
+    ``row_count`` to their denominator and start their counts here.
+
+    Every complete row counts toward ``row_count``, the denominator, whether or
+    not each of its IDs maps: an ID the pool does not carry is a player no new
+    lineup can take, so his count cannot bind, and the rest of the row's players
+    still count. Unmapped IDs are returned so the caller names them. The captain
+    is read at ``contract.captain_slot``'s position in the header-verified
+    slots, never assumed. Returns ``row_count``, ``player_counts`` and
+    ``cpt_counts`` by ``Player_Key``, ``contest_rows`` and
+    ``contest_cpt_counts`` by contest id, and ``unmapped_ids``.
+    """
+    by_id: Dict[str, str] = {}
+    if df is not None and len(df):
+        for cpt_id, util_id, key in zip(df["CPT_ID"], df["UTIL_ID"], df["Player_Key"]):
+            for pid in (_digits(cpt_id), _digits(util_id)):
+                if pid:
+                    by_id[pid] = str(key)
+    slots = [str(s).upper() for s in contract.slots]
+    cpt_at = slots.index(str(contract.captain_slot).upper()) if contract.captain_slot else None
+    rows = 0
+    players: Dict[str, int] = {}
+    captains: Dict[str, int] = {}
+    contest_rows: Dict[str, int] = {}
+    contest_cpts: Dict[str, Dict[str, int]] = {}
+    unmapped: List[str] = []
+    for row in reserved_rows or []:
+        if not row.get("is_complete"):
+            continue
+        cells = [str(c) for c in (row.get("cells") or [])]
+        keys = [by_id.get(c) for c in cells]
+        unmapped.extend(c for c, k in zip(cells, keys) if k is None)
+        rows += 1
+        cid = str(row.get("contest_id") or "")
+        contest_rows[cid] = contest_rows.get(cid, 0) + 1
+        for key in sorted({k for k in keys if k}):
+            players[key] = players.get(key, 0) + 1
+        cpt = keys[cpt_at] if cpt_at is not None and cpt_at < len(keys) else None
+        if cpt:
+            captains[cpt] = captains.get(cpt, 0) + 1
+            bucket = contest_cpts.setdefault(cid, {})
+            bucket[cpt] = bucket.get(cpt, 0) + 1
+    return {"row_count": rows, "player_counts": players, "cpt_counts": captains,
+            "contest_rows": contest_rows, "contest_cpt_counts": contest_cpts,
+            "unmapped_ids": sorted(set(unmapped))}
+
+
+def held_cap_report(held: Optional[Mapping[str, Any]], n_new: int, *,
+                    player_cap: Optional[int], cpt_cap: Optional[int],
+                    player_pct: Optional[float], cpt_pct: Optional[float],
+                    player_counts: Mapping[str, int], cpt_counts: Mapping[str, int],
+                    contest_caps: Optional[Mapping[str, int]] = None) -> Dict[str, Any]:
+    """R166 (F17). The whole-file reading of a run that started from held rows.
+
+    ``player_counts`` and ``cpt_counts`` are the run's WHOLE-FILE counts (held
+    rows plus the lineups it built). ``over_cap`` lists every count the held
+    rows ALREADY put over a cap: no new lineup can bring it back under, so it is
+    an unsatisfiable current policy, reported, never a cap quietly opened (the
+    new lineups simply cannot take that player there). ``floored_at_one`` names
+    a cap whose ``floor(pct x n)`` was 0 and that ``exposure_cap_count`` set to
+    1, beside the realized whole-file share, because the floor lets the share
+    run past the requested percentage by design.
+    """
+    held = dict(held or {})
+    rows = int(held.get("row_count") or 0)
+    denominator = int(n_new) + rows
+    over: List[Dict[str, str]] = []
+    for control, cap, counts in (("max_player_exposure_pct", player_cap,
+                                  held.get("player_counts") or {}),
+                                 ("max_cpt_exposure_pct", cpt_cap,
+                                  held.get("cpt_counts") or {})):
+        for key, count in sorted(counts.items()):
+            if cap is not None and int(count) > int(cap):
+                over.append({"control": control, "player_key": str(key),
+                             "held": str(int(count)), "cap_count": str(int(cap))})
+    for cid, counts in sorted((held.get("contest_cpt_counts") or {}).items()):
+        bar = (contest_caps or {}).get(cid)
+        for key, count in sorted(counts.items()):
+            if bar is not None and int(count) > int(bar):
+                over.append({"control": "max_cpt_per_contest", "contest_id": str(cid),
+                             "player_key": str(key), "held": str(int(count)),
+                             "cap_count": str(int(bar))})
+
+    def _max_pct(counts: Mapping[str, int]) -> float:
+        top = max((int(c) for c in counts.values()), default=0)
+        return round(100.0 * top / denominator, 1) if denominator else 0.0
+
+    floored = [{"control": control, "pct": float(pct), "cap_count": 1,
+                "realized_max_pct": _max_pct(counts)}
+               for control, pct, counts in (("max_player_exposure_pct", player_pct, player_counts),
+                                            ("max_cpt_exposure_pct", cpt_pct, cpt_counts))
+               if pct is not None and math.floor(float(pct) * denominator + 1e-9) < 1]
+    return {"row_count": rows, "denominator": denominator,
+            "over_cap": over, "floored_at_one": floored,
+            "whole_file_realized_max_pct": {"player": _max_pct(player_counts),
+                                            "captain": _max_pct(cpt_counts)},
+            "unmapped_ids": list(held.get("unmapped_ids") or [])}
 
 
 def write_showdown_entries(template_path: str | Path, candidate_path: str | Path,

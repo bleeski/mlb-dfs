@@ -1337,7 +1337,8 @@ EXPECTED_SUITE_COUNTS = {
     # R503 review, 2026-10-13: 496 -> 497, the one that pins an OUT DK arm as no declaration (DK posts MIN 1-4 with its SP Status O and the feed names Joe Ryan: the side lifts on Ryan, and nothing disagrees).
     # R310(a1), 2026-10-13: 497 -> 500, the 3 that pin the leave-one-out salary line (`SalaryFitLeaveOneOutTests`: Bernal's target is the line through the other 17, both callups leave the top three and Morales falls below Muncy, a two-hitter frame keeps the full-pool line).
     # R310(a1) review, 2026-10-13: 500 -> 502, the two that pin the small frames (three hitters already take the line through the other two; others on one salary take their mean, not the full-pool line through his own point).
-    "tests.test_showdown": 502,
+    # R166 (Session 65, F17), 2026-10-16: 502 -> 509, the 7 that pin a template's complete rows against the Showdown caps (`ShowdownFixedRowDenominatorTests`: the rows read as exposure with the captain at its slot; the bank spending them against the player cap over the whole file while publishing its own counts; the ladder's captain cap over theses plus held rows with an over-cap held captain listed; R250's hold carved from the remaining allowance; the apportionment giving no slot to a spent captain; nothing held byte-identical; `run_showdown` handing them to the apportionment, the ladder and the baseline); 13 hand mutations killed.
+    "tests.test_showdown": 509,
     # R96, 2026-08-11: 141 -> 162, the twenty-one tests that pin the delivery
     # path. A `grew` verdict is the one case where moving a pin is correct.
     # R46 round 2, 2026-08-12: 162 -> 168, the six that pin the PARTIAL side.

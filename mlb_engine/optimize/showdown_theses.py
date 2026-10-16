@@ -63,6 +63,7 @@ from mlb_engine.optimize.showdown import (
     build_showdown_lineup,
     certify_showdown,
     exposure_cap_count,
+    held_cap_report,
     per_contest_cap_count,
     player_cap_structural_floor,
 )
@@ -1867,6 +1868,7 @@ def build_thesis_ladder(df: pd.DataFrame, n_entries: int,
                         max_cpt_per_contest: int = DEFAULT_MAX_CPT_PER_CONTEST,
                         captain_sleeve: Optional[Mapping[str, Any]] = None,
                         deal_across_contests: bool = True,
+                        held: Optional[Mapping[str, Any]] = None,
                         ) -> Dict[str, Any]:
     """Generate ``n_entries`` thesis specs, allocated across game states and with
     captains rotated so no captain exceeds the cap.
@@ -1944,8 +1946,15 @@ def build_thesis_ladder(df: pd.DataFrame, n_entries: int,
     counts, duel_floor = _apply_duel_floor(counts, weights, specs,
                                            int(n_entries), both_live)
 
-    cap = exposure_cap_count(max_cpt_exposure_pct, int(n_entries))
-    cpt_counts: Dict[str, int] = {}
+    # R166 (F17). The template's complete rows are in the file the caps are
+    # graded over, so the captain cap resolves over the blank rows plus them and
+    # the apportionment starts from the captains they already hold. `held` is
+    # `showdown.complete_row_exposure`; None is the pre-R166 apportionment.
+    held_rows = int((held or {}).get("row_count") or 0)
+    held_cpts = ({str(k): int(v) for k, v in ((held or {}).get("cpt_counts") or {}).items()}
+                 if held_rows else {})
+    cap = exposure_cap_count(max_cpt_exposure_pct, int(n_entries) + held_rows)
+    cpt_counts: Dict[str, int] = dict(held_cpts)
     cap_relaxed = 0
     theses: List[Dict[str, Any]] = []
     allocation: Dict[str, int] = {}
@@ -1959,9 +1968,15 @@ def build_thesis_ladder(df: pd.DataFrame, n_entries: int,
     # The bar is per CONTEST, because it depends on that contest's own size:
     # `n - 1` is what stops a 2-entry contest being allowed both its entries on
     # one captain. See showdown.per_contest_cap_count.
-    cap_for_contest = {cid: per_contest_cap_count(size, per_contest_cap)
+    held_contest_rows = ({str(k): int(v) for k, v in ((held or {}).get("contest_rows") or {}).items()}
+                         if held_rows else {})
+    cap_for_contest = {cid: per_contest_cap_count(size + held_contest_rows.get(str(cid), 0),
+                                                  per_contest_cap)
                        for cid, size in (partition.get("sizes") or {}).items()}
-    contest_cpt_counts: Dict[str, Dict[str, int]] = {}
+    contest_cpt_counts: Dict[str, Dict[str, int]] = (
+        {str(cid): {str(k): int(v) for k, v in counts.items()}
+         for cid, counts in ((held or {}).get("contest_cpt_counts") or {}).items()}
+        if held_rows else {})
     # Widening the captain pool is NOT a relaxation and is counted apart from
     # one: the cap held, the ladder simply reached past a template's own
     # shortlist to hold it. R239 is explicit that a per-contest bind is answered
@@ -2194,7 +2209,9 @@ def build_thesis_ladder(df: pd.DataFrame, n_entries: int,
             # just produced. Reported rather than raised: the caller decides,
             # and a blank reserved row is worse than a named infeasibility.
             "captain_assignment_feasibility": captain_assignment_feasible(
-                cpt_counts, list((partition.get("sizes") or {}).values()),
+                {k: c - held_cpts.get(k, 0) for k, c in cpt_counts.items()
+                 if c - held_cpts.get(k, 0) > 0},
+                list((partition.get("sizes") or {}).values()),
                 max_cpt_per_contest=per_contest_cap)
             if partition["available"] else {
                 "feasible": None,
@@ -2486,6 +2503,7 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
                  contest_of_entry: Optional[Sequence[str]] = None,
                  max_cpt_per_contest: int = DEFAULT_MAX_CPT_PER_CONTEST,
                  seed_forbidden: Optional[Sequence[Sequence[str]]] = None,
+                 held: Optional[Mapping[str, Any]] = None,
                  ) -> List[Optional[Dict[str, Any]]]:
     """Solve each thesis under its own constraints, enforcing the overlap bound
     and the player-exposure cap against every lineup already built.
@@ -2544,6 +2562,19 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
     wall anywhere on this path. The 2026-09-25 review found that the DEFAULT
     outcome, not a corner: a deterministic solve on an unconstrained first slot
     returns the same answer every time.
+
+    R166 (F17). ``held`` is ``showdown.complete_row_exposure`` over the same
+    complete rows, and it is what makes them count against the caps (the seed
+    above only keeps them from being re-solved). Every cap resolves over the
+    theses plus its ``row_count``, and the player, captain and per-contest
+    captain counts start from its counts, so a held row spends the cap before
+    slot 0. R250's captain hold is carved from each player's REMAINING
+    allowance, because a held player with captain demand and the global
+    ceiling would be UTIL-blocked from slot 0 for the whole ladder (F40's
+    stranding). ``captain_exposure_realized`` and
+    ``captain_exposure_by_contest`` stay the ladder's own;
+    ``diagnostics["held_rows"]`` is the whole-file reading. None, the default,
+    is the pre-R166 ladder.
     """
     prior: List[List[str]] = [list(s) for s in (seed_forbidden or [])]
     out: List[Optional[Dict[str, Any]]] = []
@@ -2571,10 +2602,17 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
     solver_failures = []
     time_limited_accepted = 0
     timeout_detail: List[Dict[str, str]] = []
-    player_counts: Dict[str, int] = {}
-    cpt_counts: Dict[str, int] = {}
-    player_cap = exposure_cap_count(max_player_exposure_pct, len(theses))
-    cpt_cap = exposure_cap_count(max_cpt_exposure_pct, len(theses))
+    # Captured once: R250's hold loop below rebinds the name `held` to a count.
+    held_spec: Dict[str, Any] = dict(held or {})
+    held_rows = int(held_spec.get("row_count") or 0)
+    held_players = ({str(k): int(v) for k, v in (held_spec.get("player_counts") or {}).items()}
+                    if held_rows else {})
+    held_cpts = ({str(k): int(v) for k, v in (held_spec.get("cpt_counts") or {}).items()}
+                 if held_rows else {})
+    player_counts: Dict[str, int] = dict(held_players)
+    cpt_counts: Dict[str, int] = dict(held_cpts)
+    player_cap = exposure_cap_count(max_player_exposure_pct, len(theses) + held_rows)
+    cpt_cap = exposure_cap_count(max_cpt_exposure_pct, len(theses) + held_rows)
     player_cap_cpt_reassigned: List[Dict[str, str]] = []
     player_cap_locks_dropped: List[Dict[str, str]] = []
     cpt_cap_reassigned: List[Dict[str, str]] = []
@@ -2637,11 +2675,20 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
     # level up from where it looks. The reservation can never be worth more than
     # the player's whole exposure allowance, because it is carved OUT of that
     # allowance rather than added to it.
-    reserve_ceiling = cpt_cap if cpt_cap is not None else len(theses)
-    if player_cap is not None:
-        reserve_ceiling = min(reserve_ceiling, player_cap)
+    #
+    # R166 (F17). Per player, from what is LEFT of each allowance once the held
+    # rows have spent theirs. With nothing held it is the global ceiling above
+    # (both counts are zero); with a held row on a demanded captain, the global
+    # ceiling would hold more than the player has left and block his UTIL seat
+    # from slot 0 to the end of the ladder, the stranding F40 removed.
+    def _reserve_room(k: str) -> int:
+        room = (cpt_cap - cpt_counts.get(k, 0)) if cpt_cap is not None else len(theses)
+        if player_cap is not None:
+            room = min(room, player_cap - player_counts.get(k, 0))
+        return max(0, room)
+
     reserved_remaining: Dict[str, int] = {
-        k: min(v, reserve_ceiling) for k, v in captain_demand.items()}
+        k: min(v, _reserve_room(k)) for k, v in captain_demand.items()}
     captain_budget_reserved = {k: v for k, v in reserved_remaining.items() if v}
     util_block_slots = 0
     util_block_detail: List[Dict[str, str]] = []
@@ -2657,9 +2704,17 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
     # that lived only in the apportionment would repeat that exactly.
     solve_partition = contest_partition(contest_of_entry, len(theses))
     per_contest_cap = max(1, int(max_cpt_per_contest))
-    cap_for_contest = {cid: per_contest_cap_count(size, per_contest_cap)
+    held_contest_rows = ({str(k): int(v) for k, v in (held_spec.get("contest_rows") or {}).items()}
+                         if held_rows else {})
+    held_contest_cpts = (
+        {str(cid): {str(k): int(v) for k, v in counts.items()}
+         for cid, counts in (held_spec.get("contest_cpt_counts") or {}).items()}
+        if held_rows else {})
+    cap_for_contest = {cid: per_contest_cap_count(size + held_contest_rows.get(str(cid), 0),
+                                                  per_contest_cap)
                        for cid, size in (solve_partition.get("sizes") or {}).items()}
-    contest_cpt_counts: Dict[str, Dict[str, int]] = {}
+    contest_cpt_counts: Dict[str, Dict[str, int]] = {
+        cid: dict(counts) for cid, counts in held_contest_cpts.items()}
     contest_cpt_excluded: List[Dict[str, str]] = []
 
     def _rung(latch: Dict[str, Any], **call_kw: Any) -> Optional[Dict[str, Any]]:
@@ -3268,7 +3323,9 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
             # Reassignment records withdrawn because a lower rung re-seated the
             # captain they name. Zero on a clean ladder.
             "cap_reassignments_withdrawn": cap_reassignments_withdrawn,
-            "captain_exposure_realized": dict(cpt_counts),
+            "captain_exposure_realized": {
+                k: c - held_cpts.get(k, 0) for k, c in cpt_counts.items()
+                if c - held_cpts.get(k, 0) > 0},
             "contest_partition": solve_partition,
             # R239(b). The fourth control, on the same footing as the other
             # three so "clean" can mean all four held.
@@ -3280,10 +3337,22 @@ def solve_ladder(df: pd.DataFrame, theses: Sequence[Mapping[str, Any]],
             # per-contest cap up rather than leave a blank reserved row.
             "contest_cap_relaxed": contest_cap_relaxed,
             "captain_exposure_by_contest": {
-                cid: dict(sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])))
-                for cid, counts in sorted(contest_cpt_counts.items())
+                cid: dict(sorted(own.items(), key=lambda kv: (-kv[1], kv[0])))
+                for cid, own in sorted(
+                    (cid, {k: c - held_contest_cpts.get(cid, {}).get(k, 0)
+                           for k, c in counts.items()
+                           if c - held_contest_cpts.get(cid, {}).get(k, 0) > 0})
+                    for cid, counts in contest_cpt_counts.items())
+                if own
             },
         })
+        if held_rows:
+            diagnostics["held_rows"] = held_cap_report(
+                held_spec, sum(1 for lu in out if lu is not None),
+                player_cap=player_cap, cpt_cap=cpt_cap,
+                player_pct=max_player_exposure_pct, cpt_pct=max_cpt_exposure_pct,
+                player_counts=player_counts, cpt_counts=cpt_counts,
+                contest_caps=cap_for_contest)
     return out
 
 

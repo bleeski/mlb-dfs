@@ -7013,6 +7013,12 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
     # frame each path actually solves on.
     ladder_seed_forbidden, ladder_seed_unmapped = sd.complete_row_player_keys(
         priced if use_ladder else df, reserved.get("reserved") or [])
+    # R166 (F17). The same rows as EXPOSURE: the seed keeps them from being
+    # re-solved, this makes them count against the caps (whole-file denominator,
+    # counts started from them). Nothing held is the pre-R166 solve.
+    held_rows = sd.complete_row_exposure(
+        priced if use_ladder else df, reserved.get("reserved") or [])
+    held_kw = {"held": held_rows} if held_rows["row_count"] else {}
     while True:
         solve_diag.clear()
         cpt_diagnostics.clear()
@@ -7022,7 +7028,8 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                                                  max_cpt_exposure_pct=cpt_cap,
                                                  contest_of_entry=contest_of_entry,
                                                  max_cpt_per_contest=cpt_per_contest,
-                                                 captain_sleeve=captain_sleeve)
+                                                 captain_sleeve=captain_sleeve,
+                                                 **held_kw)
             theses = ladder_meta["theses"]
             solved = st.solve_ladder(priced, theses, max_shared_players=share_cap,
                                      max_player_exposure_pct=player_cap_pct,
@@ -7030,7 +7037,8 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                                      diagnostics=solve_diag,
                                      contest_of_entry=contest_of_entry,
                                      max_cpt_per_contest=cpt_per_contest,
-                                     seed_forbidden=ladder_seed_forbidden)
+                                     seed_forbidden=ladder_seed_forbidden,
+                                     **held_kw)
             if any(lu is None for lu in solved):
                 sd_refusal = ("showdown_ladder_infeasible", "ladder_infeasible",
                               {"unsolved": [t["name"] for t, lu in zip(theses, solved)
@@ -7047,7 +7055,8 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                                           max_shared_players=share_cap,
                                           max_player_exposure_pct=player_cap_pct,
                                           diagnostics=cpt_diagnostics,
-                                          seed_forbidden=ladder_seed_forbidden)
+                                          seed_forbidden=ladder_seed_forbidden,
+                                          **held_kw)
             if len(bank) < n_entries:
                 sd_refusal = ("showdown_bank_short", "bank_short",
                               {"built": len(bank), "needed": n_entries})
@@ -7707,6 +7716,13 @@ def run_showdown(args, slate_dir: Path, salary: Path, entries: Path) -> tuple[in
                                       or not player_cap_pct
                                       or player_cap_pct >= player_structural_floor),
         },
+        # R166 (F17). Only when the template held complete rows: the caps above
+        # resolved over them too (`cap_count` is a whole-file count), while
+        # `by_player` and `realized_max_pct` stay this build's own entries. This
+        # block is the whole-file reading and names any held count already over
+        # a cap, which no new lineup can undo.
+        **({"held_rows": (solve_diag if use_ladder else cpt_diagnostics).get("held_rows")}
+           if (solve_diag if use_ladder else cpt_diagnostics).get("held_rows") else {}),
         # R263 shadow, Ben's dated decision of 2026-08-28. Sits HERE, between the
         # two exposure caps and the diversity block, because "beside the caps" is
         # where the item put it and because that is where the reader already is.
@@ -8158,11 +8174,14 @@ def publish_showdown_baseline(args, salary: Path, entries: Path, frame,
                     "max_player_exposure_pct": player_cap_pct}
         block["controls"] = dict(controls)
         seeds, unmapped = sd.complete_row_player_keys(frame, reserved.get("reserved") or [])
+        # R166 (F17). The same held rows against the caps, as on the main path.
+        held = sd.complete_row_exposure(frame, reserved.get("reserved") or [])
         diag: dict = {}
         bank = sd.build_showdown_bank(
             frame, n=len(rows), max_cpt_exposure_pct=cpt_cap,
             max_shared_players=share_cap, max_player_exposure_pct=player_cap_pct,
-            diagnostics=diag, stop_at=stop_at, seed_forbidden=seeds)
+            diagnostics=diag, stop_at=stop_at, seed_forbidden=seeds,
+            **({"held": held} if held["row_count"] else {}))
         block["solve"] = {
             "mode": "points_max_bank", "built": len(bank), "needed": len(rows),
             "wall_s": round(time.monotonic() - started, 3),
@@ -8171,6 +8190,7 @@ def publish_showdown_baseline(args, salary: Path, entries: Path, frame,
             "time_limited_accepted": int(diag.get("time_limited_accepted") or 0),
             "complete_rows_forbidden": len(seeds),
             "complete_rows_unmapped": list(unmapped),
+            **({"held_rows": diag.get("held_rows")} if diag.get("held_rows") else {}),
         }
         block["relaxations"] = showdown_relaxation_counts(diag)
         if captain_sleeve:
