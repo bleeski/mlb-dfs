@@ -1073,6 +1073,209 @@ class ShowdownLadderCompleteRowTests(unittest.TestCase):
         self.assertEqual(captured.get("held_rosters"), expected)
 
 
+class ShowdownFixedRowDenominatorTests(unittest.TestCase):
+    """R166 (F17, Session 65). A template's complete rows count against the caps.
+
+    R426 forbade the ladder from re-solving a held complete row, but every cap
+    still resolved over the blank rows alone and every count started at zero,
+    so a file whose complete rows already held a player could take him past
+    the cap with each new lineup clean. ``complete_row_exposure`` reads what
+    the held rows spend; the ladder, the apportionment and the bank resolve
+    each cap over blank plus held rows and start from those counts.
+    """
+
+    CHEAP = "Cheap|AA"
+
+    @staticmethod
+    def _held(rows, contract=SHOWDOWN):
+        return sd.complete_row_exposure(_apex_pool(), rows, contract)
+
+    @staticmethod
+    def _row(cells, contest="901"):
+        return {"is_complete": True, "contest_id": contest, "cells": list(cells)}
+
+    @staticmethod
+    def _theses(captains):
+        return [{"template": f"t{i}", "name": f"t{i}", "why": "", "cpt": cpt,
+                 "locks": [], "excludes": [], "mult": {}}
+                for i, cpt in enumerate(captains)]
+
+    def test_complete_rows_are_read_as_exposure_with_the_captain_at_its_slot(self):
+        rows = [self._row(["2002", "1001", "1100", "1101", "1200", "1201"], "901"),
+                self._row(["2002", "1001", "1102", "1103", "1202", "9999"], "902"),
+                {"is_complete": False, "contest_id": "901", "cells": [""] * 6}]
+        held = self._held(rows)
+        self.assertEqual(held["row_count"], 2, "every complete row is in the denominator")
+        self.assertEqual(held["cpt_counts"], {"AA_Big|AA": 2})
+        self.assertEqual(held["player_counts"][self.CHEAP], 2)
+        self.assertEqual(held["player_counts"]["AA_Big|AA"], 2)
+        self.assertEqual(held["contest_rows"], {"901": 1, "902": 1})
+        self.assertEqual(held["contest_cpt_counts"], {"901": {"AA_Big|AA": 1},
+                                                      "902": {"AA_Big|AA": 1}})
+        self.assertEqual(held["unmapped_ids"], ["9999"])
+
+    def test_the_bank_spends_held_rows_against_the_player_cap(self):
+        """The cheap bat every points-max solve wants: 2 of 4 at a 0.5 cap with
+        nothing held; with two held rows carrying him the cap is 3 of 6 and the
+        bank may add only one."""
+        kw = dict(n=4, max_cpt_exposure_pct=None, max_shared_players=None,
+                  max_player_exposure_pct=0.5, time_limit=5)
+        plain_diag: dict = {}
+        plain = sd.build_showdown_bank(_apex_pool(), diagnostics=plain_diag, **kw)
+        self.assertEqual(sum(self.CHEAP in lu["player_keys"] for lu in plain), 2,
+                         "fixture precondition: the cap must bind with nothing held")
+        held = self._held([self._row(["2002", "1001", "1100", "1101", "1200", "1201"]),
+                           self._row(["2003", "1001", "1102", "1103", "1202", "1203"])])
+        diag: dict = {}
+        bank = sd.build_showdown_bank(_apex_pool(), diagnostics=diag, held=held, **kw)
+        self.assertEqual(len(bank), 4)
+        self.assertEqual(sum(self.CHEAP in lu["player_keys"] for lu in bank), 1)
+        self.assertEqual(diag["player_cap_count"], 3, "floor(0.5 x (4 + 2))")
+        self.assertEqual(diag["player_exposure"].get(self.CHEAP), 1,
+                         "the published counts stay the bank's own")
+        self.assertEqual(diag["player_relaxed_slots"], 0)
+        block = diag["held_rows"]
+        self.assertEqual((block["row_count"], block["denominator"]), (2, 6))
+        self.assertEqual(block["whole_file_realized_max_pct"]["player"], 50.0)
+        self.assertEqual(block["over_cap"], [])
+
+    def test_the_ladder_spends_held_captains_and_lists_one_already_over_the_cap(self):
+        held = self._held([self._row(["2002", "1001", "1100", "1101", "1200", "1201"]),
+                           self._row(["2002", "1001", "1102", "1103", "1202", "1203"]),
+                           self._row(["2002", "1001", "1104", "1105", "1204", "1205"])])
+        diag: dict = {}
+        solved = st.solve_ladder(_apex_pool(), self._theses(["AA_Big|AA"] * 6),
+                                 max_shared_players=None, max_cpt_exposure_pct=0.25,
+                                 time_limit=5, diagnostics=diag, held=held)
+        self.assertTrue(all(lu is not None for lu in solved))
+        captains = [lu["captain"]["player_key"] for lu in solved]
+        self.assertNotIn("AA_Big|AA", captains,
+                         "three held rows already captain him past floor(0.25 x 9) = 2")
+        self.assertEqual(diag["cpt_cap_count"], 2, "over the 6 theses alone it was 1")
+        self.assertNotIn("AA_Big|AA", diag["captain_exposure_realized"])
+        self.assertEqual(diag["cpt_cap_relaxed"], 0)
+        self.assertIn({"control": "max_cpt_exposure_pct", "player_key": "AA_Big|AA",
+                       "held": "3", "cap_count": "2"}, diag["held_rows"]["over_cap"])
+
+    def test_a_held_captain_with_no_allowance_left_holds_no_captain_budget(self):
+        """R250's hold, carved from what is left. Two held rows captain the
+        cheap bat past his captain cap, so his own rungs can never seat him;
+        holding his last player-cap units for them would block his UTIL seat
+        from slot 0 to the end of the ladder (F40's stranding)."""
+        held = self._held([self._row(["2001", "1002", "1100", "1101", "1200", "1201"]),
+                           self._row(["2001", "1003", "1102", "1103", "1202", "1203"])])
+        diag: dict = {}
+        solved = st.solve_ladder(
+            _apex_pool(),
+            self._theses(["AA_Big|AA", "BB_Big|BB", self.CHEAP, self.CHEAP]),
+            max_shared_players=None, max_cpt_exposure_pct=0.25,
+            max_player_exposure_pct=0.5, time_limit=5, diagnostics=diag, held=held)
+        self.assertTrue(all(lu is not None for lu in solved))
+        self.assertNotIn(self.CHEAP, diag["captain_budget_reserved"])
+        self.assertEqual(diag["captain_budget_util_blocks"], 0)
+        # Slot 0 captains AA_Big, whose salary leaves room only with the cheap bat
+        # at UTIL. A hold carved from the global ceiling blocks that seat.
+        self.assertEqual(solved[0]["captain"]["player_key"], "AA_Big|AA")
+        self.assertIn(self.CHEAP, solved[0]["player_keys"])
+        self.assertIn({"control": "max_cpt_exposure_pct", "player_key": self.CHEAP,
+                       "held": "2", "cap_count": "1"}, diag["held_rows"]["over_cap"])
+
+    def test_the_apportionment_gives_no_slot_to_a_captain_the_held_rows_spent(self):
+        df = st.apply_base_prior(sd.melt_showdown_salary_csv(SAL),
+                                 pitcher_hand={"MIN": "R", "CHC": "R"})
+        line = {"MIN": -150, "CHC": 130}
+        plain = st.build_thesis_ladder(df, 8, moneyline=line)
+        top = collections.Counter(t["cpt"] for t in plain["theses"] if t["cpt"]).most_common(1)[0][0]
+        cpt_id = str(df.loc[df["Player_Key"] == top, "CPT_ID"].iloc[0])
+        utils = [str(u) for u in df.loc[df["Player_Key"] != top, "UTIL_ID"].head(5)]
+        held = sd.complete_row_exposure(df, [self._row([cpt_id] + utils)] * 4)
+        ladder = st.build_thesis_ladder(df, 8, moneyline=line, held=held)
+        self.assertEqual(plain["captain_cap_count"], 2, "floor(0.25 x 8)")
+        self.assertEqual(ladder["captain_cap_count"], 3, "floor(0.25 x (8 + 4))")
+        self.assertNotIn(top, [t["cpt"] for t in ladder["theses"]],
+                         "four held rows already captain him past 3")
+
+    def test_nothing_held_is_the_pre_r166_solve(self):
+        kw = dict(max_shared_players=None, time_limit=5)
+        theses = self._theses(["AA_Big|AA", "BB_Big|BB", self.CHEAP])
+        a_diag: dict = {}
+        b_diag: dict = {}
+        a = st.solve_ladder(_apex_pool(), theses, diagnostics=a_diag, **kw)
+        b = st.solve_ladder(_apex_pool(), theses, diagnostics=b_diag,
+                            held=sd.complete_row_exposure(_apex_pool(), []), **kw)
+        self.assertEqual([lu["player_keys"] for lu in a], [lu["player_keys"] for lu in b])
+        self.assertEqual(a_diag, b_diag)
+        self.assertNotIn("held_rows", a_diag)
+        bank_a = sd.build_showdown_bank(_apex_pool(), n=3, time_limit=5)
+        bank_b = sd.build_showdown_bank(_apex_pool(), n=3, time_limit=5, held=None)
+        self.assertEqual([lu["player_keys"] for lu in bank_a],
+                         [lu["player_keys"] for lu in bank_b])
+
+    def test_run_showdown_threads_the_held_rows_to_the_ladder_and_the_baseline(self):
+        import types as _types
+        from mlb_engine.entries import upload_manifest as um
+        path = REPO / "skills" / "generate-lineups" / "scripts" / "build_slate.py"
+        spec = importlib.util.spec_from_file_location("build_slate_r166", path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        df = st.apply_base_prior(sd.melt_showdown_salary_csv(SAL),
+                                 pitcher_hand={"MIN": "R", "CHC": "R"})
+        legal = sd.build_showdown_lineup(df)
+        self.assertIsNotNone(legal)
+        captured: dict = {}
+        real_ladder, real_solve = st.build_thesis_ladder, st.solve_ladder
+        real_bank = sd.build_showdown_bank
+
+        def spy_bank(*a, **k):
+            captured["baseline"] = k.get("held")
+            return real_bank(*a, **k)
+
+        def spy_ladder(*a, **k):
+            captured["ladder"] = k.get("held")
+            return real_ladder(*a, **k)
+
+        def spy_solve(*a, **k):
+            captured["solve"] = k.get("held")
+            return real_solve(*a, **k)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            sal, ent = root / "DKSalaries.csv", root / "DKEntries.csv"
+            shutil.copy2(SAL, sal)
+            ShowdownLadderCompleteRowTests._template_with_one_complete_row(
+                self, ent, legal["roster_ids"])
+            args = _types.SimpleNamespace(
+                date="2026-07-18", entries=None, controls_override=None,
+                projections=None, declare_pitcher=[], lineups=None, odds=None,
+                brief=None)
+            with contextlib.ExitStack() as stack:
+                stack.enter_context(unittest.mock.patch.object(mod, "REPO", root))
+                stack.enter_context(unittest.mock.patch.object(um, "REPO_ROOT", root))
+                stack.enter_context(unittest.mock.patch.object(
+                    mod, "fetch_lineups",
+                    lambda *_a, **_k: (_ for _ in ()).throw(OSError("no egress in a test"))))
+                stack.enter_context(unittest.mock.patch.object(
+                    mod, "showdown_moneyline", lambda *_a, **_k: ({}, {}, {})))
+                stack.enter_context(unittest.mock.patch.object(st, "build_thesis_ladder", spy_ladder))
+                stack.enter_context(unittest.mock.patch.object(st, "solve_ladder", spy_solve))
+                stack.enter_context(unittest.mock.patch.object(sd, "build_showdown_bank", spy_bank))
+                stack.enter_context(contextlib.redirect_stdout(io.StringIO()))
+                stack.enter_context(contextlib.redirect_stderr(io.StringIO()))
+                _code, brief = mod.run_showdown(args, root, sal, ent)
+        self.assertEqual(brief["held_rows"]["row_count"], 1)
+        for block in ("captain_exposure", "player_exposure"):
+            with self.subTest(block=block):
+                self.assertIn("whole_file_realized_max_pct", brief[block],
+                              "the whole-file share must sit beside the build's own")
+        # The baseline is R389(c)'s points-max bank, published before the ladder.
+        for site in ("ladder", "solve", "baseline"):
+            with self.subTest(site=site):
+                self.assertIsNotNone(captured.get(site), f"{site} was not handed the held rows")
+                self.assertEqual(captured[site]["row_count"], 1)
+                self.assertEqual(captured[site]["cpt_counts"],
+                                 {legal["captain"]["player_key"]: 1})
+
+
 # --------------------------------------------------------------------------
 # R29(5): the odds fetch reported "no moneyline matched" on a priced game
 # --------------------------------------------------------------------------

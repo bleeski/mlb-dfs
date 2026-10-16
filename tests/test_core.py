@@ -1471,6 +1471,301 @@ class FixedExposureOffsetTests(unittest.TestCase):
             self.assertEqual(no_salary["player_counts"], offsets["player_counts"])
 
 
+class FixedRowDenominatorTests(unittest.TestCase):
+    """R166 + R449 (Session 65). The controls added after R61 resolve over the file.
+
+    R61 gave the exposure caps a whole-file denominator and headroom over the
+    rows a solve cannot change. The candidate-reuse cap and the five-stack quota
+    got neither: on a scoped swap the reuse default was sized from the file and
+    bound nothing, an operator's whole-file reuse cap certified a file over it,
+    and the quota's need was taken over the solve's entries alone. R449 is the
+    stack-identification seam under all of it: the validator and the swap
+    offsets named a primary stack on rosters the optimizer calls stackless.
+    """
+
+    STACKLESS = ("AAA", "AAA", "BBB", "BBB", "CCC", "CCC", "DDD", "DDD")
+    THREE = ("AAA", "AAA", "AAA", "BBB", "BBB", "CCC", "CCC", "DDD")
+    FIVE = ("AAA", "AAA", "AAA", "AAA", "AAA", "BBB", "BBB", "BBB")
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.root = Path(self._tmp.name)
+
+    # -- fixtures ------------------------------------------------------------ #
+
+    def _salary(self):
+        """Four hitting teams in two games and both arms in a third, so a
+        roster can spread its hitters 2-2-2-2 and still be DK-legal."""
+        path = self.root / "salary.csv"
+        rows = [["P", "Arm E (20001)", "Arm E", "20001", "P", "9000",
+                 "EEE@FFF 06/11/2026 01:00PM ET", "EEE"],
+                ["P", "Arm F (20002)", "Arm F", "20002", "P", "8800",
+                 "EEE@FFF 06/11/2026 01:00PM ET", "FFF"]]
+        pid = 21000
+        for team, game in (("AAA", "AAA@BBB"), ("BBB", "AAA@BBB"),
+                           ("CCC", "CCC@DDD"), ("DDD", "CCC@DDD")):
+            for pos, slot in (("C", "C"), ("1B", "1B"), ("2B", "2B"), ("3B", "3B"),
+                              ("SS", "SS"), ("OF", "OF1"), ("OF", "OF2"), ("OF", "OF3")):
+                pid += 1
+                rows.append([pos, f"{team} {slot} ({pid})", f"{team} {slot}", str(pid),
+                             pos, "3000", f"{game} 06/11/2026 01:00PM ET", team])
+        with path.open("w", newline="", encoding="utf-8") as handle:
+            writer = csv.writer(handle)
+            writer.writerow(["Position", "Name + ID", "Name", "ID", "Roster Position",
+                             "Salary", "Game Info", "TeamAbbrev"])
+            writer.writerows(rows)
+        return path, {row[2]: row[3] for row in rows}
+
+    @staticmethod
+    def _roster(ids, teams):
+        """Both arms, then the team for each of C, 1B, 2B, 3B, SS, OF, OF, OF."""
+        used: Counter = Counter()
+        out = [ids["Arm E"], ids["Arm F"]]
+        for slot, team in zip(("C", "1B", "2B", "3B", "SS", "OF", "OF", "OF"), teams):
+            if slot == "OF":
+                used[team] += 1
+                slot = f"OF{used[team]}"
+            out.append(ids[f"{team} {slot}"])
+        return out
+
+    def _file(self, plans, contests):
+        salary, ids = self._salary()
+        entries = self.root / "entries.csv"
+        rosters = [self._roster(ids, plan) for plan in plans]
+        write_entries(entries, rosters, contests)
+        return entries, salary, rosters
+
+    @staticmethod
+    def _entries(n, contests=None):
+        contests = contests or [f"C{i}" for i in range(n)]
+        return [{"entry_id": f"e{i}", "contest_id": contests[i],
+                 "contest_shape": "large_field_gpp"} for i in range(n)]
+
+    @staticmethod
+    def _bank(n=3, sizes=None):
+        out = [candidate(f"c{i}", [f"p{i}_{j}" for j in range(10)], 150 - i)
+               for i in range(n)]
+        for c, size in zip(out, sizes or []):
+            c["primary_stack_size"] = size
+        return out
+
+    @staticmethod
+    def _fixed(rosters):
+        """Offsets in `fixed_portfolio_exposure`'s shape, one contest per row,
+        with `player_counts` so every fixed-row branch is live."""
+        ids = [f"x{i}" for i in range(len(rosters))]
+        by_contest: dict = {}
+        for i, r in enumerate(rosters):
+            by_contest.setdefault(f"F{i}", []).append(sorted(r))
+        return {"row_count": len(rosters), "entry_ids": ids,
+                "rosters": [list(r) for r in rosters],
+                "player_counts": dict(Counter(p for r in rosters for p in r)),
+                "signatures_by_contest": by_contest,
+                "contest_by_entry": {eid: f"F{i}" for i, eid in enumerate(ids)}}
+
+    @staticmethod
+    def _unrelated(n):
+        return [[f"u{r}_{j}" for j in range(10)] for r in range(n)]
+
+    # -- R449: one stack rule on both sides of the seam ----------------------- #
+
+    def test_a_stackless_roster_names_no_primary_stack_in_the_offsets_or_the_validator(self):
+        entries, salary, _ = self._file([self.STACKLESS, self.THREE], ["901", "902"])
+        offsets = fixed_portfolio_exposure(entries, [], salary_csv_path=salary)
+        self.assertEqual(offsets["primary_stack_counts"], {"AAA": 1})
+        self.assertEqual(offsets["primary_stack_sizes"], [0, 3])
+        report = validate_dk_entries_file(entries, salary_csv_path=salary)
+        self.assertTrue(report["roster_legality_passed"], report["errors"])
+        self.assertEqual(report["exposures"]["primary_stack_counts"], {"AAA": 1},
+                         "a stackless row is no team, not a '' bucket")
+
+    def test_stackless_rows_cost_no_stack_cap_at_the_export_gate(self):
+        """The failure R449 named: the solve holds a stack cap on the optimizer's
+        field, which leaves stackless rows unbucketed, and the gate used to put
+        every one of them in the alphabetically first team's bucket."""
+        entries, salary, _ = self._file([self.STACKLESS, self.STACKLESS], ["901", "902"])
+        report = validate_dk_entries_file(
+            entries, salary_csv_path=salary,
+            portfolio_controls={"max_primary_stack_exposure_pct": 0.5})
+        self.assertTrue(report["roster_legality_passed"], report["errors"])
+        self.assertTrue(report["portfolio_caps_passed"], report["portfolio_errors"])
+
+    # -- R166(b): the reuse cap is whole-file, at the gate ------------------- #
+
+    def test_the_validator_grades_a_set_reuse_cap_over_the_whole_file_as_an_s_failure(self):
+        from mlb_engine.entries.dk_entries_manager import classify_export_failures
+        entries, salary, rosters = self._file([self.THREE] * 3, ["901", "902", "903"])
+        unset = validate_dk_entries_file(entries, salary_csv_path=salary)
+        self.assertTrue(unset["passed"], unset["errors"])
+        self.assertIsNone(unset["resolved_caps"]["max_candidate_reuse"])
+        report = validate_dk_entries_file(
+            entries, salary_csv_path=salary, portfolio_controls={"max_candidate_reuse": 2})
+        expected = f"lineup {'|'.join(sorted(rosters[0]))} count 3>2"
+        self.assertEqual(report["portfolio_errors"], [expected])
+        self.assertTrue(report["roster_legality_passed"])
+        self.assertFalse(report["portfolio_caps_passed"])
+        self.assertEqual(report["resolved_caps"]["max_candidate_reuse"], 2)
+        ok = {"passed": True, "errors": []}
+        verdict = classify_export_failures(
+            pre={"missing_gates": [], "failed_gates": [], "errors": []}, template=ok,
+            reconciliation=ok, candidate_validation=report, delta=ok)
+        self.assertTrue(verdict["review_grade"], verdict)
+        row = [r for r in verdict["failures"] if r["gate"] == "portfolio_caps_passed"][0]
+        self.assertEqual(row["controls"], ["max_candidate_reuse"])
+        ls = SwapControlsInheritanceTests._late_swap()
+        line = ls.classify_swap_failure([expected], {"max_candidate_reuse": 2})[0]
+        self.assertIn("[binding control: max_candidate_reuse=2", line)
+
+    # -- R166(a): the engine default is sized from the solve ----------------- #
+
+    def test_the_engine_default_is_sized_from_the_solve_and_spreads_a_scoped_swap(self):
+        result = select_and_assign_entries(
+            self._bank(3), self._entries(2), {},
+            fixed_exposure=self._fixed(self._unrelated(10)))
+        self.assertTrue(result["passed"], result.get("errors"))
+        block = result["candidate_reuse"]
+        self.assertEqual(block["cap_source"], "engine_default")
+        self.assertEqual(block["engine_default_rungs"], [1],
+                         "sized from the 12 file rows this was [4, 8] and bound nothing")
+        self.assertEqual(block["cap_applied"], 1)
+        self.assertEqual(block["entry_denominator"], 12, "the cap is still graded over the file")
+        self.assertEqual(block["default_sized_from_entries"], 2)
+        self.assertEqual(block["distinct_lineups"], 2)
+        self.assertEqual(block["max_signature_repeat"], 1)
+
+    def test_a_fixed_lineup_in_the_bank_is_seated_without_a_wasted_rung(self):
+        self.assertEqual(default_candidate_reuse_cap(3, 3), 1)
+        self.assertEqual(default_candidate_reuse_cap(3, 3, {"held": 1}), 2,
+                         "cap 1 less the held use seats 2 of 3; cap 2 seats 5")
+        self.assertEqual(default_candidate_reuse_cap(3, 3, {"held": 0}), 1)
+        self.assertEqual(candidate_reuse_cap_rungs(3, 3, {"held": 1}), [2])
+        self.assertEqual(candidate_reuse_cap_rungs(4, 3, {"held": 2}), [2, 4],
+                         "rung 4 is at E and still binds: the held lineup's "
+                         "headroom there is 2")
+        self.assertEqual(candidate_reuse_cap_rungs(4, 3), [2],
+                         "with nothing held a rung at E binds nothing")
+        bank = self._bank(3)
+        result = select_and_assign_entries(
+            bank, self._entries(3), {}, fixed_exposure=self._fixed([bank[0]["lineup_ids"]]))
+        self.assertTrue(result["passed"], result.get("errors"))
+        block = result["candidate_reuse"]
+        self.assertEqual(block["relaxations"], 0)
+        self.assertEqual(block["cap_applied"], 2)
+        self.assertEqual(block["fixed_signature_offsets"], 1)
+        self.assertLessEqual(block["whole_file_max_signature_repeat"], 2)
+
+    def test_without_untouchable_rows_the_reuse_block_keeps_its_keys(self):
+        result = select_and_assign_entries(self._bank(3), self._entries(2), {})
+        for key in ("default_sized_from_entries", "fixed_signature_offsets",
+                    "whole_file_max_signature_repeat"):
+            self.assertNotIn(key, result["candidate_reuse"])
+
+    # -- R166(b): the reuse rows carry headroom ------------------------------ #
+
+    def test_an_operator_cap_counts_the_rows_the_solve_cannot_change(self):
+        bank = self._bank(3)
+        held = bank[0]["lineup_ids"]
+        result = select_and_assign_entries(
+            bank, self._entries(4), {"max_candidate_reuse": 3},
+            fixed_exposure=self._fixed([held, held]))
+        self.assertTrue(result["passed"], result.get("errors"))
+        used = Counter(a["candidate_id"] for a in result["assignments"])
+        self.assertLessEqual(used["c0"], 1, "two rows already hold c0's lineup under a cap of 3")
+        block = result["candidate_reuse"]
+        self.assertEqual(block["cap_source"], "operator")
+        self.assertLessEqual(block["whole_file_max_signature_repeat"], 3)
+        self.assertEqual(
+            result["fixed_exposure_report"]["headroom_reduced_keys"]["max_candidate_reuse"],
+            ["c0"])
+
+    def test_rows_already_over_an_operator_cap_refuse_and_an_engine_default_does_not(self):
+        bank = self._bank(3)
+        held = bank[0]["lineup_ids"]
+        fixed = self._fixed([held] * 4)
+        refused = select_and_assign_entries(bank, self._entries(4),
+                                            {"max_candidate_reuse": 3}, fixed_exposure=fixed)
+        self.assertFalse(refused["passed"])
+        self.assertEqual(refused["refusal"], "untouchable_rows_exceed_cap")
+        self.assertTrue(refused["errors"][0].startswith("max_candidate_reuse: lineup "),
+                        refused["errors"])
+        self.assertIn("4 of the 4 row(s)", refused["errors"][0])
+        default = select_and_assign_entries(bank, self._entries(4), {}, fixed_exposure=fixed)
+        self.assertTrue(default["passed"], default.get("errors"))
+        self.assertNotIn("c0", {a["candidate_id"] for a in default["assignments"]})
+
+    def test_a_proven_infeasible_operator_cap_is_diagnosed_on_its_headroom(self):
+        bank = self._bank(3)
+        result = select_and_assign_entries(
+            bank, self._entries(3), {"max_candidate_reuse": 1},
+            fixed_exposure=self._fixed([bank[0]["lineup_ids"]]))
+        self.assertFalse(result["passed"])
+        blob = " ".join(result.get("errors") or [])
+        self.assertIn("max_candidate_reuse: 3 distinct lineups at cap 1", blob)
+        self.assertIn("seat 2 < 3 entries", blob)
+
+    # -- R166(c): the five-stack quota is a share of the file ---------------- #
+
+    QUOTA = {"min_five_stack_share_pct": 0.5, "five_stack_min_size": 5}
+
+    def test_untouchable_rows_that_carry_the_quota_lower_the_solves_need(self):
+        entries, salary, _ = self._file([self.FIVE, self.FIVE], ["901", "902"])
+        fixed = fixed_portfolio_exposure(entries, [], salary_csv_path=salary)
+        self.assertEqual(fixed["primary_stack_sizes"], [5, 5])
+        result = select_and_assign_entries(self._bank(4, [5, 5, 3, 3]), self._entries(2),
+                                           dict(self.QUOTA), fixed_exposure=fixed)
+        self.assertTrue(result["passed"], result.get("errors"))
+        quota = result["five_stack_quota"]
+        self.assertEqual(quota["status"], "off")
+        self.assertEqual(quota["applied_need"], 0, "an E-only need was 1")
+        self.assertEqual(quota["fixed_rows_basis"], "counted")
+        self.assertEqual(quota["whole_file"], {
+            "entry_denominator": 4, "fixed_rows_in_scope": 2, "fixed_qualifiers": 2,
+            "whole_file_need": 2, "shortfall": 0})
+
+    def test_short_untouchable_rows_raise_the_need_and_the_rest_is_reported_not_relaxed(self):
+        entries, salary, _ = self._file([self.STACKLESS, self.THREE], ["901", "902"])
+        fixed = fixed_portfolio_exposure(entries, [], salary_csv_path=salary)
+        result = select_and_assign_entries(
+            self._bank(4, [5, 5, 3, 3]), self._entries(2),
+            {"min_five_stack_share_pct": 0.75, "five_stack_min_size": 5}, fixed_exposure=fixed)
+        self.assertTrue(result["passed"], result.get("errors"))
+        quota = result["five_stack_quota"]
+        self.assertEqual(quota["applied_need"], 2, "an E-only need was floor(2 x 0.75) = 1")
+        self.assertEqual(quota["relaxations"], 0)
+        self.assertEqual(quota["relaxation_steps"], [])
+        self.assertEqual(quota["whole_file"]["whole_file_need"], 3)
+        self.assertEqual(quota["whole_file"]["shortfall"], 1)
+        self.assertTrue(quota["need_met"])
+        self.assertTrue(any("short whatever the solve does" in w
+                            for w in result.get("warnings") or []), result.get("warnings"))
+
+    def test_a_contest_scoped_quota_counts_only_its_own_contests_untouchable_rows(self):
+        entries, salary, _ = self._file([self.FIVE, self.STACKLESS], ["901", "902"])
+        fixed = fixed_portfolio_exposure(entries, [], salary_csv_path=salary)
+        result = select_and_assign_entries(
+            self._bank(4, [5, 5, 3, 3]), self._entries(3, ["901", "901", "903"]),
+            {"min_five_stack_share_pct_by_contest": {"901": 0.5}, "five_stack_min_size": 5},
+            fixed_exposure=fixed)
+        self.assertTrue(result["passed"], result.get("errors"))
+        quota = result["five_stack_quota"]
+        self.assertEqual(quota["scope"], "contests")
+        self.assertEqual(quota["whole_file"]["fixed_rows_in_scope"], 1)
+        self.assertEqual(quota["whole_file"]["fixed_qualifiers"], 1)
+        self.assertEqual(quota["applied_need"], 0)
+
+    def test_without_stack_sizes_the_untouchable_rows_are_not_read_as_short(self):
+        entries, _salary, _ = self._file([self.STACKLESS, self.THREE], ["901", "902"])
+        fixed = fixed_portfolio_exposure(entries, [])
+        self.assertFalse(fixed["stacks_derived"])
+        result = select_and_assign_entries(self._bank(4, [5, 5, 3, 3]), self._entries(2),
+                                           dict(self.QUOTA), fixed_exposure=fixed)
+        quota = result["five_stack_quota"]
+        self.assertEqual(quota["fixed_rows_basis"], "unknown")
+        self.assertNotIn("whole_file", quota)
+        self.assertEqual(quota["applied_need"], 1)
+
+
 class ControlAlignmentTests(unittest.TestCase):
     def test_candidate_reuse_cap_is_signature_keyed(self):
         roster = [f"P{i}" for i in range(10)]

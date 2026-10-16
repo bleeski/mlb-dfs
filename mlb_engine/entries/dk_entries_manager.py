@@ -25,6 +25,10 @@ from mlb_engine.optimize.roster_contracts import CLASSIC, SHOWDOWN
 # export gate cannot grade a file against a different number than the solver
 # built it under.
 from mlb_engine.optimize.optimizer_v3 import ANTI_CORRELATION_DEFAULT_MAX
+# R449: the optimizer's bucket threshold, for the same reason. The allocator caps
+# stacks on the optimizer's field; the validator and the swap offsets name them
+# here, and the two have to agree on which rosters have a stack at all.
+from mlb_engine.optimize.optimizer_v3 import PRIMARY_STACK_MIN_HITTERS
 
 VERSION = "v1.6"
 ENTRY_ID_COL = 0
@@ -870,11 +874,27 @@ def _game_cap_count(total: int, pct: float) -> int:
 
 
 def _primary_stack(roster: Sequence[str], players: Mapping[str, SalaryPlayer]) -> str:
+    """The roster's primary stack team, or "" when it has none.
+
+    R449. The optimizer's rule (`optimizer_v3._identify_primary_stack`): at least
+    PRIMARY_STACK_MIN_HITTERS hitters, most first, alphabetical on a tie. Without
+    the threshold a stackless 2-2-2-2 roster carried no bucket in the solve and
+    the alphabetical first team's bucket here, so the export gate and the swap
+    offsets counted a stack the allocator never capped.
+    """
+    return _primary_stack_and_size(roster, players)[0]
+
+
+def _primary_stack_and_size(roster: Sequence[str],
+                            players: Mapping[str, SalaryPlayer]) -> Tuple[str, int]:
+    """`_primary_stack` and its hitter count, ("", 0) for a stackless roster."""
     counts = Counter(players[pid].team for pid in roster if pid in players and "P" not in players[pid].positions)
     if not counts:
-        return ""
+        return "", 0
     best = max(counts.values())
-    return sorted(team for team, count in counts.items() if count == best)[0]
+    if best < PRIMARY_STACK_MIN_HITTERS:
+        return "", 0
+    return sorted(team for team, count in counts.items() if count == best)[0], int(best)
 
 
 def fixed_portfolio_exposure(
@@ -932,6 +952,7 @@ def fixed_portfolio_exposure(
     team_counts: Counter = Counter()
     signatures_by_contest: Dict[str, List[List[str]]] = defaultdict(list)
     contest_by_entry: Dict[str, str] = {}
+    stack_sizes: List[int] = []
     for entry in parse_dk_entry_rows(path):
         if not entry.is_complete or entry.entry_id in solved:
             continue
@@ -943,8 +964,12 @@ def fixed_portfolio_exposure(
         # "/" joined, the same key shape validate_dk_entries_file publishes in
         # ``exposures["sp_pair_counts"]``, so the two dicts compare directly.
         pair_counts["/".join(sorted(roster[:2]))] += 1
+        stack, size = _primary_stack_and_size(roster, players) if players else ("", 0)
+        # R166(c). Per row, so the allocator can count which untouchable rows
+        # already carry the five-stack quota, in the scope (portfolio or one
+        # contest) the quota was asked in.
+        stack_sizes.append(size)
         if players:
-            stack = _primary_stack(roster, players)
             if stack:
                 stack_counts[stack] += 1
             for gid in {players[pid].game_id for pid in roster
@@ -974,6 +999,10 @@ def fixed_portfolio_exposure(
         # R445. Which contest each fixed row sits in, parallel to `entry_ids`, so a
         # same-contest duplicate among the untouchable rows can name its rows.
         "contest_by_entry": contest_by_entry,
+        # R166(c). Parallel to `entry_ids`; 0 for a stackless row, and every row
+        # reads 0 when `stacks_derived` is False, which the allocator treats as
+        # unknown rather than as "no row qualifies".
+        "primary_stack_sizes": stack_sizes,
         "stacks_derived": bool(players),
     }
 
@@ -1164,7 +1193,10 @@ def validate_dk_entries_file(
     total = len(legal_rosters)
     player_counts = Counter(pid for _, roster in legal_rosters for pid in roster)
     pitcher_counts = Counter(pid for _, roster in legal_rosters for pid in roster[:2])
-    stack_counts = Counter(_primary_stack(roster, players) for _, roster in legal_rosters) if players else Counter()
+    # R449: a stackless roster names no team, so it is left out rather than
+    # published as a "" bucket.
+    stack_counts = Counter(stack for stack in (_primary_stack(roster, players) for _, roster in legal_rosters)
+                           if stack) if players else Counter()
     pair_counts = Counter(tuple(sorted(roster[:2])) for _, roster in legal_rosters)
     portfolio_errors: List[str] = []
     player_cap = _cap_count(total, controls.get("max_player_exposure_pct"))
@@ -1216,6 +1248,19 @@ def validate_dk_entries_file(
             portfolio_errors += [
                 f"team {team} footprint {count}>{team_cap}"
                 for team, count in team_counts.items() if count > team_cap]
+    # R166(b). The whole-file reuse count. `max_candidate_reuse` is how many file
+    # rows may hold one lineup, and until this landed nothing post-export graded
+    # it, so a swap that spent an operator's cap on top of untouchable rows
+    # already holding the lineup certified. Only a value the caller passes is
+    # graded: the allocator's engine default lives in its private copy of the
+    # controls and never reaches this dict.
+    reuse_cap = controls.get("max_candidate_reuse")
+    if reuse_cap is not None:
+        reuse_counts = Counter(entry.lineup_signature for entry, _ in legal_rosters)
+        portfolio_errors += [
+            f"lineup {signature} count {count}>{int(reuse_cap)}"
+            for signature, count in sorted(reuse_counts.items())
+            if signature and count > int(reuse_cap)]
     if max_overlap is not None:
         for i, (entry_a, roster_a) in enumerate(legal_rosters):
             for entry_b, roster_b in legal_rosters[i + 1:]:
@@ -1229,7 +1274,7 @@ def validate_dk_entries_file(
     if blank_entries and not require_all_reserved_filled:
         warnings.append(f"{len(blank_entries)} blank/incomplete reserved entries")
 
-    roster_legality_errors = [e for e in errors if not e.startswith(("player ", "pitcher ", "primary stack ", "SP pair ", "entries ", "game ", "team "))]
+    roster_legality_errors = [e for e in errors if not e.startswith(("player ", "pitcher ", "primary stack ", "SP pair ", "entries ", "game ", "team ", "lineup "))]
     return {
         "passed": not errors,
         "errors": errors,
@@ -1263,6 +1308,7 @@ def validate_dk_entries_file(
             "max_shared_players": max_overlap,
             "max_game_exposure_pct_by_game": game_caps or None,
             "max_team_exposure_pct": team_pct,
+            "max_candidate_reuse": int(reuse_cap) if reuse_cap is not None else None,
         },
         "summary": "DKEntries validation passed" if not errors else f"DKEntries validation failed with {len(errors)} error(s)",
     }
@@ -1356,6 +1402,8 @@ PORTFOLIO_CAP_ERROR_CONTROLS: Tuple[Tuple[str, Tuple[str, ...]], ...] = (
     ("entries ", ("max_shared_players",)),
     ("game ", ("max_game_exposure_pct", "max_game_exposure_pct_by_game")),
     ("team ", ("max_team_exposure_pct",)),
+    # R166(b). "lineup <signature> count N>M", the whole-file reuse count.
+    ("lineup ", ("max_candidate_reuse",)),
 )
 
 #: R388(d). Where a review-grade verdict came from.
