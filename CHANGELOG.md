@@ -32,7 +32,7 @@ What changed in the engine, the tools and the contracts, when, and why.
 
 **R233 grep** (`grep -rn --include=*.py -E "archetype_for_contest_shape" mlb_engine tools skills`): `ownership_prior.py` 119 (definition), 190, 212, 254, 1184, 1201; `late_swap.py` 1115, 1128; `qa_portfolio.py` 995 (`section_leverage`, kept: not touched, no drive-by refactor) and 1302 (`_prior_archetypes`, the two new sections' one resolver). `grep -rn -E "mispricing_screen|def mispricing_|def hr_vs_own"`: `platoon_order_adapter.py` 322 (the F2 batting-order screen, a different measurement, kept), `projection_builder.py` 1356, 1492, 1604.
 
-**Gate.** (filled in at the branch gate)
+**Gate.** Local (Python 3.13, a fresh worktree at the branch commit ac9677a, `tools/audit.py --run-tests`): `FAIL  test suite FAILED in tests.test_core, tests.test_showdown, tests.test_upload_integrity (ran 3953); do not build`, 3917 at ffb1583 plus the 36 net, `test_core` at its new pin 2650. Failing names taken with `python -m unittest tests.test_core tests.test_showdown tests.test_upload_integrity` in a worktree at ffb1583 and one at ac9677a: 24 failures each, the same 24 names (the host failures `CLAUDE.local.md` documents). The tip run also printed one ERROR, `R382CaptainPriorWiringTests.test_resolve_captain_prior_END_TO_END_over_a_REAL_emitted_file`, from running the audit and the unittest concurrently in one worktree (both write `outputs/1900-01-02/ownership_pred_r382probe.json`); it passes alone (`Ran 8 tests ... OK`). CI's `gate` check is the merge authority.
 
 **Found and filed.** Nothing new beyond the remainder on R252.
 
