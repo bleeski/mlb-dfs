@@ -1976,25 +1976,9 @@ entry.
 - **[Corrected 2026-08-16 (DEV): Ben DECIDED this on 2026-08-09 and this line never caught up.** The decision is recorded in `docs/backlog_inbox/2026-08-09_DEV_ben-decision-curated-satellite-archetypes.md`, which is retained on disk as its sole carrier — it holds the nine-family table, the observed `ticket_count` values, and four cautions that exist nowhere else (three families are multi-valued and must not be written single-valued; the `SUPERSat` matcher gap worth 17 entries; check `competing_patterns` before adding nine patterns at once; two rows are GOLF-only and are not this engine's domain). Two other entries on this board already say Ben decided — R10's step 1 and Tier 4's R1c-tail — so only this paragraph was stale. What remains is ARCHIVE executing it, not Ben deciding it. The text below is left as written history.]
 - **Awaiting Ben, carried from the same fragment and NOT written:** nine recurring satellite/qualifier families Ben demonstrably enters, by name substring, with the `Places_Paid` values actually observed (for a satellite, `Places_Paid` IS the ticket count awarded). The table is in ledger 3.14. ARCHIVE did not add them to `dk_contest_archetypes.csv` because a curated `ticket_count` reaches `resolve_contest_shape` immediately, where 1 routes to `wta_ticket_satellite` and anything else takes the ticket-line blend: that reranks lineups on contests entered tonight, which makes it a strategy change and Ben's dated decision rather than an archival write. Same reasoning for BUILD's suggested `Solo Shot` row. What DID land is the pure observed-history half, in `data/reference/contest_library.json` (`mlb $1.25k solo shot (early)|1.00`, field 1486, paid 350, breadth 0.2355), which is trust-order-2 and outranks name inference the next time that exact contest and fee recurs without changing any shape mapping. Given that the satellite volume is now an open question rather than something to cut, this input is more likely to matter than it looked: if the satellites are staying, routing them to the right objective is exactly the work that pays.
 
-### R137. Market-vs-crowd divergence screen (P2, S; quota-priced) | new 2026-08-16, from the leverage ideation fragment
+### R137. CLOSED 2026-10-17 -- SHIPPED, entry migrated to CHANGELOG.md
 
-- **What:** the classic leverage screen from two inputs already licensed:
-  hitters whose HR-implied percentile (the per-event props tier MLB_Classic.md
-  14 names Optional and quota-expensive) exceeds their structural-own
-  percentile (v0.1 prior, then R10's) by a stated margin. Deterministic,
-  review-only, per slate; feeds candidate review under section 7's "credible
-  duplication/ownership inputs" and never touches the solver or the pool.
-- **Cost stated up front, from MLB_Classic.md 14's own arithmetic:**
-  per-event prop markets run ≈13 credits per 12-game slate per market against
-  the free 500/month — a nightly screen spends most of the budget. Run it on
-  decision slates or on odds-api.io's flat quota; budget before pulling, and
-  the report prints what it spent.
-- **Audit fields.** Moves: leverage. Acceptance: fixture odds packet + prior
-  file → ranked divergence list with the margin stated. Falsifier: if
-  HR-implieds and structural own rank-correlate too tightly to separate
-  (plausible — both read the same Vegas totals), the screen returns empty and
-  says so; that result is informative and ends the item. FOSS: existing
-  adapters. Owner: none. Rollback: delete the tool.
+`projection_builder.hr_vs_own_divergence` and `qa_portfolio` section 6 (`--hr-props`): hitters whose HR-implied percentile leads their per-archetype structural-ownership percentile by 25 points, EMPTY with its Spearman at 0.90 or above (the entry's own falsifier), never fetching (`grep -n "R137" CHANGELOG.md`). Whether it finds anything on a real slate is unmeasured: it has run on fixtures only, and a first real packet costs about 13 credits per 12-game slate per market.
 
 ### R246. CLOSED 2026-09-01 -- SHIPPED, entry migrated to CHANGELOG.md
 
@@ -2024,47 +2008,19 @@ that shape in two commits (R249's M1, R246's L5 and L14).
 `extend_bank` twice with no `leverage`, so a portfolio delivered under a cap is
 refined by a bank that never saw it. Not fixed here, with the reason on the entry.
 
-### R252. The mispricing score: two anchors, components attributed, reported as a vector (P1, M; S with components (a)–(c) only) | new 2026-08-27, from Ben's greenfield instruction; the 2145_1g_sd session's hand-built BUY/FADE model (consumed into R247/R249) is the prototype; retitled 2026-08-28 (ed9)
+### R252. REMAINDER: the salary-anchor fit, the vector in the brief, components (d) and (e), the (c) trend half and the R259 tail delta -- (a)-(c) SHIPPED 2026-10-17, Session 54 (P1, M) | new 2026-08-27, from Ben's greenfield instruction; retitled 2026-08-28 (ed9) | Roadmap: Session 176
 
-**What.** The enrichment stack adjusts the projection and nothing states the
-DIVERGENCE. Two anchors, because they are different markets: salary-implied
-points (a salary→realized-FPTS regression per format and role, fit on the
-archive's 29,921 player-contest rows) answers "is this player mispriced by
-DK," and the ownership prior answers "is this player underpriced by the
-FIELD." The honest expectation, stated up front: DK prices skill well on
-average, so the salary anchor mostly catches NEWS (components (d)–(e)); the
-ownership anchor is the softer market and is where leverage actually lives.
-Components, each attributed in the output: (a) opposing-arm and platoon delta
-(F4 already computes both), (b) park delta (F5 today, R253's refinement
-later), (c) the xwOBA−wOBA gap and its recent trend — skill leads results,
-salary and field ownership chase results, and Savant carries both columns,
-(d) line movement since salary post (needs R251's morning capture), (e)
-batting-order promotion against the slot expectation APPG embeds. (f) is
-R137's HR-implied-vs-structural-own screen, which RIDES here unchanged,
-quota note intact.
+**STATUS 2026-10-17: (a)-(c) SHIPPED, their text migrated to CHANGELOG.md (`grep -n "R252 (a)-(c)" CHANGELOG.md`).** `projection_builder.mispricing_vector` attributes each row's `projection - AvgPointsPerGame` to (a) F4, (b) F5 and (c) the xwOBA correction (base rewrites and F1-F3 kept apart), beside a salary gap and a per-archetype field gap that are never blended; `qa_portfolio` section 5 prints it from the delivered `final/projections.csv`. Two premises were corrected there: the archive's mined rows carry no salary, so the anchor's fit is a disk-bound join and not a DEV unit, and the tree holds one Savant vintage, so (c)'s trend has no input. The 2026-08-28 rider's vector interface and its doctrine sentence shipped.
 
-**Why.** This is Ben's thread-1 ask made mechanical. The operator lever
-already exists (R249 `--projections`, R246 `--leverage`) and the LIST feeding
-it is hand-built per session; the 2145_1g_sd build proved both the value and
-the cost of that.
+**What is open.**
+1. **The salary-anchor fit (ARCHIVE).** A `format x role x salary band` table of mean realized FPTS with `n`, from the mined `player_table` rows joined to each contest's salary file through `field_miner.resolve_salary_tiered` (18 of about 860 salary files are tracked; the rest are on Ben's disk). `mispricing_vector(anchor=...)` already reads the rows `{format, role, salary_lo, salary_hi, implied_points, n}` and answers UNKNOWN below n=30. Needs a place for the fitted file (`data/reference/` is ARCHIVE's) and the join's coverage reported.
+2. **The vector in the brief.** The entry's "into the brief and qa": emit `mispricing_vector` from `run_slate` beside `park_hand.by_team`. Touches `execution_pipeline.py` and the golden replay, so it carries a golden histogram before and after; `xwoba_reasons` comes from the in-memory `xwoba_neutral_reasons`, which is exact where the file-side read is inferred.
+3. **(d) line movement since salary post.** Needs R251's morning capture.
+4. **(e) batting-order promotion.** `platoon_order_adapter.mispricing_screen` computes the F2 lift against a typical slot and is tested; it is not in the vector.
+5. **(c)'s recent trend.** Needs dated Savant vintages (`refresh_reference_data` overwrites one file in place).
+6. **The R259 tail delta** beside the mean delta (P(Y >= q) against the salary-implied distribution, q salary and role conditioned) when R259's buckets land.
 
-**Fix.** One module emitting the ranked list (BUY and FADE ends) with per-
-component attribution, into the brief and qa as a review surface. LABELED
-PRIOR; no solver input until R255 grades it. Showdown reach through R249's
-flag. Feeds R209's part C and R254. Late-swap application cross-refs R141.
-
-**Rider 2026-08-28 (ed9 §1.3/§2.1–2.2, accepted; title amended from "one
-number per player").** The interface is the VECTOR: salary edge and field
-edge stay separate named fields with their component attributions, never
-collapsed into one blended rank — one number hides whether an edge is
-performance or mere inattention. One sentence of doctrine adopted with it:
-leverage requires BOTH a positive skill edge and an unreacted field; low
-ownership alone is never leverage. Two columns deliberately NOT here, so
-nobody re-files them: duplication edge is lineup-level and lives in R10;
-marginal portfolio coverage lives in R261/R262. And when R259's buckets
-land, the salary anchor gains a TAIL delta (P(Y ≥ q) against the
-salary-implied distribution, q salary/role-conditioned) beside the mean
-delta — mean-only mispricing misses the spike this lane hunts.
+Not here: duplication edge is lineup-level and lives in R10; marginal portfolio coverage lives in R261 and R262. Showdown reach goes through R249's flag and R254; late-swap application cross-references R141.
 
 ### R253. REMAINDER (b): the profile term (pull rate x porch geometry) beside the park factor by batter side -- (a) SHIPPED 2026-10-13, Session 59 (P2, S-M once its inputs exist) | new 2026-08-27, from Ben's greenfield instruction (his own example: xwOBA that plays up in a specific park)
 
