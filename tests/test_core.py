@@ -54199,6 +54199,31 @@ class PerContestFirstPlaceTests(unittest.TestCase):
 
     G1, G2 = PortfolioFrontierTests.G1, PortfolioFrontierTests.G2
 
+    # R505. Real titles the default archetypes CSV reads as a satellite and as a
+    # portfolio GPP, so the bar's archetype comes from the title the way it does
+    # in a build; any other contest id reads "Cup <id>", which names no archetype.
+    TITLES = {"C1": "MLB Satellite to $20 NFL Fantasy Football Millionaire",
+              "C2": "MLB $75 Quarter Jukebox [Just $0.25!]"}
+    # A hermetic table: the bar's value here is this fixture's, not the shipped
+    # table's, so regenerating the shipped table never moves these tests.
+    BAR_TABLE = {
+        ("classic", "satellite", "*"): {"n": 20, "median": 140.0, "mean": 141.5,
+                                        "p25": 130.0, "p75": 152.0},
+        ("classic", "portfolio_gpp", "*"): {"n": 20, "median": 176.0, "mean": 175.0,
+                                            "p25": 160.0, "p75": 190.0},
+        ("showdown", "satellite", "*"): {"n": 20, "median": 82.0, "mean": 84.0,
+                                         "p25": 74.0, "p75": 94.0},
+    }
+
+    def setUp(self):
+        from mlb_engine.field import field_miner
+        for name, value in (("WINNING_SCORE_TABLE", self.BAR_TABLE),
+                            ("WINNING_SCORE_TABLE_PROVENANCE",
+                             {"as_of": "2026-01-01", "contests": 60})):
+            patcher = unittest.mock.patch.object(field_miner, name, value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
     # ------------------------------------------------------------- helpers
 
     @staticmethod
@@ -54216,7 +54241,8 @@ class PerContestFirstPlaceTests(unittest.TestCase):
 
     def _entry(self, eid, cid, bats, stack="AAA", shape="wta_satellite",
                arms=("AAAp", "CCCp")):
-        return {"entry_id": str(eid), "contest_id": cid, "contest_name": f"Cup {cid}",
+        return {"entry_id": str(eid), "contest_id": cid,
+                "contest_name": self.TITLES.get(cid, f"Cup {cid}"),
                 "contest_shape": shape, "sp_ids": list(arms),
                 "lineup_ids": list(arms) + list(bats), "primary_stack": stack}
 
@@ -54296,47 +54322,51 @@ class PerContestFirstPlaceTests(unittest.TestCase):
     # ------------------------------------------- Classic: the winning-score bar
 
     def test_a_missing_bar_reads_absent_never_zero(self):
+        """R505: a contest whose title names no archetype has no bar, and its
+        count is None, never 0 (the seed's cause, no slate size, is gone)."""
+        entries = self._two_contests()
+        for e in entries:
+            e["contest_name"] = f"Cup {e['contest_id']}"
+        by = self._frontier(self._projections(), entries)["by_contest"]
+        self.assertTrue(by["available"])
+        for row in by["contests"]:
+            self.assertEqual("ABSENT", row["winning_score_bar"]["status"])
+            self.assertIn("names no archetype", row["winning_score_bar"]["unavailable_reason"])
+            self.assertIsNone(row["entries_reaching_bar"])
+
+    def test_the_bar_does_not_depend_on_the_slate_size(self):
+        """R505: the seed read ABSENT with no game column; the table is keyed on
+        the title's archetype, so the block keeps its bars and `slate_games`
+        stays reported (None here), only no longer picking the bar."""
         block = self._frontier(self._projections(drop=["Game_ID"]), self._two_contests())
         by = block["by_contest"]
         self.assertTrue(by["available"], "the block survives the no-game-column return")
         self.assertFalse(block["washout"]["available"])
         self.assertIsNone(by["slate_games"])
         for row in by["contests"]:
-            self.assertEqual("ABSENT", row["winning_score_bar"]["status"])
-            self.assertIn("slate size", row["winning_score_bar"]["unavailable_reason"])
-            self.assertIsNone(row["entries_reaching_bar"])
-
-    def test_the_seed_bucket_boundaries_pick_the_ledgers_mean(self):
-        from mlb_engine.field.field_miner import winning_score_bar
-        want = {1: 138.9, 2: 138.9, 3: 144.6, 4: 144.6, 5: 161.1, 6: 161.1,
-                7: 162.8, 12: 162.8}
-        for games, value in want.items():
-            bar = winning_score_bar("classic", games)
-            self.assertEqual(("SEED", value), (bar["status"], bar["value"]), games)
-            self.assertIn("pooled across contest archetypes and field sizes", bar["basis"])
-        for bad in (None, 0, -1, "x"):
-            self.assertEqual("ABSENT", winning_score_bar("classic", bad)["status"], bad)
-        showdown = winning_score_bar("showdown", 1)
-        self.assertEqual("ABSENT", showdown["status"])
-        self.assertIn("range", showdown["unavailable_reason"])
+            self.assertEqual("MINED", row["winning_score_bar"]["status"])
+            self.assertIsNotNone(row["entries_reaching_bar"])
 
     def test_entries_reaching_the_bar_counts_at_or_above_and_zero_is_a_real_zero(self):
         block = self._frontier(self._projections(), self._two_contests())
         rows = self._rows(block)
         self.assertEqual(2, block["by_contest"]["slate_games"])
-        self.assertEqual(138.9, rows["C1"]["winning_score_bar"]["value"])
+        self.assertEqual(140.0, rows["C1"]["winning_score_bar"]["value"])
+        self.assertEqual("satellite", rows["C1"]["winning_score_bar"]["archetype"])
         self.assertEqual(2, rows["C1"]["entries_reaching_bar"],
-                         "148.0 and 148.0 reach 138.9; 132.0 does not")
+                         "148.0 and 148.0 reach 140.0; 132.0 does not")
+        self.assertEqual(176.0, rows["C2"]["winning_score_bar"]["value"])
         self.assertEqual(0, rows["C2"]["entries_reaching_bar"],
                          "a present bar nobody reaches is 0 of n, not ABSENT")
-        self.assertEqual("SEED", rows["C2"]["winning_score_bar"]["status"])
+        self.assertEqual("MINED", rows["C2"]["winning_score_bar"]["status"])
 
     def test_reaching_the_bar_is_at_or_above_it(self):
         from mlb_engine.field import field_miner
         entries = self._two_contests()
         for bar, want in ((148.0, 2), (148.01, 0)):
-            with unittest.mock.patch.object(
-                    field_miner, "WINNING_SCORE_SEED_CLASSIC", ((None, "all", bar),)):
+            table = {**self.BAR_TABLE, ("classic", "satellite", "*"): {
+                **self.BAR_TABLE[("classic", "satellite", "*")], "median": bar}}
+            with unittest.mock.patch.object(field_miner, "WINNING_SCORE_TABLE", table):
                 row = self._rows(self._frontier(self._projections(), entries))["C1"]
             self.assertEqual(want, row["entries_reaching_bar"], bar)
 
@@ -54359,12 +54389,14 @@ class PerContestFirstPlaceTests(unittest.TestCase):
         self.assertIn("1 of 5 assignments carry no contest_id", by["unavailable_reason"])
 
     def test_a_nan_game_id_is_not_a_slate_game(self):
-        """Two real games plus a NaN Game_ID is a 2-game slate (138.9), not 3-4 (144.6)."""
+        """Two real games plus a NaN Game_ID is a 2-game slate, not 3.
+
+        R505: the seed turned that count into a bar (138.9, not 144.6); the count
+        is still reported and the bar no longer reads it."""
         proj = self._projections()
         proj.loc[proj["Player_ID"].isin(["AAAh0", "AAAh1"]), "Game_ID"] = float("nan")
         by = self._frontier(proj, self._two_contests())["by_contest"]
         self.assertEqual(2, by["slate_games"])
-        self.assertEqual(138.9, by["contests"][0]["winning_score_bar"]["value"])
 
     def test_the_block_rides_the_wrapper_and_the_label_sweep_passes(self):
         from mlb_engine.pipeline import execution_pipeline as ep
@@ -54443,13 +54475,30 @@ class PerContestFirstPlaceTests(unittest.TestCase):
         self.assertEqual(1, row["distinct_lineups"])
 
     def test_the_showdown_bar_is_absent_and_says_why(self):
+        """R505: with no title to infer an archetype from the bar is ABSENT and
+        says so; the seed's cause, a range with no point, no longer applies."""
         from mlb_engine.optimize import showdown_theses as st
         df = self._showdown_df()
         row = st.per_contest_report(
             df, [self._assembled(df, 0, [1, 2, 3, 4, 5])], ["A"])["by_contest"]["A"]
         self.assertEqual("ABSENT", row["winning_score_bar"]["status"])
-        self.assertIn("range", row["winning_score_bar"]["unavailable_reason"])
+        self.assertIn("names no archetype", row["winning_score_bar"]["unavailable_reason"])
         self.assertIsNone(row["entries_reaching_bar"])
+
+    def test_a_showdown_contest_with_a_titled_archetype_gets_a_bar_and_no_reach_count(self):
+        from mlb_engine.optimize import showdown_theses as st
+        df = self._showdown_df()
+        lineup = self._assembled(df, 0, [1, 2, 3, 4, 5])
+        meta = {"A": {"contest_name": self.TITLES["C1"], "posture": None,
+                      "contest_shape": None, "posture_source": None}}
+        row = st.per_contest_report(df, [lineup], ["A"], contest_meta=meta)["by_contest"]["A"]
+        self.assertEqual("MINED", row["winning_score_bar"]["status"])
+        self.assertEqual(("satellite", 82.0, "showdown"),
+                         (row["winning_score_bar"]["archetype"],
+                          row["winning_score_bar"]["value"],
+                          row["winning_score_bar"]["contest_type"]))
+        self.assertIsNone(row["entries_reaching_bar"],
+                          "Base with the captain at 1.5x is a mean, not a Ceiling: no count")
 
     # ------------------------------------------------------------------ QA
 
@@ -54465,8 +54514,9 @@ class PerContestFirstPlaceTests(unittest.TestCase):
         self.assertIn("PER-CONTEST FIRST PLACE", text)
         self.assertIn("C1 [wta_satellite]: 3 entries, 3 distinct lineups, 2 primary stacks", text)
         self.assertIn("max overlap", text)
-        self.assertIn("2 of 3 reach the 1-2 games seed mean 138.9 [pooled across archetypes "
-                      "and field sizes]", text)
+        self.assertIn("2 of 3 reach the satellite, all field sizes (pooled) archived median "
+                      "winning score 140.0 (n=20, quartiles 130.0-152.0) [pooled across "
+                      "field sizes]", text)
         self.assertIn("C2 [mme_top_heavy]: 2 entries, 1 distinct lineup", text)
         self.assertIn("1 of 2 entries repeat a lineup already in this contest", text)
         self.assertNotIn("C1 [wta_satellite]: 3 entries, 3 distinct lineups, 2 primary "
@@ -54491,8 +54541,10 @@ class PerContestFirstPlaceTests(unittest.TestCase):
         text = "\n".join(qa.frontier_from_brief({"exposure": {"frontier": self._frontier(
             self._projections(), entries)}}))
         self.assertIn("PER-CONTEST FIRST PLACE: unavailable", text)
-        blind = self._frontier(self._projections(drop=["Game_ID"]), self._two_contests())
-        lines = qa.by_contest_lines(blind)
+        untitled = self._two_contests()
+        for e in untitled:
+            e["contest_name"] = f"Cup {e['contest_id']}"
+        lines = qa.by_contest_lines(self._frontier(self._projections(), untitled))
         self.assertEqual(1, sum("winning-score bar ABSENT:" in l for l in lines),
                          "one reason, not one per contest")
 
@@ -54759,6 +54811,430 @@ class PerContestFirstPlaceTests(unittest.TestCase):
         self.assertEqual(headings[:-1], [c for c, _ in rl.CUTS])
         for banned in ("roi", "win rate", "cash rate", "probability", "return on"):
             self.assertNotIn(banned, text.lower())
+
+    def test_an_operator_posture_override_does_not_re_key_the_bar(self):
+        """R505: the bar's archetype is the TITLE's. An operator who routes a
+        satellite as a single-entry contest changes the shape, not the table cell."""
+        entries = self._two_contests()
+        for e in entries:
+            if e["contest_id"] == "C1":
+                e["contest_shape"] = "single_entry_gpp"
+        row = self._rows(self._frontier(self._projections(), entries))["C1"]
+        self.assertEqual("single_entry_gpp", row["contest_shape"])
+        self.assertEqual("satellite", row["winning_score_bar"]["archetype"])
+        self.assertEqual(140.0, row["winning_score_bar"]["value"])
+
+
+class WinningScoreBarTests(unittest.TestCase):
+    """R505, Session 174: the winning-score bar from the mined table.
+
+    The bar R504(b) prints was ledger 3.21's seed: means by slate size, pooled
+    across archetypes and field sizes. It is now the median winning score of the
+    archived contests in the same format, title-inferred archetype and field band,
+    ABSENT below a minimum cell. These run on a hermetic table (the cells below),
+    so regenerating the shipped table never moves them; the shipped table has its
+    own class."""
+
+    SAT = "MLB Satellite to $20 NFL Fantasy Football Millionaire"
+    GPP = "MLB $75 Quarter Jukebox [Just $0.25!]"
+    SE = "MLB $500 Daily Dollar [Single Entry]"
+    CASH = "MLB $1 Double Up"
+
+    @staticmethod
+    def _cell(n, median, mean=None, p25=None, p75=None):
+        return {"n": n, "median": median, "mean": mean if mean is not None else median + 2.0,
+                "p25": p25 if p25 is not None else median - 10.0,
+                "p75": p75 if p75 is not None else median + 10.0}
+
+    def setUp(self):
+        from mlb_engine.field import field_miner
+        self.fm = field_miner
+        cell = self._cell
+        self.table = {
+            ("classic", "satellite", "*"): cell(30, 143.0),
+            ("classic", "satellite", "<=25"): cell(12, 133.0),
+            ("classic", "satellite", "101-500"): cell(18, 152.0),
+            ("classic", "satellite", "26-100"): cell(9, 140.0),          # thin: 9 < 10
+            ("classic", "cash", "*"): cell(9, 150.0),                    # thin today
+            ("classic", "se_gpp", "*"): cell(10, 171.0),                 # exactly the minimum
+            ("showdown", "satellite", "*"): cell(25, 82.0),
+        }
+        for name, value in (("WINNING_SCORE_TABLE", self.table),
+                            ("WINNING_SCORE_TABLE_PROVENANCE",
+                             {"as_of": "2026-01-01", "contests": 100})):
+            patcher = unittest.mock.patch.object(field_miner, name, value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    # ------------------------------------------------------------- lookup
+
+    def test_the_bar_is_the_median_and_its_cell_carries_the_spread(self):
+        bar = self.fm.winning_score_bar("classic", archetype="satellite", field_size=20)
+        self.assertEqual(("MINED", 133.0, "median winning score"),
+                         (bar["status"], bar["value"], bar["kind"]))
+        self.assertEqual((12, 135.0, 123.0, 143.0), (bar["n"], bar["mean"], bar["p25"], bar["p75"]))
+        self.assertEqual(("<=25", True, "satellite, <=25"),
+                         (bar["field_band"], bar["band_known"], bar["cell"]))
+
+    def test_an_unknown_field_size_reads_the_archetype_wide_cell_and_says_pooled(self):
+        bar = self.fm.winning_score_bar("classic", archetype="satellite")
+        self.assertEqual(("MINED", 143.0, False, None),
+                         (bar["status"], bar["value"], bar["band_known"], bar["field_band"]))
+        self.assertIn("POOLED across field sizes", bar["basis"])
+        exact = self.fm.winning_score_bar("classic", archetype="satellite", field_size=300)
+        self.assertNotIn("POOLED", exact["basis"])
+        self.assertTrue(exact["band_known"])
+
+    def test_the_band_edges_are_inclusive_at_the_upper_bound(self):
+        for size, band in ((1, "<=25"), (25, "<=25"), (26, "26-100"), (100, "26-100"),
+                           (101, "101-500"), (500, "101-500"), (501, "501-2K"),
+                           (2000, "501-2K"), (2001, "2K-10K"), (10000, "2K-10K"),
+                           (10001, "10K-100K"), (100000, "10K-100K"), (100001, ">100K")):
+            self.assertEqual(band, self.fm.field_band(size), size)
+        self.assertEqual("101-500", self.fm.winning_score_bar(
+            "classic", archetype="satellite", field_size=500)["field_band"])
+
+    def test_a_known_but_sparse_band_is_absent_and_never_widened(self):
+        bar = self.fm.winning_score_bar("classic", archetype="satellite", field_size=50)
+        self.assertEqual("ABSENT", bar["status"])
+        self.assertIn("26-100 holds 9 archived contest(s)", bar["unavailable_reason"])
+        self.assertIn("at least 10", bar["unavailable_reason"])
+        self.assertNotIn("value", bar, "the pooled 143.0 must not stand in for a named band")
+
+    def test_the_only_absent_causes_are_no_cell_or_a_thin_cell(self):
+        """`cash` is ABSENT because its cell is thin, not because it is cash."""
+        thin = self.fm.winning_score_bar("classic", archetype="cash")
+        self.assertEqual("ABSENT", thin["status"])
+        self.assertIn("cash cell across all field sizes holds 9", thin["unavailable_reason"])
+        self.table[("classic", "cash", "*")] = self._cell(10, 150.0)
+        self.assertEqual(("MINED", 150.0), tuple(
+            self.fm.winning_score_bar("classic", archetype="cash")[k] for k in ("status", "value")))
+        self.assertEqual("MINED", self.fm.winning_score_bar(
+            "classic", archetype="se_gpp")["status"], "exactly the minimum is a bar")
+        none = self.fm.winning_score_bar("classic", archetype="portfolio_gpp", field_size=4000)
+        self.assertEqual("ABSENT", none["status"])
+        self.assertIn("holds no classic cell for archetype 'portfolio_gpp' in field band 2K-10K",
+                      none["unavailable_reason"])
+        showdown_only = self.fm.winning_score_bar("showdown", archetype="se_gpp")
+        self.assertIn("holds no showdown cell", showdown_only["unavailable_reason"])
+
+    def test_no_archetype_and_unknown_are_absent_with_that_reason(self):
+        for archetype in (None, "", "  ", "unknown", "UNKNOWN"):
+            bar = self.fm.winning_score_bar("classic", archetype=archetype)
+            self.assertEqual("ABSENT", bar["status"], archetype)
+            self.assertIn("names no archetype", bar["unavailable_reason"])
+
+    def test_a_bad_field_size_is_absent_not_a_pooled_bar(self):
+        for bad in ("x", "500", 0, -1, 12.5, True, float("inf"), float("nan")):
+            bar = self.fm.winning_score_bar("classic", archetype="satellite", field_size=bad)
+            self.assertEqual("ABSENT", bar["status"], bad)
+            self.assertIn("not a positive whole number", bar["unavailable_reason"])
+        self.assertEqual("MINED", self.fm.winning_score_bar(
+            "classic", archetype="satellite", field_size=20.0)["status"], "20.0 is a whole number")
+
+    def test_a_stale_positional_call_fails_at_the_call_site(self):
+        with self.assertRaises(TypeError):
+            self.fm.winning_score_bar("classic", 2)
+
+    def test_the_showdown_format_reads_its_own_cells(self):
+        bar = self.fm.winning_score_bar("Showdown", archetype="Satellite")
+        self.assertEqual(("MINED", 82.0, "showdown"),
+                         (bar["status"], bar["value"], bar["contest_type"]))
+
+    def test_the_bar_labels_make_no_probability_claim(self):
+        bar = self.fm.winning_score_bar("classic", archetype="satellite")
+        for word in ("win rate", "cash rate", "roi", "probability", "chance",
+                     "expected value", "profit"):
+            self.assertNotIn(word, json.dumps(bar).lower(), word)
+
+    # ----------------------------------------------- build-side title reading
+
+    def test_bars_for_titles_read_the_archetype_off_each_title(self):
+        bars = self.fm.winning_score_bars_for_titles(
+            "classic", {"1": self.SAT, "2": self.SE, "3": self.CASH, "4": "Cup 4", "5": ""})
+        self.assertEqual(("MINED", "satellite", 143.0),
+                         tuple(bars["1"][k] for k in ("status", "archetype", "value")))
+        self.assertEqual(("MINED", "se_gpp", 171.0),
+                         tuple(bars["2"][k] for k in ("status", "archetype", "value")))
+        self.assertIn("cash cell", bars["3"]["unavailable_reason"])
+        for cid in ("4", "5"):
+            self.assertIn("names no archetype", bars[cid]["unavailable_reason"], cid)
+
+    def test_a_failing_archetype_read_is_an_absent_bar_never_an_exception(self):
+        from mlb_engine.entries import dk_entries_manager as dkm
+        with unittest.mock.patch.object(dkm, "load_archetypes", side_effect=OSError("disk")):
+            bars = self.fm.winning_score_bars_for_titles("classic", {"1": self.SAT})
+        self.assertEqual("ABSENT", bars["1"]["status"])
+        self.assertIn("could not be loaded (OSError: disk)", bars["1"]["unavailable_reason"])
+        with unittest.mock.patch.object(dkm, "infer_contest_archetype",
+                                        side_effect=RuntimeError("boom")):
+            bars = self.fm.winning_score_bars_for_titles("classic", {"1": self.SAT, "2": self.SE})
+        self.assertEqual({"ABSENT"}, {b["status"] for b in bars.values()})
+        self.assertIn("RuntimeError: boom", bars["2"]["unavailable_reason"])
+
+    def test_a_frontier_survives_a_raising_bar_read(self):
+        """The wrapper turns an exception into 'unavailable' for the WHOLE frontier,
+        which would cost the washout read; the bar's guard keeps it local."""
+        from mlb_engine.entries import dk_entries_manager as dkm
+        helper = PerContestFirstPlaceTests()
+        helper.setUp()
+        try:
+            with unittest.mock.patch.object(dkm, "load_archetypes", side_effect=OSError("disk")):
+                block = helper._frontier(helper._projections(), helper._two_contests())
+        finally:
+            helper.doCleanups()
+        self.assertTrue(block["washout"]["available"])
+        for row in block["by_contest"]["contests"]:
+            self.assertEqual("ABSENT", row["winning_score_bar"]["status"])
+            self.assertIsNone(row["entries_reaching_bar"])
+
+    def test_a_fee_does_not_change_what_a_title_infers(self):
+        """The table was built with each contest's fee and a build has none; the
+        selection is by pattern, which this pins over every title in the export."""
+        export = REPO / "data" / "reference" / "draftkings-contest-entry-history_2026-10-09.csv"
+        if not export.exists():
+            self.skipTest("the entry-history export is not staged")
+        from mlb_engine.entries.dk_entries_manager import infer_contest_archetype, load_archetypes
+        titles, _problems = self.fm.titles_from_entry_history(str(export))
+        archetypes = load_archetypes()
+        self.assertGreater(len(titles), 500)
+        for cid, t in titles.items():
+            with_fee = infer_contest_archetype(t["title"], t["fee"], archetypes)
+            without = infer_contest_archetype(t["title"], None, archetypes)
+            self.assertEqual(with_fee["inferred_type"], without["inferred_type"], cid)
+
+    # ------------------------------------------------------------ the rollup
+
+    @staticmethod
+    def _contest(cid, kind, size, points, date="2026-07-01"):
+        return {"contest_id": cid, "slate_date": date, "contest_type": kind,
+                "contest_thresholds": {"entries_total": size,
+                                       "winning": {"points": points, "state": "OBSERVED"}}}
+
+    def test_the_rollup_keys_cells_by_format_archetype_and_band_with_a_pooled_cell(self):
+        contests = [self._contest("1", "classic", 20, 100.0), self._contest("2", "classic", 20, 120.0),
+                    self._contest("3", "classic", 300, 160.0), self._contest("4", "showdown", 20, 70.0),
+                    self._contest("5", "classic", 20, 90.0)]
+        arch = {"1": "satellite", "2": "satellite", "3": "satellite", "4": "satellite",
+                "5": "se_gpp"}
+        out = self.fm.winning_score_rollup(contests, arch)
+        cells = out["cells"]
+        self.assertEqual({("classic", "satellite", "<=25"), ("classic", "satellite", "101-500"),
+                          ("classic", "satellite", "*"), ("showdown", "satellite", "<=25"),
+                          ("showdown", "satellite", "*"), ("classic", "se_gpp", "<=25"),
+                          ("classic", "se_gpp", "*")}, set(cells))
+        self.assertEqual({"n": 2, "median": 110.0, "mean": 110.0, "p25": 105.0, "p75": 115.0},
+                         cells[("classic", "satellite", "<=25")])
+        self.assertEqual({"n": 3, "median": 120.0, "mean": 126.67, "p25": 110.0, "p75": 140.0},
+                         cells[("classic", "satellite", "*")])
+        self.assertEqual({"n": 1, "median": 90.0, "mean": 90.0, "p25": 90.0, "p75": 90.0},
+                         cells[("classic", "se_gpp", "*")], "one value is its own quartiles")
+        self.assertEqual(({"classic": 4, "showdown": 1}, 5, "2026-07-01", "median"),
+                         (out["by_type"], out["contests"], out["as_of"], out["statistic"]))
+
+    def test_the_rollup_leaves_out_and_counts_what_cannot_be_placed(self):
+        contests = [self._contest("1", "classic", 20, 100.0),
+                    self._contest("2", "classic", 20, None),          # R226 UNKNOWN winner
+                    self._contest("3", "classic", 20, 100.0),         # title matched nothing
+                    self._contest("4", "classic", 20, 100.0),         # no archetype recorded
+                    self._contest("5", "classic", None, 100.0),       # no field size
+                    self._contest("6", "classic", 0, 100.0)]
+        arch = {"1": "satellite", "2": "satellite", "3": "unknown", "5": "satellite", "6": "satellite"}
+        out = self.fm.winning_score_rollup(contests, arch)
+        self.assertEqual({"no_winning_points": 1, "no_archetype": 2, "no_field_size": 2},
+                         out["excluded"])
+        self.assertEqual(1, out["contests"])
+        self.assertNotIn("unknown", {k[1] for k in out["cells"]},
+                         "an unmatched title is not an archetype and gets no cell")
+
+    def test_a_tied_winner_is_kept_and_the_as_of_window_drops_later_slates(self):
+        tied = self._contest("1", "classic", 20, 100.0)
+        tied["contest_thresholds"]["winning"]["state"] = "TIED"
+        later = self._contest("2", "classic", 20, 500.0, date="2026-09-01")
+        arch = {"1": "satellite", "2": "satellite"}
+        full = self.fm.winning_score_rollup([tied, later], arch)
+        self.assertEqual((2, "2026-09-01"), (full["contests"], full["as_of"]))
+        window = self.fm.winning_score_rollup([tied, later], arch, as_of_max="2026-07-01")
+        self.assertEqual((1, "2026-07-01", {}),
+                         (window["contests"], window["as_of"], window["excluded"]),
+                         "a slate after the window is outside it, not 'excluded'")
+        self.assertEqual(100.0, window["cells"][("classic", "satellite", "*")]["median"])
+
+    def test_the_rendered_table_is_the_two_statements_and_round_trips(self):
+        contests = [self._contest("1", "classic", 20, 100.5), self._contest("2", "classic", 20, 120.25)]
+        out = self.fm.winning_score_rollup(contests, {"1": "satellite", "2": "satellite"})
+        text = self.fm.render_winning_score_table(out, "export.csv; test")
+        scope = {"Dict": dict, "Any": object, "Tuple": tuple}
+        exec(text, scope)
+        self.assertEqual(out["cells"], scope["WINNING_SCORE_TABLE"])
+        prov = scope["WINNING_SCORE_TABLE_PROVENANCE"]
+        self.assertEqual(("2026-07-01", 2, "export.csv; test"),
+                         (prov["as_of"], prov["contests"], prov["source"]))
+        self.assertEqual(text, self.fm.render_winning_score_table(out, "export.csv; test"))
+        self.assertTrue(text.endswith("}\n"))
+
+    def test_the_title_reader_keeps_mlb_rows_and_names_disagreement(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "draftkings-contest-entry-history_x.csv"
+            with path.open("w", newline="", encoding="utf-8-sig") as fh:
+                writer = csv.writer(fh)
+                writer.writerow(["Sport", "Game_Type", "Contest_Key", "Entry", "Entry_Fee"])
+                writer.writerows([
+                    ["MLB", "Classic", "100", "MLB $75 Quarter Jukebox (1/2)", "$0.25"],
+                    ["MLB", "Classic", "100", "MLB $75 Quarter Jukebox (2/2)", "$0.25"],
+                    ["NHL", "Classic", "200", "NHL Cup", "$1.00"],
+                    ["MLB", "Classic", "300", "MLB Cup A", "$1.00"],
+                    ["MLB", "Classic", "300", "MLB Cup B", "$1.00"],
+                    ["MLB", "Classic", "400", "MLB Cup", "$1.00"],
+                    ["MLB", "Classic", "400", "MLB Cup", "$2.00"],
+                    ["MLB", "Classic", "500", "MLB Cup", "free"],
+                    ["MLB", "Classic", "600", "MLB Big", "$1,000.00"]])
+            titles, problems = self.fm.titles_from_entry_history(str(path))
+            self.assertEqual({"100": {"title": "MLB $75 Quarter Jukebox", "fee": 0.25},
+                              "600": {"title": "MLB Big", "fee": 1000.0}}, titles)
+            self.assertEqual(["300", "400", "500"], [p.split(":")[0] for p in problems])
+            bad = Path(tmp) / "not_an_export.csv"
+            bad.write_text("Sport,Contest_Key\nMLB,1\n", encoding="utf-8")
+            with self.assertRaises(ValueError):
+                self.fm.titles_from_entry_history(str(bad))
+
+    def test_the_cli_writes_the_generated_block_where_told_and_nothing_else(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            day = Path(tmp) / "archive" / "2026-07-01"
+            day.mkdir(parents=True)
+            for cid, kind, n in (("111", "classic", 30), ("222", "showdown", 30)):
+                entries = [{"rank": str(i + 1), "entry_id": str(9000 + i),
+                            "points": 150.0 - i if kind == "classic" else 90.0 - i,
+                            "players_norm": [f"p{i}"], "captain_norm": f"p{i}",
+                            "lineup_complete": True} for i in range(n)]
+                (day / f"mined_{cid}.json").write_text(json.dumps({
+                    "contest_id": cid, "slate_date": "2026-07-01", "contest_type": kind,
+                    "meta": {"entries_total": n}, "entries": entries, "player_table": []}),
+                    encoding="utf-8")
+            export = Path(tmp) / "history.csv"
+            with export.open("w", newline="", encoding="utf-8") as fh:
+                writer = csv.writer(fh)
+                writer.writerow(["Sport", "Game_Type", "Contest_Key", "Entry", "Entry_Fee"])
+                writer.writerow(["MLB", "Classic", "111", self.SAT, "$1.00"])
+                writer.writerow(["MLB", "Showdown", "222", "Cup With No Archetype", "$1.00"])
+            out = Path(tmp) / "table.txt"
+            before = sorted(p.name for p in Path(tmp).rglob("*"))
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                code = self.fm.main(["--winning-score-table", str(out),
+                                     "--archive-root", str(day.parent),
+                                     "--entry-history", str(export)])
+            self.assertEqual(0, code)
+            self.assertEqual(sorted(before + ["table.txt"]),
+                             sorted(p.name for p in Path(tmp).rglob("*")), "nothing else written")
+            scope = {"Dict": dict, "Any": object, "Tuple": tuple}
+            exec(out.read_text(encoding="utf-8"), scope)
+            table = scope["WINNING_SCORE_TABLE"]
+            self.assertEqual(150.0, table[("classic", "satellite", "*")]["median"])
+            self.assertEqual({("classic", "satellite", "*"), ("classic", "satellite", "26-100")},
+                             set(table), "the unmatched Showdown title has no cell")
+            self.assertEqual({"no_archetype": 1}, scope["WINNING_SCORE_TABLE_PROVENANCE"]["excluded"])
+            self.assertIn("1 contests through 2026-07-01", buf.getvalue())
+            with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()):
+                self.fm.main(["--winning-score-table", str(out)])
+
+    # --------------------------------------------------- one band vocabulary
+
+    def test_the_band_vocabulary_has_one_home_and_the_ledger_reads_it(self):
+        sys.path.insert(0, str(REPO / "tools"))
+        import results_ledger
+        self.assertIs(self.fm.FIELD_BAND_EDGES, results_ledger.FIELD_BANDS)
+        self.assertEqual(self.fm.FIELD_BAND_OVER, results_ledger.FIELD_BAND_OVER)
+        self.assertIs(self.fm.field_band, results_ledger.field_band)
+        self.assertEqual(["<=25", "26-100", "101-500", "501-2K", "2K-10K", "10K-100K"],
+                         [label for _upper, label in self.fm.FIELD_BAND_EDGES])
+        self.assertEqual(">100K", self.fm.FIELD_BAND_OVER, "the labels the ledger always wrote")
+
+    def test_the_ownership_grade_bands_stay_a_coarsening_of_the_home_edges(self):
+        """Its four labels are stored in ledger rows, so it keeps them; its edges
+        (100 and the allocator's 500 and 2,000) must stay edges of the home."""
+        sys.path.insert(0, str(REPO / "tools"))
+        import ownership_grade_archive as oga
+        home = {upper for upper, _label in self.fm.FIELD_BAND_EDGES}
+        theirs = {high for _label, _low, high in oga.FIELD_BANDS[:-1]}
+        self.assertEqual({100, 500, 2000}, theirs)
+        self.assertLessEqual(theirs, home)
+
+
+class WinningScoreShippedTableTests(unittest.TestCase):
+    """R505: the table in `field_miner` is the archive's rollup and nothing else."""
+
+    EXPORT = REPO / "data" / "reference" / "draftkings-contest-entry-history_2026-10-09.csv"
+
+    def test_the_shipped_table_is_the_archives_rollup_through_its_as_of(self):
+        """Regenerating from the tracked archive and the export, over the slates on
+        or before the table's own `as_of`, gives the shipped cells. Red means the
+        archive's window or the archetype rows moved: regenerate with
+        `python -m mlb_engine.field.field_miner --winning-score-table <out> --entry-history
+        data/reference/draftkings-contest-entry-history_2026-10-09.csv` and splice the block.
+        A slate mined after `as_of` leaves it green."""
+        from mlb_engine.entries.dk_entries_manager import infer_contest_archetype, load_archetypes
+        from mlb_engine.field import field_miner as fm
+        root = REPO / "data" / "archive"
+        if not self.EXPORT.exists() or not any(root.glob("*/mined_*.json")):
+            self.skipTest("the entry-history export or the archived mines are not staged")
+        prov = fm.WINNING_SCORE_TABLE_PROVENANCE
+        titles, _problems = fm.titles_from_entry_history(str(self.EXPORT))
+        archetypes = load_archetypes()
+        by_contest = {cid: str(infer_contest_archetype(t["title"], t["fee"], archetypes)
+                               .get("inferred_type") or fm.ARCHETYPE_UNKNOWN)
+                      for cid, t in titles.items()}
+        rollup = fm.winning_score_rollup(fm.archive_contest_table(root)["contests"],
+                                         by_contest, as_of_max=prov["as_of"])
+        self.assertEqual(
+            (prov["contests"], prov["by_type"], prov["excluded"], prov["as_of"]),
+            (rollup["contests"], rollup["by_type"], rollup["excluded"], rollup["as_of"]))
+        self.assertEqual(rollup["cells"], fm.WINNING_SCORE_TABLE)
+
+    def test_the_shipped_table_is_well_formed_and_the_minimum_is_honoured(self):
+        from mlb_engine.field import field_miner as fm
+        labels = {label for _upper, label in fm.FIELD_BAND_EDGES} | {
+            fm.FIELD_BAND_OVER, fm.WINNING_SCORE_BAND_ANY}
+        self.assertGreater(len(fm.WINNING_SCORE_TABLE), 20)
+        for (kind, archetype, band), cell in fm.WINNING_SCORE_TABLE.items():
+            where = (kind, archetype, band)
+            self.assertIn(kind, ("classic", "showdown"), where)
+            self.assertNotIn(archetype, ("", fm.ARCHETYPE_UNKNOWN), where)
+            self.assertIn(band, labels, where)
+            self.assertLessEqual(cell["p25"], cell["median"], where)
+            self.assertLessEqual(cell["median"], cell["p75"], where)
+            bar = fm.winning_score_bar(
+                kind, archetype=archetype,
+                field_size=None if band == fm.WINNING_SCORE_BAND_ANY else _band_member(band))
+            if cell["n"] >= fm.WINNING_SCORE_MIN_CELL:
+                self.assertEqual(("MINED", cell["median"]), (bar["status"], bar["value"]), where)
+            else:
+                self.assertEqual("ABSENT", bar["status"], where)
+        # every pooled cell holds the sum of its bands
+        for (kind, archetype, band), cell in fm.WINNING_SCORE_TABLE.items():
+            if band == fm.WINNING_SCORE_BAND_ANY:
+                parts = sum(c["n"] for (k, a, b), c in fm.WINNING_SCORE_TABLE.items()
+                            if (k, a) == (kind, archetype) and b != band)
+                self.assertEqual(cell["n"], parts, (kind, archetype))
+
+    def test_a_large_gpp_has_a_bar_in_its_own_band(self):
+        """The case the seed missed: a 10K-100K portfolio contest read against a
+        pooled satellite-dominated mean. It has a banded bar of its own."""
+        from mlb_engine.field import field_miner as fm
+        bar = fm.winning_score_bar("classic", archetype="portfolio_gpp", field_size=47000)
+        self.assertEqual(("MINED", "10K-100K", True),
+                         (bar["status"], bar["field_band"], bar["band_known"]))
+
+
+def _band_member(band):
+    """A field size inside a band label, for the table-wide lookup check."""
+    from mlb_engine.field import field_miner as fm
+    low = 1
+    for upper, label in fm.FIELD_BAND_EDGES:
+        if label == band:
+            return upper
+        low = upper + 1
+    return low
 
 
 class PerContestAllocationTests(unittest.TestCase):
