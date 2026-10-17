@@ -6372,9 +6372,12 @@ def showdown_contest_identity(entries: Path, postures_arg, rows) -> tuple:
                   f"defaulting it (Showdown steers by neither). Supply "
                   f"--postures {cid}=<posture> to label it.", file=sys.stderr)
         contests.append(row)
+        # R505: `contest_name` is what the per-contest winning-score bar infers
+        # its archetype from; the slice does not carry it on the row.
         meta[str(cid)] = {"posture": row["posture"],
                           "contest_shape": row["contest_shape"],
-                          "posture_source": row["posture_source"]}
+                          "posture_source": row["posture_source"],
+                          "contest_name": row["contest_name"]}
     identity["applied"] = True
     return identity, contests, meta
 

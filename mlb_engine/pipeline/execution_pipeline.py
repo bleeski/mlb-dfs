@@ -4194,8 +4194,10 @@ _BY_CONTEST_NOTE = (
     "by contest where apex and washout above read the whole file. distinct_lineups "
     "counts paths: two entries holding one lineup in a contest are one path. "
     "max_pairwise_overlap is the most players any two of that contest's entries "
-    "share. Ceiling is a projection input and the winning-score bar is a pooled "
-    "seed mean, so entries_reaching_bar is a deterministic review proxy, never an "
+    "share. Ceiling is a projection input and the winning-score bar is the median "
+    "observed winning score of archived contests of this archetype, pooled across "
+    "field sizes unless a field size was supplied (none is today), so "
+    "entries_reaching_bar is a deterministic review proxy, never an "
     "observed outcome and never a probability; an ABSENT bar leaves it None, which "
     "is not zero. A Ceiling total is short by any rostered player the run priced no "
     "Ceiling for (unpriced_roster_players names them), so a short total can miss the bar")
@@ -4251,8 +4253,15 @@ def per_contest_first_place(
     allocator steer per contest; each row carries `contest_deal_fields`' two
     keys, None here and filled by `attach_contest_deal` from the allocator's
     block once a build has one.
+
+    R505. Each row's bar is the contest's own: the median observed winning score
+    of archived Classic contests of the archetype its TITLE infers
+    (`field_miner.winning_score_bars_for_titles`, the one reader of title to
+    archetype for a bar). An assignment carries no field size and neither does
+    a DKEntries file, so the bar is the archetype-wide cell, labelled pooled
+    across field sizes. ``slate_games`` is reported and no longer picks the bar.
     """
-    from mlb_engine.field.field_miner import winning_score_bar
+    from mlb_engine.field.field_miner import winning_score_bars_for_titles
     out: Dict[str, Any] = {
         "available": False, "score_basis": "Ceiling", "slate_games": slate_games,
         "contests": [], "note": _BY_CONTEST_NOTE,
@@ -4269,9 +4278,11 @@ def per_contest_first_place(
             f"{unplaced} of {len(entered)} assignments carry no contest_id, so the "
             "entered set cannot be split by contest")
         return out
-    bar = winning_score_bar("classic", slate_games)
+    bars = winning_score_bars_for_titles("classic", {
+        cid: str((groups[cid][0][0] or {}).get("contest_name") or "") for cid in groups})
     rows: List[Dict[str, Any]] = []
     for cid in sorted(groups):
+        bar = bars[cid]
         members = sorted(groups[cid], key=lambda m: str((m[0] or {}).get("entry_id") or ""))
         eids = [str((m[0] or {}).get("entry_id") or "") for m in members]
         sets = [frozenset(str(p) for p in m[1]) for m in members]
@@ -4287,7 +4298,7 @@ def per_contest_first_place(
         stacks = {str((m[0] or {}).get("primary_stack") or "").strip() for m in members} - {""}
         first = members[0][0] or {}
         reaching = (sum(1 for m in members if m[2] >= bar["value"])
-                    if bar.get("status") == "SEED" else None)
+                    if bar.get("status") == "MINED" else None)
         rows.append({
             "contest_id": cid,
             "contest_name": str(first.get("contest_name") or ""),

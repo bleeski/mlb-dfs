@@ -1715,8 +1715,16 @@ def per_contest_report(df: pd.DataFrame,
     R504(b). Each row also reads the contest as a first-place problem, since two
     of our entries cannot both win it: ``distinct_lineups`` (paths, captain
     included), ``best_proj_points`` (the best entry's Base with the captain at
-    1.5x, None when no lineup carries one) and ``winning_score_bar`` (ABSENT:
-    the seed's Showdown winners are a range, 83-98, not a point).
+    1.5x, None when no lineup carries one) and ``winning_score_bar``.
+
+    R505. The bar is the median observed winning score of archived Showdown
+    contests of the archetype the contest's TITLE infers (``contest_meta``'s
+    ``contest_name``; the archetype-wide cell, pooled across field sizes, since
+    a build knows no field size), ABSENT when the title names no archetype or
+    its cell holds too few contests. ``entries_reaching_bar`` stays None on
+    purpose: ``best_proj_points`` is a projection MEAN with the captain at 1.5x,
+    not a Ceiling, so counting entries against a winner's median would read a
+    mean against a tail and mislead.
     """
     if contest_of_entry is None:
         return {"available": False,
@@ -1730,11 +1738,14 @@ def per_contest_report(df: pd.DataFrame,
         if lu is not None:
             buckets.setdefault(str(cid), []).append(lu)
 
-    # R504(b). The first-place read beside the per-contest slice. Lazily, the way
-    # `execution_pipeline` takes the same bar: `field_miner` owns it, and a second
-    # spelling of "Showdown has no winning-score point" is how the two disagree.
-    from mlb_engine.field.field_miner import winning_score_bar
-    bar = winning_score_bar("showdown", None)
+    # R504(b), R505. The first-place read beside the per-contest slice. Lazily,
+    # the way `execution_pipeline` takes the same bar: `field_miner` owns it and
+    # the one reader of title to archetype, and a second spelling of either is how
+    # the two disagree.
+    from mlb_engine.field.field_miner import winning_score_bars_for_titles
+    bars = winning_score_bars_for_titles("showdown", {
+        cid: str(((contest_meta or {}).get(cid) or {}).get("contest_name") or "")
+        for cid in buckets})
     by_contest: Dict[str, Any] = {}
     over_cap: List[Dict[str, Any]] = []
     for cid in sorted(buckets):
@@ -1788,7 +1799,7 @@ def per_contest_report(df: pd.DataFrame,
             # `player_keys`, so the same six under another captain are two.
             "distinct_lineups": len({tuple(lu["player_keys"]) for lu in lus}),
             "best_proj_points": round(max(points), 3) if points else None,
-            "winning_score_bar": bar,
+            "winning_score_bar": bars[cid],
             "entries_reaching_bar": None,
         }
     return {"available": True, "reason": "",

@@ -151,11 +151,12 @@ SIDECAR_SUFFIX = ".meta.json"
 SCHEMA = "dk_entry_results/1"
 
 # Upper bound of each field-size band, inclusive; anything larger is ">100K".
-FIELD_BANDS: Tuple[Tuple[int, str], ...] = (
-    (25, "<=25"), (100, "26-100"), (500, "101-500"), (2000, "501-2K"),
-    (10000, "2K-10K"), (100000, "10K-100K"),
-)
-FIELD_BAND_OVER = ">100K"
+# R505: the vocabulary lives in `field_miner` (the engine reads it for the
+# winning-score bar); these are the same objects, so the labels cannot drift.
+from mlb_engine.field import field_miner as _field_miner  # noqa: E402
+
+FIELD_BANDS: Tuple[Tuple[int, str], ...] = _field_miner.FIELD_BAND_EDGES
+FIELD_BAND_OVER = _field_miner.FIELD_BAND_OVER
 BLANK_CLASSES = ("blank_no_lineup", "zero_unknown", "zero_complete")
 # The archived standings row for a zero-point entry. `incomplete` is
 # parse_lineup_string's not-complete: an empty Lineup cell, or a partial one
@@ -341,11 +342,7 @@ def entry_numbers(place: int, n: int) -> Dict[str, Any]:
     }
 
 
-def field_band(n: int) -> str:
-    for upper, label in FIELD_BANDS:
-        if int(n) <= upper:
-            return label
-    return FIELD_BAND_OVER
+field_band = _field_miner.field_band
 
 
 def classify_zero(archive_lineup: str, all_ours_zero: bool) -> str:

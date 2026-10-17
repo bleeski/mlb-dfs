@@ -493,9 +493,22 @@ def frontier_from_brief(brief: dict) -> List[str]:
 
 
 def _bar_phrase(bar: Optional[Mapping[str, Any]]) -> str:
-    """The winning-score bar as one clause: the seed it is, or ABSENT and why."""
+    """The winning-score bar as one clause: the archived median it is, or ABSENT and why.
+
+    R505. A bar whose field size was not supplied is the archetype-wide cell and
+    prints bracketed as POOLED across field sizes, as the seed did; an exact cell
+    prints its band. Both carry n and the quartiles, because a median over a thin
+    cell is only as good as the spread printed beside it.
+    """
     bar = bar or {}
+    if bar.get("status") == "MINED":
+        spread = (f"n={bar.get('n')}, quartiles {bar.get('p25')}-{bar.get('p75')}")
+        pooled = "" if bar.get("band_known") else " [pooled across field sizes]"
+        return (f"the {bar.get('cell')} archived median winning score "
+                f"{bar.get('value')} ({spread}){pooled}")
     if bar.get("status") == "SEED":
+        # A brief written under R504(b) (2026-10-15 to R505) carries ledger 3.21's
+        # seed, and QA reads the artifact: it is read as the seed it was.
         return (f"the {bar.get('bucket')} seed mean {bar.get('value')} "
                 f"[pooled across archetypes and field sizes]")
     return "winning-score bar ABSENT"
@@ -506,7 +519,7 @@ def _absent_bar_reasons(bars: Sequence[Optional[Mapping[str, Any]]]) -> List[str
     repeat one fact on every row."""
     seen: List[str] = []
     for bar in bars:
-        if (bar or {}).get("status") != "SEED":
+        if (bar or {}).get("status") not in ("MINED", "SEED"):
             why = (bar or {}).get("unavailable_reason") or "unstated"
             if why not in seen:
                 seen.append(why)
@@ -535,7 +548,9 @@ def by_contest_lines(frontier: Mapping[str, Any]) -> List[str]:
            "one contest and two of ours cannot both win it, so each contest's "
            "entries should be distinct paths, not copies. Washout stays "
            "portfolio-wide above. Review proxies: Ceiling is a projection input "
-           "and the bar is a pooled seed mean, never an observed outcome."]
+           "and the bar is the median winning score of archived contests of the "
+           "same archetype (pooled across field sizes unless a band is named), "
+           "never an observed outcome of ours."]
     for row in block.get("contests") or []:
         n = row.get("entries")
         distinct = row.get("distinct_lineups")
