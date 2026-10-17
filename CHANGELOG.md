@@ -2,6 +2,104 @@
 
 What changed in the engine, the tools and the contracts, when, and why.
 
+## 2026-10-17 — R252 (a)-(c) + R137: the mispricing vector (build-side attribution, salary gap and field gap, never blended) and the HR-vs-ownership divergence screen, both review sections of `qa_portfolio` (roadmap Session 54)
+
+**Scope.** `mlb_engine/projections/projection_builder.py` (appended, nothing existing edited: `mispricing_components`, `mispricing_vector`, `salary_implied_points`, `hr_vs_own_divergence` and their helpers and constants), `tools/qa_portfolio.py` (`find_projections_file`, `_prior_archetypes`, `section_mispricing`, `section_divergence`, `--projections`, `--hr-props`, report sections 5 and 6), `tests/test_core.py` (`MispricingScoreTests`, `HrVsOwnDivergenceTests`), `tools/audit.py` (the `test_core` pin), `CHANGELOG.md`, `docs/ROADMAP.md`, `docs/backlog.md`. No pipeline, solver, allocator, brief or golden file moved.
+
+**What was wrong.** The projection (`Base * F1..F5`) is built and nothing states where it departs from DK's own season average, which factor caused the departure, or how that sits against the field's attention. Session 55 (R254) and Session 56 (R209 part C) both need that surface, and until now it was a hand-built list per session.
+
+**What shipped.**
+- **R252 (a)-(c).** `mispricing_vector(frame, prior=, anchor=, xwoba_reasons=, xwoba_applied=)` reads a delivered `final/projections.csv` and reports, per player and as separate named fields: the attribution of `projection - AvgPointsPerGame` to (a) F4 (opposing arm and platoon), (b) F5 (park by batter side) and (c) the xwOBA correction (read as the wOBA-against gap on a pitcher row); the gap to a salary-implied anchor; and the gap to the field, as projection percentile minus ownership percentile within role, per archetype and never pooled. The attribution is a log-share split that sums to the delta exactly: `points_k = appg * ln(f_k) * expm1(L) / L` with `L = ln(P / appg)`, and `expm1(L) / L` tends to 1, so factors that cancel (F4 1.10 against F5 0.91) stay finite and opposite-signed with no switch to a second formula. BUY and FADE ends are listed per gap, and `buy_on_both` is the doctrine's intersection (positive build-side points AND a positive field gap), ordered by field gap then player id, a stated tie-break and not a blended score. Fields are named `*_gap`, not the entry's `*_edge`, because CLAUDE.md bars the bare word as a claim.
+- **R137.** `hr_vs_own_divergence(props_table, own_pct_by_player_id, archetype=, margin=25.0)` lists hitters whose HR-implied percentile (best Over price's `implied_prob`, one scale per row) leads their structural-ownership percentile by at least the margin. It never fetches, reports `spent_by_this_screen: 0` and echoes the packet's cost when told it, names unmatched, unpriced and duplicate rows, and carries the entry's own falsifier: at Spearman 0.90 or above it returns EMPTY with the rho and says so.
+- **`qa_portfolio`.** Section 5 (always, Classic only; Showdown reads "ABSENT, by design") and section 6 (only when `--hr-props <json>` supplies a packet, since the per-event market is quota-priced and this tool never pulls it). Both condition on the archetype the brief's contests resolve to through the engine's own `archetype_for_contest_shape`, and print "not computed rather than pooled" when none resolves. `--projections` names the frame; the default is `runs/<brief run_id>/final/projections.csv`.
+
+**Premises checked before any edit (read-only, at ffb1583), and what they corrected in the filed entry.**
+1. **The salary anchor's fit is not a DEV unit.** R252 says the regression is fit on "the archive's 29,921 player-contest rows". The mined `player_table` rows carry `player, player_norm, roster_position, pct_drafted, fpts` and no salary (46,850 rows over 614 mines today, zero with `salary`). Salary needs a join through `field_miner.resolve_salary_tiered` over salary files, of which 18 are tracked in git and about 840 are on Ben's disk only, so the fit is a disk-bound ARCHIVE run and no test may depend on it (R155). `salary_implied_points` reads a SUPPLIED anchor (`format, role, salary_lo, salary_hi, implied_points, n`), answers UNKNOWN below n=30, and is tested on a fixture.
+2. **Component (c)'s "recent trend" has no input.** `data/reference/` holds one Savant batting vintage and no dated copies. The level gap ships; the trend half is the remainder.
+3. **Base is rewritten after the xwOBA step.** The value guard caps hitter Base (tagged `value_guard: Base capped raw->cap` in Notes) and the declared-arm workload prior multiplies it (`Workload_Factor`), so `Base / appg` is not the xwOBA factor on those rows. Both are read from the frame and kept out of (c) (`base_rewrites`). Measured on `runs/20261008T042042Z_6560d656`: a pitcher at workload 0.5 read `base_rewrites -7.18` and `c_xwoba_gap -0.34`, where the naive ratio would have called the whole drop a skill gap.
+4. **An operator-supplied Base is not detectable from the file alone.** A ratio outside the role's correction clip (0.85 to 1.15 hitters, 0.90 to 1.10 pitchers) is reported `not_attributed`; a within-clip operator Base reads as a correction unless the caller passes the brief's `enrichment.neutral_default.xwoba_base` reasons, which `section_mispricing` does.
+5. R254 (read in full) consumes this vector's interface and the attribution, not a fitted anchor, so the anchor can wait without blocking Session 55.
+
+**Declined or deferred, each with its reason, and carried on the rewritten R252.**
+- **The vector into the brief** (the entry says "into the brief and qa"): that edits `execution_pipeline.py` and re-opens the golden replay; this row's write set is `PB` and `QA`. QA only.
+- **The salary-anchor fit:** premise 1.
+- **(d) line movement** (needs R251's morning capture), **(e) order promotion** (`platoon_order_adapter.mispricing_screen` exists and is tested; wiring it in is separate), **the (c) trend half** (premise 2), **the R259 tail delta**.
+- **One commit per lettered unit** (the plan's breakpoint): not taken. Both units edit the same three files in interleaved hunks and `git add -p` is not available, so one commit carries both.
+
+**Tests (net +36, 36 hand mutations killed).** `MispricingScoreTests` (23) and `HrVsOwnDivergenceTests` (13), listed on the pin comment in `tools/audit.py`. The first mutation pass left four alive and each is now a test: the BUY-ON-BOTH list ignoring the build-side sign, the FADE end listed least-negative first, a tight-rank bar that no test sat between 0.90 and 0.999, and the QA section pooling archetypes with one archetype in the fixture; a fifth, duplicate props rows resolving by input order, was a real defect in the first cut of `hr_vs_own_divergence` and is fixed (the larger implied probability wins and the id is named in `duplicate_dk_player_ids`). The landing review (`/code-review`, high) added two fixes and their tests: the value guard's Notes tag rounds raw and cap to two decimals, so a guarded row sitting on the correction clip read as unattributable (the clip tolerance is now 0.5% where a tag exists and exact elsewhere), and a props row with a null or NaN `implied_prob` raised out of the QA section (named under `unmatched.no_implied_prob` instead). Declined: the older inline archetype resolution in `section_leverage` is not folded into `_prior_archetypes` (no drive-by refactor), and a duplicated `Player_ID` in a projections frame is not handled (the engine's validator rejects it upstream).
+
+**Run against a real delivered frame.** `runs/20261008T042042Z_6560d656/final/projections.csv` (Classic replay, 80 rows): 80 of 80 attributed, every row's components sum to its delta within rounding, (c) unreadable on 0. The ownership and HR figures in the CLI smoke run were synthetic fixtures written to the scratchpad and are not data; only the wiring was being checked. A Showdown frame reads "ABSENT, by design".
+
+**R233 grep** (`grep -rn --include=*.py -E "archetype_for_contest_shape" mlb_engine tools skills`): `ownership_prior.py` 119 (definition), 190, 212, 254, 1184, 1201; `late_swap.py` 1115, 1128; `qa_portfolio.py` 995 (`section_leverage`, kept: not touched, no drive-by refactor) and 1302 (`_prior_archetypes`, the two new sections' one resolver). `grep -rn -E "mispricing_screen|def mispricing_|def hr_vs_own"`: `platoon_order_adapter.py` 322 (the F2 batting-order screen, a different measurement, kept), `projection_builder.py` 1356, 1492, 1604.
+
+**Gate.** Local (Python 3.13, a fresh worktree at the branch commit ac9677a, `tools/audit.py --run-tests`): `FAIL  test suite FAILED in tests.test_core, tests.test_showdown, tests.test_upload_integrity (ran 3953); do not build`, 3917 at ffb1583 plus the 36 net, `test_core` at its new pin 2650. Failing names taken with `python -m unittest tests.test_core tests.test_showdown tests.test_upload_integrity` in a worktree at ffb1583 and one at ac9677a: 24 failures each, the same 24 names (the host failures `CLAUDE.local.md` documents). The tip run also printed one ERROR, `R382CaptainPriorWiringTests.test_resolve_captain_prior_END_TO_END_over_a_REAL_emitted_file`, from running the audit and the unittest concurrently in one worktree (both write `outputs/1900-01-02/ownership_pred_r382probe.json`); it passes alone (`Ran 8 tests ... OK`). CI's `gate` check is the merge authority.
+
+**Found and filed.** Nothing new beyond the remainder on R252.
+
+**Register entries, migrated, as they stood at ffb1583.**
+
+### R137. Market-vs-crowd divergence screen (P2, S; quota-priced) | new 2026-08-16, from the leverage ideation fragment
+
+- **What:** the classic leverage screen from two inputs already licensed:
+  hitters whose HR-implied percentile (the per-event props tier MLB_Classic.md
+  14 names Optional and quota-expensive) exceeds their structural-own
+  percentile (v0.1 prior, then R10's) by a stated margin. Deterministic,
+  review-only, per slate; feeds candidate review under section 7's "credible
+  duplication/ownership inputs" and never touches the solver or the pool.
+- **Cost stated up front, from MLB_Classic.md 14's own arithmetic:**
+  per-event prop markets run ≈13 credits per 12-game slate per market against
+  the free 500/month — a nightly screen spends most of the budget. Run it on
+  decision slates or on odds-api.io's flat quota; budget before pulling, and
+  the report prints what it spent.
+- **Audit fields.** Moves: leverage. Acceptance: fixture odds packet + prior
+  file → ranked divergence list with the margin stated. Falsifier: if
+  HR-implieds and structural own rank-correlate too tightly to separate
+  (plausible — both read the same Vegas totals), the screen returns empty and
+  says so; that result is informative and ends the item. FOSS: existing
+  adapters. Owner: none. Rollback: delete the tool.
+
+### R252. The mispricing score: two anchors, components attributed, reported as a vector (P1, M; S with components (a)–(c) only) | new 2026-08-27, from Ben's greenfield instruction; the 2145_1g_sd session's hand-built BUY/FADE model (consumed into R247/R249) is the prototype; retitled 2026-08-28 (ed9)
+
+**What.** The enrichment stack adjusts the projection and nothing states the
+DIVERGENCE. Two anchors, because they are different markets: salary-implied
+points (a salary→realized-FPTS regression per format and role, fit on the
+archive's 29,921 player-contest rows) answers "is this player mispriced by
+DK," and the ownership prior answers "is this player underpriced by the
+FIELD." The honest expectation, stated up front: DK prices skill well on
+average, so the salary anchor mostly catches NEWS (components (d)–(e)); the
+ownership anchor is the softer market and is where leverage actually lives.
+Components, each attributed in the output: (a) opposing-arm and platoon delta
+(F4 already computes both), (b) park delta (F5 today, R253's refinement
+later), (c) the xwOBA−wOBA gap and its recent trend — skill leads results,
+salary and field ownership chase results, and Savant carries both columns,
+(d) line movement since salary post (needs R251's morning capture), (e)
+batting-order promotion against the slot expectation APPG embeds. (f) is
+R137's HR-implied-vs-structural-own screen, which RIDES here unchanged,
+quota note intact.
+
+**Why.** This is Ben's thread-1 ask made mechanical. The operator lever
+already exists (R249 `--projections`, R246 `--leverage`) and the LIST feeding
+it is hand-built per session; the 2145_1g_sd build proved both the value and
+the cost of that.
+
+**Fix.** One module emitting the ranked list (BUY and FADE ends) with per-
+component attribution, into the brief and qa as a review surface. LABELED
+PRIOR; no solver input until R255 grades it. Showdown reach through R249's
+flag. Feeds R209's part C and R254. Late-swap application cross-refs R141.
+
+**Rider 2026-08-28 (ed9 §1.3/§2.1–2.2, accepted; title amended from "one
+number per player").** The interface is the VECTOR: salary edge and field
+edge stay separate named fields with their component attributions, never
+collapsed into one blended rank — one number hides whether an edge is
+performance or mere inattention. One sentence of doctrine adopted with it:
+leverage requires BOTH a positive skill edge and an unreacted field; low
+ownership alone is never leverage. Two columns deliberately NOT here, so
+nobody re-files them: duplication edge is lineup-level and lives in R10;
+marginal portfolio coverage lives in R261/R262. And when R259's buckets
+land, the salary anchor gains a TAIL delta (P(Y ≥ q) against the
+salary-implied distribution, q salary/role-conditioned) beside the mean
+delta — mean-only mispricing misses the spike this lane hunts.
+
 ## 2026-10-17 — R505: the winning-score bar is the median winning score of archived contests by format, title-inferred archetype and field band, in place of ledger 3.21's pooled seed (roadmap Session 174)
 
 **Scope.** `mlb_engine/field/field_miner.py` (`FIELD_BAND_EDGES`, `FIELD_BAND_OVER`, `field_band`, `WINNING_SCORE_MIN_CELL`, `WINNING_SCORE_BAND_ANY`, `ARCHETYPE_UNKNOWN`, the generated `WINNING_SCORE_TABLE` and its provenance new; `WINNING_SCORE_SEED_CLASSIC` and `WINNING_SCORE_SEED_SOURCE` deleted; `winning_score_bar` rewritten to `(contest_type, *, archetype, field_size)`; `winning_score_bars_for_titles`, `titles_from_entry_history`, `winning_score_rollup`, `render_winning_score_table`, `_quartiles` new; `main` gains `--winning-score-table`; the module docstring's CLI lines), `mlb_engine/pipeline/execution_pipeline.py` (`per_contest_first_place` reads each contest's bar from its title; `_BY_CONTEST_NOTE`), `mlb_engine/optimize/showdown_theses.py` (`per_contest_report`), `skills/generate-lineups/scripts/build_slate.py` (one key, `contest_name`, in `showdown_contest_identity`'s `meta`), `tools/results_ledger.py` (the band vocabulary imported from `field_miner`), `tools/qa_portfolio.py` (`_bar_phrase`, `_absent_bar_reasons`, the section's intro line), `tools/audit.py` (one pin), `tests/test_core.py` (`WinningScoreBarTests`, `WinningScoreShippedTableTests` new; `PerContestFirstPlaceTests` edited, below), `MLB_Classic.md` (the 2026-10-15 correction), `docs/ROADMAP.md` (row 174 Complete; row 175 and D-13 new; NEXT; the ledger row; Session 45's SHA), `docs/backlog.md` (R505 closed; R506 new). No change to `contest_allocator.py`, `optimizer_v3.py` or `tests/golden/`.

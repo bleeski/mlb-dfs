@@ -55883,3 +55883,460 @@ class PostureRoutingTests(unittest.TestCase):
             self.assertEqual(partial["contest_shape_defaults"]["contest_ids"], contests[1:])
             mapped = run_late_swap(contest_shapes={c: "cash" for c in contests}, **common)
             self.assertNotIn("contest_shape_defaults", mapped)
+
+
+class MispricingScoreTests(unittest.TestCase):
+    """R252 (a)-(c): the mispricing vector, attribution and gaps kept separate.
+
+    Pure functions over a delivered projections frame, a labeled ownership prior
+    and an optional salary anchor. Review proxies only; nothing here reaches the
+    solver and nothing is a rate or a probability.
+    """
+
+    @staticmethod
+    def _row(pid, name="Hitter", position="OF", salary=4000.0, appg=8.0, ratio=1.0,
+             f1=1.0, f2=1.0, f3=1.0, f4=1.0, f5=1.0, notes="", workload=None):
+        row = {"Player_ID": pid, "Name": name, "Team": "AAA", "Position": position,
+               "Salary": salary, "AvgPointsPerGame": appg, "Base": appg * ratio,
+               "F1": f1, "F2": f2, "F3": f3, "F4": f4, "F5": f5, "Notes": notes}
+        if workload is not None:
+            row["Workload_Factor"] = workload
+            row["Base"] = appg * ratio * workload
+        return row
+
+    def _components(self, rows, **kw):
+        from mlb_engine.projections.projection_builder import mispricing_components
+        return {c["player_id"]: c for c in mispricing_components(pd.DataFrame(rows), **kw)}
+
+    def test_components_sum_to_the_delta(self):
+        rows = [self._row("1", appg=8.0, ratio=1.07, f1=1.03, f2=1.06, f3=0.98, f4=1.09, f5=0.94),
+                self._row("2", appg=5.5, ratio=0.91, f2=0.91, f4=0.88, f5=1.06),
+                self._row("3", position="P", appg=14.0, ratio=1.04, f4=1.0, f5=0.97)]
+        got = self._components(rows)
+        for pid, c in got.items():
+            self.assertTrue(c["attributed"], pid)
+            self.assertAlmostEqual(sum(c["points"].values()), c["delta"], delta=6e-4, msg=pid)
+
+    def test_cancelling_factors_stay_finite_and_opposite_signed(self):
+        """F4 1.10 against F5 1/1.10 leaves the projection at the season average, so
+        ln(P/appg) is 0 and a log-share would divide by it. Each factor keeps its
+        own points and they cancel."""
+        got = self._components([self._row("1", appg=8.0, f4=1.10, f5=1 / 1.10)])["1"]
+        self.assertAlmostEqual(got["delta"], 0.0, places=6)
+        self.assertAlmostEqual(got["points"]["a_opp_arm_platoon"], 8.0 * math.log(1.10), places=3)
+        self.assertAlmostEqual(got["points"]["b_park"], -8.0 * math.log(1.10), places=3)
+        self.assertAlmostEqual(sum(got["points"].values()), 0.0, delta=6e-4)
+
+    def test_a_pitcher_row_reads_the_wOBA_against_gap_not_the_xwOBA_gap(self):
+        got = self._components([self._row("1", position="P", ratio=1.05),
+                                self._row("2", position="SS", ratio=1.05)])
+        self.assertEqual(got["1"]["c_label"], "wOBA-against gap")
+        self.assertEqual(got["2"]["c_label"], "xwOBA gap")
+        self.assertGreater(got["1"]["points"]["c_xwoba_gap"], 0)
+
+    def test_an_operator_base_is_unattributed_never_a_zero_gap(self):
+        reasons = {"1": "operator_supplied_base_not_corrected"}
+        got = self._components([self._row("1", ratio=1.10)], xwoba_reasons=reasons)["1"]
+        self.assertEqual(got["c_status"], "not_attributed:operator_supplied_base")
+        self.assertEqual(got["points"]["c_xwoba_gap"], 0.0)
+        self.assertGreater(got["points"]["unattributed"], 0.0)
+        self.assertAlmostEqual(sum(got["points"].values()), got["delta"], delta=6e-4)
+
+    def test_a_base_ratio_no_correction_can_produce_is_unattributed(self):
+        got = self._components([self._row("1", ratio=1.50), self._row("2", position="P", ratio=1.12)])
+        self.assertEqual(got["1"]["c_status"], "not_attributed:base_ratio_outside_the_correction_clip")
+        # 1.12 sits inside a hitter's 1.15 clip and outside a pitcher's 1.10: the clip is per role.
+        self.assertEqual(got["2"]["c_status"], "not_attributed:base_ratio_outside_the_correction_clip")
+        self.assertEqual(self._components([self._row("3", ratio=1.12)])["3"]["c_status"], "attributed")
+
+    def test_a_build_that_applied_no_correction_attributes_nothing_to_c(self):
+        got = self._components([self._row("1", ratio=1.0)], xwoba_applied=False)["1"]
+        self.assertEqual(got["c_status"], "not_attributed:no_correction_applied_by_this_build")
+
+    def test_the_workload_prior_and_value_guard_do_not_inflate_c(self):
+        """Both rewrite Base after the correction. Read as Base / appg they would pass
+        for an xwOBA gap of 0.5 and 0.8."""
+        rows = [self._row("1", position="P", appg=10.0, ratio=1.04, workload=0.5),
+                self._row("2", appg=10.0, ratio=1.04,
+                          notes="f5_park_weather: deterministic prior 1.000; "
+                                "value_guard: Base capped 10.40->8.32")]
+        rows[1]["Base"] = 8.32
+        got = self._components(rows)
+
+        def expected_c(appg, ratio, rewrite):
+            total = math.log(ratio * rewrite)
+            return appg * math.expm1(total) / total * math.log(ratio)
+
+        for pid, rewrite in (("1", 0.5), ("2", 0.8)):
+            self.assertEqual(got[pid]["c_status"], "attributed", pid)
+            self.assertAlmostEqual(got[pid]["points"]["c_xwoba_gap"], expected_c(10.0, 1.04, rewrite),
+                                   delta=6e-4, msg=pid)
+            self.assertLess(got[pid]["points"]["base_rewrites"], -1.0, pid)
+
+    def test_a_row_with_no_positive_season_average_has_no_log_and_says_so(self):
+        got = self._components([self._row("1", appg=0.0), self._row("2", appg=float("nan"))])
+        for pid in ("1", "2"):
+            self.assertFalse(got[pid]["attributed"])
+            self.assertEqual(got[pid]["reason"], "no_positive_avgpointspergame")
+
+    def test_the_vector_never_blends_the_two_gaps(self):
+        from mlb_engine.projections.projection_builder import mispricing_vector
+        frame = pd.DataFrame([self._row(str(i), appg=5.0 + i, ratio=1.0 + i / 100) for i in range(1, 7)])
+        prior = {"archetypes": {"mme": {"own_pct_by_player_id": {str(i): float(7 - i) for i in range(1, 7)}}}}
+        anchor = [{"format": "classic", "role": "hitter", "salary_lo": 3000, "salary_hi": 5000,
+                   "implied_points": 6.0, "n": 400}]
+        got = mispricing_vector(frame, prior=prior, anchor=anchor)
+        self.assertEqual(sorted(got["ends"]), ["attributed_abc_points", "buy_on_both", "field_gap", "salary_gap"])
+
+        def keys(node):
+            if isinstance(node, dict):
+                for k, v in node.items():
+                    yield str(k)
+                    yield from keys(v)
+            elif isinstance(node, list):
+                for v in node:
+                    yield from keys(v)
+        for k in keys({key: v for key, v in got.items() if key != "label"}):
+            self.assertNotRegex(k, r"(?i)\b(edge|roi|prob\w*|win|score|blend\w*)\b", k)
+        for row in got["rows"]:
+            self.assertIn("salary_gap", row)
+            self.assertIn("field_gap", row)
+            self.assertIn("abc_points", row)
+
+    def test_a_missing_prior_and_anchor_are_named_not_zeroed(self):
+        from mlb_engine.projections.projection_builder import mispricing_vector
+        got = mispricing_vector(pd.DataFrame([self._row("1")]))
+        self.assertFalse(got["field_gap"]["applied"])
+        self.assertIn("no ownership prior", got["field_gap"]["reason"])
+        self.assertEqual(got["salary_gap"]["state"], "UNKNOWN")
+        self.assertIn("no salary anchor", got["salary_gap"]["reason"])
+        self.assertIsNone(got["rows"][0]["salary_gap"])
+        self.assertEqual(got["ends"]["field_gap"], {})
+
+    def test_the_field_gap_is_per_archetype_and_within_role(self):
+        from mlb_engine.projections.projection_builder import mispricing_vector
+        rows = [self._row(str(i), appg=4.0 + i, ratio=1.0) for i in range(1, 5)]
+        rows += [self._row(f"p{i}", position="P", appg=10.0 + i, ratio=1.0) for i in range(1, 4)]
+        up = {str(i): float(i) for i in range(1, 5)}
+        up.update({f"p{i}": float(i) for i in range(1, 4)})
+        down = {k: 100.0 - v for k, v in up.items()}
+        prior = {"archetypes": {"cash": {"own_pct_by_player_id": up},
+                                "mme": {"own_pct_by_player_id": down}}}
+        got = mispricing_vector(pd.DataFrame(rows), prior=prior)
+        by = {r["player_id"]: r for r in got["rows"]}
+        # Projection and ownership rank the same way under `cash`: zero gap, in both roles.
+        for pid in ("1", "4", "p1", "p3"):
+            self.assertEqual(by[pid]["field_gap"]["cash"]["gap"], 0.0, pid)
+        # Under `mme` the order is reversed, so the best projection holds the lowest ownership.
+        self.assertGreater(by["4"]["field_gap"]["mme"]["gap"], 0)
+        self.assertLess(by["1"]["field_gap"]["mme"]["gap"], 0)
+        self.assertEqual(got["field_gap"]["archetypes"], ["cash", "mme"])
+        # A pitcher is ranked against pitchers: p3 is the top arm and the lowest-owned under mme.
+        self.assertEqual(by["p3"]["field_gap"]["mme"]["projection_percentile"], 100.0)
+
+    def test_a_thin_anchor_band_answers_unknown_never_a_point(self):
+        from mlb_engine.projections.projection_builder import (
+            MISPRICING_ANCHOR_MIN_N, salary_implied_points)
+        band = {"format": "classic", "role": "hitter", "salary_lo": 3000, "salary_hi": 3999,
+                "implied_points": 5.5, "n": MISPRICING_ANCHOR_MIN_N - 1}
+        points, why = salary_implied_points(3500, "hitter", [band])
+        self.assertIsNone(points)
+        self.assertIn("n=", why)
+        band["n"] = MISPRICING_ANCHOR_MIN_N
+        self.assertEqual(salary_implied_points(3500, "hitter", [band]), (5.5, None))
+        self.assertEqual(salary_implied_points(3500, "pitcher", [band])[0], None)
+        self.assertEqual(salary_implied_points(9000, "hitter", [band])[0], None)
+
+    def test_the_salary_gap_is_projection_minus_the_anchor(self):
+        from mlb_engine.projections.projection_builder import mispricing_vector
+        anchor = [{"format": "classic", "role": "hitter", "salary_lo": 3000, "salary_hi": 5000,
+                   "implied_points": 6.0, "n": 400}]
+        got = mispricing_vector(pd.DataFrame([self._row("1", appg=8.0, ratio=1.0, salary=4000)]), anchor=anchor)
+        self.assertEqual(got["rows"][0]["salary_gap"], 2.0)
+        self.assertTrue(got["salary_gap"]["applied"])
+
+    def test_shuffled_input_gives_identical_bytes(self):
+        from mlb_engine.projections.projection_builder import mispricing_vector
+        rows = [self._row(str(i), appg=5.0 + i * 0.7, ratio=1.0 + (i % 5) / 50, f4=1.0 + (i % 3) / 30)
+                for i in range(1, 13)]
+        prior = {"archetypes": {"mme": {"own_pct_by_player_id": {str(i): float(i % 7) for i in range(1, 13)}}}}
+        first = json.dumps(mispricing_vector(pd.DataFrame(rows), prior=prior), sort_keys=True)
+        second = json.dumps(mispricing_vector(pd.DataFrame(rows[::-1]), prior=prior), sort_keys=True)
+        self.assertEqual(first, second)
+
+    def test_a_showdown_frame_is_absent_by_design(self):
+        from mlb_engine.projections.projection_builder import mispricing_vector
+        got = mispricing_vector(pd.DataFrame([self._row("1", position="CPT")]))
+        self.assertFalse(got["applied"])
+        self.assertIn("Showdown", got["reason"])
+
+    def test_the_label_states_the_wall_and_the_doctrine_rides_with_it(self):
+        from mlb_engine.projections.projection_builder import mispricing_vector
+        got = mispricing_vector(pd.DataFrame([self._row("1")]))
+        self.assertIn("Never an ROI", got["label"])
+        self.assertIn("never a solver input", got["label"])
+        self.assertIn("BOTH a positive skill gap and an unreacted field", got["doctrine"])
+
+    def test_the_real_pipeline_frame_columns_are_enough(self):
+        """The columns a delivered final/projections.csv carries, with the Notes
+        grammar the pipeline writes, attribute without a pipeline change."""
+        from mlb_engine.projections.projection_builder import mispricing_vector
+        notes = ("confirmed_order: F2 from posted batting order; f4_matchup: deterministic prior 0.951; "
+                 "f5_park_weather: deterministic prior 1.060")
+        frame = pd.DataFrame([self._row("1", ratio=1.03, f2=1.06, f4=0.951, f5=1.06, notes=notes)])
+        frame["Batting_Order"] = 4
+        frame["Ownership_Tier"] = "Mid"
+        got = mispricing_vector(frame)
+        self.assertTrue(got["applied"])
+        self.assertEqual(got["counts"], {"rows": 1, "attributed": 1, "c_not_attributed": 0})
+
+    def _qa_section(self, brief, hdr, frame, prior=None, archetype=None):
+        from tools.qa_portfolio import section_mispricing
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "projections.csv"
+            if frame is not None:
+                frame.to_csv(path, index=False)
+            return section_mispricing(brief, hdr, path if frame is not None else None,
+                                      "test fixture", prior, archetype)
+
+    def test_the_projections_file_resolves_by_run_id_and_names_its_absence(self):
+        from tools.qa_portfolio import find_projections_file
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "runs" / "r1" / "final").mkdir(parents=True)
+            (root / "runs" / "r1" / "final" / "projections.csv").write_text("Player_ID\n", encoding="utf-8")
+            path, how = find_projections_file({"run_id": "r1"}, None, root)
+            self.assertEqual(path, root / "runs" / "r1" / "final" / "projections.csv")
+            self.assertIn("run_id (r1)", how)
+            self.assertEqual(find_projections_file({"run_id": "r1"}, "x.csv", root)[0], Path("x.csv"))
+            gone, why = find_projections_file({"run_id": "r2"}, None, root)
+            self.assertIsNone(gone)
+            self.assertIn("is not on this machine", why)
+            self.assertIsNone(find_projections_file({}, None, root)[0])
+
+    def test_a_guarded_row_at_the_correction_clip_still_attributes(self):
+        """The guard's Notes tag rounds raw and cap to two decimals, so a ratio sitting on
+        the 1.15 clip lands a hair over it; the tolerance is wider only where a tag exists."""
+        notes = "value_guard: Base capped 9.77->7.00"
+        row = self._row("1", appg=8.5, ratio=1.15, notes=notes)
+        row["Base"] = 8.5 * 1.15 * (7.00 / 9.77) * 1.004
+        self.assertEqual(self._components([row])["1"]["c_status"], "attributed")
+        plain = self._row("2", appg=8.5, ratio=1.15)
+        plain["Base"] = 8.5 * 1.15 * 1.004
+        self.assertTrue(self._components([plain])["2"]["c_status"].startswith("not_attributed"))
+
+    def test_the_qa_section_says_absent_for_showdown_and_for_a_missing_frame(self):
+        frame = pd.DataFrame([self._row("1")])
+        showdown = self._qa_section({}, ["Entry ID", "CPT", "UTIL"], frame)
+        self.assertIn("ABSENT for Showdown", showdown[0])
+        classic = ["Entry ID", "P", "C"]
+        missing = self._qa_section({}, classic, None)
+        self.assertTrue(missing[0].startswith("MISPRICING VECTOR: ABSENT."))
+
+    def test_the_qa_section_reads_the_brief_for_operator_bases(self):
+        frame = pd.DataFrame([self._row("1", name="Operator Base", ratio=1.08),
+                              self._row("2", name="Corrected", ratio=1.08)])
+        brief = {"enrichment": {"neutral_default": {"xwoba_base": {"applied": True, "players": [
+            {"player_id": "1", "reason": "operator_supplied_base_not_corrected"}]}}}}
+        lines = "\n".join(self._qa_section(brief, ["Entry ID", "P", "C"], frame))
+        self.assertIn("(c) unreadable on 1", lines)
+        self.assertIn("SALARY GAP: UNKNOWN", lines)
+        self.assertIn("FIELD GAP: ABSENT, no ownership prior was found", lines)
+
+    def test_the_qa_section_conditions_the_field_gap_on_the_contests_archetype(self):
+        rows = [self._row(str(i), name=f"P{i}", appg=4.0 + i) for i in range(1, 6)]
+        frame = pd.DataFrame(rows)
+        own = {str(i): float(10 - i) for i in range(1, 6)}
+        prior = {"schema": "ownership_pred/v1",
+                 "archetypes": {"mme": {"own_pct_by_player_id": own},
+                                "cash": {"own_pct_by_player_id": own}}}
+        lines = "\n".join(self._qa_section({}, ["Entry ID", "P", "C"], frame, prior, "mme"))
+        self.assertIn("FIELD GAP [mme]", lines)
+        self.assertNotIn("FIELD GAP [cash]", lines)
+        unresolved = "\n".join(self._qa_section({}, ["Entry ID", "P", "C"], frame, prior))
+        self.assertIn("FIELD GAP: ABSENT, no contest archetype resolved", unresolved)
+        self.assertNotIn("FIELD GAP [", unresolved)
+
+    def test_the_ends_are_ordered_and_the_intersection_needs_both_gaps(self):
+        """Mutation-found: the BUY ON BOTH list once ignored the build-side sign and
+        the FADE end once listed its least negative name first."""
+        from mlb_engine.projections.projection_builder import mispricing_vector
+        ratios = {"A": 1.10, "B": 1.05, "D": 1.00, "C": 0.95, "E": 0.90, "F": 0.85}
+        frame = pd.DataFrame([self._row(k, name=k, appg=8.0, ratio=r) for k, r in ratios.items()])
+        own = {"C": 1.0, "A": 2.0, "F": 3.0, "E": 4.0, "D": 5.0, "B": 6.0}
+        got = mispricing_vector(frame, prior={"archetypes": {"mme": {"own_pct_by_player_id": own}}})
+        abc = got["ends"]["attributed_abc_points"]
+        self.assertEqual([e["name"] for e in abc["buy"]], ["A", "B"])
+        self.assertEqual([e["name"] for e in abc["fade"]], ["F", "E", "C"])
+        # C is the lowest-owned name and ranks above that ownership, but the build
+        # projects it below its season average: no positive skill gap, no leverage.
+        by = {r["player_id"]: r for r in got["rows"]}
+        self.assertGreater(by["C"]["field_gap"]["mme"]["gap"], 0)
+        self.assertLess(by["C"]["abc_points"], 0)
+        self.assertEqual([e["name"] for e in got["ends"]["buy_on_both"]["mme"]], ["A"])
+        capped = mispricing_vector(frame, top=1)["ends"]["attributed_abc_points"]
+        self.assertEqual([len(capped["buy"]), len(capped["fade"])], [1, 1])
+
+
+class HrVsOwnDivergenceTests(unittest.TestCase):
+    """R137: hitters the HR market prices above the field's attention.
+
+    A pure function over a supplied packet and one archetype's ownership block.
+    It never fetches, reads one market on one scale, names what it could not
+    match, and returns EMPTY when the two rankings are too tight to separate,
+    which is the entry's own falsifier.
+    """
+
+    @staticmethod
+    def _table(n=10, implied=None):
+        implied = implied or {f"h{i}": 0.05 + 0.01 * i for i in range(1, n + 1)}
+        return [{"player": f"Hitter {k}", "market": "batter_home_runs", "implied_prob": v,
+                 "vig_free_prob": None, "dk_player_id": k} for k, v in implied.items()]
+
+    #: h10 has the best HR price and the lowest ownership, h9 the next; h1..h8 keep their order.
+    DIVERGING = {"h10": 1.0, "h9": 2.0, **{f"h{i}": float(i + 2) for i in range(1, 9)}}
+    TIGHT = {f"h{i}": float(i) for i in range(1, 11)}
+
+    def _screen(self, table=None, own=None, **kw):
+        from mlb_engine.projections.projection_builder import hr_vs_own_divergence
+        return hr_vs_own_divergence(table if table is not None else self._table(),
+                                    own if own is not None else self.DIVERGING, **kw)
+
+    def test_the_list_is_the_hitters_whose_hr_percentile_leads_by_the_margin(self):
+        got = self._screen(archetype="mme")
+        self.assertTrue(got["applied"])
+        self.assertTrue(got["separable"])
+        self.assertEqual([r["player_id"] for r in got["rows"]], ["h10", "h9"])
+        self.assertEqual([r["divergence"] for r in got["rows"]], [90.0, 70.0])
+        self.assertEqual(got["margin"], 25.0)
+        self.assertEqual(got["archetype"], "mme")
+        self.assertLess(got["spearman_rho"], 0.5)
+        self.assertEqual([r["player_id"] for r in self._screen(margin=80.0)["rows"]], ["h10"])
+        # The bar is "at least": a lead of exactly 90 points still lists.
+        self.assertEqual([r["player_id"] for r in self._screen(margin=90.0)["rows"]], ["h10"])
+        self.assertEqual([r["player_id"] for r in self._screen(top=1)["rows"]], ["h10"])
+
+    def test_tight_rank_correlation_returns_empty_and_says_why(self):
+        """R137's falsifier: both read the same Vegas totals, so they can co-rank."""
+        got = self._screen(own=self.TIGHT)
+        self.assertTrue(got["applied"])
+        self.assertFalse(got["separable"])
+        self.assertEqual(got["rows"], [])
+        self.assertIn("rank-correlate too tightly", got["reason"])
+        self.assertEqual(got["spearman_rho"], 1.0)
+        # Adjacent swaps leave Spearman at 0.939: over the 0.90 bar, under a perfect match.
+        swapped = {f"h{i}": float(r) for i, r in enumerate([2, 1, 4, 3, 6, 5, 8, 7, 10, 9], start=1)}
+        near = self._screen(own=swapped)
+        self.assertEqual(near["spearman_rho"], 0.9394)
+        self.assertFalse(near["separable"])
+
+    def test_a_duplicate_row_for_one_player_is_named_and_order_independent(self):
+        table = self._table() + [{"player": "Hitter h5", "market": "batter_home_runs",
+                                  "implied_prob": 0.5, "dk_player_id": "h5"}]
+        first, second = self._screen(table), self._screen(table[::-1])
+        self.assertEqual(first, second)
+        self.assertEqual(first["duplicate_dk_player_ids"], ["h5"])
+        self.assertEqual(self._screen()["duplicate_dk_player_ids"], [])
+
+    def test_an_empty_result_below_the_tight_bar_names_its_own_reason(self):
+        # Rankings that differ (Spearman 0.81, under the 0.90 bar) but never by 25 points.
+        own = {"h1": 3.0, "h2": 4.0, "h3": 1.0, "h4": 2.0, "h5": 7.0,
+               "h6": 8.0, "h7": 5.0, "h8": 6.0, "h9": 9.0, "h10": 10.0}
+        got = self._screen(own=own)
+        self.assertTrue(got["separable"])
+        self.assertEqual(got["rows"], [])
+        self.assertEqual(got["spearman_rho"], 0.8061)
+        self.assertIn("no hitter's HR-implied percentile leads", got["reason"])
+        # The bar is "at least": four hitters lead by exactly 20 points and list at margin 20.
+        at_bar = self._screen(own=own, margin=20.0)
+        self.assertEqual([r["player_id"] for r in at_bar["rows"]], ["h3", "h4", "h7", "h8"])
+
+    def test_unmatched_rows_are_named_and_other_markets_are_counted_not_read(self):
+        table = self._table() + [
+            {"player": "Nameless", "market": "batter_home_runs", "implied_prob": 0.2, "dk_player_id": None},
+            {"player": "Unpriced", "market": "batter_home_runs", "implied_prob": 0.2, "dk_player_id": "zz"},
+            {"player": "Hits Prop", "market": "batter_hits", "implied_prob": 0.9, "dk_player_id": "h1"}]
+        got = self._screen(table)
+        self.assertEqual(got["unmatched"], {"no_dk_player_id": ["Nameless"], "not_in_ownership_prior": ["Unpriced"],
+                                            "no_implied_prob": []})
+        blank = self._table() + [{"player": "No Price", "market": "batter_home_runs",
+                                  "implied_prob": None, "dk_player_id": "h3"},
+                                 {"player": "Nan Price", "market": "batter_home_runs",
+                                  "implied_prob": float("nan"), "dk_player_id": "h4"}]
+        again = self._screen(blank)
+        self.assertEqual(again["unmatched"]["no_implied_prob"], ["Nan Price", "No Price"])
+        self.assertEqual(again["rows"], got["rows"])
+        self.assertEqual(got["other_market_rows_ignored"], 1)
+        self.assertEqual(got["matched_hitters"], 10)
+        self.assertEqual([r["player_id"] for r in got["rows"]], ["h10", "h9"])
+
+    def test_too_few_matched_hitters_is_not_applied(self):
+        got = self._screen(self._table(n=5), {f"h{i}": float(i) for i in range(1, 6)})
+        self.assertFalse(got["applied"])
+        self.assertEqual(got["rows"], [])
+        self.assertIn("only 5 hitters", got["reason"])
+
+    def test_one_scale_a_vig_free_value_does_not_re_rank_a_row(self):
+        table = self._table()
+        for row in table:
+            if row["dk_player_id"] == "h10":
+                row["vig_free_prob"] = 0.001
+        self.assertEqual(self._screen(table), self._screen())
+
+    def test_it_spends_nothing_and_echoes_the_packet_cost_it_is_told(self):
+        got = self._screen(packet_credits=13)
+        self.assertEqual(got["credits"]["spent_by_this_screen"], 0)
+        self.assertEqual(got["credits"]["packet_credits"], 13)
+        self.assertIsNone(self._screen()["credits"]["packet_credits"])
+
+    def test_the_module_imports_no_network_client(self):
+        import mlb_engine.projections.projection_builder as pb
+        tree = ast.parse(Path(pb.__file__).read_text(encoding="utf-8"))
+        names = {a.name.split(".")[0] for n in ast.walk(tree) if isinstance(n, ast.Import) for a in n.names}
+        names |= {(n.module or "").split(".")[0] for n in ast.walk(tree) if isinstance(n, ast.ImportFrom)}
+        self.assertFalse(names & {"requests", "urllib", "http", "httpx", "socket"}, sorted(names))
+
+    def test_shuffled_input_gives_identical_bytes(self):
+        first = json.dumps(self._screen(), sort_keys=True)
+        second = json.dumps(self._screen(self._table()[::-1]), sort_keys=True)
+        self.assertEqual(first, second)
+
+    def test_nothing_in_the_payload_claims_a_rate_or_a_home_run_probability(self):
+        got = self._screen()
+        self.assertIn("Never an ROI", got["label"])
+        body = json.dumps({k: v for k, v in got.items() if k != "label"}).lower()
+        for banned in ("roi", "win rate", "cash rate", "profitab", "expected value"):
+            self.assertNotIn(banned, body)
+
+    def _qa(self, packet, prior, archetype="mme", brief=None):
+        from tools.qa_portfolio import section_divergence
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "props.json"
+            if packet is not None:
+                path.write_text(json.dumps(packet), encoding="utf-8")
+            return section_divergence(brief or {}, path if packet is not None else None, prior, archetype)
+
+    def test_the_qa_section_prints_only_when_a_packet_is_supplied(self):
+        prior = {"schema": "ownership_pred/v1", "archetypes": {"mme": {"own_pct_by_player_id": self.DIVERGING}}}
+        self.assertEqual(self._qa(None, prior), [])
+        lines = "\n".join(self._qa(self._table(), prior))
+        self.assertIn("HR-VS-OWN DIVERGENCE (R137)", lines)
+        self.assertIn("[mme] margin 25 percentile points, 10 hitters matched", lines)
+        self.assertIn("screen spent 0 credits", lines)
+        self.assertIn("Hitter h10", lines)
+        tight = {"schema": "ownership_pred/v1", "archetypes": {"mme": {"own_pct_by_player_id": self.TIGHT}}}
+        self.assertIn("EMPTY: HR implieds and structural ownership rank-correlate too tightly",
+                      "\n".join(self._qa(self._table(), tight)))
+
+    def test_the_qa_section_conditions_on_archetype_and_names_absence(self):
+        prior = {"schema": "ownership_pred/v1", "archetypes": {"mme": {"own_pct_by_player_id": self.DIVERGING}}}
+        two = {"schema": "ownership_pred/v1",
+               "archetypes": {"mme": {"own_pct_by_player_id": self.DIVERGING},
+                              "cash": {"own_pct_by_player_id": self.TIGHT}}}
+        named = "\n".join(self._qa(self._table(), two, archetype="mme"))
+        self.assertIn("[mme] margin", named)
+        self.assertNotIn("[cash]", named)
+        self.assertIn("ABSENT: no ownership prior was found", "\n".join(self._qa(self._table(), None)))
+        self.assertIn("ABSENT: no contest archetype resolved",
+                      "\n".join(self._qa(self._table(), prior, archetype=None)))
+        self.assertIn("did not load", "\n".join(self._qa({"unexpected": 1}, prior)))

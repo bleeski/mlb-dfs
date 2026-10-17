@@ -1304,3 +1304,385 @@ def write_projection_bundle(projections: pd.DataFrame, audit: pd.DataFrame, outp
     projections.to_csv(projection_path, index=False)
     audit.to_csv(audit_path, index=False)
     return {"projections": str(projection_path), "audit": str(audit_path)}
+
+
+# --- R252 (a)-(c): the mispricing vector (review surface) -------------------
+# The enrichment stack adjusts the projection and nothing states the DIVERGENCE.
+# This block reads a delivered projections frame and reports, per player, three
+# separately named things and never one blended rank (the ed9 rider): the
+# attribution of the projection's departure from DK's own season average to the
+# build's factors, the gap to a salary-implied anchor, and the gap to the
+# field's attention. Every number is a deterministic review proxy over a LABELED
+# PRIOR; none of it is an ROI, win-rate, cash-rate or probability claim, and
+# none of it reaches the solver until R255 grades it. The entry's "edge" names
+# are written `*_gap` here, because the contract bars the bare word as a claim.
+
+MISPRICING_SCHEMA = "mispricing/v1"
+MISPRICING_ANCHOR_MIN_N = 30          # an anchor band thinner than this answers UNKNOWN
+MISPRICING_ROUND = 4
+MISPRICING_LABEL = (
+    "DETERMINISTIC REVIEW PROXY over a LABELED PRIOR. Components restate the "
+    "build's own factors in points against DK's season average; the field gap "
+    "reads the uncalibrated structural ownership prior. Never an ROI, win "
+    "rate, cash rate or probability, and never a solver input.")
+MISPRICING_DOCTRINE = (
+    "Leverage needs BOTH a positive skill gap and an unreacted field; low "
+    "ownership alone is never leverage, so the lists below are never blended.")
+_MISPRICING_GUARD_TAG = "value_guard: Base capped "
+_COMPONENT_KEYS = (
+    "a_opp_arm_platoon", "b_park", "c_xwoba_gap", "context_f1_f2_f3",
+    "base_rewrites", "unattributed")
+
+
+def _mispricing_role(position: Any) -> str:
+    tokens = {t.strip().upper() for t in str(position or "").split("/")}
+    return "pitcher" if tokens & {"P", "SP", "RP"} else "hitter"
+
+
+def _mispricing_guard_ratio(notes: Any) -> float:
+    """cap/raw from the value guard's own Notes tag, or 1.0 when it did not fire."""
+    text = str(notes or "")
+    at = text.find(_MISPRICING_GUARD_TAG)
+    if at < 0:
+        return 1.0
+    try:
+        raw_text, cap_text = text[at + len(_MISPRICING_GUARD_TAG):].split(";")[0].split("->")
+        raw, cap = float(raw_text), float(cap_text)
+    except ValueError:
+        return 1.0
+    return cap / raw if raw > 0 and cap > 0 else 1.0
+
+
+def mispricing_components(
+    rows: Any,
+    *,
+    xwoba_reasons: Optional[Mapping[str, str]] = None,
+    xwoba_applied: Optional[bool] = None,
+) -> List[Dict[str, Any]]:
+    """Attribute each row's ``Base * F1..F5 - AvgPointsPerGame`` to named factors.
+
+    The delta is split by log-share, which is exact and sums to the delta:
+    ``points_k = appg * ln(f_k) * expm1(L) / L`` with ``L = ln(P / appg)``. The
+    ratio ``expm1(L) / L`` tends to 1 as ``L`` goes to 0, so factors that cancel
+    (F4 1.10 against F5 0.91) stay finite and opposite-signed instead of
+    dividing by a near-zero total.
+
+    Keys: (a) F4, the opposing arm and platoon; (b) F5, park; (c) the xwOBA
+    correction on Base, read as ``Base / (appg * workload * value_guard)`` and
+    labelled the wOBA-against gap on a pitcher row; ``context_f1_f2_f3`` is F1,
+    F2 and F3 (environment, order, and the third factor), which are not R252
+    components; ``base_rewrites`` is the declared-arm workload prior
+    and the value guard's cap, which rewrite Base after the correction.
+    ``unattributed`` holds (c) whenever it cannot be read: a row the caller says
+    kept an operator-supplied Base, a build that applied no correction, or a
+    Base/APPG ratio outside the role's correction clip, which no correction can
+    produce. A within-clip operator Base cannot be told from a correction in the
+    file alone, so a caller with the brief passes ``xwoba_reasons``.
+
+    A row with no positive ``AvgPointsPerGame`` or a non-positive Base or factor
+    has no log to take and returns ``attributed: False`` with the reason.
+    """
+    frame = _as_dataframe(rows)
+    missing = sorted({"Player_ID", "Name", "Team", "Position", "Salary", "Base",
+                      "AvgPointsPerGame", *FACTOR_COLUMNS} - set(frame.columns))
+    if missing:
+        raise ValueError(f"mispricing_components: frame is missing columns {missing}")
+    reasons = {str(k): str(v) for k, v in (xwoba_reasons or {}).items()}
+    out: List[Dict[str, Any]] = []
+    for _, row in frame.sort_values("Player_ID", key=lambda s: s.astype(str)).iterrows():
+        pid = str(row["Player_ID"]).strip()
+        role = _mispricing_role(row["Position"])
+        appg = pd.to_numeric(pd.Series([row["AvgPointsPerGame"]]), errors="coerce").iloc[0]
+        base = float(row["Base"])
+        factors = [float(row[c]) for c in FACTOR_COLUMNS]
+        proj = base * float(np.prod(factors))
+        record: Dict[str, Any] = {
+            "player_id": pid, "name": str(row["Name"]), "team": str(row["Team"]),
+            "position": str(row["Position"]), "role": role,
+            "salary": float(row["Salary"]),
+            "appg": None if pd.isna(appg) else round(float(appg), MISPRICING_ROUND),
+            "projection": round(proj, MISPRICING_ROUND),
+            "c_label": "wOBA-against gap" if role == "pitcher" else "xwOBA gap",
+        }
+        workload = 1.0
+        if "Workload_Factor" in frame.columns:
+            wf = pd.to_numeric(pd.Series([row["Workload_Factor"]]), errors="coerce").iloc[0]
+            workload = 1.0 if pd.isna(wf) else float(min(1.0, max(0.0, wf)))
+        guard = _mispricing_guard_ratio(row["Notes"] if "Notes" in frame.columns else "")
+        if pd.isna(appg) or float(appg) <= 0:
+            out.append({**record, "attributed": False, "reason": "no_positive_avgpointspergame"})
+            continue
+        if base <= 0 or workload <= 0 or any(f <= 0 for f in factors):
+            out.append({**record, "attributed": False, "reason": "nonpositive_base_or_factor"})
+            continue
+        appg = float(appg)
+        clip = XWOBA_PITCHER_CLIP if role == "pitcher" else XWOBA_BATTER_CLIP
+        ratio = base / (appg * workload * guard)
+        # The guard's Notes tag carries raw and cap to two decimals, so a guarded row's
+        # ratio is good to about half a percent; an unguarded row's is exact.
+        slack = 1e-6 if guard == 1.0 else 5e-3
+        reason = reasons.get(pid, "")
+        if xwoba_applied is False:
+            c_status = "not_attributed:no_correction_applied_by_this_build"
+        elif reason == "operator_supplied_base_not_corrected":
+            c_status = "not_attributed:operator_supplied_base"
+        elif not (clip[0] - slack <= ratio <= clip[1] + slack):
+            c_status = "not_attributed:base_ratio_outside_the_correction_clip"
+        elif reason:
+            c_status = f"neutral:{reason}"
+        else:
+            c_status = "attributed"
+        readable = c_status == "attributed" or c_status.startswith("neutral:")
+        t_ratio = float(np.log(ratio))
+        terms = {
+            "a_opp_arm_platoon": float(np.log(factors[3])),
+            "b_park": float(np.log(factors[4])),
+            "c_xwoba_gap": t_ratio if readable else 0.0,
+            "context_f1_f2_f3": float(np.log(factors[0] * factors[1] * factors[2])),
+            "base_rewrites": float(np.log(workload * guard)),
+            "unattributed": 0.0 if readable else t_ratio,
+        }
+        total_log = float(np.log(proj / appg))
+        scale = appg if abs(total_log) < 1e-12 else appg * float(np.expm1(total_log)) / total_log
+        points = {k: round(scale * terms[k], MISPRICING_ROUND) for k in _COMPONENT_KEYS}
+        out.append({**record, "attributed": True, "delta": round(proj - appg, MISPRICING_ROUND),
+                    "c_status": c_status, "points": points})
+    return out
+
+
+def _percentile_rank(values: Mapping[str, float]) -> Dict[str, float]:
+    """Average-rank percentile in (0, 100], ties share a rank, keys sorted first."""
+    keys = sorted(values)
+    if not keys:
+        return {}
+    ranks = pd.Series([float(values[k]) for k in keys], index=keys).rank(method="average", pct=True)
+    return {k: round(float(ranks[k]) * 100.0, MISPRICING_ROUND) for k in keys}
+
+
+def salary_implied_points(
+    salary: float, role: str, anchor: Optional[Sequence[Mapping[str, Any]]],
+    fmt: str = "classic",
+) -> Tuple[Optional[float], Optional[str]]:
+    """(points, None) from a SUPPLIED anchor band, or (None, why it is UNKNOWN).
+
+    Anchor rows are ``{"format", "role", "salary_lo", "salary_hi",
+    "implied_points", "n"}``. The fit is not this module's: the archive's mined
+    rows carry no salary, so it is a disk-bound join (R252's remainder). A band
+    thinner than ``MISPRICING_ANCHOR_MIN_N`` answers UNKNOWN, never a point.
+    """
+    if not anchor:
+        return None, "no salary anchor supplied"
+    hits = [b for b in anchor
+            if str(b.get("format", "")).lower() == fmt and str(b.get("role", "")).lower() == role
+            and float(b["salary_lo"]) <= float(salary) <= float(b["salary_hi"])]
+    if not hits:
+        return None, "no anchor band covers this salary and role"
+    band = sorted(hits, key=lambda b: (float(b["salary_lo"]), float(b["salary_hi"])))[0]
+    if int(band.get("n") or 0) < MISPRICING_ANCHOR_MIN_N:
+        return None, f"anchor band has n={int(band.get('n') or 0)} (< {MISPRICING_ANCHOR_MIN_N})"
+    return float(band["implied_points"]), None
+
+
+def _gap_ends(items: Sequence[Tuple[str, float]], names: Mapping[str, str], top: int) -> Dict[str, Any]:
+    """BUY (largest positive) and FADE (most negative) ends of one gap, id-tied."""
+    def pick(seq: Sequence[Tuple[str, float]]) -> List[Dict[str, Any]]:
+        return [{"player_id": i, "name": names[i], "value": v} for i, v in seq[:top]]
+    buy = sorted((t for t in items if t[1] > 0), key=lambda t: (-t[1], t[0]))
+    fade = sorted((t for t in items if t[1] < 0), key=lambda t: (t[1], t[0]))
+    return {"buy": pick(buy), "fade": pick(fade)}
+
+
+def mispricing_vector(
+    rows: Any,
+    *,
+    prior: Optional[Mapping[str, Any]] = None,
+    anchor: Optional[Sequence[Mapping[str, Any]]] = None,
+    xwoba_reasons: Optional[Mapping[str, str]] = None,
+    xwoba_applied: Optional[bool] = None,
+    fmt: str = "classic",
+    top: int = 10,
+) -> Dict[str, Any]:
+    """The R252 report: attribution, salary gap and field gap, side by side.
+
+    ``prior`` is an ``ownership_pred/v1`` payload: ``archetypes[<a>]
+    .own_pct_by_player_id``. The field gap is projection percentile minus
+    ownership percentile within a role, per archetype and never pooled: positive
+    means the build ranks the player higher than the field's prior does.
+    ``ends`` lists each gap's BUY and FADE ends separately; ``buy_on_both`` is
+    the doctrine's intersection (attributed (a)+(b)+(c) points above zero AND a
+    positive field gap), ordered by field gap then player id, which is a stated
+    tie-break and not a blended score.
+    """
+    frame = _as_dataframe(rows)
+    head = {"schema": MISPRICING_SCHEMA, "label": MISPRICING_LABEL, "doctrine": MISPRICING_DOCTRINE}
+    if "Position" in frame.columns and frame["Position"].astype(str).str.contains("CPT").any():
+        return {**head, "applied": False,
+                "reason": "Showdown frame: F1-F5 are not applied there, so there is nothing to attribute"}
+    try:
+        components = mispricing_components(frame, xwoba_reasons=xwoba_reasons, xwoba_applied=xwoba_applied)
+    except ValueError as exc:
+        return {**head, "applied": False, "reason": str(exc)}
+    by_id = {c["player_id"]: c for c in components}
+    names = {i: c["name"] for i, c in by_id.items()}
+    for c in components:
+        pts = c.get("points")
+        c["abc_points"] = (round(pts["a_opp_arm_platoon"] + pts["b_park"] + pts["c_xwoba_gap"],
+                                 MISPRICING_ROUND) if pts else None)
+        implied, why = salary_implied_points(c["salary"], c["role"], anchor, fmt)
+        c["salary_implied_points"] = None if implied is None else round(implied, MISPRICING_ROUND)
+        c["salary_gap"] = None if implied is None else round(c["projection"] - implied, MISPRICING_ROUND)
+        c["salary_gap_unknown"] = why
+        c["field_gap"] = {}
+
+    field: Dict[str, Any] = {"applied": False, "reason": "no ownership prior supplied", "archetypes": []}
+    archetypes = (prior or {}).get("archetypes")
+    if archetypes:
+        field = {"applied": True, "archetypes": sorted(archetypes), "unmatched_by_archetype": {}}
+        for name in sorted(archetypes):
+            own_map = {str(k): float(v) for k, v in
+                       ((archetypes[name] or {}).get("own_pct_by_player_id") or {}).items()}
+            unmatched = 0
+            for role in ("hitter", "pitcher"):
+                ids = [c["player_id"] for c in components if c["role"] == role]
+                have = [i for i in ids if i in own_map]
+                unmatched += len(ids) - len(have)
+                proj_pct = _percentile_rank({i: by_id[i]["projection"] for i in have})
+                own_pct = _percentile_rank({i: own_map[i] for i in have})
+                for i in have:
+                    by_id[i]["field_gap"][name] = {
+                        "own_pct": round(own_map[i], MISPRICING_ROUND),
+                        "own_percentile": own_pct[i], "projection_percentile": proj_pct[i],
+                        "gap": round(proj_pct[i] - own_pct[i], MISPRICING_ROUND)}
+            field["unmatched_by_archetype"][name] = unmatched
+    anchored = [c for c in components if c["salary_gap"] is not None]
+    salary = ({"applied": True, "players_anchored": len(anchored)} if anchored else
+              {"applied": False, "state": "UNKNOWN",
+               "reason": next((c["salary_gap_unknown"] for c in components if c["salary_gap_unknown"]),
+                              "no rows")})
+    ends: Dict[str, Any] = {
+        "attributed_abc_points": _gap_ends(
+            [(c["player_id"], c["abc_points"]) for c in components if c["abc_points"] is not None], names, top),
+        "salary_gap": _gap_ends([(c["player_id"], c["salary_gap"]) for c in anchored], names, top),
+        "field_gap": {}, "buy_on_both": {}}
+    for name in field["archetypes"]:
+        ends["field_gap"][name] = _gap_ends(
+            [(c["player_id"], c["field_gap"][name]["gap"]) for c in components if name in c["field_gap"]],
+            names, top)
+        both = sorted(((c["player_id"], c["field_gap"][name]["gap"]) for c in components
+                       if name in c["field_gap"] and (c["abc_points"] or 0.0) > 0
+                       and c["field_gap"][name]["gap"] > 0), key=lambda t: (-t[1], t[0]))
+        ends["buy_on_both"][name] = [
+            {"player_id": i, "name": names[i], "field_gap": g, "abc_points": by_id[i]["abc_points"]}
+            for i, g in both[:top]]
+    return {**head, "applied": True, "rows": components, "salary_gap": salary, "field_gap": field,
+            "ends": ends,
+            "counts": {"rows": len(components),
+                       "attributed": sum(1 for c in components if c["attributed"]),
+                       "c_not_attributed": sum(1 for c in components
+                                               if str(c.get("c_status", "")).startswith("not_attributed"))}}
+
+
+# --- R137: the market-vs-crowd divergence screen (review surface) -----------
+# Hitters whose HR-implied percentile (the per-event props market, Optional and
+# quota-expensive per MLB_Classic.md 14) exceeds their structural-ownership
+# percentile by a stated margin. A pure function over a SUPPLIED packet: it never
+# fetches, so it spends no credits itself and says what the packet cost only when
+# the caller reports it. Feeds candidate review; never the solver or the pool.
+# R137's own falsifier is built in: HR implieds and structural ownership both read
+# the same Vegas totals, so if they rank-correlate too tightly to separate, the
+# screen returns EMPTY and says so, and that result is the finding.
+
+HR_DIVERGENCE_SCHEMA = "hr_vs_own/v1"
+HR_DIVERGENCE_MARGIN = 25.0          # percentile points; a convention, recorded in the output
+HR_DIVERGENCE_TIGHT_RHO = 0.90       # Spearman at or above this: too tight to separate
+HR_DIVERGENCE_MIN_MATCHED = 8
+HR_DIVERGENCE_MARKET = "batter_home_runs"
+HR_DIVERGENCE_LABEL = (
+    "DETERMINISTIC REVIEW PROXY. Compares the best Over price's implied "
+    "probability on the HR market with the uncalibrated structural ownership "
+    "prior, as percentile ranks over the hitters present in both. Never an ROI, "
+    "win rate, cash rate or probability of a home run, and never a solver input.")
+
+
+def _has_price(row: Mapping[str, Any]) -> bool:
+    try:
+        return bool(np.isfinite(float(row.get("implied_prob"))))
+    except (TypeError, ValueError):
+        return False
+
+
+def hr_vs_own_divergence(
+    props_table: Sequence[Mapping[str, Any]],
+    own_pct_by_player_id: Mapping[str, float],
+    *,
+    archetype: str = "",
+    margin: float = HR_DIVERGENCE_MARGIN,
+    market: str = HR_DIVERGENCE_MARKET,
+    packet_credits: Optional[int] = None,
+    top: int = 10,
+) -> Dict[str, Any]:
+    """Rank hitters whose HR-implied percentile leads their ownership percentile.
+
+    ``props_table`` is ``live_data_adapters.build_props_implied_table`` output
+    (``player``, ``market``, ``implied_prob``, ``dk_player_id``); only the
+    ``market`` rows are read and the best Over price's ``implied_prob`` is the
+    one scale used, so a row with a vig-free value is not ranked on a different
+    scale from one without. ``own_pct_by_player_id`` is ONE archetype's block of
+    an ``ownership_pred/v1`` prior; ownership is conditioned on archetype and is
+    never pooled across them. Rows whose ``dk_player_id`` is None, or that the
+    prior does not price, are named in ``unmatched`` and never dropped silently.
+    """
+    head: Dict[str, Any] = {
+        "schema": HR_DIVERGENCE_SCHEMA, "label": HR_DIVERGENCE_LABEL, "archetype": archetype,
+        "market": market, "margin": margin, "tight_rho_threshold": HR_DIVERGENCE_TIGHT_RHO,
+        "credits": {"spent_by_this_screen": 0, "packet_credits": packet_credits,
+                    "note": "reads a supplied packet and never fetches; "
+                            "live_data_adapters.estimate_the_odds_api_props_cost prices a pull"}}
+    own = {str(k): float(v) for k, v in (own_pct_by_player_id or {}).items()}
+    rows = [r for r in props_table if str(r.get("market") or "") == market]
+    head["other_market_rows_ignored"] = len(props_table) - len(rows)
+    no_id = sorted(str(r.get("player")) for r in rows if not r.get("dk_player_id"))
+    unpriced = sorted(str(r.get("player")) for r in rows
+                      if r.get("dk_player_id") and str(r["dk_player_id"]) not in own)
+    no_price = sorted(str(r.get("player")) for r in rows
+                      if r.get("dk_player_id") and str(r["dk_player_id"]) in own and not _has_price(r))
+    head["unmatched"] = {"no_dk_player_id": no_id, "not_in_ownership_prior": unpriced,
+                         "no_implied_prob": no_price}
+    candidates = sorted((r for r in rows if r.get("dk_player_id") and str(r["dk_player_id"]) in own
+                         and _has_price(r)),
+                        key=lambda r: (str(r["dk_player_id"]), float(r["implied_prob"]), str(r.get("player"))))
+    seen: Dict[str, int] = {}
+    for r in candidates:
+        seen[str(r["dk_player_id"])] = seen.get(str(r["dk_player_id"]), 0) + 1
+    # A packet should carry one best-Over row per player; if it carries two, the larger
+    # implied probability wins (the sort puts it last) and the id is named.
+    head["duplicate_dk_player_ids"] = sorted(i for i, n in seen.items() if n > 1)
+    matched = {str(r["dk_player_id"]): r for r in candidates}
+    head["matched_hitters"] = len(matched)
+    if len(matched) < HR_DIVERGENCE_MIN_MATCHED:
+        return {**head, "applied": False, "rows": [],
+                "reason": f"only {len(matched)} hitters are in both the props packet and the "
+                          f"ownership prior (need {HR_DIVERGENCE_MIN_MATCHED})"}
+    hr_pct = _percentile_rank({i: float(r["implied_prob"]) for i, r in matched.items()})
+    own_pct = _percentile_rank({i: own[i] for i in matched})
+    rho = pd.Series([hr_pct[i] for i in sorted(matched)]).corr(
+        pd.Series([own_pct[i] for i in sorted(matched)]), method="spearman")
+    rho = None if pd.isna(rho) else round(float(rho), MISPRICING_ROUND)
+    head["spearman_rho"] = rho
+    if rho is not None and rho >= HR_DIVERGENCE_TIGHT_RHO:
+        return {**head, "applied": True, "separable": False, "rows": [],
+                "reason": f"HR implieds and structural ownership rank-correlate too tightly to "
+                          f"separate (Spearman {rho} >= {HR_DIVERGENCE_TIGHT_RHO} over "
+                          f"{len(matched)} hitters); the screen returns empty, which is the finding"}
+    listed = sorted(
+        ({"player_id": i, "name": str(matched[i].get("player")),
+          "hr_implied_pct": round(float(matched[i]["implied_prob"]) * 100.0, MISPRICING_ROUND),
+          "own_pct": round(own[i], MISPRICING_ROUND),
+          "hr_percentile": hr_pct[i], "own_percentile": own_pct[i],
+          "divergence": round(hr_pct[i] - own_pct[i], MISPRICING_ROUND)}
+         for i in matched if hr_pct[i] - own_pct[i] >= margin),
+        key=lambda r: (-r["divergence"], r["player_id"]))
+    return {**head, "applied": True, "separable": True, "rows": listed[:top],
+            "reason": "" if listed else
+            f"no hitter's HR-implied percentile leads his ownership percentile by {margin:g} points "
+            f"(Spearman {rho} over {len(matched)} hitters)"}

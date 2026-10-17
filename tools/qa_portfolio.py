@@ -4,7 +4,7 @@
 Ben, 2026-08-16: run this after every certified build and try to falsify the
 portfolio before uploading it, using data the build did not already price in.
 
-Four sections, in the order that catches the most for the least reading:
+Five sections, in the order that catches the most for the least reading:
 
   1. WHAT THE BUILD ACTUALLY APPLIED. Read from the brief's own enrichment
      self-report, not from documentation. This section exists because on
@@ -37,6 +37,13 @@ Four sections, in the order that catches the most for the least reading:
      inputs are an UNCALIBRATED v0.1 prior, so the sign of a delta is readable
      and its magnitude is not; where the prior is missing the column says
      ABSENT and why, never zero.
+
+  5. MISPRICING VECTOR (R252 a-c). Where the build's own projection departs
+     from DK's season average, by named factor (opposing arm and platoon,
+     park, the xwOBA gap), beside the gap to a salary-implied anchor and the
+     gap to the field's attention. The two gaps are separate readings and
+     never one blended rank. Classic only; the salary anchor reads UNKNOWN
+     until one is supplied.
 
 Truthful labels are not optional here. Every number this tool prints is a
 deterministic review proxy or a labeled prior. Nothing is a probability, a win
@@ -1254,6 +1261,192 @@ def _leverage_legend(sal: Dict[str, dict], have: Mapping[str, Any],
     return out
 
 
+def find_projections_file(brief: dict, explicit: Optional[str],
+                          root: Path) -> Tuple[Optional[Path], str]:
+    """(path, how it was resolved) for the run's delivered projections frame.
+
+    The brief carries the run id; the frame is `runs/<run_id>/final/
+    projections.csv`, which is gitignored and so absent on a clone. Absence is
+    named, never defaulted to another run.
+    """
+    if explicit:
+        return Path(explicit), "operator (--projections)"
+    run_id = str(brief.get("run_id") or "")
+    if not run_id:
+        return None, "the brief names no run_id, so there is no default path to try"
+    path = root / "runs" / run_id / "final" / "projections.csv"
+    if path.exists():
+        return path, f"brief run_id ({run_id})"
+    return None, (f"runs/{run_id}/final/projections.csv is not on this machine "
+                  f"(runs/ is gitignored); pass --projections to name a copy")
+
+
+def _prior_archetypes(brief: dict, prior: Optional[dict],
+                      archetype_override: Optional[str]) -> Tuple[List[str], str]:
+    """(archetypes this portfolio's contests resolve to, the reason when none).
+
+    Ownership is conditioned on archetype and never pooled, so a portfolio whose
+    contests resolve to none reports that and no per-player gap. The projection
+    is the engine's own (`ownership_prior.archetype_for_contest_shape`), never a
+    copy; an override names one archetype and must exist in the prior.
+    """
+    have = (prior or {}).get("archetypes") or {}
+    if not prior:
+        return [], "no ownership prior was found"
+    if not have or str(prior.get("schema")) != "ownership_pred/v1":
+        return [], f"the prior is schema {prior.get('schema')!r}, not ownership_pred/v1"
+    if archetype_override:
+        named = [archetype_override] if archetype_override in have else []
+        return named, f"--archetype {archetype_override!r} is not in the prior"
+    try:
+        from mlb_engine.field.ownership_prior import archetype_for_contest_shape as projector
+        projected = {projector(str(c.get("contest_shape") or ""))
+                     for c in (brief.get("contests") or [])}
+        wanted = sorted(p[0] for p in projected if p and p[0] in have)
+    except ImportError:
+        wanted = []
+    return wanted, ("no contest archetype resolved from the brief, so the ownership comparison is not "
+                    "computed rather than pooled; pass --archetype to name one")
+
+
+def _mispricing_line(row: Mapping[str, Any], key: str, value: float) -> str:
+    pts = row.get("points") or {}
+    parts = ", ".join(f"{label} {pts.get(k, 0.0):+.2f}" for label, k in
+                      (("opp arm+platoon", "a_opp_arm_platoon"), ("park", "b_park"),
+                       (str(row.get("c_label")), "c_xwoba_gap")))
+    return (f"    {str(row.get('name'))[:24]:<24} {str(row.get('position')):<6} "
+            f"{key} {value:+.2f}  [{parts}; projection {row.get('projection')} "
+            f"vs season avg {row.get('appg')}]")
+
+
+def section_mispricing(
+    brief: dict,
+    hdr: List[str],
+    projections_path: Optional[Path],
+    projections_note: str,
+    prior: Optional[dict],
+    archetype_override: Optional[str] = None,
+    top: int = 5,
+) -> List[str]:
+    """R252 (a)-(c). Where the build's projection departs from DK's season
+    average, by named factor, beside the field's attention.
+
+    Three separate readings and never one blended rank: the attribution of the
+    projection's departure from the season average (always computable from the
+    delivered frame), the gap to a salary-implied anchor (UNKNOWN until an
+    anchor is supplied: the archive's mined rows carry no salary, so the fit is
+    a disk-bound join and not this tool's), and the gap to the structural
+    ownership prior per archetype. Reports, never gates.
+    """
+    if is_showdown_header(hdr):
+        return ["MISPRICING VECTOR: ABSENT for Showdown, by design. F1-F5 are not "
+                "applied to a Showdown frame, so there is no factor attribution "
+                "to report; R254 owns the captain read."]
+    if projections_path is None:
+        return [f"MISPRICING VECTOR: ABSENT. {projections_note}."]
+    try:
+        from mlb_engine.projections.projection_builder import mispricing_vector
+        import pandas as pd
+        frame = pd.read_csv(projections_path)
+    except Exception as exc:  # noqa: BLE001
+        return [f"MISPRICING VECTOR: ABSENT. {projections_path} did not load ({exc})."]
+    neutral = (((brief.get("enrichment") or {}).get("neutral_default") or {}).get("xwoba_base") or {})
+    reasons = {str(p.get("player_id")): str(p.get("reason"))
+               for p in (neutral.get("players") or [])}
+    applied = neutral.get("applied") if "applied" in neutral else None
+
+    wanted, archetype_note = _prior_archetypes(brief, prior, archetype_override)
+    have = (prior or {}).get("archetypes") or {}
+    prior_view = {"archetypes": {a: have[a] for a in wanted}} if wanted else None
+
+    vector = mispricing_vector(frame, prior=prior_view, xwoba_reasons=reasons,
+                               xwoba_applied=applied, top=top)
+    out = [f"MISPRICING VECTOR (R252 a-c). {vector['label']}", f"  {vector['doctrine']}"]
+    if not vector.get("applied"):
+        out.append(f"  ABSENT: {vector.get('reason')}")
+        return out
+    counts = vector["counts"]
+    out.append(f"  source: {projections_path.name} ({projections_note}); {counts['rows']} rows, "
+               f"{counts['attributed']} attributed, (c) unreadable on {counts['c_not_attributed']}. "
+               f"Components are points against DK's season average; context (F1-F3) and Base "
+               f"rewrites (workload, value guard) are reported on the row and are not R252 components.")
+    by_id = {r["player_id"]: r for r in vector["rows"]}
+    ends = vector["ends"]["attributed_abc_points"]
+    for side, title in (("buy", "BUY end"), ("fade", "FADE end")):
+        out.append(f"  {title}, build-side (a)+(b)+(c) points:")
+        out.extend(_mispricing_line(by_id[e["player_id"]], "abc", e["value"]) for e in ends[side])
+        if not ends[side]:
+            out.append("    none")
+    salary = vector["salary_gap"]
+    out.append("  SALARY GAP: " + (f"{salary['players_anchored']} players anchored."
+                                   if salary.get("applied") else
+                                   f"{salary['state']}, {salary['reason']}. The fit is a disk-bound "
+                                   f"ARCHIVE join (R252 remainder), not a DEV unit."))
+    if not wanted:
+        out.append(f"  FIELD GAP: ABSENT, {archetype_note}.")
+    for name in wanted:
+        fg = vector["ends"]["field_gap"][name]
+        miss = vector["field_gap"]["unmatched_by_archetype"].get(name, 0)
+        out.append(f"  FIELD GAP [{name}] (projection percentile minus ownership percentile, "
+                   f"within role; {miss} rows had no prior):")
+        for side, title in (("buy", "BUY"), ("fade", "FADE")):
+            out.append(f"    {title}: " + ("; ".join(f"{e['name']} {e['value']:+.0f}" for e in fg[side])
+                                         or "none"))
+        both = vector["ends"]["buy_on_both"][name]
+        out.append("    BUY ON BOTH (positive build-side points AND positive field gap): "
+                   + ("; ".join(f"{e['name']} (field {e['field_gap']:+.0f}, pts {e['abc_points']:+.2f})"
+                                for e in both) or "none"))
+    return out
+
+
+def section_divergence(
+    brief: dict,
+    props_path: Optional[Path],
+    prior: Optional[dict],
+    archetype_override: Optional[str] = None,
+    top: int = 8,
+) -> List[str]:
+    """R137. Hitters the HR market prices above the field's attention, per archetype.
+
+    Printed only when a props packet is supplied: the per-event props market is
+    quota-expensive (MLB_Classic.md 14), so this tool never pulls one. The
+    packet is the JSON list `live_data_adapters.build_props_implied_table`
+    returns. Reports, never gates.
+    """
+    if props_path is None:
+        return []
+    out = ["HR-VS-OWN DIVERGENCE (R137). Hitters whose HR-implied percentile leads their "
+           "structural-ownership percentile. A deterministic review proxy over a supplied "
+           "packet and a labeled prior; never a probability of a home run, never a solver input."]
+    try:
+        packet = json.loads(Path(props_path).read_text(encoding="utf-8"))
+        table = packet.get("rows") if isinstance(packet, dict) else packet
+        if not isinstance(table, list):
+            raise ValueError("expected a JSON list of rows, or an object with a `rows` list")
+        from mlb_engine.projections.projection_builder import hr_vs_own_divergence
+    except Exception as exc:  # noqa: BLE001
+        return out + [f"  ABSENT: {props_path} did not load ({exc})."]
+    wanted, why = _prior_archetypes(brief, prior, archetype_override)
+    if not wanted:
+        return out + [f"  ABSENT: {why}."]
+    have = prior["archetypes"]
+    for name in wanted:
+        got = hr_vs_own_divergence(table, have[name].get("own_pct_by_player_id") or {},
+                                   archetype=name, top=top)
+        unmatched = got["unmatched"]
+        out.append(f"  [{name}] margin {got['margin']:g} percentile points, {got['matched_hitters']} hitters "
+                   f"matched ({len(unmatched['no_dk_player_id'])} props rows had no DK id, "
+                   f"{len(unmatched['not_in_ownership_prior'])} were not in the prior); "
+                   f"spearman {got.get('spearman_rho')}; screen spent {got['credits']['spent_by_this_screen']} credits.")
+        if not got.get("applied") or not got.get("rows"):
+            out.append(f"    EMPTY: {got.get('reason')}")
+            continue
+        for r in got["rows"]:
+            out.append(f"    {r['name'][:24]:<24} HR-implied {r['hr_implied_pct']:.1f}% (pctile {r['hr_percentile']:.0f}) "
+                       f"vs own {r['own_pct']:.1f}% (pctile {r['own_percentile']:.0f})  lead {r['divergence']:+.0f}")
+    return out
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -1264,6 +1457,13 @@ def main() -> int:
     ap.add_argument("--ownership-pred", default=None,
                     help="ownership_pred/v1 JSON for this slate; default is "
                          "outputs/<brief date>/ownership_pred_<slate tag>.json")
+    ap.add_argument("--projections", default=None,
+                    help="the run's delivered projections.csv; default is "
+                         "runs/<brief run_id>/final/projections.csv")
+    ap.add_argument("--hr-props", default=None,
+                    help="JSON list from build_props_implied_table (HR market); "
+                         "when given, prints the R137 HR-vs-ownership screen. "
+                         "This tool never pulls the quota-priced market itself")
     ap.add_argument("--archetype", default=None,
                     help="force the prior archetype for every contest in the "
                          "file, instead of projecting it from each contest's "
@@ -1302,12 +1502,22 @@ def main() -> int:
         prior_note = f"{prior_path} is not readable JSON"
     leverage = section_leverage(brief, sal, hdr, body, prior, prior_path,
                                 prior_note, Path(a.salary), a.archetype)
+    # R252. A fourth reading beside the three above: where the build's own
+    # projection departs from DK's season average, by named factor, and how that
+    # sits against the field's attention. Report only.
+    proj_path, proj_note = find_projections_file(brief, a.projections, REPO_ROOT)
+    mispricing = section_mispricing(brief, hdr, proj_path, proj_note, prior,
+                                    a.archetype)
+    divergence = section_divergence(
+        brief, Path(a.hr_props) if a.hr_props else None, prior, a.archetype)
 
     if a.as_json:
         print(json.dumps({
             "entries": len(body), "applied": applied,
             "findings": findings, "frontier": frontier,
             "leverage": leverage,
+            "mispricing": mispricing,
+            "divergence": divergence,
             "labels": "deterministic review proxies and labeled priors only; "
                       "never ROI, win rate, cash rate, or probability",
         }, indent=1))
@@ -1328,6 +1538,13 @@ def main() -> int:
     print("\n-- 4. FIELD-FACING LEVERAGE --")
     for line in leverage:
         print(f"  {line}")
+    print("\n-- 5. MISPRICING VECTOR --")
+    for line in mispricing:
+        print(f"  {line}")
+    if divergence:
+        print("\n-- 6. HR-VS-OWN DIVERGENCE --")
+        for line in divergence:
+            print(f"  {line}")
     print("\nlabels: deterministic review proxies and labeled priors only; "
           "never ROI, win rate, cash rate, or probability")
     return 0
